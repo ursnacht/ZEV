@@ -38,21 +38,8 @@ public class SolarDistribution {
         }
 
         // --- Fall B: Produktion ist kleiner als der Gesamtbedarf (Faire Verteilung) ---
-
-        // 2. Gleichmäßige Grundzuteilung (Schritt B1)
-        double pEven = solarProduction / N;
-        double allocatedPower = 0.0;
-
-        for (int i = 0; i < N; i++) {
-            double consumption = currentConsumption.get(i);
-            // Jeder erhält mindestens die Gleichverteilungsmenge oder seinen vollen Verbrauch, wenn dieser kleiner ist.
-            double initialShare = Math.min(consumption, pEven);
-            allocation.set(i, initialShare);
-            allocatedPower += initialShare;
-        }
-
-        // 3. Verteilung des Reststroms (Schritt B2 - Raffinierung)
-        double remainingPower = solarProduction - allocatedPower;
+        // Verteilung des Sroms. Zu Beginn ist der Rest gleich der Produktion
+        double remainingPower = solarProduction;
 
         // Iterativer Prozess zur Verteilung des Rests
         while (remainingPower > 1e-6) { // Verwende eine Toleranz für Double-Vergleiche
