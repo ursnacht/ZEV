@@ -4,7 +4,7 @@ Solar power distribution application for managing fair allocation of solar energ
 
 ## Prerequisites
 
-- Java 8+
+- Java 17+
 - Maven 3.6+
 - Docker & Docker Compose
 
