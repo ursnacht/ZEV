@@ -40,6 +40,7 @@ public class MesswerteController {
 
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
                 String line;
+                reader.readLine(); // Skip header line
                 while ((line = reader.readLine()) != null) {
                     String[] parts = line.split("[,;]");
                     if (parts.length >= 3) {
