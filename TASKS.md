@@ -17,3 +17,4 @@
 - Database table messwerte with entity and repository
 - POST /api/messwerte/upload endpoint for CSV upload
 - Web GUI for messwerte upload (date, typ, file selection)
+- Date auto-increment when time reaches 00:00 for monthly CSV files

@@ -34,7 +34,7 @@ public class MesswerteController {
 
         try {
             LocalDate date = LocalDate.parse(dateStr);
-            LocalTime time = LocalTime.of(0, 15);
+            LocalDateTime zeit = LocalDateTime.of(date, LocalTime.of(0, 15));
 
             List<Messwerte> messwerteList = new ArrayList<>();
 
@@ -44,12 +44,11 @@ public class MesswerteController {
                 while ((line = reader.readLine()) != null) {
                     String[] parts = line.split("[,;]");
                     if (parts.length >= 3) {
-                        LocalDateTime zeit = LocalDateTime.of(date, time);
                         Double total = Double.parseDouble(parts[1].trim());
                         Double zev = Double.parseDouble(parts[2].trim());
 
                         messwerteList.add(new Messwerte(zeit, total, zev));
-                        time = time.plusMinutes(15);
+                        zeit = zeit.plusMinutes(15);
                     }
                 }
             }
