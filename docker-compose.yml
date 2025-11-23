@@ -9,7 +9,7 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
     volumes:
-      - /data/ZEV/postgres-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     networks:
       - zev-network
     restart: unless-stopped
@@ -20,6 +20,25 @@ services:
       retries: 5
       start_period: 10s
 
+  backend-service:
+    build: ./backend-service
+    container_name: backend-service
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/zev
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - zev-network
+    restart: unless-stopped
+
 networks:
   zev-network:
     driver: bridge
+
+volumes:
+  postgres-data:

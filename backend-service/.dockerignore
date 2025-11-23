@@ -1,0 +1,6 @@
+target/
+!target/*.jar
+src/
+pom.xml
+*.md
+.git
