@@ -1,4 +1,4 @@
-package com.example;
+package ch.nacht;
 
 import java.util.Arrays;
 import java.util.List;

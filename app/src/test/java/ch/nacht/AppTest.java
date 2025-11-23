@@ -1,4 +1,4 @@
-package com.example;
+package ch.nacht;
 
 import static org.junit.Assert.assertTrue;
 
