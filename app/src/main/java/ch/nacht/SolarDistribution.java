@@ -88,8 +88,6 @@ public class SolarDistribution {
                 break;
             }
 
-            double distributedInThisIteration = 0.0;
-
             for (int i : underSuppliedIndices) {
                 double uncovered = currentConsumption.get(i) - allocation.get(i);
 
@@ -97,14 +95,7 @@ public class SolarDistribution {
                 double extraAllocation = Math.min(uncovered, share);
 
                 allocation.set(i, allocation.get(i) + extraAllocation);
-                distributedInThisIteration += extraAllocation;
-            }
-
-            remainingPower -= distributedInThisIteration;
-
-            // Wenn in einem Durchlauf kein Strom mehr verteilt wurde, beende die Schleife.
-            if (distributedInThisIteration < 1e-6) {
-                break;
+                remainingPower -= extraAllocation;
             }
         }
 
