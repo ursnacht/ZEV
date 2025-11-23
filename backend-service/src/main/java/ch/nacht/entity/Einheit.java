@@ -14,11 +14,16 @@ public class Einheit {
     @Column(name = "name", length = 30, nullable = false)
     private String name;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "typ", nullable = false)
+    private EinheitTyp typ = EinheitTyp.CONSUMER;
+
     public Einheit() {
     }
 
-    public Einheit(String name) {
+    public Einheit(String name, EinheitTyp typ) {
         this.name = name;
+        this.typ = typ;
     }
 
     public Long getId() {
@@ -37,8 +42,16 @@ public class Einheit {
         this.name = name;
     }
 
+    public EinheitTyp getTyp() {
+        return typ;
+    }
+
+    public void setTyp(EinheitTyp typ) {
+        this.typ = typ;
+    }
+
     @Override
     public String toString() {
-        return "Einheit{id=" + id + ", name='" + name + "'}";
+        return "Einheit{id=" + id + ", name='" + name + "', typ=" + typ + "}";
     }
 }
