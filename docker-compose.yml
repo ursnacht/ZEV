@@ -36,6 +36,17 @@ services:
       - zev-network
     restart: unless-stopped
 
+  frontend-edge:
+    build: ./frontend-edge
+    container_name: frontend-edge
+    ports:
+      - "4200:4200"
+    depends_on:
+      - backend-service
+    networks:
+      - zev-network
+    restart: unless-stopped
+
 networks:
   zev-network:
     driver: bridge

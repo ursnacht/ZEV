@@ -8,10 +8,16 @@ Solar power distribution application for managing fair allocation of solar energ
 - Maven 3.6+
 - Docker & Docker Compose
 
+## Architecture
+
+Multi-module Maven project:
+- **backend-service**: Spring Boot REST API (port 8080)
+- **frontend-edge**: Spring Boot serving the web UI (port 4200)
+- **frontend-app**: Angular web user interface source
+
 ## Build & Test
 
 ```bash
-cd backend-service
 mvn clean compile test
 ```
 
@@ -20,7 +26,7 @@ mvn clean compile test
 Start PostgreSQL:
 
 ```bash
-docker-compose up -d
+docker-compose up -d postgres
 ```
 
 Run Flyway migrations:
@@ -33,28 +39,43 @@ mvn flyway:migrate
 ## Run Application
 
 ```bash
-cd backend-service
-mvn spring-boot:run
+docker-compose up --build
 ```
+
+Access:
+- Frontend: http://localhost:4200
+- Backend API: http://localhost:8080
 
 ## Project Structure
 
 ```
-backend-service/
+backend-service/        # REST API backend
 ├── src/main/java/ch/nacht/
-│   ├── BackendServiceApplication.java    # Spring Boot main class
-│   ├── SolarDistribution.java            # Fair solar power distribution algorithm
+│   ├── BackendServiceApplication.java
+│   ├── SolarDistribution.java
+│   ├── config/
+│   │   └── WebConfig.java       # CORS configuration
+│   ├── controller/
+│   │   ├── MesswerteController.java
+│   │   └── PingController.java
 │   ├── entity/
-│   │   └── Einheit.java                  # JPA entity
+│   │   ├── Einheit.java
+│   │   ├── EinheitTyp.java
+│   │   └── Messwerte.java
 │   └── repository/
-│       └── EinheitRepository.java        # Spring Data repository
-├── src/test/java/ch/nacht/
-│   └── SolarDistributionTest.java
-└── src/main/resources/
-    ├── application.properties
-    └── db/migration/
-        ├── V1__create_schema_zev.sql
-        └── V2__create_table_einheit.sql
+│       ├── EinheitRepository.java
+│       └── MesswerteRepository.java
+└── src/main/resources/db/migration/
+
+frontend-edge/          # Frontend server
+└── src/main/resources/static/
+    └── index.html
+
+frontend-app/           # Frontend source (Angular)
+└── src/
+    ├── app/
+    ├── assets/
+    └── index.html
 ```
 
 ## Algorithm
