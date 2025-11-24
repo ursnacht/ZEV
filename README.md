@@ -12,8 +12,7 @@ Solar power distribution application for managing fair allocation of solar energ
 
 Multi-module Maven project:
 - **backend-service**: Spring Boot REST API (port 8080)
-- **frontend-edge**: Spring Boot serving the web UI (port 4200)
-- **frontend-app**: Angular web user interface source
+- **frontend-service**: Angular web application (port 4200)
 
 ## Build & Test
 
@@ -56,6 +55,7 @@ backend-service/        # REST API backend
 │   ├── config/
 │   │   └── WebConfig.java       # CORS configuration
 │   ├── controller/
+│   │   ├── EinheitController.java
 │   │   ├── MesswerteController.java
 │   │   └── PingController.java
 │   ├── entity/
@@ -67,15 +67,20 @@ backend-service/        # REST API backend
 │       └── MesswerteRepository.java
 └── src/main/resources/db/migration/
 
-frontend-edge/          # Frontend server
-└── src/main/resources/static/
-    └── index.html
-
-frontend-app/           # Frontend source (Angular)
-└── src/
-    ├── app/
-    ├── assets/
-    └── index.html
+frontend-service/           # Angular web application
+├── src/
+│   ├── app/
+│   │   ├── components/
+│   │   │   ├── einheit-list/
+│   │   │   ├── einheit-form/
+│   │   │   ├── messwerte-upload/
+│   │   │   └── navigation/
+│   │   ├── models/
+│   │   ├── services/
+│   │   └── app.routes.ts
+│   └── index.html
+├── Dockerfile
+└── nginx.conf
 ```
 
 ## Algorithm

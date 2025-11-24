@@ -1,0 +1,39 @@
+<div class="form-container">
+  <h2>{{ formData.id ? 'Einheit bearbeiten' : 'Neue Einheit erstellen' }}</h2>
+
+  <form (ngSubmit)="onSubmit()">
+    <div class="form-group">
+      <label for="name">Name:</label>
+      <input
+        type="text"
+        id="name"
+        [(ngModel)]="formData.name"
+        name="name"
+        required
+        maxlength="30"
+        placeholder="Einheit Name"
+      />
+      <div class="error" *ngIf="!formData.name.trim()">
+        Name ist erforderlich
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="typ">Typ:</label>
+      <select id="typ" [(ngModel)]="formData.typ" name="typ" required>
+        <option *ngFor="let option of einheitTypOptions" [value]="option.value">
+          {{ option.label }}
+        </option>
+      </select>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="primary" [disabled]="!formData.name.trim()">
+        {{ formData.id ? 'Aktualisieren' : 'Erstellen' }}
+      </button>
+      <button type="button" class="secondary" (click)="onCancel()">
+        Abbrechen
+      </button>
+    </div>
+  </form>
+</div>

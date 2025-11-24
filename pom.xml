@@ -19,7 +19,6 @@
 
   <modules>
     <module>backend-service</module>
-    <module>frontend-edge</module>
   </modules>
 
   <properties>

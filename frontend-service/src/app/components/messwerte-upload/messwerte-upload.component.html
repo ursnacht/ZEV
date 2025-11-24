@@ -1,0 +1,31 @@
+<div class="container">
+  <h1>ZEV Messwerte Upload</h1>
+
+  <div *ngIf="message" class="message" [ngClass]="messageType">
+    {{ message }}
+  </div>
+
+  <form (ngSubmit)="onSubmit()">
+    <div class="form-group">
+      <label for="date">Datum:</label>
+      <input type="date" id="date" name="date" [(ngModel)]="date" required>
+    </div>
+
+    <div class="form-group">
+      <label for="typ">Typ:</label>
+      <select id="typ" name="typ" [(ngModel)]="typ" required>
+        <option value="PRODUCER">Producer</option>
+        <option value="CONSUMER">Consumer</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="file">CSV Datei:</label>
+      <input type="file" id="file" name="file" accept=".csv" (change)="onFileChange($event)" required>
+    </div>
+
+    <button type="submit" class="primary" [disabled]="uploading || !date || !file">
+      {{ uploading ? 'Uploading...' : 'Upload' }}
+    </button>
+  </form>
+</div>
