@@ -12,10 +12,11 @@
     </div>
 
     <div class="form-group">
-      <label for="typ">Typ:</label>
-      <select id="typ" name="typ" [(ngModel)]="typ" required>
-        <option value="PRODUCER">Producer</option>
-        <option value="CONSUMER">Consumer</option>
+      <label for="einheit">Einheit:</label>
+      <select id="einheit" name="einheit" [(ngModel)]="einheitId" required>
+        <option *ngFor="let einheit of einheiten" [value]="einheit.id">
+          {{ einheit.name }} ({{ einheit.typ }})
+        </option>
       </select>
     </div>
 
@@ -24,7 +25,7 @@
       <input type="file" id="file" name="file" accept=".csv" (change)="onFileChange($event)" required>
     </div>
 
-    <button type="submit" class="primary" [disabled]="uploading || !date || !file">
+    <button type="submit" class="primary" [disabled]="uploading || !date || !einheitId || !file">
       {{ uploading ? 'Uploading...' : 'Upload' }}
     </button>
   </form>

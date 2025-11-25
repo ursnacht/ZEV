@@ -21,13 +21,18 @@ public class Messwerte {
     @Column(name = "zev", nullable = false)
     private Double zev;
 
+    @ManyToOne
+    @JoinColumn(name = "einheit_id")
+    private Einheit einheit;
+
     public Messwerte() {
     }
 
-    public Messwerte(LocalDateTime zeit, Double total, Double zev) {
+    public Messwerte(LocalDateTime zeit, Double total, Double zev, Einheit einheit) {
         this.zeit = zeit;
         this.total = total;
         this.zev = zev;
+        this.einheit = einheit;
     }
 
     public Long getId() {
@@ -62,8 +67,16 @@ public class Messwerte {
         this.zev = zev;
     }
 
+    public Einheit getEinheit() {
+        return einheit;
+    }
+
+    public void setEinheit(Einheit einheit) {
+        this.einheit = einheit;
+    }
+
     @Override
     public String toString() {
-        return "Messwerte{id=" + id + ", zeit=" + zeit + ", total=" + total + ", zev=" + zev + "}";
+        return "Messwerte{id=" + id + ", zeit=" + zeit + ", total=" + total + ", zev=" + zev + ", einheit=" + (einheit != null ? einheit.getId() : null) + "}";
     }
 }

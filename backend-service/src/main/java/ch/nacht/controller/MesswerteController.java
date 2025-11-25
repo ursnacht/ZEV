@@ -1,7 +1,8 @@
 package ch.nacht.controller;
 
-import ch.nacht.entity.EinheitTyp;
+import ch.nacht.entity.Einheit;
 import ch.nacht.entity.Messwerte;
+import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,18 +22,24 @@ import java.util.Map;
 public class MesswerteController {
 
     private final MesswerteRepository messwerteRepository;
+    private final EinheitRepository einheitRepository;
 
-    public MesswerteController(MesswerteRepository messwerteRepository) {
+    public MesswerteController(MesswerteRepository messwerteRepository, EinheitRepository einheitRepository) {
         this.messwerteRepository = messwerteRepository;
+        this.einheitRepository = einheitRepository;
     }
 
     @PostMapping("/upload")
     public ResponseEntity<Map<String, Object>> uploadCsv(
             @RequestParam("date") String dateStr,
-            @RequestParam("typ") EinheitTyp typ,
+            @RequestParam("einheitId") Long einheitId,
             @RequestParam("file") MultipartFile file) {
 
         try {
+            // Fetch the Einheit entity
+            Einheit einheit = einheitRepository.findById(einheitId)
+                .orElseThrow(() -> new RuntimeException("Einheit not found with id: " + einheitId));
+
             LocalDate date = LocalDate.parse(dateStr);
             LocalDateTime zeit = LocalDateTime.of(date, LocalTime.of(0, 15));
 
@@ -47,7 +54,7 @@ public class MesswerteController {
                         Double total = Double.parseDouble(parts[1].trim());
                         Double zev = Double.parseDouble(parts[2].trim());
 
-                        messwerteList.add(new Messwerte(zeit, total, zev));
+                        messwerteList.add(new Messwerte(zeit, total, zev, einheit));
                         zeit = zeit.plusMinutes(15);
                     }
                 }
@@ -58,7 +65,8 @@ public class MesswerteController {
             return ResponseEntity.ok(Map.of(
                 "status", "success",
                 "count", messwerteList.size(),
-                "typ", typ.name()
+                "einheitId", einheitId,
+                "einheitName", einheit.getName()
             ));
 
         } catch (Exception e) {
