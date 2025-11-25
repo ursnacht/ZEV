@@ -35,8 +35,28 @@ public class SolarDistribution {
         if (solarProduction >= totalConsumption) {
             // Jeder erhält seinen vollen Bedarf aus der Solaranlage.
             for (int i = 0; i < N; i++) {
-                allocation.set(i, currentConsumption.get(i));
+                allocation.set(i, round3(currentConsumption.get(i)));
             }
+
+            // Adjust for rounding errors: ensure total distributed equals total consumption
+            double totalDistributed = allocation.stream().mapToDouble(Double::doubleValue).sum();
+            double difference = round3(totalConsumption - totalDistributed);
+
+            if (Math.abs(difference) > 0.0) {
+                // Find the consumer with the highest consumption
+                int maxConsumptionIndex = 0;
+                double maxConsumption = currentConsumption.get(0);
+                for (int i = 1; i < N; i++) {
+                    if (currentConsumption.get(i) > maxConsumption) {
+                        maxConsumption = currentConsumption.get(i);
+                        maxConsumptionIndex = i;
+                    }
+                }
+                // Adjust the allocation for the highest consumer
+                double adjusted = round3(allocation.get(maxConsumptionIndex) + difference);
+                allocation.set(maxConsumptionIndex, adjusted);
+            }
+
             // Überschuss = solarProduction - totalConsumption (wird hier nicht zurückgegeben, aber existiert)
             return allocation;
         }
@@ -90,7 +110,38 @@ public class SolarDistribution {
             }
         }
 
+        // Round all allocations to 3 decimal places
+        for (int i = 0; i < N; i++) {
+            allocation.set(i, round3(allocation.get(i)));
+        }
+
+        // Adjust for rounding errors: ensure total distributed equals solar production
+        double totalDistributed = allocation.stream().mapToDouble(Double::doubleValue).sum();
+        double difference = round3(solarProduction - totalDistributed);
+
+        if (Math.abs(difference) > 0.0) {
+            // Find the consumer with the highest consumption
+            int maxConsumptionIndex = 0;
+            double maxConsumption = currentConsumption.get(0);
+            for (int i = 1; i < N; i++) {
+                if (currentConsumption.get(i) > maxConsumption) {
+                    maxConsumption = currentConsumption.get(i);
+                    maxConsumptionIndex = i;
+                }
+            }
+            // Adjust the allocation for the highest consumer
+            double adjusted = round3(allocation.get(maxConsumptionIndex) + difference);
+            allocation.set(maxConsumptionIndex, adjusted);
+        }
+
         return allocation;
+    }
+
+    /**
+     * Rounds a value to 3 decimal places.
+     */
+    private static double round3(double value) {
+        return Math.round(value * 1000.0) / 1000.0;
     }
 
     // --- Beispiel-Hauptmethode ---

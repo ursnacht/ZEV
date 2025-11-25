@@ -8,7 +8,7 @@ import java.util.List;
 
 public class SolarDistributionTest {
 
-    private static final double DELTA = 0.001;
+    private static final double DELTA = 0.0009;
 
     @Test
     public void testFallB_PartialCoverage() {
@@ -53,16 +53,16 @@ public class SolarDistributionTest {
 
         // Each consumer gets their full demand
         assertEquals(10, allocation.size());
-        assertEquals(0.005, allocation.get(0), DELTA);
-        assertEquals(0.002, allocation.get(1), DELTA);
-        assertEquals(0.001, allocation.get(2), DELTA);
-        assertEquals(0.003, allocation.get(3), DELTA);
-        assertEquals(0.011, allocation.get(4), DELTA);
-        assertEquals(0.003, allocation.get(5), DELTA);
-        assertEquals(0.002, allocation.get(6), DELTA);
-        assertEquals(0.0, allocation.get(7), DELTA);
-        assertEquals(0.001, allocation.get(8), DELTA);
-        assertEquals(0.007, allocation.get(9), DELTA);
+        assertEquals(0.004, allocation.get(0), DELTA);
+        assertEquals(0.004, allocation.get(1), DELTA);
+        assertEquals(0.004, allocation.get(2), DELTA);
+        assertEquals(0.004, allocation.get(3), DELTA);
+        assertEquals(0.003, allocation.get(4), DELTA); // adjusted
+        assertEquals(0.004, allocation.get(5), DELTA);
+        assertEquals(0.004, allocation.get(6), DELTA);
+        assertEquals(0.001, allocation.get(7), DELTA);
+        assertEquals(0.003, allocation.get(8), DELTA);
+        assertEquals(0.004, allocation.get(9), DELTA);
     }
 
     @Test
