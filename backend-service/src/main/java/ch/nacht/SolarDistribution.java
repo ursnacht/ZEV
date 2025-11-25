@@ -39,6 +39,8 @@ public class SolarDistribution {
             }
 
             // Adjust for rounding errors: ensure total distributed equals total consumption
+            return adjustRounding(allocation, totalConsumption, currentConsumption);
+            /*
             double totalDistributed = allocation.stream().mapToDouble(Double::doubleValue).sum();
             double difference = round3(totalConsumption - totalDistributed);
 
@@ -59,6 +61,7 @@ public class SolarDistribution {
 
             // Überschuss = solarProduction - totalConsumption (wird hier nicht zurückgegeben, aber existiert)
             return allocation;
+             */
         }
 
         // --- Fall B: Produktion ist kleiner als der Gesamtbedarf (Faire Verteilung) ---
@@ -116,6 +119,8 @@ public class SolarDistribution {
         }
 
         // Adjust for rounding errors: ensure total distributed equals solar production
+        return adjustRounding(allocation, solarProduction, currentConsumption);
+        /*
         double totalDistributed = allocation.stream().mapToDouble(Double::doubleValue).sum();
         double difference = round3(solarProduction - totalDistributed);
 
@@ -135,6 +140,7 @@ public class SolarDistribution {
         }
 
         return allocation;
+         */
     }
 
     /**
@@ -142,6 +148,30 @@ public class SolarDistribution {
      */
     private static double round3(double value) {
         return Math.round(value * 1000.0) / 1000.0;
+    }
+
+    private static List<Double> adjustRounding(List<Double> allocation, double targetAmount, List<Double> currentConsumption) {
+        // Adjust for rounding errors: ensure total distributed equals target amount
+        double totalDistributed = allocation.stream().mapToDouble(Double::doubleValue).sum();
+        double difference = round3(targetAmount - totalDistributed);
+        int N = currentConsumption.size();
+
+        if (Math.abs(difference) > 0.0) {
+            // Find the consumer with the highest consumption
+            int maxConsumptionIndex = 0;
+            double maxConsumption = currentConsumption.get(0);
+            for (int i = 1; i < N; i++) {
+                if (currentConsumption.get(i) > maxConsumption) {
+                    maxConsumption = currentConsumption.get(i);
+                    maxConsumptionIndex = i;
+                }
+            }
+            // Adjust the allocation for the highest consumer
+            double adjusted = round3(allocation.get(maxConsumptionIndex) + difference);
+            allocation.set(maxConsumptionIndex, adjusted);
+        }
+
+        return allocation;
     }
 
     // --- Beispiel-Hauptmethode ---
