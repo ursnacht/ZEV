@@ -17,7 +17,11 @@ public class SolarDistribution {
         int N = currentConsumption.size();
         if (N == 0 || solarProduction <= 0) {
             // Keine Verbraucher oder keine Produktion.
-            return new ArrayList<>(Arrays.asList(new Double[N]));
+            List<Double> zeros = new ArrayList<>(N);
+            for (int i = 0; i < N; i++) {
+                zeros.add(0.0);
+            }
+            return zeros;
         }
 
         // 1. Berechnung des Gesamtverbrauchs und Initialisierung der Zuteilung

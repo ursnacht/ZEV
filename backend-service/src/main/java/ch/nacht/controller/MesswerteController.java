@@ -4,6 +4,7 @@ import ch.nacht.entity.Einheit;
 import ch.nacht.entity.Messwerte;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
+import ch.nacht.service.MesswerteService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,10 +24,12 @@ public class MesswerteController {
 
     private final MesswerteRepository messwerteRepository;
     private final EinheitRepository einheitRepository;
+    private final MesswerteService messwerteService;
 
-    public MesswerteController(MesswerteRepository messwerteRepository, EinheitRepository einheitRepository) {
+    public MesswerteController(MesswerteRepository messwerteRepository, EinheitRepository einheitRepository, MesswerteService messwerteService) {
         this.messwerteRepository = messwerteRepository;
         this.einheitRepository = einheitRepository;
+        this.messwerteService = messwerteService;
     }
 
     @PostMapping("/upload")
@@ -51,8 +54,8 @@ public class MesswerteController {
                 while ((line = reader.readLine()) != null) {
                     String[] parts = line.split("[,;]");
                     if (parts.length >= 3) {
-                        Double total = Double.parseDouble(parts[1].trim());
-                        Double zev = Double.parseDouble(parts[2].trim());
+                        Double total = Math.abs(Double.parseDouble(parts[1].trim()));
+                        Double zev = Math.abs(Double.parseDouble(parts[2].trim()));
 
                         messwerteList.add(new Messwerte(zeit, total, zev, einheit));
                         zeit = zeit.plusMinutes(15);
@@ -67,6 +70,40 @@ public class MesswerteController {
                 "count", messwerteList.size(),
                 "einheitId", einheitId,
                 "einheitName", einheit.getName()
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "status", "error",
+                "message", e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/calculate-distribution")
+    public ResponseEntity<Map<String, Object>> calculateDistribution(
+            @RequestParam("dateFrom") String dateFromStr,
+            @RequestParam("dateTo") String dateToStr) {
+
+        try {
+            LocalDate dateFrom = LocalDate.parse(dateFromStr);
+            LocalDate dateTo = LocalDate.parse(dateToStr);
+
+            // Convert to LocalDateTime (start of day and end of day)
+            LocalDateTime dateTimeFrom = dateFrom.atStartOfDay();
+            LocalDateTime dateTimeTo = dateTo.atTime(23, 59, 59);
+
+            // Call the service to calculate distribution
+            MesswerteService.CalculationResult result = messwerteService.calculateSolarDistribution(dateTimeFrom, dateTimeTo);
+
+            return ResponseEntity.ok(Map.of(
+                "status", "success",
+                "processedTimestamps", result.getProcessedTimestamps(),
+                "processedRecords", result.getProcessedRecords(),
+                "dateFrom", result.getDateFrom().toString(),
+                "dateTo", result.getDateTo().toString(),
+                "totalSolarProduced", result.getTotalSolarProduced(),
+                "totalDistributed", result.getTotalDistributed()
             ));
 
         } catch (Exception e) {

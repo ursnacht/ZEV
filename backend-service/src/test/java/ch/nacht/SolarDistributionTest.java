@@ -45,6 +45,27 @@ public class SolarDistributionTest {
     }
 
     @Test
+    public void test() {
+        double solarProduction = 0.035;
+        List<Double> consumption = Arrays.asList(0.019, 0.008, 0.005, 0.009, 0.038, 0.011, 0.008, 0.001, 0.003, 0.024);
+
+        List<Double> allocation = SolarDistribution.distributeSolarPower(solarProduction, consumption);
+
+        // Each consumer gets their full demand
+        assertEquals(10, allocation.size());
+        assertEquals(0.005, allocation.get(0), DELTA);
+        assertEquals(0.002, allocation.get(1), DELTA);
+        assertEquals(0.001, allocation.get(2), DELTA);
+        assertEquals(0.003, allocation.get(3), DELTA);
+        assertEquals(0.011, allocation.get(4), DELTA);
+        assertEquals(0.003, allocation.get(5), DELTA);
+        assertEquals(0.002, allocation.get(6), DELTA);
+        assertEquals(0.0, allocation.get(7), DELTA);
+        assertEquals(0.001, allocation.get(8), DELTA);
+        assertEquals(0.007, allocation.get(9), DELTA);
+    }
+
+    @Test
     public void testNoProduction() {
         double solarProduction = 0.0;
         List<Double> consumption = Arrays.asList(2.0, 3.0);

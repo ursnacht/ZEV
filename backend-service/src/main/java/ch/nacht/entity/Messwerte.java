@@ -21,6 +21,9 @@ public class Messwerte {
     @Column(name = "zev", nullable = false)
     private Double zev;
 
+    @Column(name = "zev_calculated")
+    private Double zevCalculated;
+
     @ManyToOne
     @JoinColumn(name = "einheit_id")
     private Einheit einheit;
@@ -67,6 +70,14 @@ public class Messwerte {
         this.zev = zev;
     }
 
+    public Double getZevCalculated() {
+        return zevCalculated;
+    }
+
+    public void setZevCalculated(Double zevCalculated) {
+        this.zevCalculated = zevCalculated;
+    }
+
     public Einheit getEinheit() {
         return einheit;
     }
@@ -77,6 +88,6 @@ public class Messwerte {
 
     @Override
     public String toString() {
-        return "Messwerte{id=" + id + ", zeit=" + zeit + ", total=" + total + ", zev=" + zev + ", einheit=" + (einheit != null ? einheit.getId() : null) + "}";
+        return "Messwerte{id=" + id + ", zeit=" + zeit + ", total=" + total + ", zev=" + zev + ", zevCalculated=" + zevCalculated + ", einheit=" + (einheit != null ? einheit.getId() : null) + "}";
     }
 }
