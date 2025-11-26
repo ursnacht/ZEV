@@ -17,7 +17,7 @@ export class EinheitListComponent implements OnInit {
   showForm = false;
   message = '';
   messageType: 'success' | 'error' = 'success';
-  sortColumn: 'id' | 'name' | 'typ' | null = null;
+  sortColumn: 'id' | 'name' | 'typ' | null = 'name';
   sortDirection: 'asc' | 'desc' = 'asc';
 
   constructor(private einheitService: EinheitService) {}

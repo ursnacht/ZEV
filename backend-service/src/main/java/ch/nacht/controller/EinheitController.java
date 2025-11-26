@@ -21,7 +21,7 @@ public class EinheitController {
 
     @GetMapping
     public List<Einheit> getAllEinheiten() {
-        return einheitRepository.findAll();
+        return einheitRepository.findAllByOrderByNameAsc();
     }
 
     @GetMapping("/{id}")
