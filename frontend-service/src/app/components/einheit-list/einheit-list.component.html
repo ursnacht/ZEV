@@ -11,9 +11,24 @@
     <table *ngIf="einheiten.length > 0">
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Name</th>
-          <th>Typ</th>
+          <th class="sortable" (click)="onSort('id')">
+            ID
+            <span class="sort-indicator" *ngIf="sortColumn === 'id'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+          <th class="sortable" (click)="onSort('name')">
+            Name
+            <span class="sort-indicator" *ngIf="sortColumn === 'name'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+          <th class="sortable" (click)="onSort('typ')">
+            Typ
+            <span class="sort-indicator" *ngIf="sortColumn === 'typ'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
           <th>Aktionen</th>
         </tr>
       </thead>

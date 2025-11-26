@@ -17,6 +17,8 @@ export class EinheitListComponent implements OnInit {
   showForm = false;
   message = '';
   messageType: 'success' | 'error' = 'success';
+  sortColumn: 'id' | 'name' | 'typ' | null = null;
+  sortDirection: 'asc' | 'desc' = 'asc';
 
   constructor(private einheitService: EinheitService) {}
 
@@ -90,6 +92,36 @@ export class EinheitListComponent implements OnInit {
   onFormCancel(): void {
     this.showForm = false;
     this.selectedEinheit = null;
+  }
+
+  onSort(column: 'id' | 'name' | 'typ'): void {
+    if (this.sortColumn === column) {
+      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortColumn = column;
+      this.sortDirection = 'asc';
+    }
+
+    this.einheiten.sort((a, b) => {
+      let aValue: any = a[column];
+      let bValue: any = b[column];
+
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      if (typeof aValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+
+      if (aValue < bValue) {
+        return this.sortDirection === 'asc' ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return this.sortDirection === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
   }
 
   private showMessage(message: string, type: 'success' | 'error'): void {

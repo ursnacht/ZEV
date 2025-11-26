@@ -33,7 +33,11 @@ export class MesswerteUploadComponent implements OnInit {
   loadEinheiten(): void {
     this.einheitService.getAllEinheiten().subscribe({
       next: (data) => {
-        this.einheiten = data;
+        this.einheiten = data.sort((a, b) => {
+          const nameA = (a.name || '').toLowerCase();
+          const nameB = (b.name || '').toLowerCase();
+          return nameA.localeCompare(nameB);
+        });
         if (this.einheiten.length > 0) {
           this.einheitId = this.einheiten[0].id || null;
         }
