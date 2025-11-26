@@ -8,7 +8,7 @@
   <form (ngSubmit)="onSubmit()">
     <div class="form-group">
       <label for="dateFrom">Von Datum:</label>
-      <input type="date" id="dateFrom" name="dateFrom" [(ngModel)]="dateFrom" required>
+      <input type="date" id="dateFrom" name="dateFrom" [(ngModel)]="dateFrom" (ngModelChange)="onDateFromChange()" required>
     </div>
 
     <div class="form-group">

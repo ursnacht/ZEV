@@ -20,6 +20,19 @@ export class SolarCalculationComponent {
 
   constructor(private messwerteService: MesswerteService) {}
 
+  onDateFromChange(): void {
+    if (this.dateFrom) {
+      const date = new Date(this.dateFrom);
+      // Get last day of the month
+      const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+      // Format as YYYY-MM-DD using local date components
+      const year = lastDay.getFullYear();
+      const month = String(lastDay.getMonth() + 1).padStart(2, '0');
+      const day = String(lastDay.getDate()).padStart(2, '0');
+      this.dateTo = `${year}-${month}-${day}`;
+    }
+  }
+
   onSubmit(): void {
     if (!this.dateFrom || !this.dateTo) {
       this.showMessage('Bitte beide Daten ausfüllen', 'error');
