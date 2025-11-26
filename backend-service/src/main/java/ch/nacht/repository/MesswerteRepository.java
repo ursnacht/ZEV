@@ -1,5 +1,6 @@
 package ch.nacht.repository;
 
+import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Messwerte;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,4 +19,7 @@ public interface MesswerteRepository extends JpaRepository<Messwerte, Long> {
 
     @Query("SELECT m FROM Messwerte m WHERE m.zeit = :zeit AND m.einheit.typ = :typ")
     List<Messwerte> findByZeitAndEinheitTyp(@Param("zeit") LocalDateTime zeit, @Param("typ") EinheitTyp typ);
+
+    @Query("SELECT m FROM Messwerte m WHERE m.einheit = :einheit AND m.zeit BETWEEN :dateFrom AND :dateTo ORDER BY m.zeit")
+    List<Messwerte> findByEinheitAndZeitBetween(@Param("einheit") Einheit einheit, @Param("dateFrom") LocalDateTime dateFrom, @Param("dateTo") LocalDateTime dateTo);
 }

@@ -13,6 +13,11 @@ export interface CalculationResponse {
   message?: string;
 }
 
+export interface MesswertData {
+  zeit: string;
+  total: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -27,5 +32,14 @@ export class MesswerteService {
       .set('dateTo', dateTo);
 
     return this.http.post<CalculationResponse>(`${this.apiUrl}/calculate-distribution`, null, { params });
+  }
+
+  getMesswerteByEinheit(einheitId: number, dateFrom: string, dateTo: string): Observable<MesswertData[]> {
+    const params = new HttpParams()
+      .set('einheitId', einheitId.toString())
+      .set('dateFrom', dateFrom)
+      .set('dateTo', dateTo);
+
+    return this.http.get<MesswertData[]>(`${this.apiUrl}/by-einheit`, { params });
   }
 }

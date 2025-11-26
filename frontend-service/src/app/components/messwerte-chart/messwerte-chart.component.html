@@ -1,0 +1,36 @@
+<div class="container">
+  <h1>Messwerte Grafik</h1>
+
+  <div *ngIf="message" class="message" [ngClass]="messageType">
+    {{ message }}
+  </div>
+
+  <form (ngSubmit)="onSubmit()">
+    <div class="form-group">
+      <label for="einheit">Einheit:</label>
+      <select id="einheit" name="einheit" [(ngModel)]="einheitId" required>
+        <option *ngFor="let einheit of einheiten" [value]="einheit.id">
+          {{ einheit.name }} ({{ einheit.typ }})
+        </option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="dateFrom">Von Datum:</label>
+      <input type="date" id="dateFrom" name="dateFrom" [(ngModel)]="dateFrom" (ngModelChange)="onDateFromChange()" required>
+    </div>
+
+    <div class="form-group">
+      <label for="dateTo">Bis Datum:</label>
+      <input type="date" id="dateTo" name="dateTo" [(ngModel)]="dateTo" required>
+    </div>
+
+    <button type="submit" class="primary" [disabled]="loading || !dateFrom || !dateTo || !einheitId">
+      {{ loading ? 'Lade Daten...' : 'Anzeigen' }}
+    </button>
+  </form>
+
+  <div class="chart-container">
+    <canvas #chartCanvas></canvas>
+  </div>
+</div>

@@ -113,4 +113,36 @@ public class MesswerteController {
             ));
         }
     }
+
+    @GetMapping("/by-einheit")
+    public ResponseEntity<List<Map<String, Object>>> getMesswerteByEinheit(
+            @RequestParam("einheitId") Long einheitId,
+            @RequestParam("dateFrom") String dateFromStr,
+            @RequestParam("dateTo") String dateToStr) {
+
+        try {
+            LocalDate dateFrom = LocalDate.parse(dateFromStr);
+            LocalDate dateTo = LocalDate.parse(dateToStr);
+
+            LocalDateTime dateTimeFrom = dateFrom.atStartOfDay();
+            LocalDateTime dateTimeTo = dateTo.atTime(23, 59, 59);
+
+            Einheit einheit = einheitRepository.findById(einheitId)
+                .orElseThrow(() -> new RuntimeException("Einheit not found"));
+
+            List<Messwerte> messwerte = messwerteRepository.findByEinheitAndZeitBetween(einheit, dateTimeFrom, dateTimeTo);
+
+            List<Map<String, Object>> result = messwerte.stream()
+                .map(m -> Map.<String, Object>of(
+                    "zeit", m.getZeit().toString(),
+                    "total", m.getTotal()
+                ))
+                .toList();
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
 }
