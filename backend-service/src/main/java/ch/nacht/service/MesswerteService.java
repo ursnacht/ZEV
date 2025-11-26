@@ -1,23 +1,86 @@
 package ch.nacht.service;
 
 import ch.nacht.SolarDistribution;
+import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Messwerte;
+import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 public class MesswerteService {
 
     private final MesswerteRepository messwerteRepository;
+    private final EinheitRepository einheitRepository;
 
-    public MesswerteService(MesswerteRepository messwerteRepository) {
+    public MesswerteService(MesswerteRepository messwerteRepository, EinheitRepository einheitRepository) {
         this.messwerteRepository = messwerteRepository;
+        this.einheitRepository = einheitRepository;
+    }
+
+    @Transactional
+    public Map<String, Object> processCsvUpload(MultipartFile file, Long einheitId, String dateStr) throws Exception {
+        // Fetch the Einheit entity
+        Einheit einheit = einheitRepository.findById(einheitId)
+                .orElseThrow(() -> new RuntimeException("Einheit not found with id: " + einheitId));
+
+        LocalDate date = LocalDate.parse(dateStr);
+        LocalDateTime zeit = LocalDateTime.of(date, LocalTime.of(0, 15));
+
+        List<Messwerte> messwerteList = new ArrayList<>();
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
+            String line;
+            reader.readLine(); // Skip header line
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split("[,;]");
+                if (parts.length >= 3) {
+                    Double total = Math.abs(Double.parseDouble(parts[1].trim()));
+                    Double zev = Math.abs(Double.parseDouble(parts[2].trim()));
+
+                    messwerteList.add(new Messwerte(zeit, total, zev, einheit));
+                    zeit = zeit.plusMinutes(15);
+                }
+            }
+        }
+
+        messwerteRepository.saveAll(messwerteList);
+
+        return Map.of(
+                "status", "success",
+                "count", messwerteList.size(),
+                "einheitId", einheitId,
+                "einheitName", einheit.getName());
+    }
+
+    public List<Map<String, Object>> getMesswerteByEinheit(Long einheitId, LocalDate dateFrom, LocalDate dateTo) {
+        LocalDateTime dateTimeFrom = dateFrom.atStartOfDay();
+        LocalDateTime dateTimeTo = dateTo.atTime(23, 59, 59);
+
+        Einheit einheit = einheitRepository.findById(einheitId)
+                .orElseThrow(() -> new RuntimeException("Einheit not found"));
+
+        List<Messwerte> messwerte = messwerteRepository.findByEinheitAndZeitBetween(einheit, dateTimeFrom, dateTimeTo);
+
+        return messwerte.stream()
+                .map(m -> Map.<String, Object>of(
+                        "zeit", m.getZeit().toString(),
+                        "total", m.getTotal()))
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -27,8 +90,8 @@ public class MesswerteService {
 
         int processedTimestamps = 0;
         int processedRecords = 0;
-        double totalSolarProduced = 0.0;
-        double totalDistributed = 0.0;
+        BigDecimal totalSolarProduced = BigDecimal.ZERO;
+        BigDecimal totalDistributed = BigDecimal.ZERO;
 
         // Process each timestamp
         for (LocalDateTime zeit : distinctZeiten) {
@@ -41,11 +104,11 @@ public class MesswerteService {
             }
 
             // Calculate total solar production at this timestamp
-            double solarProduction = producers.stream()
-                    .mapToDouble(Messwerte::getTotal)
-                    .sum();
+            BigDecimal solarProduction = producers.stream()
+                    .map(m -> BigDecimal.valueOf(m.getTotal()))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            totalSolarProduced += solarProduction;
+            totalSolarProduced = totalSolarProduced.add(solarProduction);
 
             // Get all consumers for this timestamp
             List<Messwerte> consumers = messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER);
@@ -56,20 +119,20 @@ public class MesswerteService {
             }
 
             // Get consumption values
-            List<Double> consumptions = consumers.stream()
-                    .map(Messwerte::getTotal)
+            List<BigDecimal> consumptions = consumers.stream()
+                    .map(m -> BigDecimal.valueOf(m.getTotal()))
                     .collect(Collectors.toList());
 
             // Calculate distribution using the existing algorithm
-            List<Double> distributions = SolarDistribution.distributeSolarPower(solarProduction, consumptions);
+            List<BigDecimal> distributions = SolarDistribution.distributeSolarPower(solarProduction, consumptions);
 
             // Update zev_calculated for each consumer
             for (int i = 0; i < consumers.size(); i++) {
                 Messwerte consumer = consumers.get(i);
-                Double distributedAmount = distributions.get(i);
-                consumer.setZevCalculated(distributedAmount);
+                BigDecimal distributedAmount = distributions.get(i);
+                consumer.setZevCalculated(distributedAmount.doubleValue());
                 messwerteRepository.save(consumer);
-                totalDistributed += distributedAmount;
+                totalDistributed = totalDistributed.add(distributedAmount);
                 processedRecords++;
             }
 
@@ -81,9 +144,8 @@ public class MesswerteService {
                 processedRecords,
                 dateFrom,
                 dateTo,
-                totalSolarProduced,
-                totalDistributed
-        );
+                totalSolarProduced.doubleValue(),
+                totalDistributed.doubleValue());
     }
 
     public static class CalculationResult {
@@ -95,7 +157,7 @@ public class MesswerteService {
         private final double totalDistributed;
 
         public CalculationResult(int processedTimestamps, int processedRecords, LocalDateTime dateFrom,
-                                 LocalDateTime dateTo, double totalSolarProduced, double totalDistributed) {
+                LocalDateTime dateTo, double totalSolarProduced, double totalDistributed) {
             this.processedTimestamps = processedTimestamps;
             this.processedRecords = processedRecords;
             this.dateFrom = dateFrom;

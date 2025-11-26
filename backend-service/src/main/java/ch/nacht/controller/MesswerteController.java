@@ -1,20 +1,12 @@
 package ch.nacht.controller;
 
-import ch.nacht.entity.Einheit;
-import ch.nacht.entity.Messwerte;
-import ch.nacht.repository.EinheitRepository;
-import ch.nacht.repository.MesswerteRepository;
 import ch.nacht.service.MesswerteService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -22,13 +14,9 @@ import java.util.Map;
 @RequestMapping("/api/messwerte")
 public class MesswerteController {
 
-    private final MesswerteRepository messwerteRepository;
-    private final EinheitRepository einheitRepository;
     private final MesswerteService messwerteService;
 
-    public MesswerteController(MesswerteRepository messwerteRepository, EinheitRepository einheitRepository, MesswerteService messwerteService) {
-        this.messwerteRepository = messwerteRepository;
-        this.einheitRepository = einheitRepository;
+    public MesswerteController(MesswerteService messwerteService) {
         this.messwerteService = messwerteService;
     }
 
@@ -39,44 +27,13 @@ public class MesswerteController {
             @RequestParam("file") MultipartFile file) {
 
         try {
-            // Fetch the Einheit entity
-            Einheit einheit = einheitRepository.findById(einheitId)
-                .orElseThrow(() -> new RuntimeException("Einheit not found with id: " + einheitId));
-
-            LocalDate date = LocalDate.parse(dateStr);
-            LocalDateTime zeit = LocalDateTime.of(date, LocalTime.of(0, 15));
-
-            List<Messwerte> messwerteList = new ArrayList<>();
-
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
-                String line;
-                reader.readLine(); // Skip header line
-                while ((line = reader.readLine()) != null) {
-                    String[] parts = line.split("[,;]");
-                    if (parts.length >= 3) {
-                        Double total = Math.abs(Double.parseDouble(parts[1].trim()));
-                        Double zev = Math.abs(Double.parseDouble(parts[2].trim()));
-
-                        messwerteList.add(new Messwerte(zeit, total, zev, einheit));
-                        zeit = zeit.plusMinutes(15);
-                    }
-                }
-            }
-
-            messwerteRepository.saveAll(messwerteList);
-
-            return ResponseEntity.ok(Map.of(
-                "status", "success",
-                "count", messwerteList.size(),
-                "einheitId", einheitId,
-                "einheitName", einheit.getName()
-            ));
+            Map<String, Object> result = messwerteService.processCsvUpload(file, einheitId, dateStr);
+            return ResponseEntity.ok(result);
 
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of(
-                "status", "error",
-                "message", e.getMessage()
-            ));
+                    "status", "error",
+                    "message", e.getMessage()));
         }
     }
 
@@ -94,23 +51,22 @@ public class MesswerteController {
             LocalDateTime dateTimeTo = dateTo.atTime(23, 59, 59);
 
             // Call the service to calculate distribution
-            MesswerteService.CalculationResult result = messwerteService.calculateSolarDistribution(dateTimeFrom, dateTimeTo);
+            MesswerteService.CalculationResult result = messwerteService.calculateSolarDistribution(dateTimeFrom,
+                    dateTimeTo);
 
             return ResponseEntity.ok(Map.of(
-                "status", "success",
-                "processedTimestamps", result.getProcessedTimestamps(),
-                "processedRecords", result.getProcessedRecords(),
-                "dateFrom", result.getDateFrom().toString(),
-                "dateTo", result.getDateTo().toString(),
-                "totalSolarProduced", result.getTotalSolarProduced(),
-                "totalDistributed", result.getTotalDistributed()
-            ));
+                    "status", "success",
+                    "processedTimestamps", result.getProcessedTimestamps(),
+                    "processedRecords", result.getProcessedRecords(),
+                    "dateFrom", result.getDateFrom().toString(),
+                    "dateTo", result.getDateTo().toString(),
+                    "totalSolarProduced", result.getTotalSolarProduced(),
+                    "totalDistributed", result.getTotalDistributed()));
 
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of(
-                "status", "error",
-                "message", e.getMessage()
-            ));
+                    "status", "error",
+                    "message", e.getMessage()));
         }
     }
 
@@ -124,20 +80,7 @@ public class MesswerteController {
             LocalDate dateFrom = LocalDate.parse(dateFromStr);
             LocalDate dateTo = LocalDate.parse(dateToStr);
 
-            LocalDateTime dateTimeFrom = dateFrom.atStartOfDay();
-            LocalDateTime dateTimeTo = dateTo.atTime(23, 59, 59);
-
-            Einheit einheit = einheitRepository.findById(einheitId)
-                .orElseThrow(() -> new RuntimeException("Einheit not found"));
-
-            List<Messwerte> messwerte = messwerteRepository.findByEinheitAndZeitBetween(einheit, dateTimeFrom, dateTimeTo);
-
-            List<Map<String, Object>> result = messwerte.stream()
-                .map(m -> Map.<String, Object>of(
-                    "zeit", m.getZeit().toString(),
-                    "total", m.getTotal()
-                ))
-                .toList();
+            List<Map<String, Object>> result = messwerteService.getMesswerteByEinheit(einheitId, dateFrom, dateTo);
 
             return ResponseEntity.ok(result);
 

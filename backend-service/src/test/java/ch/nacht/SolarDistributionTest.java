@@ -3,85 +3,159 @@ package ch.nacht;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 
 public class SolarDistributionTest {
 
-    private static final double DELTA = 0.0009;
-
     @Test
     public void testFallB_PartialCoverage() {
         // Fall B: Produktion < Gesamtbedarf
-        double solarProduction = 10.0;
-        List<Double> consumption = Arrays.asList(2.0, 8.0, 5.0);
+        BigDecimal solarProduction = BigDecimal.valueOf(10.0);
+        List<BigDecimal> consumption = Arrays.asList(
+                BigDecimal.valueOf(2.0),
+                BigDecimal.valueOf(8.0),
+                BigDecimal.valueOf(5.0));
 
-        List<Double> allocation = SolarDistribution.distributeSolarPower(solarProduction, consumption);
+        List<BigDecimal> allocation = SolarDistribution.distributeSolarPower(solarProduction, consumption);
 
         // Verify allocations
         assertEquals(3, allocation.size());
-        assertEquals(2.0, allocation.get(0), DELTA); // Verbraucher 1
-        assertEquals(4.0, allocation.get(1), DELTA); // Verbraucher 2
-        assertEquals(4.0, allocation.get(2), DELTA); // Verbraucher 3
+        assertEquals(0, BigDecimal.valueOf(2.0).compareTo(allocation.get(0))); // Verbraucher 1
+        assertEquals(0, BigDecimal.valueOf(4.0).compareTo(allocation.get(1))); // Verbraucher 2
+        assertEquals(0, BigDecimal.valueOf(4.0).compareTo(allocation.get(2))); // Verbraucher 3
 
         // Verify total allocation equals production
-        double totalAllocated = allocation.stream().mapToDouble(Double::doubleValue).sum();
-        assertEquals(solarProduction, totalAllocated, DELTA);
+        BigDecimal totalAllocated = allocation.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertEquals(0, solarProduction.compareTo(totalAllocated));
     }
 
     @Test
     public void testFallA_FullCoverage() {
         // Fall A: Produktion >= Gesamtbedarf
-        double solarProduction = 20.0;
-        List<Double> consumption = Arrays.asList(5.0, 3.0, 4.0);
+        BigDecimal solarProduction = BigDecimal.valueOf(20.0);
+        List<BigDecimal> consumption = Arrays.asList(
+                BigDecimal.valueOf(5.0),
+                BigDecimal.valueOf(3.0),
+                BigDecimal.valueOf(4.0));
 
-        List<Double> allocation = SolarDistribution.distributeSolarPower(solarProduction, consumption);
+        List<BigDecimal> allocation = SolarDistribution.distributeSolarPower(solarProduction, consumption);
 
         // Each consumer gets their full demand
         assertEquals(3, allocation.size());
-        assertEquals(5.0, allocation.get(0), DELTA);
-        assertEquals(3.0, allocation.get(1), DELTA);
-        assertEquals(4.0, allocation.get(2), DELTA);
+        assertEquals(0, BigDecimal.valueOf(5.0).compareTo(allocation.get(0)));
+        assertEquals(0, BigDecimal.valueOf(3.0).compareTo(allocation.get(1)));
+        assertEquals(0, BigDecimal.valueOf(4.0).compareTo(allocation.get(2)));
     }
 
     @Test
     public void test() {
-        double solarProduction = 0.035;
-        List<Double> consumption = Arrays.asList(0.019, 0.008, 0.005, 0.009, 0.038, 0.011, 0.008, 0.001, 0.003, 0.024);
+        BigDecimal solarProduction = new BigDecimal("0.035");
+        List<BigDecimal> consumption = Arrays.asList(
+                new BigDecimal("0.019"), new BigDecimal("0.008"), new BigDecimal("0.005"),
+                new BigDecimal("0.009"), new BigDecimal("0.038"), new BigDecimal("0.011"),
+                new BigDecimal("0.008"), new BigDecimal("0.001"), new BigDecimal("0.003"),
+                new BigDecimal("0.024"));
 
-        List<Double> allocation = SolarDistribution.distributeSolarPower(solarProduction, consumption);
+        List<BigDecimal> allocation = SolarDistribution.distributeSolarPower(solarProduction, consumption);
 
         // Each consumer gets their full demand
         assertEquals(10, allocation.size());
-        assertEquals(0.004, allocation.get(0), DELTA);
-        assertEquals(0.004, allocation.get(1), DELTA);
-        assertEquals(0.004, allocation.get(2), DELTA);
-        assertEquals(0.004, allocation.get(3), DELTA);
-        assertEquals(0.003, allocation.get(4), DELTA); // adjusted
-        assertEquals(0.004, allocation.get(5), DELTA);
-        assertEquals(0.004, allocation.get(6), DELTA);
-        assertEquals(0.001, allocation.get(7), DELTA);
-        assertEquals(0.003, allocation.get(8), DELTA);
-        assertEquals(0.004, allocation.get(9), DELTA);
+        assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(0)));
+        assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(1)));
+        assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(2)));
+        assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(3)));
+        assertEquals(0, new BigDecimal("0.003").compareTo(allocation.get(4))); // adjusted
+        assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(5)));
+        assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(6)));
+        assertEquals(0, new BigDecimal("0.001").compareTo(allocation.get(7)));
+        assertEquals(0, new BigDecimal("0.003").compareTo(allocation.get(8)));
+        assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(9)));
     }
 
     @Test
     public void testNoProduction() {
-        double solarProduction = 0.0;
-        List<Double> consumption = Arrays.asList(2.0, 3.0);
+        BigDecimal solarProduction = BigDecimal.ZERO;
+        List<BigDecimal> consumption = Arrays.asList(BigDecimal.valueOf(2.0), BigDecimal.valueOf(3.0));
 
-        List<Double> allocation = SolarDistribution.distributeSolarPower(solarProduction, consumption);
+        List<BigDecimal> allocation = SolarDistribution.distributeSolarPower(solarProduction, consumption);
 
         assertEquals(2, allocation.size());
+        assertEquals(0, BigDecimal.ZERO.compareTo(allocation.get(0)));
+        assertEquals(0, BigDecimal.ZERO.compareTo(allocation.get(1)));
     }
 
     @Test
     public void testEmptyConsumers() {
-        double solarProduction = 10.0;
-        List<Double> consumption = Arrays.asList();
+        BigDecimal solarProduction = BigDecimal.valueOf(10.0);
+        List<BigDecimal> consumption = Arrays.asList();
 
-        List<Double> allocation = SolarDistribution.distributeSolarPower(solarProduction, consumption);
+        List<BigDecimal> allocation = SolarDistribution.distributeSolarPower(solarProduction, consumption);
 
         assertTrue(allocation.isEmpty());
+    }
+
+    @Test
+    public void testZeroConsumption() {
+        BigDecimal solarProduction = BigDecimal.valueOf(10.0);
+        List<BigDecimal> consumption = Arrays.asList(BigDecimal.ZERO, BigDecimal.ZERO);
+
+        List<BigDecimal> allocation = SolarDistribution.distributeSolarPower(solarProduction, consumption);
+
+        assertEquals(2, allocation.size());
+        assertEquals(0, BigDecimal.ZERO.compareTo(allocation.get(0)));
+        assertEquals(0, BigDecimal.ZERO.compareTo(allocation.get(1)));
+    }
+
+    @Test
+    public void testMixedConsumption() {
+        BigDecimal solarProduction = BigDecimal.valueOf(5.0);
+        List<BigDecimal> consumption = Arrays.asList(BigDecimal.ZERO, BigDecimal.valueOf(10.0));
+
+        List<BigDecimal> allocation = SolarDistribution.distributeSolarPower(solarProduction, consumption);
+
+        assertEquals(2, allocation.size());
+        assertEquals(0, BigDecimal.ZERO.compareTo(allocation.get(0)));
+        assertEquals(0, BigDecimal.valueOf(5.0).compareTo(allocation.get(1)));
+    }
+
+    @Test
+    public void testRoundingSplit() {
+        // 10 units produced, 3 consumers with equal demand of 10.
+        // Should be split 3.333, 3.333, 3.334 (to sum to 10)
+        BigDecimal solarProduction = BigDecimal.valueOf(10.0);
+        List<BigDecimal> consumption = Arrays.asList(
+                BigDecimal.valueOf(10.0),
+                BigDecimal.valueOf(10.0),
+                BigDecimal.valueOf(10.0));
+
+        List<BigDecimal> allocation = SolarDistribution.distributeSolarPower(solarProduction, consumption);
+
+        assertEquals(3, allocation.size());
+        BigDecimal total = allocation.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertEquals(0, solarProduction.compareTo(total));
+
+        // Check that values are close to 3.333
+        assertTrue(allocation.stream().allMatch(v -> v.compareTo(new BigDecimal("3.333")) >= 0));
+        assertTrue(allocation.stream().allMatch(v -> v.compareTo(new BigDecimal("3.334")) <= 0));
+    }
+
+    @Test
+    public void testLargeNumbers() {
+        BigDecimal solarProduction = new BigDecimal("1000000.000");
+        List<BigDecimal> consumption = Arrays.asList(
+                new BigDecimal("2000000.000"),
+                new BigDecimal("3000000.000"));
+
+        List<BigDecimal> allocation = SolarDistribution.distributeSolarPower(solarProduction, consumption);
+
+        assertEquals(2, allocation.size());
+        BigDecimal total = allocation.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertEquals(0, solarProduction.compareTo(total));
+
+        // Equal distribution: 1M / 2 = 500k each (since both need more than 500k)
+        assertEquals(0, new BigDecimal("500000.000").compareTo(allocation.get(0)));
+        assertEquals(0, new BigDecimal("500000.000").compareTo(allocation.get(1)));
     }
 }
