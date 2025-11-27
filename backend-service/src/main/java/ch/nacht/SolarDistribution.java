@@ -52,7 +52,7 @@ public class SolarDistribution {
 
         // --- Fall B: Produktion ist kleiner als der Gesamtbedarf (Faire Verteilung)
         // ---
-        // Verteilung des Sroms. Zu Beginn ist der Rest gleich der Produktion
+        // Verteilung des Stroms. Zu Beginn ist der Rest gleich der Produktion
         BigDecimal remainingPower = solarProduction;
 
         // Iterativer Prozess zur Verteilung des Rests
@@ -63,8 +63,7 @@ public class SolarDistribution {
             List<Integer> underSuppliedIndices = new ArrayList<>();
             BigDecimal currentUncoveredDemand = BigDecimal.ZERO;
 
-            // Identifiziere unterversorgte Verbraucher und berechne ihren ungedeckten
-            // Bedarf
+            // Identifiziere unterversorgte Verbraucher und berechne ihren ungedeckten Bedarf
             for (int i = 0; i < N; i++) {
                 BigDecimal uncovered = currentConsumption.get(i).subtract(allocation.get(i));
                 if (uncovered.compareTo(EPSILON) > 0) {
@@ -156,10 +155,16 @@ public class SolarDistribution {
                 BigDecimal currentAllocation = allocation.get(idx);
 
                 if (isAddition) {
-                    // Add increment to this einheit
+                    // Add increment to this einheit, but ensure we don't exceed consumption
                     BigDecimal toAdd = increment.min(remainingDifference);
-                    allocation.set(idx, round3(currentAllocation.add(toAdd)));
-                    remainingDifference = remainingDifference.subtract(toAdd);
+                    BigDecimal newValue = currentAllocation.add(toAdd);
+                    BigDecimal maxAllowed = currentConsumption.get(idx);
+
+                    // Only add if it doesn't exceed consumption
+                    if (newValue.compareTo(maxAllowed) <= 0) {
+                        allocation.set(idx, round3(newValue));
+                        remainingDifference = remainingDifference.subtract(toAdd);
+                    }
                 } else {
                     // Subtract increment, but ensure we don't go negative
                     BigDecimal toSubtract = increment.min(remainingDifference.abs());
@@ -183,6 +188,15 @@ public class SolarDistribution {
                         break;
                     }
                 }
+            }
+        }
+
+        // Final safety check: ensure no allocation exceeds consumption
+        for (int i = 0; i < N; i++) {
+            BigDecimal allocated = allocation.get(i);
+            BigDecimal consumption = currentConsumption.get(i);
+            if (allocated.compareTo(consumption) > 0) {
+                allocation.set(i, round3(consumption));
             }
         }
 
