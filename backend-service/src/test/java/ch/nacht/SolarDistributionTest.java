@@ -50,27 +50,64 @@ public class SolarDistributionTest {
     }
 
     @Test
-    public void test() {
-        BigDecimal solarProduction = new BigDecimal("0.035");
+    public void test0Adjustments() {
+        BigDecimal solarProduction = new BigDecimal("0.036");
         List<BigDecimal> consumption = Arrays.asList(
-                new BigDecimal("0.019"), new BigDecimal("0.008"), new BigDecimal("0.005"),
-                new BigDecimal("0.009"), new BigDecimal("0.038"), new BigDecimal("0.011"),
-                new BigDecimal("0.008"), new BigDecimal("0.001"), new BigDecimal("0.003"),
-                new BigDecimal("0.024"));
+                new BigDecimal("0.019"),  // 0
+                new BigDecimal("0.008"),  // 1
+                new BigDecimal("0.005"),  // 2
+                new BigDecimal("0.009"),  // 3
+                new BigDecimal("0.038"),  // 4
+                new BigDecimal("0.011"),  // 5
+                new BigDecimal("0.008"),  // 6
+                new BigDecimal("0.001"),  // 7
+                new BigDecimal("0.003"),  // 8
+                new BigDecimal("0.024")); // 9
 
         List<BigDecimal> allocation = SolarDistribution.distributeSolarPower(solarProduction, consumption);
 
-        // Each consumer gets their full demand
+        // Each consumer gets their share, with rounding adjustments starting from lowest consumers
         assertEquals(10, allocation.size());
         assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(0)));
         assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(1)));
         assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(2)));
         assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(3)));
-        assertEquals(0, new BigDecimal("0.003").compareTo(allocation.get(4))); // adjusted
+        assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(4)));
         assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(5)));
         assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(6)));
         assertEquals(0, new BigDecimal("0.001").compareTo(allocation.get(7)));
         assertEquals(0, new BigDecimal("0.003").compareTo(allocation.get(8)));
+        assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(9)));
+    }
+
+    @Test
+    public void test3Adjustments() {
+        BigDecimal solarProduction = new BigDecimal("0.033");
+        List<BigDecimal> consumption = Arrays.asList(
+                new BigDecimal("0.019"),  // 0
+                new BigDecimal("0.008"),  // 1
+                new BigDecimal("0.005"),  // 2
+                new BigDecimal("0.009"),  // 3
+                new BigDecimal("0.038"),  // 4
+                new BigDecimal("0.011"),  // 5
+                new BigDecimal("0.008"),  // 6
+                new BigDecimal("0.001"),  // 7
+                new BigDecimal("0.003"),  // 8
+                new BigDecimal("0.024")); // 9
+
+        List<BigDecimal> allocation = SolarDistribution.distributeSolarPower(solarProduction, consumption);
+
+        // Each consumer gets their share, with rounding adjustments starting from lowest consumers
+        assertEquals(10, allocation.size());
+        assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(0)));
+        assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(1)));
+        assertEquals(0, new BigDecimal("0.003").compareTo(allocation.get(2))); // adjusted
+        assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(3)));
+        assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(4)));
+        assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(5)));
+        assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(6)));
+        assertEquals(0, new BigDecimal("0.000").compareTo(allocation.get(7))); // adjusted
+        assertEquals(0, new BigDecimal("0.002").compareTo(allocation.get(8))); // adjusted
         assertEquals(0, new BigDecimal("0.004").compareTo(allocation.get(9)));
     }
 

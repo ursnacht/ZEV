@@ -120,7 +120,9 @@ public class SolarDistribution {
 
     /**
      * Adjust for rounding errors: ensure total distributed equals total consumption
-     * 
+     * Distributes the rounding difference across all einheiten, starting with the one
+     * that needs the least energy.
+     *
      * @param allocation
      * @param targetAmount
      * @param currentConsumption
@@ -134,18 +136,54 @@ public class SolarDistribution {
         int N = currentConsumption.size();
 
         if (difference.abs().compareTo(BigDecimal.ZERO) > 0) {
-            // Find the consumer with the highest consumption
-            int maxConsumptionIndex = 0;
-            BigDecimal maxConsumption = currentConsumption.get(0);
-            for (int i = 1; i < N; i++) {
-                if (currentConsumption.get(i).compareTo(maxConsumption) > 0) {
-                    maxConsumption = currentConsumption.get(i);
-                    maxConsumptionIndex = i;
+            // Create a list of indices sorted by consumption (ascending - lowest first)
+            List<Integer> sortedIndices = new ArrayList<>();
+            for (int i = 0; i < N; i++) {
+                sortedIndices.add(i);
+            }
+            sortedIndices.sort((a, b) -> currentConsumption.get(a).compareTo(currentConsumption.get(b)));
+
+            // Distribute the difference across einheiten, starting with lowest consumption
+            BigDecimal increment = new BigDecimal("0.001");
+            BigDecimal remainingDifference = difference;
+
+            // Determine if we're adding or subtracting
+            boolean isAddition = difference.compareTo(BigDecimal.ZERO) > 0;
+
+            int currentIndex = 0;
+            while (remainingDifference.abs().compareTo(EPSILON) > 0 && currentIndex < sortedIndices.size()) {
+                int idx = sortedIndices.get(currentIndex);
+                BigDecimal currentAllocation = allocation.get(idx);
+
+                if (isAddition) {
+                    // Add increment to this einheit
+                    BigDecimal toAdd = increment.min(remainingDifference);
+                    allocation.set(idx, round3(currentAllocation.add(toAdd)));
+                    remainingDifference = remainingDifference.subtract(toAdd);
+                } else {
+                    // Subtract increment, but ensure we don't go negative
+                    BigDecimal toSubtract = increment.min(remainingDifference.abs());
+                    BigDecimal newValue = currentAllocation.subtract(toSubtract);
+
+                    if (newValue.compareTo(BigDecimal.ZERO) >= 0) {
+                        allocation.set(idx, round3(newValue));
+                        remainingDifference = remainingDifference.add(toSubtract);
+                    }
+                }
+
+                // Move to next einheit in the sorted list
+                currentIndex++;
+
+                // If we've gone through all einheiten but still have remainder, loop back
+                if (currentIndex >= sortedIndices.size() && remainingDifference.abs().compareTo(EPSILON) > 0) {
+                    currentIndex = 0;
+                    // Use smaller increment for fine-tuning
+                    if (increment.compareTo(new BigDecimal("0.001")) == 0) {
+                        // Break if we can't make further progress
+                        break;
+                    }
                 }
             }
-            // Adjust the allocation for the highest consumer
-            BigDecimal adjusted = round3(allocation.get(maxConsumptionIndex).add(difference));
-            allocation.set(maxConsumptionIndex, adjusted);
         }
 
         return allocation;
