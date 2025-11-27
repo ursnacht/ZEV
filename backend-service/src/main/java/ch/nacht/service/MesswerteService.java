@@ -58,6 +58,14 @@ public class MesswerteService {
             }
         }
 
+        // Delete existing messwerte for the same einheit and date range to allow overwrite
+        LocalDateTime dateTimeFrom = date.atStartOfDay();
+        LocalDateTime dateTimeTo = date.atTime(23, 59, 59);
+        List<Messwerte> existingMesswerte = messwerteRepository.findByEinheitAndZeitBetween(einheit, dateTimeFrom, dateTimeTo);
+        if (!existingMesswerte.isEmpty()) {
+            messwerteRepository.deleteAll(existingMesswerte);
+        }
+
         messwerteRepository.saveAll(messwerteList);
 
         return Map.of(
