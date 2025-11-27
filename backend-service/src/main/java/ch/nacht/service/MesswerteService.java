@@ -39,7 +39,7 @@ public class MesswerteService {
                 .orElseThrow(() -> new RuntimeException("Einheit not found with id: " + einheitId));
 
         LocalDate date = LocalDate.parse(dateStr);
-        LocalDateTime zeit = LocalDateTime.of(date, LocalTime.of(0, 15));
+        LocalDateTime zeit = LocalDateTime.of(date, LocalTime.of(0, 0));
 
         List<Messwerte> messwerteList = new ArrayList<>();
 
