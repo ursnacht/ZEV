@@ -7,12 +7,21 @@
 
   <form (ngSubmit)="onSubmit()">
     <div class="form-group">
-      <label for="einheit">Einheit:</label>
-      <select id="einheit" name="einheit" [(ngModel)]="einheitId" required>
-        <option *ngFor="let einheit of einheiten" [value]="einheit.id">
-          {{ einheit.name }} ({{ einheit.typ }})
-        </option>
-      </select>
+      <label>Einheiten:</label>
+      <div class="checkbox-group">
+        <div *ngFor="let einheit of einheiten" class="checkbox-item">
+          <input
+            type="checkbox"
+            [id]="'einheit-' + einheit.id"
+            [value]="einheit.id"
+            [checked]="selectedEinheitIds.has(einheit.id!)"
+            (change)="onEinheitToggle(einheit.id!)"
+          >
+          <label [for]="'einheit-' + einheit.id">
+            {{ einheit.name }} ({{ einheit.typ }})
+          </label>
+        </div>
+      </div>
     </div>
 
     <div class="form-group">
@@ -25,12 +34,15 @@
       <input type="date" id="dateTo" name="dateTo" [(ngModel)]="dateTo" required>
     </div>
 
-    <button type="submit" class="primary" [disabled]="loading || !dateFrom || !dateTo || !einheitId">
+    <button type="submit" class="primary" [disabled]="loading || !dateFrom || !dateTo || selectedEinheitIds.size === 0">
       {{ loading ? 'Lade Daten...' : 'Anzeigen' }}
     </button>
   </form>
 
-  <div class="chart-container">
-    <canvas #chartCanvas></canvas>
+  <div *ngFor="let chartData of charts" class="chart-wrapper">
+    <h3>{{ chartData.einheitName }} ({{ chartData.einheitTyp }})</h3>
+    <div class="chart-container">
+      <canvas [id]="'chart-' + chartData.einheitId"></canvas>
+    </div>
   </div>
 </div>

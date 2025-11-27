@@ -3,8 +3,52 @@
   margin: 0 auto;
 }
 
+.checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkbox-item input[type="checkbox"] {
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+}
+
+.checkbox-item label {
+  cursor: pointer;
+  margin: 0;
+  user-select: none;
+}
+
+.chart-wrapper {
+  margin-top: 40px;
+}
+
+.chart-wrapper h3 {
+  margin-bottom: 15px;
+  color: #333;
+  font-size: 1.2em;
+}
+
 .chart-container {
-  margin-top: 30px;
-  height: 500px;
+  margin-top: 15px;
+  height: 400px;
   position: relative;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 10px;
+  background-color: white;
 }
