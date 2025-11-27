@@ -152,26 +152,41 @@ export class MesswerteChartComponent implements OnInit {
     if (!ctx) return;
 
     const labels = data.map(d => new Date(d.zeit).toLocaleString('de-DE'));
-    const values = data.map(d => d.total);
+    const totalValues = data.map(d => d.total);
+    const zevValues = data.map(d => -d.zevCalculated); // Negative for downward display
+
+    // Calculate sums for legend
+    const totalSum = data.reduce((sum, d) => sum + d.total, 0);
+    const zevSum = data.reduce((sum, d) => sum + d.zevCalculated, 0);
 
     const config: ChartConfiguration = {
       type: 'line',
       data: {
         labels: labels,
-        datasets: [{
-          label: 'Total (kWh)',
-          data: values,
-          borderColor: '#4CAF50',
-          backgroundColor: 'rgba(76, 175, 80, 0.1)',
-          tension: 0.1
-        }]
+        datasets: [
+          {
+            label: `Total (Σ ${totalSum.toFixed(3)} kWh)`,
+            data: totalValues,
+            borderColor: '#4CAF50',
+            backgroundColor: 'rgba(76, 175, 80, 0.1)',
+            tension: 0.1,
+            fill: false
+          },
+          {
+            label: `ZEV Calculated (Σ ${zevSum.toFixed(3)} kWh)`,
+            data: zevValues,
+            borderColor: '#2196F3',
+            backgroundColor: 'rgba(33, 150, 243, 0.1)',
+            tension: 0.1,
+            fill: false
+          }
+        ]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         scales: {
           y: {
-            beginAtZero: true,
             title: {
               display: true,
               text: 'kWh'

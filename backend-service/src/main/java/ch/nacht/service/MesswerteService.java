@@ -77,9 +77,13 @@ public class MesswerteService {
         List<Messwerte> messwerte = messwerteRepository.findByEinheitAndZeitBetween(einheit, dateTimeFrom, dateTimeTo);
 
         return messwerte.stream()
-                .map(m -> Map.<String, Object>of(
-                        "zeit", m.getZeit().toString(),
-                        "total", m.getTotal()))
+                .map(m -> {
+                    Map<String, Object> data = new java.util.HashMap<>();
+                    data.put("zeit", m.getZeit().toString());
+                    data.put("total", m.getTotal());
+                    data.put("zevCalculated", m.getZevCalculated());
+                    return data;
+                })
                 .collect(Collectors.toList());
     }
 

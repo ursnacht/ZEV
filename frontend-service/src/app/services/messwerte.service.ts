@@ -16,6 +16,7 @@ export interface CalculationResponse {
 export interface MesswertData {
   zeit: string;
   total: number;
+  zevCalculated: number;
 }
 
 @Injectable({
