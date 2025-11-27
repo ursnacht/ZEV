@@ -151,45 +151,4 @@ public class SolarDistribution {
         return allocation;
     }
 
-    // --- Beispiel-Hauptmethode ---
-    public static void main(String[] args) {
-        // Beispielwerte aus der vorherigen Erklärung:
-        BigDecimal solarProduction = BigDecimal.valueOf(10.0); // kW
-        List<BigDecimal> consumption = Arrays.asList(
-                BigDecimal.valueOf(2.0),
-                BigDecimal.valueOf(8.0),
-                BigDecimal.valueOf(5.0)); // kW (C1, C2, C3)
-
-        System.out.println("--- ZEV-Verteilungssimulation (Fall B) ---");
-        System.out.println("Solarproduktion: " + solarProduction + " kW");
-        System.out.println("Verbraucher-Bedarf: " + consumption);
-
-        List<BigDecimal> allocation = distributeSolarPower(solarProduction, consumption);
-
-        System.out.println("\nErgebnisse:");
-        BigDecimal totalAllocated = BigDecimal.ZERO;
-        for (int i = 0; i < allocation.size(); i++) {
-            BigDecimal allocated = allocation.get(i);
-            BigDecimal remainingGrid = consumption.get(i).subtract(allocated);
-            System.out.printf("Verbraucher %d: Zuteilung (Solar): %s kW | Restbezug (Netz): %s kW%n",
-                    i + 1, allocated, remainingGrid);
-            totalAllocated = totalAllocated.add(allocated);
-        }
-
-        System.out.printf("\nGesamte Zuteilung (Solar): %s kW (Soll: %s kW)%n",
-                totalAllocated, solarProduction);
-
-        // Zusätzliches Beispiel (Fall A: volle Deckung)
-        System.out.println("\n--- ZEV-Verteilungssimulation (Fall A) ---");
-        solarProduction = BigDecimal.valueOf(20.0); // kW
-        consumption = Arrays.asList(
-                BigDecimal.valueOf(5.0),
-                BigDecimal.valueOf(3.0),
-                BigDecimal.valueOf(4.0)); // Gesamt: 12 kW
-        System.out.println("Solarproduktion: " + solarProduction + " kW");
-        System.out.println("Verbraucher-Bedarf: " + consumption);
-
-        allocation = distributeSolarPower(solarProduction, consumption);
-        System.out.println("Zuteilung (Solar): " + allocation); // Soll: [5.0, 3.0, 4.0]
-    }
 }
