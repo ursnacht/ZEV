@@ -94,8 +94,7 @@ export class MesswerteUploadComponent implements OnInit {
   }
 
   private resetForm(): void {
-    this.date = '';
-    this.einheitId = this.einheiten.length > 0 ? this.einheiten[0].id || null : null;
+    // Keep the date and einheit for the next upload
     this.file = null;
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     if (fileInput) {

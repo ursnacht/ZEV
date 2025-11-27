@@ -46,9 +46,13 @@
 .chart-container {
   margin-top: 15px;
   height: 400px;
+  min-height: 200px;
+  max-height: 1000px;
   position: relative;
   border: 1px solid #e0e0e0;
   border-radius: 4px;
   padding: 10px;
   background-color: white;
+  resize: vertical;
+  overflow: auto;
 }
