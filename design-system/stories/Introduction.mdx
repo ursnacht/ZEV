@@ -1,0 +1,70 @@
+import { Meta } from '@storybook/blocks';
+
+<Meta title="Introduction" />
+
+# ZEV Design System
+
+Willkommen zur ZEV Design System Dokumentation. Dieses Design System bietet eine umfassende Sammlung wiederverwendbarer Komponenten, Design Tokens und Guidelines für die Erstellung konsistenter Benutzeroberflächen in der ZEV-Anwendung.
+
+## Was ist enthalten?
+
+- **Design Tokens**: CSS Custom Properties und TypeScript-Konstanten für Farben, Spacing, Typografie, etc.
+- **Komponenten**: Vorgefertigte, barrierefreie UI-Komponenten
+- **Utilities**: Helper-Klassen für häufige Patterns
+- **Dokumentation**: Umfassende Guides und Beispiele
+
+## Erste Schritte
+
+1. [Installation & Setup](#)
+2. [Design Tokens verwenden](#)
+3. [Komponenten verwenden](#)
+4. [Migrations-Guide](#)
+
+## Design-Prinzipien
+
+### 1. Konsistenz
+Verwende Design Tokens für alle visuellen Eigenschaften. Dies stellt sicher, dass die gesamte Anwendung ein einheitliches Aussehen hat.
+
+### 2. Barrierefreiheit
+Alle Komponenten sind WCAG AA-konform und unterstützen Tastaturnavigation.
+
+### 3. Einfachheit
+Klare, semantische Klassennamen die einfach zu verstehen und zu verwenden sind.
+
+### 4. Type-Safety
+TypeScript-Support für alle Design Tokens ermöglicht Fehler zur Compile-Zeit zu finden.
+
+## Schnellstart
+
+### CSS importieren
+
+```css
+@import '@zev/design-system/dist/index.css';
+```
+
+### TypeScript Tokens verwenden
+
+```typescript
+import { colors, spacing } from '@zev/design-system';
+
+const primaryColor = colors.primary.base;
+const baseSpacing = spacing.lg;
+```
+
+### Komponenten verwenden
+
+```html
+<button class="zev-button zev-button--primary">
+  Click Me
+</button>
+```
+
+## Verfügbare Komponenten
+
+- **Button**: Primary, Secondary, Danger Varianten
+- **Navigation**: Navbar mit Links und Active-States
+- *(Weitere Komponenten folgen)*
+
+## Unterstützung
+
+Bei Fragen oder Problemen erstelle ein Issue im GitHub Repository.

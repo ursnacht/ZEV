@@ -1,0 +1,89 @@
+/**
+ * ZEV Design System - CSS Custom Properties
+ * Root-level CSS variables for use in stylesheets
+ */
+
+:root {
+  /* Primary Colors */
+  --color-primary: #4CAF50;
+  --color-primary-hover: #45a049;
+  --color-primary-light: #81C784;
+  --color-primary-dark: #388E3C;
+
+  /* Secondary Colors */
+  --color-secondary: #2196F3;
+  --color-secondary-hover: #0b7dda;
+  --color-secondary-active: #3498db;
+  --color-secondary-light: #64B5F6;
+  --color-secondary-dark: #1976D2;
+
+  /* Danger Colors */
+  --color-danger: #f44336;
+  --color-danger-hover: #da190b;
+  --color-danger-light: #EF5350;
+  --color-danger-dark: #C62828;
+
+  /* Success Colors */
+  --color-success-bg: #d4edda;
+  --color-success-text: #155724;
+  --color-success-border: #c3e6cb;
+
+  /* Error Colors */
+  --color-error-bg: #f8d7da;
+  --color-error-text: #721c24;
+  --color-error-border: #f5c6cb;
+
+  /* Neutral Colors */
+  --color-white: #ffffff;
+  --color-gray-50: #f8f8f8;
+  --color-gray-100: #f5f5f5;
+  --color-gray-200: #f9f9f9;
+  --color-gray-300: #e0e0e0;
+  --color-gray-400: #ddd;
+  --color-gray-500: #ccc;
+  --color-gray-600: #666;
+  --color-gray-700: #555;
+  --color-gray-800: #333;
+  --color-gray-900: #2c3e50;
+
+  /* Spacing */
+  --spacing-xxs: 5px;
+  --spacing-xs: 8px;
+  --spacing-sm: 10px;
+  --spacing-md: 15px;
+  --spacing-lg: 20px;
+  --spacing-xl: 30px;
+  --spacing-xxl: 40px;
+  --spacing-12: 12px;
+  --spacing-16: 16px;
+  --spacing-18: 18px;
+
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+
+  /* Typography */
+  --font-family-primary: Arial, sans-serif;
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-base: 14px;
+  --font-size-lg: 1.2em;
+  --font-size-xl: 24px;
+  --font-weight-normal: 400;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Shadows */
+  --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+  /* Transitions */
+  --transition-fast: 0.3s;
+
+  /* Layout */
+  --layout-max-width: 1200px;
+  --form-max-width: 600px;
+  --calculation-max-width: 800px;
+  --chart-height: 400px;
+  --chart-min-height: 200px;
+  --chart-max-height: 1000px;
+}

@@ -1,0 +1,205 @@
+import { Meta } from '@storybook/blocks';
+
+<Meta title="Migration Guide" />
+
+# Migrations-Guide
+
+Dieser Guide hilft dir, bestehende ZEV-Komponenten auf das Design System zu migrieren.
+
+## Schritt 1: Design System installieren
+
+```bash
+cd frontend-service
+npm install @zev/design-system
+```
+
+## Schritt 2: In Angular importieren
+
+Aktualisiere `frontend-service/angular.json`:
+
+```json
+{
+  "architect": {
+    "build": {
+      "options": {
+        "styles": [
+          "../design-system/dist/index.css",
+          "src/styles.css"
+        ]
+      }
+    }
+  }
+}
+```
+
+## Schritt 3: Globale Styles aktualisieren
+
+Aktualisiere `frontend-service/src/styles.css`:
+
+```css
+/* Design System importieren */
+@import '@zev/design-system/dist/index.css';
+
+/* Nur app-spezifische Overrides behalten */
+body {
+  font-family: var(--font-family-primary);
+  background-color: var(--color-gray-100);
+  padding: var(--spacing-lg);
+}
+```
+
+## Schritt 4: Komponenten migrieren
+
+### Beispiel: Button Migration
+
+**Vorher (alt):**
+
+```css
+/* component.css */
+button {
+  padding: 10px 20px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #45a049;
+}
+```
+
+```html
+<!-- component.html -->
+<button>Click Me</button>
+```
+
+**Nachher (mit Design System):**
+
+```html
+<!-- component.html -->
+<button class="zev-button zev-button--primary">Click Me</button>
+```
+
+Die component.css kann entfernt oder stark reduziert werden.
+
+### Beispiel: Navigation Migration
+
+**Vorher:**
+
+```html
+<nav class="navbar">
+  <div class="nav-container">
+    <h1 class="nav-title">ZEV Management</h1>
+    <ul class="nav-menu">
+      <li><a href="/upload" class="active">Upload</a></li>
+      <li><a href="/einheiten">Einheiten</a></li>
+    </ul>
+  </div>
+</nav>
+```
+
+**Nachher:**
+
+```html
+<nav class="zev-navbar">
+  <div class="zev-navbar__container">
+    <h1 class="zev-navbar__title">ZEV Management</h1>
+    <ul class="zev-navbar__menu">
+      <li><a href="/upload" class="zev-navbar__link zev-navbar__link--active">Upload</a></li>
+      <li><a href="/einheiten" class="zev-navbar__link">Einheiten</a></li>
+    </ul>
+  </div>
+</nav>
+```
+
+## Komponenten-Migrations-Reihenfolge
+
+1. ✅ **Navigation** (einfachste, höchste Sichtbarkeit)
+2. **Buttons** (alle Komponenten)
+3. **Form-Komponenten**
+4. **Table**
+5. **Messages**
+6. **Chart**
+7. **Berechnung**
+
+## Migrations-Checkliste
+
+Für jede Komponente:
+
+- [ ] Design System CSS-Klassen anwenden
+- [ ] Template aktualisieren
+- [ ] Component CSS entfernen/reduzieren
+- [ ] Visuell im Browser testen
+- [ ] Interaktive States testen (hover, focus, disabled)
+- [ ] Browser-Console auf Fehler prüfen
+- [ ] Responsive Verhalten validieren
+
+## TypeScript Token-Verwendung
+
+In Component-Code:
+
+```typescript
+import { colors, spacing } from '@zev/design-system';
+
+export class MyComponent {
+  chartColors = [
+    colors.primary.base,
+    colors.secondary.base,
+    colors.danger.base,
+  ];
+
+  formSpacing = spacing.md;
+}
+```
+
+## Häufige Probleme
+
+### CSS wird nicht geladen
+
+**Problem**: Design System Styles werden nicht angewendet.
+
+**Lösung**:
+1. Überprüfe `angular.json` Import-Pfad
+2. Stelle sicher, dass `npm install` ausgeführt wurde
+3. Starte `ng serve` neu
+
+### Klassen-Konflikte
+
+**Problem**: Alte und neue Styles überlagern sich.
+
+**Lösung**:
+1. Entferne alte CSS-Dateien schrittweise
+2. Verwende spezifischere Selektoren falls nötig
+3. Nutze Browser DevTools zur Fehlersuche
+
+## Testing nach Migration
+
+1. **Visueller Test**: Vergleiche vor/nach Screenshots
+2. **Funktionstest**: Teste alle interaktiven Elemente
+3. **Responsive**: Teste verschiedene Bildschirmgrößen
+4. **Browser**: Teste in Chrome, Firefox, Safari, Edge
+5. **Accessibility**: Teste Tastaturnavigation
+
+## Rollback
+
+Falls Probleme auftreten:
+
+```bash
+# Design System entfernen
+npm uninstall @zev/design-system
+
+# angular.json zurücksetzen (aus Git)
+git checkout frontend-service/angular.json
+
+# Component-Dateien zurücksetzen
+git checkout frontend-service/src/app/components/
+```
+
+## Support
+
+Bei Fragen oder Problemen:
+- Konsultiere die Storybook-Dokumentation
+- Erstelle ein Issue im Repository
+- Frage das Entwicklungsteam
