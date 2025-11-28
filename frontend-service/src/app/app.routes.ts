@@ -5,7 +5,7 @@ import { SolarCalculationComponent } from './components/solar-calculation/solar-
 import { MesswerteChartComponent } from './components/messwerte-chart/messwerte-chart.component';
 
 export const routes: Routes = [
-  { path: '', redirectTo: '/upload', pathMatch: 'full' },
+  { path: '', redirectTo: '/chart', pathMatch: 'full' },
   { path: 'upload', component: MesswerteUploadComponent },
   { path: 'einheiten', component: EinheitListComponent },
   { path: 'solar-calculation', component: SolarCalculationComponent },
