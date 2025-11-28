@@ -1,41 +1,42 @@
+/* Nutzt Design System Variablen */
 .container {
   max-width: 800px;
   margin: 0 auto;
 }
 
 .result-summary {
-  margin-top: 30px;
-  padding: 20px;
-  background-color: #f5f5f5;
-  border-radius: 8px;
+  margin-top: var(--spacing-xl);
+  padding: var(--spacing-lg);
+  background-color: var(--color-gray-100);
+  border-radius: var(--radius-md);
 }
 
 .result-summary h2 {
   margin-top: 0;
-  margin-bottom: 15px;
-  color: #333;
+  margin-bottom: var(--spacing-md);
+  color: var(--color-gray-800);
 }
 
 .summary-grid {
   display: grid;
-  gap: 15px;
+  gap: var(--spacing-md);
 }
 
 .summary-item {
   display: flex;
   justify-content: space-between;
-  padding: 10px;
-  background-color: white;
-  border-radius: 4px;
-  border-left: 4px solid #4CAF50;
+  padding: var(--spacing-sm);
+  background-color: var(--color-white);
+  border-radius: var(--radius-sm);
+  border-left: 4px solid var(--color-primary);
 }
 
 .summary-item .label {
-  font-weight: 600;
-  color: #666;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-600);
 }
 
 .summary-item .value {
-  font-weight: 700;
-  color: #333;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-gray-800);
 }

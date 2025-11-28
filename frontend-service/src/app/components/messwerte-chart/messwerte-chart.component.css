@@ -1,16 +1,17 @@
+/* Nutzt Design System Variablen */
 .container {
-  max-width: 1200px;
+  max-width: var(--layout-max-width);
   margin: 0 auto;
 }
 
 .checkbox-group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background-color: #f9f9f9;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-gray-50);
   max-height: 300px;
   overflow-y: auto;
 }
@@ -18,7 +19,7 @@
 .checkbox-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-xs);
 }
 
 .checkbox-item input[type="checkbox"] {
@@ -34,25 +35,25 @@
 }
 
 .chart-wrapper {
-  margin-top: 40px;
+  margin-top: var(--spacing-xxl);
 }
 
 .chart-wrapper h3 {
-  margin-bottom: 15px;
-  color: #333;
+  margin-bottom: var(--spacing-md);
+  color: var(--color-gray-800);
   font-size: 1.2em;
 }
 
 .chart-container {
-  margin-top: 15px;
+  margin-top: var(--spacing-md);
   height: 400px;
   min-height: 200px;
   max-height: 1000px;
   position: relative;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  padding: 10px;
-  background-color: white;
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm);
+  background-color: var(--color-white);
   resize: vertical;
   overflow: auto;
 }

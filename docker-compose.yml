@@ -37,7 +37,9 @@ services:
     restart: unless-stopped
 
   frontend-service:
-    build: ./frontend-service
+    build:
+      context: .
+      dockerfile: frontend-service/Dockerfile
     container_name: frontend-service
     ports:
       - "4200:80"

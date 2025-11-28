@@ -13,18 +13,9 @@
     "build": "npm run build:css && npm run build:ts",
     "build:css": "node scripts/build-css.js",
     "build:ts": "tsc && rollup -c",
-    "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build",
     "watch": "npm run build:ts -- --watch"
   },
   "devDependencies": {
-    "@storybook/angular": "^7.6.0",
-    "@storybook/addon-essentials": "^7.6.0",
-    "@storybook/addon-interactions": "^7.6.0",
-    "@storybook/addon-links": "^7.6.0",
-    "@storybook/blocks": "^7.6.0",
-    "@storybook/test": "^7.6.0",
-    "storybook": "^7.6.0",
     "typescript": "~5.2.2",
     "rollup": "^4.0.0",
     "rollup-plugin-typescript2": "^0.36.0",

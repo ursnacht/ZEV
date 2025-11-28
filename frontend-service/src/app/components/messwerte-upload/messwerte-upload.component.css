@@ -1,4 +1,5 @@
+/* Nutzt globale .container Klasse vom Design System */
+/* Nur component-spezifische Overrides hier */
 .container {
-  max-width: 600px;
-  margin: 0 auto;
+  max-width: 600px; /* Engerer Container für Upload-Formular */
 }

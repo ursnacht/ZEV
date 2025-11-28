@@ -26,6 +26,7 @@
               "src/manifest.json"
             ],
             "styles": [
+              "/design-system/dist/index.css",
               "src/styles.css"
             ],
             "scripts": []
