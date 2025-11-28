@@ -1,0 +1,17 @@
+{
+  "name": "ZEV Management",
+  "short_name": "ZEV",
+  "description": "Zusammenschluss zum Eigenverbrauch Management System",
+  "icons": [
+    {
+      "src": "assets/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "theme_color": "#4CAF50",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/"
+}
