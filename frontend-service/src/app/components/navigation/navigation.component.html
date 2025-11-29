@@ -17,6 +17,9 @@
       <li>
         <a routerLink="/chart" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">Messwerte Grafik</a>
       </li>
+      <li *ngIf="userName" class="zev-navbar__user">
+        <span class="zev-navbar__username">{{ userName }}</span>
+      </li>
       <li>
         <button (click)="logout()" class="zev-navbar__link"
           style="background: none; border: none; cursor: pointer;">Logout</button>

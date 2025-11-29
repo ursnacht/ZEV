@@ -5,3 +5,14 @@
   /* Kompensiert body padding für full-width Navigation */
   margin: calc(var(--spacing-lg) * -1) calc(var(--spacing-lg) * -1) var(--spacing-lg);
 }
+
+.zev-navbar__user {
+  display: flex;
+  align-items: center;
+}
+
+.zev-navbar__username {
+  color: var(--color-text-light, #ffffff);
+  font-weight: 500;
+  padding: 0 var(--spacing-md, 1rem);
+}
