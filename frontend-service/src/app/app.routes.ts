@@ -9,9 +9,9 @@ import { AuthGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/chart', pathMatch: 'full' },
-  { path: 'upload', component: MesswerteUploadComponent, canActivate: [AuthGuard] },
-  { path: 'einheiten', component: EinheitListComponent, canActivate: [AuthGuard] },
-  { path: 'solar-calculation', component: SolarCalculationComponent, canActivate: [AuthGuard] },
-  { path: 'chart', component: MesswerteChartComponent, canActivate: [AuthGuard] },
-  { path: 'design-system', component: DesignSystemShowcaseComponent, canActivate: [AuthGuard] }
+  { path: 'upload', component: MesswerteUploadComponent, canActivate: [AuthGuard], data: { roles: ['zev'] } },
+  { path: 'einheiten', component: EinheitListComponent, canActivate: [AuthGuard], data: { roles: ['zev'] } },
+  { path: 'solar-calculation', component: SolarCalculationComponent, canActivate: [AuthGuard], data: { roles: ['zev'] } },
+  { path: 'chart', component: MesswerteChartComponent, canActivate: [AuthGuard], data: { roles: ['zev'] } },
+  { path: 'design-system', component: DesignSystemShowcaseComponent, canActivate: [AuthGuard], data: { roles: ['zev'] } }
 ];
