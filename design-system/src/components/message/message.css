@@ -1,0 +1,38 @@
+/**
+ * Message/Alert Component Styles
+ */
+
+@import '../../tokens/tokens.css';
+
+/* Message/Alert Base */
+.zev-message {
+  padding: var(--spacing-md);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--spacing-lg);
+  border: 1px solid transparent;
+}
+
+/* Message Variants */
+.zev-message--success {
+  background-color: var(--color-success-light);
+  color: var(--color-success-dark);
+  border-color: var(--color-success);
+}
+
+.zev-message--error {
+  background-color: var(--color-danger-light);
+  color: var(--color-danger-dark);
+  border-color: var(--color-danger);
+}
+
+.zev-message--warning {
+  background-color: #fff3cd;
+  color: #856404;
+  border-color: #ffc107;
+}
+
+.zev-message--info {
+  background-color: #d1ecf1;
+  color: #0c5460;
+  border-color: #17a2b8;
+}

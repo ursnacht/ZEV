@@ -1,25 +1,4 @@
-/* Nutzt Design System Variablen */
-.actions button {
-  margin-right: var(--spacing-sm);
-  padding: var(--spacing-xs) var(--spacing-md);
-  font-size: var(--font-size-sm);
-}
-
-button.primary {
-  margin-bottom: var(--spacing-lg);
-}
-
-th.sortable {
-  cursor: pointer;
-  user-select: none;
-}
-
-th.sortable:hover {
-  background-color: var(--color-gray-100);
-}
-
-.sort-indicator {
-  margin-left: var(--spacing-xxs);
-  font-size: var(--font-size-xs);
-  color: var(--color-primary);
-}
+/*
+ * Einheit List Component
+ * Alle Styles kommen aus dem Design System
+ */

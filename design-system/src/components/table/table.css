@@ -1,0 +1,56 @@
+/**
+ * Table Component Styles
+ */
+
+@import '../../tokens/tokens.css';
+
+/* Table */
+.zev-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: var(--spacing-lg);
+}
+
+.zev-table th,
+.zev-table td {
+  padding: var(--spacing-sm);
+  text-align: left;
+  border-bottom: 1px solid var(--color-gray-200);
+}
+
+.zev-table th {
+  background-color: var(--color-gray-50);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-800);
+}
+
+.zev-table tr:hover {
+  background-color: var(--color-gray-100);
+}
+
+.zev-table--striped tbody tr:nth-child(odd) {
+  background-color: var(--color-gray-50);
+}
+
+/* Table Actions */
+.zev-table-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+/* Sortable Table Headers */
+.zev-table__header--sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--transition-fast);
+}
+
+.zev-table__header--sortable:hover {
+  background-color: var(--color-gray-100);
+}
+
+.zev-table__sort-indicator {
+  margin-left: var(--spacing-xxs);
+  font-size: var(--font-size-xs);
+  color: var(--color-primary);
+}

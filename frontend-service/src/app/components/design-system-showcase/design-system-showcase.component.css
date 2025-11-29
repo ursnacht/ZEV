@@ -1,0 +1,233 @@
+/*
+ * Design System Showcase - Layout Utilities
+ * Alle Style-Komponenten kommen aus dem Design System
+ */
+
+.intro {
+  color: var(--color-gray-600);
+  margin-bottom: var(--spacing-xxl);
+  font-size: var(--font-size-base);
+}
+
+/* Showcase Sections */
+.showcase-section {
+  margin-bottom: var(--spacing-xxl);
+  padding: var(--spacing-lg);
+  background-color: var(--color-white);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.showcase-section h2 {
+  color: var(--color-gray-800);
+  margin-top: 0;
+  margin-bottom: var(--spacing-lg);
+  border-bottom: 2px solid var(--color-primary);
+  padding-bottom: var(--spacing-sm);
+}
+
+.subsection {
+  margin-bottom: var(--spacing-xl);
+}
+
+.subsection:last-child {
+  margin-bottom: 0;
+}
+
+.subsection h3 {
+  color: var(--color-gray-700);
+  margin-bottom: var(--spacing-md);
+  font-size: var(--font-size-lg);
+}
+
+/* Color Grid */
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.color-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.color-box {
+  height: 80px;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card);
+}
+
+.color-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xxs);
+  font-size: var(--font-size-sm);
+}
+
+.color-info strong {
+  color: var(--color-gray-800);
+  font-weight: var(--font-weight-semibold);
+}
+
+.color-info code {
+  color: var(--color-secondary);
+  background-color: var(--color-gray-100);
+  padding: 2px var(--spacing-xxs);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+}
+
+.color-info span {
+  color: var(--color-gray-600);
+  font-size: var(--font-size-xs);
+}
+
+/* Typography Samples */
+.typography-samples {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.typography-samples p {
+  margin: 0;
+  color: var(--color-gray-800);
+}
+
+.typography-samples code {
+  color: var(--color-secondary);
+  background-color: var(--color-gray-100);
+  padding: 2px var(--spacing-xxs);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  margin-left: var(--spacing-xs);
+}
+
+/* Button Samples */
+.button-samples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+}
+
+/* Navigation Sample */
+.navigation-sample {
+  background-color: var(--color-gray-100);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
+}
+
+/* Spacing Samples */
+.spacing-samples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xl);
+  align-items: flex-end;
+}
+
+.spacing-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.spacing-box {
+  background-color: var(--color-primary);
+  border-radius: var(--radius-sm);
+}
+
+.spacing-item span {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-600);
+}
+
+.spacing-item code {
+  color: var(--color-secondary);
+  background-color: var(--color-gray-100);
+  padding: 2px var(--spacing-xxs);
+  border-radius: var(--radius-sm);
+}
+
+/* Radius Samples */
+.radius-samples {
+  display: flex;
+  gap: var(--spacing-xl);
+}
+
+.radius-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.radius-box {
+  width: 100px;
+  height: 100px;
+  background-color: var(--color-primary);
+  box-shadow: var(--shadow-card);
+}
+
+.radius-item span {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-600);
+}
+
+.radius-item code {
+  color: var(--color-secondary);
+  background-color: var(--color-gray-100);
+  padding: 2px var(--spacing-xxs);
+  border-radius: var(--radius-sm);
+}
+
+/* Shadow Samples */
+.shadow-samples {
+  display: flex;
+  gap: var(--spacing-xl);
+}
+
+.shadow-box {
+  padding: var(--spacing-lg);
+  background-color: var(--color-white);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.shadow-box p {
+  margin: 0 0 var(--spacing-sm) 0;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-800);
+}
+
+.shadow-box code {
+  color: var(--color-secondary);
+  background-color: var(--color-gray-100);
+  padding: 2px var(--spacing-xxs);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+}
+
+/* Form Samples */
+.form-samples {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  max-width: var(--form-max-width);
+}
+
+/* Alert Samples */
+.alert-samples {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+/* Card Samples */
+.card-samples {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--spacing-lg);
+}

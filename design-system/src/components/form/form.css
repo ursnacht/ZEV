@@ -1,0 +1,49 @@
+/**
+ * Form Component Styles
+ */
+
+@import '../../tokens/tokens.css';
+
+/* Form Inputs */
+.zev-input,
+.zev-select {
+  width: 100%;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-primary);
+  transition: border-color var(--transition-fast);
+}
+
+.zev-input:focus,
+.zev-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.zev-input:disabled,
+.zev-select:disabled {
+  background-color: var(--color-gray-100);
+  cursor: not-allowed;
+}
+
+/* Form Group */
+.zev-form-group {
+  margin-bottom: var(--spacing-md);
+}
+
+.zev-form-group label {
+  display: block;
+  margin-bottom: var(--spacing-xxs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-600);
+  font-size: var(--font-size-sm);
+}
+
+/* Form Error */
+.zev-form-error {
+  color: var(--color-danger);
+  font-size: var(--font-size-xs);
+  margin-top: var(--spacing-xxs);
+}

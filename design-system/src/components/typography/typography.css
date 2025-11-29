@@ -1,0 +1,81 @@
+/**
+ * Typography Styles
+ */
+
+@import '../../tokens/tokens.css';
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--color-gray-800);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+}
+
+h1 {
+  font-size: var(--font-size-xxl);
+  margin-bottom: var(--spacing-lg);
+}
+
+h2 {
+  font-size: var(--font-size-xl);
+  margin-bottom: var(--spacing-lg);
+}
+
+h3 {
+  font-size: var(--font-size-lg);
+  margin-bottom: var(--spacing-md);
+}
+
+h4 {
+  font-size: var(--font-size-base);
+  margin-bottom: var(--spacing-sm);
+}
+
+h5 {
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+h6 {
+  font-size: var(--font-size-xs);
+  margin-bottom: var(--spacing-xs);
+}
+
+/* Body Text */
+p {
+  margin-bottom: var(--spacing-md);
+  line-height: 1.6;
+}
+
+/* Text Utilities */
+.zev-text--primary {
+  color: var(--color-primary);
+}
+
+.zev-text--secondary {
+  color: var(--color-secondary);
+}
+
+.zev-text--danger {
+  color: var(--color-danger);
+}
+
+.zev-text--success {
+  color: var(--color-success);
+}
+
+.zev-text--muted {
+  color: var(--color-gray-600);
+}
+
+.zev-text--bold {
+  font-weight: var(--font-weight-bold);
+}
+
+.zev-text--semibold {
+  font-weight: var(--font-weight-semibold);
+}
+
+.zev-text--normal {
+  font-weight: var(--font-weight-normal);
+}

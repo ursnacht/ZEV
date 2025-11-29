@@ -1,0 +1,49 @@
+/**
+ * Panel Component Styles
+ * Generic content panels for charts, widgets, etc.
+ */
+
+@import '../../tokens/tokens.css';
+
+/* Panel/Widget Wrapper */
+.zev-panel {
+  margin-top: var(--spacing-xxl);
+}
+
+.zev-panel__title {
+  margin-bottom: var(--spacing-md);
+  color: var(--color-gray-800);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.zev-panel__content {
+  margin-top: var(--spacing-md);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm);
+  background-color: var(--color-white);
+}
+
+/* Chart-specific Panel */
+.zev-panel--chart .zev-panel__content {
+  height: 400px;
+  min-height: 200px;
+  max-height: 1000px;
+  position: relative;
+  resize: vertical;
+  overflow: auto;
+}
+
+/* Panel Variants */
+.zev-panel--compact {
+  margin-top: var(--spacing-lg);
+}
+
+.zev-panel--no-border .zev-panel__content {
+  border: none;
+}
+
+.zev-panel--flush .zev-panel__content {
+  padding: 0;
+}

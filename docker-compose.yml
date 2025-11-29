@@ -9,7 +9,7 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
     volumes:
-      - /data/ZEV/postgres-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     networks:
       - zev-network
     restart: unless-stopped
@@ -80,6 +80,8 @@ services:
       - zev-network
     restart: unless-stopped
 
+volumes:
+  postgres-data:
 networks:
   zev-network:
     driver: bridge

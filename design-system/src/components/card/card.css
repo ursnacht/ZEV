@@ -1,0 +1,46 @@
+/**
+ * Card Component Styles
+ */
+
+@import '../../tokens/tokens.css';
+
+/* Card Base */
+.zev-card {
+  padding: var(--spacing-lg);
+  background-color: var(--color-white);
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.zev-card__title {
+  margin-top: 0;
+  margin-bottom: var(--spacing-md);
+  color: var(--color-gray-800);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.zev-card__content {
+  margin-bottom: var(--spacing-lg);
+  color: var(--color-gray-600);
+  line-height: 1.6;
+}
+
+/* Card Variants */
+.zev-card--no-border {
+  border: none;
+}
+
+.zev-card--no-shadow {
+  box-shadow: none;
+}
+
+.zev-card--interactive {
+  cursor: pointer;
+  transition: box-shadow var(--transition-fast);
+}
+
+.zev-card--interactive:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}

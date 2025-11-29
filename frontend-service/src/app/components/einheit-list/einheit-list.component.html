@@ -1,31 +1,31 @@
-<div class="container">
+<div class="zev-container">
   <h1>Einheiten Verwaltung</h1>
 
-  <div *ngIf="message" class="message" [ngClass]="messageType">
+  <div *ngIf="message" class="zev-message" [ngClass]="'zev-message--' + messageType">
     {{ message }}
   </div>
 
   <div *ngIf="!showForm">
-    <button class="primary" (click)="onCreateNew()">Neue Einheit erstellen</button>
+    <button class="zev-button zev-button--primary" (click)="onCreateNew()">Neue Einheit erstellen</button>
 
-    <table *ngIf="einheiten.length > 0">
+    <table class="zev-table" *ngIf="einheiten.length > 0">
       <thead>
         <tr>
-          <th class="sortable" (click)="onSort('id')">
+          <th class="zev-table__header--sortable" (click)="onSort('id')">
             ID
-            <span class="sort-indicator" *ngIf="sortColumn === 'id'">
+            <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'id'">
               {{ sortDirection === 'asc' ? '▲' : '▼' }}
             </span>
           </th>
-          <th class="sortable" (click)="onSort('name')">
+          <th class="zev-table__header--sortable" (click)="onSort('name')">
             Name
-            <span class="sort-indicator" *ngIf="sortColumn === 'name'">
+            <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'name'">
               {{ sortDirection === 'asc' ? '▲' : '▼' }}
             </span>
           </th>
-          <th class="sortable" (click)="onSort('typ')">
+          <th class="zev-table__header--sortable" (click)="onSort('typ')">
             Typ
-            <span class="sort-indicator" *ngIf="sortColumn === 'typ'">
+            <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'typ'">
               {{ sortDirection === 'asc' ? '▲' : '▼' }}
             </span>
           </th>
@@ -38,9 +38,9 @@
           <td>{{ einheit.name }}</td>
           <td>{{ einheit.typ }}</td>
           <td>
-            <div class="actions">
-              <button class="secondary" (click)="onEdit(einheit)">Bearbeiten</button>
-              <button class="danger" (click)="onDelete(einheit.id)">Löschen</button>
+            <div class="zev-table-actions">
+              <button class="zev-button zev-button--secondary" (click)="onEdit(einheit)">Bearbeiten</button>
+              <button class="zev-button zev-button--danger" (click)="onDelete(einheit.id)">Löschen</button>
             </div>
           </td>
         </tr>

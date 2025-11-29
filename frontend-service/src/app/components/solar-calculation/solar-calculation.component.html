@@ -1,22 +1,22 @@
-<div class="container">
+<div class="zev-container">
   <h1>Solar Distribution Berechnung</h1>
 
-  <div *ngIf="message" class="message" [ngClass]="messageType">
+  <div *ngIf="message" class="zev-message" [ngClass]="'zev-message--' + messageType">
     {{ message }}
   </div>
 
   <form (ngSubmit)="onSubmit()">
-    <div class="form-group">
+    <div class="zev-form-group">
       <label for="dateFrom">Von Datum:</label>
-      <input type="date" id="dateFrom" name="dateFrom" [(ngModel)]="dateFrom" (ngModelChange)="onDateFromChange()" required>
+      <input type="date" id="dateFrom" class="zev-input" name="dateFrom" [(ngModel)]="dateFrom" (ngModelChange)="onDateFromChange()" required>
     </div>
 
-    <div class="form-group">
+    <div class="zev-form-group">
       <label for="dateTo">Bis Datum:</label>
-      <input type="date" id="dateTo" name="dateTo" [(ngModel)]="dateTo" required>
+      <input type="date" id="dateTo" class="zev-input" name="dateTo" [(ngModel)]="dateTo" required>
     </div>
 
-    <button type="submit" class="primary" [disabled]="calculating || !dateFrom || !dateTo">
+    <button type="submit" class="zev-button zev-button--primary" [disabled]="calculating || !dateFrom || !dateTo">
       {{ calculating ? 'Berechnung läuft...' : 'Berechnen' }}
     </button>
   </form>

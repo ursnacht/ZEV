@@ -1,0 +1,28 @@
+/**
+ * Container Component Styles
+ */
+
+@import '../../tokens/tokens.css';
+
+/* Container */
+.zev-container {
+  max-width: var(--layout-max-width);
+  margin: 0 auto;
+  background-color: var(--color-white);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+/* Container Variants */
+.zev-container--fluid {
+  max-width: 100%;
+}
+
+.zev-container--no-shadow {
+  box-shadow: none;
+}
+
+.zev-container--no-background {
+  background-color: transparent;
+}

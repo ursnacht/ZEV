@@ -1,15 +1,15 @@
-<div class="container">
+<div class="zev-container">
   <h1>Messwerte Grafik</h1>
 
-  <div *ngIf="message" class="message" [ngClass]="messageType">
+  <div *ngIf="message" class="zev-message" [ngClass]="'zev-message--' + messageType">
     {{ message }}
   </div>
 
   <form (ngSubmit)="onSubmit()">
-    <div class="form-group">
+    <div class="zev-form-group">
       <label>Einheiten:</label>
-      <div class="checkbox-group">
-        <div *ngFor="let einheit of einheiten" class="checkbox-item">
+      <div class="zev-checkbox-group zev-checkbox-group--scrollable">
+        <div *ngFor="let einheit of einheiten" class="zev-checkbox-item">
           <input
             type="checkbox"
             [id]="'einheit-' + einheit.id"
@@ -24,24 +24,24 @@
       </div>
     </div>
 
-    <div class="form-group">
+    <div class="zev-form-group">
       <label for="dateFrom">Von Datum:</label>
-      <input type="date" id="dateFrom" name="dateFrom" [(ngModel)]="dateFrom" (ngModelChange)="onDateFromChange()" required>
+      <input type="date" id="dateFrom" class="zev-input" name="dateFrom" [(ngModel)]="dateFrom" (ngModelChange)="onDateFromChange()" required>
     </div>
 
-    <div class="form-group">
+    <div class="zev-form-group">
       <label for="dateTo">Bis Datum:</label>
-      <input type="date" id="dateTo" name="dateTo" [(ngModel)]="dateTo" required>
+      <input type="date" id="dateTo" class="zev-input" name="dateTo" [(ngModel)]="dateTo" required>
     </div>
 
-    <button type="submit" class="primary" [disabled]="loading || !dateFrom || !dateTo || selectedEinheitIds.size === 0">
+    <button type="submit" class="zev-button zev-button--primary" [disabled]="loading || !dateFrom || !dateTo || selectedEinheitIds.size === 0">
       {{ loading ? 'Lade Daten...' : 'Anzeigen' }}
     </button>
   </form>
 
-  <div *ngFor="let chartData of charts" class="chart-wrapper">
-    <h3>{{ chartData.einheitName }} ({{ chartData.einheitTyp }})</h3>
-    <div class="chart-container">
+  <div *ngFor="let chartData of charts" class="zev-panel zev-panel--chart">
+    <h3 class="zev-panel__title">{{ chartData.einheitName }} ({{ chartData.einheitTyp }})</h3>
+    <div class="zev-panel__content">
       <canvas [id]="'chart-' + chartData.einheitId"></canvas>
     </div>
   </div>

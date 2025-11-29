@@ -1,0 +1,48 @@
+/**
+ * Checkbox Component Styles
+ */
+
+@import '../../tokens/tokens.css';
+
+/* Checkbox Group */
+.zev-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-gray-50);
+}
+
+.zev-checkbox-group--scrollable {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Checkbox Item */
+.zev-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.zev-checkbox-item input[type="checkbox"] {
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-primary);
+}
+
+.zev-checkbox-item label {
+  cursor: pointer;
+  margin: 0;
+  user-select: none;
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-800);
+}
+
+.zev-checkbox-item input[type="checkbox"]:disabled + label {
+  color: var(--color-gray-400);
+  cursor: not-allowed;
+}
