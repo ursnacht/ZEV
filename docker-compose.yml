@@ -14,7 +14,7 @@ services:
       - zev-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -44,7 +44,7 @@ services:
     volumes:
       - ./keycloak/realms:/opt/keycloak/data/import
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/health/ready"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/health/ready" ]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -60,6 +60,8 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/zev
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:9000/realms/zev
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:9000/realms/zev/protocol/openid-connect/certs
     depends_on:
       postgres:
         condition: service_healthy
@@ -85,4 +87,3 @@ volumes:
 networks:
   zev-network:
     driver: bridge
-

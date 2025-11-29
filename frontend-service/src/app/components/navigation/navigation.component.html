@@ -3,16 +3,23 @@
     <h1 class="zev-navbar__title">ZEV Management</h1>
     <ul class="zev-navbar__menu">
       <li>
-        <a routerLink="/upload" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">Messwerte Upload</a>
+        <a routerLink="/upload" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">Messwerte
+          Upload</a>
       </li>
       <li>
-        <a routerLink="/einheiten" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">Einheiten verwalten</a>
+        <a routerLink="/einheiten" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">Einheiten
+          verwalten</a>
       </li>
       <li>
-        <a routerLink="/solar-calculation" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">Solar Distribution</a>
+        <a routerLink="/solar-calculation" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">Solar
+          Distribution</a>
       </li>
       <li>
         <a routerLink="/chart" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">Messwerte Grafik</a>
+      </li>
+      <li>
+        <button (click)="logout()" class="zev-navbar__link"
+          style="background: none; border: none; cursor: pointer;">Logout</button>
       </li>
     </ul>
   </div>
