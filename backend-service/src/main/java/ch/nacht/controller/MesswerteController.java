@@ -2,6 +2,7 @@ package ch.nacht.controller;
 
 import ch.nacht.service.MesswerteService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -21,6 +22,7 @@ public class MesswerteController {
     }
 
     @PostMapping("/upload")
+    @PreAuthorize("hasRole('zev_admin')")
     public ResponseEntity<Map<String, Object>> uploadCsv(
             @RequestParam("date") String dateStr,
             @RequestParam("einheitId") Long einheitId,
@@ -38,6 +40,7 @@ public class MesswerteController {
     }
 
     @PostMapping("/calculate-distribution")
+    @PreAuthorize("hasRole('zev_admin')")
     public ResponseEntity<Map<String, Object>> calculateDistribution(
             @RequestParam("dateFrom") String dateFromStr,
             @RequestParam("dateTo") String dateToStr) {
@@ -71,6 +74,7 @@ public class MesswerteController {
     }
 
     @GetMapping("/by-einheit")
+    @PreAuthorize("hasRole('zev')")
     public ResponseEntity<List<Map<String, Object>>> getMesswerteByEinheit(
             @RequestParam("einheitId") Long einheitId,
             @RequestParam("dateFrom") String dateFromStr,

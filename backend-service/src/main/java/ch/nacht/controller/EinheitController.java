@@ -4,12 +4,14 @@ import ch.nacht.entity.Einheit;
 import ch.nacht.service.EinheitService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/einheit")
+@PreAuthorize("hasRole('zev_admin')")
 public class EinheitController {
 
     private final EinheitService einheitService;
@@ -19,6 +21,7 @@ public class EinheitController {
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('zev')")
     public List<Einheit> getAllEinheiten() {
         return einheitService.getAllEinheiten();
     }
