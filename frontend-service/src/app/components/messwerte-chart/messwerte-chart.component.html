@@ -1,5 +1,5 @@
 <div class="zev-container">
-  <h1>Messwerte Grafik</h1>
+  <h1>{{ 'MESSWERTE_GRAFIK' | translate }}</h1>
 
   <div *ngIf="message" class="zev-message" [ngClass]="'zev-message--' + messageType">
     {{ message }}
@@ -7,16 +7,11 @@
 
   <form (ngSubmit)="onSubmit()">
     <div class="zev-form-group">
-      <label>Einheiten:</label>
+      <label>{{ 'EINHEITEN' | translate }}:</label>
       <div class="zev-checkbox-group zev-checkbox-group--scrollable">
         <div *ngFor="let einheit of einheiten" class="zev-checkbox-item">
-          <input
-            type="checkbox"
-            [id]="'einheit-' + einheit.id"
-            [value]="einheit.id"
-            [checked]="selectedEinheitIds.has(einheit.id!)"
-            (change)="onEinheitToggle(einheit.id!)"
-          >
+          <input type="checkbox" [id]="'einheit-' + einheit.id" [value]="einheit.id"
+            [checked]="selectedEinheitIds.has(einheit.id!)" (change)="onEinheitToggle(einheit.id!)">
           <label [for]="'einheit-' + einheit.id">
             {{ einheit.name }} ({{ einheit.typ }})
           </label>
@@ -25,17 +20,19 @@
     </div>
 
     <div class="zev-form-group">
-      <label for="dateFrom">Von Datum:</label>
-      <input type="date" id="dateFrom" class="zev-input" name="dateFrom" [(ngModel)]="dateFrom" (ngModelChange)="onDateFromChange()" required>
+      <label for="dateFrom">{{ 'VON_DATUM' | translate }}:</label>
+      <input type="date" id="dateFrom" class="zev-input" name="dateFrom" [(ngModel)]="dateFrom"
+        (ngModelChange)="onDateFromChange()" required>
     </div>
 
     <div class="zev-form-group">
-      <label for="dateTo">Bis Datum:</label>
+      <label for="dateTo">{{ 'BIS_DATUM' | translate }}:</label>
       <input type="date" id="dateTo" class="zev-input" name="dateTo" [(ngModel)]="dateTo" required>
     </div>
 
-    <button type="submit" class="zev-button zev-button--primary" [disabled]="loading || !dateFrom || !dateTo || selectedEinheitIds.size === 0">
-      {{ loading ? 'Lade Daten...' : 'Anzeigen' }}
+    <button type="submit" class="zev-button zev-button--primary"
+      [disabled]="loading || !dateFrom || !dateTo || selectedEinheitIds.size === 0">
+      {{ loading ? ('LADE_DATEN' | translate) : ('ANZEIGEN' | translate) }}
     </button>
   </form>
 

@@ -5,10 +5,12 @@ import { HttpClient } from '@angular/common/http';
 import { EinheitService } from '../../services/einheit.service';
 import { Einheit } from '../../models/einheit.model';
 
+import { TranslatePipe } from '../../pipes/translate.pipe';
+
 @Component({
   selector: 'app-messwerte-upload',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, TranslatePipe],
   templateUrl: './messwerte-upload.component.html',
   styleUrls: ['./messwerte-upload.component.css']
 })
@@ -24,7 +26,7 @@ export class MesswerteUploadComponent implements OnInit {
   constructor(
     private http: HttpClient,
     private einheitService: EinheitService
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     this.loadEinheiten();

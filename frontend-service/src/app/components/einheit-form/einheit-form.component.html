@@ -1,26 +1,18 @@
 <div class="form-container">
-  <h2>{{ formData.id ? 'Einheit bearbeiten' : 'Neue Einheit erstellen' }}</h2>
+  <h2>{{ formData.id ? ('EINHEIT_BEARBEITEN' | translate) : ('NEUE_EINHEIT_ERSTELLEN' | translate) }}</h2>
 
   <form (ngSubmit)="onSubmit()">
     <div class="zev-form-group">
-      <label for="name">Name:</label>
-      <input
-        type="text"
-        id="name"
-        class="zev-input"
-        [(ngModel)]="formData.name"
-        name="name"
-        required
-        maxlength="30"
-        placeholder="Einheit Name"
-      />
+      <label for="name">{{ 'NAME' | translate }}:</label>
+      <input type="text" id="name" class="zev-input" [(ngModel)]="formData.name" name="name" required maxlength="30"
+        [placeholder]="'EINHEIT_NAME' | translate" />
       <div class="zev-form-error" *ngIf="!formData.name.trim()">
-        Name ist erforderlich
+        {{ 'NAME_IST_ERFORDERLICH' | translate }}
       </div>
     </div>
 
     <div class="zev-form-group">
-      <label for="typ">Typ:</label>
+      <label for="typ">{{ 'TYP' | translate }}:</label>
       <select id="typ" class="zev-select" [(ngModel)]="formData.typ" name="typ" required>
         <option *ngFor="let option of einheitTypOptions" [value]="option.value">
           {{ option.label }}
@@ -30,10 +22,10 @@
 
     <div class="form-actions">
       <button type="submit" class="zev-button zev-button--primary" [disabled]="!formData.name.trim()">
-        {{ formData.id ? 'Aktualisieren' : 'Erstellen' }}
+        {{ formData.id ? ('AKTUALISIEREN' | translate) : ('ERSTELLEN' | translate) }}
       </button>
       <button type="button" class="zev-button zev-button--secondary" (click)="onCancel()">
-        Abbrechen
+        {{ 'ABBRECHEN' | translate }}
       </button>
     </div>
   </form>

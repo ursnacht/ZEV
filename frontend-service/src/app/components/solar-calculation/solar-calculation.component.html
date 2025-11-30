@@ -1,5 +1,5 @@
 <div class="zev-container">
-  <h1>Solar Distribution Berechnung</h1>
+  <h1>{{ 'SOLAR_DISTRIBUTION_BERECHNUNG' | translate }}</h1>
 
   <div *ngIf="message" class="zev-message" [ngClass]="'zev-message--' + messageType">
     {{ message }}
@@ -7,41 +7,42 @@
 
   <form (ngSubmit)="onSubmit()">
     <div class="zev-form-group">
-      <label for="dateFrom">Von Datum:</label>
-      <input type="date" id="dateFrom" class="zev-input" name="dateFrom" [(ngModel)]="dateFrom" (ngModelChange)="onDateFromChange()" required>
+      <label for="dateFrom">{{ 'VON_DATUM' | translate }}:</label>
+      <input type="date" id="dateFrom" class="zev-input" name="dateFrom" [(ngModel)]="dateFrom"
+        (ngModelChange)="onDateFromChange()" required>
     </div>
 
     <div class="zev-form-group">
-      <label for="dateTo">Bis Datum:</label>
+      <label for="dateTo">{{ 'BIS_DATUM' | translate }}:</label>
       <input type="date" id="dateTo" class="zev-input" name="dateTo" [(ngModel)]="dateTo" required>
     </div>
 
     <button type="submit" class="zev-button zev-button--primary" [disabled]="calculating || !dateFrom || !dateTo">
-      {{ calculating ? 'Berechnung läuft...' : 'Berechnen' }}
+      {{ calculating ? ('BERECHNUNG_LAEUFT' | translate) : ('BERECHNEN' | translate) }}
     </button>
   </form>
 
   <div *ngIf="result" class="result-summary">
-    <h2>Zusammenfassung</h2>
+    <h2>{{ 'ZUSAMMENFASSUNG' | translate }}</h2>
     <div class="summary-grid">
       <div class="summary-item">
-        <span class="label">Zeitbereich:</span>
+        <span class="label">{{ 'ZEITBEREICH' | translate }}:</span>
         <span class="value">{{ result.dateFrom | date:'short' }} - {{ result.dateTo | date:'short' }}</span>
       </div>
       <div class="summary-item">
-        <span class="label">Verarbeitete Zeitstempel:</span>
+        <span class="label">{{ 'VERARBEITETE_ZEITSTEMPEL' | translate }}:</span>
         <span class="value">{{ result.processedTimestamps }}</span>
       </div>
       <div class="summary-item">
-        <span class="label">Verarbeitete Einträge:</span>
+        <span class="label">{{ 'VERARBEITETE_EINTRAEGE' | translate }}:</span>
         <span class="value">{{ result.processedRecords }}</span>
       </div>
       <div class="summary-item">
-        <span class="label">Gesamt Solar Produktion:</span>
+        <span class="label">{{ 'GESAMT_SOLAR_PRODUKTION' | translate }}:</span>
         <span class="value">{{ result.totalSolarProduced | number:'1.2-2' }} kWh</span>
       </div>
       <div class="summary-item">
-        <span class="label">Gesamt Verteilt:</span>
+        <span class="label">{{ 'GESAMT_VERTEILT' | translate }}:</span>
         <span class="value">{{ result.totalDistributed | number:'1.2-2' }} kWh</span>
       </div>
     </div>

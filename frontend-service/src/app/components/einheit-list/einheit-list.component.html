@@ -1,35 +1,36 @@
 <div class="zev-container">
-  <h1>Einheiten Verwaltung</h1>
+  <h1>{{ 'EINHEITEN_VERWALTUNG' | translate }}</h1>
 
   <div *ngIf="message" class="zev-message" [ngClass]="'zev-message--' + messageType">
     {{ message }}
   </div>
 
   <div *ngIf="!showForm">
-    <button class="zev-button zev-button--primary" (click)="onCreateNew()">Neue Einheit erstellen</button>
+    <button class="zev-button zev-button--primary" (click)="onCreateNew()">{{ 'NEUE_EINHEIT_ERSTELLEN' | translate
+      }}</button>
 
     <table class="zev-table" *ngIf="einheiten.length > 0">
       <thead>
         <tr>
           <th class="zev-table__header--sortable" (click)="onSort('id')">
-            ID
+            {{ 'ID' | translate }}
             <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'id'">
               {{ sortDirection === 'asc' ? '▲' : '▼' }}
             </span>
           </th>
           <th class="zev-table__header--sortable" (click)="onSort('name')">
-            Name
+            {{ 'NAME' | translate }}
             <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'name'">
               {{ sortDirection === 'asc' ? '▲' : '▼' }}
             </span>
           </th>
           <th class="zev-table__header--sortable" (click)="onSort('typ')">
-            Typ
+            {{ 'TYP' | translate }}
             <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'typ'">
               {{ sortDirection === 'asc' ? '▲' : '▼' }}
             </span>
           </th>
-          <th>Aktionen</th>
+          <th>{{ 'AKTIONEN' | translate }}</th>
         </tr>
       </thead>
       <tbody>
@@ -39,21 +40,19 @@
           <td>{{ einheit.typ }}</td>
           <td>
             <div class="zev-table-actions">
-              <button class="zev-button zev-button--secondary" (click)="onEdit(einheit)">Bearbeiten</button>
-              <button class="zev-button zev-button--danger" (click)="onDelete(einheit.id)">Löschen</button>
+              <button class="zev-button zev-button--secondary" (click)="onEdit(einheit)">{{ 'BEARBEITEN' | translate
+                }}</button>
+              <button class="zev-button zev-button--danger" (click)="onDelete(einheit.id)">{{ 'LOESCHEN' | translate
+                }}</button>
             </div>
           </td>
         </tr>
       </tbody>
     </table>
 
-    <p *ngIf="einheiten.length === 0">Keine Einheiten vorhanden.</p>
+    <p *ngIf="einheiten.length === 0">{{ 'KEINE_EINHEITEN_VORHANDEN' | translate }}</p>
   </div>
 
-  <app-einheit-form
-    *ngIf="showForm"
-    [einheit]="selectedEinheit"
-    (save)="onFormSubmit($event)"
-    (cancel)="onFormCancel()"
-  ></app-einheit-form>
+  <app-einheit-form *ngIf="showForm" [einheit]="selectedEinheit" (save)="onFormSubmit($event)"
+    (cancel)="onFormCancel()"></app-einheit-form>
 </div>

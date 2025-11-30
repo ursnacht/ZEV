@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { EinheitService } from '../../services/einheit.service';
 import { Einheit } from '../../models/einheit.model';
 import { EinheitFormComponent } from '../einheit-form/einheit-form.component';
+import { TranslatePipe } from '../../pipes/translate.pipe';
 
 @Component({
   selector: 'app-einheit-list',
   standalone: true,
-  imports: [CommonModule, EinheitFormComponent],
+  imports: [CommonModule, EinheitFormComponent, TranslatePipe],
   templateUrl: './einheit-list.component.html',
   styleUrls: ['./einheit-list.component.css']
 })
@@ -20,7 +21,7 @@ export class EinheitListComponent implements OnInit {
   sortColumn: 'id' | 'name' | 'typ' | null = 'name';
   sortDirection: 'asc' | 'desc' = 'asc';
 
-  constructor(private einheitService: EinheitService) {}
+  constructor(private einheitService: EinheitService) { }
 
   ngOnInit(): void {
     this.loadEinheiten();

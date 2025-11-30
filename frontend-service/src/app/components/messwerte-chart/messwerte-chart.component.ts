@@ -6,6 +6,8 @@ import { MesswerteService, MesswertData } from '../../services/messwerte.service
 import { EinheitService } from '../../services/einheit.service';
 import { Einheit } from '../../models/einheit.model';
 import { forkJoin } from 'rxjs';
+import { TranslatePipe } from '../../pipes/translate.pipe';
+import { TranslationService } from '../../services/translation.service';
 
 Chart.register(...registerables);
 
@@ -19,7 +21,7 @@ interface ChartData {
 @Component({
   selector: 'app-messwerte-chart',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, TranslatePipe],
   templateUrl: './messwerte-chart.component.html',
   styleUrls: ['./messwerte-chart.component.css']
 })
@@ -35,8 +37,9 @@ export class MesswerteChartComponent implements OnInit {
 
   constructor(
     private messwerteService: MesswerteService,
-    private einheitService: EinheitService
-  ) {}
+    private einheitService: EinheitService,
+    private translationService: TranslationService
+  ) { }
 
   ngOnInit(): void {
     this.loadEinheiten();
@@ -52,7 +55,7 @@ export class MesswerteChartComponent implements OnInit {
         });
       },
       error: (error) => {
-        this.showMessage('Fehler beim Laden der Einheiten: ' + error.message, 'error');
+        this.showMessage(this.translationService.translate('FEHLER_BEIM_LADEN_DER_EINHEITEN') + ': ' + error.message, 'error');
       }
     });
   }
@@ -78,12 +81,12 @@ export class MesswerteChartComponent implements OnInit {
 
   onSubmit(): void {
     if (!this.dateFrom || !this.dateTo || this.selectedEinheitIds.size === 0) {
-      this.showMessage('Bitte alle Felder ausfüllen und mindestens eine Einheit auswählen', 'error');
+      this.showMessage(this.translationService.translate('BITTE_ALLE_FELDER_AUSFUELLEN'), 'error');
       return;
     }
 
     if (this.dateFrom > this.dateTo) {
-      this.showMessage('Start-Datum muss vor End-Datum liegen', 'error');
+      this.showMessage(this.translationService.translate('START_DATUM_MUSS_VOR_END_DATUM_LIEGEN'), 'error');
       return;
     }
 
@@ -134,11 +137,11 @@ export class MesswerteChartComponent implements OnInit {
           });
         }, 0);
 
-        this.showMessage(`${totalDataPoints} Datenpunkte für ${this.charts.length} Einheit(en) geladen`, 'success');
+        this.showMessage(`${totalDataPoints} ${this.translationService.translate('DATENPUNKTE_FUER')} ${this.charts.length} ${this.translationService.translate('EINHEITEN_GELADEN')}`, 'success');
         this.loading = false;
       },
       error: (error) => {
-        this.showMessage(`Fehler beim Laden der Daten: ${error.message}`, 'error');
+        this.showMessage(`${this.translationService.translate('FEHLER_BEIM_LADEN_DER_DATEN')}: ${error.message}`, 'error');
         this.loading = false;
       }
     });
@@ -195,7 +198,7 @@ export class MesswerteChartComponent implements OnInit {
           x: {
             title: {
               display: true,
-              text: 'Zeit'
+              text: this.translationService.translate('ZEIT')
             }
           }
         }

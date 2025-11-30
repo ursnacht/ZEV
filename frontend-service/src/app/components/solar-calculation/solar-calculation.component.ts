@@ -3,10 +3,12 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MesswerteService, CalculationResponse } from '../../services/messwerte.service';
 
+import { TranslatePipe } from '../../pipes/translate.pipe';
+
 @Component({
   selector: 'app-solar-calculation',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, TranslatePipe],
   templateUrl: './solar-calculation.component.html',
   styleUrls: ['./solar-calculation.component.css']
 })
@@ -18,7 +20,7 @@ export class SolarCalculationComponent {
   messageType: 'success' | 'error' | '' = '';
   result: CalculationResponse | null = null;
 
-  constructor(private messwerteService: MesswerteService) {}
+  constructor(private messwerteService: MesswerteService) { }
 
   onDateFromChange(): void {
     if (this.dateFrom) {

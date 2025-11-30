@@ -1,28 +1,39 @@
 <nav class="zev-navbar">
   <div class="zev-navbar__container">
-    <h1 class="zev-navbar__title">ZEV Management</h1>
+    <h1 class="zev-navbar__title">{{ 'ZEV_MANAGEMENT' | translate }}</h1>
     <ul class="zev-navbar__menu">
       <li>
-        <a routerLink="/upload" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">Messwerte
-          Upload</a>
+        <a routerLink="/upload" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">{{
+          'MESSWERTE_UPLOAD' | translate }}</a>
       </li>
       <li>
-        <a routerLink="/einheiten" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">Einheiten
-          verwalten</a>
+        <a routerLink="/einheiten" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">{{
+          'EINHEITEN_VERWALTUNG' | translate }}</a>
       </li>
       <li>
-        <a routerLink="/solar-calculation" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">Solar
-          Distribution</a>
+        <a routerLink="/solar-calculation" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">{{
+          'SOLAR_DISTRIBUTION' | translate }}</a>
       </li>
       <li>
-        <a routerLink="/chart" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">Messwerte Grafik</a>
+        <a routerLink="/chart" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">{{
+          'MESSWERTE_GRAFIK' | translate }}</a>
+      </li>
+      <li>
+        <a routerLink="/translations" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">{{
+          'TRANSLATION_EDITOR' | translate }}</a>
       </li>
       <li *ngIf="userName" class="zev-navbar__user">
         <span class="zev-navbar__username">{{ userName }}</span>
       </li>
       <li>
-        <button (click)="logout()" class="zev-navbar__link"
-          style="background: none; border: none; cursor: pointer;">Logout</button>
+        <button (click)="switchLanguage()" class="zev-navbar__link"
+          style="background: none; border: none; cursor: pointer;">
+          {{ currentLang === 'de' ? 'EN' : 'DE' }}
+        </button>
+      </li>
+      <li>
+        <button (click)="logout()" class="zev-navbar__link" style="background: none; border: none; cursor: pointer;">{{
+          'LOGOUT' | translate }}</button>
       </li>
     </ul>
   </div>
