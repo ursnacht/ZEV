@@ -15,6 +15,8 @@ export class TranslationEditorComponent implements OnInit {
     translations: Translation[] = [];
     newTranslation: Translation = { key: '', deutsch: '', englisch: '' };
     loading = false;
+    sortColumn: 'key' | 'deutsch' | 'englisch' | null = 'key';
+    sortDirection: 'asc' | 'desc' = 'asc';
 
     constructor(private translationService: TranslationService) { }
 
@@ -56,4 +58,34 @@ export class TranslationEditorComponent implements OnInit {
             error: (err) => console.error('Failed to create translation', err)
         });
     }
+
+  onSort(column: 'key' | 'deutsch' | 'englisch'): void {
+    if (this.sortColumn === column) {
+      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortColumn = column;
+      this.sortDirection = 'asc';
+    }
+
+    this.translations.sort((a, b) => {
+      let aValue: any = a[column];
+      let bValue: any = b[column];
+
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      if (typeof aValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+
+      if (aValue < bValue) {
+        return this.sortDirection === 'asc' ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return this.sortDirection === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+  }
 }
