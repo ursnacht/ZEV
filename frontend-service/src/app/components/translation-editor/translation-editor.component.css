@@ -1,0 +1,56 @@
+.container {
+    padding: 2rem;
+}
+
+.new-translation-form {
+    background: #f5f5f5;
+    padding: 1rem;
+    margin-bottom: 2rem;
+    border-radius: 4px;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: bold;
+}
+
+.translation-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.translation-table th,
+.translation-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid #ddd;
+    text-align: left;
+}
+
+.zev-input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.zev-button {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.zev-button--primary {
+    background-color: #007bff;
+    color: white;
+}
+
+.zev-button--secondary {
+    background-color: #6c757d;
+    color: white;
+}

@@ -1,0 +1,59 @@
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { TranslationService, Translation } from '../../services/translation.service';
+import { TranslatePipe } from '../../pipes/translate.pipe';
+
+@Component({
+    selector: 'app-translation-editor',
+    standalone: true,
+    imports: [CommonModule, FormsModule, TranslatePipe],
+    templateUrl: './translation-editor.component.html',
+    styleUrls: ['./translation-editor.component.css']
+})
+export class TranslationEditorComponent implements OnInit {
+    translations: Translation[] = [];
+    newTranslation: Translation = { key: '', deutsch: '', englisch: '' };
+    loading = false;
+
+    constructor(private translationService: TranslationService) { }
+
+    ngOnInit() {
+        this.loadTranslations();
+    }
+
+    loadTranslations() {
+        this.loading = true;
+        this.translationService.getAllTranslations().subscribe({
+            next: (data) => {
+                this.translations = data;
+                this.loading = false;
+            },
+            error: (err) => {
+                console.error('Failed to load translations', err);
+                this.loading = false;
+            }
+        });
+    }
+
+    saveTranslation(translation: Translation) {
+        this.translationService.saveTranslation(translation).subscribe({
+            next: () => {
+                // Optional: Show success message
+            },
+            error: (err) => console.error('Failed to save translation', err)
+        });
+    }
+
+    createTranslation() {
+        if (!this.newTranslation.key) return;
+
+        this.translationService.createTranslation(this.newTranslation).subscribe({
+            next: (saved) => {
+                this.translations.push(saved);
+                this.newTranslation = { key: '', deutsch: '', englisch: '' };
+            },
+            error: (err) => console.error('Failed to create translation', err)
+        });
+    }
+}

@@ -1,0 +1,43 @@
+<div class="container">
+    <h2>{{ 'TRANSLATION_EDITOR' | translate }}</h2>
+
+    <div class="new-translation-form">
+        <h3>{{ 'ADD_NEW_TRANSLATION' | translate }}</h3>
+        <div class="form-group">
+            <label>{{ 'KEY' | translate }}</label>
+            <input type="text" [(ngModel)]="newTranslation.key" class="zev-input"
+                [placeholder]="'KEY_NAME' | translate">
+        </div>
+        <div class="form-group">
+            <label>{{ 'DEUTSCH' | translate }}</label>
+            <input type="text" [(ngModel)]="newTranslation.deutsch" class="zev-input"
+                [placeholder]="'DEUTSCHER_TEXT' | translate">
+        </div>
+        <div class="form-group">
+            <label>{{ 'ENGLISCH' | translate }}</label>
+            <input type="text" [(ngModel)]="newTranslation.englisch" class="zev-input"
+                [placeholder]="'ENGLISH_TEXT' | translate">
+        </div>
+        <button (click)="createTranslation()" class="zev-button zev-button--primary">{{ 'ADD' | translate }}</button>
+    </div>
+
+    <table class="translation-table">
+        <thead>
+            <tr>
+                <th>{{ 'KEY' | translate }}</th>
+                <th>{{ 'DEUTSCH' | translate }}</th>
+                <th>{{ 'ENGLISCH' | translate }}</th>
+                <th>{{ 'ACTIONS' | translate }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr *ngFor="let t of translations">
+                <td>{{ t.key }}</td>
+                <td><input type="text" [(ngModel)]="t.deutsch" class="zev-input"></td>
+                <td><input type="text" [(ngModel)]="t.englisch" class="zev-input"></td>
+                <td><button (click)="saveTranslation(t)" class="zev-button zev-button--secondary">{{ 'SAVE' | translate
+                        }}</button></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
