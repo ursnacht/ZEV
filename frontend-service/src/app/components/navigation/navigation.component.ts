@@ -1,8 +1,8 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 
-import { KeycloakService } from 'keycloak-angular';
+import Keycloak from 'keycloak-js';
 import { KeycloakProfile } from 'keycloak-js';
 import { TranslationService } from '../../services/translation.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
@@ -17,15 +17,15 @@ import { TranslatePipe } from '../../pipes/translate.pipe';
 export class NavigationComponent implements OnInit {
   userProfile: KeycloakProfile | null = null;
   currentLang = 'de';
+  private readonly keycloak = inject(Keycloak);
 
   constructor(
-    private keycloakService: KeycloakService,
     public translationService: TranslationService
   ) { }
 
   async ngOnInit() {
-    if (this.keycloakService.isLoggedIn()) {
-      this.userProfile = await this.keycloakService.loadUserProfile();
+    if (this.keycloak.authenticated) {
+      this.userProfile = await this.keycloak.loadUserProfile();
     }
     this.currentLang = this.translationService.currentLang();
   }
@@ -40,7 +40,7 @@ export class NavigationComponent implements OnInit {
   }
 
   logout() {
-    this.keycloakService.logout();
+    this.keycloak.logout();
   }
 
   switchLanguage() {

@@ -1,12 +1,23 @@
-import { APP_INITIALIZER, ApplicationConfig, importProvidersFrom } from '@angular/core';
+import { ApplicationConfig } from '@angular/core';
 import { provideRouter } from '@angular/router';
-import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
-import { KeycloakAngularModule, KeycloakService } from 'keycloak-angular';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import {
+    provideKeycloak,
+    createInterceptorCondition,
+    IncludeBearerTokenCondition,
+    includeBearerTokenInterceptor,
+    INCLUDE_BEARER_TOKEN_INTERCEPTOR_CONFIG
+} from 'keycloak-angular';
 import { routes } from './app.routes';
 
-function initializeKeycloak(keycloak: KeycloakService) {
-    return () =>
-        keycloak.init({
+const urlCondition = createInterceptorCondition<IncludeBearerTokenCondition>({
+    urlPattern: /^(http:\/\/localhost:8080)(\/.*)?$/i,
+    bearerPrefix: 'Bearer'
+});
+
+export const appConfig: ApplicationConfig = {
+    providers: [
+        provideKeycloak({
             config: {
                 url: 'http://localhost:9000',
                 realm: 'zev',
@@ -15,22 +26,13 @@ function initializeKeycloak(keycloak: KeycloakService) {
             initOptions: {
                 onLoad: 'login-required',
                 checkLoginIframe: false
-            },
-            enableBearerInterceptor: true,
-            bearerExcludedUrls: ['/assets']
-        });
-}
-
-export const appConfig: ApplicationConfig = {
-    providers: [
-        provideRouter(routes),
-        provideHttpClient(withInterceptorsFromDi()),
-        importProvidersFrom(KeycloakAngularModule),
+            }
+        }),
         {
-            provide: APP_INITIALIZER,
-            useFactory: initializeKeycloak,
-            multi: true,
-            deps: [KeycloakService]
-        }
+            provide: INCLUDE_BEARER_TOKEN_INTERCEPTOR_CONFIG,
+            useValue: [urlCondition]
+        },
+        provideRouter(routes),
+        provideHttpClient(withInterceptors([includeBearerTokenInterceptor]))
     ]
 };
