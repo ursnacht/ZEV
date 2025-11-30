@@ -16,6 +16,10 @@
   transition: border-color var(--transition-fast);
 }
 
+input[type="date"].zev-input {
+  width: auto;
+}
+
 .zev-input:focus,
 .zev-select:focus {
   outline: none;
