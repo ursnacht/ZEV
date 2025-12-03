@@ -2,10 +2,10 @@
 
 ## Next Tasks
 
--
-
 ## Completed
 
+- Im Frontend die Auswahl des Algorithmus bei der Solarstromverteilung wählbar machen und die Verteilung dann mit dem gewählten Algorithmus vornehmen.
+- Neuer Algorithmus im Backend zur Verteilung des Solarstromes, analog zu SolarDistribution erstellen: Verteilung proportional zum Verbrauch. Wenn es einen Rest gibt, diesen wenn möglich beim Consumer mit dem grössten Verbrauch verrechnen.
 - Initial Maven project setup
 - SolarDistribution algorithm
 - JUnit tests

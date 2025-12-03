@@ -1,5 +1,6 @@
 package ch.nacht.service;
 
+import ch.nacht.ProportionalConsumptionDistribution;
 import ch.nacht.SolarDistribution;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
@@ -58,10 +59,12 @@ public class MesswerteService {
             }
         }
 
-        // Delete existing messwerte for the same einheit and entire month to allow overwrite
+        // Delete existing messwerte for the same einheit and entire month to allow
+        // overwrite
         LocalDateTime dateTimeFrom = date.withDayOfMonth(1).atStartOfDay();
         LocalDateTime dateTimeTo = date.withDayOfMonth(date.lengthOfMonth()).atTime(23, 59, 59);
-        List<Messwerte> existingMesswerte = messwerteRepository.findByEinheitAndZeitBetween(einheit, dateTimeFrom, dateTimeTo);
+        List<Messwerte> existingMesswerte = messwerteRepository.findByEinheitAndZeitBetween(einheit, dateTimeFrom,
+                dateTimeTo);
         if (!existingMesswerte.isEmpty()) {
             messwerteRepository.deleteAll(existingMesswerte);
         }
@@ -96,7 +99,8 @@ public class MesswerteService {
     }
 
     @Transactional
-    public CalculationResult calculateSolarDistribution(LocalDateTime dateFrom, LocalDateTime dateTo) {
+    public CalculationResult calculateSolarDistribution(LocalDateTime dateFrom, LocalDateTime dateTo,
+            String algorithm) {
         // Get all distinct timestamps in the date range
         List<LocalDateTime> distinctZeiten = messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo);
 
@@ -135,8 +139,14 @@ public class MesswerteService {
                     .map(m -> BigDecimal.valueOf(m.getTotal()))
                     .collect(Collectors.toList());
 
-            // Calculate distribution using the existing algorithm
-            List<BigDecimal> distributions = SolarDistribution.distributeSolarPower(solarProduction, consumptions);
+            // Calculate distribution using selected algorithm
+            List<BigDecimal> distributions;
+            if ("PROPORTIONAL".equalsIgnoreCase(algorithm)) {
+                distributions = ProportionalConsumptionDistribution.distributeSolarPower(solarProduction, consumptions);
+            } else {
+                // Default to EQUAL_SHARE
+                distributions = SolarDistribution.distributeSolarPower(solarProduction, consumptions);
+            }
 
             // Update zev_calculated for each consumer
             for (int i = 0; i < consumers.size(); i++) {

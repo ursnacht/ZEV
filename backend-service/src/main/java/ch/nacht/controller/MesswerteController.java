@@ -43,7 +43,8 @@ public class MesswerteController {
     @PreAuthorize("hasRole('zev_admin')")
     public ResponseEntity<Map<String, Object>> calculateDistribution(
             @RequestParam("dateFrom") String dateFromStr,
-            @RequestParam("dateTo") String dateToStr) {
+            @RequestParam("dateTo") String dateToStr,
+            @RequestParam(value = "algorithm", defaultValue = "EQUAL_SHARE") String algorithm) {
 
         try {
             LocalDate dateFrom = LocalDate.parse(dateFromStr);
@@ -53,12 +54,13 @@ public class MesswerteController {
             LocalDateTime dateTimeFrom = dateFrom.atStartOfDay();
             LocalDateTime dateTimeTo = dateTo.atTime(23, 59, 59);
 
-            // Call the service to calculate distribution
+            // Call the service to calculate distribution with selected algorithm
             MesswerteService.CalculationResult result = messwerteService.calculateSolarDistribution(dateTimeFrom,
-                    dateTimeTo);
+                    dateTimeTo, algorithm);
 
             return ResponseEntity.ok(Map.of(
                     "status", "success",
+                    "algorithm", algorithm,
                     "processedTimestamps", result.getProcessedTimestamps(),
                     "processedRecords", result.getProcessedRecords(),
                     "dateFrom", result.getDateFrom().toString(),

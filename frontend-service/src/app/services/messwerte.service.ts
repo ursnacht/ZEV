@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 
 export interface CalculationResponse {
   status: string;
+  algorithm?: string;
   processedTimestamps: number;
   processedRecords: number;
   dateFrom: string;
@@ -25,12 +26,13 @@ export interface MesswertData {
 export class MesswerteService {
   private apiUrl = 'http://localhost:8080/api/messwerte';
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
-  calculateDistribution(dateFrom: string, dateTo: string): Observable<CalculationResponse> {
+  calculateDistribution(dateFrom: string, dateTo: string, algorithm: string = 'EQUAL_SHARE'): Observable<CalculationResponse> {
     const params = new HttpParams()
       .set('dateFrom', dateFrom)
-      .set('dateTo', dateTo);
+      .set('dateTo', dateTo)
+      .set('algorithm', algorithm);
 
     return this.http.post<CalculationResponse>(`${this.apiUrl}/calculate-distribution`, null, { params });
   }

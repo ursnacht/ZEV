@@ -17,6 +17,20 @@
       <input type="date" id="dateTo" class="zev-input" name="dateTo" [(ngModel)]="dateTo" required>
     </div>
 
+    <div class="zev-form-group">
+      <label>{{ 'ALGORITHMUS' | translate }}:</label>
+      <div class="algorithm-selection">
+        <label class="radio-label">
+          <input type="radio" name="algorithm" value="EQUAL_SHARE" [(ngModel)]="algorithm">
+          {{ 'ALGORITHMUS_EQUAL_SHARE' | translate }}
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="algorithm" value="PROPORTIONAL" [(ngModel)]="algorithm">
+          {{ 'ALGORITHMUS_PROPORTIONAL' | translate }}
+        </label>
+      </div>
+    </div>
+
     <button type="submit" class="zev-button zev-button--primary" [disabled]="calculating || !dateFrom || !dateTo">
       {{ calculating ? ('BERECHNUNG_LAEUFT' | translate) : ('BERECHNEN' | translate) }}
     </button>
@@ -25,6 +39,11 @@
   <div *ngIf="result" class="result-summary">
     <h2>{{ 'ZUSAMMENFASSUNG' | translate }}</h2>
     <div class="summary-grid">
+      <div class="summary-item">
+        <span class="label">{{ 'VERWENDETER_ALGORITHMUS' | translate }}:</span>
+        <span class="value">{{ result.algorithm === 'PROPORTIONAL' ? ('ALGORITHMUS_PROPORTIONAL' | translate) :
+          ('ALGORITHMUS_EQUAL_SHARE' | translate) }}</span>
+      </div>
       <div class="summary-item">
         <span class="label">{{ 'ZEITBEREICH' | translate }}:</span>
         <span class="value">{{ result.dateFrom | date:'short' }} - {{ result.dateTo | date:'short' }}</span>

@@ -15,6 +15,7 @@ import { TranslatePipe } from '../../pipes/translate.pipe';
 export class SolarCalculationComponent {
   dateFrom: string = '';
   dateTo: string = '';
+  algorithm: string = 'EQUAL_SHARE';
   calculating = false;
   message = '';
   messageType: 'success' | 'error' | '' = '';
@@ -49,7 +50,7 @@ export class SolarCalculationComponent {
     this.calculating = true;
     this.result = null;
 
-    this.messwerteService.calculateDistribution(this.dateFrom, this.dateTo).subscribe({
+    this.messwerteService.calculateDistribution(this.dateFrom, this.dateTo, this.algorithm).subscribe({
       next: (response) => {
         if (response.status === 'success') {
           this.result = response;
