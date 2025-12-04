@@ -1,18 +1,12 @@
 /* Design System Navigation Component wird verwendet */
 /* Nur app-spezifische Overrides hier */
 
+/* 
+ * Alle Styles für Navbar, Hamburger-Menu und Links kommen jetzt aus dem Design System.
+ * Siehe: design-system/src/components/navigation/navbar.css
+ */
+
 .zev-navbar {
   /* Kompensiert body padding für full-width Navigation */
   margin: calc(var(--spacing-lg) * -1) calc(var(--spacing-lg) * -1) var(--spacing-lg);
-}
-
-.zev-navbar__user {
-  display: flex;
-  align-items: center;
-}
-
-.zev-navbar__username {
-  color: var(--color-text-light, #ffffff);
-  font-weight: 500;
-  padding: 0 var(--spacing-md, 1rem);
 }

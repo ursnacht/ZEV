@@ -19,6 +19,8 @@ export class NavigationComponent implements OnInit {
   currentLang = 'de';
   private readonly keycloak = inject(Keycloak);
 
+  isMenuOpen = false;
+
   constructor(
     public translationService: TranslationService
   ) { }
@@ -41,10 +43,20 @@ export class NavigationComponent implements OnInit {
 
   logout() {
     this.keycloak.logout();
+    this.closeMenu();
   }
 
   switchLanguage() {
     this.currentLang = this.currentLang === 'de' ? 'en' : 'de';
     this.translationService.setLanguage(this.currentLang as 'de' | 'en');
+    this.closeMenu();
+  }
+
+  toggleMenu() {
+    this.isMenuOpen = !this.isMenuOpen;
+  }
+
+  closeMenu() {
+    this.isMenuOpen = false;
   }
 }

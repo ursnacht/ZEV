@@ -79,6 +79,11 @@
   /* Transitions */
   --transition-fast: 0.3s;
 
+  /* Z-Index */
+  --z-index-navbar: 1000;
+  --z-index-navbar-menu: 999;
+  --z-index-modal: 1050;
+
   /* Layout */
   --layout-max-width: 1200px;
   --form-max-width: 600px;

@@ -1,25 +1,37 @@
 <nav class="zev-navbar">
   <div class="zev-navbar__container">
     <h1 class="zev-navbar__title">{{ 'ZEV_MANAGEMENT' | translate }}</h1>
-    <ul class="zev-navbar__menu">
+
+    <button class="zev-hamburger" (click)="toggleMenu()" [class.active]="isMenuOpen" aria-label="Menu">
+      <span class="bar"></span>
+      <span class="bar"></span>
+      <span class="bar"></span>
+    </button>
+
+    <ul class="zev-navbar__menu" [class.zev-navbar__menu--open]="isMenuOpen">
       <li>
-        <a routerLink="/upload" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">{{
+        <a routerLink="/upload" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
+          (click)="closeMenu()">{{
           'MESSWERTE_UPLOAD' | translate }}</a>
       </li>
       <li>
-        <a routerLink="/einheiten" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">{{
+        <a routerLink="/einheiten" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
+          (click)="closeMenu()">{{
           'EINHEITEN_VERWALTUNG' | translate }}</a>
       </li>
       <li>
-        <a routerLink="/solar-calculation" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">{{
+        <a routerLink="/solar-calculation" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
+          (click)="closeMenu()">{{
           'SOLAR_DISTRIBUTION' | translate }}</a>
       </li>
       <li>
-        <a routerLink="/chart" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">{{
+        <a routerLink="/chart" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
+          (click)="closeMenu()">{{
           'MESSWERTE_GRAFIK' | translate }}</a>
       </li>
       <li>
-        <a routerLink="/translations" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link">{{
+        <a routerLink="/translations" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
+          (click)="closeMenu()">{{
           'TRANSLATION_EDITOR' | translate }}</a>
       </li>
       <li *ngIf="userName" class="zev-navbar__user">
