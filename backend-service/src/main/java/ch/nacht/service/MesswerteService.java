@@ -7,6 +7,8 @@ import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Messwerte;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,19 +27,29 @@ import java.util.stream.Collectors;
 @Service
 public class MesswerteService {
 
+    private static final Logger log = LoggerFactory.getLogger(MesswerteService.class);
     private final MesswerteRepository messwerteRepository;
     private final EinheitRepository einheitRepository;
 
     public MesswerteService(MesswerteRepository messwerteRepository, EinheitRepository einheitRepository) {
         this.messwerteRepository = messwerteRepository;
         this.einheitRepository = einheitRepository;
+        log.info("MesswerteService initialized");
     }
 
     @Transactional
     public Map<String, Object> processCsvUpload(MultipartFile file, Long einheitId, String dateStr) throws Exception {
+        log.info("Starting CSV upload processing - einheitId: {}, date: {}, filename: {}, size: {} bytes",
+                einheitId, dateStr, file.getOriginalFilename(), file.getSize());
+
         // Fetch the Einheit entity
         Einheit einheit = einheitRepository.findById(einheitId)
-                .orElseThrow(() -> new RuntimeException("Einheit not found with id: " + einheitId));
+                .orElseThrow(() -> {
+                    log.error("Einheit not found with id: {}", einheitId);
+                    return new RuntimeException("Einheit not found with id: " + einheitId);
+                });
+
+        log.debug("Found einheit: {} (type: {})", einheit.getName(), einheit.getTyp());
 
         LocalDate date = LocalDate.parse(dateStr);
         LocalDateTime zeit = LocalDateTime.of(date, LocalTime.of(0, 0));
@@ -47,7 +59,9 @@ public class MesswerteService {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
             String line;
             reader.readLine(); // Skip header line
+            int lineNumber = 1;
             while ((line = reader.readLine()) != null) {
+                lineNumber++;
                 String[] parts = line.split("[,;]");
                 if (parts.length >= 3) {
                     Double total = Math.abs(Double.parseDouble(parts[1].trim()));
@@ -55,8 +69,14 @@ public class MesswerteService {
 
                     messwerteList.add(new Messwerte(zeit, total, zev, einheit));
                     zeit = zeit.plusMinutes(15);
+                } else {
+                    log.warn("Skipping invalid line {} in CSV: insufficient columns", lineNumber);
                 }
             }
+            log.info("Parsed {} records from CSV file", messwerteList.size());
+        } catch (Exception e) {
+            log.error("Error reading CSV file: {}", e.getMessage(), e);
+            throw e;
         }
 
         // Delete existing messwerte for the same einheit and entire month to allow
@@ -66,10 +86,12 @@ public class MesswerteService {
         List<Messwerte> existingMesswerte = messwerteRepository.findByEinheitAndZeitBetween(einheit, dateTimeFrom,
                 dateTimeTo);
         if (!existingMesswerte.isEmpty()) {
+            log.info("Deleting {} existing messwerte records for month {}", existingMesswerte.size(), date.getMonth());
             messwerteRepository.deleteAll(existingMesswerte);
         }
 
         messwerteRepository.saveAll(messwerteList);
+        log.info("Successfully saved {} messwerte records for einheit: {}", messwerteList.size(), einheit.getName());
 
         return Map.of(
                 "status", "success",
@@ -79,13 +101,19 @@ public class MesswerteService {
     }
 
     public List<Map<String, Object>> getMesswerteByEinheit(Long einheitId, LocalDate dateFrom, LocalDate dateTo) {
+        log.info("Fetching messwerte for einheitId: {}, dateFrom: {}, dateTo: {}", einheitId, dateFrom, dateTo);
+
         LocalDateTime dateTimeFrom = dateFrom.atStartOfDay();
         LocalDateTime dateTimeTo = dateTo.atTime(23, 59, 59);
 
         Einheit einheit = einheitRepository.findById(einheitId)
-                .orElseThrow(() -> new RuntimeException("Einheit not found"));
+                .orElseThrow(() -> {
+                    log.error("Einheit not found with id: {}", einheitId);
+                    return new RuntimeException("Einheit not found");
+                });
 
         List<Messwerte> messwerte = messwerteRepository.findByEinheitAndZeitBetween(einheit, dateTimeFrom, dateTimeTo);
+        log.info("Found {} messwerte records for einheit: {}", messwerte.size(), einheit.getName());
 
         return messwerte.stream()
                 .map(m -> {
@@ -101,8 +129,14 @@ public class MesswerteService {
     @Transactional
     public CalculationResult calculateSolarDistribution(LocalDateTime dateFrom, LocalDateTime dateTo,
             String algorithm) {
+        log.info("Starting solar distribution calculation - dateFrom: {}, dateTo: {}, algorithm: {}",
+                dateFrom, dateTo, algorithm);
+
+        long startTime = System.currentTimeMillis();
+
         // Get all distinct timestamps in the date range
         List<LocalDateTime> distinctZeiten = messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo);
+        log.info("Found {} distinct timestamps to process", distinctZeiten.size());
 
         int processedTimestamps = 0;
         int processedRecords = 0;
@@ -116,6 +150,7 @@ public class MesswerteService {
 
             // Skip if no producers
             if (producers.isEmpty()) {
+                log.debug("No producers found for timestamp: {}", zeit);
                 continue;
             }
 
@@ -125,12 +160,15 @@ public class MesswerteService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             totalSolarProduced = totalSolarProduced.add(solarProduction);
+            log.debug("Timestamp: {}, Solar production: {} kWh from {} producers",
+                    zeit, solarProduction, producers.size());
 
             // Get all consumers for this timestamp
             List<Messwerte> consumers = messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER);
 
             // Skip if no consumers
             if (consumers.isEmpty()) {
+                log.debug("No consumers found for timestamp: {}", zeit);
                 continue;
             }
 
@@ -142,8 +180,10 @@ public class MesswerteService {
             // Calculate distribution using selected algorithm
             List<BigDecimal> distributions;
             if ("PROPORTIONAL".equalsIgnoreCase(algorithm)) {
+                log.debug("Using PROPORTIONAL distribution algorithm");
                 distributions = ProportionalConsumptionDistribution.distributeSolarPower(solarProduction, consumptions);
             } else {
+                log.debug("Using EQUAL_SHARE distribution algorithm");
                 // Default to EQUAL_SHARE
                 distributions = SolarDistribution.distributeSolarPower(solarProduction, consumptions);
             }
@@ -159,7 +199,16 @@ public class MesswerteService {
             }
 
             processedTimestamps++;
+
+            if (processedTimestamps % 100 == 0) {
+                log.debug("Progress: {} timestamps processed", processedTimestamps);
+            }
         }
+
+        long duration = System.currentTimeMillis() - startTime;
+        log.info(
+                "Solar distribution calculation completed - timestamps: {}, records: {}, totalProduced: {} kWh, totalDistributed: {} kWh, duration: {} ms",
+                processedTimestamps, processedRecords, totalSolarProduced, totalDistributed, duration);
 
         return new CalculationResult(
                 processedTimestamps,
