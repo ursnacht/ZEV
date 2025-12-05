@@ -11,41 +11,41 @@
     <ul class="zev-navbar__menu" [class.zev-navbar__menu--open]="isMenuOpen">
       <li>
         <a routerLink="/upload" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
-          (click)="closeMenu()">{{
-          'MESSWERTE_UPLOAD' | translate }}</a>
+          (click)="closeMenu()">
+            {{ 'MESSWERTE_UPLOAD' | translate }}</a>
       </li>
       <li>
         <a routerLink="/einheiten" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
-          (click)="closeMenu()">{{
-          'EINHEITEN_VERWALTUNG' | translate }}</a>
+          (click)="closeMenu()">
+            {{ 'EINHEITEN_VERWALTUNG' | translate }}</a>
       </li>
       <li>
         <a routerLink="/solar-calculation" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
-          (click)="closeMenu()">{{
-          'SOLAR_DISTRIBUTION' | translate }}</a>
+          (click)="closeMenu()">
+            {{ 'SOLAR_DISTRIBUTION' | translate }}</a>
       </li>
       <li>
         <a routerLink="/chart" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
-          (click)="closeMenu()">{{
-          'MESSWERTE_GRAFIK' | translate }}</a>
+          (click)="closeMenu()">
+            {{ 'MESSWERTE_GRAFIK' | translate }}</a>
       </li>
       <li>
         <a routerLink="/translations" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
-          (click)="closeMenu()">{{
-          'TRANSLATION_EDITOR' | translate }}</a>
-      </li>
-      <li *ngIf="userName" class="zev-navbar__user">
-        <span class="zev-navbar__username">{{ userName }}</span>
+          (click)="closeMenu()">
+            {{ 'TRANSLATION_EDITOR' | translate }}</a>
       </li>
       <li>
-        <button (click)="switchLanguage()" class="zev-navbar__link"
-          style="background: none; border: none; cursor: pointer;">
+        <button (click)="switchLanguage()" class="zev-navbar__link">
           {{ currentLang === 'de' ? 'EN' : 'DE' }}
         </button>
       </li>
       <li>
-        <button (click)="logout()" class="zev-navbar__link" style="background: none; border: none; cursor: pointer;">{{
-          'LOGOUT' | translate }}</button>
+        <button (click)="logout()" class="zev-navbar__link">
+          {{ 'LOGOUT' | translate }}
+        </button>
+      </li>
+      <li *ngIf="userName" class="zev-navbar__user">
+        <span class="zev-navbar__username">{{ userName }}</span>
       </li>
     </ul>
   </div>
