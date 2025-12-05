@@ -52,6 +52,16 @@
                             <arguments>run build</arguments>
                         </configuration>
                     </execution>
+                    <execution>
+                        <id>npm run e2e:ci</id>
+                        <phase>integration-test</phase>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>run e2e:ci</arguments>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
         </plugins>

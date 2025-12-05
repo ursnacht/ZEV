@@ -69,6 +69,10 @@
             },
             "development": {
               "buildTarget": "frontend-service:build:development"
+            },
+            "ci": {
+              "port": 4200,
+              "buildTarget": "frontend-service:build:development"
             }
           },
           "defaultConfiguration": "development"
@@ -77,6 +81,10 @@
     }
   },
   "cli": {
-    "analytics": "3c4dade2-3a3d-4e59-8d9f-cb00b44ea3c9"
+    "analytics": "3c4dade2-3a3d-4e59-8d9f-cb00b44ea3c9",
+    "schematicCollections": [
+      "@cypress/schematic",
+      "@schematics/angular"
+    ]
   }
 }
