@@ -27,19 +27,19 @@
                 <th class="zev-table__header--sortable" (click)="onSort('key')">
                     {{ 'KEY' | translate }}
                     <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'key'">
-                       {{ sortDirection === 'asc' ? '▲' : '▼' }}
+                        {{ sortDirection === 'asc' ? '▲' : '▼' }}
                     </span>
                 </th>
                 <th class="zev-table__header--sortable" (click)="onSort('deutsch')">
                     {{ 'DEUTSCH' | translate }}
                     <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'deutsch'">
-                       {{ sortDirection === 'asc' ? '▲' : '▼' }}
+                        {{ sortDirection === 'asc' ? '▲' : '▼' }}
                     </span>
                 </th>
                 <th class="zev-table__header--sortable" (click)="onSort('englisch')">
                     {{ 'ENGLISCH' | translate }}
                     <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'englisch'">
-                       {{ sortDirection === 'asc' ? '▲' : '▼' }}
+                        {{ sortDirection === 'asc' ? '▲' : '▼' }}
                     </span>
                 </th>
                 <th>{{ 'ACTIONS' | translate }}</th>
@@ -50,8 +50,12 @@
                 <td>{{ t.key }}</td>
                 <td><input type="text" [(ngModel)]="t.deutsch" class="zev-input"></td>
                 <td><input type="text" [(ngModel)]="t.englisch" class="zev-input"></td>
-                <td><button (click)="saveTranslation(t)" class="zev-button zev-button--primary">{{ 'SAVE' | translate
-                        }}</button></td>
+                <td>
+                    <button (click)="saveTranslation(t)" class="zev-button zev-button--primary">{{ 'SAVE' | translate
+                        }}</button>
+                    <button (click)="deleteTranslation(t)" class="zev-button zev-button--danger"
+                        style="margin-left: 8px;">{{ 'DELETE' | translate }}</button>
+                </td>
             </tr>
         </tbody>
     </table>

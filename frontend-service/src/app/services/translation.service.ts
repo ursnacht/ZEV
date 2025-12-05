@@ -56,4 +56,10 @@ export class TranslationService {
     createTranslation(translation: Translation): Observable<Translation> {
         return this.http.post<Translation>(this.apiUrl, translation);
     }
+
+    deleteTranslation(key: string): Observable<void> {
+        return this.http.delete<void>(`${this.apiUrl}/${key}`).pipe(
+            tap(() => this.loadTranslations())
+        );
+    }
 }

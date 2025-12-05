@@ -11,6 +11,7 @@
     3. Admin klickt auf "Löschen"
     4. Es erscheint eine Bestätigungsmeldung
     5. Admin bestätigt die Bestätigungsmeldung und der Eintrag wird gelöscht
+    6. Text im Bestätigungsdialog übersetzbar machen
     
 ## 3. Technische Spezifikationen (Technical Specs)
 *   **API-Änderungen:**
@@ -18,10 +19,7 @@
 *   Am Datenmodell muss nichts geändert werden
 
 ## 4. Nicht-funktionale Anforderungen
-*   Performance (z.B. "muss unter 200ms antworten")
-*   Sicherheit (z.B. "nur für Admin sichtbar")
-*   Kompatibilität
+*   
 
-## 5. Edge Cases & Fehlerbehandlung
-*   Was passiert bei leeren Eingaben?
-*   Was passiert bei Netzwerkfehlern?
+## Testing
+*   Erstelle einen E2E und einen Integrationstest für den neuen Use case

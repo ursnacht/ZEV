@@ -41,7 +41,8 @@
             ],
             "realmRoles": [
                 "user",
-                "zev"
+                "zev",
+                "zev_admin"
             ]
         }
     ],
@@ -54,6 +55,10 @@
             {
                 "name": "zev",
                 "description": "ZEV Member role"
+            },
+            {
+                "name": "zev_admin",
+                "description": "ZEV Admin role"
             }
         ]
     }

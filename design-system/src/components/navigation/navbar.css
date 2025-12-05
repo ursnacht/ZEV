@@ -123,7 +123,8 @@
 }
 
 .zev-navbar__link:hover,
-.zev-navbar__link--active {
+.zev-navbar__link--active,
+button.zev-navbar__link:hover {
   color: var(--color-secondary);
   background-color: rgba(255, 255, 255, 0.1);
   text-decoration: none;
@@ -144,8 +145,11 @@
 
 /* Button reset for navbar links */
 button.zev-navbar__link {
+  background-color: transparent;
   background: none;
   border: none;
   font-family: inherit;
   font-size: inherit;
+  color: var(--color-white);
+  cursor: pointer;
 }

@@ -1,32 +1,28 @@
-# [Titel des Features / der Änderung]
+# Generelle Anforderungen
 
 ## 1. Ziel & Kontext
-*   **Was** soll erreicht werden? (Kurze Zusammenfassung)
-*   **Warum** machen wir das? (Business Value / Hintergrund)
-*   **Aktueller Stand:** Wie funktioniert es jetzt? (Falls relevant)
+*   Hier sind generelle Anforderungen aufgeführt, die bei jeder Umsatzung einer Anforderung berücksichtigt werden sollen.
+*   Die Anwendung wird so einheitlich erstellt und bekommt ein einheitliches Look & Feel
 
 ## 2. Funktionale Anforderungen (Functional Requirements)
-*   **User Story:** Als [Rolle] möchte ich [Aktion], damit [Nutzen].
-*   **Ablauf / Flow:**
-    1. User klickt auf...
-    2. System validiert...
-    3. System speichert...
-*   **Akzeptanzkriterien (Definition of Done):**
-    *   [ ] Muss X können
-    *   [ ] Darf Y nicht zulassen
-    *   [ ] Muss Fehlermeldung Z anzeigen, wenn...
+*   Die funktionalen Anforderungen werden in User Stories aufgeführt.
+*   Mach Texte immer mehrsprachig unter Verwendung des TranslationService.
+*   Füge neue Text-Keys in die Datenbank ein
 
 ## 3. Technische Spezifikationen (Technical Specs)
-*   **API-Änderungen:**
-    *   `POST /api/resource`: Request/Response Body Definition (JSON)
-*   **Datenmodell:** Welche Tabellen/Felder müssen geändert oder erstellt werden?
-*   **Algorithmen/Logik:** Spezielle Berechnungsregeln (wie beim Solar-Algorithmus).
+*   Berücksichtige immer das Design System
+*   Ergänze das Design System falls notwendig
+*   Verwende Spring Boot
 
 ## 4. Nicht-funktionale Anforderungen
-*   Performance (z.B. "muss unter 200ms antworten")
-*   Sicherheit (z.B. "nur für Admin sichtbar")
-*   Kompatibilität
+*   Beachte, dass die Benutzer immer mit keycloak authentifiziert sind
+*   Verwende immer flyway für die Datenbankmigration
+*   Füge sinnvolles Logging hinzu
+*   Füge sinnvolles Exception Handling hinzu
+*   Füge sinnvolle Validierung hinzu
+*   Füge sinnvolle Performance Optimierung hinzu
+*   Füge sinnvolle Sicherheit hinzu
 
-## 5. Edge Cases & Fehlerbehandlung
-*   Was passiert bei leeren Eingaben?
-*   Was passiert bei Netzwerkfehlern?
+## 5. Testing
+*   Ergänze die Tests wo nötig (Unit Tests, Integration Tests, End-to-End Tests). 
+*   Beachte dabei immer die Datei "AutomatisierteTests.md"

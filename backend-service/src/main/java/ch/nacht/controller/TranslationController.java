@@ -55,7 +55,7 @@ public class TranslationController {
         return ResponseEntity.ok(saved);
     }
 
-    @PutMapping("/{key}")
+    @PutMapping("/{key:.+}")
     @PreAuthorize("hasRole('zev_admin')")
     public ResponseEntity<Translation> updateTranslation(@PathVariable String key,
             @RequestBody Translation translation) {
@@ -67,5 +67,19 @@ public class TranslationController {
         Translation updated = translationService.saveTranslation(translation);
         log.info("Updated translation: {}", updated.getKey());
         return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/{key:.+}")
+    @PreAuthorize("hasRole('zev_admin')")
+    public ResponseEntity<Void> deleteTranslation(@PathVariable String key) {
+        log.info("Delete request for translation with key: {}", key);
+        boolean deleted = translationService.deleteTranslation(key);
+        if (deleted) {
+            log.info("Translation deleted successfully: {}", key);
+            return ResponseEntity.noContent().build();
+        } else {
+            log.warn("Translation not found for deletion: {}", key);
+            return ResponseEntity.notFound().build();
+        }
     }
 }
