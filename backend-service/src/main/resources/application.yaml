@@ -1,4 +1,12 @@
 spring:
+  application:
+    name: backend-service
+  boot:
+    admin:
+      client:
+        url: ${ADMIN_URL:http://admin-service:8081}
+        instance:
+          prefer-ip: true
   datasource:
     url: jdbc:postgresql://localhost:5432/zev
     username: postgres
@@ -21,6 +29,19 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: http://localhost:9000/realms/zev
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: ALWAYS
+    env:
+      show-values: ALWAYS
+    configprops:
+      show-values: ALWAYS
 
 # Logging Configuration
 logging:

@@ -65,6 +65,17 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      admin-service:
+        condition: service_started
+    networks:
+      - zev-network
+    restart: unless-stopped
+
+  admin-service:
+    build: ./admin-service
+    container_name: admin-service
+    ports:
+      - "8081:8081"
     networks:
       - zev-network
     restart: unless-stopped
