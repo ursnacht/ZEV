@@ -26,7 +26,7 @@
               "src/manifest.json"
             ],
             "styles": [
-              "../design-system/dist/index.css",
+              "target/design-system-extracted/design-system/index.css",
               "src/styles.css"
             ],
             "scripts": [],
@@ -56,7 +56,11 @@
               "vendorChunk": true,
               "extractLicenses": false,
               "sourceMap": true,
-              "namedChunks": true
+              "namedChunks": true,
+              "styles": [
+                "../design-system/dist/index.css",
+                "src/styles.css"
+              ]
             }
           },
           "defaultConfiguration": "production"

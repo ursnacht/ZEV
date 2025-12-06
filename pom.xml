@@ -20,6 +20,7 @@
   <modules>
     <module>admin-service</module>
     <module>backend-service</module>
+    <module>design-system</module>
     <module>frontend-service</module>
   </modules>
 

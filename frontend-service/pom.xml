@@ -18,6 +18,11 @@
 
     <dependencies>
         <dependency>
+            <groupId>ch.nacht</groupId>
+            <artifactId>design-system</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
@@ -34,6 +39,33 @@
 
     <build>
         <plugins>
+            <!-- 0. Extract Design System CSS from JAR dependency -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>unpack-design-system</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>unpack</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>ch.nacht</groupId>
+                                    <artifactId>design-system</artifactId>
+                                    <version>${project.version}</version>
+                                    <type>jar</type>
+                                    <includes>design-system/**</includes>
+                                    <outputDirectory>${project.basedir}/target/design-system-extracted</outputDirectory>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
             <!-- 1. Build Angular App -->
             <plugin>
                 <groupId>com.github.eirslett</groupId>

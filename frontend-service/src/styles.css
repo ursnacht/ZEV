@@ -6,30 +6,5 @@
 
 /* Body-Spacing mit Design System Variablen */
 body {
-  font-family: var(--font-family-primary);
-  background-color: var(--color-gray-100);
   padding: var(--spacing-lg);
-}
-
-/*
- * Alle Komponenten-Styles (Container, Typography, Buttons, Forms, Tables, Messages)
- * sind im Design System definiert und werden automatisch importiert.
- */
-
-/* BUGFIX: Navigation Button Styling Overrides */
-/* Override design system dist styles that set incorrect background */
-button.zev-navbar__link {
-  background-color: transparent !important;
-  background: none !important;
-  border: none;
-  font-family: inherit;
-  font-size: inherit;
-  color: var(--color-white) !important;
-  cursor: pointer;
-}
-
-button.zev-navbar__link:hover {
-  color: var(--color-secondary) !important;
-  background-color: rgba(255, 255, 255, 0.1) !important;
-  text-decoration: none;
 }
