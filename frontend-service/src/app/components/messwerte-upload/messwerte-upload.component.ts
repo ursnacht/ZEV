@@ -69,7 +69,7 @@ export class MesswerteUploadComponent implements OnInit {
     formData.append('einheitId', this.einheitId.toString());
     formData.append('file', this.file);
 
-    this.http.post<any>('http://localhost:8080/api/messwerte/upload', formData).subscribe({
+    this.http.post<any>('http://localhost:8090/api/messwerte/upload', formData).subscribe({
       next: (response) => {
         if (response.status === 'success') {
           this.showMessage(`Erfolgreich! ${response.count} Messwerte für ${response.einheitName} hochgeladen.`, 'success');

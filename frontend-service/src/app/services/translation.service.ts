@@ -12,7 +12,7 @@ export interface Translation {
     providedIn: 'root'
 })
 export class TranslationService {
-    private apiUrl = 'http://localhost:8080/api/translations';
+    private apiUrl = 'http://localhost:8090/api/translations';
     private translations: Record<string, Record<string, string>> = { de: {}, en: {} };
 
     currentLang = signal<'de' | 'en'>('de');

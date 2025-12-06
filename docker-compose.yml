@@ -55,7 +55,7 @@ services:
     build: ./backend-service
     container_name: backend-service
     ports:
-      - "8080:8080"
+      - "8090:8090"
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/zev
       - SPRING_DATASOURCE_USERNAME=postgres
@@ -81,14 +81,13 @@ services:
     restart: unless-stopped
 
   frontend-service:
-    build:
-      context: .
-      dockerfile: frontend-service/Dockerfile
+    build: ./frontend-service
     container_name: frontend-service
     ports:
-      - "4200:80"
+      - "4200:8080"
     depends_on:
       - backend-service
+      - admin-service
     networks:
       - zev-network
     restart: unless-stopped

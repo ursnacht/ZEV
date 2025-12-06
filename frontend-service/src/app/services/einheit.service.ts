@@ -7,7 +7,7 @@ import { Einheit } from '../models/einheit.model';
   providedIn: 'root'
 })
 export class EinheitService {
-  private apiUrl = 'http://localhost:8080/api/einheit';
+  private apiUrl = 'http://localhost:8090/api/einheit';
 
   constructor(private http: HttpClient) {}
 

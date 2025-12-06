@@ -1,3 +1,6 @@
+server:
+  port: 8090
+
 spring:
   application:
     name: backend-service
@@ -7,6 +10,7 @@ spring:
         url: ${ADMIN_URL:http://admin-service:8081}
         instance:
           prefer-ip: true
+          service-url: http://backend-service:8090
   datasource:
     url: jdbc:postgresql://localhost:5432/zev
     username: postgres

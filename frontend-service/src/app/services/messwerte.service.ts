@@ -24,7 +24,7 @@ export interface MesswertData {
   providedIn: 'root'
 })
 export class MesswerteService {
-  private apiUrl = 'http://localhost:8080/api/messwerte';
+  private apiUrl = 'http://localhost:8090/api/messwerte';
 
   constructor(private http: HttpClient) { }
 

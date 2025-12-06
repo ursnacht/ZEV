@@ -1,0 +1,26 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: frontend-service
+  boot:
+    admin:
+      client:
+        url: http://admin-service:8081
+        instance:
+          prefer-ip: true
+          service-url: http://frontend-service:8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: ALWAYS
+    env:
+      show-values: ALWAYS
+    configprops:
+      show-values: ALWAYS
