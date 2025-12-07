@@ -73,7 +73,9 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "zev_messdaten_upload_total",
+          "editorMode": "code",
+          "expr": "zev_messdaten_upload",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -132,7 +134,9 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "zev_solarverteilung_berechnung_total",
+          "editorMode": "code",
+          "expr": "zev_solarverteilung_berechnung",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -471,6 +475,6 @@
   "timezone": "",
   "title": "ZEV Monitoring",
   "uid": "zev-monitoring",
-  "version": 1,
+  "version": 3,
   "weekStart": ""
 }
