@@ -1,6 +1,7 @@
 package ch.nacht.controller;
 
 import ch.nacht.service.MesswerteService;
+import ch.nacht.service.MetricsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -19,9 +20,11 @@ public class MesswerteController {
 
     private static final Logger log = LoggerFactory.getLogger(MesswerteController.class);
     private final MesswerteService messwerteService;
+    private final MetricsService metricsService;
 
-    public MesswerteController(MesswerteService messwerteService) {
+    public MesswerteController(MesswerteService messwerteService, MetricsService metricsService) {
         this.messwerteService = messwerteService;
+        this.metricsService = metricsService;
         log.info("MesswerteController initialized");
     }
 
@@ -37,6 +40,7 @@ public class MesswerteController {
 
         try {
             Map<String, Object> result = messwerteService.processCsvUpload(file, einheitId, dateStr);
+            metricsService.recordMessdatenUpload();
             log.info("CSV upload successful - einheitId: {}, result: {}", einheitId, result);
             return ResponseEntity.ok(result);
 
@@ -73,6 +77,7 @@ public class MesswerteController {
             MesswerteService.CalculationResult result = messwerteService.calculateSolarDistribution(dateTimeFrom,
                     dateTimeTo, algorithm);
 
+            metricsService.recordSolarverteilungBerechnung();
             log.info(
                     "Distribution calculation completed - algorithm: {}, timestamps: {}, records: {}, totalProduced: {}, totalDistributed: {}",
                     algorithm, result.getProcessedTimestamps(), result.getProcessedRecords(),

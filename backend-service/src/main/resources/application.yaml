@@ -46,6 +46,10 @@ management:
       show-values: ALWAYS
     configprops:
       show-values: ALWAYS
+  prometheus:
+    metrics:
+      export:
+        enabled: true
 
 # Logging Configuration
 logging:

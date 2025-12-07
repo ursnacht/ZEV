@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'backend-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['backend-service:8090']
+
+  - job_name: 'admin-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['admin-service:8081']
+
+  - job_name: 'frontend-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['frontend-service:8080']
