@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Service für benutzerdefinierte Metriken mit Datenbank-Persistierung.
@@ -35,11 +36,13 @@ public class MetricsService {
     private final MetrikRepository metrikRepository;
     private final ObjectMapper objectMapper;
 
-    // AtomicLong für alle Metriken (Gauges, damit Werte setzbar sind)
+    // AtomicLong für Zähler-Metriken
     private final AtomicLong messdatenUploadTotal;
     private final AtomicLong solarverteilungTotal;
-    private final AtomicLong letzterMessdatenUploadTimestamp;
-    private final AtomicLong letzteSolarverteilungTimestamp;
+
+    // AtomicReference<Instant> für Zeitstempel-Metriken
+    private final AtomicReference<Instant> letzterMessdatenUpload;
+    private final AtomicReference<Instant> letzteSolarverteilung;
 
     public MetricsService(MeterRegistry meterRegistry, MetrikRepository metrikRepository) {
         this.metrikRepository = metrikRepository;
@@ -56,13 +59,15 @@ public class MetricsService {
                 .description("Gesamtanzahl der Solarverteilungsberechnungen")
                 .register(meterRegistry);
 
-        this.letzterMessdatenUploadTimestamp = new AtomicLong(0);
-        Gauge.builder(METRIC_MESSDATEN_UPLOAD_ZEITPUNKT, letzterMessdatenUploadTimestamp, AtomicLong::get)
+        this.letzterMessdatenUpload = new AtomicReference<>(null);
+        Gauge.builder(METRIC_MESSDATEN_UPLOAD_ZEITPUNKT, letzterMessdatenUpload,
+                        ref -> ref.get() != null ? ref.get().getEpochSecond() : 0)
                 .description("Unix-Timestamp des letzten Messdaten-Uploads")
                 .register(meterRegistry);
 
-        this.letzteSolarverteilungTimestamp = new AtomicLong(0);
-        Gauge.builder(METRIC_SOLARVERTEILUNG_ZEITPUNKT, letzteSolarverteilungTimestamp, AtomicLong::get)
+        this.letzteSolarverteilung = new AtomicReference<>(null);
+        Gauge.builder(METRIC_SOLARVERTEILUNG_ZEITPUNKT, letzteSolarverteilung,
+                        ref -> ref.get() != null ? ref.get().getEpochSecond() : 0)
                 .description("Unix-Timestamp der letzten Solarverteilungsberechnung")
                 .register(meterRegistry);
 
@@ -78,8 +83,8 @@ public class MetricsService {
 
         loadMetric(METRIC_MESSDATEN_UPLOAD_TOTAL, messdatenUploadTotal);
         loadMetric(METRIC_SOLARVERTEILUNG_TOTAL, solarverteilungTotal);
-        loadMetric(METRIC_MESSDATEN_UPLOAD_ZEITPUNKT, letzterMessdatenUploadTimestamp);
-        loadMetric(METRIC_SOLARVERTEILUNG_ZEITPUNKT, letzteSolarverteilungTimestamp);
+        loadTimestampMetric(METRIC_MESSDATEN_UPLOAD_ZEITPUNKT, letzterMessdatenUpload);
+        loadTimestampMetric(METRIC_SOLARVERTEILUNG_ZEITPUNKT, letzteSolarverteilung);
 
         log.info("Metriken geladen - Uploads: {}, Berechnungen: {}",
                 messdatenUploadTotal.get(), solarverteilungTotal.get());
@@ -100,21 +105,59 @@ public class MetricsService {
         });
     }
 
+    private void loadTimestampMetric(String name, AtomicReference<Instant> target) {
+        metrikRepository.findByName(name).ifPresent(metrik -> {
+            try {
+                Map<String, Object> valueMap = objectMapper.readValue(metrik.getValue(), Map.class);
+                Object value = valueMap.get("value");
+                if (value instanceof String) {
+                    // ISO-8601 Timestamp parsen (z.B. "2025-12-07T16:30:00")
+                    LocalDateTime ldt = LocalDateTime.parse((String) value);
+                    target.set(ldt.atZone(ZoneId.systemDefault()).toInstant());
+                    log.debug("Zeitstempel-Metrik '{}' geladen: {}", name, target.get());
+                } else if (value instanceof Number) {
+                    // Fallback: Epochensekunden (für Rückwärtskompatibilität)
+                    long epochSecond = ((Number) value).longValue();
+                    if (epochSecond > 0) {
+                        target.set(Instant.ofEpochSecond(epochSecond));
+                        log.debug("Zeitstempel-Metrik '{}' geladen (Epoch): {}", name, target.get());
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Konnte Zeitstempel-Metrik '{}' nicht laden: {}", name, e.getMessage());
+            }
+        });
+    }
+
     @Transactional
     private void persistMetric(String name, long value) {
         try {
             String jsonValue = objectMapper.writeValueAsString(Map.of("value", value));
-
-            Metrik metrik = metrikRepository.findByName(name)
-                    .orElseGet(() -> new Metrik(name, jsonValue));
-
-            metrik.setValue(jsonValue);
-            metrikRepository.save(metrik);
-
+            saveMetrik(name, jsonValue);
             log.debug("Metrik '{}' persistiert mit Wert: {}", name, value);
         } catch (JsonProcessingException e) {
             log.error("Konnte Metrik '{}' nicht persistieren: {}", name, e.getMessage());
         }
+    }
+
+    @Transactional
+    private void persistTimestampMetric(String name, Instant timestamp) {
+        try {
+            // Als lesbarer ISO-8601 Timestamp speichern (z.B. "2025-12-07T16:30:00")
+            LocalDateTime ldt = LocalDateTime.ofInstant(timestamp, ZoneId.systemDefault());
+            String jsonValue = objectMapper.writeValueAsString(Map.of("value", ldt.toString()));
+            saveMetrik(name, jsonValue);
+            log.debug("Zeitstempel-Metrik '{}' persistiert: {}", name, ldt);
+        } catch (JsonProcessingException e) {
+            log.error("Konnte Zeitstempel-Metrik '{}' nicht persistieren: {}", name, e.getMessage());
+        }
+    }
+
+    private void saveMetrik(String name, String jsonValue) {
+        Metrik metrik = metrikRepository.findByName(name)
+                .orElseGet(() -> new Metrik(name, jsonValue));
+        metrik.setValue(jsonValue);
+        metrikRepository.save(metrik);
     }
 
     /**
@@ -123,13 +166,13 @@ public class MetricsService {
     @Transactional
     public void recordMessdatenUpload() {
         long newTotal = messdatenUploadTotal.incrementAndGet();
-        long now = Instant.now().getEpochSecond();
-        letzterMessdatenUploadTimestamp.set(now);
+        Instant now = Instant.now();
+        letzterMessdatenUpload.set(now);
 
         persistMetric(METRIC_MESSDATEN_UPLOAD_TOTAL, newTotal);
-        persistMetric(METRIC_MESSDATEN_UPLOAD_ZEITPUNKT, now);
+        persistTimestampMetric(METRIC_MESSDATEN_UPLOAD_ZEITPUNKT, now);
 
-        log.debug("Metrik aktualisiert: Messdaten-Upload #{} um {}", newTotal, LocalDateTime.now());
+        log.debug("Metrik aktualisiert: Messdaten-Upload #{} um {}", newTotal, now);
     }
 
     /**
@@ -138,35 +181,43 @@ public class MetricsService {
     @Transactional
     public void recordSolarverteilungBerechnung() {
         long newTotal = solarverteilungTotal.incrementAndGet();
-        long now = Instant.now().getEpochSecond();
-        letzteSolarverteilungTimestamp.set(now);
+        Instant now = Instant.now();
+        letzteSolarverteilung.set(now);
 
         persistMetric(METRIC_SOLARVERTEILUNG_TOTAL, newTotal);
-        persistMetric(METRIC_SOLARVERTEILUNG_ZEITPUNKT, now);
+        persistTimestampMetric(METRIC_SOLARVERTEILUNG_ZEITPUNKT, now);
 
-        log.debug("Metrik aktualisiert: Solarverteilung #{} um {}", newTotal, LocalDateTime.now());
+        log.debug("Metrik aktualisiert: Solarverteilung #{} um {}", newTotal, now);
     }
 
     /**
      * Liefert den Zeitpunkt des letzten Messdaten-Uploads.
      */
-    public LocalDateTime getLetzterMessdatenUpload() {
-        long timestamp = letzterMessdatenUploadTimestamp.get();
-        if (timestamp == 0) {
-            return null;
-        }
-        return LocalDateTime.ofInstant(Instant.ofEpochSecond(timestamp), ZoneId.systemDefault());
+    public Instant getLetzterMessdatenUpload() {
+        return letzterMessdatenUpload.get();
+    }
+
+    /**
+     * Liefert den Zeitpunkt des letzten Messdaten-Uploads als LocalDateTime.
+     */
+    public LocalDateTime getLetzterMessdatenUploadAsLocalDateTime() {
+        Instant instant = letzterMessdatenUpload.get();
+        return instant != null ? LocalDateTime.ofInstant(instant, ZoneId.systemDefault()) : null;
     }
 
     /**
      * Liefert den Zeitpunkt der letzten Solarverteilungsberechnung.
      */
-    public LocalDateTime getLetzteSolarverteilung() {
-        long timestamp = letzteSolarverteilungTimestamp.get();
-        if (timestamp == 0) {
-            return null;
-        }
-        return LocalDateTime.ofInstant(Instant.ofEpochSecond(timestamp), ZoneId.systemDefault());
+    public Instant getLetzteSolarverteilung() {
+        return letzteSolarverteilung.get();
+    }
+
+    /**
+     * Liefert den Zeitpunkt der letzten Solarverteilungsberechnung als LocalDateTime.
+     */
+    public LocalDateTime getLetzteSolarverteilungAsLocalDateTime() {
+        Instant instant = letzteSolarverteilung.get();
+        return instant != null ? LocalDateTime.ofInstant(instant, ZoneId.systemDefault()) : null;
     }
 
     /**
