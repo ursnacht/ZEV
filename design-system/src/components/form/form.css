@@ -51,3 +51,57 @@ input[type="date"].zev-input {
   font-size: var(--font-size-xs);
   margin-top: var(--spacing-xxs);
 }
+
+/* Date Range Row - Inline layout for date inputs and buttons */
+.zev-date-range-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.zev-date-range-row .zev-form-group {
+  margin-bottom: 0;
+  flex: 0 0 auto;
+}
+
+.zev-date-range-row .zev-input {
+  height: 38px;
+  box-sizing: border-box;
+}
+
+.zev-date-range-row .zev-button-group {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex: 0 0 auto;
+}
+
+.zev-date-range-row .zev-button {
+  height: 38px;
+  box-sizing: border-box;
+}
+
+/* Responsive: Stack on small screens */
+@media (max-width: 600px) {
+  .zev-date-range-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .zev-date-range-row .zev-form-group {
+    width: 100%;
+  }
+
+  .zev-date-range-row .zev-form-group .zev-input {
+    width: 100%;
+  }
+
+  .zev-date-range-row .zev-button-group {
+    width: 100%;
+  }
+
+  .zev-date-range-row .zev-button-group .zev-button {
+    flex: 1;
+  }
+}

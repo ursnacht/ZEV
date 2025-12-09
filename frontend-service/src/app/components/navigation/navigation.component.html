@@ -30,6 +30,11 @@
             {{ 'MESSWERTE_GRAFIK' | translate }}</a>
       </li>
       <li>
+        <a routerLink="/statistik" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
+          (click)="closeMenu()">
+            {{ 'STATISTIK' | translate }}</a>
+      </li>
+      <li>
         <a routerLink="/translations" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
             {{ 'TRANSLATION_EDITOR' | translate }}</a>

@@ -19,21 +19,25 @@
       </div>
     </div>
 
-    <div class="zev-form-group">
-      <label for="dateFrom">{{ 'VON_DATUM' | translate }}:</label>
-      <input type="date" id="dateFrom" class="zev-input" name="dateFrom" [(ngModel)]="dateFrom"
-        (ngModelChange)="onDateFromChange()" required>
-    </div>
+    <div class="zev-date-range-row">
+      <div class="zev-form-group">
+        <label for="dateFrom">{{ 'VON_DATUM' | translate }}:</label>
+        <input type="date" id="dateFrom" class="zev-input" name="dateFrom" [(ngModel)]="dateFrom"
+          (ngModelChange)="onDateFromChange()" required>
+      </div>
 
-    <div class="zev-form-group">
-      <label for="dateTo">{{ 'BIS_DATUM' | translate }}:</label>
-      <input type="date" id="dateTo" class="zev-input" name="dateTo" [(ngModel)]="dateTo" required>
-    </div>
+      <div class="zev-form-group">
+        <label for="dateTo">{{ 'BIS_DATUM' | translate }}:</label>
+        <input type="date" id="dateTo" class="zev-input" name="dateTo" [(ngModel)]="dateTo" required>
+      </div>
 
-    <button type="submit" class="zev-button zev-button--primary"
-      [disabled]="loading || !dateFrom || !dateTo || selectedEinheitIds.size === 0">
-      {{ loading ? ('LADE_DATEN' | translate) : ('ANZEIGEN' | translate) }}
-    </button>
+      <div class="zev-button-group">
+        <button type="submit" class="zev-button zev-button--primary"
+          [disabled]="loading || !dateFrom || !dateTo || selectedEinheitIds.size === 0">
+          {{ loading ? ('LADE_DATEN' | translate) : ('ANZEIGEN' | translate) }}
+        </button>
+      </div>
+    </div>
   </form>
 
   <div *ngFor="let chartData of charts" class="zev-panel zev-panel--chart">

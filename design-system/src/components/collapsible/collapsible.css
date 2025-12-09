@@ -1,0 +1,59 @@
+/**
+ * Collapsible Component
+ * Expandable/collapsible content sections
+ */
+
+.zev-collapsible {
+  margin-top: 15px;
+  border: 1px solid var(--color-neutral-200, #e0e0e0);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.zev-collapsible__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 10px 15px;
+  background: var(--color-neutral-50, #f5f5f5);
+  border: none;
+  cursor: pointer;
+  font-size: 0.95em;
+  font-weight: 500;
+  text-align: left;
+  transition: background-color 0.2s ease;
+}
+
+.zev-collapsible__header:hover {
+  background: var(--color-neutral-100, #eeeeee);
+}
+
+.zev-collapsible__icon {
+  font-size: 0.8em;
+  color: var(--color-neutral-600, #666);
+  transition: transform 0.2s ease;
+}
+
+.zev-collapsible--open .zev-collapsible__icon {
+  transform: rotate(90deg);
+}
+
+.zev-collapsible__content {
+  padding: 15px;
+  background: var(--color-neutral-white, #ffffff);
+  border-top: 1px solid var(--color-neutral-200, #e0e0e0);
+}
+
+.zev-collapsible__content > *:first-child {
+  margin-top: 0;
+}
+
+.zev-collapsible__content > *:last-child {
+  margin-bottom: 0;
+}
+
+/* Nested content spacing */
+.zev-collapsible__content > div + div {
+  margin-top: 15px;
+}

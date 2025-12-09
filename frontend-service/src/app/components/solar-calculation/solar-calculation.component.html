@@ -6,15 +6,23 @@
   </div>
 
   <form (ngSubmit)="onSubmit()">
-    <div class="zev-form-group">
-      <label for="dateFrom">{{ 'VON_DATUM' | translate }}:</label>
-      <input type="date" id="dateFrom" class="zev-input" name="dateFrom" [(ngModel)]="dateFrom"
-        (ngModelChange)="onDateFromChange()" required>
-    </div>
+    <div class="zev-date-range-row">
+      <div class="zev-form-group">
+        <label for="dateFrom">{{ 'VON_DATUM' | translate }}:</label>
+        <input type="date" id="dateFrom" class="zev-input" name="dateFrom" [(ngModel)]="dateFrom"
+          (ngModelChange)="onDateFromChange()" required>
+      </div>
 
-    <div class="zev-form-group">
-      <label for="dateTo">{{ 'BIS_DATUM' | translate }}:</label>
-      <input type="date" id="dateTo" class="zev-input" name="dateTo" [(ngModel)]="dateTo" required>
+      <div class="zev-form-group">
+        <label for="dateTo">{{ 'BIS_DATUM' | translate }}:</label>
+        <input type="date" id="dateTo" class="zev-input" name="dateTo" [(ngModel)]="dateTo" required>
+      </div>
+
+      <div class="zev-button-group">
+        <button type="submit" class="zev-button zev-button--primary" [disabled]="calculating || !dateFrom || !dateTo">
+          {{ calculating ? ('BERECHNUNG_LAEUFT' | translate) : ('BERECHNEN' | translate) }}
+        </button>
+      </div>
     </div>
 
     <div class="zev-form-group">
@@ -30,10 +38,6 @@
         </label>
       </div>
     </div>
-
-    <button type="submit" class="zev-button zev-button--primary" [disabled]="calculating || !dateFrom || !dateTo">
-      {{ calculating ? ('BERECHNUNG_LAEUFT' | translate) : ('BERECHNEN' | translate) }}
-    </button>
   </form>
 
   <div *ngIf="result" class="result-summary">

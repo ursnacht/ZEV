@@ -9,6 +9,7 @@ import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -38,6 +39,7 @@ public class MesswerteService {
     }
 
     @Transactional
+    @CacheEvict(value = "statistik", allEntries = true)
     public Map<String, Object> processCsvUpload(MultipartFile file, Long einheitId, String dateStr) throws Exception {
         log.info("Starting CSV upload processing - einheitId: {}, date: {}, filename: {}, size: {} bytes",
                 einheitId, dateStr, file.getOriginalFilename(), file.getSize());
@@ -127,6 +129,7 @@ public class MesswerteService {
     }
 
     @Transactional
+    @CacheEvict(value = "statistik", allEntries = true)
     public CalculationResult calculateSolarDistribution(LocalDateTime dateFrom, LocalDateTime dateTo,
             String algorithm) {
         log.info("Starting solar distribution calculation - dateFrom: {}, dateTo: {}, algorithm: {}",
