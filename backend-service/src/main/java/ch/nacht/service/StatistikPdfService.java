@@ -11,11 +11,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class StatistikPdfService {
@@ -215,12 +215,18 @@ public class StatistikPdfService {
     }
 
     private String getMonthName(int month, String sprache) {
-        String[] monthsDe = {"Januar", "Februar", "Maerz", "April", "Mai", "Juni",
-                "Juli", "August", "September", "Oktober", "November", "Dezember"};
-        String[] monthsEn = {"January", "February", "March", "April", "May", "June",
-                "July", "August", "September", "October", "November", "December"};
-
-        String[] months = "en".equalsIgnoreCase(sprache) ? monthsEn : monthsDe;
-        return months[month - 1];
+        String[] months = {"JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
+                "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"};
+        Optional<Translation> translation = this.translationRepository.findById(months[month-1]);
+        if (translation.isPresent()) {
+            Translation t = translation.get();
+            if ("en".equalsIgnoreCase(sprache)) {
+                return t.getEnglisch();
+            } else if ("de".equalsIgnoreCase(sprache)) {
+                return t.getDeutsch();
+            }
+            log.warn("Invalid language to get translation of month, language: {}", sprache);
+        }
+        return months[month-1];
     }
 }
