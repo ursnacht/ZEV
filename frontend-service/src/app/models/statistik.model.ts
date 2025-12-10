@@ -38,4 +38,5 @@ export interface Statistik {
   fehlendeEinheiten: string[];
   fehlendeTage: string[];
   monate: MonatsStatistik[];
+  toleranz: number;
 }

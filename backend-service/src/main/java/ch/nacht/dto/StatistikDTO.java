@@ -10,6 +10,7 @@ public class StatistikDTO {
     private List<String> fehlendeEinheiten = new ArrayList<>();
     private List<LocalDate> fehlendeTage = new ArrayList<>();
     private List<MonatsStatistikDTO> monate = new ArrayList<>();
+    private double toleranz;
 
     public StatistikDTO() {
     }
@@ -52,5 +53,13 @@ public class StatistikDTO {
 
     public void setMonate(List<MonatsStatistikDTO> monate) {
         this.monate = monate;
+    }
+
+    public double getToleranz() {
+        return toleranz;
+    }
+
+    public void setToleranz(double toleranz) {
+        this.toleranz = toleranz;
     }
 }

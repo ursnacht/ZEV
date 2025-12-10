@@ -66,8 +66,8 @@ public class MesswerteService {
                 lineNumber++;
                 String[] parts = line.split("[,;]");
                 if (parts.length >= 3) {
-                    Double total = Math.abs(Double.parseDouble(parts[1].trim()));
-                    Double zev = Math.abs(Double.parseDouble(parts[2].trim()));
+                    Double total = Double.parseDouble(parts[1].trim());
+                    Double zev = Double.parseDouble(parts[2].trim());
 
                     messwerteList.add(new Messwerte(zeit, total, zev, einheit));
                     zeit = zeit.plusMinutes(15);
@@ -158,9 +158,17 @@ public class MesswerteService {
             }
 
             // Calculate total solar production at this timestamp
-            BigDecimal solarProduction = producers.stream()
+            // Producer values are negative (production) or positive (control unit consumption)
+            // Sum gives net production (negative), we need absolute value for distribution
+            BigDecimal netProduction = producers.stream()
                     .map(m -> BigDecimal.valueOf(m.getTotal()))
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            // Net production should be negative (production > consumption)
+            // If positive or zero, there's nothing to distribute
+            BigDecimal solarProduction = netProduction.compareTo(BigDecimal.ZERO) < 0
+                    ? netProduction.abs()
+                    : BigDecimal.ZERO;
 
             totalSolarProduced = totalSolarProduced.add(solarProduction);
             log.debug("Timestamp: {}, Solar production: {} kWh from {} producers",

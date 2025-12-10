@@ -9,6 +9,13 @@
     <div class="zev-form-group">
       <label>{{ 'EINHEITEN' | translate }}:</label>
       <div class="zev-checkbox-group zev-checkbox-group--scrollable">
+        <div class="zev-checkbox-item zev-checkbox-item--select-all">
+          <input type="checkbox" id="einheit-select-all"
+            [checked]="allSelected()" [indeterminate]="someSelected()" (change)="onSelectAllToggle()">
+          <label for="einheit-select-all">
+            <strong>{{ 'ALLE_AUSWAEHLEN' | translate }}</strong>
+          </label>
+        </div>
         <div *ngFor="let einheit of einheiten" class="zev-checkbox-item">
           <input type="checkbox" [id]="'einheit-' + einheit.id" [value]="einheit.id"
             [checked]="selectedEinheitIds.has(einheit.id!)" (change)="onEinheitToggle(einheit.id!)">

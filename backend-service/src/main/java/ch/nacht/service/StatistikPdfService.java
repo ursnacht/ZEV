@@ -146,19 +146,21 @@ public class StatistikPdfService {
             html.append("<h3>").append(t(translations, "WERT")).append("</h3>");
             html.append("<table>");
             html.append("<tr><th>").append(t(translations, "BESCHREIBUNG")).append("</th><th class=\"number\">kWh</th></tr>");
-            html.append("<tr><td>").append(t(translations, "PRODUKTION_TOTAL")).append(" (A)</td><td class=\"number\">").append(formatNumber(monat.getSummeProducerTotal())).append("</td></tr>");
-            html.append("<tr><td>").append(t(translations, "VERBRAUCH_TOTAL")).append(" (B)</td><td class=\"number\">").append(formatNumber(monat.getSummeConsumerTotal())).append("</td></tr>");
-            html.append("<tr><td>").append(t(translations, "ZEV_PRODUCER")).append(" (C)</td><td class=\"number\">").append(formatNumber(monat.getSummeProducerZev())).append("</td></tr>");
-            html.append("<tr><td>").append(t(translations, "ZEV_CONSUMER")).append(" (D)</td><td class=\"number\">").append(formatNumber(monat.getSummeConsumerZev())).append("</td></tr>");
-            html.append("<tr><td>").append(t(translations, "ZEV_CONSUMER_BERECHNET")).append(" (E)</td><td class=\"number\">").append(formatNumber(monat.getSummeConsumerZevCalculated())).append("</td></tr>");
+            html.append("<tr><td>").append(t(translations, "PRODUKTION_TOTAL")).append("</td><td class=\"number\">").append(formatNumber(monat.getSummeProducerTotal())).append("</td></tr>");
+            html.append("<tr><td>").append(t(translations, "VERBRAUCH_TOTAL")).append("</td><td class=\"number\">").append(formatNumber(monat.getSummeConsumerTotal())).append("</td></tr>");
+            html.append("<tr><td>").append(t(translations, "ZEV_PRODUCER")).append(" (A)</td><td class=\"number\">").append(formatNumber(monat.getSummeProducerZev())).append("</td></tr>");
+            html.append("<tr><td>").append(t(translations, "ZEV_CONSUMER")).append(" (B)</td><td class=\"number\">").append(formatNumber(monat.getSummeConsumerZev())).append("</td></tr>");
+            html.append("<tr><td>").append(t(translations, "ZEV_CONSUMER_BERECHNET")).append(" (C)</td><td class=\"number\">").append(formatNumber(monat.getSummeConsumerZevCalculated())).append("</td></tr>");
             html.append("</table>");
 
             // Comparisons
             html.append("<h3>").append(t(translations, "SUMMEN_VERGLEICH")).append("</h3>");
+            html.append("<div style=\"font-size: 9pt; color: #666; margin-bottom: 5px;\">")
+                .append(t(translations, "TOLERANZ")).append(": ").append(formatNumber(statistik.getToleranz())).append(" kWh</div>");
             html.append("<div class=\"comparison\">");
-            html.append(buildComparisonRow("C = D", monat.isSummenCDGleich(), monat.getDifferenzCD(), translations));
-            html.append(buildComparisonRow("C = E", monat.isSummenCEGleich(), monat.getDifferenzCE(), translations));
-            html.append(buildComparisonRow("D = E", monat.isSummenDEGleich(), monat.getDifferenzDE(), translations));
+            html.append(buildComparisonRow("A = B", monat.isSummenCDGleich(), monat.getDifferenzCD(), translations));
+            html.append(buildComparisonRow("A = C", monat.isSummenCEGleich(), monat.getDifferenzCE(), translations));
+            html.append(buildComparisonRow("B = C", monat.isSummenDEGleich(), monat.getDifferenzDE(), translations));
             html.append("</div>");
 
             // Days with deviations

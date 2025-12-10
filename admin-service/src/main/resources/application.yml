@@ -16,6 +16,9 @@ management:
     web:
       exposure:
         include: "*"
+      cors:
+        allowed-origins: "http://localhost:8081,http://admin-service:8081"
+        allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
   endpoint:
     env:
       show-values: ALWAYS
@@ -23,7 +26,9 @@ management:
       show-values: ALWAYS
     health:
       show-details: ALWAYS
+    loggers:
+      enabled: true
 
 logging:
   level:
-    de.codecentric.boot.admin: DEBUG
+    de.codecentric.boot.admin: INFO

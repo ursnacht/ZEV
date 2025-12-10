@@ -17,6 +17,9 @@ management:
     web:
       exposure:
         include: "*"
+      cors:
+        allowed-origins: "http://localhost:8081,http://admin-service:8081"
+        allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
   endpoint:
     health:
       show-details: ALWAYS
@@ -24,3 +27,5 @@ management:
       show-values: ALWAYS
     configprops:
       show-values: ALWAYS
+    loggers:
+      enabled: true

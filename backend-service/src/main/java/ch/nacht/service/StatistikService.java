@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 public class StatistikService {
 
     private static final Logger logger = LoggerFactory.getLogger(StatistikService.class);
-    private static final double TOLERANZ = 0.0009;
+    private static final double TOLERANZ = 0.1;
 
     private final MesswerteRepository messwerteRepository;
     private final EinheitRepository einheitRepository;
@@ -38,6 +38,7 @@ public class StatistikService {
         logger.info("Berechne Statistik für Zeitraum {} bis {}", von, bis);
 
         StatistikDTO statistik = new StatistikDTO();
+        statistik.setToleranz(TOLERANZ);
 
         // Letztes Datum mit Messwerten ermitteln
         LocalDate letztesMessdatum = ermittleLetztesMessdatum();
@@ -153,11 +154,12 @@ public class StatistikService {
         Double summeConsumerZevCalculated = messwerteRepository.sumZevCalculatedByEinheitTypAndZeitBetween(
                 EinheitTyp.CONSUMER, vonDateTime, bisDateTime);
 
-        dto.setSummeProducerTotal(summeProducerTotal);
-        dto.setSummeConsumerTotal(summeConsumerTotal);
-        dto.setSummeProducerZev(summeProducerZev);
-        dto.setSummeConsumerZev(summeConsumerZev);
-        dto.setSummeConsumerZevCalculated(summeConsumerZevCalculated);
+        // Producer values are negative, use absolute values for display
+        dto.setSummeProducerTotal(summeProducerTotal != null ? Math.abs(summeProducerTotal) : 0.0);
+        dto.setSummeConsumerTotal(summeConsumerTotal != null ? summeConsumerTotal : 0.0);
+        dto.setSummeProducerZev(summeProducerZev != null ? Math.abs(summeProducerZev) : 0.0);
+        dto.setSummeConsumerZev(summeConsumerZev != null ? summeConsumerZev : 0.0);
+        dto.setSummeConsumerZevCalculated(summeConsumerZevCalculated != null ? summeConsumerZevCalculated : 0.0);
 
         logger.debug("Monat {}/{}: ProducerTotal={}, ConsumerTotal={}, ProducerZev={}, ConsumerZev={}, ConsumerZevCalc={}",
                 yearMonth.getYear(), yearMonth.getMonthValue(),
@@ -239,31 +241,36 @@ public class StatistikService {
             LocalDateTime tagStart = tag.atStartOfDay();
             LocalDateTime tagEnde = tag.plusDays(1).atStartOfDay();
 
-            Double tagesSummeC = messwerteRepository.sumZevByEinheitTypAndZeitBetween(
+            Double tagesSummeProducer = messwerteRepository.sumZevByEinheitTypAndZeitBetween(
                     EinheitTyp.PRODUCER, tagStart, tagEnde);
             Double tagesSummeD = messwerteRepository.sumZevByEinheitTypAndZeitBetween(
                     EinheitTyp.CONSUMER, tagStart, tagEnde);
             Double tagesSummeE = messwerteRepository.sumZevCalculatedByEinheitTypAndZeitBetween(
                     EinheitTyp.CONSUMER, tagStart, tagEnde);
 
+            // Producer values are negative, use absolute value for comparison
+            double tagesSummeC = tagesSummeProducer != null ? Math.abs(tagesSummeProducer) : 0.0;
+            double summeD = tagesSummeD != null ? tagesSummeD : 0.0;
+            double summeE = tagesSummeE != null ? tagesSummeE : 0.0;
+
             // Prüfen ob Abweichungen vorliegen
             List<String> abweichungsTypen = new ArrayList<>();
 
-            if (Math.abs(tagesSummeC - tagesSummeD) >= TOLERANZ) {
+            if (Math.abs(tagesSummeC - summeD) >= TOLERANZ) {
                 abweichungsTypen.add("C!=D");
             }
-            if (Math.abs(tagesSummeC - tagesSummeE) >= TOLERANZ) {
+            if (Math.abs(tagesSummeC - summeE) >= TOLERANZ) {
                 abweichungsTypen.add("C!=E");
             }
-            if (Math.abs(tagesSummeD - tagesSummeE) >= TOLERANZ) {
+            if (Math.abs(summeD - summeE) >= TOLERANZ) {
                 abweichungsTypen.add("D!=E");
             }
 
             if (!abweichungsTypen.isEmpty()) {
                 // Maximale Differenz als Referenz
                 double maxDifferenz = Math.max(
-                        Math.max(Math.abs(tagesSummeC - tagesSummeD), Math.abs(tagesSummeC - tagesSummeE)),
-                        Math.abs(tagesSummeD - tagesSummeE));
+                        Math.max(Math.abs(tagesSummeC - summeD), Math.abs(tagesSummeC - summeE)),
+                        Math.abs(summeD - summeE));
 
                 TagMitAbweichungDTO abweichung = new TagMitAbweichungDTO(
                         tag,

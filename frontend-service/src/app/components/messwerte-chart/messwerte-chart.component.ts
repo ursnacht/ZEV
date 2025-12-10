@@ -68,6 +68,26 @@ export class MesswerteChartComponent implements OnInit {
     }
   }
 
+  allSelected(): boolean {
+    return this.einheiten.length > 0 && this.selectedEinheitIds.size === this.einheiten.length;
+  }
+
+  someSelected(): boolean {
+    return this.selectedEinheitIds.size > 0 && this.selectedEinheitIds.size < this.einheiten.length;
+  }
+
+  onSelectAllToggle(): void {
+    if (this.allSelected()) {
+      this.selectedEinheitIds.clear();
+    } else {
+      this.einheiten.forEach(e => {
+        if (e.id) {
+          this.selectedEinheitIds.add(e.id);
+        }
+      });
+    }
+  }
+
   onDateFromChange(): void {
     if (this.dateFrom) {
       const date = new Date(this.dateFrom);
