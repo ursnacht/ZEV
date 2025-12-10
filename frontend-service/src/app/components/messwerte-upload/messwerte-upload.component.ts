@@ -54,7 +54,48 @@ export class MesswerteUploadComponent implements OnInit {
     const files = event.target.files;
     if (files.length > 0) {
       this.file = files[0];
+      this.extractDateFromFile(files[0]);
     }
+  }
+
+  private extractDateFromFile(file: File): void {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      if (content) {
+        const lines = content.split('\n');
+        if (lines.length >= 2) {
+          const secondLine = lines[1];
+          const firstColumn = secondLine.split(',')[0];
+          const parsedDate = this.parseEnglishDate(firstColumn);
+          if (parsedDate) {
+            this.date = parsedDate;
+          }
+        }
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  private parseEnglishDate(dateStr: string): string | null {
+    // Parse format: "Tue Jul 01 2025" (EEE MMM dd yyyy)
+    const months: { [key: string]: string } = {
+      'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+      'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+      'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+    };
+
+    const trimmed = dateStr.trim();
+    const parts = trimmed.split(' ');
+    if (parts.length >= 4) {
+      const month = months[parts[1]];
+      const day = parts[2].padStart(2, '0');
+      const year = parts[3];
+      if (month && day && year) {
+        return `${year}-${month}-${day}`;
+      }
+    }
+    return null;
   }
 
   onSubmit(): void {

@@ -7,11 +7,6 @@
 
   <form (ngSubmit)="onSubmit()">
     <div class="zev-form-group">
-      <label for="date">{{ 'DATUM' | translate }}:</label>
-      <input type="date" id="date" class="zev-input" name="date" [(ngModel)]="date" required>
-    </div>
-
-    <div class="zev-form-group">
       <label for="einheit">{{ 'EINHEIT' | translate }}:</label>
       <select id="einheit" class="zev-select" name="einheit" [(ngModel)]="einheitId" required>
         <option *ngFor="let einheit of einheiten" [value]="einheit.id">
@@ -23,6 +18,11 @@
     <div class="zev-form-group">
       <label for="file">{{ 'CSV_DATEI' | translate }}:</label>
       <input type="file" id="file" class="zev-input" name="file" accept=".csv" (change)="onFileChange($event)" required>
+    </div>
+
+    <div class="zev-form-group">
+      <label for="date">{{ 'DATUM' | translate }}:</label>
+      <input type="date" id="date" class="zev-input" name="date" [(ngModel)]="date" required>
     </div>
 
     <button type="submit" class="zev-button zev-button--primary" [disabled]="uploading || !date || !einheitId || !file">
