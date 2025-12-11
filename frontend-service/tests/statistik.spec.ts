@@ -57,26 +57,32 @@ test.describe('Statistik Page', () => {
         const submitButton = page.locator('button.zev-button--primary[type="submit"]');
         await submitButton.click();
 
-        // Wait for loading to complete (button text changes or results appear)
-        // Either we get statistics panels or an error message
-        await page.waitForTimeout(2000);
+        // Wait for the request to complete - empty state should disappear or stay (if no data for selected range)
+        // The page has multiple .zev-panel elements: first is the filter form, second would be the overview
+        // We need to wait for loading to complete and check the result
 
-        // Check if statistics overview panel appears OR empty state is still shown (if no data)
-        const statistikUebersicht = page.locator('.zev-panel__title').filter({ hasText: /Uebersicht|Overview/i });
+        // Wait for loading state to end (submit button becomes enabled again)
+        await expect(submitButton).toBeEnabled({ timeout: 10000 });
+
+        // After submission, one of three states should occur:
+        // 1. Statistics loaded: Multiple panels visible (filter + overview + monthly)
+        // 2. No data: Empty state still visible
+        // 3. Error: Error message visible
+        const panels = page.locator('.zev-panel');
         const emptyState = page.locator('.zev-empty-state');
         const errorMessage = page.locator('.zev-message--error');
 
-        // One of these should be visible after submission
-        const hasOverview = await statistikUebersicht.isVisible().catch(() => false);
+        const panelCount = await panels.count();
         const hasEmpty = await emptyState.isVisible().catch(() => false);
         const hasError = await errorMessage.isVisible().catch(() => false);
 
         // At minimum, the page should respond to the submission
-        expect(hasOverview || hasEmpty || hasError).toBeTruthy();
+        // Either: more than 1 panel (filter + overview), empty state, or error
+        expect(panelCount > 1 || hasEmpty || hasError).toBeTruthy();
 
-        // If statistics loaded, verify structure
-        if (hasOverview) {
-            // Check for info rows in overview
+        // If statistics loaded (more than just the filter panel), verify structure
+        if (panelCount > 1) {
+            // Check for info rows in overview (second panel)
             const infoRows = page.locator('.zev-info-row');
             await expect(infoRows.first()).toBeVisible();
 
