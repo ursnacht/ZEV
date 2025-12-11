@@ -423,6 +423,254 @@
           </p>
         </div>
       </div>
+
+      <div class="zev-panel zev-panel--month">
+        <h3 class="zev-panel__title">
+          <span class="zev-status-indicator">
+            <span class="zev-status-dot zev-status-dot--success"></span>
+            <span>Januar 2024</span>
+          </span>
+          <span class="zev-panel__subtitle">(01.01.2024 - 31.01.2024)</span>
+        </h3>
+        <div class="zev-panel__content">
+          <p>Panel mit Monats-Variante und Status-Indikator im Titel.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Status Indicators Section -->
+  <section class="showcase-section">
+    <h2>Status Indicators</h2>
+    <div class="status-samples">
+      <div class="subsection">
+        <h3>Status Dots</h3>
+        <div style="display: flex; gap: var(--spacing-lg); flex-wrap: wrap;">
+          <span class="zev-status-indicator">
+            <span class="zev-status-dot zev-status-dot--success"></span>
+            <span>Erfolgreich / Vollstaendig</span>
+          </span>
+          <span class="zev-status-indicator">
+            <span class="zev-status-dot zev-status-dot--warning"></span>
+            <span>Warnung</span>
+          </span>
+          <span class="zev-status-indicator">
+            <span class="zev-status-dot zev-status-dot--error"></span>
+            <span>Fehler / Unvollstaendig</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="subsection">
+        <h3>Status Badges</h3>
+        <div style="display: flex; gap: var(--spacing-lg); flex-wrap: wrap;">
+          <span class="zev-status zev-status--success">Erfolgreich</span>
+          <span class="zev-status zev-status--warning">Warnung</span>
+          <span class="zev-status zev-status--error">Fehler</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Info Rows Section -->
+  <section class="showcase-section">
+    <h2>Info Rows</h2>
+    <div class="info-row-samples">
+      <div class="zev-info-row">
+        <span class="zev-info-label">Messwerte vorhanden bis:</span>
+        <span class="zev-info-value">31.01.2024</span>
+      </div>
+      <div class="zev-info-row">
+        <span class="zev-info-label">Datenstatus:</span>
+        <span class="zev-status-indicator">
+          <span class="zev-status-dot zev-status-dot--success"></span>
+          <span>Daten vollstaendig</span>
+        </span>
+      </div>
+      <div class="zev-info-row">
+        <span class="zev-info-label">Fehlende Einheiten:</span>
+        <span class="zev-info-value">Keine</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Comparison Section -->
+  <section class="showcase-section">
+    <h2>Comparison Grid</h2>
+    <div class="zev-comparison-section" style="border-top: none; padding-top: 0;">
+      <h4>Summen-Vergleich</h4>
+      <p class="zev-toleranz-info">Toleranz: 0.100 kWh</p>
+      <div class="zev-comparison-grid">
+        <div class="zev-comparison-item">
+          <span class="zev-status-indicator">
+            <span class="zev-status-dot zev-status-dot--success"></span>
+            <span>A = B</span>
+          </span>
+        </div>
+        <div class="zev-comparison-item">
+          <span class="zev-status-indicator">
+            <span class="zev-status-dot zev-status-dot--error"></span>
+            <span>A = C</span>
+          </span>
+          <span class="zev-differenz">Differenz: +2.450 kWh</span>
+        </div>
+        <div class="zev-comparison-item">
+          <span class="zev-status-indicator">
+            <span class="zev-status-dot zev-status-dot--success"></span>
+            <span>B = C</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tags and Lists Section -->
+  <section class="showcase-section">
+    <h2>Tags und Listen</h2>
+    <div class="subsection">
+      <h3>Tags</h3>
+      <span class="zev-tag-list">
+        <span class="zev-tag">01.01.2024</span>
+        <span class="zev-tag">05.01.2024</span>
+        <span class="zev-tag">12.01.2024</span>
+        <span class="zev-tag">23.01.2024</span>
+      </span>
+    </div>
+    <div class="subsection">
+      <h3>Liste</h3>
+      <ul class="zev-list">
+        <li>Wohnung A</li>
+        <li>Wohnung B</li>
+        <li>Solaranlage</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Bar Chart Section -->
+  <section class="showcase-section">
+    <h2>Bar Chart</h2>
+    <table class="zev-table zev-table--bars">
+      <thead>
+        <tr>
+          <th class="zev-table__label-col">Beschreibung</th>
+          <th class="zev-table__bar-col">Visualisierung</th>
+          <th class="zev-table__number">Wert (kWh)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Produktion (Total)</td>
+          <td class="zev-table__bar-cell">
+            <div class="zev-bar-container">
+              <div class="zev-bar" style="width: 100%; background-color: #4CAF50;"></div>
+            </div>
+          </td>
+          <td class="zev-table__number">1250.000</td>
+        </tr>
+        <tr>
+          <td>Verbrauch (Total)</td>
+          <td class="zev-table__bar-cell">
+            <div class="zev-bar-container">
+              <div class="zev-bar" style="width: 85%; background-color: #2196F3;"></div>
+            </div>
+          </td>
+          <td class="zev-table__number">1062.500</td>
+        </tr>
+        <tr>
+          <td>ZEV Producer</td>
+          <td class="zev-table__bar-cell">
+            <div class="zev-bar-container">
+              <div class="zev-bar" style="width: 70%; background-color: #FF9800;"></div>
+            </div>
+          </td>
+          <td class="zev-table__number">875.000</td>
+        </tr>
+        <tr>
+          <td>ZEV Consumer</td>
+          <td class="zev-table__bar-cell">
+            <div class="zev-bar-container">
+              <div class="zev-bar" style="width: 70%; background-color: #9C27B0;"></div>
+            </div>
+          </td>
+          <td class="zev-table__number">875.000</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Table Variants Section -->
+  <section class="showcase-section">
+    <h2>Table Variants</h2>
+    <div class="subsection">
+      <h3>Compact Table mit Row-Typen</h3>
+      <table class="zev-table zev-table--compact">
+        <thead>
+          <tr>
+            <th>Einheit</th>
+            <th>Typ</th>
+            <th class="zev-table__number">Total (kWh)</th>
+            <th class="zev-table__number">ZEV (kWh)</th>
+            <th class="zev-table__number">ZEV berechnet (kWh)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="zev-table__row--producer">
+            <td>Solaranlage</td>
+            <td>Produzent</td>
+            <td class="zev-table__number">1250.000</td>
+            <td class="zev-table__number">875.000</td>
+            <td class="zev-table__number">-</td>
+          </tr>
+          <tr class="zev-table__row--consumer">
+            <td>Wohnung A</td>
+            <td>Konsument</td>
+            <td class="zev-table__number">650.000</td>
+            <td class="zev-table__number">520.000</td>
+            <td class="zev-table__number">520.000</td>
+          </tr>
+          <tr class="zev-table__row--consumer">
+            <td>Wohnung B</td>
+            <td>Konsument</td>
+            <td class="zev-table__number">412.500</td>
+            <td class="zev-table__number">355.000</td>
+            <td class="zev-table__number">355.000</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Collapsible Section -->
+  <section class="showcase-section">
+    <h2>Collapsible</h2>
+    <div class="zev-collapsible">
+      <button type="button" class="zev-collapsible__header" (click)="toggleCollapsible()">
+        <span>Details anzeigen</span>
+        <span class="zev-collapsible__icon">{{ collapsibleOpen ? '\u25BC' : '\u25B6' }}</span>
+      </button>
+      <div *ngIf="collapsibleOpen" class="zev-collapsible__content">
+        <div>
+          <strong>Fehlende Einheiten:</strong>
+          <ul class="zev-list">
+            <li>Wohnung C</li>
+          </ul>
+        </div>
+        <div>
+          <strong>Fehlende Tage:</strong>
+          <span class="zev-tag-list">
+            <span class="zev-tag">15.01.2024</span>
+            <span class="zev-tag">16.01.2024</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Empty State Section -->
+  <section class="showcase-section">
+    <h2>Empty State</h2>
+    <div class="zev-empty-state">
+      <p>Waehlen Sie einen Zeitraum und klicken Sie auf Anzeigen</p>
     </div>
   </section>
 </div>
