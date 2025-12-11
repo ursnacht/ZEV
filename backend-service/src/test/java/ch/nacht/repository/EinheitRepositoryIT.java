@@ -3,7 +3,6 @@ package ch.nacht.repository;
 import ch.nacht.AbstractIntegrationTest;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;

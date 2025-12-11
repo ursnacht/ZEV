@@ -1,22 +1,5 @@
 import { test, expect } from '@playwright/test';
-
-/**
- * Helper function to handle Keycloak login if needed
- */
-async function handleKeycloakLogin(page: any) {
-    // Check if we're on a Keycloak login page
-    const currentUrl = page.url();
-
-    if (currentUrl.includes('/realms/') && currentUrl.includes('/protocol/openid-connect/auth')) {
-        // We're on Keycloak login page, fill in credentials
-        await page.fill('input[name="username"]', 'testuser');
-        await page.fill('input[name="password"]', 'testpassword');
-        await page.click('input[type="submit"]');
-
-        // Wait for redirect back to app
-        await page.waitForURL('http://localhost:4200/**', { timeout: 10000 });
-    }
-}
+import { handleKeycloakLogin } from './helpers';
 
 test.describe('ZEV App', () => {
     test('should display the navigation bar with title after login', async ({ page }) => {

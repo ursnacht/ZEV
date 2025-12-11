@@ -1,36 +1,16 @@
 import { test, expect } from '@playwright/test';
+import { navigateViaMenu } from './helpers';
 
 /**
  * tests / translation-editor.spec.ts
- * Helper function to handle Keycloak login if needed
+ * E2E tests for the Translation Editor
  */
-async function handleKeycloakLogin(page: any) {
-    const currentUrl = page.url();
-
-    if (currentUrl.includes('/realms/') && currentUrl.includes('/protocol/openid-connect/auth')) {
-        await page.fill('input[name="username"]', 'testuser');
-        await page.fill('input[name="password"]', 'testpassword');
-        await page.click('input[type="submit"]');
-        await page.waitForURL('http://localhost:4200/**', { timeout: 10000 });
-    }
-}
 
 /**
  * Helper function to navigate to translation editor
  */
 async function navigateToTranslationEditor(page: any) {
-    await page.goto('/');
-    await handleKeycloakLogin(page);
-
-    // Wait for navbar
-    await page.locator('.zev-navbar').waitFor({ state: 'visible', timeout: 10000 });
-
-    // Open hamburger menu
-    await page.locator('.zev-hamburger').click();
-
-    // Click on translation editor menu item
-    // Adjust selector based on actual menu structure
-    await page.locator('a[href="/translations"]').click();
+    await navigateViaMenu(page, '/translations');
 
     // Wait for translation editor to load
     await page.locator('.new-translation-form').waitFor({ state: 'visible', timeout: 10000 });
