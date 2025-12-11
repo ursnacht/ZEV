@@ -4,6 +4,15 @@ export interface TagMitAbweichung {
   differenz: number;
 }
 
+export interface EinheitSummen {
+  einheitId: number;
+  einheitName: string;
+  einheitTyp: 'PRODUCER' | 'CONSUMER';
+  summeTotal: number;
+  summeZev: number;
+  summeZevCalculated: number;
+}
+
 export interface MonatsStatistik {
   jahr: number;
   monat: number;
@@ -30,6 +39,9 @@ export interface MonatsStatistik {
 
   // Tage mit Abweichungen
   tageAbweichungen: TagMitAbweichung[];
+
+  // Summen pro Einheit
+  einheitSummen: EinheitSummen[];
 }
 
 export interface Statistik {

@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MonatsStatistikDTO {
+    // Summen pro Einheit
+    private List<EinheitSummenDTO> einheitSummen = new ArrayList<>();
     private int jahr;
     private int monat;
     private LocalDate von;
@@ -184,5 +186,13 @@ public class MonatsStatistikDTO {
 
     public void setTageAbweichungen(List<TagMitAbweichungDTO> tageAbweichungen) {
         this.tageAbweichungen = tageAbweichungen;
+    }
+
+    public List<EinheitSummenDTO> getEinheitSummen() {
+        return einheitSummen;
+    }
+
+    public void setEinheitSummen(List<EinheitSummenDTO> einheitSummen) {
+        this.einheitSummen = einheitSummen;
     }
 }

@@ -197,6 +197,32 @@
         </div>
       </div>
 
+      <!-- Summen pro Einheit -->
+      <div *ngIf="monat.einheitSummen && monat.einheitSummen.length > 0" class="zev-einheit-summen-section">
+        <h4>{{ 'SUMMEN_PRO_EINHEIT' | translate }}</h4>
+        <table class="zev-table zev-table--compact">
+          <thead>
+            <tr>
+              <th>{{ 'EINHEIT' | translate }}</th>
+              <th>{{ 'TYP' | translate }}</th>
+              <th class="zev-table__number">{{ 'TOTAL' | translate }} (kWh)</th>
+              <th class="zev-table__number">{{ 'ZEV' | translate }} (kWh)</th>
+              <th class="zev-table__number">{{ 'ZEV_BERECHNET' | translate }} (kWh)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let einheit of monat.einheitSummen"
+                [ngClass]="{'zev-table__row--producer': einheit.einheitTyp === 'PRODUCER', 'zev-table__row--consumer': einheit.einheitTyp === 'CONSUMER'}">
+              <td>{{ einheit.einheitName }}</td>
+              <td>{{ (einheit.einheitTyp === 'PRODUCER' ? 'PRODUZENT' : 'KONSUMENT') | translate }}</td>
+              <td class="zev-table__number">{{ formatNumber(einheit.summeTotal) }}</td>
+              <td class="zev-table__number">{{ formatNumber(einheit.summeZev) }}</td>
+              <td class="zev-table__number">{{ einheit.einheitTyp === 'CONSUMER' ? formatNumber(einheit.summeZevCalculated) : '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
       <!-- Aufklappbare Details -->
       <div *ngIf="!monat.datenVollstaendig || monat.tageAbweichungen.length > 0" class="zev-collapsible">
         <button type="button" class="zev-collapsible__header" (click)="toggleMonthDetails(i)">

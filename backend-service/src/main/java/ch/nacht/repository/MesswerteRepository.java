@@ -46,4 +46,14 @@ public interface MesswerteRepository extends JpaRepository<Messwerte, Long> {
 
     @Query("SELECT m FROM Messwerte m WHERE CAST(m.zeit AS LocalDate) = :date")
     List<Messwerte> findByDate(@Param("date") LocalDate date);
+
+    // Summen pro Einheit für Statistik
+    @Query("SELECT COALESCE(SUM(m.total), 0) FROM Messwerte m WHERE m.einheit = :einheit AND m.zeit >= :dateFrom AND m.zeit < :dateTo")
+    Double sumTotalByEinheitAndZeitBetween(@Param("einheit") Einheit einheit, @Param("dateFrom") LocalDateTime dateFrom, @Param("dateTo") LocalDateTime dateTo);
+
+    @Query("SELECT COALESCE(SUM(m.zev), 0) FROM Messwerte m WHERE m.einheit = :einheit AND m.zeit >= :dateFrom AND m.zeit < :dateTo")
+    Double sumZevByEinheitAndZeitBetween(@Param("einheit") Einheit einheit, @Param("dateFrom") LocalDateTime dateFrom, @Param("dateTo") LocalDateTime dateTo);
+
+    @Query("SELECT COALESCE(SUM(m.zevCalculated), 0) FROM Messwerte m WHERE m.einheit = :einheit AND m.zeit >= :dateFrom AND m.zeit < :dateTo")
+    Double sumZevCalculatedByEinheitAndZeitBetween(@Param("einheit") Einheit einheit, @Param("dateFrom") LocalDateTime dateFrom, @Param("dateTo") LocalDateTime dateTo);
 }

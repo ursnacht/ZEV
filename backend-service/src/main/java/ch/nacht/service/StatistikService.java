@@ -1,5 +1,6 @@
 package ch.nacht.service;
 
+import ch.nacht.dto.EinheitSummenDTO;
 import ch.nacht.dto.MonatsStatistikDTO;
 import ch.nacht.dto.StatistikDTO;
 import ch.nacht.dto.TagMitAbweichungDTO;
@@ -174,6 +175,9 @@ public class StatistikService {
         // Tage mit Abweichungen ermitteln
         ermittleTageAbweichungen(dto, effektivVon, effektivBis);
 
+        // Summen pro Einheit berechnen
+        berechneEinheitSummen(dto, vonDateTime, bisDateTime);
+
         return dto;
     }
 
@@ -281,5 +285,45 @@ public class StatistikService {
         }
 
         dto.setTageAbweichungen(abweichungen);
+    }
+
+    private void berechneEinheitSummen(MonatsStatistikDTO dto, LocalDateTime vonDateTime, LocalDateTime bisDateTime) {
+        List<Einheit> alleEinheiten = einheitRepository.findAll();
+        List<EinheitSummenDTO> einheitSummen = new ArrayList<>();
+
+        for (Einheit einheit : alleEinheiten) {
+            Double summeTotal = messwerteRepository.sumTotalByEinheitAndZeitBetween(einheit, vonDateTime, bisDateTime);
+            Double summeZev = messwerteRepository.sumZevByEinheitAndZeitBetween(einheit, vonDateTime, bisDateTime);
+            Double summeZevCalculated = messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(einheit, vonDateTime, bisDateTime);
+
+            // Producer values are stored as negative, use absolute values for display
+            if (einheit.getTyp() == EinheitTyp.PRODUCER) {
+                summeTotal = summeTotal != null ? Math.abs(summeTotal) : 0.0;
+                summeZev = summeZev != null ? Math.abs(summeZev) : 0.0;
+            } else {
+                summeTotal = summeTotal != null ? summeTotal : 0.0;
+                summeZev = summeZev != null ? summeZev : 0.0;
+            }
+            summeZevCalculated = summeZevCalculated != null ? summeZevCalculated : 0.0;
+
+            EinheitSummenDTO einheitSummenDTO = new EinheitSummenDTO(
+                    einheit.getId(),
+                    einheit.getName(),
+                    einheit.getTyp(),
+                    summeTotal,
+                    summeZev,
+                    summeZevCalculated
+            );
+            einheitSummen.add(einheitSummenDTO);
+        }
+
+        // Sort by type (PRODUCER first), then by name
+        einheitSummen.sort((a, b) -> {
+            int typeCompare = a.getEinheitTyp().compareTo(b.getEinheitTyp());
+            if (typeCompare != 0) return typeCompare;
+            return a.getEinheitName().compareTo(b.getEinheitName());
+        });
+
+        dto.setEinheitSummen(einheitSummen);
     }
 }

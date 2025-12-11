@@ -1,8 +1,10 @@
 package ch.nacht.service;
 
+import ch.nacht.dto.EinheitSummenDTO;
 import ch.nacht.dto.MonatsStatistikDTO;
 import ch.nacht.dto.StatistikDTO;
 import ch.nacht.dto.TagMitAbweichungDTO;
+import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Translation;
 import ch.nacht.repository.TranslationRepository;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
@@ -81,6 +83,8 @@ public class StatistikPdfService {
         html.append("th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }");
         html.append("th { background-color: #f5f5f5; font-weight: bold; }");
         html.append(".number { text-align: right; }");
+        html.append(".row-producer { background-color: rgba(76, 175, 80, 0.1); }");
+        html.append(".row-consumer { background-color: rgba(33, 150, 243, 0.05); }");
         html.append(".comparison { margin: 10px 0; padding: 10px; background: #f9f9f9; }");
         html.append(".comparison-item { margin: 5px 0; }");
         html.append(".footer { margin-top: 30px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 9pt; color: #666; }");
@@ -162,6 +166,32 @@ public class StatistikPdfService {
             html.append(buildComparisonRow("A = C", monat.isSummenCEGleich(), monat.getDifferenzCE(), translations));
             html.append(buildComparisonRow("B = C", monat.isSummenDEGleich(), monat.getDifferenzDE(), translations));
             html.append("</div>");
+
+            // Sums per unit
+            if (monat.getEinheitSummen() != null && !monat.getEinheitSummen().isEmpty()) {
+                html.append("<h3>").append(t(translations, "SUMMEN_PRO_EINHEIT")).append("</h3>");
+                html.append("<table>");
+                html.append("<tr>");
+                html.append("<th>").append(t(translations, "EINHEIT")).append("</th>");
+                html.append("<th>").append(t(translations, "TYP")).append("</th>");
+                html.append("<th class=\"number\">").append(t(translations, "TOTAL")).append(" (kWh)</th>");
+                html.append("<th class=\"number\">").append(t(translations, "ZEV")).append(" (kWh)</th>");
+                html.append("<th class=\"number\">").append(t(translations, "ZEV_BERECHNET")).append(" (kWh)</th>");
+                html.append("</tr>");
+                for (EinheitSummenDTO einheit : monat.getEinheitSummen()) {
+                    String rowClass = einheit.getEinheitTyp() == EinheitTyp.PRODUCER ? "row-producer" : "row-consumer";
+                    String typText = einheit.getEinheitTyp() == EinheitTyp.PRODUCER ? t(translations, "PRODUZENT") : t(translations, "KONSUMENT");
+                    String zevCalculatedValue = einheit.getEinheitTyp() == EinheitTyp.CONSUMER ? formatNumber(einheit.getSummeZevCalculated()) : "-";
+                    html.append("<tr class=\"").append(rowClass).append("\">");
+                    html.append("<td>").append(einheit.getEinheitName()).append("</td>");
+                    html.append("<td>").append(typText).append("</td>");
+                    html.append("<td class=\"number\">").append(formatNumber(einheit.getSummeTotal())).append("</td>");
+                    html.append("<td class=\"number\">").append(formatNumber(einheit.getSummeZev())).append("</td>");
+                    html.append("<td class=\"number\">").append(zevCalculatedValue).append("</td>");
+                    html.append("</tr>");
+                }
+                html.append("</table>");
+            }
 
             // Days with deviations
             if (!monat.getTageAbweichungen().isEmpty()) {
