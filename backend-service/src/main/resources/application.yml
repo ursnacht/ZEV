@@ -76,3 +76,24 @@ logging:
     max-size: 10MB
     max-history: 30
     total-size-cap: 1GB
+
+# Invoice Configuration
+rechnung:
+  zahlungsfrist: "30 Tage"
+  iban: "CH70 0630 0016 9464 5991 0"
+  steller:
+    name: "Urs Nacht"
+    strasse: "Hangstrasse 14a"
+    plz: "3044"
+    ort: "Innerberg"
+  adresse:
+    strasse: "Mutachstrasse 13"
+    plz: "3008"
+    ort: "Bern"
+  tarif:
+    zev:
+      bezeichnung: "vZEV PV Tarif"
+      preis: 0.2
+    ewb:
+      bezeichnung: "Strombezug EWB"
+      preis: 0.34192

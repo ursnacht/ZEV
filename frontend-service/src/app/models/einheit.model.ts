@@ -7,4 +7,6 @@ export interface Einheit {
   id?: number;
   name: string;
   typ: EinheitTyp;
+  mietername?: string;
+  messpunkt?: string;
 }

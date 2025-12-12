@@ -46,6 +46,7 @@
 * Die generierten Rechnungen werden nur temporär und nicht in der Datenbank gespeichert
 * Alle neuen Texte mehrsprachig und mit flyway in DB-Tabelle translation aufnehmen
 * Sicherheit: Rolle zev_admin notwendig
+* Verwende auf der Seite "Rechnungen" den gleichen Style wie auf der Seite /chart aus dem design-system
 
 ## 5. Referenzen
 * Specs/generell.md

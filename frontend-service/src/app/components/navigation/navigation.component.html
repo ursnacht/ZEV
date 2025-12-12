@@ -35,6 +35,11 @@
             {{ 'STATISTIK' | translate }}</a>
       </li>
       <li>
+        <a routerLink="/rechnungen" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
+          (click)="closeMenu()">
+            {{ 'RECHNUNGEN' | translate }}</a>
+      </li>
+      <li>
         <a routerLink="/translations" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
             {{ 'TRANSLATION_EDITOR' | translate }}</a>

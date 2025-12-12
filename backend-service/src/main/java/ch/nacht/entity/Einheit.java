@@ -24,6 +24,14 @@ public class Einheit {
     @Column(name = "typ", nullable = false)
     private EinheitTyp typ = EinheitTyp.CONSUMER;
 
+    @Size(max = 100, message = "Mietername must not exceed 100 characters")
+    @Column(name = "mietername", length = 100)
+    private String mietername;
+
+    @Size(max = 50, message = "Messpunkt must not exceed 50 characters")
+    @Column(name = "messpunkt", length = 50)
+    private String messpunkt;
+
     public Einheit() {
     }
 
@@ -56,8 +64,24 @@ public class Einheit {
         this.typ = typ;
     }
 
+    public String getMietername() {
+        return mietername;
+    }
+
+    public void setMietername(String mietername) {
+        this.mietername = mietername;
+    }
+
+    public String getMesspunkt() {
+        return messpunkt;
+    }
+
+    public void setMesspunkt(String messpunkt) {
+        this.messpunkt = messpunkt;
+    }
+
     @Override
     public String toString() {
-        return "Einheit{id=" + id + ", name='" + name + "', typ=" + typ + "}";
+        return "Einheit{id=" + id + ", name='" + name + "', typ=" + typ + ", mietername='" + mietername + "', messpunkt='" + messpunkt + "'}";
     }
 }

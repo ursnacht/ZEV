@@ -12,8 +12,8 @@
 
 ## 3. Technische Spezifikationen (Technical Specs)
 * Verwende immer flyway für die Datenbankmigration
-* Berücksichtige immer das Design System
-* Ergänze das Design System falls notwendig
+* Berücksichtige immer das Design System im Maven Module design-system
+* Füge neue Styles in das Design System ein
 * Verwende Spring Boot
 
 ## 4. Nicht-funktionale Anforderungen

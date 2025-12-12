@@ -14,3 +14,9 @@
 .form-actions button {
   flex: 1;
 }
+
+.zev-form-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-500);
+  margin-top: var(--spacing-xs);
+}
