@@ -95,7 +95,9 @@ public class RechnungService {
         Double sumZevCalculated = messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(einheit, vonDateTime, bisDateTime);
 
         // ZEV (self-consumed solar energy)
-        double zevMenge = sumZevCalculated != null ? sumZevCalculated : 0.0;
+        // Round quantity to whole kWh for invoice display and calculation
+        double zevMengeRaw = sumZevCalculated != null ? sumZevCalculated : 0.0;
+        double zevMenge = Math.round(zevMengeRaw);
         double zevPreis = rechnungConfig.getTarif().getZev().getPreis();
         double zevBetrag = zevMenge * zevPreis;
 
@@ -105,11 +107,13 @@ public class RechnungService {
         rechnung.setZevBezeichnung(rechnungConfig.getTarif().getZev().getBezeichnung());
 
         // EWB (grid energy = total - zev)
+        // Round quantity to whole kWh for invoice display and calculation
         double totalMenge = sumTotal != null ? sumTotal : 0.0;
-        double ewbMenge = totalMenge - zevMenge;
-        if (ewbMenge < 0) {
-            ewbMenge = 0; // Safety check
+        double ewbMengeRaw = totalMenge - zevMengeRaw;
+        if (ewbMengeRaw < 0) {
+            ewbMengeRaw = 0; // Safety check
         }
+        double ewbMenge = Math.round(ewbMengeRaw);
         double ewbPreis = rechnungConfig.getTarif().getEwb().getPreis();
         double ewbBetrag = ewbMenge * ewbPreis;
 
@@ -119,6 +123,7 @@ public class RechnungService {
         rechnung.setEwbBezeichnung(rechnungConfig.getTarif().getEwb().getBezeichnung());
 
         // Calculate totals with rounding to 5 Rappen
+        // Total is now calculated with rounded quantities for invoice consistency
         double totalBetrag = zevBetrag + ewbBetrag;
         double endBetrag = roundTo5Rappen(totalBetrag);
         double rundung = endBetrag - totalBetrag;

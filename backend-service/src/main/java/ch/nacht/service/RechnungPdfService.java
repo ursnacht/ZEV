@@ -80,6 +80,7 @@ public class RechnungPdfService {
         html.append("<html><head><meta charset=\"UTF-8\"/>");
         html.append("<style>");
         html.append("@page { size: A4; margin: 15mm 20mm 15mm 20mm; }");
+        html.append("@page qr-page { size: A4; margin: 5mm; }");
         html.append("body { font-family: Arial, sans-serif; font-size: 10pt; margin: 0; padding: 0; }");
         html.append("h1 { color: #0099cc; font-size: 18pt; margin-top: 30px; margin-bottom: 5px; }");
         html.append("h2 { color: #0099cc; font-size: 12pt; margin-top: 15px; margin-bottom: 8px; }");
@@ -87,7 +88,7 @@ public class RechnungPdfService {
         html.append(".header-row { margin: 3px 0; font-size: 9pt; }");
         html.append(".header-label { display: inline-block; width: 120px; }");
         html.append(".header-value { font-weight: normal; }");
-        html.append(".address-block { float: right; width: 200px; text-align: left; font-size: 9pt; line-height: 1.4; }");
+        html.append(".address-block { float: right; width: 200px; text-align: left; font-size: 9pt; margin-top: 50px; line-height: 1.4; }");
         html.append(".rechnungssteller { margin-bottom: 20px; font-size: 9pt; line-height: 1.4; }");
         html.append(".intro-text { color: #666; font-size: 9pt; margin-bottom: 10px; }");
         html.append("table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 9pt; }");
@@ -102,9 +103,9 @@ public class RechnungPdfService {
         html.append(".final-total { font-weight: bold; font-size: 11pt; background-color: #f0f8ff; }");
         html.append(".final-total td { padding: 10px 8px; }");
         html.append(".thanks { margin-top: 20px; font-size: 10pt; }");
-        html.append(".qr-section { page-break-before: always; margin-top: 0; }");
-        html.append(".qr-container { text-align: center; }");
-        html.append(".qr-image { max-width: 100%; height: auto; }");
+        html.append(".qr-section { page-break-before: always; page: qr-page; }");
+        html.append(".qr-container { text-align: center; margin: 0 auto; }");
+        html.append(".qr-image { width: 200mm; height: auto; display: block; margin: 0 auto; }");
         html.append(".clearfix::after { content: ''; display: table; clear: both; }");
         html.append("</style>");
         html.append("</head><body>");
