@@ -6,11 +6,12 @@ import { RechnungService, GeneratedRechnung } from '../../services/rechnung.serv
 import { Einheit, EinheitTyp } from '../../models/einheit.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
+import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
 
 @Component({
   selector: 'app-rechnungen',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe],
+  imports: [CommonModule, FormsModule, TranslatePipe, QuarterSelectorComponent],
   templateUrl: './rechnungen.component.html',
   styleUrls: ['./rechnungen.component.css']
 })
@@ -107,6 +108,11 @@ export class RechnungenComponent implements OnInit {
       const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
       this.dateTo = this.formatDate(lastDay);
     }
+  }
+
+  onQuarterSelected(event: {von: string, bis: string}): void {
+    this.dateFrom = event.von;
+    this.dateTo = event.bis;
   }
 
   canGenerate(): boolean {

@@ -1,0 +1,57 @@
+/**
+ * Quarter Selector Component Styles
+ * Horizontale Button-Reihe für Quartalsauswahl
+ */
+
+@import '../../tokens/tokens.css';
+
+.zev-quarter-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-md);
+}
+
+.zev-quarter-selector__label {
+  width: 100%;
+  margin-bottom: var(--spacing-xxs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-600);
+  font-size: var(--font-size-sm);
+}
+
+.zev-quarter-button {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-white);
+  color: var(--color-gray-800);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.zev-quarter-button:hover {
+  border-color: var(--color-primary);
+  background-color: var(--color-gray-50);
+}
+
+.zev-quarter-button--active {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-white);
+}
+
+.zev-quarter-button--active:hover {
+  background-color: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+/* Responsive: Buttons etwas kleiner auf kleinen Bildschirmen */
+@media (max-width: 600px) {
+  .zev-quarter-button {
+    padding: var(--spacing-xs) var(--spacing-xs);
+    font-size: var(--font-size-xs);
+  }
+}

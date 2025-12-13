@@ -5,11 +5,12 @@ import { StatistikService } from '../../services/statistik.service';
 import { Statistik, MonatsStatistik, TagMitAbweichung } from '../../models/statistik.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
+import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
 
 @Component({
   selector: 'app-statistik',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe],
+  imports: [CommonModule, FormsModule, TranslatePipe, QuarterSelectorComponent],
   templateUrl: './statistik.component.html',
   styleUrls: ['./statistik.component.css']
 })
@@ -55,6 +56,11 @@ export class StatistikComponent implements OnInit {
       const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
       this.dateTo = this.formatDate(lastDay);
     }
+  }
+
+  onQuarterSelected(event: {von: string, bis: string}): void {
+    this.dateFrom = event.von;
+    this.dateTo = event.bis;
   }
 
   onSubmit(): void {

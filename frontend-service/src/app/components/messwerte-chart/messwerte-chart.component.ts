@@ -8,6 +8,7 @@ import { Einheit } from '../../models/einheit.model';
 import { forkJoin } from 'rxjs';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
+import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
 
 Chart.register(...registerables);
 
@@ -21,7 +22,7 @@ interface ChartData {
 @Component({
   selector: 'app-messwerte-chart',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe],
+  imports: [CommonModule, FormsModule, TranslatePipe, QuarterSelectorComponent],
   templateUrl: './messwerte-chart.component.html',
   styleUrls: ['./messwerte-chart.component.css']
 })
@@ -97,6 +98,11 @@ export class MesswerteChartComponent implements OnInit {
       const day = String(lastDay.getDate()).padStart(2, '0');
       this.dateTo = `${year}-${month}-${day}`;
     }
+  }
+
+  onQuarterSelected(event: {von: string, bis: string}): void {
+    this.dateFrom = event.von;
+    this.dateTo = event.bis;
   }
 
   onSubmit(): void {

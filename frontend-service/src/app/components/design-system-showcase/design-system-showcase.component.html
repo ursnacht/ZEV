@@ -197,6 +197,34 @@
     </div>
   </section>
 
+  <!-- Quarter Selector Section -->
+  <section class="showcase-section">
+    <h2>Quarter Selector</h2>
+    <p>Komponente zur schnellen Auswahl der letzten 5 Quartale. Wird verwendet auf Seiten mit Zeitbereichsauswahl.</p>
+
+    <div class="subsection">
+      <h3>Standard</h3>
+      <app-quarter-selector
+        [selectedVon]="quarterDateFrom"
+        [selectedBis]="quarterDateTo"
+        (quarterSelected)="onQuarterSelected($event)">
+      </app-quarter-selector>
+      <p *ngIf="quarterDateFrom && quarterDateTo" style="margin-top: var(--spacing-sm); color: var(--color-gray-600);">
+        Ausgewählt: {{ quarterDateFrom }} - {{ quarterDateTo }}
+      </p>
+    </div>
+
+    <div class="subsection">
+      <h3>CSS Klassen</h3>
+      <ul class="zev-list">
+        <li><code>.zev-quarter-selector</code> - Container für die Button-Reihe</li>
+        <li><code>.zev-quarter-selector__label</code> - Label über den Buttons</li>
+        <li><code>.zev-quarter-button</code> - Einzelner Quartal-Button</li>
+        <li><code>.zev-quarter-button--active</code> - Aktiver/ausgewählter Button</li>
+      </ul>
+    </div>
+  </section>
+
   <!-- Navigation Section -->
   <section class="showcase-section">
     <h2>Navigation</h2>

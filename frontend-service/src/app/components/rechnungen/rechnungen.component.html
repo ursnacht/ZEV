@@ -30,6 +30,12 @@
       </div>
     </div>
 
+    <app-quarter-selector
+      [selectedVon]="dateFrom"
+      [selectedBis]="dateTo"
+      (quarterSelected)="onQuarterSelected($event)">
+    </app-quarter-selector>
+
     <div class="zev-date-range-row">
       <div class="zev-form-group">
         <label for="dateFrom">{{ 'VON_DATUM' | translate }}:</label>

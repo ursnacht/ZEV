@@ -2,13 +2,13 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MesswerteService, CalculationResponse } from '../../services/messwerte.service';
-
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
 
 @Component({
   selector: 'app-solar-calculation',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe],
+  imports: [CommonModule, FormsModule, TranslatePipe, QuarterSelectorComponent],
   templateUrl: './solar-calculation.component.html',
   styleUrls: ['./solar-calculation.component.css']
 })
@@ -34,6 +34,11 @@ export class SolarCalculationComponent {
       const day = String(lastDay.getDate()).padStart(2, '0');
       this.dateTo = `${year}-${month}-${day}`;
     }
+  }
+
+  onQuarterSelected(event: {von: string, bis: string}): void {
+    this.dateFrom = event.von;
+    this.dateTo = event.bis;
   }
 
   onSubmit(): void {
