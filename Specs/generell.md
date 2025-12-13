@@ -1,8 +1,8 @@
 # Generelle Anforderungen
 
 ## 1. Ziel & Kontext
-* Hier sind generelle Anforderungen aufgeführt, die bei jeder Umsetzung einer Anforderung berücksichtigt werden sollen.
-* Die Anwendung wird so einheitlich erstellt und bekommt ein einheitliches Look & Feel
+* **Was soll erreicht werden?** Hier sind generelle Anforderungen aufgeführt, die bei jeder Umsetzung einer Anforderung berücksichtigt werden sollen.
+* **Warum machen wir das?** Die Anwendung wird so einheitlich erstellt und bekommt ein einheitliches Look & Feel.
 
 ## 2. Funktionale Anforderungen (Functional Requirements)
 * Die funktionalen Anforderungen werden in User Stories aufgeführt.
@@ -11,10 +11,12 @@
   * Füge neue Text-Keys in die Datenbank ein. Verwende "ON CONFLICT (key) DO NOTHING", um Konflikte zu vermeiden.
 
 ## 3. Technische Spezifikationen (Technical Specs)
-* Verwende immer flyway für die Datenbankmigration
-* Berücksichtige immer das Design System im Maven Module design-system
-* Füge neue Styles in das Design System ein
 * Verwende Spring Boot
+* Verwende immer flyway für die Datenbankmigration
+* Styles
+  * Berücksichtige immer das Design System im Maven Module design-system und verwende möglichst bestehende Styles.
+  * Füge neue Styles in das Design System ein
+  * Ergänze bei neuen Styles den Design System Showcase
 
 ## 4. Nicht-funktionale Anforderungen
 * Beachte, dass die Benutzer immer mit keycloak authentifiziert sind
