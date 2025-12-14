@@ -27,7 +27,7 @@
   * Alle Spalten sind Pflicht 
 * Rechnungen 
   * Für den Zeitbereich einer Rechnung (i.d.R. ein Quartal) können mehrere Tarife gültig sein, da diese monatlich angepasst werden.
-  * Für die Berechnung des Totals muss für jeden Zeitpunkt (messwerte.zeit) der gültige Tarif verwendet werden.
+  * Der Stromverbrauch muss pro Zeile für den Gültigkeitsbereich des Tarifes und nicht der Rechnung berechnet werden.
   * Auf der Rechnung können somit mehrere Zeilen für den Strombezug vom ZEV und vom VNB nötig sein.
   * Rundungen der Mengen auf den Rechnungen beibehalten
 * Die aktuellen Spezifikationen der beiden Tarife rechnung.tarif aus application.yml entfernen.

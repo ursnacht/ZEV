@@ -23,6 +23,7 @@
 * Füge sinnvolles Logging hinzu
 * Füge sinnvolles Exception Handling hinzu
 * Füge sinnvolle Validierung hinzu
+* Korrektes Exceptionhandling: Exceptions im Backend immer abfangen und eine sinnvolle Fehlermeldungen ins Log schreiben und an das Frontend melden.
 * Füge sinnvolle Performance Optimierung hinzu
 * Füge sinnvolle Sicherheit hinzu
 
