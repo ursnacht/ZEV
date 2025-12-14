@@ -2,7 +2,7 @@
 
 ## 1. Ziel & Kontext
 * **Was soll erreicht werden:** Die Anwendung soll automatisiert getestet werden. 
-* **Warum machen wir das:** Wie wollen sicher zu sein, dass bei Änderungen die Anwendung immer noch so funktioniert, wie sie soll.
+* **Warum machen wir das:** Wie wollen sicher sein, dass bei Änderungen die Anwendung immer noch so funktioniert, wie bisher.
 * Die Testpyramide soll beachtet werden, die eine quantitative Verteilung der Testarten verlangt:
   * Unit Tests: 70-80%
   * Integration Tests: 15-20%
