@@ -22,6 +22,7 @@ export class MesswerteUploadComponent implements OnInit {
   uploading = false;
   message = '';
   messageType: 'success' | 'error' | '' = '';
+  isDragOver = false;
 
   constructor(
     private http: HttpClient,
@@ -53,9 +54,58 @@ export class MesswerteUploadComponent implements OnInit {
   onFileChange(event: any): void {
     const files = event.target.files;
     if (files.length > 0) {
-      this.file = files[0];
-      this.extractDateFromFile(files[0]);
+      this.handleFile(files[0]);
     }
+  }
+
+  onDragOver(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOver = true;
+  }
+
+  onDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOver = false;
+  }
+
+  onDrop(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOver = false;
+
+    const files = event.dataTransfer?.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (file.name.endsWith('.csv')) {
+        this.handleFile(file);
+      } else {
+        this.showMessage('Bitte nur CSV-Dateien hochladen', 'error');
+      }
+    }
+  }
+
+  private handleFile(file: File): void {
+    this.file = file;
+    this.extractDateFromFile(file);
+  }
+
+  removeFile(event: Event): void {
+    event.stopPropagation();
+    this.file = null;
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = '';
+    }
+  }
+
+  formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 
   private extractDateFromFile(file: File): void {

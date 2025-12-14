@@ -1,0 +1,124 @@
+/**
+ * Drop Zone Component
+ * A drag-and-drop file upload area
+ */
+
+.zev-drop-zone {
+  border: 2px dashed var(--zev-color-border, #ccc);
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: var(--zev-color-background-subtle, #f8f9fa);
+  min-height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.zev-drop-zone:hover {
+  border-color: var(--zev-color-primary, #007bff);
+  background-color: var(--zev-color-primary-light, #e7f1ff);
+}
+
+.zev-drop-zone--active {
+  border-color: var(--zev-color-primary, #007bff);
+  background-color: var(--zev-color-primary-light, #e7f1ff);
+  border-style: solid;
+}
+
+.zev-drop-zone--has-file {
+  border-style: solid;
+  border-color: var(--zev-color-success, #28a745);
+  background-color: var(--zev-color-success-light, #d4edda);
+}
+
+.zev-drop-zone__input {
+  display: none;
+}
+
+.zev-drop-zone__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.zev-drop-zone__icon {
+  color: var(--zev-color-text-muted, #6c757d);
+  margin-bottom: 0.5rem;
+}
+
+.zev-drop-zone:hover .zev-drop-zone__icon,
+.zev-drop-zone--active .zev-drop-zone__icon {
+  color: var(--zev-color-primary, #007bff);
+}
+
+.zev-drop-zone__text {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--zev-color-text, #333);
+  margin: 0;
+}
+
+.zev-drop-zone__hint {
+  font-size: 0.875rem;
+  color: var(--zev-color-text-muted, #6c757d);
+  margin: 0;
+}
+
+/* File display when selected */
+.zev-drop-zone__file {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  max-width: 400px;
+}
+
+.zev-drop-zone__file-icon {
+  color: var(--zev-color-success, #28a745);
+  flex-shrink: 0;
+}
+
+.zev-drop-zone__file-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.zev-drop-zone__file-name {
+  font-weight: 500;
+  color: var(--zev-color-text, #333);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.zev-drop-zone__file-size {
+  font-size: 0.875rem;
+  color: var(--zev-color-text-muted, #6c757d);
+}
+
+.zev-drop-zone__remove {
+  background: none;
+  border: none;
+  padding: 0.25rem;
+  cursor: pointer;
+  color: var(--zev-color-text-muted, #6c757d);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.zev-drop-zone__remove:hover {
+  color: var(--zev-color-danger, #dc3545);
+  background-color: var(--zev-color-danger-light, #f8d7da);
+}

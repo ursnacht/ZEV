@@ -16,8 +16,56 @@
     </div>
 
     <div class="zev-form-group">
-      <label for="file">{{ 'CSV_DATEI' | translate }}:</label>
-      <input type="file" id="file" class="zev-input" name="file" accept=".csv" (change)="onFileChange($event)" required>
+      <label>{{ 'CSV_DATEI' | translate }}:</label>
+      <div
+        class="zev-drop-zone"
+        [class.zev-drop-zone--active]="isDragOver"
+        [class.zev-drop-zone--has-file]="file"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)"
+        (click)="fileInput.click()">
+        <input
+          #fileInput
+          type="file"
+          id="file"
+          class="zev-drop-zone__input"
+          name="file"
+          accept=".csv"
+          (change)="onFileChange($event)">
+        <div class="zev-drop-zone__content" *ngIf="!file">
+          <div class="zev-drop-zone__icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+          </div>
+          <p class="zev-drop-zone__text">{{ 'DROP_CSV_HERE' | translate }}</p>
+          <p class="zev-drop-zone__hint">{{ 'OR_CLICK_TO_SELECT' | translate }}</p>
+        </div>
+        <div class="zev-drop-zone__file" *ngIf="file">
+          <div class="zev-drop-zone__file-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+              <polyline points="10 9 9 9 8 9"/>
+            </svg>
+          </div>
+          <div class="zev-drop-zone__file-info">
+            <span class="zev-drop-zone__file-name">{{ file.name }}</span>
+            <span class="zev-drop-zone__file-size">{{ formatFileSize(file.size) }}</span>
+          </div>
+          <button type="button" class="zev-drop-zone__remove" (click)="removeFile($event)" title="Entfernen">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      </div>
     </div>
 
     <div class="zev-form-group">

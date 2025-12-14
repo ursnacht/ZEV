@@ -701,4 +701,80 @@
       <p>Waehlen Sie einen Zeitraum und klicken Sie auf Anzeigen</p>
     </div>
   </section>
+
+  <!-- Drop Zone Section -->
+  <section class="showcase-section">
+    <h2>Drop Zone</h2>
+    <p>Datei-Upload-Bereich mit Drag & Drop Unterstützung.</p>
+
+    <div class="subsection">
+      <h3>Standard (ohne Datei)</h3>
+      <div
+        class="zev-drop-zone"
+        [class.zev-drop-zone--active]="dropZoneActive"
+        [class.zev-drop-zone--has-file]="dropZoneFile"
+        (dragover)="onDropZoneDragOver($event)"
+        (dragleave)="onDropZoneDragLeave($event)"
+        (drop)="onDropZoneDrop($event)"
+        (click)="dropZoneInput.click()">
+        <input
+          #dropZoneInput
+          type="file"
+          class="zev-drop-zone__input"
+          (change)="onDropZoneFileSelect($event)">
+        <div class="zev-drop-zone__content" *ngIf="!dropZoneFile">
+          <div class="zev-drop-zone__icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+          </div>
+          <p class="zev-drop-zone__text">Datei hierher ziehen</p>
+          <p class="zev-drop-zone__hint">oder klicken zum Auswählen</p>
+        </div>
+        <div class="zev-drop-zone__file" *ngIf="dropZoneFile">
+          <div class="zev-drop-zone__file-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+              <polyline points="10 9 9 9 8 9"/>
+            </svg>
+          </div>
+          <div class="zev-drop-zone__file-info">
+            <span class="zev-drop-zone__file-name">{{ dropZoneFile.name }}</span>
+            <span class="zev-drop-zone__file-size">{{ formatFileSize(dropZoneFile.size) }}</span>
+          </div>
+          <button type="button" class="zev-drop-zone__remove" (click)="removeDropZoneFile($event)" title="Entfernen">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>CSS Klassen</h3>
+      <ul class="zev-list">
+        <li><code>.zev-drop-zone</code> - Container für den Drop-Bereich</li>
+        <li><code>.zev-drop-zone--active</code> - Aktiv während Drag-Over</li>
+        <li><code>.zev-drop-zone--has-file</code> - Wenn eine Datei ausgewählt ist</li>
+        <li><code>.zev-drop-zone__input</code> - Verstecktes File-Input</li>
+        <li><code>.zev-drop-zone__content</code> - Inhalt (Icon, Text, Hint)</li>
+        <li><code>.zev-drop-zone__icon</code> - Upload-Icon</li>
+        <li><code>.zev-drop-zone__text</code> - Haupttext</li>
+        <li><code>.zev-drop-zone__hint</code> - Hinweistext</li>
+        <li><code>.zev-drop-zone__file</code> - Datei-Anzeige nach Auswahl</li>
+        <li><code>.zev-drop-zone__file-icon</code> - Datei-Icon</li>
+        <li><code>.zev-drop-zone__file-info</code> - Dateiname und -größe</li>
+        <li><code>.zev-drop-zone__file-name</code> - Dateiname</li>
+        <li><code>.zev-drop-zone__file-size</code> - Dateigröße</li>
+        <li><code>.zev-drop-zone__remove</code> - Entfernen-Button</li>
+      </ul>
+    </div>
+  </section>
 </div>
