@@ -1,0 +1,31 @@
+/* Nutzt Design System Variablen */
+.form-container {
+  background-color: var(--color-gray-50);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
+}
+
+.form-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-lg);
+}
+
+.form-actions button {
+  flex: 1;
+}
+
+.zev-form-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-500);
+  margin-top: var(--spacing-xs);
+}
+
+.zev-form-row {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.zev-form-row .zev-form-group {
+  flex: 1;
+}

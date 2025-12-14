@@ -1,0 +1,27 @@
+/*
+ * Tarif List Component
+ * Alle Basis-Styles kommen aus dem Design System
+ */
+
+.number {
+  text-align: right;
+  font-family: monospace;
+}
+
+.tarif-typ-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.tarif-typ-badge--zev {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.tarif-typ-badge--vnb {
+  background-color: #fff3e0;
+  color: #e65100;
+}

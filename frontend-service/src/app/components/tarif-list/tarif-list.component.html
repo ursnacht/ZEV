@@ -1,0 +1,77 @@
+<div class="zev-container">
+  <h1>{{ 'TARIFE_VERWALTUNG' | translate }}</h1>
+
+  <div *ngIf="message" class="zev-message" [ngClass]="'zev-message--' + messageType">
+    {{ message | translate }}
+  </div>
+
+  <div *ngIf="!showForm">
+    <button class="zev-button zev-button--primary" (click)="onCreateNew()">{{ 'NEUER_TARIF_ERSTELLEN' | translate }}</button>
+
+    <table class="zev-table" *ngIf="tarife.length > 0">
+      <thead>
+        <tr>
+          <th class="zev-table__header--sortable" (click)="onSort('tariftyp')">
+            {{ 'TARIFTYP' | translate }}
+            <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'tariftyp'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+          <th class="zev-table__header--sortable" (click)="onSort('bezeichnung')">
+            {{ 'BEZEICHNUNG' | translate }}
+            <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'bezeichnung'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+          <th class="zev-table__header--sortable" (click)="onSort('preis')">
+            {{ 'PREIS' | translate }} (CHF/kWh)
+            <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'preis'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+          <th class="zev-table__header--sortable" (click)="onSort('gueltigVon')">
+            {{ 'GUELTIG_VON' | translate }}
+            <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'gueltigVon'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+          <th class="zev-table__header--sortable" (click)="onSort('gueltigBis')">
+            {{ 'GUELTIG_BIS' | translate }}
+            <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'gueltigBis'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+          <th>{{ 'ACTIONS' | translate }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let tarif of tarife">
+          <td>
+            <span class="tarif-typ-badge" [class.tarif-typ-badge--zev]="tarif.tariftyp === 'ZEV'" [class.tarif-typ-badge--vnb]="tarif.tariftyp === 'VNB'">
+              {{ tarif.tariftyp }}
+            </span>
+          </td>
+          <td>{{ tarif.bezeichnung }}</td>
+          <td class="number">{{ formatPreis(tarif.preis) }}</td>
+          <td>{{ formatDate(tarif.gueltigVon) }}</td>
+          <td>{{ formatDate(tarif.gueltigBis) }}</td>
+          <td>
+            <div class="zev-table-actions">
+              <button class="zev-button zev-button--secondary" (click)="onEdit(tarif)">
+                {{ 'BEARBEITEN' | translate }}
+              </button>
+              <button class="zev-button zev-button--danger" (click)="onDelete(tarif.id)">
+                {{ 'LOESCHEN' | translate }}
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p *ngIf="tarife.length === 0">{{ 'KEINE_TARIFE_VORHANDEN' | translate }}</p>
+  </div>
+
+  <app-tarif-form *ngIf="showForm" [tarif]="selectedTarif" (save)="onFormSubmit($event)"
+    (cancel)="onFormCancel()"></app-tarif-form>
+</div>

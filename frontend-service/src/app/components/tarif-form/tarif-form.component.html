@@ -1,0 +1,59 @@
+<div class="form-container">
+  <h2>{{ formData.id ? ('TARIF_BEARBEITEN' | translate) : ('NEUER_TARIF_ERSTELLEN' | translate) }}</h2>
+
+  <form (ngSubmit)="onSubmit()">
+    <div class="zev-form-group">
+      <label for="tariftyp">{{ 'TARIFTYP' | translate }}:</label>
+      <select id="tariftyp" class="zev-select" [(ngModel)]="formData.tariftyp" name="tariftyp" required>
+        <option *ngFor="let option of tarifTypOptions" [value]="option.value">
+          {{ option.label }}
+        </option>
+      </select>
+      <div class="zev-form-hint">{{ 'TARIFTYP_HINT' | translate }}</div>
+    </div>
+
+    <div class="zev-form-group">
+      <label for="bezeichnung">{{ 'BEZEICHNUNG' | translate }}:</label>
+      <input type="text" id="bezeichnung" class="zev-input" [(ngModel)]="formData.bezeichnung" name="bezeichnung"
+        required maxlength="30" [placeholder]="'TARIF_BEZEICHNUNG_PLACEHOLDER' | translate" />
+      <div class="zev-form-error" *ngIf="!formData.bezeichnung.trim()">
+        {{ 'BEZEICHNUNG_IST_ERFORDERLICH' | translate }}
+      </div>
+    </div>
+
+    <div class="zev-form-group">
+      <label for="preis">{{ 'PREIS' | translate }} (CHF/kWh):</label>
+      <input type="number" id="preis" class="zev-input" [(ngModel)]="formData.preis" name="preis"
+        required min="0.00001" step="0.00001" placeholder="0.20000" />
+      <div class="zev-form-error" *ngIf="formData.preis <= 0">
+        {{ 'PREIS_IST_ERFORDERLICH' | translate }}
+      </div>
+      <div class="zev-form-hint">{{ 'PREIS_HINT' | translate }}</div>
+    </div>
+
+    <div class="zev-form-row">
+      <div class="zev-form-group">
+        <label for="gueltigVon">{{ 'GUELTIG_VON' | translate }}:</label>
+        <input type="date" id="gueltigVon" class="zev-input" [(ngModel)]="formData.gueltigVon" name="gueltigVon" required />
+      </div>
+
+      <div class="zev-form-group">
+        <label for="gueltigBis">{{ 'GUELTIG_BIS' | translate }}:</label>
+        <input type="date" id="gueltigBis" class="zev-input" [(ngModel)]="formData.gueltigBis" name="gueltigBis" required />
+      </div>
+    </div>
+
+    <div class="zev-form-error" *ngIf="!isDateRangeValid()">
+      {{ 'GUELTIG_VON_MUSS_VOR_BIS_SEIN' | translate }}
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="zev-button zev-button--primary" [disabled]="!isFormValid()">
+        {{ formData.id ? ('AKTUALISIEREN' | translate) : ('ERSTELLEN' | translate) }}
+      </button>
+      <button type="button" class="zev-button zev-button--secondary" (click)="onCancel()">
+        {{ 'ABBRECHEN' | translate }}
+      </button>
+    </div>
+  </form>
+</div>
