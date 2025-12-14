@@ -15,7 +15,7 @@ import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.c
 export class SolarCalculationComponent {
   dateFrom: string = '';
   dateTo: string = '';
-  algorithm: string = 'EQUAL_SHARE';
+  algorithm: string = 'PROPORTIONAL';
   calculating = false;
   message = '';
   messageType: 'success' | 'error' | '' = '';
