@@ -4,6 +4,7 @@ import { TarifService } from '../../services/tarif.service';
 import { Tarif, TarifTyp } from '../../models/tarif.model';
 import { TarifFormComponent } from '../tarif-form/tarif-form.component';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { TranslationService } from '../../services/translation.service';
 
 @Component({
   selector: 'app-tarif-list',
@@ -21,7 +22,10 @@ export class TarifListComponent implements OnInit {
   sortColumn: 'bezeichnung' | 'tariftyp' | 'preis' | 'gueltigVon' | 'gueltigBis' | null = 'tariftyp';
   sortDirection: 'asc' | 'desc' = 'asc';
 
-  constructor(private tarifService: TarifService) { }
+  constructor(
+    private tarifService: TarifService,
+    private translationService: TranslationService
+  ) { }
 
   ngOnInit(): void {
     this.loadTarife();
@@ -51,7 +55,7 @@ export class TarifListComponent implements OnInit {
   onDelete(id: number | undefined): void {
     if (!id) return;
 
-    if (confirm('Möchten Sie diesen Tarif wirklich löschen?')) {
+    if (confirm(this.translationService.translate('CONFIRM_DELETE_TARIF'))) {
       this.tarifService.deleteTarif(id).subscribe({
         next: () => {
           this.showMessage('TARIF_GELOESCHT', 'success');

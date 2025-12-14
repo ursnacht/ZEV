@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MesswerteService, CalculationResponse } from '../../services/messwerte.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { TranslationService } from '../../services/translation.service';
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
 
 @Component({
@@ -21,7 +22,10 @@ export class SolarCalculationComponent {
   messageType: 'success' | 'error' | '' = '';
   result: CalculationResponse | null = null;
 
-  constructor(private messwerteService: MesswerteService) { }
+  constructor(
+    private messwerteService: MesswerteService,
+    private translationService: TranslationService
+  ) { }
 
   onDateFromChange(): void {
     if (this.dateFrom) {
@@ -43,12 +47,12 @@ export class SolarCalculationComponent {
 
   onSubmit(): void {
     if (!this.dateFrom || !this.dateTo) {
-      this.showMessage('Bitte beide Daten ausfüllen', 'error');
+      this.showMessage(this.translationService.translate('BITTE_BEIDE_DATEN_AUSFUELLEN'), 'error');
       return;
     }
 
     if (this.dateFrom > this.dateTo) {
-      this.showMessage('Start-Datum muss vor End-Datum liegen', 'error');
+      this.showMessage(this.translationService.translate('START_VOR_END_DATUM'), 'error');
       return;
     }
 
@@ -59,7 +63,7 @@ export class SolarCalculationComponent {
       next: (response) => {
         if (response.status === 'success') {
           this.result = response;
-          this.showMessage('Berechnung erfolgreich abgeschlossen!', 'success');
+          this.showMessage(this.translationService.translate('BERECHNUNG_ERFOLGREICH'), 'success');
         } else {
           this.showMessage(`Fehler: ${response.message}`, 'error');
         }

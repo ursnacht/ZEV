@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { EinheitService } from '../../services/einheit.service';
 import { Einheit } from '../../models/einheit.model';
+import { TranslationService } from '../../services/translation.service';
 
 import { TranslatePipe } from '../../pipes/translate.pipe';
 
@@ -26,7 +27,8 @@ export class MesswerteUploadComponent implements OnInit {
 
   constructor(
     private http: HttpClient,
-    private einheitService: EinheitService
+    private einheitService: EinheitService,
+    private translationService: TranslationService
   ) { }
 
   ngOnInit(): void {
@@ -81,7 +83,7 @@ export class MesswerteUploadComponent implements OnInit {
       if (file.name.endsWith('.csv')) {
         this.handleFile(file);
       } else {
-        this.showMessage('Bitte nur CSV-Dateien hochladen', 'error');
+        this.showMessage(this.translationService.translate('NUR_CSV_DATEIEN'), 'error');
       }
     }
   }
@@ -150,7 +152,7 @@ export class MesswerteUploadComponent implements OnInit {
 
   onSubmit(): void {
     if (!this.date || !this.einheitId || !this.file) {
-      this.showMessage('Bitte alle Felder ausfüllen', 'error');
+      this.showMessage(this.translationService.translate('BITTE_ALLE_FELDER_AUSFUELLEN'), 'error');
       return;
     }
 

@@ -4,6 +4,7 @@ import { EinheitService } from '../../services/einheit.service';
 import { Einheit } from '../../models/einheit.model';
 import { EinheitFormComponent } from '../einheit-form/einheit-form.component';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { TranslationService } from '../../services/translation.service';
 
 @Component({
   selector: 'app-einheit-list',
@@ -21,7 +22,10 @@ export class EinheitListComponent implements OnInit {
   sortColumn: 'id' | 'name' | 'typ' | null = 'name';
   sortDirection: 'asc' | 'desc' = 'asc';
 
-  constructor(private einheitService: EinheitService) { }
+  constructor(
+    private einheitService: EinheitService,
+    private translationService: TranslationService
+  ) { }
 
   ngOnInit(): void {
     this.loadEinheiten();
@@ -51,10 +55,10 @@ export class EinheitListComponent implements OnInit {
   onDelete(id: number | undefined): void {
     if (!id) return;
 
-    if (confirm('Möchten Sie diese Einheit wirklich löschen?')) {
+    if (confirm(this.translationService.translate('CONFIRM_DELETE_EINHEIT'))) {
       this.einheitService.deleteEinheit(id).subscribe({
         next: () => {
-          this.showMessage('Einheit erfolgreich gelöscht', 'success');
+          this.showMessage(this.translationService.translate('EINHEIT_GELOESCHT'), 'success');
           this.loadEinheiten();
         },
         error: (error) => {
@@ -68,7 +72,7 @@ export class EinheitListComponent implements OnInit {
     if (einheit.id) {
       this.einheitService.updateEinheit(einheit.id, einheit).subscribe({
         next: () => {
-          this.showMessage('Einheit erfolgreich aktualisiert', 'success');
+          this.showMessage(this.translationService.translate('EINHEIT_AKTUALISIERT'), 'success');
           this.showForm = false;
           this.loadEinheiten();
         },
@@ -79,7 +83,7 @@ export class EinheitListComponent implements OnInit {
     } else {
       this.einheitService.createEinheit(einheit).subscribe({
         next: () => {
-          this.showMessage('Einheit erfolgreich erstellt', 'success');
+          this.showMessage(this.translationService.translate('EINHEIT_ERSTELLT'), 'success');
           this.showForm = false;
           this.loadEinheiten();
         },
