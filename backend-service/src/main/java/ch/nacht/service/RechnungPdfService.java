@@ -1,6 +1,7 @@
 package ch.nacht.service;
 
 import ch.nacht.dto.RechnungDTO;
+import ch.nacht.dto.TarifZeileDTO;
 import ch.nacht.entity.Translation;
 import ch.nacht.repository.TranslationRepository;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
@@ -168,23 +169,21 @@ public class RechnungPdfService {
         html.append(" - ").append(t(translations, "ENERGIEBEZUG")).append("</td>");
         html.append("</tr>");
 
-        // ZEV tariff row
-        html.append("<tr>");
-        html.append("<td>").append(escapeHtml(rechnung.getZevBezeichnung())).append("</td>");
-        html.append("<td class=\"number\">").append(formatMenge(rechnung.getZevMenge())).append("</td>");
-        html.append("<td class=\"number\">").append(formatPreis(rechnung.getZevPreis())).append("</td>");
-        html.append("<td class=\"unit\">CHF / kWh</td>");
-        html.append("<td class=\"number\">").append(formatBetrag(rechnung.getZevBetrag())).append("</td>");
-        html.append("</tr>");
-
-        // EWB tariff row
-        html.append("<tr>");
-        html.append("<td>").append(escapeHtml(rechnung.getEwbBezeichnung())).append("</td>");
-        html.append("<td class=\"number\">").append(formatMenge(rechnung.getEwbMenge())).append("</td>");
-        html.append("<td class=\"number\">").append(formatPreis(rechnung.getEwbPreis())).append("</td>");
-        html.append("<td class=\"unit\">CHF / kWh</td>");
-        html.append("<td class=\"number\">").append(formatBetrag(rechnung.getEwbBetrag())).append("</td>");
-        html.append("</tr>");
+        // Tariff line rows (dynamically from list)
+        for (TarifZeileDTO zeile : rechnung.getTarifZeilen()) {
+            html.append("<tr>");
+            // Show date range in designation if multiple tariffs exist per type
+            String bezeichnung = zeile.getBezeichnung();
+            if (hasMehrereTarifeProTyp(rechnung)) {
+                bezeichnung += " (" + zeile.getVon().format(DATE_FORMATTER) + " - " + zeile.getBis().format(DATE_FORMATTER) + ")";
+            }
+            html.append("<td>").append(escapeHtml(bezeichnung)).append("</td>");
+            html.append("<td class=\"number\">").append(formatMenge(zeile.getMenge())).append("</td>");
+            html.append("<td class=\"number\">").append(formatPreis(zeile.getPreis())).append("</td>");
+            html.append("<td class=\"unit\">CHF / kWh</td>");
+            html.append("<td class=\"number\">").append(formatBetrag(zeile.getBetrag())).append("</td>");
+            html.append("</tr>");
+        }
 
         html.append("</table>");
 
@@ -308,5 +307,14 @@ public class RechnungPdfService {
                    .replace("<", "&lt;")
                    .replace(">", "&gt;")
                    .replace("\"", "&quot;");
+    }
+
+    /**
+     * Check if invoice has multiple tariffs per type.
+     * If true, we show date ranges in the tariff line descriptions.
+     */
+    private boolean hasMehrereTarifeProTyp(RechnungDTO rechnung) {
+        // Count tariffs by type - if more than 2 total (1 ZEV + 1 VNB), we have splits
+        return rechnung.getTarifZeilen().size() > 2;
     }
 }

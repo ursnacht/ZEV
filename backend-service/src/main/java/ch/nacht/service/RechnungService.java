@@ -2,8 +2,11 @@ package ch.nacht.service;
 
 import ch.nacht.config.RechnungConfig;
 import ch.nacht.dto.RechnungDTO;
+import ch.nacht.dto.TarifZeileDTO;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
+import ch.nacht.entity.Tarif;
+import ch.nacht.entity.TarifTyp;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
 import org.slf4j.Logger;
@@ -26,13 +29,16 @@ public class RechnungService {
     private final EinheitRepository einheitRepository;
     private final MesswerteRepository messwerteRepository;
     private final RechnungConfig rechnungConfig;
+    private final TarifService tarifService;
 
     public RechnungService(EinheitRepository einheitRepository,
                            MesswerteRepository messwerteRepository,
-                           RechnungConfig rechnungConfig) {
+                           RechnungConfig rechnungConfig,
+                           TarifService tarifService) {
         this.einheitRepository = einheitRepository;
         this.messwerteRepository = messwerteRepository;
         this.rechnungConfig = rechnungConfig;
+        this.tarifService = tarifService;
     }
 
     /**
@@ -42,9 +48,13 @@ public class RechnungService {
      * @param von Start date (inclusive)
      * @param bis End date (inclusive)
      * @return List of calculated invoice DTOs
+     * @throws IllegalStateException if tariffs don't cover the entire period
      */
     public List<RechnungDTO> berechneRechnungen(List<Long> einheitIds, LocalDate von, LocalDate bis) {
         log.info("Calculating invoices for {} units from {} to {}", einheitIds.size(), von, bis);
+
+        // Validate tariff coverage before calculating any invoices
+        tarifService.validateTarifAbdeckung(von, bis);
 
         List<RechnungDTO> rechnungen = new ArrayList<>();
 
@@ -86,45 +96,19 @@ public class RechnungService {
         rechnung.setBis(bis);
         rechnung.setErstellungsdatum(LocalDate.now());
 
-        // Convert dates to LocalDateTime for repository queries
-        LocalDateTime vonDateTime = von.atStartOfDay();
-        LocalDateTime bisDateTime = bis.plusDays(1).atStartOfDay(); // exclusive end
+        // Get tariffs for the period
+        List<Tarif> zevTarife = tarifService.getTarifeForZeitraum(TarifTyp.ZEV, von, bis);
+        List<Tarif> vnbTarife = tarifService.getTarifeForZeitraum(TarifTyp.VNB, von, bis);
 
-        // Get measurement sums
-        Double sumTotal = messwerteRepository.sumTotalByEinheitAndZeitBetween(einheit, vonDateTime, bisDateTime);
-        Double sumZevCalculated = messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(einheit, vonDateTime, bisDateTime);
+        double totalBetrag = 0.0;
 
-        // ZEV (self-consumed solar energy)
-        // Round quantity to whole kWh for invoice display and calculation
-        double zevMengeRaw = sumZevCalculated != null ? sumZevCalculated : 0.0;
-        double zevMenge = Math.round(zevMengeRaw);
-        double zevPreis = rechnungConfig.getTarif().getZev().getPreis();
-        double zevBetrag = zevMenge * zevPreis;
+        // Calculate ZEV tariff lines (based on zevCalculated measurements)
+        totalBetrag += berechneTarifZeilen(rechnung, einheit, von, bis, zevTarife, TarifTyp.ZEV);
 
-        rechnung.setZevMenge(zevMenge);
-        rechnung.setZevPreis(zevPreis);
-        rechnung.setZevBetrag(zevBetrag);
-        rechnung.setZevBezeichnung(rechnungConfig.getTarif().getZev().getBezeichnung());
-
-        // EWB (grid energy = total - zev)
-        // Round quantity to whole kWh for invoice display and calculation
-        double totalMenge = sumTotal != null ? sumTotal : 0.0;
-        double ewbMengeRaw = totalMenge - zevMengeRaw;
-        if (ewbMengeRaw < 0) {
-            ewbMengeRaw = 0; // Safety check
-        }
-        double ewbMenge = Math.round(ewbMengeRaw);
-        double ewbPreis = rechnungConfig.getTarif().getEwb().getPreis();
-        double ewbBetrag = ewbMenge * ewbPreis;
-
-        rechnung.setEwbMenge(ewbMenge);
-        rechnung.setEwbPreis(ewbPreis);
-        rechnung.setEwbBetrag(ewbBetrag);
-        rechnung.setEwbBezeichnung(rechnungConfig.getTarif().getEwb().getBezeichnung());
+        // Calculate VNB tariff lines (based on total - zevCalculated measurements)
+        totalBetrag += berechneTarifZeilen(rechnung, einheit, von, bis, vnbTarife, TarifTyp.VNB);
 
         // Calculate totals with rounding to 5 Rappen
-        // Total is now calculated with rounded quantities for invoice consistency
-        double totalBetrag = zevBetrag + ewbBetrag;
         double endBetrag = roundTo5Rappen(totalBetrag);
         double rundung = endBetrag - totalBetrag;
 
@@ -142,6 +126,73 @@ public class RechnungService {
         rechnung.setAdressePlzOrt(rechnungConfig.getAdresse().getPlz() + " " + rechnungConfig.getAdresse().getOrt());
 
         return rechnung;
+    }
+
+    /**
+     * Calculate tariff lines for a specific tariff type.
+     * For each tariff, queries the actual measurements for that tariff's validity period.
+     *
+     * @param rechnung The invoice DTO to add lines to
+     * @param einheit The unit
+     * @param von Invoice start date
+     * @param bis Invoice end date
+     * @param tarife List of applicable tariffs
+     * @param typ Tariff type (ZEV or VNB)
+     * @return Total amount for all lines of this type
+     */
+    private double berechneTarifZeilen(RechnungDTO rechnung, Einheit einheit, LocalDate von, LocalDate bis,
+                                       List<Tarif> tarife, TarifTyp typ) {
+        double totalBetrag = 0.0;
+
+        if (tarife.isEmpty()) {
+            log.warn("No {} tariffs found for period {} to {}", typ, von, bis);
+            return 0.0;
+        }
+
+        for (Tarif tarif : tarife) {
+            // Determine effective dates: intersection of tariff validity and invoice period
+            LocalDate effectiveVon = tarif.getGueltigVon().isBefore(von) ? von : tarif.getGueltigVon();
+            LocalDate effectiveBis = tarif.getGueltigBis().isAfter(bis) ? bis : tarif.getGueltigBis();
+
+            // Query actual measurements for this specific period
+            LocalDateTime periodStart = effectiveVon.atStartOfDay();
+            LocalDateTime periodEnd = effectiveBis.plusDays(1).atStartOfDay(); // exclusive end
+
+            double mengeRaw;
+            if (typ == TarifTyp.ZEV) {
+                // ZEV: use zevCalculated values
+                Double sum = messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(einheit, periodStart, periodEnd);
+                mengeRaw = sum != null ? sum : 0.0;
+            } else {
+                // VNB: use (total - zevCalculated) values
+                Double sumTotal = messwerteRepository.sumTotalByEinheitAndZeitBetween(einheit, periodStart, periodEnd);
+                Double sumZev = messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(einheit, periodStart, periodEnd);
+                double total = sumTotal != null ? sumTotal : 0.0;
+                double zev = sumZev != null ? sumZev : 0.0;
+                mengeRaw = Math.max(0, total - zev);
+            }
+
+            double menge = Math.round(mengeRaw);
+            double preis = tarif.getPreis().doubleValue();
+            double betrag = menge * preis;
+
+            TarifZeileDTO zeile = new TarifZeileDTO(
+                tarif.getBezeichnung(),
+                effectiveVon,
+                effectiveBis,
+                menge,
+                preis,
+                betrag,
+                typ
+            );
+            rechnung.addTarifZeile(zeile);
+            totalBetrag += betrag;
+
+            log.debug("{} line ({} to {}): {} kWh * {} = {} CHF",
+                typ, effectiveVon, effectiveBis, menge, preis, betrag);
+        }
+
+        return totalBetrag;
     }
 
     /**

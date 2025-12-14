@@ -71,8 +71,15 @@ public class RechnungController {
         rechnungStorageService.clearAll();
 
         // Calculate invoices
-        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(
-                request.einheitIds, request.von, request.bis);
+        List<RechnungDTO> rechnungen;
+        try {
+            rechnungen = rechnungService.berechneRechnungen(
+                    request.einheitIds, request.von, request.bis);
+        } catch (IllegalStateException e) {
+            // Tariff validation error (e.g. missing tariffs for period)
+            log.warn("Tariff validation failed: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
 
         // Generate PDFs and store them
         List<Map<String, Object>> generatedList = new ArrayList<>();

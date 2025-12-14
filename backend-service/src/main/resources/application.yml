@@ -78,6 +78,7 @@ logging:
     total-size-cap: 1GB
 
 # Invoice Configuration
+# Note: Tariffs (ZEV/VNB) are now managed in database via /api/tarife
 rechnung:
   zahlungsfrist: "30 Tage"
   iban: "CH70 0630 0016 9464 5991 0"
@@ -90,10 +91,3 @@ rechnung:
     strasse: "Mutachstrasse 13"
     plz: "3008"
     ort: "Bern"
-  tarif:
-    zev:
-      bezeichnung: "vZEV PV Tarif"
-      preis: 0.2
-    ewb:
-      bezeichnung: "Strombezug EWB"
-      preis: 0.34192

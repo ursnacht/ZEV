@@ -40,6 +40,11 @@
             {{ 'RECHNUNGEN' | translate }}</a>
       </li>
       <li>
+        <a routerLink="/tarife" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
+          (click)="closeMenu()">
+            {{ 'TARIFE' | translate }}</a>
+      </li>
+      <li>
         <a routerLink="/translations" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
             {{ 'TRANSLATION_EDITOR' | translate }}</a>

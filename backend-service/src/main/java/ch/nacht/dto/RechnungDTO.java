@@ -1,6 +1,8 @@
 package ch.nacht.dto;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * DTO for a single invoice containing all data needed for PDF generation.
@@ -16,17 +18,8 @@ public class RechnungDTO {
     private LocalDate bis;
     private LocalDate erstellungsdatum;
 
-    // ZEV tariff (self-consumed solar energy)
-    private double zevMenge;        // kWh
-    private double zevPreis;        // CHF/kWh
-    private double zevBetrag;       // CHF
-    private String zevBezeichnung;
-
-    // EWB tariff (grid energy)
-    private double ewbMenge;        // kWh
-    private double ewbPreis;        // CHF/kWh
-    private double ewbBetrag;       // CHF
-    private String ewbBezeichnung;
+    // Tariff lines (multiple lines possible per type if tariffs change within period)
+    private List<TarifZeileDTO> tarifZeilen = new ArrayList<>();
 
     // Totals
     private double totalBetrag;     // CHF (before rounding)
@@ -98,68 +91,16 @@ public class RechnungDTO {
         this.erstellungsdatum = erstellungsdatum;
     }
 
-    public double getZevMenge() {
-        return zevMenge;
+    public List<TarifZeileDTO> getTarifZeilen() {
+        return tarifZeilen;
     }
 
-    public void setZevMenge(double zevMenge) {
-        this.zevMenge = zevMenge;
+    public void setTarifZeilen(List<TarifZeileDTO> tarifZeilen) {
+        this.tarifZeilen = tarifZeilen;
     }
 
-    public double getZevPreis() {
-        return zevPreis;
-    }
-
-    public void setZevPreis(double zevPreis) {
-        this.zevPreis = zevPreis;
-    }
-
-    public double getZevBetrag() {
-        return zevBetrag;
-    }
-
-    public void setZevBetrag(double zevBetrag) {
-        this.zevBetrag = zevBetrag;
-    }
-
-    public String getZevBezeichnung() {
-        return zevBezeichnung;
-    }
-
-    public void setZevBezeichnung(String zevBezeichnung) {
-        this.zevBezeichnung = zevBezeichnung;
-    }
-
-    public double getEwbMenge() {
-        return ewbMenge;
-    }
-
-    public void setEwbMenge(double ewbMenge) {
-        this.ewbMenge = ewbMenge;
-    }
-
-    public double getEwbPreis() {
-        return ewbPreis;
-    }
-
-    public void setEwbPreis(double ewbPreis) {
-        this.ewbPreis = ewbPreis;
-    }
-
-    public double getEwbBetrag() {
-        return ewbBetrag;
-    }
-
-    public void setEwbBetrag(double ewbBetrag) {
-        this.ewbBetrag = ewbBetrag;
-    }
-
-    public String getEwbBezeichnung() {
-        return ewbBezeichnung;
-    }
-
-    public void setEwbBezeichnung(String ewbBezeichnung) {
-        this.ewbBezeichnung = ewbBezeichnung;
+    public void addTarifZeile(TarifZeileDTO zeile) {
+        this.tarifZeilen.add(zeile);
     }
 
     public double getTotalBetrag() {

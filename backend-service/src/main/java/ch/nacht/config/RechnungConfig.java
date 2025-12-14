@@ -15,7 +15,6 @@ public class RechnungConfig {
     private String iban;
     private Steller steller = new Steller();
     private Adresse adresse = new Adresse();
-    private Tarif tarif = new Tarif();
 
     public String getZahlungsfrist() {
         return zahlungsfrist;
@@ -47,14 +46,6 @@ public class RechnungConfig {
 
     public void setAdresse(Adresse adresse) {
         this.adresse = adresse;
-    }
-
-    public Tarif getTarif() {
-        return tarif;
-    }
-
-    public void setTarif(Tarif tarif) {
-        this.tarif = tarif;
     }
 
     /**
@@ -137,54 +128,6 @@ public class RechnungConfig {
 
         public String getFullAddress() {
             return strasse + "\n" + plz + " " + ort;
-        }
-    }
-
-    /**
-     * Tariff configuration container
-     */
-    public static class Tarif {
-        private TarifDetails zev = new TarifDetails();
-        private TarifDetails ewb = new TarifDetails();
-
-        public TarifDetails getZev() {
-            return zev;
-        }
-
-        public void setZev(TarifDetails zev) {
-            this.zev = zev;
-        }
-
-        public TarifDetails getEwb() {
-            return ewb;
-        }
-
-        public void setEwb(TarifDetails ewb) {
-            this.ewb = ewb;
-        }
-    }
-
-    /**
-     * Individual tariff details (name and price)
-     */
-    public static class TarifDetails {
-        private String bezeichnung;
-        private double preis;
-
-        public String getBezeichnung() {
-            return bezeichnung;
-        }
-
-        public void setBezeichnung(String bezeichnung) {
-            this.bezeichnung = bezeichnung;
-        }
-
-        public double getPreis() {
-            return preis;
-        }
-
-        public void setPreis(double preis) {
-            this.preis = preis;
         }
     }
 }
