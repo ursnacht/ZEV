@@ -1,8 +1,8 @@
 # Generelle Anforderungen
 
 ## 1. Ziel & Kontext
-* **Was soll erreicht werden?** Hier sind generelle Anforderungen aufgeführt, die bei jeder Umsetzung einer Anforderung berücksichtigt werden sollen.
-* **Warum machen wir das?** Die Anwendung wird so einheitlich erstellt und bekommt ein einheitliches Look & Feel.
+* **Was soll erreicht werden:** Hier sind generelle Anforderungen aufgeführt, die bei jeder Umsetzung einer Anforderung berücksichtigt werden sollen.
+* **Warum machen wir das:** Die Anwendung wird so einheitlich erstellt und bekommt ein einheitliches Look & Feel.
 
 ## 2. Funktionale Anforderungen (Functional Requirements)
 * Die funktionalen Anforderungen werden in User Stories aufgeführt.
@@ -28,4 +28,4 @@
 
 ## 5. Testing
 * Ergänze die Tests wo nötig (Unit Tests, Integration Tests, End-to-End Tests). 
-* Beachte immer auch die Datei Specs/AutomatisierteTests.md für weitere Anforderungen bezüglich Testing
+* Beachte immer auch die Datei Specs/AutomatisierteTests.md für weitere Anforderungen zum Thema Testing

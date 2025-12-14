@@ -1,8 +1,8 @@
 # [Titel des Features / der Änderung]
 
 ## 1. Ziel & Kontext
-* **Was soll erreicht werden?** (Kurze Zusammenfassung)
-* **Warum machen wir das?** (Business Value / Hintergrund)
+* **Was soll erreicht werden:** (Kurze Zusammenfassung)
+* **Warum machen wir das:** (Business Value / Hintergrund)
 * **Aktueller Stand:** Wie funktioniert es jetzt? (Falls relevant)
 
 ## 2. Funktionale Anforderungen (Functional Requirements)
