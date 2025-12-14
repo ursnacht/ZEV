@@ -21,12 +21,11 @@
 ## 4. Nicht-funktionale Anforderungen
 * Beachte, dass die Benutzer immer mit keycloak authentifiziert sind
 * Füge sinnvolles Logging hinzu
-* Füge sinnvolles Exception Handling hinzu
+* Verwende korrektes Exceptionhandling: Exceptions im Backend immer abfangen und eine sinnvolle Fehlermeldungen ins Log schreiben und an das Frontend melden.
 * Füge sinnvolle Validierung hinzu
-* Korrektes Exceptionhandling: Exceptions im Backend immer abfangen und eine sinnvolle Fehlermeldungen ins Log schreiben und an das Frontend melden.
 * Füge sinnvolle Performance Optimierung hinzu
 * Füge sinnvolle Sicherheit hinzu
 
 ## 5. Testing
 * Ergänze die Tests wo nötig (Unit Tests, Integration Tests, End-to-End Tests). 
-* Beachte immer auch die Datei Specs/AutomatisierteTests.md
+* Beachte immer auch die Datei Specs/AutomatisierteTests.md für weitere Anforderungen bezüglich Testing
