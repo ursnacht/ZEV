@@ -30,6 +30,12 @@
               {{ sortDirection === 'asc' ? '▲' : '▼' }}
             </span>
           </th>
+          <th class="zev-table__header--sortable" (click)="onSort('mietername')">
+            {{ 'MIETERNAME' | translate }}
+            <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'mietername'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
           <th>{{ 'ACTIONS' | translate }}</th>
         </tr>
       </thead>
@@ -38,6 +44,7 @@
           <td>{{ einheit.id }}</td>
           <td>{{ einheit.name }}</td>
           <td>{{ einheit.typ }}</td>
+          <td>{{ einheit.mietername }}</td>
           <td>
             <div class="zev-table-actions">
               <button class="zev-button zev-button--secondary" (click)="onEdit(einheit)">

@@ -19,7 +19,7 @@ export class EinheitListComponent implements OnInit {
   showForm = false;
   message = '';
   messageType: 'success' | 'error' = 'success';
-  sortColumn: 'id' | 'name' | 'typ' | null = 'name';
+  sortColumn: 'id' | 'name' | 'typ' | 'mietername' | null = 'name';
   sortDirection: 'asc' | 'desc' = 'asc';
 
   constructor(
@@ -99,7 +99,7 @@ export class EinheitListComponent implements OnInit {
     this.selectedEinheit = null;
   }
 
-  onSort(column: 'id' | 'name' | 'typ'): void {
+  onSort(column: 'id' | 'name' | 'typ' | 'mietername'): void {
     if (this.sortColumn === column) {
       this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
     } else {
