@@ -1,4 +1,4 @@
-# Matriken mit Prometheus und Grafana
+# Metriken mit Prometheus und Grafana
 
 ## 1. Ziel & Kontext
 *   Metriken dienen der Überwachung / Monitoring der Anwendung.
@@ -11,6 +11,6 @@
 *   Wenn ich Messdaten lade oder die Solarverteilung berechnen lasse, soll eine Metrik mit dem aktuellen Datum publiziert werden.
 
 ## 3. Technische Spezifikationen (Technical Specs)
-*   Services "prometheus" und "grafana" im docker compose ifle aufnehmen.
+*   Services "prometheus" und "grafana" in docker-compose.yml aufnehmen.
 *   Metriken mit sprechenden Namen erstellen (in "Messdaten laden" und "Solarstromverteilung") und publizieren.
 *   Zugriff auf die Metrik-Endpunkte für Prometheus zulassen.
