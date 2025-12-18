@@ -1,24 +1,60 @@
 # Automatisiertes Testing
 
 ## 1. Ziel & Kontext
-* **Was soll erreicht werden:** Die Anwendung soll automatisiert getestet werden. 
-* **Warum machen wir das:** Wie wollen sicher sein, dass bei Änderungen die Anwendung immer noch so funktioniert, wie bisher.
-* Die Testpyramide soll beachtet werden, die eine quantitative Verteilung der Testarten verlangt:
+* **Was soll erreicht werden:** Die Anwendung soll automatisiert getestet werden.
+* **Warum machen wir das:** Wir wollen sicher sein, dass bei Änderungen die Anwendung immer noch so funktioniert wie bisher.
+* Die Testpyramide soll beachtet werden:
   * Unit Tests: 70-80%
   * Integration Tests: 15-20%
   * End-to-End Tests: 5-10%
-* Die automatisierte Teststrategie muss nahtlos in den Build-Prozess integriert werden, wobei Unit- und Integrationstests strikt voneinander getrennt ablaufen müssen. Dies gewährleistet eine schnelle Ausführung der Unit Tests und eine sichere Verwaltung der Ressourcen für die Integrationstests.
+* Die automatisierte Teststrategie muss nahtlos in den Build-Prozess integriert werden, wobei Unit- und Integrationstests strikt voneinander getrennt ablaufen müssen.
 
-## 2. Technische Spezifikationen (Technical Specs)
-* Setze die Standard-Toolchain für Spring Boot ein
-  * Unit Tests: JUnit mit Jupiter und Assertions
-    * Namenskonventionen: `*Test.java`
-    * Werden von Surefire ausgeführt
-  * Integration Tests: Verwende "Spring Test Slices" (@WebMvcTest, @JsonTest, @DataJpaTest für die das Testen der Persistenz-Schicht), um den Spring Application Context zu minimieren und so die Testgeschwindigkeit zu erhöhen. 
-    * Verwende Testcontainers und deaktiviere die Autokonfiguration der In-Memory-Datenbanken. Vermeide die Verwendung von @SpringBootTest.
-    * Verwende ArgumentCaptor für die Validierung von komplexen Datenstrukturen. Weise auf den Gebrauch von @MockBean hin, so dass die Architektur verbessert werden kann (Trennung Gechäftslogik und Spring Infrastruktur).
-    * Namenskonvention: `*IT.java`
-    * Werden von Failsafe ausgeführt
-    * Implementiere in der post-integration-test-Phase ein sauberes Teardown (z.B. Testcontainer herunterfahren, Testdaten löschen), um Ressourcenlecks zu vermeiden. 
-  * E2E Tests: RestTestClient für Backend-API-Tests, Playwright für Frontend-E2E-Tests. Beide sollen über Maven getriggert werden (z.B. mittels `frontend-maven-plugin` in einer `verify` oder `integration-test` Phase).
-    * Namenskonvention: `*.spec.ts` für alle Frontend-Tests.
+## 2. Backend Tests
+
+### Unit Tests
+* **Tool:** JUnit 5 (Jupiter) mit AssertJ
+* **Namenskonvention:** `*Test.java`
+* **Ausführung:** Maven Surefire Plugin (`mvn test`)
+* **Mocking:** Mockito für Abhängigkeiten
+* **Scope:** Einzelne Klassen/Methoden isoliert testen
+
+### Integration Tests
+* **Tool:** Spring Test Slices (@WebMvcTest, @DataJpaTest, @JsonTest)
+* **Namenskonvention:** `*IT.java`
+* **Ausführung:** Maven Failsafe Plugin (`mvn verify`)
+* **Datenbank:** Testcontainers (keine In-Memory-DB)
+* **Hinweise:**
+  * @SpringBootTest vermeiden - Spring Context minimieren
+  * ArgumentCaptor für komplexe Validierungen
+  * @MockBean sparsam einsetzen (deutet auf Architekturproblem hin)
+  * Post-Test Teardown: Testcontainer herunterfahren, Testdaten löschen
+
+## 3. Frontend Tests
+
+### Unit Tests
+* **Tool:** Jasmine mit Karma
+* **Namenskonvention:** `*.spec.ts`
+* **Ausführung:** `npm test` (im frontend-service Verzeichnis)
+* **Scope:** Komponenten, Services, Pipes isoliert testen
+
+### End-to-End Tests
+* **Tool:** Playwright
+* **Verzeichnis:** `frontend-service/e2e/`
+* **Ausführung:** `npm run e2e` oder `npm run e2e:ui` (interaktiv)
+* **Scope:** Komplette User Flows durch die Anwendung
+
+## 4. Ausführung
+
+| Befehl | Beschreibung |
+|--------|--------------|
+| `mvn test` | Backend Unit Tests |
+| `mvn verify` | Backend Unit + Integration Tests |
+| `cd frontend-service && npm test` | Frontend Unit Tests |
+| `cd frontend-service && npm run e2e` | Frontend E2E Tests |
+| `mvn clean compile test verify` | Alles (ohne E2E) |
+
+## 5. Test-Daten & Mocking
+* **Unit Tests:** Mocks für alle externen Abhängigkeiten
+* **Integration Tests:** Testcontainers mit echten Datenbank-Operationen
+* **E2E Tests:** Dedizierte Testbenutzer in Keycloak (testuser/testpassword)
+* **Fixtures:** Wiederverwendbare Testdaten in separaten Dateien/Klassen

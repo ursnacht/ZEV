@@ -1,5 +1,6 @@
-# Erstelle Tests E2E-Tests
+# Erstelle E2E-Tests
 
-* Siehe #$ARGUMENT
-* Erstelle E2E-Tests mit playwright
-* Beachte auch die Datei Specs/AutomatisierteTests.md
+* Siehe #$ARGUMENTS
+* Beachte die Datei Specs/AutomatisierteTests.md
+* Erstelle Playwright-Tests in frontend-service/e2e/
+* Führe die Tests aus mit `npm.cmd run e2e:ci` und stelle sicher, dass sie erfolgreich sind
