@@ -34,24 +34,24 @@
 ### Unit Tests
 * **Tool:** Jasmine mit Karma
 * **Namenskonvention:** `*.spec.ts`
-* **Ausführung:** `npm test` (im frontend-service Verzeichnis)
+* **Ausführung:** `npm.cmd test` (im frontend-service Verzeichnis)
 * **Scope:** Komponenten, Services, Pipes isoliert testen
 
 ### End-to-End Tests
 * **Tool:** Playwright
-* **Verzeichnis:** `frontend-service/e2e/`
-* **Ausführung:** `npm run e2e` oder `npm run e2e:ui` (interaktiv)
+* **Verzeichnis:** `frontend-service`
+* **Ausführung:** `npm.cmd run e2e:ci` oder `npm run e2e:ui` (interaktiv)
 * **Scope:** Komplette User Flows durch die Anwendung
 
 ## 4. Ausführung
 
-| Befehl | Beschreibung |
-|--------|--------------|
-| `mvn test` | Backend Unit Tests |
-| `mvn verify` | Backend Unit + Integration Tests |
-| `cd frontend-service && npm test` | Frontend Unit Tests |
-| `cd frontend-service && npm run e2e` | Frontend E2E Tests |
-| `mvn clean compile test verify` | Alles (ohne E2E) |
+| Befehl                                      | Beschreibung |
+|---------------------------------------------|--------------|
+| `mvn test`                                  | Backend Unit Tests |
+| `mvn verify`                                | Backend Unit + Integration Tests |
+| `cd frontend-service && npm.cmd test`       | Frontend Unit Tests |
+| `cd frontend-service && npm.cmd run e2e:ci` | Frontend E2E Tests |
+| `mvn clean compile test verify`             | Alles (ohne E2E) |
 
 ## 5. Test-Daten & Mocking
 * **Unit Tests:** Mocks für alle externen Abhängigkeiten
