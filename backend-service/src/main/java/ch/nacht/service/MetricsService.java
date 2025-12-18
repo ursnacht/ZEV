@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -34,6 +35,7 @@ public class MetricsService {
     private static final String METRIC_SOLARVERTEILUNG_ZEITPUNKT = "zev.solarverteilung.berechnung.letzter_zeitpunkt";
 
     private final MetrikRepository metrikRepository;
+    private final MeterRegistry meterRegistry;
     private final ObjectMapper objectMapper;
 
     // AtomicLong für Zähler-Metriken
@@ -44,8 +46,15 @@ public class MetricsService {
     private final AtomicReference<Instant> letzterMessdatenUpload;
     private final AtomicReference<Instant> letzteSolarverteilung;
 
+    // Einheit-Name für den letzten Upload (für dynamisches Label)
+    private final AtomicReference<String> letzteUploadEinheit = new AtomicReference<>(null);
+
+    // Referenz auf die aktuelle Gauge (für Neuregistrierung)
+    private Gauge letzterMessdatenUploadGauge;
+
     public MetricsService(MeterRegistry meterRegistry, MetrikRepository metrikRepository) {
         this.metrikRepository = metrikRepository;
+        this.meterRegistry = meterRegistry;
         this.objectMapper = new ObjectMapper();
 
         // Alle Metriken als Gauge registrieren (damit Werte setzbar sind)
@@ -60,10 +69,8 @@ public class MetricsService {
                 .register(meterRegistry);
 
         this.letzterMessdatenUpload = new AtomicReference<>(null);
-        Gauge.builder(METRIC_MESSDATEN_UPLOAD_ZEITPUNKT, letzterMessdatenUpload,
-                        ref -> ref.get() != null ? ref.get().getEpochSecond() : 0)
-                .description("Unix-Timestamp des letzten Messdaten-Uploads")
-                .register(meterRegistry);
+        // Gauge wird später mit Label registriert (nach Laden aus DB oder bei erstem Upload)
+        this.letzterMessdatenUploadGauge = null;
 
         this.letzteSolarverteilung = new AtomicReference<>(null);
         Gauge.builder(METRIC_SOLARVERTEILUNG_ZEITPUNKT, letzteSolarverteilung,
@@ -83,11 +90,52 @@ public class MetricsService {
 
         loadMetric(METRIC_MESSDATEN_UPLOAD_TOTAL, messdatenUploadTotal);
         loadMetric(METRIC_SOLARVERTEILUNG_TOTAL, solarverteilungTotal);
-        loadTimestampMetric(METRIC_MESSDATEN_UPLOAD_ZEITPUNKT, letzterMessdatenUpload);
+        loadUploadTimestampMetricWithEinheit();
         loadTimestampMetric(METRIC_SOLARVERTEILUNG_ZEITPUNKT, letzteSolarverteilung);
 
-        log.info("Metriken geladen - Uploads: {}, Berechnungen: {}",
-                messdatenUploadTotal.get(), solarverteilungTotal.get());
+        log.info("Metriken geladen - Uploads: {}, Berechnungen: {}, letzte Einheit: {}",
+                messdatenUploadTotal.get(), solarverteilungTotal.get(), letzteUploadEinheit.get());
+    }
+
+    /**
+     * Lädt den Upload-Zeitstempel und Einheit-Namen aus der Datenbank und registriert die Gauge.
+     */
+    private void loadUploadTimestampMetricWithEinheit() {
+        metrikRepository.findByName(METRIC_MESSDATEN_UPLOAD_ZEITPUNKT).ifPresent(metrik -> {
+            try {
+                Map<String, Object> valueMap = objectMapper.readValue(metrik.getValue(), Map.class);
+                Object value = valueMap.get("value");
+                Object einheit = valueMap.get("einheit");
+
+                // Zeitstempel laden
+                if (value instanceof String) {
+                    LocalDateTime ldt = LocalDateTime.parse((String) value);
+                    letzterMessdatenUpload.set(ldt.atZone(ZoneId.systemDefault()).toInstant());
+                } else if (value instanceof Number) {
+                    long epochSecond = ((Number) value).longValue();
+                    if (epochSecond > 0) {
+                        letzterMessdatenUpload.set(Instant.ofEpochSecond(epochSecond));
+                    }
+                }
+
+                // Einheit-Name laden und Gauge registrieren
+                String einheitName = einheit instanceof String ? (String) einheit : "unbekannt";
+                letzteUploadEinheit.set(einheitName);
+                registerUploadGauge(einheitName);
+
+                log.debug("Upload-Zeitstempel-Metrik geladen: {} (Einheit: {})",
+                        letzterMessdatenUpload.get(), einheitName);
+            } catch (Exception e) {
+                log.warn("Konnte Upload-Zeitstempel-Metrik nicht laden: {}", e.getMessage());
+                // Fallback: Gauge ohne Label registrieren
+                registerUploadGauge("unbekannt");
+            }
+        });
+
+        // Falls keine Metrik in DB: Gauge mit Default-Label registrieren
+        if (letzterMessdatenUploadGauge == null) {
+            registerUploadGauge("unbekannt");
+        }
     }
 
     private void loadMetric(String name, AtomicLong target) {
@@ -161,18 +209,88 @@ public class MetricsService {
     }
 
     /**
-     * Wird aufgerufen, wenn Messdaten hochgeladen wurden.
+     * Registriert die Upload-Gauge mit dem angegebenen Einheit-Label.
+     * Falls bereits eine Gauge registriert ist, wird diese zuerst entfernt.
+     */
+    private void registerUploadGauge(String einheitName) {
+        // Alte Gauge entfernen falls vorhanden
+        if (letzterMessdatenUploadGauge != null) {
+            meterRegistry.remove(letzterMessdatenUploadGauge);
+        }
+
+        // Neue Gauge mit Label registrieren
+        letzterMessdatenUploadGauge = Gauge.builder(METRIC_MESSDATEN_UPLOAD_ZEITPUNKT, letzterMessdatenUpload,
+                        ref -> ref.get() != null ? ref.get().getEpochSecond() : 0)
+                .tag("einheit", einheitName)
+                .description("Unix-Timestamp des letzten Messdaten-Uploads")
+                .register(meterRegistry);
+
+        log.debug("Upload-Gauge registriert mit Einheit: {}", einheitName);
+    }
+
+    /**
+     * Sanitisiert den Einheit-Namen für die Verwendung als Prometheus-Label.
+     */
+    private String sanitizeEinheitName(String name) {
+        if (name == null || name.isBlank()) {
+            return "unbekannt";
+        }
+        // Prometheus-Labels erlauben: [a-zA-Z_][a-zA-Z0-9_]*
+        // Wir behalten lesbare Zeichen und ersetzen problematische
+        return name.trim();
+    }
+
+    /**
+     * Persistiert den Upload-Zeitstempel zusammen mit dem Einheit-Namen.
      */
     @Transactional
-    public void recordMessdatenUpload() {
+    private void persistTimestampMetricWithEinheit(String name, Instant timestamp, String einheitName) {
+        try {
+            LocalDateTime ldt = LocalDateTime.ofInstant(timestamp, ZoneId.systemDefault());
+            Map<String, Object> valueMap = new HashMap<>();
+            valueMap.put("value", ldt.toString());
+            valueMap.put("einheit", einheitName);
+            String jsonValue = objectMapper.writeValueAsString(valueMap);
+            saveMetrik(name, jsonValue);
+            log.debug("Zeitstempel-Metrik '{}' persistiert: {} (Einheit: {})", name, ldt, einheitName);
+        } catch (JsonProcessingException e) {
+            log.error("Konnte Zeitstempel-Metrik '{}' nicht persistieren: {}", name, e.getMessage());
+        }
+    }
+
+    /**
+     * Wird aufgerufen, wenn Messdaten für eine Einheit hochgeladen wurden.
+     *
+     * @param einheitName Name der Einheit für das Label
+     */
+    @Transactional
+    public void recordMessdatenUpload(String einheitName) {
         long newTotal = messdatenUploadTotal.incrementAndGet();
         Instant now = Instant.now();
         letzterMessdatenUpload.set(now);
 
-        persistMetric(METRIC_MESSDATEN_UPLOAD_TOTAL, newTotal);
-        persistTimestampMetric(METRIC_MESSDATEN_UPLOAD_ZEITPUNKT, now);
+        // Einheit-Name sanitisieren und speichern
+        String sanitizedName = sanitizeEinheitName(einheitName);
+        letzteUploadEinheit.set(sanitizedName);
 
-        log.debug("Metrik aktualisiert: Messdaten-Upload #{} um {}", newTotal, now);
+        // Gauge neu registrieren mit aktuellem Label
+        registerUploadGauge(sanitizedName);
+
+        // Persistieren
+        persistMetric(METRIC_MESSDATEN_UPLOAD_TOTAL, newTotal);
+        persistTimestampMetricWithEinheit(METRIC_MESSDATEN_UPLOAD_ZEITPUNKT, now, sanitizedName);
+
+        log.debug("Metrik aktualisiert: Messdaten-Upload #{} für Einheit '{}' um {}", newTotal, sanitizedName, now);
+    }
+
+    /**
+     * Wird aufgerufen, wenn Messdaten hochgeladen wurden (ohne Einheit).
+     * @deprecated Verwende {@link #recordMessdatenUpload(String)} mit Einheit-Name.
+     */
+    @Deprecated
+    @Transactional
+    public void recordMessdatenUpload() {
+        recordMessdatenUpload("unbekannt");
     }
 
     /**
@@ -203,6 +321,13 @@ public class MetricsService {
     public LocalDateTime getLetzterMessdatenUploadAsLocalDateTime() {
         Instant instant = letzterMessdatenUpload.get();
         return instant != null ? LocalDateTime.ofInstant(instant, ZoneId.systemDefault()) : null;
+    }
+
+    /**
+     * Liefert den Namen der Einheit des letzten Messdaten-Uploads.
+     */
+    public String getLetzteUploadEinheit() {
+        return letzteUploadEinheit.get();
     }
 
     /**

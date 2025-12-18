@@ -1,5 +1,7 @@
 package ch.nacht.controller;
 
+import ch.nacht.entity.Einheit;
+import ch.nacht.service.EinheitService;
 import ch.nacht.service.MesswerteService;
 import ch.nacht.service.MetricsService;
 import org.slf4j.Logger;
@@ -21,10 +23,13 @@ public class MesswerteController {
     private static final Logger log = LoggerFactory.getLogger(MesswerteController.class);
     private final MesswerteService messwerteService;
     private final MetricsService metricsService;
+    private final EinheitService einheitService;
 
-    public MesswerteController(MesswerteService messwerteService, MetricsService metricsService) {
+    public MesswerteController(MesswerteService messwerteService, MetricsService metricsService,
+                               EinheitService einheitService) {
         this.messwerteService = messwerteService;
         this.metricsService = metricsService;
+        this.einheitService = einheitService;
         log.info("MesswerteController initialized");
     }
 
@@ -40,7 +45,13 @@ public class MesswerteController {
 
         try {
             Map<String, Object> result = messwerteService.processCsvUpload(file, einheitId, dateStr);
-            metricsService.recordMessdatenUpload();
+
+            // Einheit-Namen für Metrik abrufen
+            String einheitName = einheitService.getEinheitById(einheitId)
+                    .map(Einheit::getName)
+                    .orElse("unbekannt");
+            metricsService.recordMessdatenUpload(einheitName);
+
             log.info("CSV upload successful - einheitId: {}, result: {}", einheitId, result);
             return ResponseEntity.ok(result);
 

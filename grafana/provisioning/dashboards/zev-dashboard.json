@@ -181,73 +181,6 @@
         "x": 12,
         "y": 0
       },
-      "id": 3,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "10.1.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "zev_messdaten_upload_letzter_zeitpunkt * 1000",
-          "refId": "A"
-        }
-      ],
-      "title": "Letzter Messdaten-Upload",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 86400
-              },
-              {
-                "color": "red",
-                "value": 604800
-              }
-            ]
-          },
-          "unit": "dateTimeAsLocal"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 0
-      },
       "id": 4,
       "options": {
         "colorMode": "value",
@@ -333,7 +266,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 6,
         "w": 12,
         "x": 0,
         "y": 4
@@ -359,7 +292,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "jvm_memory_used_bytes{area=\"heap\"} / 1000000000",
+          "expr": "sum by (instance) (jvm_memory_used_bytes{area=\"heap\"}) / sum by (instance) (jvm_memory_max_bytes{area=\"heap\"}) * 100",
           "legendFormat": "{{instance}}",
           "range": true,
           "refId": "A"
@@ -367,6 +300,79 @@
       ],
       "title": "JVM Heap Memory Usage (%)",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Zeigt den Zeitpunkt des letzten Messdaten-Uploads und die Einheit an",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 86400
+              },
+              {
+                "color": "red",
+                "value": 604800
+              }
+            ]
+          },
+          "unit": "dateTimeAsLocal"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "vertical",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {},
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.1.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "zev_messdaten_upload_letzter_zeitpunkt * 1000",
+          "legendFormat": "{{einheit}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Letzter Messdaten-Upload",
+      "type": "stat"
     },
     {
       "datasource": {
@@ -424,10 +430,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 6,
         "w": 12,
-        "x": 12,
-        "y": 4
+        "x": 0,
+        "y": 11
       },
       "id": 6,
       "options": {
@@ -449,7 +455,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "system_cpu_usage * 100",
+          "expr": "process_cpu_usage * 100",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -475,6 +481,6 @@
   "timezone": "",
   "title": "ZEV Monitoring",
   "uid": "zev-monitoring",
-  "version": 3,
+  "version": 31,
   "weekStart": ""
 }
