@@ -21,7 +21,7 @@ services:
       start_period: 10s
 
   keycloak:
-    image: quay.io/keycloak/keycloak:23.0
+    image: quay.io/keycloak/keycloak:26.0.7
     container_name: keycloak
     environment:
       KEYCLOAK_ADMIN: admin
@@ -37,6 +37,7 @@ services:
     command:
       - start-dev
       - --import-realm
+      - --features=organization
     ports:
       - "9000:9000"
     depends_on:
