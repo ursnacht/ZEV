@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
@@ -34,6 +35,8 @@ class MesswerteRepositoryIT extends AbstractIntegrationTest {
     @Autowired
     private EinheitRepository einheitRepository;
 
+    private static final UUID TEST_ORG_ID = UUID.fromString("c2c9ba74-de18-4491-9489-8185629edd93");
+
     private Einheit producer;
     private Einheit consumer1;
     private Einheit consumer2;
@@ -44,10 +47,19 @@ class MesswerteRepositoryIT extends AbstractIntegrationTest {
         messwerteRepository.deleteAll();
         einheitRepository.deleteAll();
 
-        // Create test units
-        producer = einheitRepository.save(new Einheit("Solaranlage", EinheitTyp.PRODUCER));
-        consumer1 = einheitRepository.save(new Einheit("Wohnung A", EinheitTyp.CONSUMER));
-        consumer2 = einheitRepository.save(new Einheit("Wohnung B", EinheitTyp.CONSUMER));
+        // Create test units with org_id
+        producer = createEinheit("Solaranlage", EinheitTyp.PRODUCER);
+        producer = einheitRepository.save(producer);
+        consumer1 = createEinheit("Wohnung A", EinheitTyp.CONSUMER);
+        consumer1 = einheitRepository.save(consumer1);
+        consumer2 = createEinheit("Wohnung B", EinheitTyp.CONSUMER);
+        consumer2 = einheitRepository.save(consumer2);
+    }
+
+    private Einheit createEinheit(String name, EinheitTyp typ) {
+        Einheit einheit = new Einheit(name, typ);
+        einheit.setOrgId(TEST_ORG_ID);
+        return einheit;
     }
 
     @Test
@@ -316,6 +328,7 @@ class MesswerteRepositoryIT extends AbstractIntegrationTest {
 
     private Messwerte createMesswerte(LocalDateTime zeit, Einheit einheit, Double total, Double zev, Double zevCalculated) {
         Messwerte m = new Messwerte(zeit, total, zev, einheit);
+        m.setOrgId(TEST_ORG_ID);
         m.setZevCalculated(zevCalculated);
         return m;
     }

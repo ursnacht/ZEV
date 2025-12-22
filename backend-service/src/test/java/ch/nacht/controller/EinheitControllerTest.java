@@ -3,6 +3,7 @@ package ch.nacht.controller;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.service.EinheitService;
+import ch.nacht.service.OrganizationContextService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,9 @@ public class EinheitControllerTest {
 
     @MockBean
     private EinheitService einheitService;
+
+    @MockBean
+    private OrganizationContextService organizationContextService;
 
     @Autowired
     private ObjectMapper objectMapper;

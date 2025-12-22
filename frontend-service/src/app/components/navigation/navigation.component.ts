@@ -17,6 +17,7 @@ import { TranslatePipe } from '../../pipes/translate.pipe';
 export class NavigationComponent implements OnInit {
   userProfile: KeycloakProfile | null = null;
   currentLang = 'de';
+  organizationAlias: string | null = null;
   private readonly keycloak = inject(Keycloak);
 
   isMenuOpen = false;
@@ -28,8 +29,24 @@ export class NavigationComponent implements OnInit {
   async ngOnInit() {
     if (this.keycloak.authenticated) {
       this.userProfile = await this.keycloak.loadUserProfile();
+      this.extractOrganization();
     }
     this.currentLang = this.translationService.currentLang();
+  }
+
+  private extractOrganization(): void {
+    try {
+      const token = this.keycloak.tokenParsed;
+      if (token && token['organizations']) {
+        const organizations = token['organizations'] as Record<string, { id: string }>;
+        const aliases = Object.keys(organizations);
+        if (aliases.length > 0) {
+          this.organizationAlias = aliases[0];
+        }
+      }
+    } catch (e) {
+      console.warn('Could not extract organization from token', e);
+    }
   }
 
   get userName(): string {
@@ -39,6 +56,14 @@ export class NavigationComponent implements OnInit {
     const firstName = this.userProfile.firstName || '';
     const lastName = this.userProfile.lastName || '';
     return `${firstName} ${lastName}`.trim();
+  }
+
+  get userDisplayName(): string {
+    const name = this.userName;
+    if (this.organizationAlias) {
+      return `${name}, ${this.organizationAlias}`;
+    }
+    return name;
   }
 
   logout() {

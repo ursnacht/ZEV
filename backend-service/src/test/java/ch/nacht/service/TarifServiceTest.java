@@ -28,6 +28,12 @@ public class TarifServiceTest {
     @Mock
     private TarifRepository tarifRepository;
 
+    @Mock
+    private OrganizationContextService organizationContextService;
+
+    @Mock
+    private HibernateFilterService hibernateFilterService;
+
     @InjectMocks
     private TarifService tarifService;
 

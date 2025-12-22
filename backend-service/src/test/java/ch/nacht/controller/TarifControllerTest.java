@@ -2,6 +2,7 @@ package ch.nacht.controller;
 
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
+import ch.nacht.service.OrganizationContextService;
 import ch.nacht.service.TarifService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -36,6 +37,9 @@ public class TarifControllerTest {
 
     @MockBean
     private TarifService tarifService;
+
+    @MockBean
+    private OrganizationContextService organizationContextService;
 
     private ObjectMapper objectMapper;
 

@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,15 +29,23 @@ class TarifRepositoryIT extends AbstractIntegrationTest {
     @Autowired
     private TarifRepository tarifRepository;
 
+    private static final UUID TEST_ORG_ID = UUID.fromString("c2c9ba74-de18-4491-9489-8185629edd93");
+
     @BeforeEach
     void setUp() {
         tarifRepository.deleteAll();
     }
 
+    private Tarif createTarif(String bezeichnung, TarifTyp typ, BigDecimal preis, LocalDate von, LocalDate bis) {
+        Tarif tarif = new Tarif(bezeichnung, typ, preis, von, bis);
+        tarif.setOrgId(TEST_ORG_ID);
+        return tarif;
+    }
+
     @Test
     void shouldSaveAndFindTarif() {
         // Given
-        Tarif tarif = new Tarif(
+        Tarif tarif = createTarif(
             "ZEV Tarif 2024",
             TarifTyp.ZEV,
             new BigDecimal("0.20000"),
@@ -54,6 +63,7 @@ class TarifRepositoryIT extends AbstractIntegrationTest {
         assertThat(saved.getPreis()).isEqualByComparingTo(new BigDecimal("0.20000"));
         assertThat(saved.getGueltigVon()).isEqualTo(LocalDate.of(2024, 1, 1));
         assertThat(saved.getGueltigBis()).isEqualTo(LocalDate.of(2024, 12, 31));
+        assertThat(saved.getOrgId()).isEqualTo(TEST_ORG_ID);
 
         Optional<Tarif> found = tarifRepository.findById(saved.getId());
         assertThat(found).isPresent();
@@ -62,15 +72,15 @@ class TarifRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldFindAllByOrderByTariftypAscGueltigVonDesc() {
         // Given
-        Tarif vnb2024 = tarifRepository.save(new Tarif(
+        tarifRepository.save(createTarif(
             "VNB 2024", TarifTyp.VNB, new BigDecimal("0.34"),
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
         ));
-        Tarif zev2023 = tarifRepository.save(new Tarif(
+        tarifRepository.save(createTarif(
             "ZEV 2023", TarifTyp.ZEV, new BigDecimal("0.19"),
             LocalDate.of(2023, 1, 1), LocalDate.of(2023, 12, 31)
         ));
-        Tarif zev2024 = tarifRepository.save(new Tarif(
+        tarifRepository.save(createTarif(
             "ZEV 2024", TarifTyp.ZEV, new BigDecimal("0.20"),
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
         ));
@@ -90,7 +100,7 @@ class TarifRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldFindByTariftypAndZeitraumOverlapping_ExactMatch() {
         // Given
-        Tarif tarif = tarifRepository.save(new Tarif(
+        Tarif tarif = tarifRepository.save(createTarif(
             "ZEV 2024", TarifTyp.ZEV, new BigDecimal("0.20"),
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
         ));
@@ -110,7 +120,7 @@ class TarifRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldFindByTariftypAndZeitraumOverlapping_PartialOverlap() {
         // Given
-        tarifRepository.save(new Tarif(
+        tarifRepository.save(createTarif(
             "ZEV 2024", TarifTyp.ZEV, new BigDecimal("0.20"),
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
         ));
@@ -129,7 +139,7 @@ class TarifRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldFindByTariftypAndZeitraumOverlapping_NoMatch_WrongType() {
         // Given
-        tarifRepository.save(new Tarif(
+        tarifRepository.save(createTarif(
             "ZEV 2024", TarifTyp.ZEV, new BigDecimal("0.20"),
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
         ));
@@ -148,7 +158,7 @@ class TarifRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldFindByTariftypAndZeitraumOverlapping_NoMatch_OutOfRange() {
         // Given
-        tarifRepository.save(new Tarif(
+        tarifRepository.save(createTarif(
             "ZEV 2024", TarifTyp.ZEV, new BigDecimal("0.20"),
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
         ));
@@ -167,11 +177,11 @@ class TarifRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldFindByTariftypAndZeitraumOverlapping_MultipleTarifs() {
         // Given
-        tarifRepository.save(new Tarif(
+        tarifRepository.save(createTarif(
             "ZEV H1 2024", TarifTyp.ZEV, new BigDecimal("0.19"),
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 6, 30)
         ));
-        tarifRepository.save(new Tarif(
+        tarifRepository.save(createTarif(
             "ZEV H2 2024", TarifTyp.ZEV, new BigDecimal("0.21"),
             LocalDate.of(2024, 7, 1), LocalDate.of(2024, 12, 31)
         ));
@@ -193,7 +203,7 @@ class TarifRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldExistsOverlappingTarif_ReturnTrue_WhenOverlapExists() {
         // Given
-        tarifRepository.save(new Tarif(
+        tarifRepository.save(createTarif(
             "ZEV 2024", TarifTyp.ZEV, new BigDecimal("0.20"),
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
         ));
@@ -213,7 +223,7 @@ class TarifRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldExistsOverlappingTarif_ReturnFalse_WhenNoOverlap() {
         // Given
-        tarifRepository.save(new Tarif(
+        tarifRepository.save(createTarif(
             "ZEV 2024", TarifTyp.ZEV, new BigDecimal("0.20"),
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
         ));
@@ -233,7 +243,7 @@ class TarifRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldExistsOverlappingTarif_ExcludeOwnId() {
         // Given
-        Tarif tarif = tarifRepository.save(new Tarif(
+        Tarif tarif = tarifRepository.save(createTarif(
             "ZEV 2024", TarifTyp.ZEV, new BigDecimal("0.20"),
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
         ));
@@ -253,7 +263,7 @@ class TarifRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldExistsOverlappingTarif_DifferentType_NoConflict() {
         // Given
-        tarifRepository.save(new Tarif(
+        tarifRepository.save(createTarif(
             "ZEV 2024", TarifTyp.ZEV, new BigDecimal("0.20"),
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
         ));
@@ -273,7 +283,7 @@ class TarifRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldDeleteTarif() {
         // Given
-        Tarif tarif = tarifRepository.save(new Tarif(
+        Tarif tarif = tarifRepository.save(createTarif(
             "ZEV 2024", TarifTyp.ZEV, new BigDecimal("0.20"),
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
         ));
@@ -290,7 +300,7 @@ class TarifRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldUpdateTarif() {
         // Given
-        Tarif tarif = tarifRepository.save(new Tarif(
+        Tarif tarif = tarifRepository.save(createTarif(
             "ZEV 2024", TarifTyp.ZEV, new BigDecimal("0.20"),
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
         ));

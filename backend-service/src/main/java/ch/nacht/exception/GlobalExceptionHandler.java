@@ -26,4 +26,15 @@ public class GlobalExceptionHandler {
         });
         return ResponseEntity.badRequest().body(errors);
     }
+
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    @ExceptionHandler(NoOrganizationException.class)
+    public ResponseEntity<Map<String, Object>> handleNoOrganizationException(
+            NoOrganizationException ex) {
+        Map<String, Object> error = new HashMap<>();
+        error.put("error", "NO_ORGANIZATION");
+        error.put("message", ex.getMessage());
+        error.put("action", "LOGOUT");
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
 }

@@ -1,16 +1,23 @@
 package ch.nacht.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.Filter;
+
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "messwerte", schema = "zev")
+@Filter(name = "orgFilter", condition = "org_id = :orgId")
 public class Messwerte {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "messwerte_seq")
     @SequenceGenerator(name = "messwerte_seq", sequenceName = "zev.messwerte_seq", allocationSize = 1)
     private Long id;
+
+    @Column(name = "org_id", nullable = false)
+    private UUID orgId;
 
     @Column(name = "zeit", nullable = false)
     private LocalDateTime zeit;
@@ -86,8 +93,16 @@ public class Messwerte {
         this.einheit = einheit;
     }
 
+    public UUID getOrgId() {
+        return orgId;
+    }
+
+    public void setOrgId(UUID orgId) {
+        this.orgId = orgId;
+    }
+
     @Override
     public String toString() {
-        return "Messwerte{id=" + id + ", zeit=" + zeit + ", total=" + total + ", zev=" + zev + ", zevCalculated=" + zevCalculated + ", einheit=" + (einheit != null ? einheit.getId() : null) + "}";
+        return "Messwerte{id=" + id + ", orgId=" + orgId + ", zeit=" + zeit + ", total=" + total + ", zev=" + zev + ", zevCalculated=" + zevCalculated + ", einheit=" + (einheit != null ? einheit.getId() : null) + "}";
     }
 }

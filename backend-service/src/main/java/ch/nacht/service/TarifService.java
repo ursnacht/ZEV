@@ -22,9 +22,15 @@ public class TarifService {
     private static final Logger log = LoggerFactory.getLogger(TarifService.class);
 
     private final TarifRepository tarifRepository;
+    private final OrganizationContextService organizationContextService;
+    private final HibernateFilterService hibernateFilterService;
 
-    public TarifService(TarifRepository tarifRepository) {
+    public TarifService(TarifRepository tarifRepository,
+                        OrganizationContextService organizationContextService,
+                        HibernateFilterService hibernateFilterService) {
         this.tarifRepository = tarifRepository;
+        this.organizationContextService = organizationContextService;
+        this.hibernateFilterService = hibernateFilterService;
     }
 
     /**
@@ -32,7 +38,9 @@ public class TarifService {
      *
      * @return List of all tariffs
      */
+    @Transactional(readOnly = true)
     public List<Tarif> getAllTarife() {
+        hibernateFilterService.enableOrgFilter();
         return tarifRepository.findAllByOrderByTariftypAscGueltigVonDesc();
     }
 
@@ -42,7 +50,9 @@ public class TarifService {
      * @param id Tariff ID
      * @return Optional containing the tariff if found
      */
+    @Transactional(readOnly = true)
     public Optional<Tarif> getTarifById(Long id) {
+        hibernateFilterService.enableOrgFilter();
         return tarifRepository.findById(id);
     }
 
@@ -56,6 +66,7 @@ public class TarifService {
      */
     @Transactional
     public Tarif saveTarif(Tarif tarif) {
+        hibernateFilterService.enableOrgFilter();
         log.info("Saving tariff: {}", tarif);
 
         // Validate date range
@@ -73,6 +84,11 @@ public class TarifService {
             throw new IllegalArgumentException("Tarif überschneidet sich mit bestehendem Tarif");
         }
 
+        // org_id setzen bei neuem Tarif
+        if (tarif.getId() == null) {
+            tarif.setOrgId(organizationContextService.getCurrentOrgId());
+        }
+
         Tarif saved = tarifRepository.save(tarif);
         log.info("Tariff saved with ID: {}", saved.getId());
         return saved;
@@ -86,6 +102,7 @@ public class TarifService {
      */
     @Transactional
     public boolean deleteTarif(Long id) {
+        hibernateFilterService.enableOrgFilter();
         if (tarifRepository.existsById(id)) {
             tarifRepository.deleteById(id);
             log.info("Deleted tariff with ID: {}", id);
@@ -104,7 +121,9 @@ public class TarifService {
      * @param bis End date
      * @return List of valid tariffs
      */
+    @Transactional(readOnly = true)
     public List<Tarif> getTarifeForZeitraum(TarifTyp typ, LocalDate von, LocalDate bis) {
+        hibernateFilterService.enableOrgFilter();
         return tarifRepository.findByTariftypAndZeitraumOverlapping(typ, von, bis);
     }
 

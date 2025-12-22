@@ -1,6 +1,7 @@
 package ch.nacht.controller;
 
 import ch.nacht.entity.Translation;
+import ch.nacht.service.OrganizationContextService;
 import ch.nacht.service.TranslationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,9 @@ class TranslationControllerTest {
 
     @MockBean
     private TranslationService translationService;
+
+    @MockBean
+    private OrganizationContextService organizationContextService;
 
     @Test
     void shouldDeleteTranslationWithDotsInKey() throws Exception {

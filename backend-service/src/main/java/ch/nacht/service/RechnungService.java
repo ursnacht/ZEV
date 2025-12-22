@@ -12,6 +12,7 @@ import ch.nacht.repository.MesswerteRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -30,15 +31,18 @@ public class RechnungService {
     private final MesswerteRepository messwerteRepository;
     private final RechnungConfig rechnungConfig;
     private final TarifService tarifService;
+    private final HibernateFilterService hibernateFilterService;
 
     public RechnungService(EinheitRepository einheitRepository,
                            MesswerteRepository messwerteRepository,
                            RechnungConfig rechnungConfig,
-                           TarifService tarifService) {
+                           TarifService tarifService,
+                           HibernateFilterService hibernateFilterService) {
         this.einheitRepository = einheitRepository;
         this.messwerteRepository = messwerteRepository;
         this.rechnungConfig = rechnungConfig;
         this.tarifService = tarifService;
+        this.hibernateFilterService = hibernateFilterService;
     }
 
     /**
@@ -50,7 +54,9 @@ public class RechnungService {
      * @return List of calculated invoice DTOs
      * @throws IllegalStateException if tariffs don't cover the entire period
      */
+    @Transactional(readOnly = true)
     public List<RechnungDTO> berechneRechnungen(List<Long> einheitIds, LocalDate von, LocalDate bis) {
+        hibernateFilterService.enableOrgFilter();
         log.info("Calculating invoices for {} units from {} to {}", einheitIds.size(), von, bis);
 
         // Validate tariff coverage before calculating any invoices

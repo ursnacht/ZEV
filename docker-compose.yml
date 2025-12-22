@@ -37,7 +37,6 @@ services:
     command:
       - start-dev
       - --import-realm
-      - --features=organization
     ports:
       - "9000:9000"
     depends_on:

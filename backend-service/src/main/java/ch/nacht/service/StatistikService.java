@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -28,14 +29,20 @@ public class StatistikService {
 
     private final MesswerteRepository messwerteRepository;
     private final EinheitRepository einheitRepository;
+    private final HibernateFilterService hibernateFilterService;
 
-    public StatistikService(MesswerteRepository messwerteRepository, EinheitRepository einheitRepository) {
+    public StatistikService(MesswerteRepository messwerteRepository,
+                            EinheitRepository einheitRepository,
+                            HibernateFilterService hibernateFilterService) {
         this.messwerteRepository = messwerteRepository;
         this.einheitRepository = einheitRepository;
+        this.hibernateFilterService = hibernateFilterService;
     }
 
+    @Transactional(readOnly = true)
     @Cacheable(value = "statistik", key = "#von.toString() + '-' + #bis.toString()")
     public StatistikDTO getStatistik(LocalDate von, LocalDate bis) {
+        hibernateFilterService.enableOrgFilter();
         logger.info("Berechne Statistik für Zeitraum {} bis {}", von, bis);
 
         StatistikDTO statistik = new StatistikDTO();
@@ -63,7 +70,9 @@ public class StatistikService {
         return statistik;
     }
 
+    @Transactional(readOnly = true)
     public LocalDate ermittleLetztesMessdatum() {
+        hibernateFilterService.enableOrgFilter();
         return messwerteRepository.findMaxZeit()
                 .map(LocalDateTime::toLocalDate)
                 .orElse(null);

@@ -35,6 +35,9 @@ public class StatistikServiceTest {
     @Mock
     private EinheitRepository einheitRepository;
 
+    @Mock
+    private HibernateFilterService hibernateFilterService;
+
     @InjectMocks
     private StatistikService statistikService;
 

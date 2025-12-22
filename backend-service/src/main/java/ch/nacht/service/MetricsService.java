@@ -6,7 +6,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
-import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -17,12 +16,14 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Service für benutzerdefinierte Metriken mit Datenbank-Persistierung.
- * Metriken werden bei Änderungen in der Datenbank gespeichert und beim Start geladen.
+ * Metriken werden pro Organisation in der Datenbank gespeichert.
+ * Prometheus-Metriken sind global (nicht org-spezifisch).
  */
 @Service
 public class MetricsService {
@@ -37,24 +38,28 @@ public class MetricsService {
     private final MetrikRepository metrikRepository;
     private final MeterRegistry meterRegistry;
     private final ObjectMapper objectMapper;
+    private final OrganizationContextService organizationContextService;
 
-    // AtomicLong für Zähler-Metriken
+    // AtomicLong für Zähler-Metriken (Prometheus - global)
     private final AtomicLong messdatenUploadTotal;
     private final AtomicLong solarverteilungTotal;
 
-    // AtomicReference<Instant> für Zeitstempel-Metriken
+    // AtomicReference<Instant> für Zeitstempel-Metriken (Prometheus - global)
     private final AtomicReference<Instant> letzterMessdatenUpload;
     private final AtomicReference<Instant> letzteSolarverteilung;
 
     // Einheit-Name für den letzten Upload (für dynamisches Label)
-    private final AtomicReference<String> letzteUploadEinheit = new AtomicReference<>(null);
+    private final AtomicReference<String> letzteUploadEinheit = new AtomicReference<>("unbekannt");
 
     // Referenz auf die aktuelle Gauge (für Neuregistrierung)
     private Gauge letzterMessdatenUploadGauge;
 
-    public MetricsService(MeterRegistry meterRegistry, MetrikRepository metrikRepository) {
+    public MetricsService(MeterRegistry meterRegistry,
+                          MetrikRepository metrikRepository,
+                          OrganizationContextService organizationContextService) {
         this.metrikRepository = metrikRepository;
         this.meterRegistry = meterRegistry;
+        this.organizationContextService = organizationContextService;
         this.objectMapper = new ObjectMapper();
 
         // Alle Metriken als Gauge registrieren (damit Werte setzbar sind)
@@ -69,8 +74,8 @@ public class MetricsService {
                 .register(meterRegistry);
 
         this.letzterMessdatenUpload = new AtomicReference<>(null);
-        // Gauge wird später mit Label registriert (nach Laden aus DB oder bei erstem Upload)
-        this.letzterMessdatenUploadGauge = null;
+        // Gauge mit Default-Label registrieren
+        registerUploadGauge("unbekannt");
 
         this.letzteSolarverteilung = new AtomicReference<>(null);
         Gauge.builder(METRIC_SOLARVERTEILUNG_ZEITPUNKT, letzteSolarverteilung,
@@ -82,99 +87,21 @@ public class MetricsService {
     }
 
     /**
-     * Lädt persistierte Metriken aus der Datenbank beim Anwendungsstart.
+     * Hilfsmethode um die aktuelle Org-ID zu holen.
      */
-    @PostConstruct
-    public void loadPersistedMetrics() {
-        log.info("Lade persistierte Metriken aus der Datenbank...");
-
-        loadMetric(METRIC_MESSDATEN_UPLOAD_TOTAL, messdatenUploadTotal);
-        loadMetric(METRIC_SOLARVERTEILUNG_TOTAL, solarverteilungTotal);
-        loadUploadTimestampMetricWithEinheit();
-        loadTimestampMetric(METRIC_SOLARVERTEILUNG_ZEITPUNKT, letzteSolarverteilung);
-
-        log.info("Metriken geladen - Uploads: {}, Berechnungen: {}, letzte Einheit: {}",
-                messdatenUploadTotal.get(), solarverteilungTotal.get(), letzteUploadEinheit.get());
+    private UUID getCurrentOrgId() {
+        return organizationContextService.getCurrentOrgId();
     }
 
     /**
-     * Lädt den Upload-Zeitstempel und Einheit-Namen aus der Datenbank und registriert die Gauge.
+     * Sucht eine Metrik nach Name für die aktuelle Organisation.
      */
-    private void loadUploadTimestampMetricWithEinheit() {
-        metrikRepository.findByName(METRIC_MESSDATEN_UPLOAD_ZEITPUNKT).ifPresent(metrik -> {
-            try {
-                Map<String, Object> valueMap = objectMapper.readValue(metrik.getValue(), Map.class);
-                Object value = valueMap.get("value");
-                Object einheit = valueMap.get("einheit");
-
-                // Zeitstempel laden
-                if (value instanceof String) {
-                    LocalDateTime ldt = LocalDateTime.parse((String) value);
-                    letzterMessdatenUpload.set(ldt.atZone(ZoneId.systemDefault()).toInstant());
-                } else if (value instanceof Number) {
-                    long epochSecond = ((Number) value).longValue();
-                    if (epochSecond > 0) {
-                        letzterMessdatenUpload.set(Instant.ofEpochSecond(epochSecond));
-                    }
-                }
-
-                // Einheit-Name laden und Gauge registrieren
-                String einheitName = einheit instanceof String ? (String) einheit : "unbekannt";
-                letzteUploadEinheit.set(einheitName);
-                registerUploadGauge(einheitName);
-
-                log.debug("Upload-Zeitstempel-Metrik geladen: {} (Einheit: {})",
-                        letzterMessdatenUpload.get(), einheitName);
-            } catch (Exception e) {
-                log.warn("Konnte Upload-Zeitstempel-Metrik nicht laden: {}", e.getMessage());
-                // Fallback: Gauge ohne Label registrieren
-                registerUploadGauge("unbekannt");
-            }
-        });
-
-        // Falls keine Metrik in DB: Gauge mit Default-Label registrieren
-        if (letzterMessdatenUploadGauge == null) {
-            registerUploadGauge("unbekannt");
+    private java.util.Optional<Metrik> findMetrikByName(String name) {
+        UUID orgId = getCurrentOrgId();
+        if (orgId == null) {
+            return java.util.Optional.empty();
         }
-    }
-
-    private void loadMetric(String name, AtomicLong target) {
-        metrikRepository.findByName(name).ifPresent(metrik -> {
-            try {
-                Map<String, Object> valueMap = objectMapper.readValue(metrik.getValue(), Map.class);
-                Object value = valueMap.get("value");
-                if (value instanceof Number) {
-                    target.set(((Number) value).longValue());
-                    log.debug("Metrik '{}' geladen mit Wert: {}", name, target.get());
-                }
-            } catch (JsonProcessingException e) {
-                log.warn("Konnte Metrik '{}' nicht laden: {}", name, e.getMessage());
-            }
-        });
-    }
-
-    private void loadTimestampMetric(String name, AtomicReference<Instant> target) {
-        metrikRepository.findByName(name).ifPresent(metrik -> {
-            try {
-                Map<String, Object> valueMap = objectMapper.readValue(metrik.getValue(), Map.class);
-                Object value = valueMap.get("value");
-                if (value instanceof String) {
-                    // ISO-8601 Timestamp parsen (z.B. "2025-12-07T16:30:00")
-                    LocalDateTime ldt = LocalDateTime.parse((String) value);
-                    target.set(ldt.atZone(ZoneId.systemDefault()).toInstant());
-                    log.debug("Zeitstempel-Metrik '{}' geladen: {}", name, target.get());
-                } else if (value instanceof Number) {
-                    // Fallback: Epochensekunden (für Rückwärtskompatibilität)
-                    long epochSecond = ((Number) value).longValue();
-                    if (epochSecond > 0) {
-                        target.set(Instant.ofEpochSecond(epochSecond));
-                        log.debug("Zeitstempel-Metrik '{}' geladen (Epoch): {}", name, target.get());
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("Konnte Zeitstempel-Metrik '{}' nicht laden: {}", name, e.getMessage());
-            }
-        });
+        return metrikRepository.findByNameAndOrgId(name, orgId);
     }
 
     @Transactional
@@ -202,8 +129,17 @@ public class MetricsService {
     }
 
     private void saveMetrik(String name, String jsonValue) {
-        Metrik metrik = metrikRepository.findByName(name)
-                .orElseGet(() -> new Metrik(name, jsonValue));
+        UUID orgId = getCurrentOrgId();
+        if (orgId == null) {
+            log.warn("Keine Organisation im Kontext - Metrik '{}' wird nicht gespeichert", name);
+            return;
+        }
+        Metrik metrik = metrikRepository.findByNameAndOrgId(name, orgId)
+                .orElseGet(() -> {
+                    Metrik newMetrik = new Metrik(name, jsonValue);
+                    newMetrik.setOrgId(orgId);
+                    return newMetrik;
+                });
         metrik.setValue(jsonValue);
         metrikRepository.save(metrik);
     }

@@ -31,16 +31,24 @@ public class MesswerteService {
     private static final Logger log = LoggerFactory.getLogger(MesswerteService.class);
     private final MesswerteRepository messwerteRepository;
     private final EinheitRepository einheitRepository;
+    private final OrganizationContextService organizationContextService;
+    private final HibernateFilterService hibernateFilterService;
 
-    public MesswerteService(MesswerteRepository messwerteRepository, EinheitRepository einheitRepository) {
+    public MesswerteService(MesswerteRepository messwerteRepository,
+                            EinheitRepository einheitRepository,
+                            OrganizationContextService organizationContextService,
+                            HibernateFilterService hibernateFilterService) {
         this.messwerteRepository = messwerteRepository;
         this.einheitRepository = einheitRepository;
+        this.organizationContextService = organizationContextService;
+        this.hibernateFilterService = hibernateFilterService;
         log.info("MesswerteService initialized");
     }
 
     @Transactional
     @CacheEvict(value = "statistik", allEntries = true)
     public Map<String, Object> processCsvUpload(MultipartFile file, Long einheitId, String dateStr) throws Exception {
+        hibernateFilterService.enableOrgFilter();
         log.info("Starting CSV upload processing - einheitId: {}, date: {}, filename: {}, size: {} bytes",
                 einheitId, dateStr, file.getOriginalFilename(), file.getSize());
 
@@ -69,7 +77,9 @@ public class MesswerteService {
                     Double total = Double.parseDouble(parts[1].trim());
                     Double zev = Double.parseDouble(parts[2].trim());
 
-                    messwerteList.add(new Messwerte(zeit, total, zev, einheit));
+                    Messwerte messwert = new Messwerte(zeit, total, zev, einheit);
+                    messwert.setOrgId(organizationContextService.getCurrentOrgId());
+                    messwerteList.add(messwert);
                     zeit = zeit.plusMinutes(15);
                 } else {
                     log.warn("Skipping invalid line {} in CSV: insufficient columns", lineNumber);
@@ -102,7 +112,9 @@ public class MesswerteService {
                 "einheitName", einheit.getName());
     }
 
+    @Transactional(readOnly = true)
     public List<Map<String, Object>> getMesswerteByEinheit(Long einheitId, LocalDate dateFrom, LocalDate dateTo) {
+        hibernateFilterService.enableOrgFilter();
         log.info("Fetching messwerte for einheitId: {}, dateFrom: {}, dateTo: {}", einheitId, dateFrom, dateTo);
 
         LocalDateTime dateTimeFrom = dateFrom.atStartOfDay();
@@ -132,6 +144,7 @@ public class MesswerteService {
     @CacheEvict(value = "statistik", allEntries = true)
     public CalculationResult calculateSolarDistribution(LocalDateTime dateFrom, LocalDateTime dateTo,
             String algorithm) {
+        hibernateFilterService.enableOrgFilter();
         log.info("Starting solar distribution calculation - dateFrom: {}, dateTo: {}, algorithm: {}",
                 dateFrom, dateTo, algorithm);
 
