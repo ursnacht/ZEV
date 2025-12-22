@@ -26,7 +26,8 @@ export const appConfig: ApplicationConfig = {
             },
             initOptions: {
                 onLoad: 'login-required',
-                checkLoginIframe: false
+                checkLoginIframe: false,
+                scope: 'openid organization'
             }
         }),
         {
