@@ -57,18 +57,34 @@ npm run build       # Build CSS + TypeScript
 npm run watch       # Watch mode for development
 ```
 
+### Admin Service
+```bash
+cd admin-service
+
+# Build
+mvn clean compile
+
+# Run tests
+mvn test
+```
+
 ## Architecture
 
 ```
-┌─────────────────┐     ┌─────────────────┐
-│ frontend-service│────▶│ backend-service │
-│   (Angular 19)  │     │ (Spring Boot)   │
-└────────┬────────┘     └────────┬────────┘
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│ frontend-service│────▶│ backend-service │────▶│  admin-service  │
+│   (Angular 19)  │     │ (Spring Boot)   │     │ (Spring Boot)   │
+└────────┬────────┘     └────────┬────────┘     └─────────────────┘
          │                       │
          ▼                       ▼
 ┌─────────────────┐     ┌─────────────────┐
 │    Keycloak     │     │   PostgreSQL    │
 │   (OAuth2/JWT)  │     │     (zev DB)    │
+└─────────────────┘     └─────────────────┘
+
+┌─────────────────┐     ┌─────────────────┐
+│   Prometheus    │────▶│     Grafana     │
+│   (Metrics)     │     │  (Dashboards)   │
 └─────────────────┘     └─────────────────┘
 ```
 
@@ -78,8 +94,15 @@ npm run watch       # Watch mode for development
 - `EinheitController` - CRUD for units (consumers/producers)
 - `MesswerteController` - Measurement data upload/retrieval
 - `TranslationController` - i18n support
+- `TarifController` - Tariff management
+- `QuartalController` - Quarterly periods management
 - `SolarDistribution.java` - Core fair distribution algorithm
 - `SecurityConfig` - OAuth2 JWT validation with Keycloak
+- Multi-tenant support via Keycloak organization claim
+
+**Admin Service:**
+- Separate Spring Boot service for admin operations
+- Runs on port 8081
 
 **Key Frontend Components:**
 - `EinheitListComponent` / `EinheitFormComponent` - Unit management
@@ -122,13 +145,25 @@ Feature specs are in `/Specs/`:
 - `SPEC.md` - Template for new feature specifications
 - `generell.md` - General requirements (i18n, design system, testing)
 - `AutomatisierteTests.md` - Testing strategy and tool configuration
+- `Mandantenfähigkeit.md` - Multi-tenancy implementation
+- `Tarifverwaltung.md` - Tariff management
+- `Quartale.md` - Quarterly periods management
+- `RechnungenGenerieren.md` - Invoice generation
+- `Statistik.md` - Statistics and reporting
+- `Metriken.md` - Prometheus metrics integration
+- `Anleitung-keycloak.md` - Keycloak configuration guide
+
+Specs with `_Umsetzungsplan` suffix contain implementation plans.
 
 ## Access Points (Docker)
 
 - Frontend: http://localhost:4200
 - Backend API: http://localhost:8090
+- Admin Service: http://localhost:8081
 - Keycloak: http://localhost:9000
-- Admin Dashboard: http://localhost:8081
+- Keycloak Admin: http://localhost:9000 (admin/admin)
+- Prometheus: http://localhost:9090
+- Grafana: http://localhost:3000 (admin/admin)
 
 ## Test Users (Keycloak)
 

@@ -40,7 +40,7 @@
 * Was passiert bei Netzwerkfehlern?
 
 ## 6. Abgrenzung / Out of Scope
-* Was wird bewusst NICHT umgesetzt?
+* Was wird bewusst **nicht** umgesetzt?
 
 ## 7. Offene Fragen
 * Punkte die noch geklärt werden müssen bevor die Umsetzung startet
