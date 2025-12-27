@@ -18,7 +18,7 @@
 | 1 | [Design-System: CSS-Styles für Kebabmenü](#phase-1-design-system-css-styles) | ✅ Abgeschlossen |
 | 2 | [Angular: KebabMenuComponent erstellen](#phase-2-angular-kebabmenucomponent) | ✅ Abgeschlossen |
 | 3 | [Integration: Listen-Komponenten anpassen](#phase-3-integration-listen-komponenten) | ✅ Abgeschlossen |
-| 4 | [Tests und Validierung](#phase-4-tests-und-validierung) | ⬜ Offen |
+| 4 | [Tests und Validierung](#phase-4-tests-und-validierung) | ✅ Abgeschlossen |
 
 **Legende:** ⬜ Offen | 🔄 In Arbeit | ✅ Abgeschlossen
 
@@ -215,13 +215,22 @@ menuItems: KebabMenuItem[] = [
 
 | Nr | Aufgabe | Status |
 |----|---------|--------|
-| 4.1 | Manuell: Kebabmenü in Einheitenverwaltung testen | ⬜ |
-| 4.2 | Manuell: Kebabmenü in Tarifverwaltung testen | ⬜ |
-| 4.3 | Manuell: Kebabmenü in Übersetzungen testen | ⬜ |
-| 4.4 | Manuell: Click-Outside-Schliessen testen | ⬜ |
-| 4.5 | Manuell: ESC-Taste testen | ⬜ |
-| 4.6 | Manuell: Nur ein Menü gleichzeitig offen | ⬜ |
-| 4.7 | E2E-Tests anpassen (falls vorhanden) | ⬜ |
+| 4.1 | E2E-Helper-Funktionen für Kebabmenü erstellen (`helpers.ts`) | ✅ |
+| 4.2 | Neue Testdatei `kebab-menu.spec.ts` erstellen | ✅ |
+| 4.3 | Bestehende `tarif-verwaltung.spec.ts` auf Kebabmenü umstellen | ✅ |
+| 4.4 | Tests für Menü öffnen/schliessen | ✅ |
+| 4.5 | Tests für Click-Outside-Schliessen | ✅ |
+| 4.6 | Tests für ESC-Taste | ✅ |
+| 4.7 | Tests für Edit-Aktion via Kebabmenü | ✅ |
+| 4.8 | Tests für Delete-Aktion via Kebabmenü | ✅ |
+
+### E2E-Test-Dateien
+
+| Datei | Beschreibung |
+|-------|--------------|
+| `tests/helpers.ts` | Helper-Funktionen: `clickKebabMenuItem()`, `openKebabMenu()`, `closeKebabMenu()`, `closeKebabMenuWithEsc()` |
+| `tests/kebab-menu.spec.ts` | Spezifische Kebabmenü-Tests: Öffnen, Schliessen, Aktionen |
+| `tests/tarif-verwaltung.spec.ts` | Aktualisiert für Kebabmenü statt Buttons |
 
 ### Testfälle
 
@@ -246,6 +255,9 @@ menuItems: KebabMenuItem[] = [
 | `frontend-service/src/app/components/einheit-list/` | Anpassen |
 | `frontend-service/src/app/components/tarif-list/` | Anpassen |
 | `frontend-service/src/app/components/translation-editor/` | Anpassen |
+| `frontend-service/tests/helpers.ts` | Kebabmenü-Helper hinzugefügt |
+| `frontend-service/tests/kebab-menu.spec.ts` | Neu - E2E-Tests |
+| `frontend-service/tests/tarif-verwaltung.spec.ts` | Auf Kebabmenü umgestellt |
 
 ---
 
