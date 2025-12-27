@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TranslationService, Translation } from '../../services/translation.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.component';
 
 @Component({
   selector: 'app-translation-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe],
+  imports: [CommonModule, FormsModule, TranslatePipe, KebabMenuComponent],
   templateUrl: './translation-editor.component.html',
   styleUrls: ['./translation-editor.component.css']
 })
@@ -17,6 +18,11 @@ export class TranslationEditorComponent implements OnInit {
   loading = false;
   sortColumn: 'key' | 'deutsch' | 'englisch' | null = 'key';
   sortDirection: 'asc' | 'desc' = 'asc';
+
+  menuItems: KebabMenuItem[] = [
+    { label: 'SAVE', action: 'save' },
+    { label: 'DELETE', action: 'delete', danger: true }
+  ];
 
   constructor(private translationService: TranslationService) { }
 
@@ -73,6 +79,17 @@ export class TranslationEditorComponent implements OnInit {
       },
       error: (err) => console.error('Failed to delete translation', err)
     });
+  }
+
+  onMenuAction(action: string, translation: Translation): void {
+    switch (action) {
+      case 'save':
+        this.saveTranslation(translation);
+        break;
+      case 'delete':
+        this.deleteTranslation(translation);
+        break;
+    }
   }
 
   onSort(column: 'key' | 'deutsch' | 'englisch'): void {

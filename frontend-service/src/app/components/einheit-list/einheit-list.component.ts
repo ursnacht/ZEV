@@ -5,11 +5,12 @@ import { Einheit } from '../../models/einheit.model';
 import { EinheitFormComponent } from '../einheit-form/einheit-form.component';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
+import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.component';
 
 @Component({
   selector: 'app-einheit-list',
   standalone: true,
-  imports: [CommonModule, EinheitFormComponent, TranslatePipe],
+  imports: [CommonModule, EinheitFormComponent, TranslatePipe, KebabMenuComponent],
   templateUrl: './einheit-list.component.html',
   styleUrls: ['./einheit-list.component.css']
 })
@@ -21,6 +22,11 @@ export class EinheitListComponent implements OnInit {
   messageType: 'success' | 'error' = 'success';
   sortColumn: 'id' | 'name' | 'typ' | 'mietername' | null = 'name';
   sortDirection: 'asc' | 'desc' = 'asc';
+
+  menuItems: KebabMenuItem[] = [
+    { label: 'BEARBEITEN', action: 'edit' },
+    { label: 'LOESCHEN', action: 'delete', danger: true }
+  ];
 
   constructor(
     private einheitService: EinheitService,
@@ -65,6 +71,17 @@ export class EinheitListComponent implements OnInit {
           this.showMessage('Fehler beim Löschen: ' + error.message, 'error');
         }
       });
+    }
+  }
+
+  onMenuAction(action: string, einheit: Einheit): void {
+    switch (action) {
+      case 'edit':
+        this.onEdit(einheit);
+        break;
+      case 'delete':
+        this.onDelete(einheit.id);
+        break;
     }
   }
 

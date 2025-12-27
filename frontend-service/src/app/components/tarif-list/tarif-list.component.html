@@ -41,7 +41,7 @@
               {{ sortDirection === 'asc' ? '▲' : '▼' }}
             </span>
           </th>
-          <th>{{ 'ACTIONS' | translate }}</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -56,14 +56,10 @@
           <td>{{ formatDate(tarif.gueltigVon) }}</td>
           <td>{{ formatDate(tarif.gueltigBis) }}</td>
           <td>
-            <div class="zev-table-actions">
-              <button class="zev-button zev-button--secondary" (click)="onEdit(tarif)">
-                {{ 'BEARBEITEN' | translate }}
-              </button>
-              <button class="zev-button zev-button--danger" (click)="onDelete(tarif.id)">
-                {{ 'LOESCHEN' | translate }}
-              </button>
-            </div>
+            <app-kebab-menu
+              [items]="menuItems"
+              (itemClick)="onMenuAction($event, tarif)">
+            </app-kebab-menu>
           </td>
         </tr>
       </tbody>

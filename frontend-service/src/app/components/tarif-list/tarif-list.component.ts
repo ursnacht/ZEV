@@ -5,11 +5,12 @@ import { Tarif, TarifTyp } from '../../models/tarif.model';
 import { TarifFormComponent } from '../tarif-form/tarif-form.component';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
+import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.component';
 
 @Component({
   selector: 'app-tarif-list',
   standalone: true,
-  imports: [CommonModule, TarifFormComponent, TranslatePipe],
+  imports: [CommonModule, TarifFormComponent, TranslatePipe, KebabMenuComponent],
   templateUrl: './tarif-list.component.html',
   styleUrls: ['./tarif-list.component.css']
 })
@@ -21,6 +22,11 @@ export class TarifListComponent implements OnInit {
   messageType: 'success' | 'error' = 'success';
   sortColumn: 'bezeichnung' | 'tariftyp' | 'preis' | 'gueltigVon' | 'gueltigBis' | null = 'tariftyp';
   sortDirection: 'asc' | 'desc' = 'asc';
+
+  menuItems: KebabMenuItem[] = [
+    { label: 'BEARBEITEN', action: 'edit' },
+    { label: 'LOESCHEN', action: 'delete', danger: true }
+  ];
 
   constructor(
     private tarifService: TarifService,
@@ -65,6 +71,17 @@ export class TarifListComponent implements OnInit {
           this.showMessage('FEHLER_LOESCHEN_TARIF', 'error');
         }
       });
+    }
+  }
+
+  onMenuAction(action: string, tarif: Tarif): void {
+    switch (action) {
+      case 'edit':
+        this.onEdit(tarif);
+        break;
+      case 'delete':
+        this.onDelete(tarif.id);
+        break;
     }
   }
 

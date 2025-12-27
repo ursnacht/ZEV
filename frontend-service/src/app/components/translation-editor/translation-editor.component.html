@@ -42,7 +42,7 @@
                         {{ sortDirection === 'asc' ? '▲' : '▼' }}
                     </span>
                 </th>
-                <th>{{ 'ACTIONS' | translate }}</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -51,10 +51,10 @@
                 <td><input type="text" [(ngModel)]="t.deutsch" class="zev-input"></td>
                 <td><input type="text" [(ngModel)]="t.englisch" class="zev-input"></td>
                 <td>
-                    <button (click)="saveTranslation(t)" class="zev-button zev-button--primary">{{ 'SAVE' | translate
-                        }}</button>
-                    <button (click)="deleteTranslation(t)" class="zev-button zev-button--danger"
-                        style="margin-left: 8px;">{{ 'DELETE' | translate }}</button>
+                    <app-kebab-menu
+                        [items]="menuItems"
+                        (itemClick)="onMenuAction($event, t)">
+                    </app-kebab-menu>
                 </td>
             </tr>
         </tbody>

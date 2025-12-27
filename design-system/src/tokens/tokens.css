@@ -91,4 +91,7 @@
   --chart-height: 400px;
   --chart-min-height: 200px;
   --chart-max-height: 1000px;
+
+  /* table row height */
+  --table-row-height: 1.0;
 }

@@ -1,0 +1,116 @@
+/**
+ * Kebab Menu Component Styles
+ * A three-dot vertical menu for compact action display in tables
+ */
+
+@import '../../tokens/tokens.css';
+
+/* Container for positioning */
+.zev-kebab-container {
+  position: relative;
+  display: inline-block;
+}
+
+/* Kebab Button (three dots) */
+.zev-kebab-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.zev-kebab-button:hover {
+  background-color: var(--color-gray-300);
+}
+
+.zev-kebab-button:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Kebab dots */
+.zev-kebab-button__dot {
+  width: 4px;
+  height: 4px;
+  background-color: var(--color-gray-600);
+  border-radius: 50%;
+}
+
+.zev-kebab-button:hover .zev-kebab-button__dot {
+  background-color: var(--color-gray-800);
+}
+
+/* Dropdown Menu */
+.zev-kebab-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  min-width: 140px;
+  margin: 0;
+  padding: var(--spacing-xs) 0;
+  list-style: none;
+  background-color: var(--color-primary-dark);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card), 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: var(--z-index-modal);
+
+  /* Hidden state */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  pointer-events: none;
+  transition: opacity var(--transition-fast),
+              transform var(--transition-fast),
+              visibility var(--transition-fast);
+}
+
+.zev-kebab-menu--open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* Menu Items */
+.zev-kebab-menu__item {
+  display: block;
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-md);
+  margin: 0;
+  background: transparent;
+  border: none;
+  color: var(--color-white);
+  font-family: var(--font-family-primary);
+  font-size: var(--font-size-base);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.zev-kebab-menu__item:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.zev-kebab-menu__item:focus {
+  outline: none;
+  background-color: var(--color-primary-hover);
+}
+
+/* Danger variant (for delete actions) */
+.zev-kebab-menu__item--danger {
+  color: var(--color-danger-light);
+}
+
+.zev-kebab-menu__item--danger:hover {
+  background-color: var(--color-danger);
+  color: var(--color-white);
+}
