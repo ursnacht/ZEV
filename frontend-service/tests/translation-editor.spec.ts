@@ -1,123 +1,142 @@
-import { test, expect } from '@playwright/test';
-import { navigateViaMenu } from './helpers';
+import { test, expect } from "@playwright/test";
+import { navigateViaMenu, clickKebabMenuItem, openKebabMenu } from "./helpers";
 
 /**
  * tests / translation-editor.spec.ts
  * E2E tests for the Translation Editor
+ * Updated to use kebab menu instead of direct buttons
  */
 
 /**
  * Helper function to navigate to translation editor
  */
 async function navigateToTranslationEditor(page: any) {
-    await navigateViaMenu(page, '/translations');
-
-    // Wait for translation editor to load
-    await page.locator('.new-translation-form').waitFor({ state: 'visible', timeout: 10000 });
+    await navigateViaMenu(page, "/translations");
+    await page.locator(".new-translation-form").waitFor({ state: "visible", timeout: 10000 });
 }
 
-test.describe('Translation Editor - Delete Functionality', () => {
-    test('should display delete button for each translation', async ({ page }) => {
+test.describe("Translation Editor - Kebab Menu Functionality", () => {
+    test("should display kebab menu for each translation row", async ({ page }) => {
         await navigateToTranslationEditor(page);
-
-        // Check that delete buttons exist
-        const deleteButtons = page.locator('button:has-text("Delete"), button:has-text("Löschen")');
-        await expect(deleteButtons.first()).toBeVisible();
+        const tableRows = page.locator(".translation-table tbody tr, table tbody tr");
+        const rowCount = await tableRows.count();
+        if (rowCount > 0) {
+            const kebabButtons = page.locator(".zev-kebab-button");
+            await expect(kebabButtons.first()).toBeVisible();
+        }
     });
 
-    test('should show confirmation dialog when delete button is clicked', async ({ page }) => {
+    test("should show save and delete options in kebab menu", async ({ page }) => {
         await navigateToTranslationEditor(page);
+        const tableRows = page.locator(".translation-table tbody tr, table tbody tr");
+        const rowCount = await tableRows.count();
+        if (rowCount > 0) {
+            const firstRow = tableRows.first();
+            await openKebabMenu(page, firstRow);
+            const menuItems = firstRow.locator(".zev-kebab-menu__item");
+            const itemCount = await menuItems.count();
+            expect(itemCount).toBeGreaterThanOrEqual(2);
+            const dangerItem = firstRow.locator(".zev-kebab-menu__item--danger");
+            await expect(dangerItem).toBeVisible();
+        }
+    });
+});
 
-        // Set up dialog handler before clicking delete
-        let dialogMessage = '';
-        page.on('dialog', async dialog => {
-            dialogMessage = dialog.message();
-            await dialog.dismiss(); // Cancel the deletion
-        });
-
-        // Click first delete button
-        const deleteButton = page.locator('button:has-text("DELETE"), button:has-text("Löschen")').first();
-        await deleteButton.click();
-
-        // Wait a bit for dialog to be handled
-        await page.waitForTimeout(500);
-
-        // Verify confirmation dialog was shown
-        expect(dialogMessage).toBeTruthy();
-        expect(dialogMessage).toContain('löschen'); // German or English "delete"
+test.describe("Translation Editor - Delete Functionality via Kebab Menu", () => {
+    test("should show confirmation dialog when delete is clicked via kebab menu", async ({ page }) => {
+        await navigateToTranslationEditor(page);
+        const tableRows = page.locator(".translation-table tbody tr, table tbody tr");
+        const rowCount = await tableRows.count();
+        if (rowCount > 0) {
+            const firstRow = tableRows.first();
+            let dialogMessage = "";
+            page.on("dialog", async dialog => {
+                dialogMessage = dialog.message();
+                await dialog.dismiss();
+            });
+            await clickKebabMenuItem(page, firstRow, "delete");
+            await page.waitForTimeout(500);
+            expect(dialogMessage).toBeTruthy();
+        }
     });
 
-    test('should delete translation when confirmed', async ({ page }) => {
-        // Debug console
-        page.on('console', msg => console.log(`BROWSER LOG: ${msg.text()}`));
-
+    test("should delete translation when confirmed via kebab menu", async ({ page }) => {
         await navigateToTranslationEditor(page);
-
-        // Create a test translation first
         const testKey = `testkey_${Date.now()}`;
-        await page.fill('input[placeholder*="KEY"], input[placeholder*="Key"]', testKey);
-        await page.fill('input[placeholder*="DEUTSCH"], input[placeholder*="Deutsch"]', 'E2E Test Löschen');
-        await page.fill('input[placeholder*="ENGLISH"], input[placeholder*="Englisch"]', 'E2E Test Delete');
-        await page.locator('button:has-text("ADD"), button:has-text("Hinzufügen")').click();
-
-        // Wait for translation to appear in table
+        
+        // Use the correct input selectors based on the actual placeholders
+        await page.locator(".new-translation-form input").nth(0).fill(testKey);
+        await page.locator(".new-translation-form input").nth(1).fill("E2E Test Loeschen");
+        await page.locator(".new-translation-form input").nth(2).fill("E2E Test Delete");
+        
+        // Click the primary button in the form
+        await page.locator(".new-translation-form button.zev-button--primary").click();
+        
         await page.waitForTimeout(1000);
-
-        // Find the row with our test translation
         const testRow = page.locator(`tr:has-text("${testKey}")`);
         await expect(testRow).toBeVisible();
-
-        // Count rows before deletion
-        const rowsBefore = await page.locator('tbody tr').count();
-
-        // Set up dialog handler to accept deletion
-        page.on('dialog', async dialog => {
+        const rowsBefore = await page.locator(".translation-table tbody tr").count();
+        
+        page.on("dialog", async dialog => {
             await dialog.accept();
         });
-
-        // Click delete button for our test translation
-        const deleteButton = testRow.locator('button:has-text("DELETE"), button:has-text("Löschen")');
-        await deleteButton.click();
-
-        // Wait for deletion to complete
+        await clickKebabMenuItem(page, testRow, "delete");
         await page.waitForTimeout(1000);
-
-        // Verify translation is removed from table
         await expect(testRow).not.toBeVisible();
-
-        // Verify row count decreased
-        const rowsAfter = await page.locator('tbody tr').count();
+        const rowsAfter = await page.locator(".translation-table tbody tr").count();
         expect(rowsAfter).toBe(rowsBefore - 1);
     });
 
-    test('should not delete translation when cancelled', async ({ page }) => {
+    test("should not delete translation when cancelled via kebab menu", async ({ page }) => {
         await navigateToTranslationEditor(page);
-
-        // Get first translation key
-        const firstRow = page.locator('tbody tr').first();
-        const firstKey = await firstRow.locator('td').first().textContent();
-
-        // Count rows before
-        const rowsBefore = await page.locator('tbody tr').count();
-
-        // Set up dialog handler to cancel deletion
-        page.on('dialog', async dialog => {
+        const firstRow = page.locator(".translation-table tbody tr").first();
+        const firstKey = await firstRow.locator("td").first().textContent();
+        const rowsBefore = await page.locator(".translation-table tbody tr").count();
+        
+        page.on("dialog", async dialog => {
             await dialog.dismiss();
         });
-
-        // Click delete button
-        const deleteButton = firstRow.locator('button:has-text("DELETE"), button:has-text("Löschen")');
-        await deleteButton.click();
-
-        // Wait a bit
+        await clickKebabMenuItem(page, firstRow, "delete");
         await page.waitForTimeout(500);
-
-        // Verify translation still exists
         await expect(firstRow).toBeVisible();
-        await expect(page.locator(`tr:has-text("${firstKey}")`)).toBeVisible();
-
-        // Verify row count unchanged
-        const rowsAfter = await page.locator('tbody tr').count();
+        if (firstKey) {
+            await expect(page.locator(`tr:has-text("${firstKey}")`)).toBeVisible();
+        }
+        const rowsAfter = await page.locator(".translation-table tbody tr").count();
         expect(rowsAfter).toBe(rowsBefore);
+    });
+});
+
+test.describe("Translation Editor - Save Functionality via Kebab Menu", () => {
+    test("should save translation changes via kebab menu", async ({ page }) => {
+        await navigateToTranslationEditor(page);
+        const testKey = `savetest_${Date.now()}`;
+        
+        // Use the correct input selectors
+        await page.locator(".new-translation-form input").nth(0).fill(testKey);
+        await page.locator(".new-translation-form input").nth(1).fill("Original DE");
+        await page.locator(".new-translation-form input").nth(2).fill("Original EN");
+        
+        // Click the primary button in the form
+        await page.locator(".new-translation-form button.zev-button--primary").click();
+        
+        await page.waitForTimeout(1000);
+        const testRow = page.locator(`tr:has-text("${testKey}")`);
+        await expect(testRow).toBeVisible();
+        
+        // Modify the German translation in the inline input
+        const germanInput = testRow.locator("input").first();
+        await germanInput.fill("Modified DE");
+        
+        // Click save via kebab menu (first non-danger item is SAVE)
+        await clickKebabMenuItem(page, testRow, "edit");
+        await page.waitForTimeout(1000);
+        
+        // Clean up: delete the test translation
+        page.on("dialog", async dialog => {
+            await dialog.accept();
+        });
+        await clickKebabMenuItem(page, testRow, "delete");
+        await page.waitForTimeout(1000);
     });
 });

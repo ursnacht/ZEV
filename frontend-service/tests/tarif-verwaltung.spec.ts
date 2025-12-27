@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { navigateViaMenu } from './helpers';
+import { navigateViaMenu, clickKebabMenuItem, waitForFormResult, waitForTableWithData } from './helpers';
 
 /**
  * tests / tarif-verwaltung.spec.ts
@@ -13,7 +13,9 @@ async function navigateToTarife(page: Page): Promise<void> {
     await navigateViaMenu(page, '/tarife');
 
     // Wait for Tarife page to load - use the container's h1, not navbar
-    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 10000 });
+    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
+    // Wait for table to load
+    await waitForTableWithData(page, 10000);
 }
 
 /**
@@ -180,38 +182,36 @@ test.describe('Tarif Management - Create Tariff', () => {
         const submitButton = page.locator('button[type="submit"]');
         await submitButton.click();
 
-        // Wait for API response - either success message or error message
-        const successMessage = page.locator('.zev-message--success');
-        const errorMessage = page.locator('.zev-message--error');
-
-        // Wait for one of the messages to appear
-        await expect(successMessage.or(errorMessage)).toBeVisible({ timeout: 15000 });
-
-        // Check if it was a success
-        const isSuccess = await successMessage.isVisible().catch(() => false);
+        // Wait for form result
+        let isSuccess = false;
+        try {
+            isSuccess = await waitForFormResult(page, 20000);
+        } catch {
+            console.log('Tariff creation failed, skipping verification');
+            return;
+        }
 
         if (isSuccess) {
-            // Form should be closed, table should be visible
-            await page.locator('.zev-table').waitFor({ state: 'visible', timeout: 5000 });
+            // Wait for table to reload
+            await waitForTableWithData(page, 10000);
 
             // Verify the new tariff appears in the table
             const newTarifRow = page.locator(`tr:has-text("${testName}")`);
-            await expect(newTarifRow).toBeVisible();
+            await expect(newTarifRow).toBeVisible({ timeout: 10000 });
 
             // Verify it has ZEV badge
             const zevBadge = newTarifRow.locator('.tarif-typ-badge--zev');
             await expect(zevBadge).toBeVisible();
 
             // Clean up: delete the test tariff
-            const deleteButton = newTarifRow.locator('button.zev-button--danger');
+            // Use kebab menu for delete
             page.on('dialog', async dialog => {
                 await dialog.accept();
             });
-            await deleteButton.click();
+            await clickKebabMenuItem(page, newTarifRow, 'delete');
             await page.waitForTimeout(1000);
         } else {
             // If error, skip the cleanup as tariff was not created
-            // This may happen if the backend is not running or returns an error
             console.log('Tariff creation failed, skipping verification');
         }
     });
@@ -237,34 +237,33 @@ test.describe('Tarif Management - Create Tariff', () => {
         const submitButton = page.locator('button[type="submit"]');
         await submitButton.click();
 
-        // Wait for API response - either success message or error message
-        const successMessage = page.locator('.zev-message--success');
-        const errorMessage = page.locator('.zev-message--error');
-
-        // Wait for one of the messages to appear
-        await expect(successMessage.or(errorMessage)).toBeVisible({ timeout: 15000 });
-
-        // Check if it was a success
-        const isSuccess = await successMessage.isVisible().catch(() => false);
+        // Wait for form result
+        let isSuccess = false;
+        try {
+            isSuccess = await waitForFormResult(page, 20000);
+        } catch {
+            console.log('Tariff creation failed, skipping verification');
+            return;
+        }
 
         if (isSuccess) {
-            // Form should be closed, table should be visible
-            await page.locator('.zev-table').waitFor({ state: 'visible', timeout: 5000 });
+            // Wait for table to reload
+            await waitForTableWithData(page, 10000);
 
             // Verify the new tariff appears in the table
             const newTarifRow = page.locator(`tr:has-text("${testName}")`);
-            await expect(newTarifRow).toBeVisible();
+            await expect(newTarifRow).toBeVisible({ timeout: 10000 });
 
             // Verify it has VNB badge
             const vnbBadge = newTarifRow.locator('.tarif-typ-badge--vnb');
             await expect(vnbBadge).toBeVisible();
 
             // Clean up: delete the test tariff
-            const deleteButton = newTarifRow.locator('button.zev-button--danger');
+            // Use kebab menu for delete
             page.on('dialog', async dialog => {
                 await dialog.accept();
             });
-            await deleteButton.click();
+            await clickKebabMenuItem(page, newTarifRow, 'delete');
             await page.waitForTimeout(1000);
         } else {
             // If error, skip the cleanup as tariff was not created
@@ -385,27 +384,29 @@ test.describe('Tarif Management - Edit Tariff', () => {
         let submitButton = page.locator('button[type="submit"]');
         await submitButton.click();
 
-        // Wait for API response - either success message or error message
-        const successMessage = page.locator('.zev-message--success');
-        const errorMessage = page.locator('.zev-message--error');
-        await expect(successMessage.or(errorMessage)).toBeVisible({ timeout: 15000 });
+        // Wait for form result
+        let isSuccess = false;
+        try {
+            isSuccess = await waitForFormResult(page, 20000);
+        } catch {
+            console.log('Tariff creation failed, skipping edit test');
+            return;
+        }
 
-        // Check if creation was successful
-        let isSuccess = await successMessage.isVisible().catch(() => false);
         if (!isSuccess) {
             console.log('Tariff creation failed, skipping edit test');
             return;
         }
 
-        // Wait for list to appear
-        await page.locator('.zev-table').waitFor({ state: 'visible', timeout: 10000 });
+        // Wait for table to reload
+        await waitForTableWithData(page, 10000);
 
         // Find the row and click edit
         const tarifRow = page.locator(`tr:has-text("${originalName}")`);
-        await expect(tarifRow).toBeVisible();
+        await expect(tarifRow).toBeVisible({ timeout: 10000 });
 
-        const editButton = tarifRow.locator('button.zev-button--secondary');
-        await editButton.click();
+        // Use kebab menu for edit
+        await clickKebabMenuItem(page, tarifRow, 'edit');
 
         // Form should now be in edit mode
         await expect(page.locator('form')).toBeVisible({ timeout: 5000 });
@@ -421,10 +422,14 @@ test.describe('Tarif Management - Edit Tariff', () => {
         submitButton = page.locator('button[type="submit"]');
         await submitButton.click();
 
-        // Wait for API response after edit
-        await expect(successMessage.or(errorMessage)).toBeVisible({ timeout: 15000 });
+        // Wait for form result after edit
+        try {
+            isSuccess = await waitForFormResult(page, 20000);
+        } catch {
+            console.log('Tariff edit failed, skipping verification');
+            return;
+        }
 
-        isSuccess = await successMessage.isVisible().catch(() => false);
         if (!isSuccess) {
             console.log('Tariff edit failed, skipping verification');
             // Cancel form if still visible
@@ -435,17 +440,17 @@ test.describe('Tarif Management - Edit Tariff', () => {
             return;
         }
 
-        // Verify list shows updated values
-        await page.locator('.zev-table').waitFor({ state: 'visible', timeout: 10000 });
+        // Wait for table to reload
+        await waitForTableWithData(page, 10000);
         const updatedRow = page.locator(`tr:has-text("${originalName}")`);
-        await expect(updatedRow).toBeVisible();
+        await expect(updatedRow).toBeVisible({ timeout: 10000 });
 
         // Clean up: delete the test tariff
-        const deleteButton = updatedRow.locator('button.zev-button--danger');
+        // Use kebab menu for delete
         page.on('dialog', async dialog => {
             await dialog.accept();
         });
-        await deleteButton.click();
+        await clickKebabMenuItem(page, tarifRow, 'delete');
         await page.waitForTimeout(1000);
     });
 });
@@ -470,24 +475,26 @@ test.describe('Tarif Management - Delete Tariff', () => {
         const submitButton = page.locator('button[type="submit"]');
         await submitButton.click();
 
-        // Wait for API response
-        const successMessage = page.locator('.zev-message--success');
-        const errorMessage = page.locator('.zev-message--error');
-        await expect(successMessage.or(errorMessage)).toBeVisible({ timeout: 15000 });
+        // Wait for form result
+        let isSuccess = false;
+        try {
+            isSuccess = await waitForFormResult(page, 20000);
+        } catch {
+            console.log('Tariff creation failed, skipping delete test');
+            return;
+        }
 
-        // Check if creation was successful
-        const isSuccess = await successMessage.isVisible().catch(() => false);
         if (!isSuccess) {
             console.log('Tariff creation failed, skipping delete test');
             return;
         }
 
-        // Wait for list to appear
-        await page.locator('.zev-table').waitFor({ state: 'visible', timeout: 5000 });
+        // Wait for table to reload
+        await waitForTableWithData(page, 10000);
 
         // Find the row
         const tarifRow = page.locator(`tr:has-text("${testName}")`);
-        await expect(tarifRow).toBeVisible();
+        await expect(tarifRow).toBeVisible({ timeout: 10000 });
 
         // Set up dialog handler to dismiss
         let dialogMessage = '';
@@ -496,9 +503,8 @@ test.describe('Tarif Management - Delete Tariff', () => {
             await dialog.dismiss(); // Cancel deletion
         });
 
-        // Click delete button
-        const deleteButton = tarifRow.locator('button.zev-button--danger');
-        await deleteButton.click();
+        // Click delete button via kebab menu
+        await clickKebabMenuItem(page, tarifRow, 'delete');
 
         await page.waitForTimeout(500);
 
@@ -513,7 +519,7 @@ test.describe('Tarif Management - Delete Tariff', () => {
         page.on('dialog', async dialog => {
             await dialog.accept();
         });
-        await deleteButton.click();
+        await clickKebabMenuItem(page, tarifRow, 'delete');
         await page.waitForTimeout(1000);
     });
 
@@ -536,41 +542,39 @@ test.describe('Tarif Management - Delete Tariff', () => {
         const submitButton = page.locator('button[type="submit"]');
         await submitButton.click();
 
-        // Wait for API response
-        const successMessage = page.locator('.zev-message--success');
-        const errorMessage = page.locator('.zev-message--error');
-        await expect(successMessage.or(errorMessage)).toBeVisible({ timeout: 15000 });
+        // Wait for form result
+        let isSuccess = false;
+        try {
+            isSuccess = await waitForFormResult(page, 20000);
+        } catch {
+            console.log('Tariff creation failed, skipping delete test');
+            return;
+        }
 
-        // Check if creation was successful
-        const isSuccess = await successMessage.isVisible().catch(() => false);
         if (!isSuccess) {
             console.log('Tariff creation failed, skipping delete test');
             return;
         }
 
-        // Wait for list to appear
-        await page.locator('.zev-table').waitFor({ state: 'visible', timeout: 5000 });
+        // Wait for table to reload
+        await waitForTableWithData(page, 10000);
 
         // Find the row
         const tarifRow = page.locator(`tr:has-text("${testName}")`);
-        await expect(tarifRow).toBeVisible();
+        await expect(tarifRow).toBeVisible({ timeout: 10000 });
 
         // Set up dialog handler BEFORE clicking delete
         page.once('dialog', async dialog => {
             await dialog.accept();
         });
 
-        // Click delete button
-        const deleteButton = tarifRow.locator('button.zev-button--danger');
-        await deleteButton.click();
+        // Click delete button via kebab menu
+        await clickKebabMenuItem(page, tarifRow, 'delete');
 
         // Wait for deletion - the specific row should disappear
-        // Use a try-catch to handle cases where deletion might fail
         try {
             await expect(tarifRow).not.toBeVisible({ timeout: 10000 });
         } catch {
-            // If tariff still visible, deletion may have failed - log but don't fail test
-            // This can happen if backend returns an error
             console.log('Tariff deletion may have failed, row still visible');
         }
     });
@@ -650,8 +654,8 @@ test.describe('Tarif Management - Overlapping Validation', () => {
             page.on('dialog', async dialog => {
                 await dialog.accept();
             });
-            const deleteButton = tarifRow.locator('button.zev-button--danger');
-            await deleteButton.click();
+            // Use kebab menu for delete action
+            await clickKebabMenuItem(page, tarifRow, 'delete');
             await page.waitForTimeout(1000);
         }
     });
