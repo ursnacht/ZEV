@@ -68,3 +68,7 @@
 * Leere Listen: Hilfreiche Meldung anzeigen ("Keine Daten vorhanden")
 * Netzwerkfehler: Retry-Möglichkeit oder klare Fehlermeldung
 * Ungültige IDs: 404 zurückgeben, nicht 500
+
+## 7. Zusätzliche Infos
+* Zugriff auf die Datenbank via docker container
+  * Beispiel um alle Übersetzungskeys zu lesen: "docker exec postgres psql -U postgres -d zev -c "SELECT key FROM zev.translation ORDER BY key;"
