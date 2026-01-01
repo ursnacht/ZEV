@@ -9,6 +9,7 @@ Erstelle Unit Tests für die angegebene Angular-Komponente oder Service.
 1. **Analysiere die Ziel-Datei** - Verstehe die Geschäftslogik, Inputs, Outputs und Abhängigkeiten
 2. **Prüfe existierende Tests** - Schaue ob bereits eine `*.spec.ts` existiert und was fehlt
 3. **Orientiere dich an bestehenden Tests** - Nutze vorhandene Specs als Vorlage für Stil und Struktur
+4. **Erstelle Tests** für jede public Methode mit Success- und Error-Cases
 
 ## Test-Anforderungen
 * **Tool:** Jasmine mit Karma
@@ -17,12 +18,171 @@ Erstelle Unit Tests für die angegebene Angular-Komponente oder Service.
 * Teste: Initialisierung, Inputs/Outputs, public Methoden, Edge Cases, Fehlerbehandlung
 * Keine E2E-Aspekte (DOM-Interaktion, Routing) - nur isolierte Logik
 
+## Service Tests
+
+### Datei-Struktur (exakt einhalten)
+```typescript
+import { TestBed } from '@angular/core/testing';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { XxxService } from './xxx.service';
+import { Xxx } from '../models/xxx.model';
+
+describe('XxxService', () => {
+  let service: XxxService;
+  let httpMock: HttpTestingController;
+  const apiUrl = 'http://localhost:8090/api/xxx';
+
+  const mockXxx: Xxx = {
+    id: 1,
+    // ... alle Properties
+  };
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      providers: [XxxService]
+    });
+    service = TestBed.inject(XxxService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+  });
+
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
+
+  describe('methodName', () => {
+    it('should description', () => {
+      service.methodName().subscribe(result => {
+        expect(result).toEqual(...);
+      });
+
+      const req = httpMock.expectOne(apiUrl);
+      expect(req.request.method).toBe('GET');
+      req.flush(mockData);
+    });
+  });
+});
+```
+
+### Pflicht-Tests für HTTP-Services
+| Methode | Tests |
+|---------|-------|
+| getAll() | `should return all items` |
+| getById(id) | `should return single item by id` |
+| create(item) | `should create new item` |
+| update(id, item) | `should update existing item` |
+| delete(id) | `should delete item` |
+
+
+## Component Tests
+
+### Datei-Struktur (exakt einhalten)
+```typescript
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { XxxComponent } from './xxx.component';
+import { XxxService } from '../../services/xxx.service';
+import { TranslationService } from '../../services/translation.service';
+import { of, throwError } from 'rxjs';
+
+describe('XxxComponent', () => {
+  let component: XxxComponent;
+  let fixture: ComponentFixture<XxxComponent>;
+  let xxxServiceSpy: jasmine.SpyObj<XxxService>;
+
+  const mockData = { /* ... */ };
+
+  beforeEach(async () => {
+    xxxServiceSpy = jasmine.createSpyObj('XxxService', ['getAll', 'create', 'update', 'delete']);
+    xxxServiceSpy.getAll.and.returnValue(of([]));
+
+    await TestBed.configureTestingModule({
+      imports: [XxxComponent],
+      providers: [
+        { provide: XxxService, useValue: xxxServiceSpy },
+        { provide: TranslationService, useValue: { translate: (k: string) => k } }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(XxxComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+
+  describe('initialization', () => {
+    it('should load data on init', () => {
+      expect(xxxServiceSpy.getAll).toHaveBeenCalled();
+    });
+  });
+
+  describe('methodName', () => {
+    it('should description', () => {
+      // Arrange
+      // Act
+      // Assert
+    });
+  });
+});
+```
+
+### Naming-Konvention für describe/it Blöcke
+
+```typescript
+describe('XxxComponent', () => {
+  describe('initialization', () => {
+    it('should load data on init', ...);
+    it('should set default values', ...);
+  });
+
+  describe('methodName', () => {
+    it('should do something when condition', ...);
+    it('should throw error when invalid', ...);
+  });
+
+  describe('events', () => {
+    it('should emit save event with form data', ...);
+    it('should emit cancel event', ...);
+  });
+});
+```
+
+---
+
+## Pflicht-Tests pro Komponenten-Typ
+
+### Form-Komponenten
+| Aspekt | Tests |
+|--------|-------|
+| Initialisierung | `should set default values`, `should populate with input data` |
+| Validierung | `should return false when field empty`, `should return true when valid` |
+| Events | `should emit save on valid submit`, `should not emit on invalid`, `should emit cancel` |
+
+### List-Komponenten
+| Aspekt | Tests |
+|--------|-------|
+| Initialisierung | `should load items on init`, `should show empty state` |
+| CRUD | `should call create`, `should call update`, `should call delete` |
+| Sortierung | `should toggle sort direction`, `should sort by column` |
+| Messages | `should show success message`, `should show error message` |
+
+
+---
+
 ## Ausführung
 * Führe `npm test` im `frontend-service` Verzeichnis aus
 * Alle Tests müssen grün sein
 
 ## Referenz
-* Specs/AutomatisierteTests.md, Kapitel "3. Frontend Tests"
+* Specs/AutomatisierteTests.md
+
+---
 
 ## Hinweise für Tester
 ### Unit Tests interaktiv ausführen

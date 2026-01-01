@@ -3,7 +3,7 @@
 Erstelle Unit- und Integrationstests für Backend-Code.
 
 ## Input
-* Ziel: $ARGUMENTS (z.B. `TarifService` oder `Specs/Tarifverwaltung_Umsetzungsplan.md`)
+* Ziel: $ARGUMENTS (z.B. `Specs/Tarifverwaltung_Umsetzungsplan.md` oder kurz `TarifService`)
 
 ## Vorgehen
 1. **Analysiere den Code** - Verstehe die zu testende Klasse/Funktionalität
@@ -22,7 +22,7 @@ Erstelle Unit- und Integrationstests für Backend-Code.
 ### Integration Tests (`*IT.java`)
 * **Tool:** Spring Test Slices (@WebMvcTest, @DataJpaTest)
 * **Ausführung:** `mvn verify` (Failsafe Plugin)
-* **Datenbank:** Testcontainers (PostgreSQL)
+* **Datenbank:** Testcontainers (PostgreSQL) verwenden
 * **Scope:** Repository-Queries, Controller-Endpoints
 * **Hinweise:**
   - @SpringBootTest vermeiden - Spring Context minimieren
@@ -36,6 +36,140 @@ Erstelle Unit- und Integrationstests für Backend-Code.
 | Controller | Optional | Ja (@WebMvcTest) |
 | Utility-Klassen | Ja | Nein |
 
+## Unit Tests für Services
+
+### Vorlage Datei-Struktur (exakt einhalten)
+
+```java
+package ch.nacht.service;
+
+// 1. Projekt-Imports (alphabetisch)
+import ch.nacht.entity....;
+import ch.nacht.repository....;
+
+// 2. JUnit/Mockito-Imports
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+// 3. Java-Standard-Imports
+import java.util.*;
+
+// 4. Static-Imports
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+public class XxxServiceTest {
+
+    @Mock
+    private XxxRepository xxxRepository;
+
+    @InjectMocks
+    private XxxService xxxService;
+
+    private Xxx testEntity;
+
+    @BeforeEach
+    void setUp() {
+        testEntity = new Xxx(...);
+        testEntity.setId(1L);
+    }
+
+    @Test
+    void methodName_Scenario_ExpectedResult() {
+        // Arrange
+        when(repository.method()).thenReturn(...);
+
+        // Act
+        Result result = service.method();
+
+        // Assert
+        assertNotNull(result);
+        verify(repository).method();
+    }
+}
+```
+
+### Naming-Konvention für Test-Methoden
+```
+methodName_Scenario_ExpectedResult
+```
+Beispiele:
+- `getAllTarife_ReturnsSortedList`
+- `getTarifById_Found_ReturnsTarif`
+- `getTarifById_NotFound_ReturnsEmpty`
+- `saveTarif_ValidNewTarif_SavesSuccessfully`
+- `saveTarif_OverlappingTarif_ThrowsException`
+- `deleteTarif_Exists_ReturnsTrue`
+- `deleteTarif_NotExists_ReturnsFalse`
+
+## Controller Tests
+
+### Datei-Struktur (exakt einhalten)
+
+```java
+package ch.nacht.controller;
+
+// Imports wie oben, plus:
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@WebMvcTest(XxxController.class)
+@AutoConfigureMockMvc(addFilters = false)
+public class XxxControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private XxxService xxxService;
+
+    @MockBean
+    private OrganizationContextService organizationContextService;
+
+    private ObjectMapper objectMapper;
+
+    @BeforeEach
+    void setUp() {
+        objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+    }
+
+    @Test
+    void getAll_ReturnsListOfXxx() throws Exception {
+        when(xxxService.getAll()).thenReturn(Arrays.asList(...));
+
+        mockMvc.perform(get("/api/xxx"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$", hasSize(2)));
+    }
+}
+```
+
+## Pflicht-Tests pro Endpoint
+
+| HTTP | Endpoint | Tests |
+|------|----------|-------|
+| GET | /api/xxx | `getAll_ReturnsList` |
+| GET | /api/xxx/{id} | `getById_Found_ReturnsEntity`, `getById_NotFound_Returns404` |
+| POST | /api/xxx | `create_ValidInput_ReturnsCreated`, `create_InvalidInput_ReturnsBadRequest` |
+| PUT | /api/xxx/{id} | `update_ValidInput_ReturnsOk`, `update_NotFound_Returns404` |
+| DELETE | /api/xxx/{id} | `delete_Exists_ReturnsNoContent`, `delete_NotFound_Returns404` |
+
+---
+
 ## Ausführung
 ```bash
 cd backend-service
@@ -45,4 +179,4 @@ mvn test -Dtest=TarifServiceTest  # Einzelne Testklasse
 ```
 
 ## Referenz
-* Specs/AutomatisierteTests.md, Kapitel "2. Backend Tests"
+* Specs/AutomatisierteTests.md

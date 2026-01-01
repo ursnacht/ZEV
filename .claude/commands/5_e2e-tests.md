@@ -12,7 +12,7 @@ Erstelle End-to-End Tests mit Playwright für komplette User Flows.
 
 ## Test-Anforderungen
 * **Tool:** Playwright
-* **Verzeichnis:** `frontend-service/e2e/`
+* **Verzeichnis:** `frontend-service/tests/`
 * **Namenskonvention:** `[feature].spec.ts`
 * **Test-User:** `testuser` / `testpassword` (zev_admin Rolle)
 

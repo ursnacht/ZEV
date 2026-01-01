@@ -139,6 +139,39 @@ mvn test
 - Design tokens in `design-system/src/tokens/`
 - Components: Button, Navigation, Card
 
+## Code-Vorlagen für deterministische Generierung
+
+Bei der Code-Generierung diese Dateien als Vorlage verwenden und deren Struktur exakt übernehmen:
+
+### Backend
+
+| Neuer Code | Vorlage |
+|------------|---------|
+| Entity | `backend-service/src/main/java/ch/nacht/entity/Tarif.java` |
+| Repository | `backend-service/src/main/java/ch/nacht/repository/TarifRepository.java` |
+| Service | `backend-service/src/main/java/ch/nacht/service/TarifService.java` |
+| Controller | `backend-service/src/main/java/ch/nacht/controller/TarifController.java` |
+| Service Test | `backend-service/src/test/java/ch/nacht/service/TarifServiceTest.java` |
+| Controller Test | `backend-service/src/test/java/ch/nacht/controller/TarifControllerTest.java` |
+
+### Frontend
+
+| Neuer Code | Vorlage |
+|------------|---------|
+| Model | `frontend-service/src/app/models/tarif.model.ts` |
+| Service | `frontend-service/src/app/services/tarif.service.ts` |
+| List-Component | `frontend-service/src/app/components/tarif-list/` |
+| Form-Component | `frontend-service/src/app/components/tarif-form/` |
+| Service Unit Test | `frontend-service/src/app/services/tarif.service.spec.ts` |
+| Component Unit Test | `frontend-service/src/app/components/tarif-form/tarif-form.component.spec.ts` |
+| E2E Test | `frontend-service/tests/tarif-verwaltung.spec.ts` |
+
+### Umsetzungsplan
+
+| Neuer Plan | Vorlage |
+|------------|---------|
+| Feature-Umsetzungsplan | `Specs/Tarifverwaltung_Umsetzungsplan.md` |
+
 ## Specifications
 
 Feature specs are in `/Specs/`:

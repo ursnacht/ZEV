@@ -3,7 +3,7 @@
 Setze einen Umsetzungsplan schrittweise um.
 
 ## Input
-* Umsetzungsplan: $ARGUMENTS (z.B. `Specs/Tarifverwaltung_Umsetzungsplan.md`)
+* Umsetzungsplan: $ARGUMENTS (z.B. `Specs/Tarifverwaltung_Umsetzungsplan.md` oder kurz `Tarifverwaltung`)
 
 ## Vorgehen
 1. **Lies den Umsetzungsplan** - Verstehe alle Phasen und deren Status
@@ -12,17 +12,17 @@ Setze einen Umsetzungsplan schrittweise um.
 4. **Aktualisiere den Status** - Markiere die Phase mit `[x]` als erledigt
 5. **Wiederhole** - Fahre mit der nächsten Phase fort
 
-## Wichtige Regeln
-* **Keine Tests erstellen** - Tests werden separat mit anderen Commands erstellt
-* **Beachte Specs/generell.md** - Allgemeine Projekt-Konventionen einhalten
-* **Inkrementell arbeiten** - Eine Phase nach der anderen abschließen
-* **Status aktuell halten** - Umsetzungsplan nach jeder Phase aktualisieren
-
 ## Konventionen
 * **Backend:** Controller → Service → Repository → Entity Pattern
+  * Alle Texte via TranslationService
 * **Frontend:** Komponenten nutzen `@zev/design-system`, Texte via `TranslationService`
 * **Datenbank:** Flyway-Migrationen in `backend-service/src/main/resources/db/migration/`
-* **Naming:** Migrations `V[nummer]__[beschreibung].sql`
+  * **Naming:** Migrations `V[nummer]__[beschreibung].sql`
+
+## Wichtige Regeln
+* **Keine Tests erstellen** - Tests werden separat mit anderen Commands erstellt
+* **Inkrementell arbeiten** - Eine Phase nach der anderen abschliessen
+* **Status aktuell halten** - Umsetzungsplan nach jeder Phase aktualisieren
 
 ## Referenz
 * Specs/generell.md - Allgemeine Anforderungen (i18n, Design System)
