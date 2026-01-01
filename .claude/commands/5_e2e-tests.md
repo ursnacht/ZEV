@@ -34,10 +34,11 @@ Erstelle End-to-End Tests mit Playwright für komplette User Flows.
 cd frontend-service
 npm run e2e:ci      # Headless (CI)
 npm run e2e:ui      # Interaktiv mit UI
+npx playwright test tests/tarif-verwaltung.spec.ts # Einzelne Spec-Datei
 ```
 
 ## Voraussetzungen
-* Backend und Frontend müssen laufen (`docker-compose up`)
+* Backend und Frontend müssen laufen (`docker compose up`)
 * Keycloak muss erreichbar sein mit Test-User
 
 ## Referenz
