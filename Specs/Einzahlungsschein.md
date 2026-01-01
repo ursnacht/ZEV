@@ -20,27 +20,26 @@
 Der Einzahlungsschein besteht aus zwei Teilen gemäss SIX-Standard:
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                                                                             │
+┌────────────────────────────────────────────────────────────────────────────┐
+│                                                                            │
 │  ┌─────────────────────┐  ┌─────────────────────────────────────────────┐  │
-│  │    EMPFANGSSCHEIN   │  │              ZAHLTEIL                       │  │
-│  │    (62mm breit)     │  │              (148mm breit)                  │  │
+│  │  EMPFANGSSCHEIN     │  │  ZAHLTEIL        Konto / Zahlbar an         │  │
+│  │   (62mm breit)      │  │   (148mm breit)  [IBAN]                     │  │
+│  │                     │  │                  [Name]                     │  │
+│  │  Konto / Zahlbar an │  │  ┌────────────┐  [Adressen]                 │  │
+│  │  [IBAN]             │  │  │  QR-Code   │                             │  │
+│  │  [Name]             │  │  │  (46x46mm) │  Zusätzliche Informationen  │  │
+│  │  [Adresse]          │  │  │            │  [Mitteilung]               │  │
+│  │                     │  │  │            │                             │  │
+│  │  Zahlbar durch      │  │  │            │  Zahlbar durch              │  │
+│  │  [Name]             │  │  └────────────┘  [Name]                     │  │
+│  │  [Adresse]          │  │                  [Adresse]                  │  │
 │  │                     │  │                                             │  │
-│  │  Konto / Zahlbar an │  │  Währung  Betrag        ┌────────────┐     │  │
-│  │  [IBAN]             │  │  CHF      [Betrag]      │  QR-Code   │     │  │
-│  │  [Name]             │  │                         │  (46x46mm) │     │  │
-│  │  [Adresse]          │  │  Konto / Zahlbar an     └────────────┘     │  │
-│  │                     │  │  [IBAN]                                    │  │
-│  │  Zahlbar durch      │  │  [Name, Adresse]                           │  │
-│  │  [Name]             │  │                                             │  │
-│  │  [Adresse]          │  │  Zusätzliche Informationen                 │  │
-│  │                     │  │  [Mitteilung]                               │  │
-│  │  Währung   Betrag   │  │                                             │  │
-│  │  CHF       [Betrag] │  │  Zahlbar durch                              │  │
-│  │                     │  │  [Name, Adresse]                            │  │
+│  │  Währung  Betrag    │  │  Währung  Betrag                            │  │
+│  │  CHF      [Betrag]  │  │  CHF      [Betrag]                          │  │ 
 │  └─────────────────────┘  └─────────────────────────────────────────────┘  │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Elemente:**

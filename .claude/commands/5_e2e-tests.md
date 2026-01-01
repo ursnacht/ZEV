@@ -55,3 +55,8 @@ npx playwright test tests/tarif-verwaltung.spec.ts # Einzelne Spec-Datei
 ## Voraussetzungen
 * Backend und Frontend müssen laufen (`docker compose up`)
 * Keycloak muss erreichbar sein mit Test-User
+
+---
+
+## Playwright Report anzeigen
+`npx.cmd playwright show-report "C:\\data\\git\\ZEV\\frontend-service\\playwright-report"`

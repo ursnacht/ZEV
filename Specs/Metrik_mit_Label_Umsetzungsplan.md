@@ -2,14 +2,30 @@
 
 ## Zusammenfassung
 
-Die Metrik `zev.messdaten.upload.letzter_zeitpunkt` soll um ein Label `einheit` erweitert werden, das den Namen der zuletzt verwendeten Einheit enthält. Es wird nur **ein** Label-Wert gespeichert (die letzte Einheit), nicht pro Einheit separate Metriken.
+Die Metrik `zev.messdaten.upload.letzter_zeitpunkt` wird um ein Label `einheit` erweitert, das den Namen der zuletzt verwendeten Einheit enthält. Es wird nur **ein** Label-Wert gespeichert (die letzte Einheit), nicht pro Einheit separate Metriken.
 
-## Klärungen
+## Akzeptanzkriterien
 
-- **Scope:** Nur ein Label für die zuletzt verwendete Einheit
-- **Label-Wert:** Das Feld `name` der Einheit wird als Label-Wert verwendet
-- **Technik:** Bei jedem Upload wird die Gauge neu registriert mit dem aktuellen Einheit-Namen
-- **Alerting:** Kein Alerting in dieser Phase
+- [ ] Nach einem Messdaten-Upload zeigt Prometheus die Metrik mit dem korrekten Einheit-Label
+- [ ] Nach Neustart der Anwendung wird das Label aus der Datenbank geladen
+- [ ] Grafana zeigt den Zeitpunkt und den Einheit-Namen an
+- [ ] Einheit-Namen mit Sonderzeichen werden korrekt sanitisiert
+- [ ] Anleitung zum Bereinigen alter Prometheus-Daten ist dokumentiert
+
+## Annahmen & Klärungen
+
+| Frage | Antwort |
+|-------|---------|
+| Was bei leerem Einheit-Namen? | Fallback auf "unbekannt" |
+| Was bei gelöschter Einheit? | Label bleibt bis zum nächsten Upload |
+| Technik für dynamisches Label? | Gauge bei jedem Upload neu registrieren |
+| Alerting? | Nicht in dieser Phase |
+
+## Abgrenzung / Out of Scope
+
+- Separate Metriken pro Einheit (nur letzte Einheit wird gespeichert)
+- Grafana Alerting (folgt später)
+- Historisierung der Upload-Einheiten
 
 ---
 
@@ -17,10 +33,10 @@ Die Metrik `zev.messdaten.upload.letzter_zeitpunkt` soll um ein Label `einheit` 
 
 | Phase | Beschreibung | Status |
 |-------|--------------|--------|
-| 1 | Backend: MetricsService erweitern | ✅ Abgeschlossen |
-| 2 | Backend: Controller anpassen | ✅ Abgeschlossen |
-| 3 | Grafana: Dashboard anpassen | ✅ Abgeschlossen |
-| 4 | Prometheus: Alte Metrik bereinigen | ⬜ Offen (manuell) |
+| 1 | Backend: MetricsService erweitern | ⬜ Offen |
+| 2 | Backend: Controller anpassen | ⬜ Offen |
+| 3 | Grafana: Dashboard anpassen | ⬜ Offen |
+| 4 | Dokumentation: Prometheus bereinigen | ⬜ Offen |
 
 **Legende:** ⬜ Offen | 🔄 In Bearbeitung | ✅ Abgeschlossen
 
@@ -28,72 +44,36 @@ Die Metrik `zev.messdaten.upload.letzter_zeitpunkt` soll um ein Label `einheit` 
 
 ## Phase 1: Backend - MetricsService erweitern
 
+### Ziel
+Die Gauge-Metrik soll dynamisch mit einem `einheit`-Label registriert werden.
+
 ### Aufgaben
-1. **Feld für aktuellen Einheit-Namen hinzufügen**
-   - `AtomicReference<String> letzteUploadEinheit`
-
-2. **Gauge dynamisch neu registrieren**
-   - MeterRegistry als Feld speichern
-   - Bei `recordMessdatenUpload(String einheitName)`: alte Gauge entfernen, neue mit Tag registrieren
-
-3. **Persistierung erweitern**
-   - Einheit-Name zusammen mit Zeitstempel im JSON speichern
-   - Beim Laden: Einheit-Name aus JSON lesen und Gauge mit Tag registrieren
-
-4. **Sanitisierung des Einheit-Namens**
-   - Sonderzeichen entfernen/ersetzen für Prometheus-Kompatibilität
+1. Feld `AtomicReference<String> letzteUploadEinheit` hinzufügen
+2. Feld `Gauge letzterMessdatenUploadGauge` für Referenz auf aktuelle Gauge
+3. Methode `registerUploadGauge(String einheitName)` erstellen
+4. Methode `sanitizeEinheitName(String name)` erstellen
+5. Methode `recordMessdatenUpload(String einheitName)` erstellen
+6. Persistierung erweitern: Einheit-Name im JSON speichern
+7. Laden erweitern: Einheit-Name aus JSON lesen und Gauge registrieren
 
 ### Betroffene Dateien
 - `backend-service/src/main/java/ch/nacht/service/MetricsService.java`
 
-### Code-Änderungen
+### Technische Details
 
+**Gauge neu registrieren:**
 ```java
-// Neue Felder
-private final MeterRegistry meterRegistry;
-private final AtomicReference<String> letzteUploadEinheit = new AtomicReference<>(null);
-private Gauge letzterMessdatenUploadGauge;
-
-// Neue Methode
-@Transactional
-public void recordMessdatenUpload(String einheitName) {
-    long newTotal = messdatenUploadTotal.incrementAndGet();
-    Instant now = Instant.now();
-    letzterMessdatenUpload.set(now);
-
-    // Einheit-Name sanitisieren und speichern
-    String sanitizedName = sanitizeEinheitName(einheitName);
-    letzteUploadEinheit.set(sanitizedName);
-
-    // Gauge neu registrieren mit aktuellem Label
-    reRegisterUploadGauge(sanitizedName);
-
-    // Persistieren (inkl. Einheit-Name)
-    persistMetric(METRIC_MESSDATEN_UPLOAD_TOTAL, newTotal);
-    persistTimestampMetricWithEinheit(METRIC_MESSDATEN_UPLOAD_ZEITPUNKT, now, sanitizedName);
-}
-
-private void reRegisterUploadGauge(String einheitName) {
-    // Alte Gauge entfernen falls vorhanden
+private void registerUploadGauge(String einheitName) {
     if (letzterMessdatenUploadGauge != null) {
         meterRegistry.remove(letzterMessdatenUploadGauge);
     }
-    // Neue Gauge mit Label registrieren
-    letzterMessdatenUploadGauge = Gauge.builder(METRIC_MESSDATEN_UPLOAD_ZEITPUNKT, letzterMessdatenUpload,
-                    ref -> ref.get() != null ? ref.get().getEpochSecond() : 0)
+    letzterMessdatenUploadGauge = Gauge.builder(METRIC_MESSDATEN_UPLOAD_ZEITPUNKT, ...)
             .tag("einheit", einheitName)
-            .description("Unix-Timestamp des letzten Messdaten-Uploads")
             .register(meterRegistry);
-}
-
-private String sanitizeEinheitName(String name) {
-    if (name == null) return "unbekannt";
-    // Nur alphanumerische Zeichen, Leerzeichen, Punkte und Bindestriche erlauben
-    return name.replaceAll("[^a-zA-Z0-9äöüÄÖÜß .\\-]", "_");
 }
 ```
 
-### JSON-Struktur für Persistierung
+**JSON-Struktur für Persistierung:**
 ```json
 {
   "value": "2025-12-18T10:30:00",
@@ -105,33 +85,19 @@ private String sanitizeEinheitName(String name) {
 
 ## Phase 2: Backend - Controller anpassen
 
+### Ziel
+Der MesswerteController ruft beim Upload den Einheit-Namen ab und übergibt ihn an MetricsService.
+
 ### Aufgaben
-1. **EinheitService injizieren**
-2. **Einheit-Namen beim Upload abrufen**
-3. **MetricsService mit Einheit-Namen aufrufen**
+1. `EinheitService` in MesswerteController injizieren
+2. Im Upload-Endpoint: Einheit-Namen via `einheitService.getEinheitById()` abrufen
+3. `metricsService.recordMessdatenUpload(einheitName)` aufrufen
 
 ### Betroffene Dateien
 - `backend-service/src/main/java/ch/nacht/controller/MesswerteController.java`
 
-### Code-Änderungen
-
+### Code-Änderung
 ```java
-// Import hinzufügen
-import ch.nacht.entity.Einheit;
-import ch.nacht.service.EinheitService;
-
-// Feld hinzufügen
-private final EinheitService einheitService;
-
-// Konstruktor anpassen
-public MesswerteController(MesswerteService messwerteService, MetricsService metricsService,
-                           EinheitService einheitService) {
-    this.messwerteService = messwerteService;
-    this.metricsService = metricsService;
-    this.einheitService = einheitService;
-}
-
-// Im Upload-Endpoint
 String einheitName = einheitService.getEinheitById(einheitId)
         .map(Einheit::getName)
         .orElse("unbekannt");
@@ -142,84 +108,50 @@ metricsService.recordMessdatenUpload(einheitName);
 
 ## Phase 3: Grafana - Dashboard anpassen
 
+### Ziel
+Das Panel "Letzter Messdaten-Upload" zeigt zusätzlich den Einheit-Namen an.
+
 ### Aufgaben
-1. **Panel "Letzter Messdaten-Upload" anpassen**
-   - Einheit-Name aus Label anzeigen
-   - Query anpassen für Label-Extraktion
+1. Query anpassen: `legendFormat: "{{einheit}}"`
+2. Panel-Option: `textMode: "value_and_name"` für Anzeige von Wert und Label
 
 ### Betroffene Dateien
 - `grafana/provisioning/dashboards/zev-dashboard.json`
 
 ### Prometheus-Query
 ```promql
-# Zeitstempel mit Einheit-Label
 zev_messdaten_upload_letzter_zeitpunkt * 1000
-
-# Label-Wert in Grafana anzeigen via Legend: {{einheit}}
 ```
-
-### Panel-Anpassung
-- Legend Format: `{{einheit}}`
-- Oder: Transformation um Label als separate Spalte anzuzeigen
+Mit Legend Format `{{einheit}}` wird der Label-Wert angezeigt.
 
 ---
 
-## Phase 4: Prometheus - Alte Metrik bereinigen
+## Phase 4: Dokumentation - Prometheus bereinigen
 
-### Problem
-Nach der Einführung des `einheit`-Labels existiert die alte Metrik ohne Label noch in Prometheus. Dies kann zu Verwirrung führen.
+### Ziel
+Anleitung erstellen, wie die alte Metrik ohne Label aus Prometheus gelöscht wird.
 
-### Option 1: Prometheus-Volume vollständig löschen (empfohlen für Entwicklung)
+### Optionen
 
+**Option A: Prometheus-Volume löschen (Entwicklung)**
 ```bash
-# Docker-Container stoppen
 docker-compose stop prometheus
-
-# Prometheus-Volume löschen
 docker volume rm zev_prometheus-data
-
-# Prometheus neu starten
 docker-compose up -d prometheus
 ```
 
-### Option 2: Selektives Löschen über Admin API
-
-Falls die Admin API aktiviert ist:
-
+**Option B: Admin API (falls aktiviert)**
 ```bash
-# Alte Metrik ohne Label löschen
 curl -X POST -g 'http://localhost:9090/api/v1/admin/tsdb/delete_series?match[]={__name__="zev_messdaten_upload_letzter_zeitpunkt",einheit=""}'
-
-# Tombstones bereinigen
 curl -X POST http://localhost:9090/api/v1/admin/tsdb/clean_tombstones
 ```
 
-### Option 3: Admin API in Docker-Compose aktivieren
-
-Falls die Admin API nicht aktiviert ist:
-
+**Option C: Admin API aktivieren**
 ```yaml
 prometheus:
   command:
-    - '--config.file=/etc/prometheus/prometheus.yml'
-    - '--storage.tsdb.path=/prometheus'
-    - '--web.enable-lifecycle'
-    - '--web.enable-admin-api'  # Diese Zeile hinzufügen
+    - '--web.enable-admin-api'
 ```
-
----
-
-## Technische Details
-
-### Metrik-Struktur in Prometheus
-```
-zev_messdaten_upload_letzter_zeitpunkt{einheit="1. Stock li"} 1734518400
-```
-
-### Datenbank-Struktur (metriken-Tabelle)
-| name | value | zeitstempel |
-|------|-------|-------------|
-| zev.messdaten.upload.letzter_zeitpunkt | {"value":"2025-12-18T10:30:00","einheit":"1. Stock li"} | 2025-12-18 10:30:00 |
 
 ---
 
@@ -242,5 +174,16 @@ Phase 2 (Controller)
     ↓
 Phase 3 (Dashboard)
     ↓
-Phase 4 (Prometheus bereinigen)
+Phase 4 (Dokumentation)
 ```
+
+---
+
+## Testplan
+
+| Test | Typ | Beschreibung |
+|------|-----|--------------|
+| MetricsService Unit Test | Unit | `recordMessdatenUpload()` setzt Label korrekt |
+| Sanitisierung Test | Unit | Sonderzeichen werden entfernt/ersetzt |
+| Persistierung Test | Integration | Label wird in DB gespeichert und geladen |
+| E2E Upload Test | E2E | Nach Upload zeigt Grafana den Einheit-Namen |
