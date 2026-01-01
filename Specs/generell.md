@@ -62,7 +62,6 @@
 ## 5. Testing
 * Ergänze Tests wo nötig (Unit Tests, Integration Tests, End-to-End Tests)
 * Test-Pyramide beachten: Mehr Unit Tests, weniger E2E Tests
-* Siehe `Specs/AutomatisierteTests.md` für Details
 
 ## 6. Edge Cases & Fehlerbehandlung (Generelle Patterns)
 * Leere Listen: Hilfreiche Meldung anzeigen ("Keine Daten vorhanden")

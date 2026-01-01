@@ -11,6 +11,12 @@ Erstelle Unit Tests für die angegebene Angular-Komponente oder Service.
 3. **Orientiere dich an bestehenden Tests** - Nutze vorhandene Specs als Vorlage für Stil und Struktur
 4. **Erstelle Tests** für jede public Methode mit Success- und Error-Cases
 
+## Testpyramide
+* **Unit Tests:** 70-80% der Tests (dieser Command)
+* **E2E Tests:** 5-10% der Tests (separater Command)
+
+---
+
 ## Test-Anforderungen
 * **Tool:** Jasmine mit Karma
 * **Namenskonvention:** `*.spec.ts` (gleicher Ordner wie Quell-Datei)
@@ -175,12 +181,10 @@ describe('XxxComponent', () => {
 
 ---
 
-## Ausführung
-* Führe `npm test` im `frontend-service` Verzeichnis aus
-* Alle Tests müssen grün sein
+## Test-Daten & Mocking
 
-## Referenz
-* Specs/AutomatisierteTests.md
+* **Unit Tests:** Mocks für alle externen Abhängigkeiten (Services, HTTP-Calls)
+* **Fixtures:** Wiederverwendbare Testdaten als Konstanten im Test
 
 ---
 

@@ -10,35 +10,23 @@ Erstelle Unit- und Integrationstests für Backend-Code.
 2. **Prüfe existierende Tests** - Schaue ob bereits Tests existieren und was fehlt
 3. **Orientiere dich an bestehenden Tests** - Nutze vorhandene Tests als Vorlage
 
-## Test-Typen
+## Testpyramide
+* **Unit Tests:** 70-80% der Tests
+* **Integration Tests:** 15-20% der Tests
+* Unit- und Integrationstests müssen strikt voneinander getrennt ablaufen
 
-### Unit Tests (`*Test.java`)
+---
+
+## Unit Tests (`*Test.java`)
+
 * **Tool:** JUnit 5 (Jupiter) mit AssertJ
-* **Ausführung:** `mvn test` (Surefire Plugin)
+* **Namenskonvention:** `*Test.java`
+* **Ausführung:** Maven Surefire Plugin (`mvn test`)
 * **Mocking:** Mockito für alle Abhängigkeiten
-* **Scope:** Einzelne Klassen/Methoden isoliert
+* **Scope:** Einzelne Klassen/Methoden isoliert testen
 * **Fokus:** Service-Logik, Validierungen, Edge Cases
 
-### Integration Tests (`*IT.java`)
-* **Tool:** Spring Test Slices (@WebMvcTest, @DataJpaTest)
-* **Ausführung:** `mvn verify` (Failsafe Plugin)
-* **Datenbank:** Testcontainers (PostgreSQL) verwenden
-* **Scope:** Repository-Queries, Controller-Endpoints
-* **Hinweise:**
-  - @SpringBootTest vermeiden - Spring Context minimieren
-  - @MockBean sparsam einsetzen
-
-## Wann welcher Test-Typ?
-| Komponente | Unit Test | Integration Test |
-|------------|-----------|------------------|
-| Service-Logik | Ja | Nein |
-| Repository | Nein | Ja (@DataJpaTest) |
-| Controller | Optional | Ja (@WebMvcTest) |
-| Utility-Klassen | Ja | Nein |
-
-## Unit Tests für Services
-
-### Vorlage Datei-Struktur (exakt einhalten)
+### Datei-Struktur (exakt einhalten)
 
 ```java
 package ch.nacht.service;
@@ -108,14 +96,27 @@ Beispiele:
 - `deleteTarif_Exists_ReturnsTrue`
 - `deleteTarif_NotExists_ReturnsFalse`
 
-## Controller Tests
+---
 
-### Datei-Struktur (exakt einhalten)
+## Integration Tests (`*IT.java`)
+
+* **Tool:** Spring Test Slices (@WebMvcTest, @DataJpaTest, @JsonTest)
+* **Namenskonvention:** `*IT.java`
+* **Ausführung:** Maven Failsafe Plugin (`mvn verify`)
+* **Datenbank:** Testcontainers (PostgreSQL) - keine In-Memory-DB
+* **Scope:** Repository-Queries, Controller-Endpoints
+
+### Hinweise
+- @SpringBootTest vermeiden - Spring Context minimieren
+- ArgumentCaptor für komplexe Validierungen
+- @MockBean sparsam einsetzen (deutet auf Architekturproblem hin)
+- Post-Test Teardown: Testcontainer herunterfahren, Testdaten löschen
+
+### Controller Test Struktur
 
 ```java
 package ch.nacht.controller;
 
-// Imports wie oben, plus:
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -158,6 +159,17 @@ public class XxxControllerTest {
 }
 ```
 
+---
+
+## Wann welcher Test-Typ?
+
+| Komponente | Unit Test | Integration Test |
+|------------|-----------|------------------|
+| Service-Logik | Ja | Nein |
+| Repository | Nein | Ja (@DataJpaTest) |
+| Controller | Optional | Ja (@WebMvcTest) |
+| Utility-Klassen | Ja | Nein |
+
 ## Pflicht-Tests pro Endpoint
 
 | HTTP | Endpoint | Tests |
@@ -170,13 +182,19 @@ public class XxxControllerTest {
 
 ---
 
-## Ausführung
-```bash
-cd backend-service
-mvn test                        # Unit Tests
-mvn verify                      # Unit + Integration Tests
-mvn test -Dtest=TarifServiceTest  # Einzelne Testklasse
-```
+## Test-Daten & Mocking
 
-## Referenz
-* Specs/AutomatisierteTests.md
+* **Unit Tests:** Mocks für alle externen Abhängigkeiten
+* **Integration Tests:** Testcontainers mit echten Datenbank-Operationen
+* **Fixtures:** Wiederverwendbare Testdaten in separaten Dateien/Klassen
+
+---
+
+## Ausführung
+
+| Befehl | Beschreibung |
+|--------|--------------|
+| `mvn test` | Backend Unit Tests |
+| `mvn verify` | Backend Unit + Integration Tests |
+| `mvn test -Dtest=TarifServiceTest` | Einzelne Testklasse |
+| `mvn clean compile test verify` | Alles (ohne E2E) |

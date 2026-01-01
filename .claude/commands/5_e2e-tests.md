@@ -7,8 +7,15 @@ Erstelle End-to-End Tests mit Playwright für komplette User Flows.
 
 ## Vorgehen
 1. **Identifiziere User Flows** - Welche Benutzer-Szenarien sollen getestet werden?
-2. **Prüfe existierende Tests** - Schaue in `frontend-service/e2e/` nach vorhandenen Tests
+2. **Prüfe existierende Tests** - Schaue in `frontend-service/tests/` nach vorhandenen Tests
 3. **Orientiere dich an bestehenden Tests** - Nutze vorhandene Specs als Vorlage für Stil und Struktur
+
+## Testpyramide
+* **E2E Tests:** 5-10% der Tests (dieser Command)
+* **Unit Tests:** 70-80% der Tests (separater Command)
+* E2E Tests sind am aufwändigsten - nur kritische User Flows testen
+
+---
 
 ## Test-Anforderungen
 * **Tool:** Playwright
@@ -37,9 +44,14 @@ npm run e2e:ui      # Interaktiv mit UI
 npx playwright test tests/tarif-verwaltung.spec.ts # Einzelne Spec-Datei
 ```
 
+## Test-Daten
+
+* **E2E Tests:** Dedizierte Testbenutzer in Keycloak
+* **Test-User:** `testuser` / `testpassword` (zev_admin Rolle)
+* **Isolation:** Jeder Test erstellt eigene Testdaten und räumt auf
+
+---
+
 ## Voraussetzungen
 * Backend und Frontend müssen laufen (`docker compose up`)
 * Keycloak muss erreichbar sein mit Test-User
-
-## Referenz
-* Specs/AutomatisierteTests.md, Kapitel "3. Frontend Tests" → End-to-End Tests
