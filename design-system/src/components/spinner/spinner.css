@@ -1,0 +1,41 @@
+/**
+ * Spinner Component
+ * Loading indicator for async operations
+ */
+
+.zev-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-gray-200, #e5e7eb);
+  border-top-color: var(--color-primary, #3b82f6);
+  border-radius: 50%;
+  animation: zev-spin 0.8s linear infinite;
+}
+
+.zev-spinner--small {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+}
+
+.zev-spinner--large {
+  width: 32px;
+  height: 32px;
+  border-width: 3px;
+}
+
+@keyframes zev-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Spinner with text */
+.zev-spinner-container {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm, 8px);
+  color: var(--color-gray-500, #6b7280);
+  font-size: var(--font-size-sm, 0.875rem);
+}

@@ -3,6 +3,14 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Einheit } from '../models/einheit.model';
 
+export interface EinheitMatchResponse {
+  einheitId: number | null;
+  einheitName: string | null;
+  confidence: number;
+  matched: boolean;
+  message: string | null;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -29,5 +37,12 @@ export class EinheitService {
 
   deleteEinheit(id: number): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
+  }
+
+  matchEinheitByFilename(filename: string): Observable<EinheitMatchResponse> {
+    return this.http.post<EinheitMatchResponse>(
+      `${this.apiUrl}/match`,
+      { filename }
+    );
   }
 }

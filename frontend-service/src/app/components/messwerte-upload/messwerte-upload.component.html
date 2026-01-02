@@ -7,8 +7,22 @@
 
   <form (ngSubmit)="onSubmit()">
     <div class="zev-form-group">
-      <label for="einheit">{{ 'EINHEIT' | translate }}:</label>
-      <select id="einheit" class="zev-select" name="einheit" [(ngModel)]="einheitId" required>
+      <label for="einheit">
+        {{ 'EINHEIT' | translate }}:
+        <span *ngIf="isMatching" class="zev-spinner-container">
+          <span class="zev-spinner zev-spinner--small"></span>
+          {{ 'EINHEIT_WIRD_ERKANNT' | translate }}
+        </span>
+        <span *ngIf="matchResult?.matched && (matchResult?.confidence ?? 0) > 0.8"
+              class="zev-status zev-status--success">
+          {{ 'AUTOMATISCH_ERKANNT' | translate }}
+        </span>
+        <span *ngIf="matchResult?.matched && (matchResult?.confidence ?? 0) <= 0.8"
+              class="zev-status zev-status--warning">
+          {{ 'BITTE_PRUEFEN' | translate }}
+        </span>
+      </label>
+      <select id="einheit" class="zev-select" name="einheit" [(ngModel)]="einheitId" required [disabled]="isMatching">
         <option *ngFor="let einheit of einheiten" [value]="einheit.id">
           {{ einheit.name }} ({{ einheit.typ }})
         </option>
@@ -73,7 +87,7 @@
       <input type="date" id="date" class="zev-input" name="date" [(ngModel)]="date" required>
     </div>
 
-    <button type="submit" class="zev-button zev-button--primary" [disabled]="uploading || !date || !einheitId || !file">
+    <button type="submit" class="zev-button zev-button--primary" [disabled]="uploading || isMatching || !date || !einheitId || !file">
       {{ uploading ? ('UPLOADING' | translate) : ('UPLOAD' | translate) }}
     </button>
   </form>

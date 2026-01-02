@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
-import { EinheitService } from '../../services/einheit.service';
+import { EinheitService, EinheitMatchResponse } from '../../services/einheit.service';
 import { Einheit } from '../../models/einheit.model';
 import { TranslationService } from '../../services/translation.service';
 
@@ -22,8 +22,13 @@ export class MesswerteUploadComponent implements OnInit {
   file: File | null = null;
   uploading = false;
   message = '';
-  messageType: 'success' | 'error' | '' = '';
+  messageType: 'success' | 'error' | 'warning' | '' = '';
   isDragOver = false;
+
+  // KI-Matching properties
+  isMatching = false;
+  matchResult: EinheitMatchResponse | null = null;
+  private readonly CONFIDENCE_THRESHOLD = 0.8;
 
   constructor(
     private http: HttpClient,
@@ -91,6 +96,48 @@ export class MesswerteUploadComponent implements OnInit {
   private handleFile(file: File): void {
     this.file = file;
     this.extractDateFromFile(file);
+    this.matchEinheitByFilename(file.name);
+  }
+
+  private matchEinheitByFilename(filename: string): void {
+    this.isMatching = true;
+    this.matchResult = null;
+
+    this.einheitService.matchEinheitByFilename(filename).subscribe({
+      next: (result) => {
+        this.isMatching = false;
+        this.matchResult = result;
+
+        if (result.matched && result.einheitId && result.confidence > this.CONFIDENCE_THRESHOLD) {
+          // High confidence match - auto-select
+          this.einheitId = result.einheitId;
+          this.showMessage(
+            this.translationService.translate('EINHEIT_ERKANNT') + ': ' + result.einheitName,
+            'success'
+          );
+        } else if (result.matched && result.confidence <= this.CONFIDENCE_THRESHOLD) {
+          // Low confidence match - suggest but don't auto-select
+          if (result.einheitId) {
+            this.einheitId = result.einheitId;
+          }
+          this.showMessage(
+            this.translationService.translate('EINHEIT_BITTE_PRUEFEN'),
+            'warning'
+          );
+        } else if (!result.matched && result.message) {
+          // Error from backend (e.g. invalid API key, service unavailable)
+          this.showMessage(result.message, 'error');
+        }
+      },
+      error: (error) => {
+        this.isMatching = false;
+        this.matchResult = null;
+        // Show error message from HTTP error
+        const message = error.error?.message || error.message ||
+          this.translationService.translate('KI_NICHT_VERFUEGBAR');
+        this.showMessage(message, 'error');
+      }
+    });
   }
 
   removeFile(event: Event): void {
@@ -179,7 +226,7 @@ export class MesswerteUploadComponent implements OnInit {
     });
   }
 
-  private showMessage(message: string, type: 'success' | 'error'): void {
+  private showMessage(message: string, type: 'success' | 'error' | 'warning'): void {
     this.message = message;
     this.messageType = type;
     setTimeout(() => {

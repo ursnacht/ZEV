@@ -1,6 +1,9 @@
 package ch.nacht.controller;
 
+import ch.nacht.dto.EinheitMatchRequestDTO;
+import ch.nacht.dto.EinheitMatchResponseDTO;
 import ch.nacht.entity.Einheit;
+import ch.nacht.service.EinheitMatchingService;
 import ch.nacht.service.EinheitService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,9 +21,12 @@ public class EinheitController {
 
     private static final Logger log = LoggerFactory.getLogger(EinheitController.class);
     private final EinheitService einheitService;
+    private final EinheitMatchingService einheitMatchingService;
 
-    public EinheitController(EinheitService einheitService) {
+    public EinheitController(EinheitService einheitService,
+                             EinheitMatchingService einheitMatchingService) {
         this.einheitService = einheitService;
+        this.einheitMatchingService = einheitMatchingService;
         log.info("EinheitController initialized");
     }
 
@@ -79,6 +85,26 @@ public class EinheitController {
         } else {
             log.warn("Cannot delete - einheit not found with id: {}", id);
             return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PostMapping("/match")
+    public ResponseEntity<EinheitMatchResponseDTO> matchEinheit(
+            @jakarta.validation.Valid @RequestBody EinheitMatchRequestDTO request) {
+        log.info("Matching einheit by filename: {}", request.getFilename());
+        try {
+            EinheitMatchResponseDTO response =
+                    einheitMatchingService.matchEinheitByFilename(request.getFilename());
+            log.info("Match result: matched={}, einheitId={}",
+                    response.isMatched(), response.getEinheitId());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error during einheit matching: {}", e.getMessage());
+            return ResponseEntity.ok(EinheitMatchResponseDTO.builder()
+                    .matched(false)
+                    .message("KI-Service nicht verfügbar")
+                    .confidence(0.0)
+                    .build());
         }
     }
 }
