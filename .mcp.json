@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "zev-db": {
+      "command": "npx.cmd",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://postgres:postgres@localhost:5432/zev"
+      ]
+    }
+  }
+}

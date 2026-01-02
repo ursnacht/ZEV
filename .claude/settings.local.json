@@ -7,5 +7,9 @@
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "zev-db"
+  ],
+  "enableAllProjectMcpServers": true
 }
