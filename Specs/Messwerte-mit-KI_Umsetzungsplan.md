@@ -51,7 +51,7 @@ Erweiterung des Messwerte-Uploads um eine KI-basierte automatische Erkennung der
 | [x] | 7. Frontend Komponente | Upload-Komponente mit Design System Komponenten erweitern |
 | [x] | 8. Übersetzungen | Flyway-Migration für neue i18n Keys |
 | [x] | 9. Fehlerbehandlung | Backend-Exceptions im Frontend anzeigen |
-| [ ] | 10. Tests | Unit- und Integrationstests |
+| [x] | 10. Tests | Unit- und Integrationstests |
 
 ---
 
