@@ -106,7 +106,7 @@ public class EinheitMatchingService {
     }
 
     // Pattern to extract unit identifier from filename (after YYYY-MM-)
-    private static final Pattern FILENAME_PATTERN = Pattern.compile("^\\d{4}.\\d{2}.(.+?)(?:\\.csv)?$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern FILENAME_PATTERN = Pattern.compile("^\\d{2,4}.?\\d{1,2}.?(.+?)(?:\\.csv)?$", Pattern.CASE_INSENSITIVE);
 
     /**
      * Extract the unit identifier part from a filename.
@@ -128,25 +128,21 @@ public class EinheitMatchingService {
         String unitIdentifier = extractUnitIdentifier(filename);
 
         StringBuilder sb = new StringBuilder();
-        sb.append("Finde die passende Einheit anhand des Dateinamens.\n\n");
-        sb.append("WICHTIG: Der Dateiname hat das Format YYYY-MM-<einheit>.csv\n");
-        sb.append("Der relevante Teil für das Matching ist: '").append(unitIdentifier).append("'\n\n");
-
-        sb.append("Typische Abkürzungen:\n");
-        sb.append("- 'allg' oder 'allgemein' -> Allgemein\n");
-        sb.append("- 'pv' oder 'pv-anlage' -> PV-Anlage\n");
-        sb.append("- 'pv-steuerung' oder 'pv-verbrauch' -> PV-Verbrauch\n");
+        sb.append("Finde die passende Einheit anhand des Kürzels: '").append(unitIdentifier).append("'\n\n");
+        sb.append("Typische Abkürzungen sind:\n");
+        sb.append("- 'a' oder 'allg' oder 'allgemein' -> Allgemein\n");
+        sb.append("- 'pv' oder 'pv-anlage' -> PV Produktion\n");
+        sb.append("- 'pv-steuerung' oder 'pv-verbrauch' -> PV Verbrauch\n");
         sb.append("- '1-li' oder '1l' oder '1-l' oder '1-links' -> 1. Stock links\n");
         sb.append("- '1-re' oder '1r' oder '1-r' oder '1-rechts' -> 1. Stock rechts\n");
         sb.append("- 'p-li' oder 'pl' -> Parterre links\n");
         sb.append("- 'p-re' oder 'pr' oder 'p-r' -> Parterre rechts\n");
-        sb.append("- 'eg' -> Erdgeschoss\n");
-        sb.append("- 'dg' -> Dachgeschoss\n\n");
+        sb.append("- 'e' oder 'eg' -> Erdgeschoss\n");
+        sb.append("- 'd' oder 'dg' -> Dachgeschoss\n\n");
 
         sb.append("Verfügbare Einheiten:\n");
         for (Einheit e : einheiten) {
-            sb.append("- ID ").append(e.getId()).append(": ").append(e.getName());
-            sb.append(" (Typ: ").append(e.getTyp()).append(")\n");
+            sb.append("- ID ").append(e.getId()).append(": ").append(e.getName()).append("\n");
         }
 
         sb.append("\nWelche Einheit passt am besten zu '").append(unitIdentifier).append("'?\n");
