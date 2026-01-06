@@ -6,6 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ZEV (Zusammenschluss zum Eigenverbrauch) is a solar power distribution application for managing fair allocation of solar energy among consumers in a self-consumption community. Multi-module Maven project with Spring Boot backend, Angular frontend, and Keycloak authentication.
 
+## Prerequisites
+
+- Java 17+
+- Maven 3.6+
+- Node.js 18.19.1+
+- Docker & Docker Compose
+
 ## Build & Test Commands
 
 ### Full Stack
@@ -116,7 +123,7 @@ mvn test
 ### Testing Strategy
 - Unit tests: `*Test.java` (backend), `*.spec.ts` (frontend)
 - Integration tests: `*IT.java` with TestContainers
-- E2E tests: Playwright in `frontend-service/e2e/`
+- E2E tests: Playwright in `frontend-service/tests/`
 - Follow test pyramid: 70-80% unit, 15-20% integration, 5-10% E2E
 
 ### Database
@@ -201,3 +208,13 @@ Specs with `_Umsetzungsplan` suffix contain implementation plans.
 
 - `testuser` / `testpassword` (zev_admin role)
 - `user` / `password` (zev role)
+
+## Database Access
+
+Direct database access options:
+- **MCP Server**: Use the `zev-db` MCP server for SQL queries
+- **Docker**: `docker exec postgres psql -U postgres -d zev -c "SELECT ..."`
+
+## AI Integration
+
+The backend uses Spring AI with Anthropic Claude for AI-powered features (e.g., unit matching during measurement upload). Requires `ANTHROPIC_API_KEY` environment variable.
