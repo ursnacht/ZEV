@@ -131,6 +131,56 @@ mvn test
 - Migration naming: `V[number]__[description].sql`
 - Schema: `zev` (application), `keycloak` (identity)
 
+#### Entity Relationship Diagram
+
+```mermaid
+erDiagram
+    EINHEIT {
+        bigint id PK
+        varchar typ "VERBRAUCHER|ERZEUGER"
+        varchar name
+        varchar mietername
+        varchar messpunkt
+        uuid org_id "Mandant"
+    }
+
+    MESSWERTE {
+        bigint id PK
+        timestamp zeit
+        double total "Gesamtverbrauch kWh"
+        double zev "ZEV-Anteil kWh"
+        double zev_calculated "Berechneter ZEV"
+        bigint einheit_id FK
+        uuid org_id "Mandant"
+    }
+
+    TARIF {
+        bigint id PK
+        varchar bezeichnung
+        varchar tariftyp "ZEV|VNB"
+        numeric preis "CHF pro kWh"
+        date gueltig_von
+        date gueltig_bis
+        uuid org_id "Mandant"
+    }
+
+    TRANSLATION {
+        varchar key PK
+        text deutsch
+        text englisch
+    }
+
+    METRIKEN {
+        bigint id PK
+        varchar name
+        jsonb value
+        timestamp zeitstempel
+        uuid org_id "Mandant"
+    }
+
+    EINHEIT ||--o{ MESSWERTE : "hat"
+```
+
 ### Internationalization
 - All UI text via `TranslationService` (not hardcoded)
 - Translations stored in database
