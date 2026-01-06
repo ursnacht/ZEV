@@ -4,7 +4,9 @@ import ch.nacht.dto.EinheitMatchResponseDTO;
 import ch.nacht.entity.Einheit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -53,17 +55,26 @@ public class EinheitMatchingService {
         }
 
         // 2. Build prompt for Claude
-        String prompt = buildPrompt(filename, einheiten);
-        log.debug("Generated prompt: {}", prompt);
+        String systemPrompt = buildSystemPrompt(einheiten);
+        log.debug("Generated System prompt: {}", systemPrompt);
+        String userPrompt = buildUserPrompt(filename);
+        log.debug("Generated User prompt: {}", userPrompt);
 
         // 3. Call Claude API
+        // Note: Prompt caching with AnthropicCacheStrategy.SYSTEM_AND_TOOLS requires Spring AI 1.1.0+
         String response;
         try {
-            response = chatClient.prompt()
-                    .user(prompt)
+            ChatResponse chatResponse = chatClient.prompt()
+                    .system(systemPrompt)
+                    .user(userPrompt)
                     .call()
-                    .content();
+                    .chatResponse();
+
+            response = chatResponse.getResult().getOutput().getText();
             log.debug("Claude response: {}", response);
+
+            // Log token usage metadata
+            logTokenUsage(chatResponse);
         } catch (Exception e) {
             log.error("Error calling Claude API: {}", e.getMessage(), e);
             String errorMessage = extractErrorMessage(e);
@@ -76,6 +87,36 @@ public class EinheitMatchingService {
 
         // 4. Parse response and return result
         return parseResponse(response, einheiten);
+    }
+
+    /**
+     * Log token usage metadata from the ChatResponse.
+     * When Spring AI 1.1.0+ is available, this will also log cacheCreationInputTokens and cacheReadInputTokens.
+     */
+    private void logTokenUsage(ChatResponse chatResponse) {
+        try {
+            if (chatResponse.getMetadata() != null &&
+                chatResponse.getMetadata().getUsage() != null) {
+
+                var usage = chatResponse.getMetadata().getUsage();
+                log.info("Anthropic Token Usage - Input: {} tokens, Output: {} tokens",
+                        usage.getPromptTokens(),
+                        usage.getGenerationTokens());
+
+                // Try to access native usage for cache metrics (requires Spring AI 1.1.0+)
+                if (usage.getNativeUsage() != null) {
+                    Object nativeUsage = usage.getNativeUsage();
+                    if (nativeUsage instanceof AnthropicApi.Usage anthropicUsage) {
+                        log.debug("Native Anthropic Usage - Input: {}, Output: {}",
+                                anthropicUsage.inputTokens(), anthropicUsage.outputTokens());
+                        // Note: cacheCreationInputTokens() and cacheReadInputTokens()
+                        // are available in Spring AI 1.1.0+
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not read token usage metadata: {}", e.getMessage());
+        }
     }
 
     /**
@@ -124,11 +165,9 @@ public class EinheitMatchingService {
     /**
      * Build the prompt for Claude to analyze the filename.
      */
-    private String buildPrompt(String filename, List<Einheit> einheiten) {
-        String unitIdentifier = extractUnitIdentifier(filename);
-
+    private String buildSystemPrompt(List<Einheit> einheiten) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Finde die passende Einheit anhand des Kürzels: '").append(unitIdentifier).append("'\n\n");
+        sb.append("Finde die passende Einheit anhand einer Abkürzung.\n\n");
         sb.append("Typische Abkürzungen sind:\n");
         sb.append("- 'a' oder 'allg' oder 'allgemein' -> Allgemein\n");
         sb.append("- 'pv' oder 'pv-anlage' -> PV Produktion\n");
@@ -145,7 +184,15 @@ public class EinheitMatchingService {
             sb.append("- ID ").append(e.getId()).append(": ").append(e.getName()).append("\n");
         }
 
-        sb.append("\nWelche Einheit passt am besten zu '").append(unitIdentifier).append("'?\n");
+        return sb.toString();
+    }
+
+    private String buildUserPrompt(String filename) {
+        String unitIdentifier = extractUnitIdentifier(filename);
+
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("\nWelche Einheit passt am besten zur Abkürzung '").append(unitIdentifier).append("'?\n");
         sb.append("Antworte NUR mit der ID-Nummer oder 'KEINE'.");
 
         return sb.toString();

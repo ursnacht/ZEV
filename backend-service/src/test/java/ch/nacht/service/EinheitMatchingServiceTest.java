@@ -9,6 +9,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -35,6 +38,12 @@ public class EinheitMatchingServiceTest {
 
     @Mock
     private EinheitService einheitService;
+
+    @Mock
+    private ChatResponse chatResponse;
+
+    @Mock
+    private Generation generation;
 
     private EinheitMatchingService einheitMatchingService;
 
@@ -69,15 +78,22 @@ public class EinheitMatchingServiceTest {
         verify(chatClient, never()).prompt();
     }
 
+    private void setupChatClientMock(String responseText) {
+        when(chatClient.prompt()).thenReturn(requestSpec);
+        when(requestSpec.system(anyString())).thenReturn(requestSpec);
+        when(requestSpec.user(anyString())).thenReturn(requestSpec);
+        when(requestSpec.call()).thenReturn(responseSpec);
+        when(responseSpec.chatResponse()).thenReturn(chatResponse);
+        when(chatResponse.getResult()).thenReturn(generation);
+        when(generation.getOutput()).thenReturn(new AssistantMessage(responseText));
+    }
+
     @Test
     void matchEinheitByFilename_ClaudeReturnsValidId_ReturnsMatch() {
         List<Einheit> einheiten = Arrays.asList(einheit1, einheit2, einheit3);
         when(einheitService.getAllEinheiten()).thenReturn(einheiten);
 
-        when(chatClient.prompt()).thenReturn(requestSpec);
-        when(requestSpec.user(anyString())).thenReturn(requestSpec);
-        when(requestSpec.call()).thenReturn(responseSpec);
-        when(responseSpec.content()).thenReturn("2");
+        setupChatClientMock("2");
 
         EinheitMatchResponseDTO result = einheitMatchingService.matchEinheitByFilename("2025-07-1-li.csv");
 
@@ -92,10 +108,7 @@ public class EinheitMatchingServiceTest {
         List<Einheit> einheiten = Arrays.asList(einheit1, einheit2, einheit3);
         when(einheitService.getAllEinheiten()).thenReturn(einheiten);
 
-        when(chatClient.prompt()).thenReturn(requestSpec);
-        when(requestSpec.user(anyString())).thenReturn(requestSpec);
-        when(requestSpec.call()).thenReturn(responseSpec);
-        when(responseSpec.content()).thenReturn("KEINE");
+        setupChatClientMock("KEINE");
 
         EinheitMatchResponseDTO result = einheitMatchingService.matchEinheitByFilename("2025-07-unknown.csv");
 
@@ -109,10 +122,7 @@ public class EinheitMatchingServiceTest {
         List<Einheit> einheiten = Arrays.asList(einheit1, einheit2, einheit3);
         when(einheitService.getAllEinheiten()).thenReturn(einheiten);
 
-        when(chatClient.prompt()).thenReturn(requestSpec);
-        when(requestSpec.user(anyString())).thenReturn(requestSpec);
-        when(requestSpec.call()).thenReturn(responseSpec);
-        when(responseSpec.content()).thenReturn("999");
+        setupChatClientMock("999");
 
         EinheitMatchResponseDTO result = einheitMatchingService.matchEinheitByFilename("2025-07-test.csv");
 
@@ -126,10 +136,7 @@ public class EinheitMatchingServiceTest {
         List<Einheit> einheiten = Arrays.asList(einheit1, einheit2, einheit3);
         when(einheitService.getAllEinheiten()).thenReturn(einheiten);
 
-        when(chatClient.prompt()).thenReturn(requestSpec);
-        when(requestSpec.user(anyString())).thenReturn(requestSpec);
-        when(requestSpec.call()).thenReturn(responseSpec);
-        when(responseSpec.content()).thenReturn("invalid response");
+        setupChatClientMock("invalid response");
 
         EinheitMatchResponseDTO result = einheitMatchingService.matchEinheitByFilename("2025-07-test.csv");
 
@@ -144,6 +151,7 @@ public class EinheitMatchingServiceTest {
         when(einheitService.getAllEinheiten()).thenReturn(einheiten);
 
         when(chatClient.prompt()).thenReturn(requestSpec);
+        when(requestSpec.system(anyString())).thenReturn(requestSpec);
         when(requestSpec.user(anyString())).thenReturn(requestSpec);
         when(requestSpec.call()).thenThrow(new RuntimeException("Connection refused"));
 
@@ -154,14 +162,19 @@ public class EinheitMatchingServiceTest {
         assertEquals(0.0, result.getConfidence());
     }
 
+    private void setupChatClientMockForError(RuntimeException exception) {
+        when(chatClient.prompt()).thenReturn(requestSpec);
+        when(requestSpec.system(anyString())).thenReturn(requestSpec);
+        when(requestSpec.user(anyString())).thenReturn(requestSpec);
+        when(requestSpec.call()).thenThrow(exception);
+    }
+
     @Test
     void matchEinheitByFilename_InvalidApiKey_ReturnsSpecificErrorMessage() {
         List<Einheit> einheiten = Arrays.asList(einheit1, einheit2, einheit3);
         when(einheitService.getAllEinheiten()).thenReturn(einheiten);
 
-        when(chatClient.prompt()).thenReturn(requestSpec);
-        when(requestSpec.user(anyString())).thenReturn(requestSpec);
-        when(requestSpec.call()).thenThrow(new RuntimeException("Invalid API key"));
+        setupChatClientMockForError(new RuntimeException("Invalid API key"));
 
         EinheitMatchResponseDTO result = einheitMatchingService.matchEinheitByFilename("2025-07-test.csv");
 
@@ -174,9 +187,7 @@ public class EinheitMatchingServiceTest {
         List<Einheit> einheiten = Arrays.asList(einheit1, einheit2, einheit3);
         when(einheitService.getAllEinheiten()).thenReturn(einheiten);
 
-        when(chatClient.prompt()).thenReturn(requestSpec);
-        when(requestSpec.user(anyString())).thenReturn(requestSpec);
-        when(requestSpec.call()).thenThrow(new RuntimeException("Rate limit exceeded"));
+        setupChatClientMockForError(new RuntimeException("Rate limit exceeded"));
 
         EinheitMatchResponseDTO result = einheitMatchingService.matchEinheitByFilename("2025-07-test.csv");
 
@@ -189,9 +200,7 @@ public class EinheitMatchingServiceTest {
         List<Einheit> einheiten = Arrays.asList(einheit1, einheit2, einheit3);
         when(einheitService.getAllEinheiten()).thenReturn(einheiten);
 
-        when(chatClient.prompt()).thenReturn(requestSpec);
-        when(requestSpec.user(anyString())).thenReturn(requestSpec);
-        when(requestSpec.call()).thenThrow(new RuntimeException("Request timed out"));
+        setupChatClientMockForError(new RuntimeException("Request timed out"));
 
         EinheitMatchResponseDTO result = einheitMatchingService.matchEinheitByFilename("2025-07-test.csv");
 
@@ -204,9 +213,7 @@ public class EinheitMatchingServiceTest {
         List<Einheit> einheiten = Arrays.asList(einheit1, einheit2, einheit3);
         when(einheitService.getAllEinheiten()).thenReturn(einheiten);
 
-        when(chatClient.prompt()).thenReturn(requestSpec);
-        when(requestSpec.user(anyString())).thenReturn(requestSpec);
-        when(requestSpec.call()).thenThrow(new RuntimeException("Connection refused"));
+        setupChatClientMockForError(new RuntimeException("Connection refused"));
 
         EinheitMatchResponseDTO result = einheitMatchingService.matchEinheitByFilename("2025-07-test.csv");
 
@@ -219,9 +226,7 @@ public class EinheitMatchingServiceTest {
         List<Einheit> einheiten = Arrays.asList(einheit1, einheit2, einheit3);
         when(einheitService.getAllEinheiten()).thenReturn(einheiten);
 
-        when(chatClient.prompt()).thenReturn(requestSpec);
-        when(requestSpec.user(anyString())).thenReturn(requestSpec);
-        when(requestSpec.call()).thenThrow(new RuntimeException((String) null));
+        setupChatClientMockForError(new RuntimeException((String) null));
 
         EinheitMatchResponseDTO result = einheitMatchingService.matchEinheitByFilename("2025-07-test.csv");
 
@@ -234,10 +239,7 @@ public class EinheitMatchingServiceTest {
         List<Einheit> einheiten = Arrays.asList(einheit1, einheit2, einheit3);
         when(einheitService.getAllEinheiten()).thenReturn(einheiten);
 
-        when(chatClient.prompt()).thenReturn(requestSpec);
-        when(requestSpec.user(anyString())).thenReturn(requestSpec);
-        when(requestSpec.call()).thenReturn(responseSpec);
-        when(responseSpec.content()).thenReturn("1");
+        setupChatClientMock("1");
 
         EinheitMatchResponseDTO result = einheitMatchingService.matchEinheitByFilename("2025-07-allg.csv");
 
@@ -251,10 +253,7 @@ public class EinheitMatchingServiceTest {
         List<Einheit> einheiten = Arrays.asList(einheit1, einheit2, einheit3);
         when(einheitService.getAllEinheiten()).thenReturn(einheiten);
 
-        when(chatClient.prompt()).thenReturn(requestSpec);
-        when(requestSpec.user(anyString())).thenReturn(requestSpec);
-        when(requestSpec.call()).thenReturn(responseSpec);
-        when(responseSpec.content()).thenReturn("  3  ");
+        setupChatClientMock("  3  ");
 
         EinheitMatchResponseDTO result = einheitMatchingService.matchEinheitByFilename("2025-07-pv.csv");
 
@@ -268,10 +267,7 @@ public class EinheitMatchingServiceTest {
         List<Einheit> einheiten = Arrays.asList(einheit1, einheit2, einheit3);
         when(einheitService.getAllEinheiten()).thenReturn(einheiten);
 
-        when(chatClient.prompt()).thenReturn(requestSpec);
-        when(requestSpec.user(anyString())).thenReturn(requestSpec);
-        when(requestSpec.call()).thenReturn(responseSpec);
-        when(responseSpec.content()).thenReturn("keine");
+        setupChatClientMock("keine");
 
         EinheitMatchResponseDTO result = einheitMatchingService.matchEinheitByFilename("2025-07-unknown.csv");
 

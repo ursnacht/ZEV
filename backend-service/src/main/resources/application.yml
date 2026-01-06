@@ -12,6 +12,8 @@ spring:
           model: claude-haiku-4-5-20251001
           max-tokens: 100
           temperature: 0.0
+          # Prompt Caching with AnthropicCacheStrategy.SYSTEM_AND_TOOLS requires Spring AI 1.1.0+
+          # Token usage is logged in EinheitMatchingService
   boot:
     admin:
       client:

@@ -84,6 +84,7 @@
       <scope>runtime</scope>
     </dependency>
     <!-- Spring AI for Claude integration -->
+    <!-- Note: Prompt caching (AnthropicCacheStrategy) requires version 1.1.0+ when available -->
     <dependency>
       <groupId>org.springframework.ai</groupId>
       <artifactId>spring-ai-anthropic-spring-boot-starter</artifactId>
