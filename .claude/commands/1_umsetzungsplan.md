@@ -1,4 +1,4 @@
-# Umsetzungsplan
+# Erstelle Umsetzungsplan
 
 Erstelle einen detaillierten Umsetzungsplan für eine Spezifikation.
 
@@ -23,17 +23,17 @@ Erstelle einen detaillierten Umsetzungsplan für eine Spezifikation.
 ### Phasen-Tabelle Format
 
 ```markdown
-| Status | Phase | Beschreibung |
-|--------|-------|--------------|
-| [ ] | 1. DB-Migration | Flyway-Migration für neue Tabelle |
-| [ ] | 2. Backend-Entity | Entity und Repository erstellen |
-| [ ] | 3. Backend-Service | Service-Logik implementieren |
-| [ ] | 4. Backend-Controller | REST-Endpunkte erstellen |
-| [ ] | 5. Frontend-Service | Angular-Service für API-Calls |
-| [ ] | 6. Frontend Komponenten | Model, Service und Komponenten erstellen |
-| [ ] | 7. Routing | Änderung in: `frontend-service/src/app/app.routes.ts` |
-| [ ] | 8. Navigation | Änderung in: `frontend-service/src/app/app.component.html` |
-| [ ] | 9. Übersetzungen | Datei: `backend-service/src/main/resources/db/migration/V[XX]__Add_[Feature]_Translations.sql` |
+| Status | Phase                   | Beschreibung                                                                                   |
+|--------|-------------------------|------------------------------------------------------------------------------------------------|
+|  [ ]   | 1. DB-Migration         | Flyway-Migration für neue Tabelle                                                              |
+|  [ ]   | 2. Backend-Entity       | Entity und Repository erstellen                                                                |
+|  [ ]   | 3. Backend-Service      | Service-Logik implementieren                                                                   |
+|  [ ]   | 4. Backend-Controller   | REST-Endpunkte erstellen                                                                       |
+|  [ ]   | 5. Frontend-Service     | Angular-Service für API-Calls                                                                  |
+|  [ ]   | 6. Frontend Komponenten | Model, Service und Komponenten erstellen                                                       |
+|  [ ]   | 7. Routing              | Änderung in: `frontend-service/src/app/app.routes.ts`                                          |
+|  [ ]   | 8. Navigation           | Änderung in: `frontend-service/src/app/app.component.html`                                     |
+|  [ ]   | 9. Übersetzungen        | Datei: `backend-service/src/main/resources/db/migration/V[XX]__Add_[Feature]_Translations.sql` |
 ```
 
 #### Hinweise
@@ -44,16 +44,16 @@ Erstelle einen detaillierten Umsetzungsplan für eine Spezifikation.
 ## Konventionen
 
 ### Dateinamen
-| Typ | Muster                                                  |
-|-----|---------------------------------------------------------|
-| Flyway | `V[XX]__[Snake_Case_Beschreibung].sql`                  |
-| Entity | `/entity/[PascalCase].java`                             |
-| Repository | `/repository/[Name]Repository.java`                     |
-| Service | `/service/[Name]Service.java`                           |
-| Controller | `/controller/[Name]Controller.java`                     |
-| Angular Model | `frontend-service/src/app/models/[kebab-case].model.ts` |
-| Angular Service | `frontend-service/src/app/services/[kebab-case].service.ts`                 |
-| Angular Component | `frontend-service/src/app/componentens/[kebab-case].component.ts`           |
+| Typ | Muster                                                                          |
+|-----|---------------------------------------------------------------------------------|
+| Flyway | `V[XX]__[Snake_Case_Beschreibung].sql`                                       |
+| Entity | `/entity/[PascalCase].java`                                                  |
+| Repository | `/repository/[Name]Repository.java`                                      |
+| Service | `/service/[Name]Service.java`                                               |
+| Controller | `/controller/[Name]Controller.java`                                      |
+| Angular Model | `frontend-service/src/app/models/[kebab-case].model.ts`               |
+| Angular Service | `frontend-service/src/app/services/[kebab-case].service.ts`         |
+| Angular Component | `frontend-service/src/app/componentens/[kebab-case].component.ts` |
 
 ---
 
