@@ -65,7 +65,7 @@ Die Präsentation muss folgende Themen abdecken:
 
 ### FR-3: Layout & Design
 * Verwende die Farben von ZEV/design-system
-* Code-Blöcke mit Java-Syntax-Highlighting in heller Farbe mit guten Kontrast für Präsentation
+* Code-Blöcke mit Java-Syntax-Highlighting in heller Farbe mit gutem Kontrast für Präsentation
 * Tabellen für strukturierte Informationen
 * Diagramme wo sinnvoll (ASCII/Mermaid)
 
