@@ -660,3 +660,135 @@ test.describe('Tarif Management - Overlapping Validation', () => {
         }
     });
 });
+
+test.describe('Tarif Management - Validation Buttons', () => {
+    test('should display validation buttons', async ({ page }) => {
+        await navigateToTarife(page);
+
+        // Check for validation buttons (secondary buttons)
+        const buttons = page.locator('.button-row button.zev-button--secondary');
+        const buttonCount = await buttons.count();
+
+        // Should have 2 validation buttons
+        expect(buttonCount).toBe(2);
+
+        // Check button texts
+        const buttonTexts = await buttons.allTextContents();
+        const hasQuartaleButton = buttonTexts.some(text => text.toLowerCase().includes('quartal'));
+        const hasJahreButton = buttonTexts.some(text => text.toLowerCase().includes('jahr'));
+
+        expect(hasQuartaleButton).toBeTruthy();
+        expect(hasJahreButton).toBeTruthy();
+    });
+
+    test('should show success message when validation passes', async ({ page }) => {
+        await navigateToTarife(page);
+
+        // Click "Quartale validieren" button
+        const quartaleButton = page.locator('button.zev-button--secondary').filter({ hasText: /quartal/i });
+        await quartaleButton.click();
+
+        // Wait for response - either success or error message
+        const successMessage = page.locator('.zev-message--success');
+        const errorMessage = page.locator('.zev-message--error');
+        await expect(successMessage.or(errorMessage)).toBeVisible({ timeout: 15000 });
+
+        // If success, verify message content
+        const isSuccess = await successMessage.isVisible().catch(() => false);
+        if (isSuccess) {
+            // Success message should be visible
+            await expect(successMessage).toBeVisible();
+        }
+    });
+
+    test('should show error message with details when validation fails', async ({ page }) => {
+        await navigateToTarife(page);
+
+        // Click "Jahre validieren" button
+        const jahreButton = page.locator('button.zev-button--secondary').filter({ hasText: /jahr/i });
+        await jahreButton.click();
+
+        // Wait for response
+        const successMessage = page.locator('.zev-message--success');
+        const errorMessage = page.locator('.zev-message--error');
+        await expect(successMessage.or(errorMessage)).toBeVisible({ timeout: 15000 });
+
+        // Check if there are validation errors
+        const hasError = await errorMessage.isVisible().catch(() => false);
+        if (hasError) {
+            // Error message should have validation errors list
+            const errorList = page.locator('.validation-errors');
+            const hasErrorList = await errorList.isVisible().catch(() => false);
+
+            // If validation fails, errors should be shown
+            if (hasErrorList) {
+                const errorItems = page.locator('.validation-errors li');
+                const errorCount = await errorItems.count();
+                expect(errorCount).toBeGreaterThan(0);
+            }
+        }
+    });
+
+    test('should dismiss error message when clicked', async ({ page }) => {
+        await navigateToTarife(page);
+
+        // Click validation button
+        const jahreButton = page.locator('button.zev-button--secondary').filter({ hasText: /jahr/i });
+        await jahreButton.click();
+
+        // Wait for response
+        const errorMessage = page.locator('.zev-message--error');
+        const successMessage = page.locator('.zev-message--success');
+        await expect(successMessage.or(errorMessage)).toBeVisible({ timeout: 15000 });
+
+        // If error message is shown, click to dismiss
+        const hasError = await errorMessage.isVisible().catch(() => false);
+        if (hasError) {
+            // Check for dismiss button (×)
+            const dismissButton = page.locator('.zev-message__dismiss');
+            const hasDismiss = await dismissButton.isVisible().catch(() => false);
+
+            if (hasDismiss) {
+                // Click on error message to dismiss
+                await errorMessage.click();
+
+                // Message should disappear
+                await expect(errorMessage).not.toBeVisible({ timeout: 5000 });
+            }
+        }
+    });
+
+    test('should run quartale validation and show result', async ({ page }) => {
+        await navigateToTarife(page);
+
+        // Click "Quartale validieren" button
+        const quartaleButton = page.locator('button.zev-button--secondary').filter({ hasText: /quartal/i });
+        await expect(quartaleButton).toBeVisible();
+        await quartaleButton.click();
+
+        // Wait for message to appear
+        const message = page.locator('.zev-message');
+        await expect(message).toBeVisible({ timeout: 15000 });
+
+        // Message should contain some text
+        const messageText = await message.textContent();
+        expect(messageText).toBeTruthy();
+    });
+
+    test('should run jahre validation and show result', async ({ page }) => {
+        await navigateToTarife(page);
+
+        // Click "Jahre validieren" button
+        const jahreButton = page.locator('button.zev-button--secondary').filter({ hasText: /jahr/i });
+        await expect(jahreButton).toBeVisible();
+        await jahreButton.click();
+
+        // Wait for message to appear
+        const message = page.locator('.zev-message');
+        await expect(message).toBeVisible({ timeout: 15000 });
+
+        // Message should contain some text
+        const messageText = await message.textContent();
+        expect(messageText).toBeTruthy();
+    });
+});

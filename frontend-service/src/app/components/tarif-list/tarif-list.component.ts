@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TarifService } from '../../services/tarif.service';
-import { Tarif, TarifTyp } from '../../models/tarif.model';
+import { Tarif, TarifTyp, ValidationResult } from '../../models/tarif.model';
 import { TarifFormComponent } from '../tarif-form/tarif-form.component';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
@@ -20,6 +20,8 @@ export class TarifListComponent implements OnInit {
   showForm = false;
   message = '';
   messageType: 'success' | 'error' = 'success';
+  messagePersistent = false;
+  validationErrors: string[] = [];
   sortColumn: 'bezeichnung' | 'tariftyp' | 'preis' | 'gueltigVon' | 'gueltigBis' | null = 'tariftyp';
   sortDirection: 'asc' | 'desc' = 'asc';
 
@@ -162,11 +164,45 @@ export class TarifListComponent implements OnInit {
     return typ === TarifTyp.ZEV ? 'ZEV (Solarstrom)' : 'VNB (Netzstrom)';
   }
 
-  private showMessage(message: string, type: 'success' | 'error'): void {
+  onValidateQuartale(): void {
+    this.tarifService.validateQuartale().subscribe({
+      next: (result) => this.handleValidationResult(result),
+      error: () => this.showMessage('FEHLER_VALIDIERUNG', 'error')
+    });
+  }
+
+  onValidateJahre(): void {
+    this.tarifService.validateJahre().subscribe({
+      next: (result) => this.handleValidationResult(result),
+      error: () => this.showMessage('FEHLER_VALIDIERUNG', 'error')
+    });
+  }
+
+  private handleValidationResult(result: ValidationResult): void {
+    if (result.valid) {
+      this.showMessage('VALIDIERUNG_ERFOLGREICH', 'success');
+      this.validationErrors = [];
+    } else {
+      this.showMessage('VALIDIERUNG_FEHLER', 'error', true);
+      this.validationErrors = result.errors;
+    }
+  }
+
+  dismissMessage(): void {
+    this.message = '';
+    this.validationErrors = [];
+    this.messagePersistent = false;
+  }
+
+  private showMessage(message: string, type: 'success' | 'error', persistent: boolean = false): void {
     this.message = message;
     this.messageType = type;
-    setTimeout(() => {
-      this.message = '';
-    }, 5000);
+    this.messagePersistent = persistent;
+    if (!persistent) {
+      this.validationErrors = [];
+      setTimeout(() => {
+        this.message = '';
+      }, 5000);
+    }
   }
 }

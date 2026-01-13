@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Tarif } from '../models/tarif.model';
+import { Tarif, ValidationResult } from '../models/tarif.model';
 
 @Injectable({
   providedIn: 'root'
@@ -29,5 +29,13 @@ export class TarifService {
 
   deleteTarif(id: number): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
+  }
+
+  validateQuartale(): Observable<ValidationResult> {
+    return this.http.post<ValidationResult>(`${this.apiUrl}/validate?modus=quartale`, {});
+  }
+
+  validateJahre(): Observable<ValidationResult> {
+    return this.http.post<ValidationResult>(`${this.apiUrl}/validate?modus=jahre`, {});
   }
 }

@@ -94,4 +94,20 @@ public class TarifController {
             return ResponseEntity.notFound().build();
         }
     }
+
+    @PostMapping("/validate")
+    public ResponseEntity<TarifService.ValidationResult> validateTarife(
+            @RequestParam(defaultValue = "quartale") String modus) {
+        log.info("Validating tarife with modus: {}", modus);
+
+        TarifService.ValidationResult result;
+        if ("jahre".equalsIgnoreCase(modus)) {
+            result = tarifService.validateJahre();
+        } else {
+            result = tarifService.validateQuartale();
+        }
+
+        log.info("Validation result: valid={}, errors={}", result.valid(), result.errors().size());
+        return ResponseEntity.ok(result);
+    }
 }

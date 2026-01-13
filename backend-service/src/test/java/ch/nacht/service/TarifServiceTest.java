@@ -17,6 +17,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -320,5 +323,217 @@ public class TarifServiceTest {
             .thenReturn(Collections.singletonList(vnbTarif2024));
 
         assertDoesNotThrow(() -> tarifService.validateTarifAbdeckung(von, bis));
+    }
+
+    // ==================== validateQuartale Tests ====================
+
+    @Test
+    void validateQuartale_NoTarife_ReturnsValidWithMessage() {
+        when(tarifRepository.findAllByOrderByTariftypAscGueltigVonDesc())
+            .thenReturn(Collections.emptyList());
+
+        TarifService.ValidationResult result = tarifService.validateQuartale();
+
+        assertTrue(result.valid());
+        assertEquals("Keine Tarife vorhanden", result.message());
+        assertTrue(result.errors().isEmpty());
+    }
+
+    @Test
+    void validateQuartale_FullCoverage_ReturnsValid() {
+        when(tarifRepository.findAllByOrderByTariftypAscGueltigVonDesc())
+            .thenReturn(Arrays.asList(zevTarif2024, vnbTarif2024));
+
+        // Mock coverage for all quarters
+        when(tarifRepository.findByTariftypAndZeitraumOverlapping(eq(TarifTyp.ZEV), any(), any()))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(tarifRepository.findByTariftypAndZeitraumOverlapping(eq(TarifTyp.VNB), any(), any()))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+
+        TarifService.ValidationResult result = tarifService.validateQuartale();
+
+        assertTrue(result.valid());
+        assertEquals("Alle Quartale sind vollständig abgedeckt", result.message());
+        assertTrue(result.errors().isEmpty());
+    }
+
+    @Test
+    void validateQuartale_MissingTarifInQuarter_ReturnsInvalidWithErrors() {
+        // Only ZEV tarif for Q1
+        Tarif zevQ1 = new Tarif(
+            "ZEV Q1",
+            TarifTyp.ZEV,
+            new BigDecimal("0.20000"),
+            LocalDate.of(2024, 1, 1),
+            LocalDate.of(2024, 3, 31)
+        );
+
+        when(tarifRepository.findAllByOrderByTariftypAscGueltigVonDesc())
+            .thenReturn(Collections.singletonList(zevQ1));
+
+        // ZEV covered, VNB missing
+        when(tarifRepository.findByTariftypAndZeitraumOverlapping(eq(TarifTyp.ZEV), any(), any()))
+            .thenReturn(Collections.singletonList(zevQ1));
+        when(tarifRepository.findByTariftypAndZeitraumOverlapping(eq(TarifTyp.VNB), any(), any()))
+            .thenReturn(Collections.emptyList());
+
+        TarifService.ValidationResult result = tarifService.validateQuartale();
+
+        assertFalse(result.valid());
+        assertEquals("Validierungsfehler", result.message());
+        assertFalse(result.errors().isEmpty());
+        assertThat(result.errors().get(0), containsString("Q1/2024"));
+        assertThat(result.errors().get(0), containsString("VNB"));
+    }
+
+    @Test
+    void validateQuartale_GapInQuarter_ReturnsInvalidWithErrors() {
+        // ZEV tarif only covers first half of Q1
+        Tarif zevPartial = new Tarif(
+            "ZEV Partial",
+            TarifTyp.ZEV,
+            new BigDecimal("0.20000"),
+            LocalDate.of(2024, 1, 1),
+            LocalDate.of(2024, 2, 15)
+        );
+
+        when(tarifRepository.findAllByOrderByTariftypAscGueltigVonDesc())
+            .thenReturn(Arrays.asList(zevPartial, vnbTarif2024));
+
+        // ZEV has gap, VNB full coverage
+        when(tarifRepository.findByTariftypAndZeitraumOverlapping(eq(TarifTyp.ZEV), any(), any()))
+            .thenReturn(Collections.singletonList(zevPartial));
+        when(tarifRepository.findByTariftypAndZeitraumOverlapping(eq(TarifTyp.VNB), any(), any()))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+
+        TarifService.ValidationResult result = tarifService.validateQuartale();
+
+        assertFalse(result.valid());
+        assertFalse(result.errors().isEmpty());
+        assertThat(result.errors().get(0), containsString("ZEV"));
+    }
+
+    // ==================== validateJahre Tests ====================
+
+    @Test
+    void validateJahre_NoTarife_ReturnsValidWithMessage() {
+        when(tarifRepository.findDistinctYears())
+            .thenReturn(Collections.emptyList());
+
+        TarifService.ValidationResult result = tarifService.validateJahre();
+
+        assertTrue(result.valid());
+        assertEquals("Keine Tarife vorhanden", result.message());
+        assertTrue(result.errors().isEmpty());
+    }
+
+    @Test
+    void validateJahre_FullCoverage_ReturnsValid() {
+        when(tarifRepository.findDistinctYears())
+            .thenReturn(Collections.singletonList(2024));
+
+        // Mock full year coverage
+        when(tarifRepository.findByTariftypAndZeitraumOverlapping(
+            eq(TarifTyp.ZEV),
+            eq(LocalDate.of(2024, 1, 1)),
+            eq(LocalDate.of(2024, 12, 31))))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(tarifRepository.findByTariftypAndZeitraumOverlapping(
+            eq(TarifTyp.VNB),
+            eq(LocalDate.of(2024, 1, 1)),
+            eq(LocalDate.of(2024, 12, 31))))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+
+        TarifService.ValidationResult result = tarifService.validateJahre();
+
+        assertTrue(result.valid());
+        assertEquals("Alle Jahre sind vollständig abgedeckt", result.message());
+        assertTrue(result.errors().isEmpty());
+    }
+
+    @Test
+    void validateJahre_MissingTarifInYear_ReturnsInvalidWithErrors() {
+        when(tarifRepository.findDistinctYears())
+            .thenReturn(Collections.singletonList(2024));
+
+        // ZEV covered, VNB missing
+        when(tarifRepository.findByTariftypAndZeitraumOverlapping(
+            eq(TarifTyp.ZEV),
+            eq(LocalDate.of(2024, 1, 1)),
+            eq(LocalDate.of(2024, 12, 31))))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(tarifRepository.findByTariftypAndZeitraumOverlapping(
+            eq(TarifTyp.VNB),
+            eq(LocalDate.of(2024, 1, 1)),
+            eq(LocalDate.of(2024, 12, 31))))
+            .thenReturn(Collections.emptyList());
+
+        TarifService.ValidationResult result = tarifService.validateJahre();
+
+        assertFalse(result.valid());
+        assertEquals("Validierungsfehler", result.message());
+        assertFalse(result.errors().isEmpty());
+        assertThat(result.errors().get(0), containsString("2024"));
+        assertThat(result.errors().get(0), containsString("VNB"));
+    }
+
+    @Test
+    void validateJahre_MultipleYears_ChecksAllYears() {
+        when(tarifRepository.findDistinctYears())
+            .thenReturn(Arrays.asList(2024, 2025));
+
+        // 2024 fully covered
+        when(tarifRepository.findByTariftypAndZeitraumOverlapping(
+            eq(TarifTyp.ZEV),
+            eq(LocalDate.of(2024, 1, 1)),
+            eq(LocalDate.of(2024, 12, 31))))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(tarifRepository.findByTariftypAndZeitraumOverlapping(
+            eq(TarifTyp.VNB),
+            eq(LocalDate.of(2024, 1, 1)),
+            eq(LocalDate.of(2024, 12, 31))))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+
+        // 2025 missing both tariffs
+        when(tarifRepository.findByTariftypAndZeitraumOverlapping(
+            eq(TarifTyp.ZEV),
+            eq(LocalDate.of(2025, 1, 1)),
+            eq(LocalDate.of(2025, 12, 31))))
+            .thenReturn(Collections.emptyList());
+        when(tarifRepository.findByTariftypAndZeitraumOverlapping(
+            eq(TarifTyp.VNB),
+            eq(LocalDate.of(2025, 1, 1)),
+            eq(LocalDate.of(2025, 12, 31))))
+            .thenReturn(Collections.emptyList());
+
+        TarifService.ValidationResult result = tarifService.validateJahre();
+
+        assertFalse(result.valid());
+        assertFalse(result.errors().isEmpty());
+        assertThat(result.errors().get(0), containsString("2025"));
+    }
+
+    @Test
+    void validateJahre_DateFormatIsSwiss() {
+        when(tarifRepository.findDistinctYears())
+            .thenReturn(Collections.singletonList(2024));
+
+        // ZEV missing
+        when(tarifRepository.findByTariftypAndZeitraumOverlapping(
+            eq(TarifTyp.ZEV),
+            eq(LocalDate.of(2024, 1, 1)),
+            eq(LocalDate.of(2024, 12, 31))))
+            .thenReturn(Collections.emptyList());
+        when(tarifRepository.findByTariftypAndZeitraumOverlapping(
+            eq(TarifTyp.VNB),
+            eq(LocalDate.of(2024, 1, 1)),
+            eq(LocalDate.of(2024, 12, 31))))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+
+        TarifService.ValidationResult result = tarifService.validateJahre();
+
+        assertFalse(result.valid());
+        // Check date format is dd.MM.yyyy (Swiss format)
+        assertThat(result.errors().get(0), containsString("01.01.2024"));
     }
 }

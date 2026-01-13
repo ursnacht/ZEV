@@ -9,9 +9,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Service for managing tariffs.
@@ -204,13 +207,133 @@ public class TarifService {
         return gaps;
     }
 
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+
     /**
-     * Format date gaps for error message.
+     * Format date gaps for error message using Swiss date format (dd.MM.yyyy).
      */
     private String formatDateGaps(List<LocalDate> gaps) {
         if (gaps.size() == 1) {
-            return gaps.get(0).toString();
+            return gaps.get(0).format(DATE_FORMATTER);
         }
-        return gaps.get(0) + " (und weitere)";
+        return gaps.get(0).format(DATE_FORMATTER) + " (und weitere)";
     }
+
+    /**
+     * Validate tariff coverage for all quarters that have at least one tariff.
+     *
+     * @return ValidationResult with status and error messages
+     */
+    @Transactional(readOnly = true)
+    public ValidationResult validateQuartale() {
+        hibernateFilterService.enableOrgFilter();
+        log.info("Validating tariff coverage for all quarters");
+
+        List<Tarif> alleTarife = tarifRepository.findAllByOrderByTariftypAscGueltigVonDesc();
+        if (alleTarife.isEmpty()) {
+            return new ValidationResult(true, "Keine Tarife vorhanden", List.of());
+        }
+
+        Set<String> quartalsToCheck = new HashSet<>();
+        for (Tarif tarif : alleTarife) {
+            addQuartalsForTarif(tarif, quartalsToCheck);
+        }
+
+        List<String> errors = new ArrayList<>();
+        for (String quartal : quartalsToCheck.stream().sorted().toList()) {
+            String[] parts = quartal.split("/");
+            int q = Integer.parseInt(parts[0].substring(1));
+            int year = Integer.parseInt(parts[1]);
+
+            LocalDate von = getQuartalStart(q, year);
+            LocalDate bis = getQuartalEnd(q, year);
+
+            try {
+                validateTarifAbdeckung(von, bis);
+            } catch (IllegalStateException e) {
+                errors.add(quartal + ": " + e.getMessage().replace("Für den Zeitraum fehlen gültige Tarife: ", ""));
+            }
+        }
+
+        if (errors.isEmpty()) {
+            log.info("Quarter validation successful");
+            return new ValidationResult(true, "Alle Quartale sind vollständig abgedeckt", List.of());
+        } else {
+            log.warn("Quarter validation found {} errors", errors.size());
+            return new ValidationResult(false, "Validierungsfehler", errors);
+        }
+    }
+
+    /**
+     * Validate tariff coverage for all years that have at least one tariff.
+     *
+     * @return ValidationResult with status and error messages
+     */
+    @Transactional(readOnly = true)
+    public ValidationResult validateJahre() {
+        hibernateFilterService.enableOrgFilter();
+        log.info("Validating tariff coverage for all years");
+
+        List<Integer> years = tarifRepository.findDistinctYears();
+        if (years.isEmpty()) {
+            return new ValidationResult(true, "Keine Tarife vorhanden", List.of());
+        }
+
+        List<String> errors = new ArrayList<>();
+        for (Integer year : years) {
+            LocalDate von = LocalDate.of(year, 1, 1);
+            LocalDate bis = LocalDate.of(year, 12, 31);
+
+            try {
+                validateTarifAbdeckung(von, bis);
+            } catch (IllegalStateException e) {
+                errors.add(year + ": " + e.getMessage().replace("Für den Zeitraum fehlen gültige Tarife: ", ""));
+            }
+        }
+
+        if (errors.isEmpty()) {
+            log.info("Year validation successful");
+            return new ValidationResult(true, "Alle Jahre sind vollständig abgedeckt", List.of());
+        } else {
+            log.warn("Year validation found {} errors", errors.size());
+            return new ValidationResult(false, "Validierungsfehler", errors);
+        }
+    }
+
+    private void addQuartalsForTarif(Tarif tarif, Set<String> quartals) {
+        LocalDate von = tarif.getGueltigVon();
+        LocalDate bis = tarif.getGueltigBis();
+
+        LocalDate current = von;
+        while (!current.isAfter(bis)) {
+            int q = (current.getMonthValue() - 1) / 3 + 1;
+            quartals.add("Q" + q + "/" + current.getYear());
+            current = getQuartalEnd(q, current.getYear()).plusDays(1);
+        }
+    }
+
+    private LocalDate getQuartalStart(int q, int year) {
+        return switch (q) {
+            case 1 -> LocalDate.of(year, 1, 1);
+            case 2 -> LocalDate.of(year, 4, 1);
+            case 3 -> LocalDate.of(year, 7, 1);
+            case 4 -> LocalDate.of(year, 10, 1);
+            default -> throw new IllegalArgumentException("Invalid quarter: " + q);
+        };
+    }
+
+    private LocalDate getQuartalEnd(int q, int year) {
+        return switch (q) {
+            case 1 -> LocalDate.of(year, 3, 31);
+            case 2 -> LocalDate.of(year, 6, 30);
+            case 3 -> LocalDate.of(year, 9, 30);
+            case 4 -> LocalDate.of(year, 12, 31);
+            default -> throw new IllegalArgumentException("Invalid quarter: " + q);
+        };
+    }
+
+    /**
+     * Result of tariff validation.
+     */
+    public record ValidationResult(boolean valid, String message, List<String> errors) {}
 }

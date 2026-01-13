@@ -1,12 +1,21 @@
 <div class="zev-container">
   <h1>{{ 'TARIFE_VERWALTUNG' | translate }}</h1>
 
-  <div *ngIf="message" class="zev-message" [ngClass]="'zev-message--' + messageType">
-    {{ message | translate }}
+  <div *ngIf="message" class="zev-message" [ngClass]="'zev-message--' + messageType"
+       [class.zev-message--clickable]="messagePersistent" (click)="messagePersistent && dismissMessage()">
+    <span>{{ message | translate }}</span>
+    <ul *ngIf="validationErrors.length > 0" class="validation-errors">
+      <li *ngFor="let error of validationErrors">{{ error }}</li>
+    </ul>
+    <span *ngIf="messagePersistent" class="zev-message__dismiss">&times;</span>
   </div>
 
   <div *ngIf="!showForm">
-    <button class="zev-button zev-button--primary" (click)="onCreateNew()">{{ 'NEUER_TARIF_ERSTELLEN' | translate }}</button>
+    <div class="button-row">
+      <button class="zev-button zev-button--primary" (click)="onCreateNew()">{{ 'NEUER_TARIF_ERSTELLEN' | translate }}</button>
+      <button class="zev-button zev-button--secondary" (click)="onValidateQuartale()">{{ 'QUARTALE_VALIDIEREN' | translate }}</button>
+      <button class="zev-button zev-button--secondary" (click)="onValidateJahre()">{{ 'JAHRE_VALIDIEREN' | translate }}</button>
+    </div>
 
     <table class="zev-table" *ngIf="tarife.length > 0">
       <thead>

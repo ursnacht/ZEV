@@ -18,6 +18,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.hasSize;
@@ -227,5 +229,98 @@ public class TarifControllerTest {
 
         mockMvc.perform(delete("/api/tarife/999"))
             .andExpect(status().isNotFound());
+    }
+
+    // ==================== Validation Endpoint Tests ====================
+
+    @Test
+    void validateTarife_QuartaleMode_ReturnsValidResult() throws Exception {
+        TarifService.ValidationResult validResult = new TarifService.ValidationResult(
+            true,
+            "Alle Quartale sind vollständig abgedeckt",
+            Collections.emptyList()
+        );
+        when(tarifService.validateQuartale()).thenReturn(validResult);
+
+        mockMvc.perform(post("/api/tarife/validate?modus=quartale"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.valid", is(true)))
+            .andExpect(jsonPath("$.message", is("Alle Quartale sind vollständig abgedeckt")))
+            .andExpect(jsonPath("$.errors", hasSize(0)));
+
+        verify(tarifService).validateQuartale();
+        verify(tarifService, never()).validateJahre();
+    }
+
+    @Test
+    void validateTarife_JahreMode_ReturnsValidResult() throws Exception {
+        TarifService.ValidationResult validResult = new TarifService.ValidationResult(
+            true,
+            "Alle Jahre sind vollständig abgedeckt",
+            Collections.emptyList()
+        );
+        when(tarifService.validateJahre()).thenReturn(validResult);
+
+        mockMvc.perform(post("/api/tarife/validate?modus=jahre"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.valid", is(true)))
+            .andExpect(jsonPath("$.message", is("Alle Jahre sind vollständig abgedeckt")))
+            .andExpect(jsonPath("$.errors", hasSize(0)));
+
+        verify(tarifService).validateJahre();
+        verify(tarifService, never()).validateQuartale();
+    }
+
+    @Test
+    void validateTarife_DefaultMode_UsesQuartale() throws Exception {
+        TarifService.ValidationResult validResult = new TarifService.ValidationResult(
+            true,
+            "Alle Quartale sind vollständig abgedeckt",
+            Collections.emptyList()
+        );
+        when(tarifService.validateQuartale()).thenReturn(validResult);
+
+        mockMvc.perform(post("/api/tarife/validate"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.valid", is(true)));
+
+        verify(tarifService).validateQuartale();
+    }
+
+    @Test
+    void validateTarife_ValidationErrors_ReturnsErrorsInResponse() throws Exception {
+        List<String> errors = Arrays.asList(
+            "Q1/2024: VNB-Tarif fehlt für: 01.01.2024",
+            "Q2/2024: ZEV-Tarif fehlt für: 01.04.2024"
+        );
+        TarifService.ValidationResult invalidResult = new TarifService.ValidationResult(
+            false,
+            "Validierungsfehler",
+            errors
+        );
+        when(tarifService.validateQuartale()).thenReturn(invalidResult);
+
+        mockMvc.perform(post("/api/tarife/validate?modus=quartale"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.valid", is(false)))
+            .andExpect(jsonPath("$.message", is("Validierungsfehler")))
+            .andExpect(jsonPath("$.errors", hasSize(2)))
+            .andExpect(jsonPath("$.errors[0]", is("Q1/2024: VNB-Tarif fehlt für: 01.01.2024")))
+            .andExpect(jsonPath("$.errors[1]", is("Q2/2024: ZEV-Tarif fehlt für: 01.04.2024")));
+    }
+
+    @Test
+    void validateTarife_NoTarife_ReturnsValidWithMessage() throws Exception {
+        TarifService.ValidationResult noTarifeResult = new TarifService.ValidationResult(
+            true,
+            "Keine Tarife vorhanden",
+            Collections.emptyList()
+        );
+        when(tarifService.validateJahre()).thenReturn(noTarifeResult);
+
+        mockMvc.perform(post("/api/tarife/validate?modus=jahre"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.valid", is(true)))
+            .andExpect(jsonPath("$.message", is("Keine Tarife vorhanden")));
     }
 }

@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testin
 import { TarifListComponent } from './tarif-list.component';
 import { TarifService } from '../../services/tarif.service';
 import { TranslationService } from '../../services/translation.service';
-import { Tarif, TarifTyp } from '../../models/tarif.model';
+import { Tarif, TarifTyp, ValidationResult } from '../../models/tarif.model';
 import { of, throwError } from 'rxjs';
 
 describe('TarifListComponent', () => {
@@ -32,7 +32,7 @@ describe('TarifListComponent', () => {
 
   beforeEach(async () => {
     tarifServiceSpy = jasmine.createSpyObj('TarifService', [
-      'getAllTarife', 'createTarif', 'updateTarif', 'deleteTarif'
+      'getAllTarife', 'createTarif', 'updateTarif', 'deleteTarif', 'validateQuartale', 'validateJahre'
     ]);
     translationServiceSpy = jasmine.createSpyObj('TranslationService', ['translate']);
 
@@ -350,6 +350,147 @@ describe('TarifListComponent', () => {
 
       expect(component.message).toBeTruthy();
       tick(5000);
+      expect(component.message).toBe('');
+    }));
+  });
+
+  // ==================== Validation Tests ====================
+
+  describe('onValidateQuartale', () => {
+    const validResult: ValidationResult = {
+      valid: true,
+      message: 'Alle Quartale sind vollständig abgedeckt',
+      errors: []
+    };
+
+    const invalidResult: ValidationResult = {
+      valid: false,
+      message: 'Validierungsfehler',
+      errors: ['Q1/2024: VNB-Tarif fehlt für: 01.01.2024']
+    };
+
+    it('should call validateQuartale on service', () => {
+      tarifServiceSpy.validateQuartale.and.returnValue(of(validResult));
+      component.onValidateQuartale();
+      expect(tarifServiceSpy.validateQuartale).toHaveBeenCalled();
+    });
+
+    it('should show success message when valid', () => {
+      tarifServiceSpy.validateQuartale.and.returnValue(of(validResult));
+      component.onValidateQuartale();
+      expect(component.message).toBe('VALIDIERUNG_ERFOLGREICH');
+      expect(component.messageType).toBe('success');
+      expect(component.validationErrors).toEqual([]);
+    });
+
+    it('should show error message with errors when invalid', () => {
+      tarifServiceSpy.validateQuartale.and.returnValue(of(invalidResult));
+      component.onValidateQuartale();
+      expect(component.message).toBe('VALIDIERUNG_FEHLER');
+      expect(component.messageType).toBe('error');
+      expect(component.validationErrors.length).toBe(1);
+      expect(component.validationErrors[0]).toContain('Q1/2024');
+    });
+
+    it('should set message as persistent when validation fails', () => {
+      tarifServiceSpy.validateQuartale.and.returnValue(of(invalidResult));
+      component.onValidateQuartale();
+      expect(component.messagePersistent).toBeTrue();
+    });
+
+    it('should show error message on service error', () => {
+      tarifServiceSpy.validateQuartale.and.returnValue(throwError(() => new Error('Network error')));
+      component.onValidateQuartale();
+      expect(component.message).toBe('FEHLER_VALIDIERUNG');
+      expect(component.messageType).toBe('error');
+    });
+  });
+
+  describe('onValidateJahre', () => {
+    const validResult: ValidationResult = {
+      valid: true,
+      message: 'Alle Jahre sind vollständig abgedeckt',
+      errors: []
+    };
+
+    const invalidResult: ValidationResult = {
+      valid: false,
+      message: 'Validierungsfehler',
+      errors: ['2024: VNB-Tarif fehlt für: 01.01.2024', '2025: ZEV-Tarif fehlt für: 01.01.2025']
+    };
+
+    it('should call validateJahre on service', () => {
+      tarifServiceSpy.validateJahre.and.returnValue(of(validResult));
+      component.onValidateJahre();
+      expect(tarifServiceSpy.validateJahre).toHaveBeenCalled();
+    });
+
+    it('should show success message when valid', () => {
+      tarifServiceSpy.validateJahre.and.returnValue(of(validResult));
+      component.onValidateJahre();
+      expect(component.message).toBe('VALIDIERUNG_ERFOLGREICH');
+      expect(component.messageType).toBe('success');
+    });
+
+    it('should show multiple errors when invalid', () => {
+      tarifServiceSpy.validateJahre.and.returnValue(of(invalidResult));
+      component.onValidateJahre();
+      expect(component.validationErrors.length).toBe(2);
+      expect(component.validationErrors[0]).toContain('2024');
+      expect(component.validationErrors[1]).toContain('2025');
+    });
+  });
+
+  describe('dismissMessage', () => {
+    it('should clear message and validation errors', () => {
+      component.message = 'VALIDIERUNG_FEHLER';
+      component.validationErrors = ['Error 1', 'Error 2'];
+      component.messagePersistent = true;
+
+      component.dismissMessage();
+
+      expect(component.message).toBe('');
+      expect(component.validationErrors).toEqual([]);
+      expect(component.messagePersistent).toBeFalse();
+    });
+  });
+
+  describe('persistent message behavior', () => {
+    it('should not auto-clear persistent messages', fakeAsync(() => {
+      const invalidResult: ValidationResult = {
+        valid: false,
+        message: 'Validierungsfehler',
+        errors: ['Q1/2024: Error']
+      };
+      tarifServiceSpy.validateQuartale.and.returnValue(of(invalidResult));
+
+      component.onValidateQuartale();
+
+      expect(component.message).toBe('VALIDIERUNG_FEHLER');
+      expect(component.messagePersistent).toBeTrue();
+
+      tick(5000);
+
+      // Message should still be visible (persistent)
+      expect(component.message).toBe('VALIDIERUNG_FEHLER');
+    }));
+
+    it('should auto-clear success messages', fakeAsync(() => {
+      const validResult: ValidationResult = {
+        valid: true,
+        message: 'Alle Quartale sind vollständig abgedeckt',
+        errors: []
+      };
+      tarifServiceSpy.validateQuartale.and.returnValue(of(validResult));
+
+      component.onValidateQuartale();
+
+      expect(component.message).toBe('VALIDIERUNG_ERFOLGREICH');
+      expect(component.messagePersistent).toBeFalse();
+
+      tick(5000);
+
+      // Success message should be cleared after timeout
       expect(component.message).toBe('');
     }));
   });

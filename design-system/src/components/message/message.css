@@ -14,15 +14,15 @@
 
 /* Message Variants */
 .zev-message--success {
-  background-color: var(--color-success-light);
-  color: var(--color-success-dark);
-  border-color: var(--color-success);
+  background-color: var(--color-success-bg);
+  color: var(--color-success-text);
+  border-color: var(--color-success-border);
 }
 
 .zev-message--error {
-  background-color: var(--color-danger-light);
-  color: var(--color-danger-dark);
-  border-color: var(--color-danger);
+  background-color: var(--color-error-bg);
+  color: var(--color-error-text);
+  border-color: var(--color-error-border);
 }
 
 .zev-message--warning {

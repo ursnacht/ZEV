@@ -60,4 +60,14 @@ public interface TarifRepository extends JpaRepository<Tarif, Long> {
      * @return List of all tariffs
      */
     List<Tarif> findAllByOrderByTariftypAscGueltigVonDesc();
+
+    /**
+     * Find all distinct years that have at least one tariff.
+     *
+     * @return List of years with tariffs
+     */
+    @Query("SELECT DISTINCT YEAR(t.gueltigVon) FROM Tarif t " +
+           "UNION SELECT DISTINCT YEAR(t.gueltigBis) FROM Tarif t " +
+           "ORDER BY 1")
+    List<Integer> findDistinctYears();
 }
