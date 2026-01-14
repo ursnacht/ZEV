@@ -1,63 +1,81 @@
 <div class="zev-container">
   <h1>{{ 'EINHEITEN_VERWALTUNG' | translate }}</h1>
 
-  <div *ngIf="message" class="zev-message" [ngClass]="'zev-message--' + messageType">
-    {{ message }}
-  </div>
+  @if (message) {
+    <div class="zev-message" [ngClass]="'zev-message--' + messageType">
+      {{ message }}
+    </div>
+  }
 
-  <div *ngIf="!showForm">
-    <button class="zev-button zev-button--primary" (click)="onCreateNew()">{{ 'NEUE_EINHEIT_ERSTELLEN' | translate
+  @if (!showForm) {
+    <div>
+      <button class="zev-button zev-button--primary" (click)="onCreateNew()">{{ 'NEUE_EINHEIT_ERSTELLEN' | translate
       }}</button>
+      @if (einheiten.length > 0) {
+        <table class="zev-table">
+          <thead>
+            <tr>
+              <th class="zev-table__header--sortable" (click)="onSort('id')">
+                {{ 'ID' | translate }}
+                @if (sortColumn === 'id') {
+                  <span class="zev-table__sort-indicator">
+                    {{ sortDirection === 'asc' ? '▲' : '▼' }}
+                  </span>
+                }
+              </th>
+              <th class="zev-table__header--sortable" (click)="onSort('name')">
+                {{ 'NAME' | translate }}
+                @if (sortColumn === 'name') {
+                  <span class="zev-table__sort-indicator">
+                    {{ sortDirection === 'asc' ? '▲' : '▼' }}
+                  </span>
+                }
+              </th>
+              <th class="zev-table__header--sortable" (click)="onSort('typ')">
+                {{ 'TYP' | translate }}
+                @if (sortColumn === 'typ') {
+                  <span class="zev-table__sort-indicator">
+                    {{ sortDirection === 'asc' ? '▲' : '▼' }}
+                  </span>
+                }
+              </th>
+              <th class="zev-table__header--sortable" (click)="onSort('mietername')">
+                {{ 'MIETERNAME' | translate }}
+                @if (sortColumn === 'mietername') {
+                  <span class="zev-table__sort-indicator">
+                    {{ sortDirection === 'asc' ? '▲' : '▼' }}
+                  </span>
+                }
+              </th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (einheit of einheiten; track einheit) {
+              <tr>
+                <td>{{ einheit.id }}</td>
+                <td>{{ einheit.name }}</td>
+                <td>{{ einheit.typ }}</td>
+                <td>{{ einheit.mietername }}</td>
+                <td>
+                  <app-kebab-menu
+                    [items]="menuItems"
+                    (itemClick)="onMenuAction($event, einheit)">
+                  </app-kebab-menu>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+      @if (einheiten.length === 0) {
+        <p>{{ 'KEINE_EINHEITEN_VORHANDEN' | translate }}</p>
+      }
+    </div>
+  }
 
-    <table class="zev-table" *ngIf="einheiten.length > 0">
-      <thead>
-        <tr>
-          <th class="zev-table__header--sortable" (click)="onSort('id')">
-            {{ 'ID' | translate }}
-            <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'id'">
-              {{ sortDirection === 'asc' ? '▲' : '▼' }}
-            </span>
-          </th>
-          <th class="zev-table__header--sortable" (click)="onSort('name')">
-            {{ 'NAME' | translate }}
-            <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'name'">
-              {{ sortDirection === 'asc' ? '▲' : '▼' }}
-            </span>
-          </th>
-          <th class="zev-table__header--sortable" (click)="onSort('typ')">
-            {{ 'TYP' | translate }}
-            <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'typ'">
-              {{ sortDirection === 'asc' ? '▲' : '▼' }}
-            </span>
-          </th>
-          <th class="zev-table__header--sortable" (click)="onSort('mietername')">
-            {{ 'MIETERNAME' | translate }}
-            <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'mietername'">
-              {{ sortDirection === 'asc' ? '▲' : '▼' }}
-            </span>
-          </th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let einheit of einheiten">
-          <td>{{ einheit.id }}</td>
-          <td>{{ einheit.name }}</td>
-          <td>{{ einheit.typ }}</td>
-          <td>{{ einheit.mietername }}</td>
-          <td>
-            <app-kebab-menu
-              [items]="menuItems"
-              (itemClick)="onMenuAction($event, einheit)">
-            </app-kebab-menu>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-
-    <p *ngIf="einheiten.length === 0">{{ 'KEINE_EINHEITEN_VORHANDEN' | translate }}</p>
-  </div>
-
-  <app-einheit-form *ngIf="showForm" [einheit]="selectedEinheit" (save)="onFormSubmit($event)"
+  @if (showForm) {
+    <app-einheit-form [einheit]="selectedEinheit" (save)="onFormSubmit($event)"
     (cancel)="onFormCancel()"></app-einheit-form>
+  }
 </div>

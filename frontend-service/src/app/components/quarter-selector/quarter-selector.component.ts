@@ -1,5 +1,4 @@
 import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 
 interface Quarter {
@@ -11,19 +10,21 @@ interface Quarter {
 @Component({
   selector: 'app-quarter-selector',
   standalone: true,
-  imports: [CommonModule, TranslatePipe],
+  imports: [TranslatePipe],
   template: `
     <div class="zev-quarter-selector">
       <span class="zev-quarter-selector__label">{{ 'QUARTAL_WAEHLEN' | translate }}:</span>
-      <button *ngFor="let q of quarters"
-              type="button"
-              class="zev-quarter-button"
-              [class.zev-quarter-button--active]="isSelected(q)"
-              (click)="selectQuarter(q)">
-        {{ q.label }}
-      </button>
+      @for (q of quarters; track q) {
+        <button
+          type="button"
+          class="zev-quarter-button"
+          [class.zev-quarter-button--active]="isSelected(q)"
+          (click)="selectQuarter(q)">
+          {{ q.label }}
+        </button>
+      }
     </div>
-  `
+    `
 })
 export class QuarterSelectorComponent implements OnInit {
   @Input() selectedVon: string = '';

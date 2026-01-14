@@ -1,5 +1,4 @@
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Tarif, TarifTyp } from '../../models/tarif.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
@@ -7,7 +6,7 @@ import { TranslatePipe } from '../../pipes/translate.pipe';
 @Component({
   selector: 'app-tarif-form',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe],
+  imports: [FormsModule, TranslatePipe],
   templateUrl: './tarif-form.component.html',
   styleUrls: ['./tarif-form.component.css']
 })

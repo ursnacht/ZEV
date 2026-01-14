@@ -12,42 +12,42 @@
       <li>
         <a routerLink="/upload" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-            {{ 'MESSWERTE_UPLOAD' | translate }}</a>
+        {{ 'MESSWERTE_UPLOAD' | translate }}</a>
       </li>
       <li>
         <a routerLink="/einheiten" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-            {{ 'EINHEITEN_VERWALTUNG' | translate }}</a>
+        {{ 'EINHEITEN_VERWALTUNG' | translate }}</a>
       </li>
       <li>
         <a routerLink="/solar-calculation" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-            {{ 'SOLAR_DISTRIBUTION' | translate }}</a>
+        {{ 'SOLAR_DISTRIBUTION' | translate }}</a>
       </li>
       <li>
         <a routerLink="/chart" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-            {{ 'MESSWERTE_GRAFIK' | translate }}</a>
+        {{ 'MESSWERTE_GRAFIK' | translate }}</a>
       </li>
       <li>
         <a routerLink="/statistik" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-            {{ 'STATISTIK' | translate }}</a>
+        {{ 'STATISTIK' | translate }}</a>
       </li>
       <li>
         <a routerLink="/rechnungen" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-            {{ 'RECHNUNGEN' | translate }}</a>
+        {{ 'RECHNUNGEN' | translate }}</a>
       </li>
       <li>
         <a routerLink="/tarife" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-            {{ 'TARIFE' | translate }}</a>
+        {{ 'TARIFE' | translate }}</a>
       </li>
       <li>
         <a routerLink="/translations" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-            {{ 'TRANSLATION_EDITOR' | translate }}</a>
+        {{ 'TRANSLATION_EDITOR' | translate }}</a>
       </li>
       <li>
         <button (click)="switchLanguage()" class="zev-navbar__link">
@@ -59,9 +59,11 @@
           {{ 'LOGOUT' | translate }}
         </button>
       </li>
-      <li *ngIf="userDisplayName" class="zev-navbar__user">
-        <span class="zev-navbar__username">{{ userDisplayName }}</span>
-      </li>
+      @if (userDisplayName) {
+        <li class="zev-navbar__user">
+          <span class="zev-navbar__username">{{ userDisplayName }}</span>
+        </li>
+      }
     </ul>
   </div>
 </nav>

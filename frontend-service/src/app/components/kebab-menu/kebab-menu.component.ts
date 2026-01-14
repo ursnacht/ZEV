@@ -1,5 +1,4 @@
 import { Component, Input, Output, EventEmitter, ElementRef, HostListener } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 
 export interface KebabMenuItem {
@@ -11,7 +10,7 @@ export interface KebabMenuItem {
 @Component({
   selector: 'app-kebab-menu',
   standalone: true,
-  imports: [CommonModule, TranslatePipe],
+  imports: [TranslatePipe],
   templateUrl: './kebab-menu.component.html'
 })
 export class KebabMenuComponent {

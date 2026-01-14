@@ -10,7 +10,7 @@ ZEV (Zusammenschluss zum Eigenverbrauch) is a solar power distribution applicati
 
 - Java 17+
 - Maven 3.6+
-- Node.js 18.19.1+
+- Node.js 20.19.0+
 - Docker & Docker Compose
 
 ## Build & Test Commands
@@ -80,7 +80,7 @@ mvn test
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │ frontend-service│────▶│ backend-service │────▶│  admin-service  │
-│   (Angular 19)  │     │ (Spring Boot)   │     │ (Spring Boot)   │
+│   (Angular 21)  │     │ (Spring Boot)   │     │ (Spring Boot)   │
 └────────┬────────┘     └────────┬────────┘     └─────────────────┘
          │                       │
          ▼                       ▼

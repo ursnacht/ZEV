@@ -180,503 +180,506 @@
       <div class="typography-samples">
         <p style="font-weight: var(--font-weight-normal);">Normal Weight (400) - <code>--font-weight-normal</code></p>
         <p style="font-weight: var(--font-weight-semibold);">Semibold Weight (600) - <code>--font-weight-semibold</code>
-        </p>
-        <p style="font-weight: var(--font-weight-bold);">Bold Weight (700) - <code>--font-weight-bold</code></p>
-      </div>
+      </p>
+      <p style="font-weight: var(--font-weight-bold);">Bold Weight (700) - <code>--font-weight-bold</code></p>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- Buttons Section -->
-  <section class="showcase-section">
-    <h2>Buttons</h2>
-    <div class="button-samples">
-      <button class="zev-button zev-button--primary">Primary Button</button>
-      <button class="zev-button zev-button--secondary">Secondary Button</button>
-      <button class="zev-button zev-button--danger">Danger Button</button>
-      <button class="zev-button" disabled>Disabled Button</button>
-    </div>
-  </section>
+<!-- Buttons Section -->
+<section class="showcase-section">
+  <h2>Buttons</h2>
+  <div class="button-samples">
+    <button class="zev-button zev-button--primary">Primary Button</button>
+    <button class="zev-button zev-button--secondary">Secondary Button</button>
+    <button class="zev-button zev-button--danger">Danger Button</button>
+    <button class="zev-button" disabled>Disabled Button</button>
+  </div>
+</section>
 
-  <!-- Quarter Selector Section -->
-  <section class="showcase-section">
-    <h2>Quarter Selector</h2>
-    <p>Komponente zur schnellen Auswahl der letzten 5 Quartale. Wird verwendet auf Seiten mit Zeitbereichsauswahl.</p>
+<!-- Quarter Selector Section -->
+<section class="showcase-section">
+  <h2>Quarter Selector</h2>
+  <p>Komponente zur schnellen Auswahl der letzten 5 Quartale. Wird verwendet auf Seiten mit Zeitbereichsauswahl.</p>
 
-    <div class="subsection">
-      <h3>Standard</h3>
-      <app-quarter-selector
-        [selectedVon]="quarterDateFrom"
-        [selectedBis]="quarterDateTo"
-        (quarterSelected)="onQuarterSelected($event)">
-      </app-quarter-selector>
-      <p *ngIf="quarterDateFrom && quarterDateTo" style="margin-top: var(--spacing-sm); color: var(--color-gray-600);">
+  <div class="subsection">
+    <h3>Standard</h3>
+    <app-quarter-selector
+      [selectedVon]="quarterDateFrom"
+      [selectedBis]="quarterDateTo"
+      (quarterSelected)="onQuarterSelected($event)">
+    </app-quarter-selector>
+    @if (quarterDateFrom && quarterDateTo) {
+      <p style="margin-top: var(--spacing-sm); color: var(--color-gray-600);">
         Ausgewählt: {{ quarterDateFrom }} - {{ quarterDateTo }}
       </p>
+    }
+  </div>
+
+  <div class="subsection">
+    <h3>CSS Klassen</h3>
+    <ul class="zev-list">
+      <li><code>.zev-quarter-selector</code> - Container für die Button-Reihe</li>
+      <li><code>.zev-quarter-selector__label</code> - Label über den Buttons</li>
+      <li><code>.zev-quarter-button</code> - Einzelner Quartal-Button</li>
+      <li><code>.zev-quarter-button--active</code> - Aktiver/ausgewählter Button</li>
+    </ul>
+  </div>
+</section>
+
+<!-- Navigation Section -->
+<section class="showcase-section">
+  <h2>Navigation</h2>
+  <div class="navigation-sample">
+    <nav class="zev-navbar">
+      <div class="zev-navbar__container">
+        <h1 class="zev-navbar__title">ZEV Management</h1>
+        <ul class="zev-navbar__menu">
+          <li><a href="#" class="zev-navbar__link">Link 1</a></li>
+          <li><a href="#" class="zev-navbar__link zev-navbar__link--active">Active Link</a></li>
+          <li><a href="#" class="zev-navbar__link">Link 3</a></li>
+        </ul>
+      </div>
+    </nav>
+  </div>
+</section>
+
+<!-- Spacing Section -->
+<section class="showcase-section">
+  <h2>Spacing</h2>
+  <div class="spacing-samples">
+    <div class="spacing-item">
+      <div class="spacing-box" style="width: var(--spacing-xxs); height: var(--spacing-xxs);"></div>
+      <span><code>--spacing-xxs</code> (5px)</span>
+    </div>
+    <div class="spacing-item">
+      <div class="spacing-box" style="width: var(--spacing-xs); height: var(--spacing-xs);"></div>
+      <span><code>--spacing-xs</code> (8px)</span>
+    </div>
+    <div class="spacing-item">
+      <div class="spacing-box" style="width: var(--spacing-sm); height: var(--spacing-sm);"></div>
+      <span><code>--spacing-sm</code> (10px)</span>
+    </div>
+    <div class="spacing-item">
+      <div class="spacing-box" style="width: var(--spacing-md); height: var(--spacing-md);"></div>
+      <span><code>--spacing-md</code> (15px)</span>
+    </div>
+    <div class="spacing-item">
+      <div class="spacing-box" style="width: var(--spacing-lg); height: var(--spacing-lg);"></div>
+      <span><code>--spacing-lg</code> (20px)</span>
+    </div>
+    <div class="spacing-item">
+      <div class="spacing-box" style="width: var(--spacing-xl); height: var(--spacing-xl);"></div>
+      <span><code>--spacing-xl</code> (30px)</span>
+    </div>
+    <div class="spacing-item">
+      <div class="spacing-box" style="width: var(--spacing-xxl); height: var(--spacing-xxl);"></div>
+      <span><code>--spacing-xxl</code> (40px)</span>
+    </div>
+  </div>
+</section>
+
+<!-- Border Radius Section -->
+<section class="showcase-section">
+  <h2>Border Radius</h2>
+  <div class="radius-samples">
+    <div class="radius-item">
+      <div class="radius-box" style="border-radius: var(--radius-sm);"></div>
+      <span><code>--radius-sm</code> (4px)</span>
+    </div>
+    <div class="radius-item">
+      <div class="radius-box" style="border-radius: var(--radius-md);"></div>
+      <span><code>--radius-md</code> (8px)</span>
+    </div>
+  </div>
+</section>
+
+<!-- Shadows Section -->
+<section class="showcase-section">
+  <h2>Shadows</h2>
+  <div class="shadow-samples">
+    <div class="shadow-box" style="box-shadow: var(--shadow-card);">
+      <p>Card Shadow</p>
+      <code>--shadow-card</code>
+    </div>
+  </div>
+</section>
+
+<!-- Forms Section -->
+<section class="showcase-section">
+  <h2>Form Elements</h2>
+  <div class="form-samples">
+    <div class="zev-form-group">
+      <label for="text-input">Text Input</label>
+      <input type="text" id="text-input" class="zev-input" placeholder="Beispieltext">
     </div>
 
-    <div class="subsection">
-      <h3>CSS Klassen</h3>
-      <ul class="zev-list">
-        <li><code>.zev-quarter-selector</code> - Container für die Button-Reihe</li>
-        <li><code>.zev-quarter-selector__label</code> - Label über den Buttons</li>
-        <li><code>.zev-quarter-button</code> - Einzelner Quartal-Button</li>
-        <li><code>.zev-quarter-button--active</code> - Aktiver/ausgewählter Button</li>
-      </ul>
+    <div class="zev-form-group">
+      <label for="select-input">Select</label>
+      <select id="select-input" class="zev-select">
+        <option>Option 1</option>
+        <option>Option 2</option>
+        <option>Option 3</option>
+      </select>
     </div>
-  </section>
 
-  <!-- Navigation Section -->
-  <section class="showcase-section">
-    <h2>Navigation</h2>
-    <div class="navigation-sample">
-      <nav class="zev-navbar">
-        <div class="zev-navbar__container">
-          <h1 class="zev-navbar__title">ZEV Management</h1>
-          <ul class="zev-navbar__menu">
-            <li><a href="#" class="zev-navbar__link">Link 1</a></li>
-            <li><a href="#" class="zev-navbar__link zev-navbar__link--active">Active Link</a></li>
-            <li><a href="#" class="zev-navbar__link">Link 3</a></li>
-          </ul>
-        </div>
-      </nav>
+    <div class="zev-form-group">
+      <label for="file-input">File Input</label>
+      <input type="file" id="file-input" class="zev-input">
     </div>
-  </section>
 
-  <!-- Spacing Section -->
-  <section class="showcase-section">
-    <h2>Spacing</h2>
-    <div class="spacing-samples">
-      <div class="spacing-item">
-        <div class="spacing-box" style="width: var(--spacing-xxs); height: var(--spacing-xxs);"></div>
-        <span><code>--spacing-xxs</code> (5px)</span>
-      </div>
-      <div class="spacing-item">
-        <div class="spacing-box" style="width: var(--spacing-xs); height: var(--spacing-xs);"></div>
-        <span><code>--spacing-xs</code> (8px)</span>
-      </div>
-      <div class="spacing-item">
-        <div class="spacing-box" style="width: var(--spacing-sm); height: var(--spacing-sm);"></div>
-        <span><code>--spacing-sm</code> (10px)</span>
-      </div>
-      <div class="spacing-item">
-        <div class="spacing-box" style="width: var(--spacing-md); height: var(--spacing-md);"></div>
-        <span><code>--spacing-md</code> (15px)</span>
-      </div>
-      <div class="spacing-item">
-        <div class="spacing-box" style="width: var(--spacing-lg); height: var(--spacing-lg);"></div>
-        <span><code>--spacing-lg</code> (20px)</span>
-      </div>
-      <div class="spacing-item">
-        <div class="spacing-box" style="width: var(--spacing-xl); height: var(--spacing-xl);"></div>
-        <span><code>--spacing-xl</code> (30px)</span>
-      </div>
-      <div class="spacing-item">
-        <div class="spacing-box" style="width: var(--spacing-xxl); height: var(--spacing-xxl);"></div>
-        <span><code>--spacing-xxl</code> (40px)</span>
-      </div>
+    <div class="zev-form-group">
+      <label for="textarea">Textarea</label>
+      <textarea id="textarea" class="zev-input" rows="4" placeholder="Mehrzeiliger Text"></textarea>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- Border Radius Section -->
-  <section class="showcase-section">
-    <h2>Border Radius</h2>
-    <div class="radius-samples">
-      <div class="radius-item">
-        <div class="radius-box" style="border-radius: var(--radius-sm);"></div>
-        <span><code>--radius-sm</code> (4px)</span>
-      </div>
-      <div class="radius-item">
-        <div class="radius-box" style="border-radius: var(--radius-md);"></div>
-        <span><code>--radius-md</code> (8px)</span>
-      </div>
+<!-- Alert Messages Section -->
+<section class="showcase-section">
+  <h2>Alert Messages</h2>
+  <div class="alert-samples">
+    <div class="zev-message zev-message--success">
+      Erfolgreiche Operation - Dies ist eine Erfolgsmeldung
     </div>
-  </section>
-
-  <!-- Shadows Section -->
-  <section class="showcase-section">
-    <h2>Shadows</h2>
-    <div class="shadow-samples">
-      <div class="shadow-box" style="box-shadow: var(--shadow-card);">
-        <p>Card Shadow</p>
-        <code>--shadow-card</code>
-      </div>
+    <div class="zev-message zev-message--error">
+      Fehler aufgetreten - Dies ist eine Fehlermeldung
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- Forms Section -->
-  <section class="showcase-section">
-    <h2>Form Elements</h2>
-    <div class="form-samples">
-      <div class="zev-form-group">
-        <label for="text-input">Text Input</label>
-        <input type="text" id="text-input" class="zev-input" placeholder="Beispieltext">
-      </div>
-
-      <div class="zev-form-group">
-        <label for="select-input">Select</label>
-        <select id="select-input" class="zev-select">
-          <option>Option 1</option>
-          <option>Option 2</option>
-          <option>Option 3</option>
-        </select>
-      </div>
-
-      <div class="zev-form-group">
-        <label for="file-input">File Input</label>
-        <input type="file" id="file-input" class="zev-input">
-      </div>
-
-      <div class="zev-form-group">
-        <label for="textarea">Textarea</label>
-        <textarea id="textarea" class="zev-input" rows="4" placeholder="Mehrzeiliger Text"></textarea>
-      </div>
+<!-- Cards Section -->
+<section class="showcase-section">
+  <h2>Cards</h2>
+  <div class="card-samples">
+    <div class="zev-card">
+      <h3 class="zev-card__title">Card Title</h3>
+      <p class="zev-card__content">Dies ist ein Beispiel für eine Card-Komponente mit Shadow und Border Radius.</p>
+      <button class="zev-button zev-button--primary">Action</button>
     </div>
-  </section>
-
-  <!-- Alert Messages Section -->
-  <section class="showcase-section">
-    <h2>Alert Messages</h2>
-    <div class="alert-samples">
-      <div class="zev-message zev-message--success">
-        Erfolgreiche Operation - Dies ist eine Erfolgsmeldung
-      </div>
-      <div class="zev-message zev-message--error">
-        Fehler aufgetreten - Dies ist eine Fehlermeldung
-      </div>
+    <div class="zev-card">
+      <h3 class="zev-card__title">Another Card</h3>
+      <p class="zev-card__content">Cards nutzen das Design System für konsistentes Styling.</p>
+      <button class="zev-button zev-button--secondary">Learn More</button>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- Cards Section -->
-  <section class="showcase-section">
-    <h2>Cards</h2>
-    <div class="card-samples">
-      <div class="zev-card">
-        <h3 class="zev-card__title">Card Title</h3>
-        <p class="zev-card__content">Dies ist ein Beispiel für eine Card-Komponente mit Shadow und Border Radius.</p>
-        <button class="zev-button zev-button--primary">Action</button>
-      </div>
-      <div class="zev-card">
-        <h3 class="zev-card__title">Another Card</h3>
-        <p class="zev-card__content">Cards nutzen das Design System für konsistentes Styling.</p>
-        <button class="zev-button zev-button--secondary">Learn More</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- Tables Section -->
-  <section class="showcase-section">
-    <h2>Tables</h2>
-    <div class="table-samples">
-      <table class="zev-table">
-        <thead>
-          <tr>
-            <th class="zev-table__header--sortable">
-              ID
-              <span class="zev-table__sort-indicator">▲</span>
-            </th>
-            <th class="zev-table__header--sortable">Name</th>
-            <th class="zev-table__header--sortable">Type</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>1</td>
-            <td>Beispiel A</td>
-            <td>Produktion</td>
-            <td>
-              <div class="zev-table-actions">
-                <button class="zev-button zev-button--secondary">Edit</button>
-                <button class="zev-button zev-button--danger">Delete</button>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td>2</td>
-            <td>Beispiel B</td>
-            <td>Verbrauch</td>
-            <td>
-              <div class="zev-table-actions">
-                <button class="zev-button zev-button--secondary">Edit</button>
-                <button class="zev-button zev-button--danger">Delete</button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- Checkboxes Section -->
-  <section class="showcase-section">
-    <h2>Checkboxes</h2>
-    <div class="checkbox-samples">
-      <div class="zev-checkbox-group">
-        <div class="zev-checkbox-item">
-          <input type="checkbox" id="check1" checked>
-          <label for="check1">Option 1 (checked)</label>
-        </div>
-        <div class="zev-checkbox-item">
-          <input type="checkbox" id="check2">
-          <label for="check2">Option 2</label>
-        </div>
-        <div class="zev-checkbox-item">
-          <input type="checkbox" id="check3">
-          <label for="check3">Option 3</label>
-        </div>
-        <div class="zev-checkbox-item">
-          <input type="checkbox" id="check4" disabled>
-          <label for="check4">Option 4 (disabled)</label>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Panels Section -->
-  <section class="showcase-section">
-    <h2>Panels</h2>
-    <div class="panel-samples">
-      <div class="zev-panel">
-        <h3 class="zev-panel__title">Standard Panel</h3>
-        <div class="zev-panel__content">
-          <p>Dies ist ein Standard-Panel für generischen Content.</p>
-        </div>
-      </div>
-
-      <div class="zev-panel zev-panel--chart">
-        <h3 class="zev-panel__title">Chart Panel</h3>
-        <div class="zev-panel__content">
-          <p style="padding: var(--spacing-xl); text-align: center; color: var(--color-gray-600);">
-            Chart-spezifisches Panel mit fester Höhe und resize-Funktion
-          </p>
-        </div>
-      </div>
-
-      <div class="zev-panel zev-panel--month">
-        <h3 class="zev-panel__title">
-          <span class="zev-status-indicator">
-            <span class="zev-status-dot zev-status-dot--success"></span>
-            <span>Januar 2024</span>
-          </span>
-          <span class="zev-panel__subtitle">(01.01.2024 - 31.01.2024)</span>
-        </h3>
-        <div class="zev-panel__content">
-          <p>Panel mit Monats-Variante und Status-Indikator im Titel.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Status Indicators Section -->
-  <section class="showcase-section">
-    <h2>Status Indicators</h2>
-    <div class="status-samples">
-      <div class="subsection">
-        <h3>Status Dots</h3>
-        <div style="display: flex; gap: var(--spacing-lg); flex-wrap: wrap;">
-          <span class="zev-status-indicator">
-            <span class="zev-status-dot zev-status-dot--success"></span>
-            <span>Erfolgreich / Vollstaendig</span>
-          </span>
-          <span class="zev-status-indicator">
-            <span class="zev-status-dot zev-status-dot--warning"></span>
-            <span>Warnung</span>
-          </span>
-          <span class="zev-status-indicator">
-            <span class="zev-status-dot zev-status-dot--error"></span>
-            <span>Fehler / Unvollstaendig</span>
-          </span>
-        </div>
-      </div>
-
-      <div class="subsection">
-        <h3>Status Badges</h3>
-        <div style="display: flex; gap: var(--spacing-lg); flex-wrap: wrap;">
-          <span class="zev-status zev-status--success">Erfolgreich</span>
-          <span class="zev-status zev-status--warning">Warnung</span>
-          <span class="zev-status zev-status--error">Fehler</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Info Rows Section -->
-  <section class="showcase-section">
-    <h2>Info Rows</h2>
-    <div class="info-row-samples">
-      <div class="zev-info-row">
-        <span class="zev-info-label">Messwerte vorhanden bis:</span>
-        <span class="zev-info-value">31.01.2024</span>
-      </div>
-      <div class="zev-info-row">
-        <span class="zev-info-label">Datenstatus:</span>
-        <span class="zev-status-indicator">
-          <span class="zev-status-dot zev-status-dot--success"></span>
-          <span>Daten vollstaendig</span>
-        </span>
-      </div>
-      <div class="zev-info-row">
-        <span class="zev-info-label">Fehlende Einheiten:</span>
-        <span class="zev-info-value">Keine</span>
-      </div>
-    </div>
-  </section>
-
-  <!-- Comparison Section -->
-  <section class="showcase-section">
-    <h2>Comparison Grid</h2>
-    <div class="zev-comparison-section" style="border-top: none; padding-top: 0;">
-      <h4>Summen-Vergleich</h4>
-      <p class="zev-toleranz-info">Toleranz: 0.100 kWh</p>
-      <div class="zev-comparison-grid">
-        <div class="zev-comparison-item">
-          <span class="zev-status-indicator">
-            <span class="zev-status-dot zev-status-dot--success"></span>
-            <span>A = B</span>
-          </span>
-        </div>
-        <div class="zev-comparison-item">
-          <span class="zev-status-indicator">
-            <span class="zev-status-dot zev-status-dot--error"></span>
-            <span>A = C</span>
-          </span>
-          <span class="zev-differenz">Differenz: +2.450 kWh</span>
-        </div>
-        <div class="zev-comparison-item">
-          <span class="zev-status-indicator">
-            <span class="zev-status-dot zev-status-dot--success"></span>
-            <span>B = C</span>
-          </span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Tags and Lists Section -->
-  <section class="showcase-section">
-    <h2>Tags und Listen</h2>
-    <div class="subsection">
-      <h3>Tags</h3>
-      <span class="zev-tag-list">
-        <span class="zev-tag">01.01.2024</span>
-        <span class="zev-tag">05.01.2024</span>
-        <span class="zev-tag">12.01.2024</span>
-        <span class="zev-tag">23.01.2024</span>
-      </span>
-    </div>
-    <div class="subsection">
-      <h3>Liste</h3>
-      <ul class="zev-list">
-        <li>Wohnung A</li>
-        <li>Wohnung B</li>
-        <li>Solaranlage</li>
-      </ul>
-    </div>
-  </section>
-
-  <!-- Bar Chart Section -->
-  <section class="showcase-section">
-    <h2>Bar Chart</h2>
-    <table class="zev-table zev-table--bars">
+<!-- Tables Section -->
+<section class="showcase-section">
+  <h2>Tables</h2>
+  <div class="table-samples">
+    <table class="zev-table">
       <thead>
         <tr>
-          <th class="zev-table__label-col">Beschreibung</th>
-          <th class="zev-table__bar-col">Visualisierung</th>
-          <th class="zev-table__number">Wert (kWh)</th>
+          <th class="zev-table__header--sortable">
+            ID
+            <span class="zev-table__sort-indicator">▲</span>
+          </th>
+          <th class="zev-table__header--sortable">Name</th>
+          <th class="zev-table__header--sortable">Type</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
         <tr>
-          <td>Produktion (Total)</td>
-          <td class="zev-table__bar-cell">
-            <div class="zev-bar-container">
-              <div class="zev-bar" style="width: 100%; background-color: #4CAF50;"></div>
+          <td>1</td>
+          <td>Beispiel A</td>
+          <td>Produktion</td>
+          <td>
+            <div class="zev-table-actions">
+              <button class="zev-button zev-button--secondary">Edit</button>
+              <button class="zev-button zev-button--danger">Delete</button>
             </div>
           </td>
-          <td class="zev-table__number">1250.000</td>
         </tr>
         <tr>
-          <td>Verbrauch (Total)</td>
-          <td class="zev-table__bar-cell">
-            <div class="zev-bar-container">
-              <div class="zev-bar" style="width: 85%; background-color: #2196F3;"></div>
+          <td>2</td>
+          <td>Beispiel B</td>
+          <td>Verbrauch</td>
+          <td>
+            <div class="zev-table-actions">
+              <button class="zev-button zev-button--secondary">Edit</button>
+              <button class="zev-button zev-button--danger">Delete</button>
             </div>
           </td>
-          <td class="zev-table__number">1062.500</td>
-        </tr>
-        <tr>
-          <td>ZEV Producer</td>
-          <td class="zev-table__bar-cell">
-            <div class="zev-bar-container">
-              <div class="zev-bar" style="width: 70%; background-color: #FF9800;"></div>
-            </div>
-          </td>
-          <td class="zev-table__number">875.000</td>
-        </tr>
-        <tr>
-          <td>ZEV Consumer</td>
-          <td class="zev-table__bar-cell">
-            <div class="zev-bar-container">
-              <div class="zev-bar" style="width: 70%; background-color: #9C27B0;"></div>
-            </div>
-          </td>
-          <td class="zev-table__number">875.000</td>
         </tr>
       </tbody>
     </table>
-  </section>
+  </div>
+</section>
 
-  <!-- Table Variants Section -->
-  <section class="showcase-section">
-    <h2>Table Variants</h2>
-    <div class="subsection">
-      <h3>Compact Table mit Row-Typen</h3>
-      <table class="zev-table zev-table--compact">
-        <thead>
-          <tr>
-            <th>Einheit</th>
-            <th>Typ</th>
-            <th class="zev-table__number">Total (kWh)</th>
-            <th class="zev-table__number">ZEV (kWh)</th>
-            <th class="zev-table__number">ZEV berechnet (kWh)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr class="zev-table__row--producer">
-            <td>Solaranlage</td>
-            <td>Produzent</td>
-            <td class="zev-table__number">1250.000</td>
-            <td class="zev-table__number">875.000</td>
-            <td class="zev-table__number">-</td>
-          </tr>
-          <tr class="zev-table__row--consumer">
-            <td>Wohnung A</td>
-            <td>Konsument</td>
-            <td class="zev-table__number">650.000</td>
-            <td class="zev-table__number">520.000</td>
-            <td class="zev-table__number">520.000</td>
-          </tr>
-          <tr class="zev-table__row--consumer">
-            <td>Wohnung B</td>
-            <td>Konsument</td>
-            <td class="zev-table__number">412.500</td>
-            <td class="zev-table__number">355.000</td>
-            <td class="zev-table__number">355.000</td>
-          </tr>
-        </tbody>
-      </table>
+<!-- Checkboxes Section -->
+<section class="showcase-section">
+  <h2>Checkboxes</h2>
+  <div class="checkbox-samples">
+    <div class="zev-checkbox-group">
+      <div class="zev-checkbox-item">
+        <input type="checkbox" id="check1" checked>
+        <label for="check1">Option 1 (checked)</label>
+      </div>
+      <div class="zev-checkbox-item">
+        <input type="checkbox" id="check2">
+        <label for="check2">Option 2</label>
+      </div>
+      <div class="zev-checkbox-item">
+        <input type="checkbox" id="check3">
+        <label for="check3">Option 3</label>
+      </div>
+      <div class="zev-checkbox-item">
+        <input type="checkbox" id="check4" disabled>
+        <label for="check4">Option 4 (disabled)</label>
+      </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- Collapsible Section -->
-  <section class="showcase-section">
-    <h2>Collapsible</h2>
-    <div class="zev-collapsible">
-      <button type="button" class="zev-collapsible__header" (click)="toggleCollapsible()">
-        <span>Details anzeigen</span>
-        <span class="zev-collapsible__icon">{{ collapsibleOpen ? '\u25BC' : '\u25B6' }}</span>
-      </button>
-      <div *ngIf="collapsibleOpen" class="zev-collapsible__content">
+<!-- Panels Section -->
+<section class="showcase-section">
+  <h2>Panels</h2>
+  <div class="panel-samples">
+    <div class="zev-panel">
+      <h3 class="zev-panel__title">Standard Panel</h3>
+      <div class="zev-panel__content">
+        <p>Dies ist ein Standard-Panel für generischen Content.</p>
+      </div>
+    </div>
+
+    <div class="zev-panel zev-panel--chart">
+      <h3 class="zev-panel__title">Chart Panel</h3>
+      <div class="zev-panel__content">
+        <p style="padding: var(--spacing-xl); text-align: center; color: var(--color-gray-600);">
+          Chart-spezifisches Panel mit fester Höhe und resize-Funktion
+        </p>
+      </div>
+    </div>
+
+    <div class="zev-panel zev-panel--month">
+      <h3 class="zev-panel__title">
+        <span class="zev-status-indicator">
+          <span class="zev-status-dot zev-status-dot--success"></span>
+          <span>Januar 2024</span>
+        </span>
+        <span class="zev-panel__subtitle">(01.01.2024 - 31.01.2024)</span>
+      </h3>
+      <div class="zev-panel__content">
+        <p>Panel mit Monats-Variante und Status-Indikator im Titel.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Status Indicators Section -->
+<section class="showcase-section">
+  <h2>Status Indicators</h2>
+  <div class="status-samples">
+    <div class="subsection">
+      <h3>Status Dots</h3>
+      <div style="display: flex; gap: var(--spacing-lg); flex-wrap: wrap;">
+        <span class="zev-status-indicator">
+          <span class="zev-status-dot zev-status-dot--success"></span>
+          <span>Erfolgreich / Vollstaendig</span>
+        </span>
+        <span class="zev-status-indicator">
+          <span class="zev-status-dot zev-status-dot--warning"></span>
+          <span>Warnung</span>
+        </span>
+        <span class="zev-status-indicator">
+          <span class="zev-status-dot zev-status-dot--error"></span>
+          <span>Fehler / Unvollstaendig</span>
+        </span>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>Status Badges</h3>
+      <div style="display: flex; gap: var(--spacing-lg); flex-wrap: wrap;">
+        <span class="zev-status zev-status--success">Erfolgreich</span>
+        <span class="zev-status zev-status--warning">Warnung</span>
+        <span class="zev-status zev-status--error">Fehler</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Info Rows Section -->
+<section class="showcase-section">
+  <h2>Info Rows</h2>
+  <div class="info-row-samples">
+    <div class="zev-info-row">
+      <span class="zev-info-label">Messwerte vorhanden bis:</span>
+      <span class="zev-info-value">31.01.2024</span>
+    </div>
+    <div class="zev-info-row">
+      <span class="zev-info-label">Datenstatus:</span>
+      <span class="zev-status-indicator">
+        <span class="zev-status-dot zev-status-dot--success"></span>
+        <span>Daten vollstaendig</span>
+      </span>
+    </div>
+    <div class="zev-info-row">
+      <span class="zev-info-label">Fehlende Einheiten:</span>
+      <span class="zev-info-value">Keine</span>
+    </div>
+  </div>
+</section>
+
+<!-- Comparison Section -->
+<section class="showcase-section">
+  <h2>Comparison Grid</h2>
+  <div class="zev-comparison-section" style="border-top: none; padding-top: 0;">
+    <h4>Summen-Vergleich</h4>
+    <p class="zev-toleranz-info">Toleranz: 0.100 kWh</p>
+    <div class="zev-comparison-grid">
+      <div class="zev-comparison-item">
+        <span class="zev-status-indicator">
+          <span class="zev-status-dot zev-status-dot--success"></span>
+          <span>A = B</span>
+        </span>
+      </div>
+      <div class="zev-comparison-item">
+        <span class="zev-status-indicator">
+          <span class="zev-status-dot zev-status-dot--error"></span>
+          <span>A = C</span>
+        </span>
+        <span class="zev-differenz">Differenz: +2.450 kWh</span>
+      </div>
+      <div class="zev-comparison-item">
+        <span class="zev-status-indicator">
+          <span class="zev-status-dot zev-status-dot--success"></span>
+          <span>B = C</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Tags and Lists Section -->
+<section class="showcase-section">
+  <h2>Tags und Listen</h2>
+  <div class="subsection">
+    <h3>Tags</h3>
+    <span class="zev-tag-list">
+      <span class="zev-tag">01.01.2024</span>
+      <span class="zev-tag">05.01.2024</span>
+      <span class="zev-tag">12.01.2024</span>
+      <span class="zev-tag">23.01.2024</span>
+    </span>
+  </div>
+  <div class="subsection">
+    <h3>Liste</h3>
+    <ul class="zev-list">
+      <li>Wohnung A</li>
+      <li>Wohnung B</li>
+      <li>Solaranlage</li>
+    </ul>
+  </div>
+</section>
+
+<!-- Bar Chart Section -->
+<section class="showcase-section">
+  <h2>Bar Chart</h2>
+  <table class="zev-table zev-table--bars">
+    <thead>
+      <tr>
+        <th class="zev-table__label-col">Beschreibung</th>
+        <th class="zev-table__bar-col">Visualisierung</th>
+        <th class="zev-table__number">Wert (kWh)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Produktion (Total)</td>
+        <td class="zev-table__bar-cell">
+          <div class="zev-bar-container">
+            <div class="zev-bar" style="width: 100%; background-color: #4CAF50;"></div>
+          </div>
+        </td>
+        <td class="zev-table__number">1250.000</td>
+      </tr>
+      <tr>
+        <td>Verbrauch (Total)</td>
+        <td class="zev-table__bar-cell">
+          <div class="zev-bar-container">
+            <div class="zev-bar" style="width: 85%; background-color: #2196F3;"></div>
+          </div>
+        </td>
+        <td class="zev-table__number">1062.500</td>
+      </tr>
+      <tr>
+        <td>ZEV Producer</td>
+        <td class="zev-table__bar-cell">
+          <div class="zev-bar-container">
+            <div class="zev-bar" style="width: 70%; background-color: #FF9800;"></div>
+          </div>
+        </td>
+        <td class="zev-table__number">875.000</td>
+      </tr>
+      <tr>
+        <td>ZEV Consumer</td>
+        <td class="zev-table__bar-cell">
+          <div class="zev-bar-container">
+            <div class="zev-bar" style="width: 70%; background-color: #9C27B0;"></div>
+          </div>
+        </td>
+        <td class="zev-table__number">875.000</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- Table Variants Section -->
+<section class="showcase-section">
+  <h2>Table Variants</h2>
+  <div class="subsection">
+    <h3>Compact Table mit Row-Typen</h3>
+    <table class="zev-table zev-table--compact">
+      <thead>
+        <tr>
+          <th>Einheit</th>
+          <th>Typ</th>
+          <th class="zev-table__number">Total (kWh)</th>
+          <th class="zev-table__number">ZEV (kWh)</th>
+          <th class="zev-table__number">ZEV berechnet (kWh)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="zev-table__row--producer">
+          <td>Solaranlage</td>
+          <td>Produzent</td>
+          <td class="zev-table__number">1250.000</td>
+          <td class="zev-table__number">875.000</td>
+          <td class="zev-table__number">-</td>
+        </tr>
+        <tr class="zev-table__row--consumer">
+          <td>Wohnung A</td>
+          <td>Konsument</td>
+          <td class="zev-table__number">650.000</td>
+          <td class="zev-table__number">520.000</td>
+          <td class="zev-table__number">520.000</td>
+        </tr>
+        <tr class="zev-table__row--consumer">
+          <td>Wohnung B</td>
+          <td>Konsument</td>
+          <td class="zev-table__number">412.500</td>
+          <td class="zev-table__number">355.000</td>
+          <td class="zev-table__number">355.000</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Collapsible Section -->
+<section class="showcase-section">
+  <h2>Collapsible</h2>
+  <div class="zev-collapsible">
+    <button type="button" class="zev-collapsible__header" (click)="toggleCollapsible()">
+      <span>Details anzeigen</span>
+      <span class="zev-collapsible__icon">{{ collapsibleOpen ? '\u25BC' : '\u25B6' }}</span>
+    </button>
+    @if (collapsibleOpen) {
+      <div class="zev-collapsible__content">
         <div>
           <strong>Fehlende Einheiten:</strong>
           <ul class="zev-list">
@@ -691,69 +694,74 @@
           </span>
         </div>
       </div>
-    </div>
-  </section>
+    }
+  </div>
+</section>
 
-  <!-- Empty State Section -->
-  <section class="showcase-section">
-    <h2>Empty State</h2>
-    <div class="zev-empty-state">
-      <p>Waehlen Sie einen Zeitraum und klicken Sie auf Anzeigen</p>
-    </div>
-  </section>
+<!-- Empty State Section -->
+<section class="showcase-section">
+  <h2>Empty State</h2>
+  <div class="zev-empty-state">
+    <p>Waehlen Sie einen Zeitraum und klicken Sie auf Anzeigen</p>
+  </div>
+</section>
 
-  <!-- Drop Zone Section -->
-  <section class="showcase-section">
-    <h2>Drop Zone</h2>
-    <p>Datei-Upload-Bereich mit Drag & Drop Unterstützung.</p>
+<!-- Drop Zone Section -->
+<section class="showcase-section">
+  <h2>Drop Zone</h2>
+  <p>Datei-Upload-Bereich mit Drag & Drop Unterstützung.</p>
 
-    <div class="subsection">
-      <h3>Standard (ohne Datei)</h3>
-      <div
-        class="zev-drop-zone"
-        [class.zev-drop-zone--active]="dropZoneActive"
-        [class.zev-drop-zone--has-file]="dropZoneFile"
-        (dragover)="onDropZoneDragOver($event)"
-        (dragleave)="onDropZoneDragLeave($event)"
-        (drop)="onDropZoneDrop($event)"
-        (click)="dropZoneInput.click()">
-        <input
-          #dropZoneInput
-          type="file"
-          class="zev-drop-zone__input"
-          (change)="onDropZoneFileSelect($event)">
-        <div class="zev-drop-zone__content" *ngIf="!dropZoneFile">
-          <div class="zev-drop-zone__icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8"/>
-              <line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
+  <div class="subsection">
+    <h3>Standard (ohne Datei)</h3>
+    <div
+      class="zev-drop-zone"
+      [class.zev-drop-zone--active]="dropZoneActive"
+      [class.zev-drop-zone--has-file]="dropZoneFile"
+      (dragover)="onDropZoneDragOver($event)"
+      (dragleave)="onDropZoneDragLeave($event)"
+      (drop)="onDropZoneDrop($event)"
+      (click)="dropZoneInput.click()">
+      <input
+        #dropZoneInput
+        type="file"
+        class="zev-drop-zone__input"
+        (change)="onDropZoneFileSelect($event)">
+        @if (!dropZoneFile) {
+          <div class="zev-drop-zone__content">
+            <div class="zev-drop-zone__icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </div>
+            <p class="zev-drop-zone__text">Datei hierher ziehen</p>
+            <p class="zev-drop-zone__hint">oder klicken zum Auswählen</p>
           </div>
-          <p class="zev-drop-zone__text">Datei hierher ziehen</p>
-          <p class="zev-drop-zone__hint">oder klicken zum Auswählen</p>
-        </div>
-        <div class="zev-drop-zone__file" *ngIf="dropZoneFile">
-          <div class="zev-drop-zone__file-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="16" y1="13" x2="8" y2="13"/>
-              <line x1="16" y1="17" x2="8" y2="17"/>
-              <polyline points="10 9 9 9 8 9"/>
-            </svg>
+        }
+        @if (dropZoneFile) {
+          <div class="zev-drop-zone__file">
+            <div class="zev-drop-zone__file-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
+              </svg>
+            </div>
+            <div class="zev-drop-zone__file-info">
+              <span class="zev-drop-zone__file-name">{{ dropZoneFile.name }}</span>
+              <span class="zev-drop-zone__file-size">{{ formatFileSize(dropZoneFile.size) }}</span>
+            </div>
+            <button type="button" class="zev-drop-zone__remove" (click)="removeDropZoneFile($event)" title="Entfernen">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
           </div>
-          <div class="zev-drop-zone__file-info">
-            <span class="zev-drop-zone__file-name">{{ dropZoneFile.name }}</span>
-            <span class="zev-drop-zone__file-size">{{ formatFileSize(dropZoneFile.size) }}</span>
-          </div>
-          <button type="button" class="zev-drop-zone__remove" (click)="removeDropZoneFile($event)" title="Entfernen">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
+        }
       </div>
     </div>
 

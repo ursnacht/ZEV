@@ -1,9 +1,11 @@
 <div class="zev-container">
   <h1>{{ 'RECHNUNGEN' | translate }}</h1>
 
-  <div *ngIf="message" class="zev-message" [ngClass]="'zev-message--' + messageType">
-    {{ message }}
-  </div>
+  @if (message) {
+    <div class="zev-message" [ngClass]="'zev-message--' + messageType">
+      {{ message }}
+    </div>
+  }
 
   <form (ngSubmit)="onGenerate()">
     <div class="zev-form-group">
@@ -12,85 +14,96 @@
         <div class="zev-checkbox-item zev-checkbox-item--select-all">
           <input type="checkbox" id="consumer-select-all"
             [checked]="allSelected()" [indeterminate]="someSelected()" (change)="onSelectAllToggle()">
-          <label for="consumer-select-all">
-            <strong>{{ 'ALLE_AUSWAEHLEN' | translate }}</strong>
-          </label>
+            <label for="consumer-select-all">
+              <strong>{{ 'ALLE_AUSWAEHLEN' | translate }}</strong>
+            </label>
+          </div>
+          @for (consumer of consumers; track consumer) {
+            <div class="zev-checkbox-item">
+              <input type="checkbox" [id]="'consumer-' + consumer.id" [value]="consumer.id"
+                [checked]="selectedEinheitIds.has(consumer.id!)" (change)="onEinheitToggle(consumer.id!)">
+                <label [for]="'consumer-' + consumer.id">
+                  {{ consumer.name }}
+                  @if (consumer.mietername) {
+                    <span class="zev-text-muted"> ({{ consumer.mietername }})</span>
+                  }
+                </label>
+              </div>
+            }
+          </div>
+          @if (consumers.length === 0 && !loading) {
+            <div class="zev-form-hint">
+              {{ 'KEINE_KONSUMENTEN_VORHANDEN' | translate }}
+            </div>
+          }
         </div>
-        <div *ngFor="let consumer of consumers" class="zev-checkbox-item">
-          <input type="checkbox" [id]="'consumer-' + consumer.id" [value]="consumer.id"
-            [checked]="selectedEinheitIds.has(consumer.id!)" (change)="onEinheitToggle(consumer.id!)">
-          <label [for]="'consumer-' + consumer.id">
-            {{ consumer.name }}
-            <span *ngIf="consumer.mietername" class="zev-text-muted"> ({{ consumer.mietername }})</span>
-          </label>
-        </div>
-      </div>
-      <div *ngIf="consumers.length === 0 && !loading" class="zev-form-hint">
-        {{ 'KEINE_KONSUMENTEN_VORHANDEN' | translate }}
-      </div>
-    </div>
 
-    <app-quarter-selector
-      [selectedVon]="dateFrom"
-      [selectedBis]="dateTo"
-      (quarterSelected)="onQuarterSelected($event)">
-    </app-quarter-selector>
+        <app-quarter-selector
+          [selectedVon]="dateFrom"
+          [selectedBis]="dateTo"
+          (quarterSelected)="onQuarterSelected($event)">
+        </app-quarter-selector>
 
-    <div class="zev-date-range-row">
-      <div class="zev-form-group">
-        <label for="dateFrom">{{ 'VON_DATUM' | translate }}:</label>
-        <input type="date" id="dateFrom" class="zev-input" name="dateFrom" [(ngModel)]="dateFrom"
-          (ngModelChange)="onDateFromChange()" required>
-      </div>
+        <div class="zev-date-range-row">
+          <div class="zev-form-group">
+            <label for="dateFrom">{{ 'VON_DATUM' | translate }}:</label>
+            <input type="date" id="dateFrom" class="zev-input" name="dateFrom" [(ngModel)]="dateFrom"
+              (ngModelChange)="onDateFromChange()" required>
+            </div>
 
-      <div class="zev-form-group">
-        <label for="dateTo">{{ 'BIS_DATUM' | translate }}:</label>
-        <input type="date" id="dateTo" class="zev-input" name="dateTo" [(ngModel)]="dateTo" required>
-      </div>
+            <div class="zev-form-group">
+              <label for="dateTo">{{ 'BIS_DATUM' | translate }}:</label>
+              <input type="date" id="dateTo" class="zev-input" name="dateTo" [(ngModel)]="dateTo" required>
+            </div>
 
-      <div class="zev-button-group">
-        <button type="submit" class="zev-button zev-button--primary"
-          [disabled]="!canGenerate()">
-          {{ generating ? ('GENERIERE' | translate) + '...' : ('GENERIEREN' | translate) }}
-        </button>
-      </div>
-    </div>
-  </form>
-
-  <!-- Results Section -->
-  <div *ngIf="generatedRechnungen.length > 0" class="zev-panel zev-panel--chart">
-    <h3 class="zev-panel__title">{{ 'GENERIERTE_RECHNUNGEN' | translate }}</h3>
-    <div class="zev-panel__content">
-      <p class="zev-text-muted">{{ 'RECHNUNGEN_TEMPORAER_HINWEIS' | translate }}</p>
-
-      <table class="zev-table">
-        <thead>
-          <tr>
-            <th>{{ 'EINHEIT' | translate }}</th>
-            <th>{{ 'MIETERNAME' | translate }}</th>
-            <th class="zev-table__number">{{ 'BETRAG' | translate }} (CHF)</th>
-            <th>{{ 'AKTION' | translate }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let rechnung of generatedRechnungen">
-            <td>{{ rechnung.einheitName }}</td>
-            <td>{{ rechnung.mietername || '-' }}</td>
-            <td class="zev-table__number">{{ formatBetrag(rechnung.endBetrag) }}</td>
-            <td>
-              <button type="button" class="zev-button zev-button--secondary"
-                (click)="onDownload(rechnung)">
-                {{ 'DOWNLOAD' | translate }}
+            <div class="zev-button-group">
+              <button type="submit" class="zev-button zev-button--primary"
+                [disabled]="!canGenerate()">
+                {{ generating ? ('GENERIERE' | translate) + '...' : ('GENERIEREN' | translate) }}
               </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+            </div>
+          </div>
+        </form>
 
-  <!-- Loading State -->
-  <div *ngIf="loading" class="zev-empty-state">
-    {{ 'LADE_DATEN' | translate }}...
-  </div>
-</div>
+        <!-- Results Section -->
+        @if (generatedRechnungen.length > 0) {
+          <div class="zev-panel zev-panel--chart">
+            <h3 class="zev-panel__title">{{ 'GENERIERTE_RECHNUNGEN' | translate }}</h3>
+            <div class="zev-panel__content">
+              <p class="zev-text-muted">{{ 'RECHNUNGEN_TEMPORAER_HINWEIS' | translate }}</p>
+              <table class="zev-table">
+                <thead>
+                  <tr>
+                    <th>{{ 'EINHEIT' | translate }}</th>
+                    <th>{{ 'MIETERNAME' | translate }}</th>
+                    <th class="zev-table__number">{{ 'BETRAG' | translate }} (CHF)</th>
+                    <th>{{ 'AKTION' | translate }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (rechnung of generatedRechnungen; track rechnung) {
+                    <tr>
+                      <td>{{ rechnung.einheitName }}</td>
+                      <td>{{ rechnung.mietername || '-' }}</td>
+                      <td class="zev-table__number">{{ formatBetrag(rechnung.endBetrag) }}</td>
+                      <td>
+                        <button type="button" class="zev-button zev-button--secondary"
+                          (click)="onDownload(rechnung)">
+                          {{ 'DOWNLOAD' | translate }}
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+
+        <!-- Loading State -->
+        @if (loading) {
+          <div class="zev-empty-state">
+            {{ 'LADE_DATEN' | translate }}...
+          </div>
+        }
+      </div>

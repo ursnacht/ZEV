@@ -1,5 +1,4 @@
 import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TranslationService, Translation } from '../../services/translation.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
@@ -8,7 +7,7 @@ import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.comp
 @Component({
   selector: 'app-translation-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe, KebabMenuComponent],
+  imports: [FormsModule, TranslatePipe, KebabMenuComponent],
   templateUrl: './translation-editor.component.html',
   styleUrls: ['./translation-editor.component.css']
 })

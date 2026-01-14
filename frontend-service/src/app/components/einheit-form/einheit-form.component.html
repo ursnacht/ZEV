@@ -6,36 +6,39 @@
       <label for="name">{{ 'NAME' | translate }}:</label>
       <input type="text" id="name" class="zev-input" [(ngModel)]="formData.name" name="name" required maxlength="30"
         [placeholder]="'EINHEIT_NAME' | translate" />
-      <div class="zev-form-error" *ngIf="!formData.name.trim()">
-        {{ 'NAME_IST_ERFORDERLICH' | translate }}
-      </div>
+      @if (!formData.name.trim()) {
+        <div class="zev-form-error">
+          {{ 'NAME_IST_ERFORDERLICH' | translate }}
+        </div>
+      }
     </div>
 
     <div class="zev-form-group">
       <label for="typ">{{ 'TYP' | translate }}:</label>
       <select id="typ" class="zev-select" [(ngModel)]="formData.typ" name="typ" required>
-        <option *ngFor="let option of einheitTypOptions" [value]="option.value">
-          {{ option.label }}
-        </option>
+        @for (option of einheitTypOptions; track option) {
+          <option [value]="option.value">
+            {{ option.label }}
+          </option>
+        }
       </select>
     </div>
 
     <!-- Consumer-specific fields for invoicing -->
-    <ng-container *ngIf="formData.typ === 'CONSUMER'">
+    @if (formData.typ === 'CONSUMER') {
       <div class="zev-form-group">
         <label for="mietername">{{ 'MIETERNAME' | translate }}:</label>
         <input type="text" id="mietername" class="zev-input" [(ngModel)]="formData.mietername" name="mietername" maxlength="100"
           [placeholder]="'MIETERNAME_PLACEHOLDER' | translate" />
         <div class="zev-form-hint">{{ 'MIETERNAME_HINT' | translate }}</div>
       </div>
-
       <div class="zev-form-group">
         <label for="messpunkt">{{ 'MESSPUNKT' | translate }}:</label>
         <input type="text" id="messpunkt" class="zev-input" [(ngModel)]="formData.messpunkt" name="messpunkt" maxlength="50"
           [placeholder]="'MESSPUNKT_PLACEHOLDER' | translate" />
         <div class="zev-form-hint">{{ 'MESSPUNKT_HINT' | translate }}</div>
       </div>
-    </ng-container>
+    }
 
     <div class="form-actions">
       <button type="submit" class="zev-button zev-button--primary" [disabled]="!formData.name.trim()">

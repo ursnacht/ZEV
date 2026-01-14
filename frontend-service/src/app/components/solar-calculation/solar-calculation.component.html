@@ -1,9 +1,11 @@
 <div class="zev-container">
   <h1>{{ 'SOLAR_DISTRIBUTION_BERECHNUNG' | translate }}</h1>
 
-  <div *ngIf="message" class="zev-message" [ngClass]="'zev-message--' + messageType">
-    {{ message }}
-  </div>
+  @if (message) {
+    <div class="zev-message" [ngClass]="'zev-message--' + messageType">
+      {{ message }}
+    </div>
+  }
 
   <form (ngSubmit)="onSubmit()">
     <app-quarter-selector
@@ -46,34 +48,36 @@
     </div>
   </form>
 
-  <div *ngIf="result" class="result-summary">
-    <h2>{{ 'ZUSAMMENFASSUNG' | translate }}</h2>
-    <div class="summary-grid">
-      <div class="summary-item">
-        <span class="label">{{ 'VERWENDETER_ALGORITHMUS' | translate }}:</span>
-        <span class="value">{{ result.algorithm === 'PROPORTIONAL' ? ('ALGORITHMUS_PROPORTIONAL' | translate) :
+  @if (result) {
+    <div class="result-summary">
+      <h2>{{ 'ZUSAMMENFASSUNG' | translate }}</h2>
+      <div class="summary-grid">
+        <div class="summary-item">
+          <span class="label">{{ 'VERWENDETER_ALGORITHMUS' | translate }}:</span>
+          <span class="value">{{ result.algorithm === 'PROPORTIONAL' ? ('ALGORITHMUS_PROPORTIONAL' | translate) :
           ('ALGORITHMUS_EQUAL_SHARE' | translate) }}</span>
-      </div>
-      <div class="summary-item">
-        <span class="label">{{ 'ZEITBEREICH' | translate }}:</span>
-        <span class="value">{{ result.dateFrom | date:'short' }} - {{ result.dateTo | date:'short' }}</span>
-      </div>
-      <div class="summary-item">
-        <span class="label">{{ 'VERARBEITETE_ZEITSTEMPEL' | translate }}:</span>
-        <span class="value">{{ result.processedTimestamps }}</span>
-      </div>
-      <div class="summary-item">
-        <span class="label">{{ 'VERARBEITETE_EINTRAEGE' | translate }}:</span>
-        <span class="value">{{ result.processedRecords }}</span>
-      </div>
-      <div class="summary-item">
-        <span class="label">{{ 'GESAMT_SOLAR_PRODUKTION' | translate }}:</span>
-        <span class="value">{{ result.totalSolarProduced | number:'1.2-2' }} kWh</span>
-      </div>
-      <div class="summary-item">
-        <span class="label">{{ 'GESAMT_VERTEILT' | translate }}:</span>
-        <span class="value">{{ result.totalDistributed | number:'1.2-2' }} kWh</span>
+        </div>
+        <div class="summary-item">
+          <span class="label">{{ 'ZEITBEREICH' | translate }}:</span>
+          <span class="value">{{ result.dateFrom | date:'short' }} - {{ result.dateTo | date:'short' }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="label">{{ 'VERARBEITETE_ZEITSTEMPEL' | translate }}:</span>
+          <span class="value">{{ result.processedTimestamps }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="label">{{ 'VERARBEITETE_EINTRAEGE' | translate }}:</span>
+          <span class="value">{{ result.processedRecords }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="label">{{ 'GESAMT_SOLAR_PRODUKTION' | translate }}:</span>
+          <span class="value">{{ result.totalSolarProduced | number:'1.2-2' }} kWh</span>
+        </div>
+        <div class="summary-item">
+          <span class="label">{{ 'GESAMT_VERTEILT' | translate }}:</span>
+          <span class="value">{{ result.totalDistributed | number:'1.2-2' }} kWh</span>
+        </div>
       </div>
     </div>
-  </div>
+  }
 </div>

@@ -1,62 +1,72 @@
 <div class="container">
-    <h2>{{ 'TRANSLATION_EDITOR' | translate }}</h2>
+  <h2>{{ 'TRANSLATION_EDITOR' | translate }}</h2>
 
-    <div class="new-translation-form">
-        <h3>{{ 'ADD_NEW_TRANSLATION' | translate }}</h3>
-        <div class="form-group">
-            <label>{{ 'KEY' | translate }}</label>
-            <input type="text" [(ngModel)]="newTranslation.key" class="zev-input"
-                [placeholder]="'KEY_NAME' | translate">
+  <div class="new-translation-form">
+    <h3>{{ 'ADD_NEW_TRANSLATION' | translate }}</h3>
+    <div class="form-group">
+      <label>{{ 'KEY' | translate }}</label>
+      <input type="text" [(ngModel)]="newTranslation.key" class="zev-input"
+        [placeholder]="'KEY_NAME' | translate">
+      </div>
+      <div class="form-group">
+        <label>{{ 'DEUTSCH' | translate }}</label>
+        <input type="text" [(ngModel)]="newTranslation.deutsch" class="zev-input"
+          [placeholder]="'DEUTSCHER_TEXT' | translate">
         </div>
         <div class="form-group">
-            <label>{{ 'DEUTSCH' | translate }}</label>
-            <input type="text" [(ngModel)]="newTranslation.deutsch" class="zev-input"
-                [placeholder]="'DEUTSCHER_TEXT' | translate">
+          <label>{{ 'ENGLISCH' | translate }}</label>
+          <input type="text" [(ngModel)]="newTranslation.englisch" class="zev-input"
+            [placeholder]="'ENGLISH_TEXT' | translate">
+          </div>
+          <button (click)="createTranslation()" class="zev-button zev-button--primary">{{ 'ADD' | translate }}</button>
         </div>
-        <div class="form-group">
-            <label>{{ 'ENGLISCH' | translate }}</label>
-            <input type="text" [(ngModel)]="newTranslation.englisch" class="zev-input"
-                [placeholder]="'ENGLISH_TEXT' | translate">
-        </div>
-        <button (click)="createTranslation()" class="zev-button zev-button--primary">{{ 'ADD' | translate }}</button>
-    </div>
 
-    <table class="translation-table" *ngIf="translations.length > 0">
-        <thead>
-            <tr>
+        @if (translations.length > 0) {
+          <table class="translation-table">
+            <thead>
+              <tr>
                 <th class="zev-table__header--sortable" (click)="onSort('key')">
-                    {{ 'KEY' | translate }}
-                    <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'key'">
-                        {{ sortDirection === 'asc' ? '▲' : '▼' }}
+                  {{ 'KEY' | translate }}
+                  @if (sortColumn === 'key') {
+                    <span class="zev-table__sort-indicator">
+                      {{ sortDirection === 'asc' ? '▲' : '▼' }}
                     </span>
+                  }
                 </th>
                 <th class="zev-table__header--sortable" (click)="onSort('deutsch')">
-                    {{ 'DEUTSCH' | translate }}
-                    <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'deutsch'">
-                        {{ sortDirection === 'asc' ? '▲' : '▼' }}
+                  {{ 'DEUTSCH' | translate }}
+                  @if (sortColumn === 'deutsch') {
+                    <span class="zev-table__sort-indicator">
+                      {{ sortDirection === 'asc' ? '▲' : '▼' }}
                     </span>
+                  }
                 </th>
                 <th class="zev-table__header--sortable" (click)="onSort('englisch')">
-                    {{ 'ENGLISCH' | translate }}
-                    <span class="zev-table__sort-indicator" *ngIf="sortColumn === 'englisch'">
-                        {{ sortDirection === 'asc' ? '▲' : '▼' }}
+                  {{ 'ENGLISCH' | translate }}
+                  @if (sortColumn === 'englisch') {
+                    <span class="zev-table__sort-indicator">
+                      {{ sortDirection === 'asc' ? '▲' : '▼' }}
                     </span>
+                  }
                 </th>
                 <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr *ngFor="let t of translations">
-                <td>{{ t.key }}</td>
-                <td><input type="text" [(ngModel)]="t.deutsch" class="zev-input"></td>
-                <td><input type="text" [(ngModel)]="t.englisch" class="zev-input"></td>
-                <td>
+              </tr>
+            </thead>
+            <tbody>
+              @for (t of translations; track t) {
+                <tr>
+                  <td>{{ t.key }}</td>
+                  <td><input type="text" [(ngModel)]="t.deutsch" class="zev-input"></td>
+                  <td><input type="text" [(ngModel)]="t.englisch" class="zev-input"></td>
+                  <td>
                     <app-kebab-menu
-                        [items]="menuItems"
-                        (itemClick)="onMenuAction($event, t)">
+                      [items]="menuItems"
+                      (itemClick)="onMenuAction($event, t)">
                     </app-kebab-menu>
-                </td>
-            </tr>
-        </tbody>
-    </table>
-</div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>

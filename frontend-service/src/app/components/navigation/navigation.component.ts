@@ -1,6 +1,5 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { RouterModule } from '@angular/router';
-import { CommonModule } from '@angular/common';
 
 import Keycloak from 'keycloak-js';
 import { KeycloakProfile } from 'keycloak-js';
@@ -10,7 +9,7 @@ import { TranslatePipe } from '../../pipes/translate.pipe';
 @Component({
   selector: 'app-navigation',
   standalone: true,
-  imports: [CommonModule, RouterModule, TranslatePipe],
+  imports: [RouterModule, TranslatePipe],
   templateUrl: './navigation.component.html',
   styleUrls: ['./navigation.component.css']
 })

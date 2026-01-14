@@ -76,8 +76,8 @@
                 <artifactId>frontend-maven-plugin</artifactId>
                 <version>1.15.0</version>
                 <configuration>
-                    <nodeVersion>v20.11.0</nodeVersion>
-                    <npmVersion>10.2.4</npmVersion>
+                    <nodeVersion>v20.19.0</nodeVersion>
+                    <npmVersion>10.8.2</npmVersion>
                     <workingDirectory>${project.basedir}</workingDirectory>
                 </configuration>
                 <executions>

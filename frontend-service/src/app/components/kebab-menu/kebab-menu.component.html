@@ -6,13 +6,15 @@
   </button>
 
   <ul class="zev-kebab-menu" [class.zev-kebab-menu--open]="isOpen">
-    <li *ngFor="let item of items">
-      <button class="zev-kebab-menu__item"
-              [class.zev-kebab-menu__item--danger]="item.danger"
-              (click)="onItemClick(item.action)"
-              type="button">
-        {{ item.label | translate }}
-      </button>
-    </li>
+    @for (item of items; track item) {
+      <li>
+        <button class="zev-kebab-menu__item"
+          [class.zev-kebab-menu__item--danger]="item.danger"
+          (click)="onItemClick(item.action)"
+          type="button">
+          {{ item.label | translate }}
+        </button>
+      </li>
+    }
   </ul>
 </div>

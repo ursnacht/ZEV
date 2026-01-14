@@ -1,9 +1,11 @@
 <div class="zev-container">
   <h1>{{ 'STATISTIK' | translate }}</h1>
 
-  <div *ngIf="message" class="zev-message" [ngClass]="'zev-message--' + messageType">
-    {{ message }}
-  </div>
+  @if (message) {
+    <div class="zev-message" [ngClass]="'zev-message--' + messageType">
+      {{ message }}
+    </div>
+  }
 
   <!-- Filter Section -->
   <div class="zev-panel">
@@ -21,264 +23,301 @@
             <label for="dateFrom">{{ 'VON_DATUM' | translate }}:</label>
             <input type="date" id="dateFrom" class="zev-input" name="dateFrom" [(ngModel)]="dateFrom"
               (ngModelChange)="onDateFromChange()" required>
-          </div>
+            </div>
 
-          <div class="zev-form-group">
-            <label for="dateTo">{{ 'BIS_DATUM' | translate }}:</label>
-            <input type="date" id="dateTo" class="zev-input" name="dateTo" [(ngModel)]="dateTo" required>
-          </div>
+            <div class="zev-form-group">
+              <label for="dateTo">{{ 'BIS_DATUM' | translate }}:</label>
+              <input type="date" id="dateTo" class="zev-input" name="dateTo" [(ngModel)]="dateTo" required>
+            </div>
 
-          <div class="zev-button-group">
-            <button type="submit" class="zev-button zev-button--primary" [disabled]="loading || !dateFrom || !dateTo">
-              {{ loading ? ('LADE_DATEN' | translate) : ('ANZEIGEN' | translate) }}
-            </button>
-            <button type="button" class="zev-button zev-button--secondary" (click)="exportPdf()"
-              [disabled]="!statistik || loading">
-              {{ 'PDF_EXPORTIEREN' | translate }}
-            </button>
+            <div class="zev-button-group">
+              <button type="submit" class="zev-button zev-button--primary" [disabled]="loading || !dateFrom || !dateTo">
+                {{ loading ? ('LADE_DATEN' | translate) : ('ANZEIGEN' | translate) }}
+              </button>
+              <button type="button" class="zev-button zev-button--secondary" (click)="exportPdf()"
+                [disabled]="!statistik || loading">
+                {{ 'PDF_EXPORTIEREN' | translate }}
+              </button>
+            </div>
           </div>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Overview Section -->
-  <div *ngIf="statistik" class="zev-panel">
-    <h3 class="zev-panel__title">{{ 'STATISTIK_UEBERSICHT' | translate }}</h3>
-    <div class="zev-panel__content">
-      <!-- Messwerte vorhanden bis -->
-      <div class="zev-info-row">
-        <span class="zev-info-label">{{ 'MESSWERTE_VORHANDEN_BIS' | translate }}:</span>
-        <span class="zev-info-value">{{ statistik.messwerteBisDate || '-' }}</span>
-      </div>
-
-      <!-- Datenvollständigkeit -->
-      <div class="zev-info-row">
-        <span class="zev-info-label">{{ 'DATENSTATUS' | translate }}:</span>
-        <span class="zev-status-indicator">
-          <span class="zev-status-dot" [ngClass]="getStatusClass(statistik.datenVollstaendig)"></span>
-          <span>{{ (statistik.datenVollstaendig ? 'DATEN_VOLLSTAENDIG' : 'DATEN_UNVOLLSTAENDIG') | translate }}</span>
-        </span>
-      </div>
-
-      <!-- Aufklappbare Details für fehlende Daten -->
-      <div *ngIf="!statistik.datenVollstaendig" class="zev-collapsible">
-        <button type="button" class="zev-collapsible__header" (click)="toggleGlobalDetails()">
-          <span>{{ 'DETAILS_ANZEIGEN' | translate }}</span>
-          <span class="zev-collapsible__icon">{{ expandedGlobalDetails ? '▼' : '▶' }}</span>
-        </button>
-        <div *ngIf="expandedGlobalDetails" class="zev-collapsible__content">
-          <div *ngIf="statistik.fehlendeEinheiten.length > 0">
-            <strong>{{ 'FEHLENDE_EINHEITEN' | translate }}:</strong>
-            <ul class="zev-list">
-              <li *ngFor="let einheit of statistik.fehlendeEinheiten">{{ einheit }}</li>
-            </ul>
-          </div>
-          <div *ngIf="statistik.fehlendeTage.length > 0">
-            <strong>{{ 'FEHLENDE_TAGE' | translate }}:</strong>
-            <span class="zev-tag-list">
-              <span *ngFor="let tag of statistik.fehlendeTage" class="zev-tag">{{ tag }}</span>
-            </span>
-          </div>
-        </div>
+        </form>
       </div>
     </div>
-  </div>
 
-  <!-- Monthly Statistics -->
-  <div *ngFor="let monat of statistik?.monate; let i = index" class="zev-panel zev-panel--month">
-    <h3 class="zev-panel__title">
-      <span class="zev-status-indicator">
-        <span class="zev-status-dot" [ngClass]="getStatusClass(monat.datenVollstaendig)"></span>
-        <span>{{ getMonthName(monat.monat) }} {{ monat.jahr }}</span>
-      </span>
-      <span class="zev-panel__subtitle">({{ monat.von }} - {{ monat.bis }})</span>
-    </h3>
-    <div class="zev-panel__content">
-      <!-- Summen Tabelle mit Balkendiagrammen -->
-      <table class="zev-table zev-table--bars">
-        <thead>
-          <tr>
-            <th class="zev-table__label-col">{{ 'BESCHREIBUNG' | translate }}</th>
-            <th class="zev-table__bar-col">{{ 'VISUALISIERUNG' | translate }}</th>
-            <th class="zev-table__number">{{ 'WERT' | translate }} (kWh)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>{{ 'PRODUKTION_TOTAL' | translate }}</td>
-            <td class="zev-table__bar-cell">
-              <div class="zev-bar-container">
-                <div class="zev-bar"
-                     [style.width.%]="getBarWidth(monat.summeProducerTotal, monat)"
-                     [style.background-color]="getBarColor('A')">
-                </div>
-              </div>
-            </td>
-            <td class="zev-table__number">{{ formatNumber(monat.summeProducerTotal) }}</td>
-          </tr>
-          <tr>
-            <td>{{ 'VERBRAUCH_TOTAL' | translate }}</td>
-            <td class="zev-table__bar-cell">
-              <div class="zev-bar-container">
-                <div class="zev-bar"
-                     [style.width.%]="getBarWidth(monat.summeConsumerTotal, monat)"
-                     [style.background-color]="getBarColor('B')">
-                </div>
-              </div>
-            </td>
-            <td class="zev-table__number">{{ formatNumber(monat.summeConsumerTotal) }}</td>
-          </tr>
-          <tr>
-            <td>{{ 'ZEV_PRODUCER' | translate }} (A)</td>
-            <td class="zev-table__bar-cell">
-              <div class="zev-bar-container">
-                <div class="zev-bar"
-                     [style.width.%]="getBarWidth(monat.summeProducerZev, monat)"
-                     [style.background-color]="getBarColor('C')">
-                </div>
-              </div>
-            </td>
-            <td class="zev-table__number">{{ formatNumber(monat.summeProducerZev) }}</td>
-          </tr>
-          <tr>
-            <td>{{ 'ZEV_CONSUMER' | translate }} (B)</td>
-            <td class="zev-table__bar-cell">
-              <div class="zev-bar-container">
-                <div class="zev-bar"
-                     [style.width.%]="getBarWidth(monat.summeConsumerZev, monat)"
-                     [style.background-color]="getBarColor('D')">
-                </div>
-              </div>
-            </td>
-            <td class="zev-table__number">{{ formatNumber(monat.summeConsumerZev) }}</td>
-          </tr>
-          <tr>
-            <td>{{ 'ZEV_CONSUMER_BERECHNET' | translate }} (C)</td>
-            <td class="zev-table__bar-cell">
-              <div class="zev-bar-container">
-                <div class="zev-bar"
-                     [style.width.%]="getBarWidth(monat.summeConsumerZevCalculated, monat)"
-                     [style.background-color]="getBarColor('E')">
-                </div>
-              </div>
-            </td>
-            <td class="zev-table__number">{{ formatNumber(monat.summeConsumerZevCalculated) }}</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <!-- Vergleiche -->
-      <div class="zev-comparison-section">
-        <h4>{{ 'SUMMEN_VERGLEICH' | translate }}</h4>
-        <p class="zev-toleranz-info">{{ 'TOLERANZ' | translate }}: {{ statistik?.toleranz }} kWh</p>
-        <div class="zev-comparison-grid">
-          <div class="zev-comparison-item">
+    <!-- Overview Section -->
+    @if (statistik) {
+      <div class="zev-panel">
+        <h3 class="zev-panel__title">{{ 'STATISTIK_UEBERSICHT' | translate }}</h3>
+        <div class="zev-panel__content">
+          <!-- Messwerte vorhanden bis -->
+          <div class="zev-info-row">
+            <span class="zev-info-label">{{ 'MESSWERTE_VORHANDEN_BIS' | translate }}:</span>
+            <span class="zev-info-value">{{ statistik.messwerteBisDate || '-' }}</span>
+          </div>
+          <!-- Datenvollständigkeit -->
+          <div class="zev-info-row">
+            <span class="zev-info-label">{{ 'DATENSTATUS' | translate }}:</span>
             <span class="zev-status-indicator">
-              <span class="zev-status-dot" [ngClass]="getComparisonStatusClass(monat.summenCDGleich)"></span>
-              <span>A = B</span>
-            </span>
-            <span *ngIf="!monat.summenCDGleich" class="zev-differenz">
-              {{ 'DIFFERENZ' | translate }}: {{ formatDifferenz(monat.differenzCD) }} kWh
+              <span class="zev-status-dot" [ngClass]="getStatusClass(statistik.datenVollstaendig)"></span>
+              <span>{{ (statistik.datenVollstaendig ? 'DATEN_VOLLSTAENDIG' : 'DATEN_UNVOLLSTAENDIG') | translate }}</span>
             </span>
           </div>
-          <div class="zev-comparison-item">
-            <span class="zev-status-indicator">
-              <span class="zev-status-dot" [ngClass]="getComparisonStatusClass(monat.summenCEGleich)"></span>
-              <span>A = C</span>
-            </span>
-            <span *ngIf="!monat.summenCEGleich" class="zev-differenz">
-              {{ 'DIFFERENZ' | translate }}: {{ formatDifferenz(monat.differenzCE) }} kWh
-            </span>
-          </div>
-          <div class="zev-comparison-item">
-            <span class="zev-status-indicator">
-              <span class="zev-status-dot" [ngClass]="getComparisonStatusClass(monat.summenDEGleich)"></span>
-              <span>B = C</span>
-            </span>
-            <span *ngIf="!monat.summenDEGleich" class="zev-differenz">
-              {{ 'DIFFERENZ' | translate }}: {{ formatDifferenz(monat.differenzDE) }} kWh
-            </span>
-          </div>
+          <!-- Aufklappbare Details für fehlende Daten -->
+          @if (!statistik.datenVollstaendig) {
+            <div class="zev-collapsible">
+              <button type="button" class="zev-collapsible__header" (click)="toggleGlobalDetails()">
+                <span>{{ 'DETAILS_ANZEIGEN' | translate }}</span>
+                <span class="zev-collapsible__icon">{{ expandedGlobalDetails ? '▼' : '▶' }}</span>
+              </button>
+              @if (expandedGlobalDetails) {
+                <div class="zev-collapsible__content">
+                  @if (statistik.fehlendeEinheiten.length > 0) {
+                    <div>
+                      <strong>{{ 'FEHLENDE_EINHEITEN' | translate }}:</strong>
+                      <ul class="zev-list">
+                        @for (einheit of statistik.fehlendeEinheiten; track einheit) {
+                          <li>{{ einheit }}</li>
+                        }
+                      </ul>
+                    </div>
+                  }
+                  @if (statistik.fehlendeTage.length > 0) {
+                    <div>
+                      <strong>{{ 'FEHLENDE_TAGE' | translate }}:</strong>
+                      <span class="zev-tag-list">
+                        @for (tag of statistik.fehlendeTage; track tag) {
+                          <span class="zev-tag">{{ tag }}</span>
+                        }
+                      </span>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
         </div>
       </div>
+    }
 
-      <!-- Summen pro Einheit -->
-      <div *ngIf="monat.einheitSummen && monat.einheitSummen.length > 0" class="zev-einheit-summen-section">
-        <h4>{{ 'SUMMEN_PRO_EINHEIT' | translate }}</h4>
-        <table class="zev-table zev-table--compact">
-          <thead>
-            <tr>
-              <th>{{ 'EINHEIT' | translate }}</th>
-              <th>{{ 'TYP' | translate }}</th>
-              <th class="zev-table__number">{{ 'TOTAL' | translate }} (kWh)</th>
-              <th class="zev-table__number">{{ 'ZEV' | translate }} (kWh)</th>
-              <th class="zev-table__number">{{ 'ZEV_BERECHNET' | translate }} (kWh)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let einheit of monat.einheitSummen"
-                [ngClass]="{'zev-table__row--producer': einheit.einheitTyp === 'PRODUCER', 'zev-table__row--consumer': einheit.einheitTyp === 'CONSUMER'}">
-              <td>{{ einheit.einheitName }}</td>
-              <td>{{ (einheit.einheitTyp === 'PRODUCER' ? 'PRODUZENT' : 'KONSUMENT') | translate }}</td>
-              <td class="zev-table__number">{{ formatNumber(einheit.summeTotal) }}</td>
-              <td class="zev-table__number">{{ formatNumber(einheit.summeZev) }}</td>
-              <td class="zev-table__number">{{ einheit.einheitTyp === 'CONSUMER' ? formatNumber(einheit.summeZevCalculated) : '-' }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Aufklappbare Details -->
-      <div *ngIf="!monat.datenVollstaendig || monat.tageAbweichungen.length > 0" class="zev-collapsible">
-        <button type="button" class="zev-collapsible__header" (click)="toggleMonthDetails(i)">
-          <span>{{ 'DETAILS_ANZEIGEN' | translate }}</span>
-          <span class="zev-collapsible__icon">{{ isMonthExpanded(i) ? '▼' : '▶' }}</span>
-        </button>
-        <div *ngIf="isMonthExpanded(i)" class="zev-collapsible__content">
-          <!-- Fehlende Einheiten -->
-          <div *ngIf="monat.fehlendeEinheiten.length > 0">
-            <strong>{{ 'FEHLENDE_EINHEITEN' | translate }}:</strong>
-            <ul class="zev-list">
-              <li *ngFor="let einheit of monat.fehlendeEinheiten">{{ einheit }}</li>
-            </ul>
+    <!-- Monthly Statistics -->
+    @for (monat of statistik?.monate; track monat; let i = $index) {
+      <div class="zev-panel zev-panel--month">
+        <h3 class="zev-panel__title">
+          <span class="zev-status-indicator">
+            <span class="zev-status-dot" [ngClass]="getStatusClass(monat.datenVollstaendig)"></span>
+            <span>{{ getMonthName(monat.monat) }} {{ monat.jahr }}</span>
+          </span>
+          <span class="zev-panel__subtitle">({{ monat.von }} - {{ monat.bis }})</span>
+        </h3>
+        <div class="zev-panel__content">
+          <!-- Summen Tabelle mit Balkendiagrammen -->
+          <table class="zev-table zev-table--bars">
+            <thead>
+              <tr>
+                <th class="zev-table__label-col">{{ 'BESCHREIBUNG' | translate }}</th>
+                <th class="zev-table__bar-col">{{ 'VISUALISIERUNG' | translate }}</th>
+                <th class="zev-table__number">{{ 'WERT' | translate }} (kWh)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{{ 'PRODUKTION_TOTAL' | translate }}</td>
+                <td class="zev-table__bar-cell">
+                  <div class="zev-bar-container">
+                    <div class="zev-bar"
+                      [style.width.%]="getBarWidth(monat.summeProducerTotal, monat)"
+                      [style.background-color]="getBarColor('A')">
+                    </div>
+                  </div>
+                </td>
+                <td class="zev-table__number">{{ formatNumber(monat.summeProducerTotal) }}</td>
+              </tr>
+              <tr>
+                <td>{{ 'VERBRAUCH_TOTAL' | translate }}</td>
+                <td class="zev-table__bar-cell">
+                  <div class="zev-bar-container">
+                    <div class="zev-bar"
+                      [style.width.%]="getBarWidth(monat.summeConsumerTotal, monat)"
+                      [style.background-color]="getBarColor('B')">
+                    </div>
+                  </div>
+                </td>
+                <td class="zev-table__number">{{ formatNumber(monat.summeConsumerTotal) }}</td>
+              </tr>
+              <tr>
+                <td>{{ 'ZEV_PRODUCER' | translate }} (A)</td>
+                <td class="zev-table__bar-cell">
+                  <div class="zev-bar-container">
+                    <div class="zev-bar"
+                      [style.width.%]="getBarWidth(monat.summeProducerZev, monat)"
+                      [style.background-color]="getBarColor('C')">
+                    </div>
+                  </div>
+                </td>
+                <td class="zev-table__number">{{ formatNumber(monat.summeProducerZev) }}</td>
+              </tr>
+              <tr>
+                <td>{{ 'ZEV_CONSUMER' | translate }} (B)</td>
+                <td class="zev-table__bar-cell">
+                  <div class="zev-bar-container">
+                    <div class="zev-bar"
+                      [style.width.%]="getBarWidth(monat.summeConsumerZev, monat)"
+                      [style.background-color]="getBarColor('D')">
+                    </div>
+                  </div>
+                </td>
+                <td class="zev-table__number">{{ formatNumber(monat.summeConsumerZev) }}</td>
+              </tr>
+              <tr>
+                <td>{{ 'ZEV_CONSUMER_BERECHNET' | translate }} (C)</td>
+                <td class="zev-table__bar-cell">
+                  <div class="zev-bar-container">
+                    <div class="zev-bar"
+                      [style.width.%]="getBarWidth(monat.summeConsumerZevCalculated, monat)"
+                      [style.background-color]="getBarColor('E')">
+                    </div>
+                  </div>
+                </td>
+                <td class="zev-table__number">{{ formatNumber(monat.summeConsumerZevCalculated) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <!-- Vergleiche -->
+          <div class="zev-comparison-section">
+            <h4>{{ 'SUMMEN_VERGLEICH' | translate }}</h4>
+            <p class="zev-toleranz-info">{{ 'TOLERANZ' | translate }}: {{ statistik?.toleranz }} kWh</p>
+            <div class="zev-comparison-grid">
+              <div class="zev-comparison-item">
+                <span class="zev-status-indicator">
+                  <span class="zev-status-dot" [ngClass]="getComparisonStatusClass(monat.summenCDGleich)"></span>
+                  <span>A = B</span>
+                </span>
+                @if (!monat.summenCDGleich) {
+                  <span class="zev-differenz">
+                    {{ 'DIFFERENZ' | translate }}: {{ formatDifferenz(monat.differenzCD) }} kWh
+                  </span>
+                }
+              </div>
+              <div class="zev-comparison-item">
+                <span class="zev-status-indicator">
+                  <span class="zev-status-dot" [ngClass]="getComparisonStatusClass(monat.summenCEGleich)"></span>
+                  <span>A = C</span>
+                </span>
+                @if (!monat.summenCEGleich) {
+                  <span class="zev-differenz">
+                    {{ 'DIFFERENZ' | translate }}: {{ formatDifferenz(monat.differenzCE) }} kWh
+                  </span>
+                }
+              </div>
+              <div class="zev-comparison-item">
+                <span class="zev-status-indicator">
+                  <span class="zev-status-dot" [ngClass]="getComparisonStatusClass(monat.summenDEGleich)"></span>
+                  <span>B = C</span>
+                </span>
+                @if (!monat.summenDEGleich) {
+                  <span class="zev-differenz">
+                    {{ 'DIFFERENZ' | translate }}: {{ formatDifferenz(monat.differenzDE) }} kWh
+                  </span>
+                }
+              </div>
+            </div>
           </div>
-
-          <!-- Fehlende Tage -->
-          <div *ngIf="monat.fehlendeTage.length > 0">
-            <strong>{{ 'FEHLENDE_TAGE' | translate }}:</strong>
-            <span class="zev-tag-list">
-              <span *ngFor="let tag of monat.fehlendeTage" class="zev-tag">{{ tag }}</span>
-            </span>
-          </div>
-
-          <!-- Tage mit Abweichungen -->
-          <div *ngIf="monat.tageAbweichungen.length > 0">
-            <strong>{{ 'TAGE_MIT_ABWEICHUNGEN' | translate }}:</strong>
-            <table class="zev-table zev-table--compact">
-              <thead>
-                <tr>
-                  <th>{{ 'DATUM' | translate }}</th>
-                  <th>{{ 'ABWEICHUNG' | translate }}</th>
-                  <th class="zev-table__number">{{ 'DIFFERENZ' | translate }} (kWh)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let abweichung of monat.tageAbweichungen">
-                  <td>{{ abweichung.datum }}</td>
-                  <td>{{ abweichung.abweichungstyp }}</td>
-                  <td class="zev-table__number">{{ formatNumber(abweichung.differenz) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <!-- Summen pro Einheit -->
+          @if (monat.einheitSummen && monat.einheitSummen.length > 0) {
+            <div class="zev-einheit-summen-section">
+              <h4>{{ 'SUMMEN_PRO_EINHEIT' | translate }}</h4>
+              <table class="zev-table zev-table--compact">
+                <thead>
+                  <tr>
+                    <th>{{ 'EINHEIT' | translate }}</th>
+                    <th>{{ 'TYP' | translate }}</th>
+                    <th class="zev-table__number">{{ 'TOTAL' | translate }} (kWh)</th>
+                    <th class="zev-table__number">{{ 'ZEV' | translate }} (kWh)</th>
+                    <th class="zev-table__number">{{ 'ZEV_BERECHNET' | translate }} (kWh)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (einheit of monat.einheitSummen; track einheit) {
+                    <tr
+                      [ngClass]="{'zev-table__row--producer': einheit.einheitTyp === 'PRODUCER', 'zev-table__row--consumer': einheit.einheitTyp === 'CONSUMER'}">
+                      <td>{{ einheit.einheitName }}</td>
+                      <td>{{ (einheit.einheitTyp === 'PRODUCER' ? 'PRODUZENT' : 'KONSUMENT') | translate }}</td>
+                      <td class="zev-table__number">{{ formatNumber(einheit.summeTotal) }}</td>
+                      <td class="zev-table__number">{{ formatNumber(einheit.summeZev) }}</td>
+                      <td class="zev-table__number">{{ einheit.einheitTyp === 'CONSUMER' ? formatNumber(einheit.summeZevCalculated) : '-' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+          <!-- Aufklappbare Details -->
+          @if (!monat.datenVollstaendig || monat.tageAbweichungen.length > 0) {
+            <div class="zev-collapsible">
+              <button type="button" class="zev-collapsible__header" (click)="toggleMonthDetails(i)">
+                <span>{{ 'DETAILS_ANZEIGEN' | translate }}</span>
+                <span class="zev-collapsible__icon">{{ isMonthExpanded(i) ? '▼' : '▶' }}</span>
+              </button>
+              @if (isMonthExpanded(i)) {
+                <div class="zev-collapsible__content">
+                  <!-- Fehlende Einheiten -->
+                  @if (monat.fehlendeEinheiten.length > 0) {
+                    <div>
+                      <strong>{{ 'FEHLENDE_EINHEITEN' | translate }}:</strong>
+                      <ul class="zev-list">
+                        @for (einheit of monat.fehlendeEinheiten; track einheit) {
+                          <li>{{ einheit }}</li>
+                        }
+                      </ul>
+                    </div>
+                  }
+                  <!-- Fehlende Tage -->
+                  @if (monat.fehlendeTage.length > 0) {
+                    <div>
+                      <strong>{{ 'FEHLENDE_TAGE' | translate }}:</strong>
+                      <span class="zev-tag-list">
+                        @for (tag of monat.fehlendeTage; track tag) {
+                          <span class="zev-tag">{{ tag }}</span>
+                        }
+                      </span>
+                    </div>
+                  }
+                  <!-- Tage mit Abweichungen -->
+                  @if (monat.tageAbweichungen.length > 0) {
+                    <div>
+                      <strong>{{ 'TAGE_MIT_ABWEICHUNGEN' | translate }}:</strong>
+                      <table class="zev-table zev-table--compact">
+                        <thead>
+                          <tr>
+                            <th>{{ 'DATUM' | translate }}</th>
+                            <th>{{ 'ABWEICHUNG' | translate }}</th>
+                            <th class="zev-table__number">{{ 'DIFFERENZ' | translate }} (kWh)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (abweichung of monat.tageAbweichungen; track abweichung) {
+                            <tr>
+                              <td>{{ abweichung.datum }}</td>
+                              <td>{{ abweichung.abweichungstyp }}</td>
+                              <td class="zev-table__number">{{ formatNumber(abweichung.differenz) }}</td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
         </div>
       </div>
-    </div>
-  </div>
+    }
 
-  <!-- Empty State -->
-  <div *ngIf="!statistik && !loading" class="zev-empty-state">
-    <p>{{ 'WAEHLEN_SIE_EINEN_ZEITRAUM' | translate }}</p>
+    <!-- Empty State -->
+    @if (!statistik && !loading) {
+      <div class="zev-empty-state">
+        <p>{{ 'WAEHLEN_SIE_EINEN_ZEITRAUM' | translate }}</p>
+      </div>
+    }
   </div>
-</div>

@@ -1,9 +1,11 @@
 <div class="zev-container">
   <h1>{{ 'MESSWERTE_GRAFIK' | translate }}</h1>
 
-  <div *ngIf="message" class="zev-message" [ngClass]="'zev-message--' + messageType">
-    {{ message }}
-  </div>
+  @if (message) {
+    <div class="zev-message" [ngClass]="'zev-message--' + messageType">
+      {{ message }}
+    </div>
+  }
 
   <form (ngSubmit)="onSubmit()">
     <div class="zev-form-group">
@@ -12,51 +14,55 @@
         <div class="zev-checkbox-item zev-checkbox-item--select-all">
           <input type="checkbox" id="einheit-select-all"
             [checked]="allSelected()" [indeterminate]="someSelected()" (change)="onSelectAllToggle()">
-          <label for="einheit-select-all">
-            <strong>{{ 'ALLE_AUSWAEHLEN' | translate }}</strong>
-          </label>
+            <label for="einheit-select-all">
+              <strong>{{ 'ALLE_AUSWAEHLEN' | translate }}</strong>
+            </label>
+          </div>
+          @for (einheit of einheiten; track einheit) {
+            <div class="zev-checkbox-item">
+              <input type="checkbox" [id]="'einheit-' + einheit.id" [value]="einheit.id"
+                [checked]="selectedEinheitIds.has(einheit.id!)" (change)="onEinheitToggle(einheit.id!)">
+                <label [for]="'einheit-' + einheit.id">
+                  {{ einheit.name }} ({{ einheit.typ }})
+                </label>
+              </div>
+            }
+          </div>
         </div>
-        <div *ngFor="let einheit of einheiten" class="zev-checkbox-item">
-          <input type="checkbox" [id]="'einheit-' + einheit.id" [value]="einheit.id"
-            [checked]="selectedEinheitIds.has(einheit.id!)" (change)="onEinheitToggle(einheit.id!)">
-          <label [for]="'einheit-' + einheit.id">
-            {{ einheit.name }} ({{ einheit.typ }})
-          </label>
-        </div>
+
+        <app-quarter-selector
+          [selectedVon]="dateFrom"
+          [selectedBis]="dateTo"
+          (quarterSelected)="onQuarterSelected($event)">
+        </app-quarter-selector>
+
+        <div class="zev-date-range-row">
+          <div class="zev-form-group">
+            <label for="dateFrom">{{ 'VON_DATUM' | translate }}:</label>
+            <input type="date" id="dateFrom" class="zev-input" name="dateFrom" [(ngModel)]="dateFrom"
+              (ngModelChange)="onDateFromChange()" required>
+            </div>
+
+            <div class="zev-form-group">
+              <label for="dateTo">{{ 'BIS_DATUM' | translate }}:</label>
+              <input type="date" id="dateTo" class="zev-input" name="dateTo" [(ngModel)]="dateTo" required>
+            </div>
+
+            <div class="zev-button-group">
+              <button type="submit" class="zev-button zev-button--primary"
+                [disabled]="loading || !dateFrom || !dateTo || selectedEinheitIds.size === 0">
+                {{ loading ? ('LADE_DATEN' | translate) : ('ANZEIGEN' | translate) }}
+              </button>
+            </div>
+          </div>
+        </form>
+
+        @for (chartData of charts; track chartData) {
+          <div class="zev-panel zev-panel--chart">
+            <h3 class="zev-panel__title">{{ chartData.einheitName }} ({{ chartData.einheitTyp }})</h3>
+            <div class="zev-panel__content">
+              <canvas [id]="'chart-' + chartData.einheitId"></canvas>
+            </div>
+          </div>
+        }
       </div>
-    </div>
-
-    <app-quarter-selector
-      [selectedVon]="dateFrom"
-      [selectedBis]="dateTo"
-      (quarterSelected)="onQuarterSelected($event)">
-    </app-quarter-selector>
-
-    <div class="zev-date-range-row">
-      <div class="zev-form-group">
-        <label for="dateFrom">{{ 'VON_DATUM' | translate }}:</label>
-        <input type="date" id="dateFrom" class="zev-input" name="dateFrom" [(ngModel)]="dateFrom"
-          (ngModelChange)="onDateFromChange()" required>
-      </div>
-
-      <div class="zev-form-group">
-        <label for="dateTo">{{ 'BIS_DATUM' | translate }}:</label>
-        <input type="date" id="dateTo" class="zev-input" name="dateTo" [(ngModel)]="dateTo" required>
-      </div>
-
-      <div class="zev-button-group">
-        <button type="submit" class="zev-button zev-button--primary"
-          [disabled]="loading || !dateFrom || !dateTo || selectedEinheitIds.size === 0">
-          {{ loading ? ('LADE_DATEN' | translate) : ('ANZEIGEN' | translate) }}
-        </button>
-      </div>
-    </div>
-  </form>
-
-  <div *ngFor="let chartData of charts" class="zev-panel zev-panel--chart">
-    <h3 class="zev-panel__title">{{ chartData.einheitName }} ({{ chartData.einheitTyp }})</h3>
-    <div class="zev-panel__content">
-      <canvas [id]="'chart-' + chartData.einheitId"></canvas>
-    </div>
-  </div>
-</div>
