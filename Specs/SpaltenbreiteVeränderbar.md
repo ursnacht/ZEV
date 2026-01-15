@@ -7,7 +7,7 @@
 
 ## 2. Funktionale Anforderungen (FR) - Was soll das System tun?
 ### FR-1: Ablauf / Flow
-1. Durch Ziehen mit der Maus (drag) eines senkrechten Striches im Titel von Tabellen, kann die Spaltenbreite verändert werden.
+1. Durch Ziehen mit der Maus (drag) eines senkrechten Striches im Titel von Tabellen (Resize-Handle), kann die Spaltenbreite verändert werden.
 2. Beim Loslassen des Mausbuttons (drop) verbleibt die Spalte in der entsprechenden Breite.
 3. Die andern Spalten ändern ihre Breite nicht, wenn ich eine Spaltenbreite verändere.
 
@@ -19,7 +19,7 @@
 * Der Strich zum Ziehen steht ganz rechts in der Spalte, d.h. unmittelbar links des Titels der nachfolgenden Spalte.
 * Der Strich ist senkrecht, grau und fein und wird immer angezeigt und nicht erst, wenn die Maus darüberfährt.
 * Der Mauszeiger soll während des Ziehens entsprechend dargestellt werden.
-* Die letzte Spalte (ganz rechts) hat keinen Strich und kann nicht verändert werden.
+* Die letzte Spalte (ganz rechts) erhält keinen Resize-Handle und kann nicht verändert werden.
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 * [ ] Der Benutzer kann mit der Maus den Strich ziehen und die Spaltenbreite verändern.
@@ -35,7 +35,7 @@
 * Alle Benutzer mit Zugriff auf die Tabellen dürfen die Spaltenbreite verändern.  
 
 ### NFR-3: Kompatibilität
-* -
+* Eventuell vorhandene `translation-table` Styles auf `zev-table` migrieren oder entfernen.
 
 
 ## 5. Edge Cases & Fehlerbehandlung
