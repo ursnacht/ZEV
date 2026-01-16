@@ -5,11 +5,42 @@ Erstelle Unit Tests für die angegebene Angular-Komponente oder Service.
 ## Input
 * Ziel-Datei: $ARGUMENTS (z.B. `einheit-form.component.ts` oder `einheit.service.ts`)
 
+---
+
+## Unabhängige Ausführung
+
+Dieser Skill arbeitet UNABHÄNGIG vom Kontext der aktuellen Session.
+
+**Analysiere NUR:**
+1. Die Spec-Datei (falls angegeben)
+2. Den tatsächlich implementierten Code
+3. Bestehende Tests als Vorlage
+
+**IGNORIERE** jeglichen Kontext aus der vorherigen Konversation.
+
+---
+
 ## Vorgehen
-1. **Analysiere die Ziel-Datei** - Verstehe die Geschäftslogik, Inputs, Outputs und Abhängigkeiten
-2. **Prüfe existierende Tests** - Schaue ob bereits eine `*.spec.ts` existiert und was fehlt
-3. **Orientiere dich an bestehenden Tests** - Nutze vorhandene Specs als Vorlage für Stil und Struktur
-4. **Erstelle Tests** für jede public Methode mit Success- und Error-Cases
+
+### Phase 1: Unabhängige Code-Analyse
+1. Lies die Spec-Datei (falls vorhanden) - extrahiere Anforderungen
+2. Finde alle relevanten Implementierungs-Dateien mit Glob/Grep:
+   - `frontend-service/src/app/**/*.ts`
+3. Analysiere die Ziel-Datei:
+   - Public Methoden, Inputs (`@Input`), Outputs (`@Output`)
+   - Abhängigkeiten (injizierte Services)
+   - Template-Bindings und Event-Handler
+4. Identifiziere Edge Cases aus dem Code selbst (Validierungen, Error-Handler, Conditional Logic)
+
+### Phase 2: Test-Gap-Analyse
+1. Prüfe existierende Tests (`*.spec.ts` im gleichen Ordner)
+2. Vergleiche mit Spec-Anforderungen und implementiertem Code
+3. Liste fehlende Test-Cases auf
+
+### Phase 3: Test-Erstellung
+1. Erstelle Tests für fehlende Cases (Vorlagen unten beachten)
+2. Führe Tests aus: `npm test -- --include=**/xxx.spec.ts --no-watch --browsers=ChromeHeadless`
+3. Behebe Fehler bis Tests grün sind
 
 ## Testpyramide
 * **Unit Tests:** 70-80% der Tests (dieser Command)

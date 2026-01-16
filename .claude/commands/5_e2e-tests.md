@@ -5,10 +5,43 @@ Erstelle End-to-End Tests mit Playwright für komplette User Flows.
 ## Input
 * Ziel: $ARGUMENTS (z.B. `Tarifverwaltung` oder `Specs/Tarifverwaltung_Umsetzungsplan.md`)
 
+---
+
+## Unabhängige Ausführung
+
+Dieser Skill arbeitet UNABHÄNGIG vom Kontext der aktuellen Session.
+
+**Analysiere NUR:**
+1. Die Spec-Datei (falls angegeben)
+2. Die tatsächlich implementierten Komponenten und Routes
+3. Bestehende E2E-Tests als Vorlage
+
+**IGNORIERE** jeglichen Kontext aus der vorherigen Konversation.
+
+---
+
 ## Vorgehen
-1. **Identifiziere User Flows** - Welche Benutzer-Szenarien sollen getestet werden?
-2. **Prüfe existierende Tests** - Schaue in `frontend-service/tests/` nach vorhandenen Tests
-3. **Orientiere dich an bestehenden Tests** - Nutze vorhandene Specs als Vorlage für Stil und Struktur
+
+### Phase 1: Unabhängige Code-Analyse
+1. Lies die Spec-Datei (falls vorhanden) - extrahiere User Stories und Akzeptanzkriterien
+2. Analysiere die Routing-Konfiguration: `frontend-service/src/app/app.routes.ts`
+3. Finde relevante Komponenten mit Glob/Grep:
+   - `frontend-service/src/app/components/**/*.html`
+4. Identifiziere testbare User Flows:
+   - Navigation (Menü, Links)
+   - Formulare (Eingabe, Validierung, Submit)
+   - CRUD-Operationen (Liste, Erstellen, Bearbeiten, Löschen)
+   - Fehlermeldungen und Feedback
+
+### Phase 2: Test-Gap-Analyse
+1. Prüfe existierende E2E-Tests in `frontend-service/tests/`
+2. Vergleiche mit Spec-Anforderungen und UI-Flows
+3. Liste fehlende Test-Szenarien auf
+
+### Phase 3: Test-Erstellung
+1. Erstelle Tests für fehlende Szenarien
+2. Führe Tests aus: `npm run e2e:ci` oder `npx playwright test tests/xxx.spec.ts`
+3. Behebe Fehler bis Tests grün sind
 
 ## Testpyramide
 * **E2E Tests:** 5-10% der Tests (dieser Command)

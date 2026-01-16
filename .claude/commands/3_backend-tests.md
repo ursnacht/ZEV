@@ -5,10 +5,39 @@ Erstelle Unit- und Integrationstests für Backend-Code.
 ## Input
 * Ziel: $ARGUMENTS (z.B. `Specs/Tarifverwaltung_Umsetzungsplan.md` oder kurz `TarifService`)
 
+---
+
+## Unabhängige Ausführung
+
+Dieser Skill arbeitet UNABHÄNGIG vom Kontext der aktuellen Session.
+
+**Analysiere NUR:**
+1. Die Spec-Datei (falls angegeben)
+2. Den tatsächlich implementierten Code
+3. Bestehende Tests als Vorlage
+
+**IGNORIERE** jeglichen Kontext aus der vorherigen Konversation.
+
+---
+
 ## Vorgehen
-1. **Analysiere den Code** - Verstehe die zu testende Klasse/Funktionalität
-2. **Prüfe existierende Tests** - Schaue ob bereits Tests existieren und was fehlt
-3. **Orientiere dich an bestehenden Tests** - Nutze vorhandene Tests als Vorlage
+
+### Phase 1: Unabhängige Code-Analyse
+1. Lies die Spec-Datei (falls vorhanden) - extrahiere Anforderungen
+2. Finde alle relevanten Implementierungs-Dateien mit Glob/Grep:
+   - `backend-service/src/main/java/ch/nacht/**/*.java`
+3. Analysiere public API: Methoden, Parameter, Return-Types, Exceptions
+4. Identifiziere Edge Cases aus dem Code selbst (null-checks, Validierungen, Fehlerbehandlung)
+
+### Phase 2: Test-Gap-Analyse
+1. Prüfe existierende Tests in `backend-service/src/test/java/`
+2. Vergleiche mit Spec-Anforderungen und implementiertem Code
+3. Liste fehlende Test-Cases auf
+
+### Phase 3: Test-Erstellung
+1. Erstelle Tests für fehlende Cases (Vorlagen unten beachten)
+2. Führe Tests aus: `mvn test -Dtest=XxxTest`
+3. Behebe Fehler bis Tests grün sind
 
 ## Testpyramide
 * **Unit Tests:** 70-80% der Tests
