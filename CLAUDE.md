@@ -117,6 +117,13 @@ mvn test
 - `MesswerteChartComponent` - Chart visualization
 - `SolarCalculationComponent` - Distribution calculator
 - `TranslationEditorComponent` - Admin translation management
+- `StatistikComponent` - Statistics and reporting
+
+**Shared Frontend Utilities:**
+- `SwissDatePipe` - Formats dates to Swiss format (dd.MM.yyyy)
+- `TranslatePipe` - i18n translation pipe
+- `ColumnResizeDirective` - Resizable table columns with drag & auto-fit
+- `date-utils.ts` - Date formatting/parsing utilities (`formatSwissDate`, `parseSwissDate`)
 
 ## Key Conventions
 
@@ -219,8 +226,13 @@ Bei der Code-Generierung diese Dateien als Vorlage verwenden und deren Struktur 
 | Service | `frontend-service/src/app/services/tarif.service.ts` |
 | List-Component | `frontend-service/src/app/components/tarif-list/` |
 | Form-Component | `frontend-service/src/app/components/tarif-form/` |
+| Directive | `frontend-service/src/app/directives/column-resize.directive.ts` |
+| Pipe | `frontend-service/src/app/pipes/swiss-date.pipe.ts` |
+| Utility | `frontend-service/src/app/utils/date-utils.ts` |
 | Service Unit Test | `frontend-service/src/app/services/tarif.service.spec.ts` |
 | Component Unit Test | `frontend-service/src/app/components/tarif-form/tarif-form.component.spec.ts` |
+| Directive Unit Test | `frontend-service/src/app/directives/column-resize.directive.spec.ts` |
+| Pipe Unit Test | `frontend-service/src/app/pipes/swiss-date.pipe.spec.ts` |
 | E2E Test | `frontend-service/tests/tarif-verwaltung.spec.ts` |
 
 ### Umsetzungsplan
@@ -240,6 +252,7 @@ Feature specs are in `/Specs/`:
 - `RechnungenGenerieren.md` - Invoice generation
 - `Statistik.md` - Statistics and reporting
 - `Metriken.md` - Prometheus metrics integration
+- `SpaltenbreiteVeränderbar.md` - Resizable table columns
 - `Anleitung-keycloak.md` - Keycloak configuration guide
 
 Specs with `_Umsetzungsplan` suffix contain implementation plans.
