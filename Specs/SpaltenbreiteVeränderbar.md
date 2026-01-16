@@ -10,6 +10,7 @@
 1. Durch Ziehen mit der Maus (drag) eines senkrechten Striches im Titel von Tabellen (Resize-Handle), kann die Spaltenbreite verändert werden.
 2. Beim Loslassen des Mausbuttons (drop) verbleibt die Spalte in der entsprechenden Breite.
 3. Die andern Spalten ändern ihre Breite nicht, wenn ich eine Spaltenbreite verändere.
+4. Auto-Fit bei Doppelklick: Passt Spalte automatisch an den breitesten Inhalt an
 
 ### FR-2: Persistierung
 * Die Spaltenbreite soll nicht gespeichert werden. 
@@ -43,7 +44,7 @@
 
 
 ## 6. Abgrenzung / Out of Scope
-* Bei einem Doppelklick auf den Strich soll nichts passieren.
+* -
 
 ## 7. Offene Fragen
 * Gibt es ein besseres Icon als der senkrechte Strich zum Ziehen?
