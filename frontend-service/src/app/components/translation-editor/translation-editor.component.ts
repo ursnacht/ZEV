@@ -3,11 +3,12 @@ import { FormsModule } from '@angular/forms';
 import { TranslationService, Translation } from '../../services/translation.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.component';
+import { ColumnResizeDirective } from '../../directives/column-resize.directive';
 
 @Component({
   selector: 'app-translation-editor',
   standalone: true,
-  imports: [FormsModule, TranslatePipe, KebabMenuComponent],
+  imports: [FormsModule, TranslatePipe, KebabMenuComponent, ColumnResizeDirective],
   templateUrl: './translation-editor.component.html',
   styleUrls: ['./translation-editor.component.css']
 })

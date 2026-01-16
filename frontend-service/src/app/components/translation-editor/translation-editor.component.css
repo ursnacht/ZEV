@@ -19,18 +19,6 @@
     font-weight: bold;
 }
 
-.translation-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.translation-table th,
-.translation-table td {
-    padding: 0.75rem;
-    border-bottom: 1px solid #ddd;
-    text-align: left;
-}
-
 .zev-input {
     width: 100%;
     padding: 0.5rem;

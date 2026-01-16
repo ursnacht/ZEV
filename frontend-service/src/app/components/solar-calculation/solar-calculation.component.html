@@ -59,7 +59,7 @@
         </div>
         <div class="summary-item">
           <span class="label">{{ 'ZEITBEREICH' | translate }}:</span>
-          <span class="value">{{ result.dateFrom | date:'short' }} - {{ result.dateTo | date:'short' }}</span>
+          <span class="value">{{ result.dateFrom | swissDate }} - {{ result.dateTo | swissDate }}</span>
         </div>
         <div class="summary-item">
           <span class="label">{{ 'VERARBEITETE_ZEITSTEMPEL' | translate }}:</span>

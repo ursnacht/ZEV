@@ -3,13 +3,14 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MesswerteService, CalculationResponse } from '../../services/messwerte.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { SwissDatePipe } from '../../pipes/swiss-date.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
 
 @Component({
   selector: 'app-solar-calculation',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe, QuarterSelectorComponent],
+  imports: [CommonModule, FormsModule, TranslatePipe, SwissDatePipe, QuarterSelectorComponent],
   templateUrl: './solar-calculation.component.html',
   styleUrls: ['./solar-calculation.component.css']
 })

@@ -52,7 +52,7 @@
           <!-- Messwerte vorhanden bis -->
           <div class="zev-info-row">
             <span class="zev-info-label">{{ 'MESSWERTE_VORHANDEN_BIS' | translate }}:</span>
-            <span class="zev-info-value">{{ statistik.messwerteBisDate || '-' }}</span>
+            <span class="zev-info-value">{{ statistik.messwerteBisDate | swissDate }}</span>
           </div>
           <!-- Datenvollständigkeit -->
           <div class="zev-info-row">
@@ -86,7 +86,7 @@
                       <strong>{{ 'FEHLENDE_TAGE' | translate }}:</strong>
                       <span class="zev-tag-list">
                         @for (tag of statistik.fehlendeTage; track tag) {
-                          <span class="zev-tag">{{ tag }}</span>
+                          <span class="zev-tag">{{ tag | swissDate }}</span>
                         }
                       </span>
                     </div>
@@ -107,7 +107,7 @@
             <span class="zev-status-dot" [ngClass]="getStatusClass(monat.datenVollstaendig)"></span>
             <span>{{ getMonthName(monat.monat) }} {{ monat.jahr }}</span>
           </span>
-          <span class="zev-panel__subtitle">({{ monat.von }} - {{ monat.bis }})</span>
+          <span class="zev-panel__subtitle">({{ monat.von | swissDate }} - {{ monat.bis | swissDate }})</span>
         </h3>
         <div class="zev-panel__content">
           <!-- Summen Tabelle mit Balkendiagrammen -->
@@ -277,7 +277,7 @@
                       <strong>{{ 'FEHLENDE_TAGE' | translate }}:</strong>
                       <span class="zev-tag-list">
                         @for (tag of monat.fehlendeTage; track tag) {
-                          <span class="zev-tag">{{ tag }}</span>
+                          <span class="zev-tag">{{ tag | swissDate }}</span>
                         }
                       </span>
                     </div>
@@ -297,7 +297,7 @@
                         <tbody>
                           @for (abweichung of monat.tageAbweichungen; track abweichung) {
                             <tr>
-                              <td>{{ abweichung.datum }}</td>
+                              <td>{{ abweichung.datum | swissDate }}</td>
                               <td>{{ abweichung.abweichungstyp }}</td>
                               <td class="zev-table__number">{{ formatNumber(abweichung.differenz) }}</td>
                             </tr>

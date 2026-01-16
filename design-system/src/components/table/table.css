@@ -23,6 +23,7 @@
 }
 
 .zev-table th {
+  position: relative;
   background-color: var(--color-gray-50);
   font-weight: var(--font-weight-semibold);
   color: var(--color-gray-800);
@@ -57,4 +58,31 @@
   margin-left: var(--spacing-xxs);
   font-size: var(--font-size-xs);
   color: var(--color-primary);
+}
+
+/* Column Resize Handle */
+.zev-table__resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--table-resize-handle-width);
+  background-color: var(--table-resize-handle-color);
+  cursor: col-resize;
+  z-index: 1;
+}
+
+.zev-table__resize-handle:hover,
+.zev-table__resize-handle--active {
+  background-color: var(--table-resize-handle-hover-color);
+}
+
+/* Table state during column resize */
+.zev-table--resizing {
+  user-select: none;
+  cursor: col-resize;
+}
+
+.zev-table--resizing * {
+  cursor: col-resize;
 }

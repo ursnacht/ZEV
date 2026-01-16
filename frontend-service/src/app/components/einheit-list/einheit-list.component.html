@@ -12,7 +12,7 @@
       <button class="zev-button zev-button--primary" (click)="onCreateNew()">{{ 'NEUE_EINHEIT_ERSTELLEN' | translate
       }}</button>
       @if (einheiten.length > 0) {
-        <table class="zev-table">
+        <table class="zev-table" appColumnResize>
           <thead>
             <tr>
               <th class="zev-table__header--sortable" (click)="onSort('id')">

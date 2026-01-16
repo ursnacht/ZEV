@@ -4,13 +4,14 @@ import { FormsModule } from '@angular/forms';
 import { StatistikService } from '../../services/statistik.service';
 import { Statistik, MonatsStatistik, TagMitAbweichung } from '../../models/statistik.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { SwissDatePipe } from '../../pipes/swiss-date.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
 
 @Component({
   selector: 'app-statistik',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe, QuarterSelectorComponent],
+  imports: [CommonModule, FormsModule, TranslatePipe, SwissDatePipe, QuarterSelectorComponent],
   templateUrl: './statistik.component.html',
   styleUrls: ['./statistik.component.css']
 })

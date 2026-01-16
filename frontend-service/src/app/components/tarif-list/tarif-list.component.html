@@ -26,7 +26,7 @@
         <button class="zev-button zev-button--secondary" (click)="onValidateJahre()">{{ 'JAHRE_VALIDIEREN' | translate }}</button>
       </div>
       @if (tarife.length > 0) {
-        <table class="zev-table">
+        <table class="zev-table" appColumnResize>
           <thead>
             <tr>
               <th class="zev-table__header--sortable" (click)="onSort('tariftyp')">
@@ -82,8 +82,8 @@
                 </td>
                 <td>{{ tarif.bezeichnung }}</td>
                 <td class="number">{{ formatPreis(tarif.preis) }}</td>
-                <td>{{ formatDate(tarif.gueltigVon) }}</td>
-                <td>{{ formatDate(tarif.gueltigBis) }}</td>
+                <td>{{ tarif.gueltigVon | swissDate }}</td>
+                <td>{{ tarif.gueltigBis | swissDate }}</td>
                 <td>
                   <app-kebab-menu
                     [items]="menuItems"

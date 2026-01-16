@@ -92,6 +92,10 @@
   --chart-min-height: 200px;
   --chart-max-height: 1000px;
 
-  /* table row height */
+  /* Table */
   --table-row-height: 1.0;
+  --table-resize-handle-width: 4px;
+  --table-resize-handle-color: var(--color-gray-400);
+  --table-resize-handle-hover-color: var(--color-primary);
+  --table-column-min-width: 50px;
 }

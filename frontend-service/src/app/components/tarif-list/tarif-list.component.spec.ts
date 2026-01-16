@@ -299,19 +299,6 @@ describe('TarifListComponent', () => {
     });
   });
 
-  describe('formatDate', () => {
-    it('should format date string to Swiss format', () => {
-      const result = component.formatDate('2024-06-15');
-      expect(result).toContain('15');
-      expect(result).toContain('6') ;
-      expect(result).toContain('2024');
-    });
-
-    it('should return dash for empty date', () => {
-      expect(component.formatDate('')).toBe('-');
-    });
-  });
-
   describe('formatPreis', () => {
     it('should format price with 5 decimal places', () => {
       expect(component.formatPreis(0.195)).toBe('0.19500');

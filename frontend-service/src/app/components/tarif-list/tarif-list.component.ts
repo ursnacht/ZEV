@@ -4,13 +4,15 @@ import { TarifService } from '../../services/tarif.service';
 import { Tarif, TarifTyp, ValidationResult } from '../../models/tarif.model';
 import { TarifFormComponent } from '../tarif-form/tarif-form.component';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { SwissDatePipe } from '../../pipes/swiss-date.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.component';
+import { ColumnResizeDirective } from '../../directives/column-resize.directive';
 
 @Component({
   selector: 'app-tarif-list',
   standalone: true,
-  imports: [CommonModule, TarifFormComponent, TranslatePipe, KebabMenuComponent],
+  imports: [CommonModule, TarifFormComponent, TranslatePipe, SwissDatePipe, KebabMenuComponent, ColumnResizeDirective],
   templateUrl: './tarif-list.component.html',
   styleUrls: ['./tarif-list.component.css']
 })
@@ -148,12 +150,6 @@ export class TarifListComponent implements OnInit {
       }
       return 0;
     });
-  }
-
-  formatDate(dateStr: string): string {
-    if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('de-CH');
   }
 
   formatPreis(preis: number): string {

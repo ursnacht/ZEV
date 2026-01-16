@@ -6,11 +6,12 @@ import { EinheitFormComponent } from '../einheit-form/einheit-form.component';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.component';
+import { ColumnResizeDirective } from '../../directives/column-resize.directive';
 
 @Component({
   selector: 'app-einheit-list',
   standalone: true,
-  imports: [CommonModule, EinheitFormComponent, TranslatePipe, KebabMenuComponent],
+  imports: [CommonModule, EinheitFormComponent, TranslatePipe, KebabMenuComponent, ColumnResizeDirective],
   templateUrl: './einheit-list.component.html',
   styleUrls: ['./einheit-list.component.css']
 })
