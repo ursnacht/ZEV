@@ -7,11 +7,12 @@ import { Einheit } from '../../models/einheit.model';
 import { TranslationService } from '../../services/translation.service';
 
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { IconComponent } from '../icon/icon.component';
 
 @Component({
   selector: 'app-messwerte-upload',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe],
+  imports: [CommonModule, FormsModule, TranslatePipe, IconComponent],
   templateUrl: './messwerte-upload.component.html',
   styleUrls: ['./messwerte-upload.component.css']
 })

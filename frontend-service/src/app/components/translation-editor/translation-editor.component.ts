@@ -4,11 +4,12 @@ import { TranslationService, Translation } from '../../services/translation.serv
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.component';
 import { ColumnResizeDirective } from '../../directives/column-resize.directive';
+import { IconComponent } from '../icon/icon.component';
 
 @Component({
   selector: 'app-translation-editor',
   standalone: true,
-  imports: [FormsModule, TranslatePipe, KebabMenuComponent, ColumnResizeDirective],
+  imports: [FormsModule, TranslatePipe, KebabMenuComponent, ColumnResizeDirective, IconComponent],
   templateUrl: './translation-editor.component.html',
   styleUrls: ['./translation-editor.component.css']
 })
@@ -20,8 +21,8 @@ export class TranslationEditorComponent implements OnInit {
   sortDirection: 'asc' | 'desc' = 'asc';
 
   menuItems: KebabMenuItem[] = [
-    { label: 'SAVE', action: 'save' },
-    { label: 'DELETE', action: 'delete', danger: true }
+    { label: 'SAVE', action: 'save', icon: 'check' },
+    { label: 'DELETE', action: 'delete', danger: true, icon: 'trash-2' }
   ];
 
   constructor(private translationService: TranslationService) { }

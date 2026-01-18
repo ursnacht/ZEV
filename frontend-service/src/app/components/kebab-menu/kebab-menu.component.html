@@ -12,6 +12,9 @@
           [class.zev-kebab-menu__item--danger]="item.danger"
           (click)="onItemClick(item.action)"
           type="button">
+          @if (item.icon) {
+            <app-icon [name]="item.icon"></app-icon>
+          }
           {{ item.label | translate }}
         </button>
       </li>

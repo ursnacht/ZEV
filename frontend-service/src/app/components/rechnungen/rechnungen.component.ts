@@ -7,11 +7,12 @@ import { Einheit, EinheitTyp } from '../../models/einheit.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
+import { IconComponent } from '../icon/icon.component';
 
 @Component({
   selector: 'app-rechnungen',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe, QuarterSelectorComponent],
+  imports: [CommonModule, FormsModule, TranslatePipe, QuarterSelectorComponent, IconComponent],
   templateUrl: './rechnungen.component.html',
   styleUrls: ['./rechnungen.component.css']
 })

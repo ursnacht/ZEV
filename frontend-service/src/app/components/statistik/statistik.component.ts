@@ -7,11 +7,12 @@ import { TranslatePipe } from '../../pipes/translate.pipe';
 import { SwissDatePipe } from '../../pipes/swiss-date.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
+import { IconComponent } from '../icon/icon.component';
 
 @Component({
   selector: 'app-statistik',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe, SwissDatePipe, QuarterSelectorComponent],
+  imports: [CommonModule, FormsModule, TranslatePipe, SwissDatePipe, QuarterSelectorComponent, IconComponent],
   templateUrl: './statistik.component.html',
   styleUrls: ['./statistik.component.css']
 })

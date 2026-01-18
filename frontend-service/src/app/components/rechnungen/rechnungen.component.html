@@ -1,5 +1,5 @@
 <div class="zev-container">
-  <h1>{{ 'RECHNUNGEN' | translate }}</h1>
+  <h1><app-icon name="file-text" size="lg"></app-icon> {{ 'RECHNUNGEN' | translate }}</h1>
 
   @if (message) {
     <div class="zev-message" [ngClass]="'zev-message--' + messageType">
@@ -59,6 +59,7 @@
             <div class="zev-button-group">
               <button type="submit" class="zev-button zev-button--primary"
                 [disabled]="!canGenerate()">
+                <app-icon name="file-text"></app-icon>
                 {{ generating ? ('GENERIERE' | translate) + '...' : ('GENERIEREN' | translate) }}
               </button>
             </div>
@@ -89,6 +90,7 @@
                       <td>
                         <button type="button" class="zev-button zev-button--secondary"
                           (click)="onDownload(rechnung)">
+                          <app-icon name="download"></app-icon>
                           {{ 'DOWNLOAD' | translate }}
                         </button>
                       </td>

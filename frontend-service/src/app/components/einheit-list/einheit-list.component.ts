@@ -7,11 +7,12 @@ import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.component';
 import { ColumnResizeDirective } from '../../directives/column-resize.directive';
+import { IconComponent } from '../icon/icon.component';
 
 @Component({
   selector: 'app-einheit-list',
   standalone: true,
-  imports: [CommonModule, EinheitFormComponent, TranslatePipe, KebabMenuComponent, ColumnResizeDirective],
+  imports: [CommonModule, EinheitFormComponent, TranslatePipe, KebabMenuComponent, ColumnResizeDirective, IconComponent],
   templateUrl: './einheit-list.component.html',
   styleUrls: ['./einheit-list.component.css']
 })
@@ -25,8 +26,8 @@ export class EinheitListComponent implements OnInit {
   sortDirection: 'asc' | 'desc' = 'asc';
 
   menuItems: KebabMenuItem[] = [
-    { label: 'BEARBEITEN', action: 'edit' },
-    { label: 'LOESCHEN', action: 'delete', danger: true }
+    { label: 'BEARBEITEN', action: 'edit', icon: 'edit-2' },
+    { label: 'LOESCHEN', action: 'delete', danger: true, icon: 'trash-2' }
   ];
 
   constructor(

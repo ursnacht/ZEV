@@ -1,15 +1,19 @@
 import { Component } from '@angular/core';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
+import { IconComponent } from '../icon/icon.component';
+import { ICONS } from '../icon/icons';
 
 @Component({
   selector: 'app-design-system-showcase',
   standalone: true,
-  imports: [TranslatePipe, QuarterSelectorComponent],
+  imports: [TranslatePipe, QuarterSelectorComponent, IconComponent],
   templateUrl: './design-system-showcase.component.html',
   styleUrl: './design-system-showcase.component.css'
 })
 export class DesignSystemShowcaseComponent {
+  // Icon names for showcase
+  iconNames: string[] = Object.keys(ICONS);
   collapsibleOpen = false;
   quarterDateFrom = '';
   quarterDateTo = '';

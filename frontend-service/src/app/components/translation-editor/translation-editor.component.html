@@ -1,5 +1,5 @@
 <div class="container">
-  <h2>{{ 'TRANSLATION_EDITOR' | translate }}</h2>
+  <h2><app-icon name="globe" size="lg"></app-icon> {{ 'TRANSLATION_EDITOR' | translate }}</h2>
 
   <div class="new-translation-form">
     <h3>{{ 'ADD_NEW_TRANSLATION' | translate }}</h3>
@@ -18,7 +18,10 @@
           <input type="text" [(ngModel)]="newTranslation.englisch" class="zev-input"
             [placeholder]="'ENGLISH_TEXT' | translate">
           </div>
-          <button (click)="createTranslation()" class="zev-button zev-button--primary">{{ 'ADD' | translate }}</button>
+          <button (click)="createTranslation()" class="zev-button zev-button--primary">
+            <app-icon name="plus"></app-icon>
+            {{ 'ADD' | translate }}
+          </button>
         </div>
 
         @if (translations.length > 0) {

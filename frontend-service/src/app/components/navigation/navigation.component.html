@@ -1,6 +1,9 @@
 <nav class="zev-navbar">
   <div class="zev-navbar__container">
-    <h1 class="zev-navbar__title">{{ 'ZEV_MANAGEMENT' | translate }}</h1>
+    <h1 class="zev-navbar__title">
+      <app-icon name="sun" size="lg"></app-icon>
+      {{ 'ZEV_MANAGEMENT' | translate }}
+    </h1>
 
     <button class="zev-hamburger" (click)="toggleMenu()" [class.active]="isMenuOpen" aria-label="Menu">
       <span class="bar"></span>
@@ -12,42 +15,58 @@
       <li>
         <a routerLink="/upload" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-        {{ 'MESSWERTE_UPLOAD' | translate }}</a>
+          <app-icon name="upload"></app-icon>
+          {{ 'MESSWERTE_UPLOAD' | translate }}
+        </a>
       </li>
       <li>
         <a routerLink="/einheiten" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-        {{ 'EINHEITEN_VERWALTUNG' | translate }}</a>
+          <app-icon name="home"></app-icon>
+          {{ 'EINHEITEN_VERWALTUNG' | translate }}
+        </a>
       </li>
       <li>
         <a routerLink="/solar-calculation" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-        {{ 'SOLAR_DISTRIBUTION' | translate }}</a>
+          <app-icon name="zap"></app-icon>
+          {{ 'SOLAR_DISTRIBUTION' | translate }}
+        </a>
       </li>
       <li>
         <a routerLink="/chart" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-        {{ 'MESSWERTE_GRAFIK' | translate }}</a>
+          <app-icon name="bar-chart-2"></app-icon>
+          {{ 'MESSWERTE_GRAFIK' | translate }}
+        </a>
       </li>
       <li>
         <a routerLink="/statistik" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-        {{ 'STATISTIK' | translate }}</a>
+          <app-icon name="pie-chart"></app-icon>
+          {{ 'STATISTIK' | translate }}
+        </a>
       </li>
       <li>
         <a routerLink="/rechnungen" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-        {{ 'RECHNUNGEN' | translate }}</a>
+          <app-icon name="file-text"></app-icon>
+          {{ 'RECHNUNGEN' | translate }}
+        </a>
       </li>
       <li>
         <a routerLink="/tarife" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-        {{ 'TARIFE' | translate }}</a>
+          <app-icon name="tag"></app-icon>
+          {{ 'TARIFE' | translate }}
+        </a>
       </li>
       <li>
         <a routerLink="/translations" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-        {{ 'TRANSLATION_EDITOR' | translate }}</a>
+          <app-icon name="globe"></app-icon>
+          {{ 'TRANSLATION_EDITOR' | translate }}
+        </a>
       </li>
       <li>
         <button (click)="switchLanguage()" class="zev-navbar__link">
@@ -56,11 +75,13 @@
       </li>
       <li>
         <button (click)="logout()" class="zev-navbar__link">
+          <app-icon name="log-out"></app-icon>
           {{ 'LOGOUT' | translate }}
         </button>
       </li>
       @if (userDisplayName) {
         <li class="zev-navbar__user">
+          <app-icon name="user"></app-icon>
           <span class="zev-navbar__username">{{ userDisplayName }}</span>
         </li>
       }

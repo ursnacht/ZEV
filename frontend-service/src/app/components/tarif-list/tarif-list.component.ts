@@ -8,11 +8,12 @@ import { SwissDatePipe } from '../../pipes/swiss-date.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.component';
 import { ColumnResizeDirective } from '../../directives/column-resize.directive';
+import { IconComponent } from '../icon/icon.component';
 
 @Component({
   selector: 'app-tarif-list',
   standalone: true,
-  imports: [CommonModule, TarifFormComponent, TranslatePipe, SwissDatePipe, KebabMenuComponent, ColumnResizeDirective],
+  imports: [CommonModule, TarifFormComponent, TranslatePipe, SwissDatePipe, KebabMenuComponent, ColumnResizeDirective, IconComponent],
   templateUrl: './tarif-list.component.html',
   styleUrls: ['./tarif-list.component.css']
 })
@@ -28,8 +29,8 @@ export class TarifListComponent implements OnInit {
   sortDirection: 'asc' | 'desc' = 'asc';
 
   menuItems: KebabMenuItem[] = [
-    { label: 'BEARBEITEN', action: 'edit' },
-    { label: 'LOESCHEN', action: 'delete', danger: true }
+    { label: 'BEARBEITEN', action: 'edit', icon: 'edit-2' },
+    { label: 'LOESCHEN', action: 'delete', danger: true, icon: 'trash-2' }
   ];
 
   constructor(

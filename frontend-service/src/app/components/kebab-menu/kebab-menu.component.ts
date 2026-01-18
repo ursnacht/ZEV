@@ -1,16 +1,18 @@
 import { Component, Input, Output, EventEmitter, ElementRef, HostListener } from '@angular/core';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { IconComponent } from '../icon/icon.component';
 
 export interface KebabMenuItem {
   label: string;
   action: string;
   danger?: boolean;
+  icon?: string;
 }
 
 @Component({
   selector: 'app-kebab-menu',
   standalone: true,
-  imports: [TranslatePipe],
+  imports: [TranslatePipe, IconComponent],
   templateUrl: './kebab-menu.component.html'
 })
 export class KebabMenuComponent {

@@ -1,5 +1,5 @@
 <div class="zev-container">
-  <h1>{{ 'MESSWERTE_GRAFIK' | translate }}</h1>
+  <h1><app-icon name="bar-chart-2" size="lg"></app-icon> {{ 'MESSWERTE_GRAFIK' | translate }}</h1>
 
   @if (message) {
     <div class="zev-message" [ngClass]="'zev-message--' + messageType">
@@ -51,6 +51,7 @@
             <div class="zev-button-group">
               <button type="submit" class="zev-button zev-button--primary"
                 [disabled]="loading || !dateFrom || !dateTo || selectedEinheitIds.size === 0">
+                <app-icon name="search"></app-icon>
                 {{ loading ? ('LADE_DATEN' | translate) : ('ANZEIGEN' | translate) }}
               </button>
             </div>

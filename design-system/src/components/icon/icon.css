@@ -1,0 +1,56 @@
+/**
+ * Icon Component Styles
+ */
+
+@import '../../tokens/tokens.css';
+
+.zev-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1em;
+  height: 1em;
+  vertical-align: middle;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
+/* Size variants */
+.zev-icon--sm {
+  width: 0.875em;
+  height: 0.875em;
+}
+
+.zev-icon--md {
+  width: 1em;
+  height: 1em;
+}
+
+.zev-icon--lg {
+  width: 1.25em;
+  height: 1.25em;
+}
+
+/* Button integration */
+.zev-button .zev-icon {
+  margin-right: var(--spacing-xs);
+}
+
+/* Navbar integration */
+.zev-navbar__link .zev-icon {
+  margin-right: var(--spacing-xs);
+}
+
+/* Title integration */
+.zev-navbar__title .zev-icon {
+  margin-right: var(--spacing-sm);
+}
+
+/* Kebab menu integration */
+.zev-kebab-menu__item .zev-icon {
+  margin-right: var(--spacing-xs);
+}

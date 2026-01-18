@@ -3,11 +3,12 @@ import { FormsModule } from '@angular/forms';
 import { Einheit, EinheitTyp } from '../../models/einheit.model';
 
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { IconComponent } from '../icon/icon.component';
 
 @Component({
   selector: 'app-einheit-form',
   standalone: true,
-  imports: [FormsModule, TranslatePipe],
+  imports: [FormsModule, TranslatePipe, IconComponent],
   templateUrl: './einheit-form.component.html',
   styleUrls: ['./einheit-form.component.css']
 })

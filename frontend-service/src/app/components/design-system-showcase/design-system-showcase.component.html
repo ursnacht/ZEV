@@ -1,5 +1,5 @@
 <div class="zev-container">
-  <h1>{{ 'ZEV_DESIGN_SYSTEM_SHOWCASE' | translate }}</h1>
+  <h1><app-icon name="settings" size="lg"></app-icon> {{ 'ZEV_DESIGN_SYSTEM_SHOWCASE' | translate }}</h1>
   <p class="intro">{{ 'DESIGN_SYSTEM_INTRO' | translate }}</p>
 
   <!-- Colors Section -->
@@ -194,6 +194,80 @@
     <button class="zev-button zev-button--secondary">Secondary Button</button>
     <button class="zev-button zev-button--danger">Danger Button</button>
     <button class="zev-button" disabled>Disabled Button</button>
+  </div>
+
+  <div class="subsection">
+    <h3>Buttons mit Icons</h3>
+    <div class="button-samples">
+      <button class="zev-button zev-button--primary">
+        <app-icon name="plus"></app-icon>
+        Erstellen
+      </button>
+      <button class="zev-button zev-button--secondary">
+        <app-icon name="download"></app-icon>
+        Exportieren
+      </button>
+      <button class="zev-button zev-button--danger">
+        <app-icon name="trash-2"></app-icon>
+        Löschen
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- Icons Section -->
+<section class="showcase-section">
+  <h2>Icons</h2>
+  <p>Feather Icons - leichte SVG-Icons mit stroke-basiertem Rendering. Die Icons passen sich automatisch der Textfarbe an.</p>
+
+  <div class="subsection">
+    <h3>Größen</h3>
+    <div class="icon-size-samples">
+      <div class="icon-size-item">
+        <app-icon name="sun" size="sm"></app-icon>
+        <span>Small (sm)</span>
+      </div>
+      <div class="icon-size-item">
+        <app-icon name="sun" size="md"></app-icon>
+        <span>Medium (md) - Standard</span>
+      </div>
+      <div class="icon-size-item">
+        <app-icon name="sun" size="lg"></app-icon>
+        <span>Large (lg)</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <h3>Verfügbare Icons</h3>
+    <div class="icon-grid">
+      @for (iconName of iconNames; track iconName) {
+        <div class="icon-item">
+          <app-icon [name]="iconName"></app-icon>
+          <span class="icon-name">{{ iconName }}</span>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="subsection">
+    <h3>Verwendung</h3>
+    <pre><code>&lt;app-icon name="sun"&gt;&lt;/app-icon&gt;
+&lt;app-icon name="upload" size="lg"&gt;&lt;/app-icon&gt;</code></pre>
+    <ul class="zev-list">
+      <li><code>name</code> - Name des Icons (siehe Übersicht oben)</li>
+      <li><code>size</code> - Größe: "sm", "md" (Standard), "lg"</li>
+    </ul>
+  </div>
+
+  <div class="subsection">
+    <h3>CSS Klassen</h3>
+    <ul class="zev-list">
+      <li><code>.zev-icon</code> - Basis-Klasse</li>
+      <li><code>.zev-icon--sm</code> - Kleine Größe (0.875em)</li>
+      <li><code>.zev-icon--md</code> - Mittlere Größe (1em)</li>
+      <li><code>.zev-icon--lg</code> - Große Größe (1.25em)</li>
+    </ul>
   </div>
 </section>
 

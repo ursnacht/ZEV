@@ -1,5 +1,5 @@
 <div class="zev-container">
-  <h1>{{ 'EINHEITEN_VERWALTUNG' | translate }}</h1>
+  <h1><app-icon name="home" size="lg"></app-icon> {{ 'EINHEITEN_VERWALTUNG' | translate }}</h1>
 
   @if (message) {
     <div class="zev-message" [ngClass]="'zev-message--' + messageType">
@@ -9,8 +9,10 @@
 
   @if (!showForm) {
     <div>
-      <button class="zev-button zev-button--primary" (click)="onCreateNew()">{{ 'NEUE_EINHEIT_ERSTELLEN' | translate
-      }}</button>
+      <button class="zev-button zev-button--primary" (click)="onCreateNew()">
+        <app-icon name="plus"></app-icon>
+        {{ 'NEUE_EINHEIT_ERSTELLEN' | translate }}
+      </button>
       @if (einheiten.length > 0) {
         <table class="zev-table" appColumnResize>
           <thead>

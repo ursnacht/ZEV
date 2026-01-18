@@ -5,11 +5,12 @@ import Keycloak from 'keycloak-js';
 import { KeycloakProfile } from 'keycloak-js';
 import { TranslationService } from '../../services/translation.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { IconComponent } from '../icon/icon.component';
 
 @Component({
   selector: 'app-navigation',
   standalone: true,
-  imports: [RouterModule, TranslatePipe],
+  imports: [RouterModule, TranslatePipe, IconComponent],
   templateUrl: './navigation.component.html',
   styleUrls: ['./navigation.component.css']
 })

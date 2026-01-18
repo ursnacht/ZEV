@@ -1,5 +1,5 @@
 <div class="zev-container">
-  <h1>{{ 'SOLAR_DISTRIBUTION_BERECHNUNG' | translate }}</h1>
+  <h1><app-icon name="zap" size="lg"></app-icon> {{ 'SOLAR_DISTRIBUTION_BERECHNUNG' | translate }}</h1>
 
   @if (message) {
     <div class="zev-message" [ngClass]="'zev-message--' + messageType">
@@ -28,6 +28,7 @@
 
       <div class="zev-button-group">
         <button type="submit" class="zev-button zev-button--primary" [disabled]="calculating || !dateFrom || !dateTo">
+          <app-icon name="calculator"></app-icon>
           {{ calculating ? ('BERECHNUNG_LAEUFT' | translate) : ('BERECHNEN' | translate) }}
         </button>
       </div>

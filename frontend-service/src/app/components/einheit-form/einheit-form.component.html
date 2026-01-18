@@ -43,9 +43,11 @@
 
     <div class="form-actions">
       <button type="submit" class="zev-button zev-button--primary" [disabled]="!formData.name.trim()">
+        <app-icon name="check"></app-icon>
         {{ formData.id ? ('AKTUALISIEREN' | translate) : ('ERSTELLEN' | translate) }}
       </button>
       <button type="button" class="zev-button zev-button--secondary" (click)="onCancel()">
+        <app-icon name="x"></app-icon>
         {{ 'ABBRECHEN' | translate }}
       </button>
     </div>

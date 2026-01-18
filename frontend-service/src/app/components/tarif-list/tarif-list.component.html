@@ -1,5 +1,5 @@
 <div class="zev-container">
-  <h1>{{ 'TARIFE_VERWALTUNG' | translate }}</h1>
+  <h1><app-icon name="tag" size="lg"></app-icon> {{ 'TARIFE_VERWALTUNG' | translate }}</h1>
 
   @if (message) {
     <div class="zev-message" [ngClass]="'zev-message--' + messageType"
@@ -21,9 +21,18 @@
   @if (!showForm) {
     <div>
       <div class="button-row">
-        <button class="zev-button zev-button--primary" (click)="onCreateNew()">{{ 'NEUER_TARIF_ERSTELLEN' | translate }}</button>
-        <button class="zev-button zev-button--secondary" (click)="onValidateQuartale()">{{ 'QUARTALE_VALIDIEREN' | translate }}</button>
-        <button class="zev-button zev-button--secondary" (click)="onValidateJahre()">{{ 'JAHRE_VALIDIEREN' | translate }}</button>
+        <button class="zev-button zev-button--primary" (click)="onCreateNew()">
+          <app-icon name="plus"></app-icon>
+          {{ 'NEUER_TARIF_ERSTELLEN' | translate }}
+        </button>
+        <button class="zev-button zev-button--secondary" (click)="onValidateQuartale()">
+          <app-icon name="check"></app-icon>
+          {{ 'QUARTALE_VALIDIEREN' | translate }}
+        </button>
+        <button class="zev-button zev-button--secondary" (click)="onValidateJahre()">
+          <app-icon name="check"></app-icon>
+          {{ 'JAHRE_VALIDIEREN' | translate }}
+        </button>
       </div>
       @if (tarife.length > 0) {
         <table class="zev-table" appColumnResize>
