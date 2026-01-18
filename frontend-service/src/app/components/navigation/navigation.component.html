@@ -70,7 +70,8 @@
       </li>
       <li>
         <button (click)="switchLanguage()" class="zev-navbar__link">
-          {{ currentLang === 'de' ? 'EN' : 'DE' }}
+          <app-icon name="globe"></app-icon>
+          {{ ( currentLang === 'de' ? 'EN' : 'DE' ) | translate }}
         </button>
       </li>
       <li>

@@ -76,7 +76,7 @@
   background-color: var(--color-primary-dark);
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   padding: 0;
   margin: 0;
   list-style: none;
@@ -103,22 +103,21 @@
 .zev-navbar__menu li {
   margin: var(--spacing-xs) 0;
   width: 100%;
-  text-align: center;
 }
 
 .zev-navbar__link {
   color: var(--color-white);
   text-decoration: none;
   font-size: 1.1rem;
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
   padding: var(--spacing-xs) var(--spacing-md);
   border-radius: var(--radius-sm);
   transition: color var(--transition-fast), background-color var(--transition-fast);
   cursor: pointer;
-  text-align: center;
-  /* Ensure text is centered */
+  text-align: left;
   width: 100%;
-  /* Ensure full width for click area */
   box-sizing: border-box;
 }
 
@@ -134,8 +133,9 @@ a.zev-navbar__link:hover {
 .zev-navbar__user {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: var(--spacing-sm);
   margin: var(--spacing-md) 0;
+  padding: 0 var(--spacing-md);
 }
 
 .zev-navbar__username {
