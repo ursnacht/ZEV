@@ -18,7 +18,7 @@ async function navigateToTranslationEditor(page: any) {
 test.describe("Translation Editor - Kebab Menu Functionality", () => {
     test("should display kebab menu for each translation row", async ({ page }) => {
         await navigateToTranslationEditor(page);
-        const tableRows = page.locator(".translation-table tbody tr, table tbody tr");
+        const tableRows = page.locator(".zev-table tbody tr, table tbody tr");
         const rowCount = await tableRows.count();
         if (rowCount > 0) {
             const kebabButtons = page.locator(".zev-kebab-button");
@@ -28,7 +28,7 @@ test.describe("Translation Editor - Kebab Menu Functionality", () => {
 
     test("should show save and delete options in kebab menu", async ({ page }) => {
         await navigateToTranslationEditor(page);
-        const tableRows = page.locator(".translation-table tbody tr, table tbody tr");
+        const tableRows = page.locator(".zev-table tbody tr, table tbody tr");
         const rowCount = await tableRows.count();
         if (rowCount > 0) {
             const firstRow = tableRows.first();
@@ -45,7 +45,7 @@ test.describe("Translation Editor - Kebab Menu Functionality", () => {
 test.describe("Translation Editor - Delete Functionality via Kebab Menu", () => {
     test("should show confirmation dialog when delete is clicked via kebab menu", async ({ page }) => {
         await navigateToTranslationEditor(page);
-        const tableRows = page.locator(".translation-table tbody tr, table tbody tr");
+        const tableRows = page.locator(".zev-table tbody tr, table tbody tr");
         const rowCount = await tableRows.count();
         if (rowCount > 0) {
             const firstRow = tableRows.first();
@@ -75,7 +75,7 @@ test.describe("Translation Editor - Delete Functionality via Kebab Menu", () => 
         await page.waitForTimeout(1000);
         const testRow = page.locator(`tr:has-text("${testKey}")`);
         await expect(testRow).toBeVisible();
-        const rowsBefore = await page.locator(".translation-table tbody tr").count();
+        const rowsBefore = await page.locator(".zev-table tbody tr").count();
         
         page.on("dialog", async dialog => {
             await dialog.accept();
@@ -83,15 +83,15 @@ test.describe("Translation Editor - Delete Functionality via Kebab Menu", () => 
         await clickKebabMenuItem(page, testRow, "delete");
         await page.waitForTimeout(1000);
         await expect(testRow).not.toBeVisible();
-        const rowsAfter = await page.locator(".translation-table tbody tr").count();
+        const rowsAfter = await page.locator(".zev-table tbody tr").count();
         expect(rowsAfter).toBe(rowsBefore - 1);
     });
 
     test("should not delete translation when cancelled via kebab menu", async ({ page }) => {
         await navigateToTranslationEditor(page);
-        const firstRow = page.locator(".translation-table tbody tr").first();
+        const firstRow = page.locator(".zev-table tbody tr").first();
         const firstKey = await firstRow.locator("td").first().textContent();
-        const rowsBefore = await page.locator(".translation-table tbody tr").count();
+        const rowsBefore = await page.locator(".zev-table tbody tr").count();
         
         page.on("dialog", async dialog => {
             await dialog.dismiss();
@@ -102,7 +102,7 @@ test.describe("Translation Editor - Delete Functionality via Kebab Menu", () => 
         if (firstKey) {
             await expect(page.locator(`tr:has-text("${firstKey}")`)).toBeVisible();
         }
-        const rowsAfter = await page.locator(".translation-table tbody tr").count();
+        const rowsAfter = await page.locator(".zev-table tbody tr").count();
         expect(rowsAfter).toBe(rowsBefore);
     });
 });
