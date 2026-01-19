@@ -133,8 +133,8 @@ public class MesswerteService {
                 .map(m -> {
                     Map<String, Object> data = new java.util.HashMap<>();
                     data.put("zeit", m.getZeit().toString());
-                    data.put("total", m.getTotal());
-                    data.put("zevCalculated", m.getZevCalculated());
+                    data.put("total", m.getTotal() != null ? m.getTotal() : 0.0);
+                    data.put("zevCalculated", m.getZevCalculated() != null ? m.getZevCalculated() : 0.0);
                     return data;
                 })
                 .collect(Collectors.toList());

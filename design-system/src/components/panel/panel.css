@@ -32,7 +32,7 @@
   max-height: 1000px;
   position: relative;
   resize: vertical;
-  overflow: auto;
+  overflow: hidden;
 }
 
 /* Panel Variants */

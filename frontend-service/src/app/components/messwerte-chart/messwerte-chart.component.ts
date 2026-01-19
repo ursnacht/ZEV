@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
@@ -27,7 +27,7 @@ interface ChartData {
   templateUrl: './messwerte-chart.component.html',
   styleUrls: ['./messwerte-chart.component.css']
 })
-export class MesswerteChartComponent implements OnInit {
+export class MesswerteChartComponent implements OnInit, OnDestroy {
   dateFrom: string = '';
   dateTo: string = '';
   selectedEinheitIds: Set<number> = new Set();
@@ -40,8 +40,18 @@ export class MesswerteChartComponent implements OnInit {
   constructor(
     private messwerteService: MesswerteService,
     private einheitService: EinheitService,
-    private translationService: TranslationService
+    private translationService: TranslationService,
+    private cdr: ChangeDetectorRef
   ) { }
+
+  ngOnDestroy(): void {
+    // Cleanup all charts to prevent memory leaks
+    this.charts.forEach(chartData => {
+      if (chartData.chart) {
+        chartData.chart.destroy();
+      }
+    });
+  }
 
   ngOnInit(): void {
     this.loadEinheiten();
@@ -156,13 +166,11 @@ export class MesswerteChartComponent implements OnInit {
           this.charts.push(chartData);
         });
 
-        // Wait for DOM to update, then create charts
-        setTimeout(() => {
-          this.charts.forEach((chartData, index) => {
-            const data = results[index];
-            this.createChart(chartData, data);
-          });
-        }, 0);
+        // Trigger change detection to ensure DOM is updated
+        this.cdr.detectChanges();
+
+        // Create charts sequentially with delays to prevent browser freeze
+        this.createChartsSequentially(results);
 
         this.showMessage(`${totalDataPoints} ${this.translationService.translate('DATENPUNKTE_FUER')} ${this.charts.length} ${this.translationService.translate('EINHEITEN_GELADEN')}`, 'success');
         this.loading = false;
@@ -174,20 +182,58 @@ export class MesswerteChartComponent implements OnInit {
     });
   }
 
+  /**
+   * Create charts one by one with small delays to prevent browser freeze
+   */
+  private createChartsSequentially(results: MesswertData[][]): void {
+    let index = 0;
+
+    const createNext = () => {
+      if (index >= this.charts.length) return;
+
+      const chartData = this.charts[index];
+      const data = results[index];
+      this.createChart(chartData, data);
+
+      index++;
+
+      // Use setTimeout to give browser time to render
+      if (index < this.charts.length) {
+        setTimeout(createNext, 50);
+      }
+    };
+
+    // Start after a small delay to ensure DOM is ready
+    setTimeout(createNext, 100);
+  }
+
   private createChart(chartData: ChartData, data: MesswertData[]): void {
     const canvas = document.getElementById(`chart-${chartData.einheitId}`) as HTMLCanvasElement;
-    if (!canvas) return;
+    if (!canvas) {
+      return;
+    }
+
+    // Set canvas dimensions explicitly from parent container
+    const parent = canvas.parentElement;
+    if (parent) {
+      const parentWidth = parent.clientWidth || 800;
+      const parentHeight = parent.clientHeight || 400;
+      canvas.width = parentWidth;
+      canvas.height = parentHeight;
+    }
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      return;
+    }
 
     const labels = data.map(d => new Date(d.zeit).toLocaleString('de-DE'));
-    const totalValues = data.map(d => d.total);
-    const zevValues = data.map(d => -d.zevCalculated); // Negative for downward display
+    const totalValues = data.map(d => d.total ?? 0);
+    const zevValues = data.map(d => -(d.zevCalculated ?? 0)); // Negative for downward display
 
     // Calculate sums for legend
-    const totalSum = data.reduce((sum, d) => sum + d.total, 0);
-    const zevSum = data.reduce((sum, d) => sum + d.zevCalculated, 0);
+    const totalSum = data.reduce((sum, d) => sum + (d.total ?? 0), 0);
+    const zevSum = data.reduce((sum, d) => sum + (d.zevCalculated ?? 0), 0);
 
     const config: ChartConfiguration = {
       type: 'line',
@@ -213,7 +259,7 @@ export class MesswerteChartComponent implements OnInit {
         ]
       },
       options: {
-        responsive: true,
+        responsive: false,
         maintainAspectRatio: false,
         scales: {
           y: {

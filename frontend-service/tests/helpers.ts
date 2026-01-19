@@ -27,11 +27,33 @@ export async function handleKeycloakLogin(page: Page): Promise<void> {
         }
 
         if (isLoginFormVisible) {
-            // Login form is visible, perform login
+            // Keycloak 26+ uses a multi-step login: first username, then password
+            // Step 1: Enter username and submit
             await loginFormLocator.fill('testuser');
-            await page.fill('input[name="password"]', 'testpassword');
-            // Keycloak 26+ uses a button element instead of input[type="submit"]
             await page.click('button[type="submit"], input[type="submit"]');
+
+            // Step 2: Wait for password field (multi-step) or check if already redirected
+            const passwordLocator = page.locator('input[name="password"]');
+            try {
+                await passwordLocator.waitFor({ state: 'visible', timeout: 5000 });
+                // Password field appeared - enter password and submit
+                await passwordLocator.fill('testpassword');
+                await page.click('button[type="submit"], input[type="submit"]');
+            } catch {
+                // Password field didn't appear - might be single-step login or error
+                // Check if we're already redirected to the app
+                const navbarVisible = await navbarLocator.isVisible().catch(() => false);
+                if (navbarVisible) {
+                    return;
+                }
+                // Check for any error message or unexpected state
+                const errorLocator = page.locator('.kc-feedback-text, .alert, [role="alert"]');
+                const hasError = await errorLocator.isVisible().catch(() => false);
+                if (hasError) {
+                    const errorText = await errorLocator.textContent().catch(() => 'Unknown error');
+                    throw new Error(`Login failed: ${errorText}`);
+                }
+            }
 
             // Wait for redirect and app to load
             try {
