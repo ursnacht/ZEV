@@ -259,6 +259,7 @@ export class MesswerteChartComponent implements OnInit, OnDestroy {
         ]
       },
       options: {
+        // WICHTIG! Funktioniert mit true nicht.
         responsive: false,
         maintainAspectRatio: false,
         scales: {
