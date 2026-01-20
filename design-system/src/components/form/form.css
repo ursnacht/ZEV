@@ -45,9 +45,9 @@ input[type="date"].zev-input {
   font-size: var(--font-size-sm);
 }
 
-/* Form Error */
-.zev-form-error {
-  color: var(--color-danger);
+/* Form Hint */
+.zev-form-hint {
+  color: var(--color-gray-500);
   font-size: var(--font-size-xs);
   margin-top: var(--spacing-xxs);
 }

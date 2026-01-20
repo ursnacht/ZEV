@@ -191,11 +191,13 @@ export class TarifListComponent implements OnInit {
     this.messagePersistent = false;
   }
 
-  private showMessage(message: string, type: 'success' | 'error', persistent: boolean = false): void {
+  private showMessage(message: string, type: 'success' | 'error', persistent?: boolean): void {
     this.message = message;
     this.messageType = type;
-    this.messagePersistent = persistent;
-    if (!persistent) {
+    // Error messages are persistent by default, success messages auto-dismiss
+    const isPersistent = persistent !== undefined ? persistent : type === 'error';
+    this.messagePersistent = isPersistent;
+    if (!isPersistent) {
       this.validationErrors = [];
       setTimeout(() => {
         this.message = '';

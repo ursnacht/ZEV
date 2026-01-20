@@ -40,7 +40,6 @@
 
 .zev-message--clickable {
   cursor: pointer;
-  position: relative;
   padding-right: var(--spacing-xl);
 }
 

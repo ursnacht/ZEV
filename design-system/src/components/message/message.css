@@ -6,10 +6,18 @@
 
 /* Message/Alert Base */
 .zev-message {
-  padding: var(--spacing-md);
+  position: fixed;
+  top: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  padding: var(--spacing-md) var(--spacing-xl);
   border-radius: var(--radius-sm);
-  margin-bottom: var(--spacing-lg);
   border: 1px solid transparent;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 300px;
+  max-width: 80%;
+  text-align: center;
 }
 
 /* Message Variants */
