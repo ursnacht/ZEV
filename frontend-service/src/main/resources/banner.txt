@@ -5,5 +5,5 @@
  | | | | | (_) | | | | ||  __/ | | | (_| |      \__ \  __/ |   \ V /| | (_|  __/
  |_| |_|  \___/|_| |_|\__\___|_| |_|\__,_|      |___/\___|_|    \_/ |_|\___\___|
 
-${application.title}        ${application.version}
+frontend-service        ${application.version}
 Powered by Spring Boot  ${spring-boot.version}

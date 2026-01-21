@@ -4,6 +4,6 @@
 | |_) | (_| | (__|   <  __/ | | | (_| |_____\__ \  __/ |   \ V /| | (_|  __/
 |_.__/ \__,_|\___|_|\_\___|_| |_|\__,_|     |___/\___|_|    \_/ |_|\___\___|
 
-${application.title}         ${application.version}
+backend-service         ${application.version}
 Powered by Spring Boot  ${spring-boot.version}
 
