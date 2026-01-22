@@ -30,6 +30,7 @@ export class TarifListComponent implements OnInit {
 
   menuItems: KebabMenuItem[] = [
     { label: 'BEARBEITEN', action: 'edit', icon: 'edit-2' },
+    { label: 'KOPIEREN', action: 'copy', icon: 'copy' },
     { label: 'LOESCHEN', action: 'delete', danger: true, icon: 'trash-2' }
   ];
 
@@ -63,6 +64,13 @@ export class TarifListComponent implements OnInit {
     this.showForm = true;
   }
 
+  onCopy(tarif: Tarif): void {
+    // Kopie ohne ID erstellen - wird als neuer Tarif behandelt
+    const { id, ...tarifOhneId } = tarif;
+    this.selectedTarif = { ...tarifOhneId } as Tarif;
+    this.showForm = true;
+  }
+
   onDelete(id: number | undefined): void {
     if (!id) return;
 
@@ -83,6 +91,9 @@ export class TarifListComponent implements OnInit {
     switch (action) {
       case 'edit':
         this.onEdit(tarif);
+        break;
+      case 'copy':
+        this.onCopy(tarif);
         break;
       case 'delete':
         this.onDelete(tarif.id);

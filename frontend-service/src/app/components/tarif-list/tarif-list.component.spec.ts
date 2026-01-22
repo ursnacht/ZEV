@@ -71,10 +71,11 @@ describe('TarifListComponent', () => {
       expect(component.sortDirection).toBe('asc');
     });
 
-    it('should have menu items for edit and delete', () => {
-      expect(component.menuItems.length).toBe(2);
+    it('should have menu items for edit, copy and delete', () => {
+      expect(component.menuItems.length).toBe(3);
       expect(component.menuItems[0].action).toBe('edit');
-      expect(component.menuItems[1].action).toBe('delete');
+      expect(component.menuItems[1].action).toBe('copy');
+      expect(component.menuItems[2].action).toBe('delete');
     });
   });
 
@@ -113,6 +114,32 @@ describe('TarifListComponent', () => {
     it('should create a copy of the tarif', () => {
       const tarif = mockTarife[0];
       component.onEdit(tarif);
+      expect(component.selectedTarif).not.toBe(tarif);
+    });
+  });
+
+  describe('onCopy', () => {
+    it('should set selectedTarif without id and show form', () => {
+      const tarif = mockTarife[0];
+      component.onCopy(tarif);
+      expect(component.selectedTarif).toBeTruthy();
+      expect(component.selectedTarif!.id).toBeUndefined();
+      expect(component.showForm).toBeTrue();
+    });
+
+    it('should copy all properties except id', () => {
+      const tarif = mockTarife[0];
+      component.onCopy(tarif);
+      expect(component.selectedTarif!.bezeichnung).toBe(tarif.bezeichnung);
+      expect(component.selectedTarif!.tariftyp).toBe(tarif.tariftyp);
+      expect(component.selectedTarif!.preis).toBe(tarif.preis);
+      expect(component.selectedTarif!.gueltigVon).toBe(tarif.gueltigVon);
+      expect(component.selectedTarif!.gueltigBis).toBe(tarif.gueltigBis);
+    });
+
+    it('should create a new object (not reference)', () => {
+      const tarif = mockTarife[0];
+      component.onCopy(tarif);
       expect(component.selectedTarif).not.toBe(tarif);
     });
   });
@@ -170,6 +197,12 @@ describe('TarifListComponent', () => {
       spyOn(component, 'onEdit');
       component.onMenuAction('edit', mockTarife[0]);
       expect(component.onEdit).toHaveBeenCalledWith(mockTarife[0]);
+    });
+
+    it('should call onCopy for copy action', () => {
+      spyOn(component, 'onCopy');
+      component.onMenuAction('copy', mockTarife[0]);
+      expect(component.onCopy).toHaveBeenCalledWith(mockTarife[0]);
     });
 
     it('should call onDelete for delete action', () => {

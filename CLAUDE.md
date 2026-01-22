@@ -248,6 +248,7 @@ Feature specs are in `/Specs/`:
 - `generell.md` - General requirements (i18n, design system, testing)
 - `Mandantenfähigkeit.md` - Multi-tenancy implementation
 - `Tarifverwaltung.md` - Tariff management
+- `Tarifverwaltung-Tarif-kopieren.md` - Copy tariff functionality
 - `Quartale.md` - Quarterly periods management
 - `RechnungenGenerieren.md` - Invoice generation
 - `Statistik.md` - Statistics and reporting
