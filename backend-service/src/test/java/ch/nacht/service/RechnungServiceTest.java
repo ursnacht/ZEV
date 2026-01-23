@@ -5,6 +5,7 @@ import ch.nacht.dto.RechnungDTO;
 import ch.nacht.dto.TarifZeileDTO;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
+import ch.nacht.entity.Mieter;
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
 import ch.nacht.repository.EinheitRepository;
@@ -45,6 +46,9 @@ public class RechnungServiceTest {
     private TarifService tarifService;
 
     @Mock
+    private MieterService mieterService;
+
+    @Mock
     private HibernateFilterService hibernateFilterService;
 
     @InjectMocks
@@ -58,7 +62,6 @@ public class RechnungServiceTest {
     void setUp() {
         consumer = new Einheit("Wohnung A", EinheitTyp.CONSUMER);
         consumer.setId(1L);
-        consumer.setMietername("Max Muster");
         consumer.setMesspunkt("CH123456789");
 
         zevTarif2024 = new Tarif(
@@ -115,11 +118,12 @@ public class RechnungServiceTest {
             eq(consumer), any(LocalDateTime.class), any(LocalDateTime.class)))
             .thenReturn(150.0);
 
-        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, von, bis);
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
 
         assertNotNull(rechnung);
         assertEquals("Wohnung A", rechnung.getEinheitName());
-        assertEquals("Max Muster", rechnung.getMietername());
+        // No tenant provided
+        assertNull(rechnung.getMieterName());
 
         List<TarifZeileDTO> zeilen = rechnung.getTarifZeilen();
         assertEquals(2, zeilen.size());
@@ -143,6 +147,38 @@ public class RechnungServiceTest {
         // Total: 20 + 17 = 37.00
         assertEquals(37.0, rechnung.getTotalBetrag(), 0.01);
         assertEquals(37.0, rechnung.getEndBetrag(), 0.01);
+    }
+
+    @Test
+    void berechneRechnung_WithTenant_IncludesTenantData() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 1, 31);
+
+        Mieter mieter = new Mieter("Max Muster", LocalDate.of(2023, 1, 1), 1L);
+        mieter.setId(1L);
+        mieter.setStrasse("Musterweg 5");
+        mieter.setPlz("3000");
+        mieter.setOrt("Bern");
+
+        when(tarifService.getTarifeForZeitraum(TarifTyp.ZEV, von, bis))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.VNB, von, bis))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(
+            eq(consumer), any(LocalDateTime.class), any(LocalDateTime.class)))
+            .thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(
+            eq(consumer), any(LocalDateTime.class), any(LocalDateTime.class)))
+            .thenReturn(150.0);
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
+
+        assertNotNull(rechnung);
+        assertEquals("Max Muster", rechnung.getMieterName());
+        assertEquals("Musterweg 5", rechnung.getMieterStrasse());
+        assertEquals("3000 Bern", rechnung.getMieterPlzOrt());
+        assertEquals(1L, rechnung.getMieterId());
     }
 
     @Test
@@ -189,7 +225,7 @@ public class RechnungServiceTest {
             eq(LocalDate.of(2024, 7, 1).atStartOfDay())))
             .thenReturn(110.0);
 
-        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, von, bis);
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
 
         // Should have 3 lines: 2 ZEV + 1 VNB
         List<TarifZeileDTO> zevZeilen = rechnung.getTarifZeilen().stream()
@@ -216,7 +252,7 @@ public class RechnungServiceTest {
             eq(consumer), any(), any()))
             .thenReturn(200.0);
 
-        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, von, bis);
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
 
         // 123 * 0.20 = 24.60, 77 * 0.34 = 26.18, Total = 50.78, rounded to 50.80
         assertEquals(50.80, rechnung.getEndBetrag(), 0.001);
@@ -240,7 +276,7 @@ public class RechnungServiceTest {
             eq(consumer), any(), any()))
             .thenReturn(null);
 
-        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, von, bis);
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
 
         assertEquals(0.0, rechnung.getTotalBetrag());
         assertEquals(0.0, rechnung.getEndBetrag());
@@ -274,6 +310,7 @@ public class RechnungServiceTest {
         doNothing().when(tarifService).validateTarifAbdeckung(von, bis);
         when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumer));
         when(einheitRepository.findById(2L)).thenReturn(Optional.of(producer));
+        when(mieterService.getMieterForQuartal(eq(1L), any(), any())).thenReturn(Collections.emptyList());
 
         when(tarifService.getTarifeForZeitraum(any(), any(), any()))
             .thenReturn(Collections.singletonList(zevTarif2024));
@@ -288,6 +325,70 @@ public class RechnungServiceTest {
         // Only consumer should have invoice
         assertEquals(1, rechnungen.size());
         assertEquals("Wohnung A", rechnungen.get(0).getEinheitName());
+    }
+
+    @Test
+    void berechneRechnungen_CreatesSeparateInvoicesPerTenant() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Mieter mieter1 = new Mieter("Mieter A", LocalDate.of(2023, 1, 1), 1L);
+        mieter1.setId(1L);
+        mieter1.setMietende(LocalDate.of(2024, 2, 15));
+
+        Mieter mieter2 = new Mieter("Mieter B", LocalDate.of(2024, 2, 16), 1L);
+        mieter2.setId(2L);
+
+        doNothing().when(tarifService).validateTarifAbdeckung(von, bis);
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumer));
+        when(mieterService.getMieterForQuartal(eq(1L), any(), any()))
+            .thenReturn(Arrays.asList(mieter1, mieter2));
+
+        when(tarifService.getTarifeForZeitraum(any(), any(), any()))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(150.0);
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(1L), von, bis);
+
+        // Should create 2 invoices - one per tenant
+        assertEquals(2, rechnungen.size());
+        assertEquals("Mieter A", rechnungen.get(0).getMieterName());
+        assertEquals("Mieter B", rechnungen.get(1).getMieterName());
+
+        // First invoice: from period start to tenant end
+        assertEquals(von, rechnungen.get(0).getVon());
+        assertEquals(LocalDate.of(2024, 2, 15), rechnungen.get(0).getBis());
+
+        // Second invoice: from tenant start to period end
+        assertEquals(LocalDate.of(2024, 2, 16), rechnungen.get(1).getVon());
+        assertEquals(bis, rechnungen.get(1).getBis());
+    }
+
+    @Test
+    void berechneRechnungen_NoTenants_CreatesInvoiceWithoutTenantData() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 1, 31);
+
+        doNothing().when(tarifService).validateTarifAbdeckung(von, bis);
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumer));
+        when(mieterService.getMieterForQuartal(eq(1L), any(), any())).thenReturn(Collections.emptyList());
+
+        when(tarifService.getTarifeForZeitraum(any(), any(), any()))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(150.0);
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(1L), von, bis);
+
+        assertEquals(1, rechnungen.size());
+        assertNull(rechnungen.get(0).getMieterName());
+        assertEquals(von, rechnungen.get(0).getVon());
+        assertEquals(bis, rechnungen.get(0).getBis());
     }
 
     @Test
@@ -319,7 +420,7 @@ public class RechnungServiceTest {
             eq(LocalDate.of(2024, 4, 1).atStartOfDay())))
             .thenReturn(50.0);
 
-        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, von, bis);
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
 
         TarifZeileDTO zevZeile = rechnung.getTarifZeilen().stream()
             .filter(z -> z.getTyp() == TarifTyp.ZEV)

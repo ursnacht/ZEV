@@ -5,7 +5,7 @@ import { Observable } from 'rxjs';
 export interface GeneratedRechnung {
   einheitId: number;
   einheitName: string;
-  mietername: string;
+  mieterName: string;
   endBetrag: number;
   filename: string;
   downloadKey: string;

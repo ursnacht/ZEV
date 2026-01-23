@@ -22,7 +22,7 @@ export class EinheitListComponent implements OnInit {
   showForm = false;
   message = '';
   messageType: 'success' | 'error' = 'success';
-  sortColumn: 'id' | 'name' | 'typ' | 'mietername' | null = 'name';
+  sortColumn: 'id' | 'name' | 'typ' | 'messpunkt' | null = 'name';
   sortDirection: 'asc' | 'desc' = 'asc';
 
   menuItems: KebabMenuItem[] = [
@@ -118,7 +118,7 @@ export class EinheitListComponent implements OnInit {
     this.selectedEinheit = null;
   }
 
-  onSort(column: 'id' | 'name' | 'typ' | 'mietername'): void {
+  onSort(column: 'id' | 'name' | 'typ' | 'messpunkt'): void {
     if (this.sortColumn === column) {
       this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
     } else {

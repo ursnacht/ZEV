@@ -1,0 +1,83 @@
+<div class="form-container">
+  <h2>{{ formData.id ? ('MIETER_BEARBEITEN' | translate) : ('NEUER_MIETER' | translate) }}</h2>
+
+  <form (ngSubmit)="onSubmit()">
+    <div class="zev-form-group">
+      <label for="einheitId">{{ 'EINHEIT' | translate }}:</label>
+      <select id="einheitId" class="zev-select" [(ngModel)]="formData.einheitId" name="einheitId" required>
+        <option [value]="0" disabled>{{ 'EINHEIT_AUSWAEHLEN' | translate }}</option>
+        @for (einheit of einheiten; track einheit) {
+          <option [value]="einheit.id">
+            {{ getEinheitDisplayName(einheit) }}
+          </option>
+        }
+      </select>
+      @if (formData.einheitId === 0) {
+        <div class="zev-form-error">
+          {{ 'EINHEIT_IST_ERFORDERLICH' | translate }}
+        </div>
+      }
+    </div>
+
+    <div class="zev-form-group">
+      <label for="name">{{ 'NAME' | translate }}:</label>
+      <input type="text" id="name" class="zev-input" [(ngModel)]="formData.name" name="name"
+        required maxlength="150" [placeholder]="'MIETER_NAME_PLACEHOLDER' | translate" />
+      @if (!formData.name.trim()) {
+        <div class="zev-form-error">
+          {{ 'NAME_IST_ERFORDERLICH' | translate }}
+        </div>
+      }
+    </div>
+
+    <div class="zev-form-group">
+      <label for="strasse">{{ 'STRASSE' | translate }}:</label>
+      <input type="text" id="strasse" class="zev-input" [(ngModel)]="formData.strasse" name="strasse"
+        maxlength="150" />
+    </div>
+
+    <div class="zev-form-row">
+      <div class="zev-form-group">
+        <label for="plz">{{ 'PLZ' | translate }}:</label>
+        <input type="text" id="plz" class="zev-input" [(ngModel)]="formData.plz" name="plz"
+          maxlength="20" />
+      </div>
+
+      <div class="zev-form-group">
+        <label for="ort">{{ 'ORT' | translate }}:</label>
+        <input type="text" id="ort" class="zev-input" [(ngModel)]="formData.ort" name="ort"
+          maxlength="100" />
+      </div>
+    </div>
+
+    <div class="zev-form-row">
+      <div class="zev-form-group">
+        <label for="mietbeginn">{{ 'MIETBEGINN' | translate }}:</label>
+        <input type="date" id="mietbeginn" class="zev-input" [(ngModel)]="formData.mietbeginn" name="mietbeginn" required />
+      </div>
+
+      <div class="zev-form-group">
+        <label for="mietende">{{ 'MIETENDE' | translate }}:</label>
+        <input type="date" id="mietende" class="zev-input" [(ngModel)]="formData.mietende" name="mietende" />
+        <div class="zev-form-hint">{{ 'MIETENDE_HINT' | translate }}</div>
+      </div>
+    </div>
+
+    @if (!isDateRangeValid()) {
+      <div class="zev-form-error">
+        {{ 'MIETENDE_NACH_MIETBEGINN' | translate }}
+      </div>
+    }
+
+    <div class="form-actions">
+      <button type="submit" class="zev-button zev-button--primary" [disabled]="!isFormValid()">
+        <app-icon name="check"></app-icon>
+        {{ formData.id ? ('AKTUALISIEREN' | translate) : ('ERSTELLEN' | translate) }}
+      </button>
+      <button type="button" class="zev-button zev-button--secondary" (click)="onCancel()">
+        <app-icon name="x"></app-icon>
+        {{ 'ABBRECHEN' | translate }}
+      </button>
+    </div>
+  </form>
+</div>

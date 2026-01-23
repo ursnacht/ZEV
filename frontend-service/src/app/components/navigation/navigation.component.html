@@ -62,6 +62,13 @@
         </a>
       </li>
       <li>
+        <a routerLink="/mieter" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
+          (click)="closeMenu()">
+          <app-icon name="users"></app-icon>
+          {{ 'MIETERVERWALTUNG' | translate }}
+        </a>
+      </li>
+      <li>
         <a routerLink="/translations" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
           <app-icon name="globe"></app-icon>

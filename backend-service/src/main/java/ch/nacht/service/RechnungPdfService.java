@@ -144,8 +144,8 @@ public class RechnungPdfService {
 
         // Right-aligned address block
         html.append("<div class=\"address-block\">");
-        if (rechnung.getMietername() != null && !rechnung.getMietername().isEmpty()) {
-            html.append(escapeHtml(rechnung.getMietername())).append("<br/>");
+        if (rechnung.getMieterName() != null && !rechnung.getMieterName().isEmpty()) {
+            html.append(escapeHtml(rechnung.getMieterName())).append("<br/>");
         }
         html.append(escapeHtml(rechnung.getAdresseStrasse())).append("<br/>");
         html.append(escapeHtml(rechnung.getAdressePlzOrt()));
@@ -268,10 +268,10 @@ public class RechnungPdfService {
         String creditorPlzOrt = escapeHtml(rechnung.getStellerPlzOrt());
 
         // Debtor info
-        String debtorName = rechnung.getMietername() != null ? escapeHtml(rechnung.getMietername()) : "";
+        String debtorName = rechnung.getMieterName() != null ? escapeHtml(rechnung.getMieterName()) : "";
         String debtorStreet = escapeHtml(rechnung.getAdresseStrasse());
         String debtorPlzOrt = escapeHtml(rechnung.getAdressePlzOrt());
-        boolean hasDebtor = rechnung.getMietername() != null && !rechnung.getMietername().isEmpty();
+        boolean hasDebtor = rechnung.getMieterName() != null && !rechnung.getMieterName().isEmpty();
 
         // Main table: Empfangsschein | Zahlteil
         html.append("<table class=\"qr-bill-table\"><tr>");
@@ -386,9 +386,9 @@ public class RechnungPdfService {
             bill.setAccount(iban);
 
             // Debtor (invoice recipient)
-            if (rechnung.getMietername() != null && !rechnung.getMietername().isEmpty()) {
+            if (rechnung.getMieterName() != null && !rechnung.getMieterName().isEmpty()) {
                 Address debtor = new Address();
-                debtor.setName(rechnung.getMietername());
+                debtor.setName(rechnung.getMieterName());
                 debtor.setStreet(rechnung.getAdresseStrasse());
                 String[] debtorPlzOrt = rechnung.getAdressePlzOrt().split(" ", 2);
                 debtor.setPostalCode(debtorPlzOrt[0]);

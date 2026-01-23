@@ -5,6 +5,7 @@ import ch.nacht.dto.RechnungDTO;
 import ch.nacht.dto.TarifZeileDTO;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
+import ch.nacht.entity.Mieter;
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
 import ch.nacht.repository.EinheitRepository;
@@ -31,22 +32,26 @@ public class RechnungService {
     private final MesswerteRepository messwerteRepository;
     private final RechnungConfig rechnungConfig;
     private final TarifService tarifService;
+    private final MieterService mieterService;
     private final HibernateFilterService hibernateFilterService;
 
     public RechnungService(EinheitRepository einheitRepository,
                            MesswerteRepository messwerteRepository,
                            RechnungConfig rechnungConfig,
                            TarifService tarifService,
+                           MieterService mieterService,
                            HibernateFilterService hibernateFilterService) {
         this.einheitRepository = einheitRepository;
         this.messwerteRepository = messwerteRepository;
         this.rechnungConfig = rechnungConfig;
         this.tarifService = tarifService;
+        this.mieterService = mieterService;
         this.hibernateFilterService = hibernateFilterService;
     }
 
     /**
      * Calculate invoices for the given unit IDs and time period.
+     * Creates separate invoices for each tenant within the period.
      *
      * @param einheitIds List of unit IDs to generate invoices for
      * @param von Start date (inclusive)
@@ -67,9 +72,29 @@ public class RechnungService {
         for (Long einheitId : einheitIds) {
             einheitRepository.findById(einheitId).ifPresent(einheit -> {
                 if (einheit.getTyp() == EinheitTyp.CONSUMER) {
-                    RechnungDTO rechnung = berechneRechnung(einheit, von, bis);
-                    rechnungen.add(rechnung);
-                    log.debug("Calculated invoice for unit {}: {} CHF", einheit.getName(), rechnung.getEndBetrag());
+                    // Get all tenants for this unit within the period
+                    List<Mieter> mieter = mieterService.getMieterForQuartal(einheitId, von, bis);
+
+                    if (mieter.isEmpty()) {
+                        // No tenant: create invoice without tenant data
+                        RechnungDTO rechnung = berechneRechnung(einheit, null, von, bis);
+                        rechnungen.add(rechnung);
+                        log.debug("Calculated invoice for unit {} (no tenant): {} CHF",
+                                einheit.getName(), rechnung.getEndBetrag());
+                    } else {
+                        // Create separate invoice for each tenant
+                        for (Mieter m : mieter) {
+                            // Effective period = intersection of invoice period and lease period
+                            LocalDate effektivVon = m.getMietbeginn().isBefore(von) ? von : m.getMietbeginn();
+                            LocalDate effektivBis = (m.getMietende() == null || m.getMietende().isAfter(bis))
+                                    ? bis : m.getMietende();
+
+                            RechnungDTO rechnung = berechneRechnung(einheit, m, effektivVon, effektivBis);
+                            rechnungen.add(rechnung);
+                            log.debug("Calculated invoice for unit {}, tenant {} ({} to {}): {} CHF",
+                                    einheit.getName(), m.getName(), effektivVon, effektivBis, rechnung.getEndBetrag());
+                        }
+                    }
                 } else {
                     log.warn("Skipping unit {} - not a consumer", einheit.getName());
                 }
@@ -81,23 +106,33 @@ public class RechnungService {
     }
 
     /**
-     * Calculate a single invoice for a unit and time period.
+     * Calculate a single invoice for a unit, optional tenant, and time period.
      *
      * @param einheit The unit to generate invoice for
+     * @param mieter The tenant (can be null for vacant units)
      * @param von Start date (inclusive)
      * @param bis End date (inclusive)
      * @return Calculated invoice DTO
      */
-    public RechnungDTO berechneRechnung(Einheit einheit, LocalDate von, LocalDate bis) {
+    public RechnungDTO berechneRechnung(Einheit einheit, Mieter mieter, LocalDate von, LocalDate bis) {
         RechnungDTO rechnung = new RechnungDTO();
 
         // Unit information
         rechnung.setEinheitId(einheit.getId());
         rechnung.setEinheitName(einheit.getName());
-        rechnung.setMietername(einheit.getMietername());
         rechnung.setMesspunkt(einheit.getMesspunkt());
 
-        // Time period
+        // Tenant information (if available)
+        if (mieter != null) {
+            rechnung.setMieterId(mieter.getId());
+            rechnung.setMieterName(mieter.getName());
+            rechnung.setMieterStrasse(mieter.getStrasse());
+            String plzOrt = ((mieter.getPlz() != null ? mieter.getPlz() : "") + " " +
+                    (mieter.getOrt() != null ? mieter.getOrt() : "")).trim();
+            rechnung.setMieterPlzOrt(plzOrt.isEmpty() ? null : plzOrt);
+        }
+
+        // Time period (effective period for this tenant)
         rechnung.setVon(von);
         rechnung.setBis(bis);
         rechnung.setErstellungsdatum(LocalDate.now());

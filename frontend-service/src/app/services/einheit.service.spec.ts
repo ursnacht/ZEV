@@ -12,7 +12,6 @@ describe('EinheitService', () => {
     id: 1,
     name: 'Allgemein',
     typ: EinheitTyp.CONSUMER,
-    mietername: 'Test Mieter',
     messpunkt: 'MP-001'
   };
 

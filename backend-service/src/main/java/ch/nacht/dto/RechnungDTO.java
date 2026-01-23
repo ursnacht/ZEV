@@ -11,8 +11,13 @@ public class RechnungDTO {
 
     private Long einheitId;
     private String einheitName;
-    private String mietername;
     private String messpunkt;
+
+    // Mieter-Daten
+    private Long mieterId;
+    private String mieterName;
+    private String mieterStrasse;
+    private String mieterPlzOrt;
 
     private LocalDate von;
     private LocalDate bis;
@@ -51,12 +56,36 @@ public class RechnungDTO {
         this.einheitName = einheitName;
     }
 
-    public String getMietername() {
-        return mietername;
+    public Long getMieterId() {
+        return mieterId;
     }
 
-    public void setMietername(String mietername) {
-        this.mietername = mietername;
+    public void setMieterId(Long mieterId) {
+        this.mieterId = mieterId;
+    }
+
+    public String getMieterName() {
+        return mieterName;
+    }
+
+    public void setMieterName(String mieterName) {
+        this.mieterName = mieterName;
+    }
+
+    public String getMieterStrasse() {
+        return mieterStrasse;
+    }
+
+    public void setMieterStrasse(String mieterStrasse) {
+        this.mieterStrasse = mieterStrasse;
+    }
+
+    public String getMieterPlzOrt() {
+        return mieterPlzOrt;
+    }
+
+    public void setMieterPlzOrt(String mieterPlzOrt) {
+        this.mieterPlzOrt = mieterPlzOrt;
     }
 
     public String getMesspunkt() {

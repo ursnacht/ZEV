@@ -24,9 +24,6 @@
                 [checked]="selectedEinheitIds.has(consumer.id!)" (change)="onEinheitToggle(consumer.id!)">
                 <label [for]="'consumer-' + consumer.id">
                   {{ consumer.name }}
-                  @if (consumer.mietername) {
-                    <span class="zev-text-muted"> ({{ consumer.mietername }})</span>
-                  }
                 </label>
               </div>
             }
@@ -85,7 +82,7 @@
                   @for (rechnung of generatedRechnungen; track rechnung) {
                     <tr>
                       <td>{{ rechnung.einheitName }}</td>
-                      <td>{{ rechnung.mietername || '-' }}</td>
+                      <td>{{ rechnung.mieterName || '-' }}</td>
                       <td class="zev-table__number">{{ formatBetrag(rechnung.endBetrag) }}</td>
                       <td>
                         <button type="button" class="zev-button zev-button--secondary"

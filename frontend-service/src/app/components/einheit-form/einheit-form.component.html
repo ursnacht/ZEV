@@ -31,16 +31,6 @@
       <div class="zev-form-hint">{{ 'MESSPUNKT_HINT' | translate }}</div>
     </div>
 
-    <!-- Consumer-specific fields for invoicing -->
-    @if (formData.typ === 'CONSUMER') {
-      <div class="zev-form-group">
-        <label for="mietername">{{ 'MIETERNAME' | translate }}:</label>
-        <input type="text" id="mietername" class="zev-input" [(ngModel)]="formData.mietername" name="mietername" maxlength="100"
-          [placeholder]="'MIETERNAME_PLACEHOLDER' | translate" />
-        <div class="zev-form-hint">{{ 'MIETERNAME_HINT' | translate }}</div>
-      </div>
-    }
-
     <div class="form-actions">
       <button type="submit" class="zev-button zev-button--primary" [disabled]="!formData.name.trim()">
         <app-icon name="check"></app-icon>

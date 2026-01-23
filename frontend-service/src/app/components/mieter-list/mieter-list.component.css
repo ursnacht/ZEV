@@ -1,0 +1,39 @@
+/*
+ * Mieter List Component
+ * Alle Basis-Styles kommen aus dem Design System
+ */
+
+.button-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.mieter-aktuell {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.zev-message--clickable {
+  cursor: pointer;
+  padding-right: var(--spacing-xl);
+}
+
+.zev-message__dismiss {
+  position: absolute;
+  right: var(--spacing-sm);
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.5rem;
+  font-weight: bold;
+  opacity: 0.7;
+}
+
+.zev-message__dismiss:hover {
+  opacity: 1;
+}

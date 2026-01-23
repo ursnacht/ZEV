@@ -94,7 +94,7 @@ public class RechnungController {
                 Map<String, Object> meta = new HashMap<>();
                 meta.put("einheitId", rechnung.getEinheitId());
                 meta.put("einheitName", rechnung.getEinheitName());
-                meta.put("mietername", rechnung.getMietername());
+                meta.put("mieterName", rechnung.getMieterName());
                 meta.put("endBetrag", rechnung.getEndBetrag());
                 meta.put("filename", rechnungStorageService.getFilename(key));
                 meta.put("downloadKey", key);

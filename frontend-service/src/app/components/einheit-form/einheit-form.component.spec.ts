@@ -40,7 +40,6 @@ describe('EinheitFormComponent', () => {
         id: 1,
         name: 'Test Einheit',
         typ: EinheitTyp.PRODUCER,
-        mietername: 'Max Muster',
         messpunkt: 'MP-001'
       };
 
@@ -50,7 +49,6 @@ describe('EinheitFormComponent', () => {
       expect(component.formData.id).toBe(1);
       expect(component.formData.name).toBe('Test Einheit');
       expect(component.formData.typ).toBe(EinheitTyp.PRODUCER);
-      expect(component.formData.mietername).toBe('Max Muster');
       expect(component.formData.messpunkt).toBe('MP-001');
     });
 
@@ -93,7 +91,6 @@ describe('EinheitFormComponent', () => {
       component.formData = {
         name: 'Test Einheit',
         typ: EinheitTyp.CONSUMER,
-        mietername: 'Max Muster',
         messpunkt: 'MP-001'
       };
 
@@ -140,7 +137,6 @@ describe('EinheitFormComponent', () => {
       component.formData = {
         name: 'Verbraucher 1',
         typ: EinheitTyp.CONSUMER,
-        mietername: 'Hans Müller',
         messpunkt: 'MP-100'
       };
 
@@ -184,18 +180,6 @@ describe('EinheitFormComponent', () => {
   });
 
   describe('optional fields', () => {
-    it('should allow submission without mietername', () => {
-      const saveSpy = spyOn(component.save, 'emit');
-      component.formData = {
-        name: 'Test Einheit',
-        typ: EinheitTyp.CONSUMER
-      };
-
-      component.onSubmit();
-
-      expect(saveSpy).toHaveBeenCalled();
-    });
-
     it('should allow submission without messpunkt', () => {
       const saveSpy = spyOn(component.save, 'emit');
       component.formData = {
@@ -213,14 +197,12 @@ describe('EinheitFormComponent', () => {
         id: 5,
         name: 'Wohnung 3B',
         typ: EinheitTyp.CONSUMER,
-        mietername: 'Familie Schmidt',
         messpunkt: 'MP-3B'
       };
 
       component.einheit = inputEinheit;
       component.ngOnInit();
 
-      expect(component.formData.mietername).toBe('Familie Schmidt');
       expect(component.formData.messpunkt).toBe('MP-3B');
     });
   });

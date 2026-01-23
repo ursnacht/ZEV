@@ -1,0 +1,117 @@
+<div class="zev-container">
+  <h1><app-icon name="users" size="lg"></app-icon> {{ 'MIETERVERWALTUNG' | translate }}</h1>
+
+  @if (message) {
+    <div class="zev-message" [ngClass]="'zev-message--' + messageType"
+      [class.zev-message--clickable]="messageType === 'error'" (click)="messageType === 'error' && dismissMessage()">
+      <span>{{ message | translate }}</span>
+      @if (messageType === 'error') {
+        <span class="zev-message__dismiss">&times;</span>
+      }
+    </div>
+  }
+
+  @if (!showForm) {
+    <div>
+      <div class="button-row">
+        <button class="zev-button zev-button--primary" (click)="onCreateNew()">
+          <app-icon name="plus"></app-icon>
+          {{ 'NEUER_MIETER' | translate }}
+        </button>
+      </div>
+      @if (mieter.length > 0) {
+        <table class="zev-table" appColumnResize>
+          <thead>
+            <tr>
+              <th class="zev-table__header--sortable" (click)="onSort('einheitId')">
+                {{ 'EINHEIT' | translate }}
+                @if (sortColumn === 'einheitId') {
+                  <span class="zev-table__sort-indicator">
+                    {{ sortDirection === 'asc' ? '▲' : '▼' }}
+                  </span>
+                }
+              </th>
+              <th class="zev-table__header--sortable" (click)="onSort('name')">
+                {{ 'NAME' | translate }}
+                @if (sortColumn === 'name') {
+                  <span class="zev-table__sort-indicator">
+                    {{ sortDirection === 'asc' ? '▲' : '▼' }}
+                  </span>
+                }
+              </th>
+              <th class="zev-table__header--sortable" (click)="onSort('strasse')">
+                {{ 'STRASSE' | translate }}
+                @if (sortColumn === 'strasse') {
+                  <span class="zev-table__sort-indicator">
+                    {{ sortDirection === 'asc' ? '▲' : '▼' }}
+                  </span>
+                }
+              </th>
+              <th class="zev-table__header--sortable" (click)="onSort('plzOrt')">
+                {{ 'PLZ' | translate }} / {{ 'ORT' | translate }}
+                @if (sortColumn === 'plzOrt') {
+                  <span class="zev-table__sort-indicator">
+                    {{ sortDirection === 'asc' ? '▲' : '▼' }}
+                  </span>
+                }
+              </th>
+              <th class="zev-table__header--sortable" (click)="onSort('mietbeginn')">
+                {{ 'MIETBEGINN' | translate }}
+                @if (sortColumn === 'mietbeginn') {
+                  <span class="zev-table__sort-indicator">
+                    {{ sortDirection === 'asc' ? '▲' : '▼' }}
+                  </span>
+                }
+              </th>
+              <th class="zev-table__header--sortable" (click)="onSort('mietende')">
+                {{ 'MIETENDE' | translate }}
+                @if (sortColumn === 'mietende') {
+                  <span class="zev-table__sort-indicator">
+                    {{ sortDirection === 'asc' ? '▲' : '▼' }}
+                  </span>
+                }
+              </th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (m of mieter; track m) {
+              <tr>
+                <td>{{ getEinheitName(m.einheitId) }}</td>
+                <td>{{ m.name }}</td>
+                <td>{{ m.strasse }}</td>
+                <td>{{ formatPlzOrt(m) }}</td>
+                <td>{{ m.mietbeginn | swissDate }}</td>
+                <td>
+                  @if (m.mietende) {
+                    {{ m.mietende | swissDate }}
+                  } @else {
+                    <span class="mieter-aktuell">{{ 'AKTUELL' | translate }}</span>
+                  }
+                </td>
+                <td>
+                  <app-kebab-menu
+                    [items]="menuItems"
+                    (itemClick)="onMenuAction($event, m)">
+                  </app-kebab-menu>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+      @if (mieter.length === 0) {
+        <p>{{ 'KEINE_MIETER_VORHANDEN' | translate }}</p>
+      }
+    </div>
+  }
+
+  @if (showForm) {
+    <app-mieter-form
+      [mieter]="selectedMieter"
+      [einheiten]="einheiten"
+      (save)="onFormSubmit($event)"
+      (cancel)="onFormCancel()">
+    </app-mieter-form>
+  }
+</div>

@@ -41,9 +41,9 @@
                   </span>
                 }
               </th>
-              <th class="zev-table__header--sortable" (click)="onSort('mietername')">
-                {{ 'MIETERNAME' | translate }}
-                @if (sortColumn === 'mietername') {
+              <th class="zev-table__header--sortable" (click)="onSort('messpunkt')">
+                {{ 'MESSPUNKT' | translate }}
+                @if (sortColumn === 'messpunkt') {
                   <span class="zev-table__sort-indicator">
                     {{ sortDirection === 'asc' ? '▲' : '▼' }}
                   </span>
@@ -58,7 +58,7 @@
                 <td>{{ einheit.id }}</td>
                 <td>{{ einheit.name }}</td>
                 <td>{{ einheit.typ }}</td>
-                <td>{{ einheit.mietername }}</td>
+                <td>{{ einheit.messpunkt || '-' }}</td>
                 <td>
                   <app-kebab-menu
                     [items]="menuItems"
