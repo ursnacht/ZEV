@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { test as baseTest, expect, Page } from '@playwright/test';
 import { navigateViaMenu, openKebabMenu, closeKebabMenu, closeKebabMenuWithEsc, clickKebabMenuItem, waitForFormResult, waitForTableWithData } from './helpers';
 
 /**
@@ -6,6 +6,81 @@ import { navigateViaMenu, openKebabMenu, closeKebabMenu, closeKebabMenuWithEsc, 
  * E2E tests for the Kebab Menu component
  * Tests the dropdown menu functionality in list components
  */
+
+// Custom fixture to track tariff names per test (isolated, no shared state)
+type TarifTracker = {
+    names: string[];
+    add: (name: string) => void;
+    remove: (name: string) => void;
+};
+
+const test = baseTest.extend<{ tarifTracker: TarifTracker }>({
+    tarifTracker: async ({ page }, use) => {
+        // Create isolated tracker for this test
+        const tracker: TarifTracker = {
+            names: [],
+            add: (name: string) => {
+                console.log(`Tracker: Added "${name}"`);
+                tracker.names.push(name);
+            },
+            remove: (name: string) => {
+                tracker.names = tracker.names.filter(n => n !== name);
+            }
+        };
+
+        // Run the test
+        await use(tracker);
+
+        // Cleanup: delete all tracked tariffs
+        if (tracker.names.length === 0) {
+            console.log('Cleanup: No test tariffs to delete');
+            return;
+        }
+
+        try {
+            page.removeAllListeners('dialog');
+            await navigateToTarife(page);
+
+            const form = page.locator('form');
+            if (await form.isVisible().catch(() => false)) {
+                const cancelButton = page.locator('button.zev-button--secondary');
+                if (await cancelButton.isVisible().catch(() => false)) {
+                    await cancelButton.click();
+                    await page.waitForTimeout(500);
+                }
+            }
+
+            await waitForTableWithData(page, 5000);
+
+            for (const tarifName of [...tracker.names]) {
+                console.log(`Cleanup: Deleting tariff "${tarifName}"`);
+
+                const tarifRow = page.locator(`tr:has-text("${tarifName}")`);
+                if (await tarifRow.isVisible().catch(() => false)) {
+                    page.once('dialog', async dialog => {
+                        await dialog.accept();
+                    });
+
+                    const kebabButton = tarifRow.locator('.zev-kebab-button');
+                    await kebabButton.click();
+                    await page.waitForTimeout(300);
+
+                    const deleteItem = tarifRow.locator('.zev-kebab-menu__item--danger');
+                    await deleteItem.click();
+
+                    await page.waitForTimeout(1500);
+                    console.log(`Cleanup: Deleted tariff "${tarifName}"`);
+                } else {
+                    console.log(`Cleanup: Tariff "${tarifName}" not found (already deleted)`);
+                }
+            }
+            console.log('Cleanup: All tracked test tariffs processed');
+        } catch (error) {
+            console.log(`Cleanup error: ${error}`);
+            page.removeAllListeners('dialog');
+        }
+    }
+});
 
 /**
  * Helper function to navigate to Tarif management page
@@ -27,9 +102,14 @@ async function navigateToEinheiten(page: Page): Promise<void> {
 
 /**
  * Helper to create a unique test tariff name
+ * Note: bezeichnung field has max 30 characters, so we use short timestamps
  */
-function generateTestName(prefix: string = 'E2E Test'): string {
-    return `${prefix} ${Date.now()}`;
+function generateTestName(prefix: string = 'E2E'): string {
+    // Use last 8 digits of timestamp for uniqueness (fits in 30 char limit)
+    const shortTimestamp = Date.now().toString().slice(-8);
+    const name = `${prefix} ${shortTimestamp}`;
+    // Ensure max 30 characters (DB limit)
+    return name.slice(0, 30);
 }
 
 /**
@@ -238,7 +318,7 @@ test.describe('Kebab Menu - Close Behavior', () => {
 });
 
 test.describe('Kebab Menu - Edit Action', () => {
-    test('should open edit form when clicking edit in kebab menu', async ({ page }) => {
+    test('should open edit form when clicking edit in kebab menu', async ({ page, tarifTracker }) => {
         await navigateToTarife(page);
 
         // First create a test tariff
@@ -271,6 +351,9 @@ test.describe('Kebab Menu - Edit Action', () => {
             return;
         }
 
+        // Track for cleanup
+        tarifTracker.add(testName);
+
         // Wait for table to reload
         await waitForTableWithData(page, 10000);
 
@@ -287,25 +370,14 @@ test.describe('Kebab Menu - Edit Action', () => {
         const bezeichnungInput = page.locator('#bezeichnung');
         await expect(bezeichnungInput).toHaveValue(testName);
 
-        // Cancel and cleanup
+        // Cancel form
         const cancelButton = page.locator('button.zev-button--secondary');
         await cancelButton.click();
-
-        // Delete test tariff
-        await waitForTableWithData(page, 10000);
-        const tarifRowForDelete = page.locator(`tr:has-text("${testName}")`);
-        if (await tarifRowForDelete.isVisible().catch(() => false)) {
-            page.on('dialog', async dialog => {
-                await dialog.accept();
-            });
-            await clickKebabMenuItem(page, tarifRowForDelete, 'delete');
-            await page.waitForTimeout(1000);
-        }
     });
 });
 
 test.describe('Kebab Menu - Delete Action', () => {
-    test('should show confirmation dialog when clicking delete in kebab menu', async ({ page }) => {
+    test('should show confirmation dialog when clicking delete in kebab menu', async ({ page, tarifTracker }) => {
         await navigateToTarife(page);
 
         // First create a test tariff
@@ -338,6 +410,9 @@ test.describe('Kebab Menu - Delete Action', () => {
             return;
         }
 
+        // Track for cleanup
+        tarifTracker.add(testName);
+
         // Wait for table to reload
         await waitForTableWithData(page, 10000);
 
@@ -347,7 +422,7 @@ test.describe('Kebab Menu - Delete Action', () => {
 
         // Set up dialog handler to capture and dismiss
         let dialogMessage = '';
-        page.on('dialog', async dialog => {
+        page.once('dialog', async dialog => {
             dialogMessage = dialog.message();
             await dialog.dismiss();
         });
@@ -363,16 +438,10 @@ test.describe('Kebab Menu - Delete Action', () => {
         // Tariff should still exist (we dismissed the dialog)
         await expect(tarifRow).toBeVisible();
 
-        // Now actually delete for cleanup
-        page.removeAllListeners('dialog');
-        page.on('dialog', async dialog => {
-            await dialog.accept();
-        });
-        await clickKebabMenuItem(page, tarifRow, 'delete');
-        await page.waitForTimeout(1000);
+        // Cleanup will happen in afterEach
     });
 
-    test('should delete item when confirming in kebab menu', async ({ page }) => {
+    test('should delete item when confirming in kebab menu', async ({ page, tarifTracker }) => {
         await navigateToTarife(page);
 
         // First create a test tariff
@@ -405,6 +474,9 @@ test.describe('Kebab Menu - Delete Action', () => {
             return;
         }
 
+        // Track for cleanup (in case deletion fails)
+        tarifTracker.add(testName);
+
         // Wait for table to reload
         await waitForTableWithData(page, 10000);
 
@@ -423,6 +495,8 @@ test.describe('Kebab Menu - Delete Action', () => {
         // Wait for deletion - row should disappear
         try {
             await expect(tarifRow).not.toBeVisible({ timeout: 10000 });
+            // Remove from tracking since it was successfully deleted
+            tarifTracker.remove(testName);
         } catch {
             console.log('Deletion may have failed, row still visible');
         }
