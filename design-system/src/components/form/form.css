@@ -52,6 +52,14 @@ input[type="date"].zev-input {
   margin-top: var(--spacing-xxs);
 }
 
+.zev-form-error {
+  color: var(--color-danger);
+  font-size: 0.60rem;
+  margin-top: var(--spacing-xxs);
+  font-weight: var(--font-weight-semibold);
+  display: block;
+}
+
 /* Date Range Row - Inline layout for date inputs and buttons */
 .zev-date-range-row {
   display: flex;

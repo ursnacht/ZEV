@@ -88,7 +88,11 @@ public class RechnungController {
         for (RechnungDTO rechnung : rechnungen) {
             try {
                 byte[] pdf = rechnungPdfService.generatePdf(rechnung, sprache);
-                String key = rechnungStorageService.sanitizeKey(rechnung.getEinheitName());
+                // Include mieterId in key to distinguish multiple tenants per unit
+                String keyBase = rechnung.getMieterId() != null
+                        ? rechnung.getEinheitName() + "_" + rechnung.getMieterId()
+                        : rechnung.getEinheitName();
+                String key = rechnungStorageService.sanitizeKey(keyBase);
                 rechnungStorageService.store(key, pdf);
 
                 Map<String, Object> meta = new HashMap<>();

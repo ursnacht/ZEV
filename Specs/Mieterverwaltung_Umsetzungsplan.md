@@ -13,6 +13,7 @@ Implementierung einer eigenständigen Mieterverwaltung mit Mietdauer (Mietbeginn
 | DB Migration | `backend-service/src/main/resources/db/migration/V36__Create_Mieter_Table.sql` | Neu |
 | DB Migration | `backend-service/src/main/resources/db/migration/V37__Remove_Mietername_From_Einheit.sql` | Neu |
 | DB Migration | `backend-service/src/main/resources/db/migration/V38__Add_Mieter_Translations.sql` | Neu |
+| DB Migration | `backend-service/src/main/resources/db/migration/V39__Mieter_Address_Required.sql` | Neu |
 | Backend Entity | `backend-service/src/main/java/ch/nacht/entity/Mieter.java` | Neu |
 | Backend Entity | `backend-service/src/main/java/ch/nacht/entity/Einheit.java` | Änderung |
 | Backend Repository | `backend-service/src/main/java/ch/nacht/repository/MieterRepository.java` | Neu |
@@ -50,6 +51,7 @@ Implementierung einer eigenständigen Mieterverwaltung mit Mietdauer (Mietbeginn
 | [x] | 14. Übersetzungen | Flyway-Migration V38 für Translation-Keys |
 | [x] | 15. RechnungDTO anpassen | Mieter-Adressfelder hinzufügen (mieterStrasse, mieterPlzOrt) |
 | [x] | 16. RechnungService anpassen | Pro Mieter einer Einheit im Quartal eine separate Rechnung erstellen |
+| [x] | 17. Adressfelder als Pflicht | Strasse, PLZ und Ort als Pflichtfelder (Backend + Frontend + Migration V39) |
 
 ---
 

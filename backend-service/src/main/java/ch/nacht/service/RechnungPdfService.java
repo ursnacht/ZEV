@@ -142,13 +142,20 @@ public class RechnungPdfService {
         // Header with invoice info and address
         html.append("<div class=\"header-section clearfix\">");
 
-        // Right-aligned address block
+        // Right-aligned address block (use tenant address if available)
         html.append("<div class=\"address-block\">");
         if (rechnung.getMieterName() != null && !rechnung.getMieterName().isEmpty()) {
             html.append(escapeHtml(rechnung.getMieterName())).append("<br/>");
+            if (rechnung.getMieterStrasse() != null && !rechnung.getMieterStrasse().isEmpty()) {
+                html.append(escapeHtml(rechnung.getMieterStrasse())).append("<br/>");
+            }
+            if (rechnung.getMieterPlzOrt() != null && !rechnung.getMieterPlzOrt().isEmpty()) {
+                html.append(escapeHtml(rechnung.getMieterPlzOrt()));
+            }
+        } else {
+            html.append(escapeHtml(rechnung.getAdresseStrasse())).append("<br/>");
+            html.append(escapeHtml(rechnung.getAdressePlzOrt()));
         }
-        html.append(escapeHtml(rechnung.getAdresseStrasse())).append("<br/>");
-        html.append(escapeHtml(rechnung.getAdressePlzOrt()));
         html.append("</div>");
 
         // Left-aligned header info
@@ -267,10 +274,17 @@ public class RechnungPdfService {
         String creditorStreet = escapeHtml(rechnung.getStellerStrasse());
         String creditorPlzOrt = escapeHtml(rechnung.getStellerPlzOrt());
 
-        // Debtor info
+        // Debtor info (use tenant address if available)
         String debtorName = rechnung.getMieterName() != null ? escapeHtml(rechnung.getMieterName()) : "";
-        String debtorStreet = escapeHtml(rechnung.getAdresseStrasse());
-        String debtorPlzOrt = escapeHtml(rechnung.getAdressePlzOrt());
+        String debtorStreet;
+        String debtorPlzOrt;
+        if (rechnung.getMieterName() != null && !rechnung.getMieterName().isEmpty()) {
+            debtorStreet = rechnung.getMieterStrasse() != null ? escapeHtml(rechnung.getMieterStrasse()) : "";
+            debtorPlzOrt = rechnung.getMieterPlzOrt() != null ? escapeHtml(rechnung.getMieterPlzOrt()) : "";
+        } else {
+            debtorStreet = escapeHtml(rechnung.getAdresseStrasse());
+            debtorPlzOrt = escapeHtml(rechnung.getAdressePlzOrt());
+        }
         boolean hasDebtor = rechnung.getMieterName() != null && !rechnung.getMieterName().isEmpty();
 
         // Main table: Empfangsschein | Zahlteil
@@ -385,14 +399,18 @@ public class RechnungPdfService {
             String iban = rechnung.getIban().replace(" ", "");
             bill.setAccount(iban);
 
-            // Debtor (invoice recipient)
+            // Debtor (invoice recipient) - use tenant address
             if (rechnung.getMieterName() != null && !rechnung.getMieterName().isEmpty()) {
                 Address debtor = new Address();
                 debtor.setName(rechnung.getMieterName());
-                debtor.setStreet(rechnung.getAdresseStrasse());
-                String[] debtorPlzOrt = rechnung.getAdressePlzOrt().split(" ", 2);
-                debtor.setPostalCode(debtorPlzOrt[0]);
-                debtor.setTown(debtorPlzOrt.length > 1 ? debtorPlzOrt[1] : "");
+                if (rechnung.getMieterStrasse() != null) {
+                    debtor.setStreet(rechnung.getMieterStrasse());
+                }
+                if (rechnung.getMieterPlzOrt() != null && !rechnung.getMieterPlzOrt().isEmpty()) {
+                    String[] mieterPlzOrtParts = rechnung.getMieterPlzOrt().split(" ", 2);
+                    debtor.setPostalCode(mieterPlzOrtParts[0]);
+                    debtor.setTown(mieterPlzOrtParts.length > 1 ? mieterPlzOrtParts[1] : "");
+                }
                 debtor.setCountryCode("CH");
                 bill.setDebtor(debtor);
             }

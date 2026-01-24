@@ -2,7 +2,7 @@
 
 ## 1. Ziel & Kontext
 * **Was soll erreicht werden:** Hier sind generelle Anforderungen aufgeführt, die bei jeder Umsetzung einer Anforderung
-  berücksichtigt werden sollen.
+    berücksichtigt werden sollen.
 * **Warum machen wir das:** 
   * Deterministische Umsetzung wird so erreicht.
   * Die Anwendung wird einheitlich erstellt und bekommt ein einheitliches Look & Feel. 
@@ -17,6 +17,8 @@
 
 ### Frontend
 * Angular 19 mit TypeScript
+* Verwende immer das Schweizer Datumsformat dd.MM.yyyy
+* Verwende wo möglich und sinnvoll ein Feather Icon: Navigation, Seitentitel
 
 ### Git-Konventionen
 * Commit-Messages: Kurz und prägnant, beschreiben was geändert wurde

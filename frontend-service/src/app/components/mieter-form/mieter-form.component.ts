@@ -57,6 +57,9 @@ export class MieterFormComponent implements OnInit {
   isFormValid(): boolean {
     return !!(
       this.formData.name.trim() &&
+      this.formData.strasse?.trim() &&
+      this.formData.plz?.trim() &&
+      this.formData.ort?.trim() &&
       this.formData.mietbeginn &&
       this.formData.einheitId > 0 &&
       this.isDateRangeValid()

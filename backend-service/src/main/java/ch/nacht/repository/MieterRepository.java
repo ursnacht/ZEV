@@ -31,21 +31,38 @@ public interface MieterRepository extends JpaRepository<Mieter, Long> {
     List<Mieter> findByEinheitIdOrderByMietbeginnDesc(Long einheitId);
 
     /**
-     * Check if overlapping lease periods exist for a unit.
-     * Two periods overlap if: start1 < end2 AND end1 > start2
-     * NULL mietende means open-ended (infinite end date).
+     * Check if overlapping lease periods exist for a unit (open-ended new lease).
+     * Used when the new tenant has no mietende (current tenant).
      *
      * @param einheitId Unit ID
      * @param mietbeginn Lease start date
-     * @param mietende Lease end date (can be null for open-ended)
+     * @param excludeId ID to exclude (use -1 for new tenants)
+     * @return true if an overlapping tenant exists
+     */
+    @Query("SELECT COUNT(m) > 0 FROM Mieter m WHERE m.einheitId = :einheitId " +
+           "AND m.id != :excludeId " +
+           "AND (m.mietende IS NULL OR m.mietende > :mietbeginn)")
+    boolean existsOverlappingMieterOpenEnded(
+        @Param("einheitId") Long einheitId,
+        @Param("mietbeginn") LocalDate mietbeginn,
+        @Param("excludeId") Long excludeId
+    );
+
+    /**
+     * Check if overlapping lease periods exist for a unit (bounded new lease).
+     * Used when the new tenant has a specific mietende.
+     *
+     * @param einheitId Unit ID
+     * @param mietbeginn Lease start date
+     * @param mietende Lease end date
      * @param excludeId ID to exclude (use -1 for new tenants)
      * @return true if an overlapping tenant exists
      */
     @Query("SELECT COUNT(m) > 0 FROM Mieter m WHERE m.einheitId = :einheitId " +
            "AND m.id != :excludeId " +
            "AND (m.mietende IS NULL OR m.mietende > :mietbeginn) " +
-           "AND (:mietende IS NULL OR m.mietbeginn < :mietende)")
-    boolean existsOverlappingMieter(
+           "AND m.mietbeginn < :mietende")
+    boolean existsOverlappingMieterBounded(
         @Param("einheitId") Long einheitId,
         @Param("mietbeginn") LocalDate mietbeginn,
         @Param("mietende") LocalDate mietende,

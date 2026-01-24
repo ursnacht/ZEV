@@ -33,20 +33,35 @@
     <div class="zev-form-group">
       <label for="strasse">{{ 'STRASSE' | translate }}:</label>
       <input type="text" id="strasse" class="zev-input" [(ngModel)]="formData.strasse" name="strasse"
-        maxlength="150" />
+        required maxlength="150" />
+      @if (!formData.strasse?.trim()) {
+        <div class="zev-form-error">
+          {{ 'STRASSE_IST_ERFORDERLICH' | translate }}
+        </div>
+      }
     </div>
 
     <div class="zev-form-row">
       <div class="zev-form-group">
         <label for="plz">{{ 'PLZ' | translate }}:</label>
         <input type="text" id="plz" class="zev-input" [(ngModel)]="formData.plz" name="plz"
-          maxlength="20" />
+          required maxlength="20" />
+        @if (!formData.plz?.trim()) {
+          <div class="zev-form-error">
+            {{ 'PLZ_IST_ERFORDERLICH' | translate }}
+          </div>
+        }
       </div>
 
       <div class="zev-form-group">
         <label for="ort">{{ 'ORT' | translate }}:</label>
         <input type="text" id="ort" class="zev-input" [(ngModel)]="formData.ort" name="ort"
-          maxlength="100" />
+          required maxlength="100" />
+        @if (!formData.ort?.trim()) {
+          <div class="zev-form-error">
+            {{ 'ORT_IST_ERFORDERLICH' | translate }}
+          </div>
+        }
       </div>
     </div>
 

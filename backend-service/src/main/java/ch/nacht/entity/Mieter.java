@@ -30,16 +30,19 @@ public class Mieter {
     @Column(name = "name", length = 150, nullable = false)
     private String name;
 
+    @NotBlank(message = "Strasse is required")
     @Size(max = 150, message = "Strasse must not exceed 150 characters")
-    @Column(name = "strasse", length = 150)
+    @Column(name = "strasse", length = 150, nullable = false)
     private String strasse;
 
+    @NotBlank(message = "PLZ is required")
     @Size(max = 20, message = "PLZ must not exceed 20 characters")
-    @Column(name = "plz", length = 20)
+    @Column(name = "plz", length = 20, nullable = false)
     private String plz;
 
+    @NotBlank(message = "Ort is required")
     @Size(max = 100, message = "Ort must not exceed 100 characters")
-    @Column(name = "ort", length = 100)
+    @Column(name = "ort", length = 100, nullable = false)
     private String ort;
 
     @NotNull(message = "Mietbeginn is required")

@@ -75,11 +75,20 @@ public class MieterService {
         Long excludeId = mieter.getId() != null ? mieter.getId() : -1L;
 
         // Validate: no overlapping lease periods for the same unit
-        if (mieterRepository.existsOverlappingMieter(
-                mieter.getEinheitId(),
-                mieter.getMietbeginn(),
-                mieter.getMietende(),
-                excludeId)) {
+        boolean hasOverlap;
+        if (mieter.getMietende() == null) {
+            hasOverlap = mieterRepository.existsOverlappingMieterOpenEnded(
+                    mieter.getEinheitId(),
+                    mieter.getMietbeginn(),
+                    excludeId);
+        } else {
+            hasOverlap = mieterRepository.existsOverlappingMieterBounded(
+                    mieter.getEinheitId(),
+                    mieter.getMietbeginn(),
+                    mieter.getMietende(),
+                    excludeId);
+        }
+        if (hasOverlap) {
             throw new IllegalArgumentException("Mietzeit überschneidet sich mit bestehendem Mieter");
         }
 

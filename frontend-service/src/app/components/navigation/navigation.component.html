@@ -13,18 +13,32 @@
 
     <ul class="zev-navbar__menu" [class.zev-navbar__menu--open]="isMenuOpen">
       <li>
-        <a routerLink="/upload" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
+        <a routerLink="/tarife" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-          <app-icon name="upload"></app-icon>
-          {{ 'MESSWERTE_UPLOAD' | translate }}
+          <app-icon name="tag"></app-icon>
+          {{ 'TARIFE' | translate }}
         </a>
       </li>
       <li>
-        <a routerLink="/einheiten" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
+        <a routerLink="/mieter" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-          <app-icon name="home"></app-icon>
-          {{ 'EINHEITEN_VERWALTUNG' | translate }}
+          <app-icon name="users"></app-icon>
+          {{ 'MIETERVERWALTUNG' | translate }}
         </a>
+      </li>
+      <li>
+        <a routerLink="/rechnungen" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
+          (click)="closeMenu()">
+          <app-icon name="file-text"></app-icon>
+          {{ 'RECHNUNGEN' | translate }}
+        </a>
+      </li>
+      <li>
+        <a routerLink="/upload" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
+         (click)="closeMenu()">
+         <app-icon name="upload"></app-icon>
+         {{ 'MESSWERTE_UPLOAD' | translate }}
+       </a>
       </li>
       <li>
         <a routerLink="/solar-calculation" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
@@ -48,24 +62,10 @@
         </a>
       </li>
       <li>
-        <a routerLink="/rechnungen" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
+        <a routerLink="/einheiten" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-          <app-icon name="file-text"></app-icon>
-          {{ 'RECHNUNGEN' | translate }}
-        </a>
-      </li>
-      <li>
-        <a routerLink="/tarife" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
-          (click)="closeMenu()">
-          <app-icon name="tag"></app-icon>
-          {{ 'TARIFE' | translate }}
-        </a>
-      </li>
-      <li>
-        <a routerLink="/mieter" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
-          (click)="closeMenu()">
-          <app-icon name="users"></app-icon>
-          {{ 'MIETERVERWALTUNG' | translate }}
+          <app-icon name="home"></app-icon>
+          {{ 'EINHEITEN_VERWALTUNG' | translate }}
         </a>
       </li>
       <li>

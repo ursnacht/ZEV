@@ -6,6 +6,9 @@ import { navigateViaMenu, clickKebabMenuItem, waitForFormResult, waitForTableWit
  * E2E tests for the Tarif (Tariff) Management page
  */
 
+// Track created tariffs for cleanup
+let createdTarifNames: string[] = [];
+
 /**
  * Helper function to navigate to Tarif management page
  */
@@ -41,6 +44,93 @@ async function fillTarifForm(page: Page, data: {
     await page.locator('#gueltigVon').fill(data.gueltigVon);
     await page.locator('#gueltigBis').fill(data.gueltigBis);
 }
+
+/**
+ * Helper to delete a tariff by name
+ */
+async function deleteTarifByName(page: Page, name: string): Promise<void> {
+    console.log(`Cleanup: Attempting to delete tariff "${name}"`);
+    try {
+        // Remove any existing dialog handlers to avoid conflicts
+        page.removeAllListeners('dialog');
+
+        // Always navigate to tarife page for cleanup
+        await navigateToTarife(page);
+
+        // Cancel any open form first
+        const form = page.locator('form');
+        if (await form.isVisible().catch(() => false)) {
+            const cancelButton = page.locator('button.zev-button--secondary');
+            if (await cancelButton.isVisible().catch(() => false)) {
+                await cancelButton.click();
+                await page.waitForTimeout(500);
+            }
+        }
+
+        // Wait for table
+        await waitForTableWithData(page, 5000);
+
+        // Find the tariff row
+        const tarifRow = page.locator(`tr:has-text("${name}")`);
+        const isVisible = await tarifRow.isVisible().catch(() => false);
+        console.log(`Cleanup: Tariff row "${name}" visible: ${isVisible}`);
+
+        if (isVisible) {
+            // Set up dialog handler to accept deletion BEFORE clicking
+            page.on('dialog', async dialog => {
+                console.log(`Cleanup: Dialog appeared, accepting...`);
+                await dialog.accept();
+            });
+
+            // Open kebab menu and click delete
+            const kebabButton = tarifRow.locator('.zev-kebab-button');
+            await kebabButton.click();
+            await page.waitForTimeout(300);
+
+            const deleteItem = tarifRow.locator('.zev-kebab-menu__item--danger');
+            await deleteItem.click();
+
+            // Wait for deletion to complete
+            await page.waitForTimeout(2000);
+
+            // Verify deletion
+            const stillVisible = await tarifRow.isVisible().catch(() => false);
+            if (!stillVisible) {
+                console.log(`Cleanup: Successfully deleted tariff "${name}"`);
+            } else {
+                console.log(`Cleanup: Tariff "${name}" still visible after delete attempt`);
+            }
+
+            // Remove dialog handler
+            page.removeAllListeners('dialog');
+        } else {
+            console.log(`Cleanup: Tariff "${name}" not found (may already be deleted)`);
+        }
+    } catch (error) {
+        console.log(`Cleanup: Error deleting tariff "${name}": ${error}`);
+        page.removeAllListeners('dialog');
+    }
+}
+
+/**
+ * Cleanup function to delete all created tariffs
+ */
+async function cleanupCreatedTariffs(page: Page): Promise<void> {
+    for (const name of createdTarifNames) {
+        await deleteTarifByName(page, name);
+    }
+    createdTarifNames = [];
+}
+
+// Reset tracking before each test
+test.beforeEach(() => {
+    createdTarifNames = [];
+});
+
+// Cleanup after each test
+test.afterEach(async ({ page }) => {
+    await cleanupCreatedTariffs(page);
+});
 
 test.describe('Tarif Management - Navigation and Display', () => {
     test('should display the tariff management page with table and create button', async ({ page }) => {
@@ -192,6 +282,9 @@ test.describe('Tarif Management - Create Tariff', () => {
         }
 
         if (isSuccess) {
+            // Track for cleanup
+            createdTarifNames.push(testName);
+
             // Wait for table to reload
             await waitForTableWithData(page, 10000);
 
@@ -202,16 +295,7 @@ test.describe('Tarif Management - Create Tariff', () => {
             // Verify it has ZEV badge
             const zevBadge = newTarifRow.locator('.tarif-typ-badge--zev');
             await expect(zevBadge).toBeVisible();
-
-            // Clean up: delete the test tariff
-            // Use kebab menu for delete
-            page.on('dialog', async dialog => {
-                await dialog.accept();
-            });
-            await clickKebabMenuItem(page, newTarifRow, 'delete');
-            await page.waitForTimeout(1000);
         } else {
-            // If error, skip the cleanup as tariff was not created
             console.log('Tariff creation failed, skipping verification');
         }
     });
@@ -247,6 +331,9 @@ test.describe('Tarif Management - Create Tariff', () => {
         }
 
         if (isSuccess) {
+            // Track for cleanup
+            createdTarifNames.push(testName);
+
             // Wait for table to reload
             await waitForTableWithData(page, 10000);
 
@@ -257,16 +344,7 @@ test.describe('Tarif Management - Create Tariff', () => {
             // Verify it has VNB badge
             const vnbBadge = newTarifRow.locator('.tarif-typ-badge--vnb');
             await expect(vnbBadge).toBeVisible();
-
-            // Clean up: delete the test tariff
-            // Use kebab menu for delete
-            page.on('dialog', async dialog => {
-                await dialog.accept();
-            });
-            await clickKebabMenuItem(page, newTarifRow, 'delete');
-            await page.waitForTimeout(1000);
         } else {
-            // If error, skip the cleanup as tariff was not created
             console.log('Tariff creation failed, skipping verification');
         }
     });
@@ -398,6 +476,9 @@ test.describe('Tarif Management - Edit Tariff', () => {
             return;
         }
 
+        // Track for cleanup
+        createdTarifNames.push(originalName);
+
         // Wait for table to reload
         await waitForTableWithData(page, 10000);
 
@@ -444,14 +525,6 @@ test.describe('Tarif Management - Edit Tariff', () => {
         await waitForTableWithData(page, 10000);
         const updatedRow = page.locator(`tr:has-text("${originalName}")`);
         await expect(updatedRow).toBeVisible({ timeout: 10000 });
-
-        // Clean up: delete the test tariff
-        // Use kebab menu for delete
-        page.on('dialog', async dialog => {
-            await dialog.accept();
-        });
-        await clickKebabMenuItem(page, tarifRow, 'delete');
-        await page.waitForTimeout(1000);
     });
 });
 
@@ -489,6 +562,9 @@ test.describe('Tarif Management - Delete Tariff', () => {
             return;
         }
 
+        // Track for cleanup (in case test fails before deletion)
+        createdTarifNames.push(testName);
+
         // Wait for table to reload
         await waitForTableWithData(page, 10000);
 
@@ -498,7 +574,7 @@ test.describe('Tarif Management - Delete Tariff', () => {
 
         // Set up dialog handler to dismiss
         let dialogMessage = '';
-        page.on('dialog', async dialog => {
+        page.once('dialog', async dialog => {
             dialogMessage = dialog.message();
             await dialog.dismiss(); // Cancel deletion
         });
@@ -514,13 +590,7 @@ test.describe('Tarif Management - Delete Tariff', () => {
         // Tariff should still exist
         await expect(tarifRow).toBeVisible();
 
-        // Now actually delete (for cleanup)
-        page.removeAllListeners('dialog');
-        page.on('dialog', async dialog => {
-            await dialog.accept();
-        });
-        await clickKebabMenuItem(page, tarifRow, 'delete');
-        await page.waitForTimeout(1000);
+        // Cleanup will happen in afterEach
     });
 
     test('should delete tariff when confirmed', async ({ page }) => {
@@ -556,6 +626,9 @@ test.describe('Tarif Management - Delete Tariff', () => {
             return;
         }
 
+        // Track for cleanup (in case deletion fails)
+        createdTarifNames.push(testName);
+
         // Wait for table to reload
         await waitForTableWithData(page, 10000);
 
@@ -574,6 +647,8 @@ test.describe('Tarif Management - Delete Tariff', () => {
         // Wait for deletion - the specific row should disappear
         try {
             await expect(tarifRow).not.toBeVisible({ timeout: 10000 });
+            // Remove from tracking since it was successfully deleted
+            createdTarifNames = createdTarifNames.filter(n => n !== testName);
         } catch {
             console.log('Tariff deletion may have failed, row still visible');
         }
@@ -612,6 +687,9 @@ test.describe('Tarif Management - Overlapping Validation', () => {
             return;
         }
 
+        // Track for cleanup
+        createdTarifNames.push(testName1);
+
         // Wait for list
         await page.locator('.zev-table').waitFor({ state: 'visible', timeout: 10000 });
 
@@ -637,26 +715,18 @@ test.describe('Tarif Management - Overlapping Validation', () => {
         // Either error message is shown (overlapping validation), or form stays visible
         const hasError = await errorMessage.isVisible().catch(() => false);
         const formStillVisible = await page.locator('form').isVisible().catch(() => false);
+
+        // If second tariff was created despite overlap, track it for cleanup
+        if (!hasError && !formStillVisible) {
+            createdTarifNames.push(testName2);
+        }
+
         expect(hasError || formStillVisible).toBeTruthy();
 
         // Clean up: cancel form if still visible
         if (formStillVisible) {
             const cancelButton = page.locator('button.zev-button--secondary');
             await cancelButton.click();
-        }
-
-        // Wait for table to be visible before cleanup
-        await page.locator('.zev-table').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-
-        // Delete the first test tariff
-        const tarifRow = page.locator(`tr:has-text("${testName1}")`);
-        if (await tarifRow.isVisible().catch(() => false)) {
-            page.on('dialog', async dialog => {
-                await dialog.accept();
-            });
-            // Use kebab menu for delete action
-            await clickKebabMenuItem(page, tarifRow, 'delete');
-            await page.waitForTimeout(1000);
         }
     });
 });
