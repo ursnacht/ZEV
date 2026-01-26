@@ -1,0 +1,113 @@
+<div class="zev-container">
+  <h1><app-icon name="settings" size="lg"></app-icon> {{ 'EINSTELLUNGEN' | translate }}</h1>
+
+  @if (message) {
+    <div class="zev-message" [ngClass]="'zev-message--' + messageType"
+      [class.zev-message--dismissible]="messageType === 'error'" (click)="messageType === 'error' && dismissMessage()">
+      <span>{{ message | translate }}</span>
+      @if (messageType === 'error') {
+        <span class="zev-message__dismiss">&times;</span>
+      }
+    </div>
+  }
+
+  @if (loading) {
+    <p>{{ 'LADEN' | translate }}...</p>
+  }
+
+  @if (!loading) {
+    <div class="zev-form-container zev-form-container--narrow">
+      <form (ngSubmit)="onSubmit()">
+        <div class="zev-form-group">
+          <label for="zahlungsfrist">{{ 'ZAHLUNGSFRIST' | translate }}:</label>
+          <input type="text" id="zahlungsfrist" class="zev-input"
+            [(ngModel)]="formData.zahlungsfrist" name="zahlungsfrist"
+            required placeholder="z.B. 30 Tage" />
+          @if (!formData.zahlungsfrist?.trim()) {
+            <div class="zev-form-error">
+              {{ 'PFLICHTFELD' | translate }}
+            </div>
+          }
+        </div>
+
+        <div class="zev-form-group">
+          <label for="iban">{{ 'IBAN' | translate }}:</label>
+          <input type="text" id="iban" class="zev-input"
+            [(ngModel)]="formData.iban" name="iban"
+            required placeholder="CH00 0000 0000 0000 0000 0" />
+          @if (formData.iban && !isIbanValid()) {
+            <div class="zev-form-error">
+              {{ 'IBAN_UNGUELTIG' | translate }}
+            </div>
+          }
+          @if (!formData.iban?.trim()) {
+            <div class="zev-form-error">
+              {{ 'PFLICHTFELD' | translate }}
+            </div>
+          }
+        </div>
+
+        <div class="zev-form-section">
+          <h3 class="zev-form-section__title">{{ 'RECHNUNGSSTELLER' | translate }}</h3>
+
+          <div class="zev-form-group">
+            <label for="stellerName">{{ 'NAME' | translate }}:</label>
+            <input type="text" id="stellerName" class="zev-input"
+              [(ngModel)]="formData.steller.name" name="stellerName"
+              required />
+            @if (!formData.steller?.name?.trim()) {
+              <div class="zev-form-error">
+                {{ 'PFLICHTFELD' | translate }}
+              </div>
+            }
+          </div>
+
+          <div class="zev-form-group">
+            <label for="stellerStrasse">{{ 'STRASSE' | translate }}:</label>
+            <input type="text" id="stellerStrasse" class="zev-input"
+              [(ngModel)]="formData.steller.strasse" name="stellerStrasse"
+              required />
+            @if (!formData.steller?.strasse?.trim()) {
+              <div class="zev-form-error">
+                {{ 'PFLICHTFELD' | translate }}
+              </div>
+            }
+          </div>
+
+          <div class="zev-form-row">
+            <div class="zev-form-group">
+              <label for="stellerPlz">{{ 'PLZ' | translate }}:</label>
+              <input type="text" id="stellerPlz" class="zev-input"
+                [(ngModel)]="formData.steller.plz" name="stellerPlz"
+                required maxlength="10" />
+              @if (!formData.steller?.plz?.trim()) {
+                <div class="zev-form-error">
+                  {{ 'PFLICHTFELD' | translate }}
+                </div>
+              }
+            </div>
+
+            <div class="zev-form-group">
+              <label for="stellerOrt">{{ 'ORT' | translate }}:</label>
+              <input type="text" id="stellerOrt" class="zev-input"
+                [(ngModel)]="formData.steller.ort" name="stellerOrt"
+                required />
+              @if (!formData.steller?.ort?.trim()) {
+                <div class="zev-form-error">
+                  {{ 'PFLICHTFELD' | translate }}
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="zev-form-actions">
+          <button type="submit" class="zev-button zev-button--primary" [disabled]="!isFormValid()">
+            <app-icon name="check"></app-icon>
+            {{ 'SAVE' | translate }}
+          </button>
+        </div>
+      </form>
+    </div>
+  }
+</div>

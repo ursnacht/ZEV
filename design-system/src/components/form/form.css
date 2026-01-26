@@ -32,6 +32,17 @@ input[type="date"].zev-input {
   cursor: not-allowed;
 }
 
+/* Form Container */
+.zev-form-container {
+  background-color: var(--color-gray-50);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
+}
+
+.zev-form-container--narrow {
+  max-width: 600px;
+}
+
 /* Form Group */
 .zev-form-group {
   margin-bottom: var(--spacing-md);
@@ -58,6 +69,42 @@ input[type="date"].zev-input {
   margin-top: var(--spacing-xxs);
   font-weight: var(--font-weight-semibold);
   display: block;
+}
+
+/* Form Actions (button row) */
+.zev-form-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-lg);
+}
+
+.zev-form-actions--equal button {
+  flex: 1;
+}
+
+/* Form Row (side-by-side fields) */
+.zev-form-row {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.zev-form-row .zev-form-group {
+  flex: 1;
+}
+
+/* Form Section */
+.zev-form-section {
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--color-gray-200);
+}
+
+.zev-form-section__title {
+  color: var(--color-gray-700);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  margin-top: 0;
+  margin-bottom: var(--spacing-md);
 }
 
 /* Date Range Row - Inline layout for date inputs and buttons */

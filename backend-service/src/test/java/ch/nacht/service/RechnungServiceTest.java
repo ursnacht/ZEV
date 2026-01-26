@@ -1,7 +1,8 @@
 package ch.nacht.service;
 
-import ch.nacht.config.RechnungConfig;
+import ch.nacht.dto.EinstellungenDTO;
 import ch.nacht.dto.RechnungDTO;
+import ch.nacht.dto.RechnungKonfigurationDTO;
 import ch.nacht.dto.TarifZeileDTO;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
@@ -40,7 +41,7 @@ public class RechnungServiceTest {
     private MesswerteRepository messwerteRepository;
 
     @Mock
-    private RechnungConfig rechnungConfig;
+    private EinstellungenService einstellungenService;
 
     @Mock
     private TarifService tarifService;
@@ -82,22 +83,15 @@ public class RechnungServiceTest {
         );
         vnbTarif2024.setId(2L);
 
-        // Setup RechnungConfig mock (all lenient as not all tests use them)
-        RechnungConfig.Steller steller = mock(RechnungConfig.Steller.class);
-        lenient().when(steller.getName()).thenReturn("Test AG");
-        lenient().when(steller.getStrasse()).thenReturn("Teststrasse 1");
-        lenient().when(steller.getPlz()).thenReturn("3000");
-        lenient().when(steller.getOrt()).thenReturn("Bern");
-
-        RechnungConfig.Adresse adresse = mock(RechnungConfig.Adresse.class);
-        lenient().when(adresse.getStrasse()).thenReturn("Musterweg 5");
-        lenient().when(adresse.getPlz()).thenReturn("3001");
-        lenient().when(adresse.getOrt()).thenReturn("Bern");
-
-        lenient().when(rechnungConfig.getZahlungsfrist()).thenReturn("30 Tage");
-        lenient().when(rechnungConfig.getIban()).thenReturn("CH12 3456 7890 1234");
-        lenient().when(rechnungConfig.getSteller()).thenReturn(steller);
-        lenient().when(rechnungConfig.getAdresse()).thenReturn(adresse);
+        // Setup EinstellungenService mock (lenient as not all tests use them)
+        RechnungKonfigurationDTO.StellerDTO steller = new RechnungKonfigurationDTO.StellerDTO(
+            "Test AG", "Teststrasse 1", "3000", "Bern"
+        );
+        RechnungKonfigurationDTO rechnungKonfig = new RechnungKonfigurationDTO(
+            "30 Tage", "CH12 3456 7890 1234", steller
+        );
+        EinstellungenDTO einstellungen = new EinstellungenDTO(1L, rechnungKonfig);
+        lenient().when(einstellungenService.getEinstellungenOrThrow()).thenReturn(einstellungen);
     }
 
     @Test

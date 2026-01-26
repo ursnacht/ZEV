@@ -1,7 +1,8 @@
 package ch.nacht.service;
 
-import ch.nacht.config.RechnungConfig;
+import ch.nacht.dto.EinstellungenDTO;
 import ch.nacht.dto.RechnungDTO;
+import ch.nacht.dto.RechnungKonfigurationDTO;
 import ch.nacht.dto.TarifZeileDTO;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
@@ -30,20 +31,20 @@ public class RechnungService {
 
     private final EinheitRepository einheitRepository;
     private final MesswerteRepository messwerteRepository;
-    private final RechnungConfig rechnungConfig;
+    private final EinstellungenService einstellungenService;
     private final TarifService tarifService;
     private final MieterService mieterService;
     private final HibernateFilterService hibernateFilterService;
 
     public RechnungService(EinheitRepository einheitRepository,
                            MesswerteRepository messwerteRepository,
-                           RechnungConfig rechnungConfig,
+                           EinstellungenService einstellungenService,
                            TarifService tarifService,
                            MieterService mieterService,
                            HibernateFilterService hibernateFilterService) {
         this.einheitRepository = einheitRepository;
         this.messwerteRepository = messwerteRepository;
-        this.rechnungConfig = rechnungConfig;
+        this.einstellungenService = einstellungenService;
         this.tarifService = tarifService;
         this.mieterService = mieterService;
         this.hibernateFilterService = hibernateFilterService;
@@ -157,14 +158,16 @@ public class RechnungService {
         rechnung.setRundung(rundung);
         rechnung.setEndBetrag(endBetrag);
 
-        // Configuration values
-        rechnung.setZahlungsfrist(rechnungConfig.getZahlungsfrist());
-        rechnung.setIban(rechnungConfig.getIban());
-        rechnung.setStellerName(rechnungConfig.getSteller().getName());
-        rechnung.setStellerStrasse(rechnungConfig.getSteller().getStrasse());
-        rechnung.setStellerPlzOrt(rechnungConfig.getSteller().getPlz() + " " + rechnungConfig.getSteller().getOrt());
-        rechnung.setAdresseStrasse(rechnungConfig.getAdresse().getStrasse());
-        rechnung.setAdressePlzOrt(rechnungConfig.getAdresse().getPlz() + " " + rechnungConfig.getAdresse().getOrt());
+        // Configuration values from database settings
+        EinstellungenDTO einstellungen = einstellungenService.getEinstellungenOrThrow();
+        RechnungKonfigurationDTO config = einstellungen.getRechnung();
+        RechnungKonfigurationDTO.StellerDTO steller = config.getSteller();
+
+        rechnung.setZahlungsfrist(config.getZahlungsfrist());
+        rechnung.setIban(config.getIban());
+        rechnung.setStellerName(steller.getName());
+        rechnung.setStellerStrasse(steller.getStrasse());
+        rechnung.setStellerPlzOrt(steller.getPlz() + " " + steller.getOrt());
 
         return rechnung;
     }

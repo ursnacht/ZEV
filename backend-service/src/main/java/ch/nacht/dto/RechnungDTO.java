@@ -37,8 +37,6 @@ public class RechnungDTO {
     private String stellerName;
     private String stellerStrasse;
     private String stellerPlzOrt;
-    private String adresseStrasse;
-    private String adressePlzOrt;
 
     public Long getEinheitId() {
         return einheitId;
@@ -194,21 +192,5 @@ public class RechnungDTO {
 
     public void setStellerPlzOrt(String stellerPlzOrt) {
         this.stellerPlzOrt = stellerPlzOrt;
-    }
-
-    public String getAdresseStrasse() {
-        return adresseStrasse;
-    }
-
-    public void setAdresseStrasse(String adresseStrasse) {
-        this.adresseStrasse = adresseStrasse;
-    }
-
-    public String getAdressePlzOrt() {
-        return adressePlzOrt;
-    }
-
-    public void setAdressePlzOrt(String adressePlzOrt) {
-        this.adressePlzOrt = adressePlzOrt;
     }
 }

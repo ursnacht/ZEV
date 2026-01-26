@@ -142,7 +142,7 @@ public class RechnungPdfService {
         // Header with invoice info and address
         html.append("<div class=\"header-section clearfix\">");
 
-        // Right-aligned address block (use tenant address if available)
+        // Right-aligned address block (tenant address)
         html.append("<div class=\"address-block\">");
         if (rechnung.getMieterName() != null && !rechnung.getMieterName().isEmpty()) {
             html.append(escapeHtml(rechnung.getMieterName())).append("<br/>");
@@ -152,9 +152,6 @@ public class RechnungPdfService {
             if (rechnung.getMieterPlzOrt() != null && !rechnung.getMieterPlzOrt().isEmpty()) {
                 html.append(escapeHtml(rechnung.getMieterPlzOrt()));
             }
-        } else {
-            html.append(escapeHtml(rechnung.getAdresseStrasse())).append("<br/>");
-            html.append(escapeHtml(rechnung.getAdressePlzOrt()));
         }
         html.append("</div>");
 
@@ -274,17 +271,10 @@ public class RechnungPdfService {
         String creditorStreet = escapeHtml(rechnung.getStellerStrasse());
         String creditorPlzOrt = escapeHtml(rechnung.getStellerPlzOrt());
 
-        // Debtor info (use tenant address if available)
+        // Debtor info (tenant address)
         String debtorName = rechnung.getMieterName() != null ? escapeHtml(rechnung.getMieterName()) : "";
-        String debtorStreet;
-        String debtorPlzOrt;
-        if (rechnung.getMieterName() != null && !rechnung.getMieterName().isEmpty()) {
-            debtorStreet = rechnung.getMieterStrasse() != null ? escapeHtml(rechnung.getMieterStrasse()) : "";
-            debtorPlzOrt = rechnung.getMieterPlzOrt() != null ? escapeHtml(rechnung.getMieterPlzOrt()) : "";
-        } else {
-            debtorStreet = escapeHtml(rechnung.getAdresseStrasse());
-            debtorPlzOrt = escapeHtml(rechnung.getAdressePlzOrt());
-        }
+        String debtorStreet = rechnung.getMieterStrasse() != null ? escapeHtml(rechnung.getMieterStrasse()) : "";
+        String debtorPlzOrt = rechnung.getMieterPlzOrt() != null ? escapeHtml(rechnung.getMieterPlzOrt()) : "";
         boolean hasDebtor = rechnung.getMieterName() != null && !rechnung.getMieterName().isEmpty();
 
         // Main table: Empfangsschein | Zahlteil

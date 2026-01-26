@@ -87,17 +87,5 @@ logging:
     max-history: 30
     total-size-cap: 1GB
 
-# Invoice Configuration
-# Note: Tariffs (ZEV/VNB) are now managed in database via /api/tarife
-rechnung:
-  zahlungsfrist: "30 Tage"
-  iban: "CH70 0630 0016 9464 5991 0"
-  steller:
-    name: "Urs Nacht"
-    strasse: "Hangstrasse 14a"
-    plz: "3044"
-    ort: "Innerberg"
-  adresse:
-    strasse: "Mutachstrasse 13"
-    plz: "3008"
-    ort: "Bern"
+# Note: Invoice configuration (zahlungsfrist, IBAN, steller) is now managed
+# in the database via /api/einstellungen. Tariffs are managed via /api/tarife.

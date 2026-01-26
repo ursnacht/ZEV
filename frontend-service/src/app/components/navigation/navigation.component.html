@@ -69,6 +69,13 @@
         </a>
       </li>
       <li>
+        <a routerLink="/einstellungen" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
+          (click)="closeMenu()">
+          <app-icon name="settings"></app-icon>
+          {{ 'EINSTELLUNGEN' | translate }}
+        </a>
+      </li>
+      <li>
         <a routerLink="/translations" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
           <app-icon name="globe"></app-icon>

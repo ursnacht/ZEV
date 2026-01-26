@@ -13,10 +13,19 @@ Setze einen Umsetzungsplan schrittweise um.
 5. **Wiederhole** - Fahre mit der nächsten Phase fort
 
 ## Konventionen
-* **Design System:**
-    * Verwende bestehende Styles aus dem Maven Module `/design-system`
-    * Füge neue Styles in das Design System ein
-    * Design System Showcase bei neuen Komponenten/Styles ergänzen
+* **Design System (WICHTIG):**
+    * **Immer zuerst prüfen:** Vor dem Erstellen neuer CSS-Styles im Design System nachschauen (`design-system/src/components/`)
+    * **Verfügbare Komponenten nutzen:**
+      * Formulare: `.zev-form-container`, `.zev-form-group`, `.zev-form-row`, `.zev-form-actions`, `.zev-form-section`
+      * Inputs: `.zev-input`, `.zev-select`, `.zev-form-error`, `.zev-form-hint`
+      * Buttons: `.zev-button`, `.zev-button--primary`, `.zev-button--secondary`, `.zev-button--danger`
+      * Tabellen: `.zev-table`, `.zev-table__header--sortable`
+      * Messages: `.zev-message`, `.zev-message--success`, `.zev-message--error`, `.zev-message--dismissible`
+      * Container: `.zev-container`, `.zev-card`, `.zev-panel`
+    * **Neue Styles ins Design System:** Wiederverwendbare Styles gehören in `design-system/src/components/`
+    * **Komponenten-CSS minimal halten:** Nur komponentenspezifische Styles, keine Duplikate
+    * **Design System bauen:** Nach Änderungen `cd design-system && npm run build`
+    * **Design System Showcase:** bei neue erstellten Komponenten oder Styles ergänzen
 * **Frontend:** 
   * Komponenten im Verzeichnis `frontend-service/src/app/`
   * **Fehleranzeige im Frontend:**

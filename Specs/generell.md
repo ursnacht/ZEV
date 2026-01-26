@@ -20,6 +20,25 @@
 * Verwende immer das Schweizer Datumsformat dd.MM.yyyy
 * Verwende wo möglich und sinnvoll ein Feather Icon: Navigation, Seitentitel
 
+### Design System
+Das Design System (`/design-system`) enthält alle wiederverwendbaren UI-Komponenten und Styles.
+
+**Wichtig:** Vor dem Erstellen neuer Styles immer prüfen, ob bereits eine passende Klasse existiert!
+
+| Kategorie | Verfügbare Klassen |
+|-----------|-------------------|
+| Container | `.zev-container`, `.zev-card`, `.zev-panel` |
+| Formulare | `.zev-form-container`, `.zev-form-group`, `.zev-form-row`, `.zev-form-actions`, `.zev-form-section` |
+| Inputs | `.zev-input`, `.zev-select`, `.zev-form-error`, `.zev-form-hint` |
+| Buttons | `.zev-button`, `.zev-button--primary`, `.zev-button--secondary`, `.zev-button--danger` |
+| Tabellen | `.zev-table`, `.zev-table__header--sortable` |
+| Messages | `.zev-message`, `.zev-message--success`, `.zev-message--error`, `.zev-message--dismissible` |
+
+**Regeln:**
+* Komponenten-CSS-Dateien minimal halten (nur komponentenspezifische Styles)
+* Neue wiederverwendbare Styles in `design-system/src/components/` hinzufügen
+* Nach Änderungen am Design System: `cd design-system && npm run build`
+
 ### Git-Konventionen
 * Commit-Messages: Kurz und prägnant, beschreiben was geändert wurde
 * Keine Secrets oder Credentials committen
