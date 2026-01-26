@@ -382,30 +382,87 @@
 <!-- Forms Section -->
 <section class="showcase-section">
   <h2>Form Elements</h2>
-  <div class="form-samples">
-    <div class="zev-form-group">
-      <label for="text-input">Text Input</label>
-      <input type="text" id="text-input" class="zev-input" placeholder="Beispieltext">
-    </div>
 
-    <div class="zev-form-group">
-      <label for="select-input">Select</label>
-      <select id="select-input" class="zev-select">
-        <option>Option 1</option>
-        <option>Option 2</option>
-        <option>Option 3</option>
-      </select>
-    </div>
+  <div class="subsection">
+    <h3>Inputs</h3>
+    <div class="form-samples">
+      <div class="zev-form-group">
+        <label for="text-input">Text Input</label>
+        <input type="text" id="text-input" class="zev-input" placeholder="Beispieltext">
+      </div>
 
-    <div class="zev-form-group">
-      <label for="file-input">File Input</label>
-      <input type="file" id="file-input" class="zev-input">
-    </div>
+      <div class="zev-form-group">
+        <label for="select-input">Select</label>
+        <select id="select-input" class="zev-select">
+          <option>Option 1</option>
+          <option>Option 2</option>
+          <option>Option 3</option>
+        </select>
+      </div>
 
-    <div class="zev-form-group">
-      <label for="textarea">Textarea</label>
-      <textarea id="textarea" class="zev-input" rows="4" placeholder="Mehrzeiliger Text"></textarea>
+      <div class="zev-form-group">
+        <label for="file-input">File Input</label>
+        <input type="file" id="file-input" class="zev-input">
+      </div>
+
+      <div class="zev-form-group">
+        <label for="textarea">Textarea</label>
+        <textarea id="textarea" class="zev-input" rows="4" placeholder="Mehrzeiliger Text"></textarea>
+      </div>
     </div>
+  </div>
+
+  <div class="subsection">
+    <h3>Form Container &amp; Layout</h3>
+    <div class="zev-form-container">
+      <div class="zev-form-group">
+        <label for="fc-name">Name</label>
+        <input type="text" id="fc-name" class="zev-input" placeholder="Max Muster">
+      </div>
+      <div class="zev-form-row">
+        <div class="zev-form-group">
+          <label for="fc-plz">PLZ</label>
+          <input type="text" id="fc-plz" class="zev-input" placeholder="3000">
+        </div>
+        <div class="zev-form-group">
+          <label for="fc-ort">Ort</label>
+          <input type="text" id="fc-ort" class="zev-input" placeholder="Bern">
+        </div>
+      </div>
+      <div class="zev-form-section">
+        <h3 class="zev-form-section__title">Abschnitt mit Trennlinie</h3>
+        <div class="zev-form-group">
+          <label for="fc-email">E-Mail</label>
+          <input type="text" id="fc-email" class="zev-input" placeholder="max@example.com">
+          <div class="zev-form-hint">Wird nur intern verwendet</div>
+        </div>
+        <div class="zev-form-group">
+          <label for="fc-error">Pflichtfeld (leer)</label>
+          <input type="text" id="fc-error" class="zev-input" value="">
+          <div class="zev-form-error">Pflichtfeld</div>
+        </div>
+      </div>
+      <div class="zev-form-actions">
+        <button class="zev-button zev-button--primary">Speichern</button>
+        <button class="zev-button zev-button--secondary">Abbrechen</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <h3>CSS Klassen</h3>
+    <ul class="zev-list">
+      <li><code>.zev-form-container</code> - Grauer Hintergrund-Container</li>
+      <li><code>.zev-form-container--narrow</code> - Max. 600px Breite</li>
+      <li><code>.zev-form-group</code> - Label + Input Wrapper</li>
+      <li><code>.zev-form-row</code> - Felder nebeneinander</li>
+      <li><code>.zev-form-section</code> - Abschnitt mit Trennlinie oben</li>
+      <li><code>.zev-form-section__title</code> - Abschnittstitel</li>
+      <li><code>.zev-form-actions</code> - Button-Zeile am Ende</li>
+      <li><code>.zev-form-actions--equal</code> - Buttons gleich breit</li>
+      <li><code>.zev-form-hint</code> - Hinweistext unter Input</li>
+      <li><code>.zev-form-error</code> - Fehlermeldung unter Input</li>
+    </ul>
   </div>
 </section>
 
@@ -419,6 +476,29 @@
     <div class="zev-message zev-message--error">
       Fehler aufgetreten - Dies ist eine Fehlermeldung
     </div>
+    <div class="zev-message zev-message--warning">
+      Warnung - Dies ist eine Warnmeldung
+    </div>
+    <div class="zev-message zev-message--info">
+      Information - Dies ist eine Informationsmeldung
+    </div>
+    <div class="zev-message zev-message--error zev-message--dismissible" style="position: relative;">
+      <span>Fehler mit Schliessen-Button</span>
+      <span class="zev-message__dismiss">&times;</span>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <h3>CSS Klassen</h3>
+    <ul class="zev-list">
+      <li><code>.zev-message</code> - Basis-Klasse (fixiert oben zentriert)</li>
+      <li><code>.zev-message--success</code> - Erfolgsmeldung (grün)</li>
+      <li><code>.zev-message--error</code> - Fehlermeldung (rot)</li>
+      <li><code>.zev-message--warning</code> - Warnmeldung (gelb)</li>
+      <li><code>.zev-message--info</code> - Information (blau)</li>
+      <li><code>.zev-message--dismissible</code> - Klickbar zum Schliessen</li>
+      <li><code>.zev-message__dismiss</code> - Schliessen-Symbol (&times;)</li>
+    </ul>
   </div>
 </section>
 

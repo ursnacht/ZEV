@@ -51,6 +51,7 @@ export class MieterListComponent implements OnInit {
       next: (data) => {
         // Only CONSUMER units can have tenants
         this.einheiten = data.filter(e => e.typ === EinheitTyp.CONSUMER);
+        this.applySorting();
       },
       error: () => {
         this.showMessage('FEHLER_LADEN_EINHEITEN', 'error');
@@ -62,6 +63,7 @@ export class MieterListComponent implements OnInit {
     this.mieterService.getAllMieter().subscribe({
       next: (data) => {
         this.mieter = data;
+        this.applySorting();
       },
       error: () => {
         this.showMessage('FEHLER_LADEN_MIETER', 'error');
@@ -160,6 +162,12 @@ export class MieterListComponent implements OnInit {
       this.sortColumn = column;
       this.sortDirection = 'asc';
     }
+    this.applySorting();
+  }
+
+  private applySorting(): void {
+    const column = this.sortColumn;
+    if (!column) return;
 
     this.mieter.sort((a, b) => {
       let aValue: any;
