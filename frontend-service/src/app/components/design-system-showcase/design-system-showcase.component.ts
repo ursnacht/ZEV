@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
 import { IconComponent } from '../icon/icon.component';
@@ -7,7 +8,7 @@ import { ICONS } from '../icon/icons';
 @Component({
   selector: 'app-design-system-showcase',
   standalone: true,
-  imports: [TranslatePipe, QuarterSelectorComponent, IconComponent],
+  imports: [TranslatePipe, QuarterSelectorComponent, IconComponent, FormsModule],
   templateUrl: './design-system-showcase.component.html',
   styleUrl: './design-system-showcase.component.css'
 })
@@ -17,6 +18,7 @@ export class DesignSystemShowcaseComponent {
   collapsibleOpen = false;
   quarterDateFrom = '';
   quarterDateTo = '';
+  showcaseSearchTerm = '';
   dropZoneActive = false;
   dropZoneFile: File | null = null;
 

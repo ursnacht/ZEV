@@ -60,6 +60,11 @@ export class TranslationEditorComponent implements OnInit {
     this.applyFilter();
   }
 
+  clearSearch() {
+    this.searchTerm = '';
+    this.applyFilter();
+  }
+
   private applyFilter() {
     if (!this.searchTerm.trim()) {
       this.filteredTranslations = this.translations;

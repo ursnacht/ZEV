@@ -37,9 +37,14 @@
 
   <div class="search-bar">
     <app-icon name="search"></app-icon>
-    <input type="text" class="zev-input" [(ngModel)]="searchTerm"
-      (ngModelChange)="onSearchChange()"
-      [placeholder]="'SUCHEN' | translate">
+    <div class="search-input-wrapper">
+      <input type="text" class="zev-input" [(ngModel)]="searchTerm"
+        (ngModelChange)="onSearchChange()"
+        [placeholder]="'SUCHEN' | translate">
+      @if (searchTerm) {
+        <button type="button" class="search-clear" (click)="clearSearch()">&times;</button>
+      }
+    </div>
     <span class="search-count">{{ filteredTranslations.length }} / {{ translations.length }}</span>
   </div>
 

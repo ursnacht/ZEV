@@ -413,6 +413,26 @@
   </div>
 
   <div class="subsection">
+    <h3>Search Input mit Clear-Button</h3>
+    <div class="search-sample">
+      <app-icon name="search"></app-icon>
+      <div class="search-input-wrapper">
+        <input type="text" class="zev-input" [(ngModel)]="showcaseSearchTerm" placeholder="Suchen...">
+        @if (showcaseSearchTerm) {
+          <button type="button" class="search-clear" (click)="showcaseSearchTerm = ''">&times;</button>
+        }
+      </div>
+    </div>
+    <div class="subsection">
+      <h3>CSS Klassen</h3>
+      <ul class="zev-list">
+        <li><code>.search-input-wrapper</code> - Relativer Container um Input + Clear-Button</li>
+        <li><code>.search-clear</code> - Absolut positionierter Clear-Button im Input</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="subsection">
     <h3>Form Container &amp; Layout</h3>
     <div class="zev-form-container">
       <div class="zev-form-group">
