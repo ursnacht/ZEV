@@ -6,6 +6,15 @@ import { navigateViaMenu, waitForFormResult } from './helpers';
  * E2E tests for the Einstellungen (Settings) page
  */
 
+interface EinstellungenFormData {
+    zahlungsfrist: string;
+    iban: string;
+    stellerName: string;
+    stellerStrasse: string;
+    stellerPlz: string;
+    stellerOrt: string;
+}
+
 /**
  * Helper function to navigate to Einstellungen page
  */
@@ -26,22 +35,42 @@ async function navigateToEinstellungen(page: Page): Promise<void> {
 }
 
 /**
+ * Helper to read current form values
+ */
+async function readEinstellungenForm(page: Page): Promise<EinstellungenFormData> {
+    return {
+        zahlungsfrist: await page.locator('#zahlungsfrist').inputValue(),
+        iban: await page.locator('#iban').inputValue(),
+        stellerName: await page.locator('#stellerName').inputValue(),
+        stellerStrasse: await page.locator('#stellerStrasse').inputValue(),
+        stellerPlz: await page.locator('#stellerPlz').inputValue(),
+        stellerOrt: await page.locator('#stellerOrt').inputValue()
+    };
+}
+
+/**
  * Helper to fill the settings form
  */
-async function fillEinstellungenForm(page: Page, data: {
-    zahlungsfrist: string;
-    iban: string;
-    stellerName: string;
-    stellerStrasse: string;
-    stellerPlz: string;
-    stellerOrt: string;
-}): Promise<void> {
+async function fillEinstellungenForm(page: Page, data: EinstellungenFormData): Promise<void> {
     await page.locator('#zahlungsfrist').fill(data.zahlungsfrist);
     await page.locator('#iban').fill(data.iban);
     await page.locator('#stellerName').fill(data.stellerName);
     await page.locator('#stellerStrasse').fill(data.stellerStrasse);
     await page.locator('#stellerPlz').fill(data.stellerPlz);
     await page.locator('#stellerOrt').fill(data.stellerOrt);
+}
+
+/**
+ * Helper to save the current form
+ */
+async function submitEinstellungenForm(page: Page): Promise<boolean> {
+    const saveButton = page.locator('button[type="submit"]');
+    await saveButton.click();
+    try {
+        return await waitForFormResult(page, 15000);
+    } catch {
+        return false;
+    }
 }
 
 test.describe('Einstellungen - Navigation and Display', () => {
@@ -82,15 +111,19 @@ test.describe('Einstellungen - Save Settings', () => {
         const form = page.locator('form');
         await expect(form).toBeVisible({ timeout: 10000 });
 
-        // Fill in the form with test data
-        await fillEinstellungenForm(page, {
+        // Step 1: Read and store the original settings
+        const originalData = await readEinstellungenForm(page);
+
+        // Step 2: Fill in the form with test data
+        const testData: EinstellungenFormData = {
             zahlungsfrist: '30 Tage',
             iban: 'CH7006300016946459910',
             stellerName: 'Test Steller',
             stellerStrasse: 'Teststrasse 1',
             stellerPlz: '3000',
             stellerOrt: 'Bern'
-        });
+        };
+        await fillEinstellungenForm(page, testData);
 
         // Save button should now be enabled
         const saveButton = page.locator('button[type="submit"]');
@@ -112,11 +145,18 @@ test.describe('Einstellungen - Save Settings', () => {
         await expect(form).toBeVisible({ timeout: 10000 });
 
         // Verify that saved values are loaded back
-        await expect(page.locator('#zahlungsfrist')).toHaveValue('30 Tage');
-        await expect(page.locator('#iban')).toHaveValue('CH7006300016946459910');
-        await expect(page.locator('#stellerName')).toHaveValue('Test Steller');
-        await expect(page.locator('#stellerStrasse')).toHaveValue('Teststrasse 1');
-        await expect(page.locator('#stellerPlz')).toHaveValue('3000');
-        await expect(page.locator('#stellerOrt')).toHaveValue('Bern');
+        await expect(page.locator('#zahlungsfrist')).toHaveValue(testData.zahlungsfrist);
+        await expect(page.locator('#iban')).toHaveValue(testData.iban);
+        await expect(page.locator('#stellerName')).toHaveValue(testData.stellerName);
+        await expect(page.locator('#stellerStrasse')).toHaveValue(testData.stellerStrasse);
+        await expect(page.locator('#stellerPlz')).toHaveValue(testData.stellerPlz);
+        await expect(page.locator('#stellerOrt')).toHaveValue(testData.stellerOrt);
+
+        // Step 3: Restore original settings
+        const hasOriginalData = originalData.zahlungsfrist || originalData.iban || originalData.stellerName;
+        if (hasOriginalData) {
+            await fillEinstellungenForm(page, originalData);
+            await submitEinstellungenForm(page);
+        }
     });
 });
