@@ -4,7 +4,6 @@ import { navigateViaMenu, clickKebabMenuItem, openKebabMenu } from "./helpers";
 /**
  * tests / translation-editor.spec.ts
  * E2E tests for the Translation Editor
- * Updated to use kebab menu instead of direct buttons
  */
 
 /**
@@ -12,13 +11,31 @@ import { navigateViaMenu, clickKebabMenuItem, openKebabMenu } from "./helpers";
  */
 async function navigateToTranslationEditor(page: any) {
     await navigateViaMenu(page, "/translations");
-    await page.locator(".new-translation-form").waitFor({ state: "visible", timeout: 10000 });
+    await page.locator(".zev-form-container").waitFor({ state: "visible", timeout: 10000 });
+}
+
+/**
+ * Helper to fill the translation form
+ */
+async function fillTranslationForm(page: any, key: string, deutsch: string, englisch: string) {
+    const formContainer = page.locator(".zev-form-container");
+    const inputs = formContainer.locator("input.zev-input");
+    await inputs.nth(0).fill(key);
+    await inputs.nth(1).fill(deutsch);
+    await inputs.nth(2).fill(englisch);
+}
+
+/**
+ * Helper to submit the translation form
+ */
+async function submitTranslationForm(page: any) {
+    await page.locator(".zev-form-container .zev-form-actions button.zev-button--primary").click();
 }
 
 test.describe("Translation Editor - Kebab Menu Functionality", () => {
     test("should display kebab menu for each translation row", async ({ page }) => {
         await navigateToTranslationEditor(page);
-        const tableRows = page.locator(".zev-table tbody tr, table tbody tr");
+        const tableRows = page.locator(".zev-table tbody tr");
         const rowCount = await tableRows.count();
         if (rowCount > 0) {
             const kebabButtons = page.locator(".zev-kebab-button");
@@ -28,7 +45,7 @@ test.describe("Translation Editor - Kebab Menu Functionality", () => {
 
     test("should show save and delete options in kebab menu", async ({ page }) => {
         await navigateToTranslationEditor(page);
-        const tableRows = page.locator(".zev-table tbody tr, table tbody tr");
+        const tableRows = page.locator(".zev-table tbody tr");
         const rowCount = await tableRows.count();
         if (rowCount > 0) {
             const firstRow = tableRows.first();
@@ -45,7 +62,7 @@ test.describe("Translation Editor - Kebab Menu Functionality", () => {
 test.describe("Translation Editor - Delete Functionality via Kebab Menu", () => {
     test("should show confirmation dialog when delete is clicked via kebab menu", async ({ page }) => {
         await navigateToTranslationEditor(page);
-        const tableRows = page.locator(".zev-table tbody tr, table tbody tr");
+        const tableRows = page.locator(".zev-table tbody tr");
         const rowCount = await tableRows.count();
         if (rowCount > 0) {
             const firstRow = tableRows.first();
@@ -63,20 +80,16 @@ test.describe("Translation Editor - Delete Functionality via Kebab Menu", () => 
     test("should delete translation when confirmed via kebab menu", async ({ page }) => {
         await navigateToTranslationEditor(page);
         const testKey = `testkey_${Date.now()}`;
-        
-        // Use the correct input selectors based on the actual placeholders
-        await page.locator(".new-translation-form input").nth(0).fill(testKey);
-        await page.locator(".new-translation-form input").nth(1).fill("E2E Test Loeschen");
-        await page.locator(".new-translation-form input").nth(2).fill("E2E Test Delete");
-        
-        // Click the primary button in the form
-        await page.locator(".new-translation-form button.zev-button--primary").click();
-        
+
+        // Fill the form to create a test translation
+        await fillTranslationForm(page, testKey, "E2E Test Loeschen", "E2E Test Delete");
+        await submitTranslationForm(page);
+
         await page.waitForTimeout(1000);
         const testRow = page.locator(`tr:has-text("${testKey}")`);
         await expect(testRow).toBeVisible();
         const rowsBefore = await page.locator(".zev-table tbody tr").count();
-        
+
         page.on("dialog", async dialog => {
             await dialog.accept();
         });
@@ -92,7 +105,7 @@ test.describe("Translation Editor - Delete Functionality via Kebab Menu", () => 
         const firstRow = page.locator(".zev-table tbody tr").first();
         const firstKey = await firstRow.locator("td").first().textContent();
         const rowsBefore = await page.locator(".zev-table tbody tr").count();
-        
+
         page.on("dialog", async dialog => {
             await dialog.dismiss();
         });
@@ -111,32 +124,38 @@ test.describe("Translation Editor - Save Functionality via Kebab Menu", () => {
     test("should save translation changes via kebab menu", async ({ page }) => {
         await navigateToTranslationEditor(page);
         const testKey = `savetest_${Date.now()}`;
-        
-        // Use the correct input selectors
-        await page.locator(".new-translation-form input").nth(0).fill(testKey);
-        await page.locator(".new-translation-form input").nth(1).fill("Original DE");
-        await page.locator(".new-translation-form input").nth(2).fill("Original EN");
-        
-        // Click the primary button in the form
-        await page.locator(".new-translation-form button.zev-button--primary").click();
-        
+
+        // Create a test translation
+        await fillTranslationForm(page, testKey, "Original DE", "Original EN");
+        await submitTranslationForm(page);
+
         await page.waitForTimeout(1000);
         const testRow = page.locator(`tr:has-text("${testKey}")`);
         await expect(testRow).toBeVisible();
-        
-        // Modify the German translation in the inline input
-        const germanInput = testRow.locator("input").first();
-        await germanInput.fill("Modified DE");
-        
-        // Click save via kebab menu (first non-danger item is SAVE)
+
+        // Click edit via kebab menu - this populates the form at the top
         await clickKebabMenuItem(page, testRow, "edit");
+        await page.waitForTimeout(500);
+
+        // Form should now be in edit mode - modify the German text
+        const formContainer = page.locator(".zev-form-container");
+        const deutschInput = formContainer.locator("input.zev-input").nth(1);
+        await deutschInput.fill("Modified DE");
+
+        // Save via the form's save button
+        await submitTranslationForm(page);
         await page.waitForTimeout(1000);
-        
+
+        // Verify the row now shows the modified text
+        const updatedRow = page.locator(`tr:has-text("${testKey}")`);
+        await expect(updatedRow).toBeVisible();
+        await expect(updatedRow.locator("td").nth(1)).toHaveText("Modified DE");
+
         // Clean up: delete the test translation
         page.on("dialog", async dialog => {
             await dialog.accept();
         });
-        await clickKebabMenuItem(page, testRow, "delete");
+        await clickKebabMenuItem(page, updatedRow, "delete");
         await page.waitForTimeout(1000);
     });
 });
