@@ -260,6 +260,13 @@
   gap: var(--spacing-md);
 }
 
+::ng-deep .alert-samples .zev-message {
+  position: static;
+  transform: none;
+  min-width: auto;
+  max-width: none;
+}
+
 /* Card Samples */
 .card-samples {
   display: grid;
