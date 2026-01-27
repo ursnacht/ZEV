@@ -261,7 +261,9 @@
 }
 
 ::ng-deep .alert-samples .zev-message {
-  position: static;
+  position: relative;
+  top: auto;
+  left: auto;
   transform: none;
   min-width: auto;
   max-width: none;
