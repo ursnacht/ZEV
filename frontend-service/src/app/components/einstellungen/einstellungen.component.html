@@ -23,7 +23,7 @@
           <input type="text" id="zahlungsfrist" class="zev-input"
             [(ngModel)]="formData.zahlungsfrist" name="zahlungsfrist"
             required placeholder="z.B. 30 Tage" />
-          @if (!formData.zahlungsfrist?.trim()) {
+          @if (!formData.zahlungsfrist.trim()) {
             <div class="zev-form-error">
               {{ 'PFLICHTFELD' | translate }}
             </div>
@@ -40,7 +40,7 @@
               {{ 'IBAN_UNGUELTIG' | translate }}
             </div>
           }
-          @if (!formData.iban?.trim()) {
+          @if (!formData.iban.trim()) {
             <div class="zev-form-error">
               {{ 'PFLICHTFELD' | translate }}
             </div>
@@ -55,7 +55,7 @@
             <input type="text" id="stellerName" class="zev-input"
               [(ngModel)]="formData.steller.name" name="stellerName"
               required />
-            @if (!formData.steller?.name?.trim()) {
+            @if (!formData.steller.name.trim()) {
               <div class="zev-form-error">
                 {{ 'PFLICHTFELD' | translate }}
               </div>
@@ -67,7 +67,7 @@
             <input type="text" id="stellerStrasse" class="zev-input"
               [(ngModel)]="formData.steller.strasse" name="stellerStrasse"
               required />
-            @if (!formData.steller?.strasse?.trim()) {
+            @if (!formData.steller.strasse.trim()) {
               <div class="zev-form-error">
                 {{ 'PFLICHTFELD' | translate }}
               </div>
@@ -80,7 +80,7 @@
               <input type="text" id="stellerPlz" class="zev-input"
                 [(ngModel)]="formData.steller.plz" name="stellerPlz"
                 required maxlength="10" />
-              @if (!formData.steller?.plz?.trim()) {
+              @if (!formData.steller.plz.trim()) {
                 <div class="zev-form-error">
                   {{ 'PFLICHTFELD' | translate }}
                 </div>
@@ -92,7 +92,7 @@
               <input type="text" id="stellerOrt" class="zev-input"
                 [(ngModel)]="formData.steller.ort" name="stellerOrt"
                 required />
-              @if (!formData.steller?.ort?.trim()) {
+              @if (!formData.steller.ort.trim()) {
                 <div class="zev-form-error">
                   {{ 'PFLICHTFELD' | translate }}
                 </div>
