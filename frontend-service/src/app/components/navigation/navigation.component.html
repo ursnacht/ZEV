@@ -13,6 +13,13 @@
 
     <ul class="zev-navbar__menu" [class.zev-navbar__menu--open]="isMenuOpen">
       <li>
+        <a routerLink="/startseite" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
+          (click)="closeMenu()">
+          <app-icon name="home"></app-icon>
+          {{ 'STARTSEITE' | translate }}
+        </a>
+      </li>
+      <li>
         <a routerLink="/tarife" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
           <app-icon name="tag"></app-icon>
@@ -64,7 +71,7 @@
       <li>
         <a routerLink="/einheiten" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
-          <app-icon name="home"></app-icon>
+          <app-icon name="grid"></app-icon>
           {{ 'EINHEITEN_VERWALTUNG' | translate }}
         </a>
       </li>
@@ -95,9 +102,11 @@
         </button>
       </li>
       @if (userDisplayName) {
-        <li class="zev-navbar__user">
-          <app-icon name="user"></app-icon>
-          <span class="zev-navbar__username">{{ userDisplayName }}</span>
+        <li>
+          <span class="zev-navbar__link zev-navbar__link--static">
+            <app-icon name="user"></app-icon>
+            {{ userDisplayName }}
+          </span>
         </li>
       }
     </ul>

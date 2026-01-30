@@ -71,8 +71,9 @@
   /* Don't stretch to left */
   right: 0;
   /* Anchor to right */
-  width: 25vw;
-  min-width: 250px;
+  width: 20vw;
+  min-width: 230px;
+  max-width: 230px;
   background-color: var(--color-primary-dark);
   display: flex;
   flex-direction: column;
@@ -158,4 +159,13 @@ button.zev-navbar__link {
 button.zev-navbar__link:hover {
   color: var(--color-white) !important;
   background-color: var(--color-primary-hover) !important;
+}
+
+/* Static link (no hover effect, not clickable) */
+.zev-navbar__link--static {
+  cursor: default;
+}
+
+.zev-navbar__link--static:hover {
+  background-color: transparent;
 }

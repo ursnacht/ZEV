@@ -1,5 +1,7 @@
-import { Component, OnInit, inject } from '@angular/core';
-import { RouterModule } from '@angular/router';
+import { Component, OnInit, inject, OnDestroy } from '@angular/core';
+import { Router, RouterModule, NavigationEnd } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { filter } from 'rxjs/operators';
 
 import Keycloak from 'keycloak-js';
 import { KeycloakProfile } from 'keycloak-js';
@@ -14,11 +16,13 @@ import { IconComponent } from '../icon/icon.component';
   templateUrl: './navigation.component.html',
   styleUrls: ['./navigation.component.css']
 })
-export class NavigationComponent implements OnInit {
+export class NavigationComponent implements OnInit, OnDestroy {
   userProfile: KeycloakProfile | null = null;
   currentLang = 'de';
   organizationAlias: string | null = null;
   private readonly keycloak = inject(Keycloak);
+  private readonly router = inject(Router);
+  private routerSubscription: Subscription | null = null;
 
   isMenuOpen = false;
 
@@ -32,6 +36,28 @@ export class NavigationComponent implements OnInit {
       this.extractOrganization();
     }
     this.currentLang = this.translationService.currentLang();
+
+    // Open menu on startseite
+    this.checkAndOpenMenuForStartseite(this.router.url);
+
+    // Listen for route changes
+    this.routerSubscription = this.router.events.pipe(
+      filter(event => event instanceof NavigationEnd)
+    ).subscribe((event: NavigationEnd) => {
+      this.checkAndOpenMenuForStartseite(event.urlAfterRedirects || event.url);
+    });
+  }
+
+  ngOnDestroy() {
+    if (this.routerSubscription) {
+      this.routerSubscription.unsubscribe();
+    }
+  }
+
+  private checkAndOpenMenuForStartseite(url: string): void {
+    if (url === '/' || url === '/startseite') {
+      this.isMenuOpen = true;
+    }
   }
 
   private extractOrganization(): void {

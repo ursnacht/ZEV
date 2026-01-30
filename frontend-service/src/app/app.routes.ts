@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { StartseiteComponent } from './components/startseite/startseite.component';
 import { EinheitListComponent } from './components/einheit-list/einheit-list.component';
 import { MesswerteUploadComponent } from './components/messwerte-upload/messwerte-upload.component';
 import { SolarCalculationComponent } from './components/solar-calculation/solar-calculation.component';
@@ -14,7 +15,8 @@ import { TranslationEditorComponent } from './components/translation-editor/tran
 import { AuthGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
-  { path: '', redirectTo: '/chart', pathMatch: 'full' },
+  { path: '', redirectTo: '/startseite', pathMatch: 'full' },
+  { path: 'startseite', component: StartseiteComponent, canActivate: [AuthGuard], data: { roles: ['zev', 'zev_admin'] } },
   { path: 'upload', component: MesswerteUploadComponent, canActivate: [AuthGuard], data: { roles: ['zev', 'zev_admin'] } },
   { path: 'einheiten', component: EinheitListComponent, canActivate: [AuthGuard], data: { roles: ['zev', 'zev_admin'] } },
   { path: 'solar-calculation', component: SolarCalculationComponent, canActivate: [AuthGuard], data: { roles: ['zev', 'zev_admin'] } },

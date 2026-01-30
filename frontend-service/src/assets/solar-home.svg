@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="skyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#87CEEB;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#E8F5E9;stop-opacity:0.1" />
+    </linearGradient>
+    <linearGradient id="roofGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#5D4037" />
+      <stop offset="100%" style="stop-color:#3E2723" />
+    </linearGradient>
+    <linearGradient id="panelGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1565C0" />
+      <stop offset="100%" style="stop-color:#0D47A1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="400" height="300" fill="url(#skyGradient)"/>
+
+  <!-- Sun -->
+  <g transform="translate(320, 60)">
+    <!-- Sun rays -->
+    <g fill="#FFEB3B" opacity="0.6">
+      <rect x="-3" y="-50" width="6" height="20" rx="3"/>
+      <rect x="-3" y="30" width="6" height="20" rx="3"/>
+      <rect x="-50" y="-3" width="20" height="6" rx="3"/>
+      <rect x="30" y="-3" width="20" height="6" rx="3"/>
+      <rect x="21" y="-40" width="6" height="20" rx="3" transform="rotate(45)"/>
+      <rect x="-27" y="20" width="6" height="20" rx="3" transform="rotate(45)"/>
+      <rect x="21" y="20" width="6" height="20" rx="3" transform="rotate(-45)"/>
+      <rect x="-27" y="-40" width="6" height="20" rx="3" transform="rotate(-45)"/>
+    </g>
+    <!-- Sun circle -->
+    <circle cx="0" cy="0" r="25" fill="#FFEB3B"/>
+    <circle cx="0" cy="0" r="20" fill="#FFC107"/>
+    <circle cx="-5" cy="-5" r="8" fill="#FFEB3B" opacity="0.5"/>
+  </g>
+
+  <!-- Ground -->
+  <ellipse cx="200" cy="280" rx="180" ry="30" fill="#4CAF50" opacity="0.3"/>
+
+  <!-- House body -->
+  <rect x="100" y="160" width="160" height="100" fill="#ECEFF1" stroke="#B0BEC5" stroke-width="2"/>
+
+  <!-- Door -->
+  <rect x="165" y="200" width="30" height="60" fill="#5D4037" rx="2"/>
+  <circle cx="188" cy="235" r="3" fill="#FFC107"/>
+
+  <!-- Windows -->
+  <rect x="115" y="180" width="35" height="35" fill="#81D4FA" stroke="#B0BEC5" stroke-width="2" rx="2"/>
+  <line x1="132.5" y1="180" x2="132.5" y2="215" stroke="#B0BEC5" stroke-width="2"/>
+  <line x1="115" y1="197.5" x2="150" y2="197.5" stroke="#B0BEC5" stroke-width="2"/>
+
+  <rect x="210" y="180" width="35" height="35" fill="#81D4FA" stroke="#B0BEC5" stroke-width="2" rx="2"/>
+  <line x1="227.5" y1="180" x2="227.5" y2="215" stroke="#B0BEC5" stroke-width="2"/>
+  <line x1="210" y1="197.5" x2="245" y2="197.5" stroke="#B0BEC5" stroke-width="2"/>
+
+  <!-- Roof -->
+  <polygon points="90,160 180,80 270,160" fill="url(#roofGradient)" stroke="#3E2723" stroke-width="2"/>
+
+  <!-- Solar panels on roof -->
+  <g transform="translate(115, 105) rotate(-33.7)">
+    <!-- Panel 1 -->
+    <rect x="0" y="0" width="35" height="25" fill="url(#panelGradient)" stroke="#0D47A1" stroke-width="1" rx="2"/>
+    <line x1="0" y1="8.3" x2="35" y2="8.3" stroke="#1976D2" stroke-width="0.5"/>
+    <line x1="0" y1="16.6" x2="35" y2="16.6" stroke="#1976D2" stroke-width="0.5"/>
+    <line x1="11.7" y1="0" x2="11.7" y2="25" stroke="#1976D2" stroke-width="0.5"/>
+    <line x1="23.3" y1="0" x2="23.3" y2="25" stroke="#1976D2" stroke-width="0.5"/>
+    <!-- Reflection -->
+    <rect x="2" y="2" width="8" height="5" fill="#64B5F6" opacity="0.3" rx="1"/>
+  </g>
+
+  <g transform="translate(155, 95) rotate(-33.7)">
+    <!-- Panel 2 -->
+    <rect x="0" y="0" width="35" height="25" fill="url(#panelGradient)" stroke="#0D47A1" stroke-width="1" rx="2"/>
+    <line x1="0" y1="8.3" x2="35" y2="8.3" stroke="#1976D2" stroke-width="0.5"/>
+    <line x1="0" y1="16.6" x2="35" y2="16.6" stroke="#1976D2" stroke-width="0.5"/>
+    <line x1="11.7" y1="0" x2="11.7" y2="25" stroke="#1976D2" stroke-width="0.5"/>
+    <line x1="23.3" y1="0" x2="23.3" y2="25" stroke="#1976D2" stroke-width="0.5"/>
+    <!-- Reflection -->
+    <rect x="2" y="2" width="8" height="5" fill="#64B5F6" opacity="0.3" rx="1"/>
+  </g>
+
+  <!-- Energy flow visualization -->
+  <g fill="none" stroke="#4CAF50" stroke-width="2" stroke-dasharray="5,5" opacity="0.7">
+    <path d="M 290 75 Q 250 90 200 100">
+      <animate attributeName="stroke-dashoffset" from="10" to="0" dur="1s" repeatCount="indefinite"/>
+    </path>
+  </g>
+
+  <!-- Energy bolt icon -->
+  <g transform="translate(70, 200)">
+    <polygon points="15,0 5,18 12,18 8,32 22,12 14,12 18,0" fill="#FFC107" stroke="#FF9800" stroke-width="1"/>
+  </g>
+
+  <!-- Grass details -->
+  <g fill="#4CAF50" opacity="0.6">
+    <path d="M50,270 Q52,260 54,270"/>
+    <path d="M55,270 Q57,255 59,270"/>
+    <path d="M60,270 Q62,262 64,270"/>
+    <path d="M300,270 Q302,258 304,270"/>
+    <path d="M305,270 Q307,263 309,270"/>
+    <path d="M310,270 Q312,255 314,270"/>
+    <path d="M340,272 Q342,262 344,272"/>
+    <path d="M345,272 Q347,258 349,272"/>
+  </g>
+</svg>
