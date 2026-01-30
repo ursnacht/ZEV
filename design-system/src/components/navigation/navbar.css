@@ -141,7 +141,10 @@ a.zev-navbar__link:hover {
 
 .zev-navbar__username {
   color: var(--color-white);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-bold);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
   padding: 0 var(--spacing-md);
 }
 

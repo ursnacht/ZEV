@@ -89,7 +89,7 @@
   </g>
 
   <!-- Energy bolt icon -->
-  <g transform="translate(70, 200)">
+  <g transform="translate(143, 115)">
     <polygon points="15,0 5,18 12,18 8,32 22,12 14,12 18,0" fill="#FFC107" stroke="#FF9800" stroke-width="1"/>
   </g>
 
