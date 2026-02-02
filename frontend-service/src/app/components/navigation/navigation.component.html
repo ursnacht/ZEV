@@ -5,11 +5,19 @@
       {{ 'ZEV_MANAGEMENT' | translate }}
     </h1>
 
-    <button class="zev-hamburger" (click)="toggleMenu()" [class.active]="isMenuOpen" aria-label="Menu">
-      <span class="bar"></span>
-      <span class="bar"></span>
-      <span class="bar"></span>
-    </button>
+    <div class="zev-navbar__right">
+      @if (userDisplayName) {
+        <span class="zev-navbar__username">
+          <app-icon name="user"></app-icon>
+          {{ userDisplayName }}
+        </span>
+      }
+      <button class="zev-hamburger" (click)="toggleMenu()" [class.active]="isMenuOpen" aria-label="Menu">
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      </button>
+    </div>
 
     <ul class="zev-navbar__menu" [class.zev-navbar__menu--open]="isMenuOpen">
       <li>
@@ -101,14 +109,6 @@
           {{ 'LOGOUT' | translate }}
         </button>
       </li>
-      @if (userDisplayName) {
-        <li>
-          <span class="zev-navbar__username zev-navbar__link--static ">
-            <app-icon name="user"></app-icon>
-            {{ userDisplayName }}
-          </span>
-        </li>
-      }
     </ul>
   </div>
 </nav>
