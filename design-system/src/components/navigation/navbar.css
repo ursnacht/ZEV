@@ -9,8 +9,23 @@
   color: var(--color-white);
   padding: 0;
   box-shadow: var(--shadow-card);
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: var(--z-index-navbar);
+  transition: all var(--transition-fast) ease-in-out;
+}
+
+/* Compact version when scrolled */
+.zev-navbar--compact {
+  box-shadow: var(--shadow-lg);
+}
+
+.zev-navbar--compact .zev-navbar__container {
+  padding: var(--spacing-xs) var(--spacing-lg);
+}
+
+.zev-navbar--compact .zev-navbar__title {
+  font-size: var(--font-size-lg);
 }
 
 .zev-navbar__container {
