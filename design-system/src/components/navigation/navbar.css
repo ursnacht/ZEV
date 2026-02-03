@@ -139,13 +139,18 @@ a.zev-navbar__link:hover {
   padding: 0 var(--spacing-md);
 }
 
+.zev-navbar__right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
 .zev-navbar__username {
   color: var(--color-white);
   font-weight: var(--font-weight-bold);
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
-  padding: 0 var(--spacing-md);
+  gap: var(--spacing-sm);
 }
 
 /* Button reset for navbar links */
