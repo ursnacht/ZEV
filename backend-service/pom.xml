@@ -59,10 +59,18 @@
       <groupId>com.github.ben-manes.caffeine</groupId>
       <artifactId>caffeine</artifactId>
     </dependency>
+    <!-- JasperReports for PDF generation -->
     <dependency>
-      <groupId>com.openhtmltopdf</groupId>
-      <artifactId>openhtmltopdf-pdfbox</artifactId>
-      <version>1.0.10</version>
+      <groupId>net.sf.jasperreports</groupId>
+      <artifactId>jasperreports</artifactId>
+      <version>6.21.0</version>
+      <exclusions>
+        <!-- Exclude older commons-collections to avoid conflicts -->
+        <exclusion>
+          <groupId>commons-collections</groupId>
+          <artifactId>commons-collections</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <!-- Swiss QR Bill Generator for payment slips -->
     <dependency>
