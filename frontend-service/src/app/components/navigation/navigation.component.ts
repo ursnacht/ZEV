@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, OnDestroy } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy, HostListener, HostBinding } from '@angular/core';
 import { Router, RouterModule, NavigationEnd } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
@@ -25,6 +25,12 @@ export class NavigationComponent implements OnInit, OnDestroy {
   private routerSubscription: Subscription | null = null;
 
   isMenuOpen = false;
+  isCompact = false;
+
+  @HostListener('window:scroll')
+  onWindowScroll(): void {
+    this.isCompact = window.scrollY > 50;
+  }
 
   constructor(
     public translationService: TranslationService
