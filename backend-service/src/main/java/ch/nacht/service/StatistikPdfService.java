@@ -6,6 +6,7 @@ import ch.nacht.entity.Translation;
 import ch.nacht.repository.TranslationRepository;
 import net.sf.jasperreports.engine.*;
 import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
+import net.sf.jasperreports.engine.util.JRLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -37,12 +38,14 @@ public class StatistikPdfService {
     @PostConstruct
     public void init() {
         try {
-            InputStream reportStream = getClass().getResourceAsStream("/reports/statistik.jrxml");
+            // InputStream reportStream = getClass().getResourceAsStream("/reports/statistik.jrxml");
+            InputStream reportStream = getClass().getResourceAsStream("/reports/statistik.jasper");
             if (reportStream == null) {
-                throw new RuntimeException("Could not find statistik.jrxml template");
+                throw new RuntimeException("Could not find statistik.jasper template");
             }
-            compiledReport = JasperCompileManager.compileReport(reportStream);
-            log.info("Compiled statistik.jrxml template successfully");
+            compiledReport = (JasperReport) JRLoader.loadObject(reportStream);
+            // compiledReport = JasperCompileManager.compileReport(reportStream);
+            log.info("Compiled statistik.jasper template successfully");
         } catch (JRException e) {
             log.error("Failed to compile JasperReports template: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to compile JasperReports template", e);

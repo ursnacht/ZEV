@@ -16,7 +16,12 @@
   <dependencies>
     <dependency>
       <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-web</artifactId>
+      <artifactId>spring-boot-starter-webmvc</artifactId>
+    </dependency>
+    <!-- Jackson 2 compatibility for Spring Boot 4 (uses Jackson 3 by default) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-jackson2</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -32,7 +37,7 @@
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+      <artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -45,7 +50,7 @@
     <dependency>
       <groupId>de.codecentric</groupId>
       <artifactId>spring-boot-admin-starter-client</artifactId>
-      <version>3.4.1</version>
+      <version>4.0.0-M1</version>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -53,24 +58,22 @@
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-aop</artifactId>
+      <artifactId>spring-boot-starter-aspectj</artifactId>
     </dependency>
     <dependency>
       <groupId>com.github.ben-manes.caffeine</groupId>
       <artifactId>caffeine</artifactId>
     </dependency>
-    <!-- JasperReports for PDF generation -->
+    <!-- JasperReports for PDF generation (7.x = Jakarta EE compatible) -->
     <dependency>
       <groupId>net.sf.jasperreports</groupId>
       <artifactId>jasperreports</artifactId>
-      <version>6.21.0</version>
-      <exclusions>
-        <!-- Exclude older commons-collections to avoid conflicts -->
-        <exclusion>
-          <groupId>commons-collections</groupId>
-          <artifactId>commons-collections</artifactId>
-        </exclusion>
-      </exclusions>
+      <version>7.0.3</version>
+    </dependency>
+    <dependency>
+      <groupId>net.sf.jasperreports</groupId>
+      <artifactId>jasperreports-pdf</artifactId>
+      <version>7.0.3</version>
     </dependency>
     <!-- Swiss QR Bill Generator for payment slips -->
     <dependency>
@@ -91,34 +94,49 @@
       <artifactId>postgresql</artifactId>
       <scope>runtime</scope>
     </dependency>
-    <!-- Spring AI for Claude integration -->
-    <!-- Note: Prompt caching (AnthropicCacheStrategy) requires version 1.1.0+ when available -->
+    <!-- Spring AI for Claude integration (2.x = Spring Boot 4 / Spring Framework 7) -->
+    <!-- Artifact renamed from spring-ai-anthropic-spring-boot-starter to spring-ai-starter-model-anthropic -->
     <dependency>
       <groupId>org.springframework.ai</groupId>
-      <artifactId>spring-ai-anthropic-spring-boot-starter</artifactId>
-      <version>1.0.0-M6</version>
+      <artifactId>spring-ai-starter-model-anthropic</artifactId>
+      <version>2.0.0-M1</version>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-test</artifactId>
+      <artifactId>spring-boot-starter-test-classic</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security-test</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>testcontainers</artifactId>
-      <version>2.0.2</version>
+      <version>2.0.3</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.testcontainers</groupId>
-      <artifactId>postgresql</artifactId>
-        <version>1.21.3</version>
+      <artifactId>testcontainers-postgresql</artifactId>
+      <version>2.0.3</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.testcontainers</groupId>
-      <artifactId>junit-jupiter</artifactId>
-      <version>1.21.3</version>
+      <artifactId>testcontainers-junit-jupiter</artifactId>
+      <version>2.0.3</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -133,17 +151,6 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
-
-  <repositories>
-    <repository>
-      <id>spring-milestones</id>
-      <name>Spring Milestones</name>
-      <url>https://repo.spring.io/milestone</url>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </repository>
-  </repositories>
 
   <build>
     <plugins>
@@ -194,6 +201,24 @@
             <schema>zev</schema>
           </schemas>
           <createSchemas>true</createSchemas>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>com.pro-crafting.tools</groupId>
+        <artifactId>jasperreports-maven-plugin</artifactId>
+        <version>4.0.1</version>
+        <executions>
+          <execution>
+            <phase>prepare-package</phase>
+            <goals>
+              <goal>jasper</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <sourceDirectory>src/main/resources/reports</sourceDirectory>
+          <outputDirectory>${project.build.outputDirectory}/reports</outputDirectory>
+          <additionalClasspath>${project.build.outputDirectory}</additionalClasspath>
         </configuration>
       </plugin>
     </plugins>

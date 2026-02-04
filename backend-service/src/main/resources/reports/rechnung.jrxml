@@ -1,8 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
-              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
-              name="rechnung" pageWidth="595" pageHeight="842" columnWidth="555"
+<jasperReport name="rechnung" pageWidth="595" pageHeight="842" columnWidth="555"
               leftMargin="20" rightMargin="20" topMargin="15" bottomMargin="15"
               uuid="a1b2c3d4-e5f6-7890-abcd-ef1234567890">
 
@@ -28,446 +24,325 @@
     </variable>
 
     <!-- Title Band - Header with addresses -->
-    <title>
-        <band height="200" splitType="Stretch">
-            <!-- Right-aligned recipient address -->
-            <textField isBlankWhenNull="true">
-                <reportElement x="355" y="50" width="200" height="15" uuid="11111111-1111-1111-1111-111111111111"/>
-                <textElement textAlignment="Left"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getMieterName()]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="355" y="65" width="200" height="15" uuid="11111111-1111-1111-1111-111111111112"/>
-                <textElement textAlignment="Left"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getMieterStrasse()]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="355" y="80" width="200" height="15" uuid="11111111-1111-1111-1111-111111111113"/>
-                <textElement textAlignment="Left"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getMieterPlzOrt()]]></textFieldExpression>
-            </textField>
+    <title height="200">
+        <!-- Right-aligned recipient address -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111111" x="355" y="50" width="200" height="15" blankWhenNull="true" fontSize="9.0" hTextAlign="Left">
+            <expression><![CDATA[$P{RECHNUNG}.getMieterName()]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111112" x="355" y="65" width="200" height="15" blankWhenNull="true" fontSize="9.0" hTextAlign="Left">
+            <expression><![CDATA[$P{RECHNUNG}.getMieterStrasse()]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111113" x="355" y="80" width="200" height="15" blankWhenNull="true" fontSize="9.0" hTextAlign="Left">
+            <expression><![CDATA[$P{RECHNUNG}.getMieterPlzOrt()]]></expression>
+        </element>
 
-            <!-- Left-aligned invoice info -->
-            <textField>
-                <reportElement x="0" y="0" width="120" height="15" uuid="11111111-1111-1111-1111-111111111114"/>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("DATUM") + ":"]]></textFieldExpression>
-            </textField>
-            <textField>
-                <reportElement x="120" y="0" width="150" height="15" uuid="11111111-1111-1111-1111-111111111115"/>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getErstellungsdatum().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))]]></textFieldExpression>
-            </textField>
+        <!-- Left-aligned invoice info -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111114" x="0" y="0" width="120" height="15" fontSize="9.0">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("DATUM") + ":"]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111115" x="120" y="0" width="150" height="15" fontSize="9.0">
+            <expression><![CDATA[$P{RECHNUNG}.getErstellungsdatum().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))]]></expression>
+        </element>
 
-            <textField>
-                <reportElement x="0" y="15" width="120" height="15" uuid="11111111-1111-1111-1111-111111111116"/>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("ZAHLUNGSFRIST") + ":"]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="120" y="15" width="150" height="15" uuid="11111111-1111-1111-1111-111111111117"/>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getZahlungsfrist()]]></textFieldExpression>
-            </textField>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111116" x="0" y="15" width="120" height="15" fontSize="9.0">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("ZAHLUNGSFRIST") + ":"]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111117" x="120" y="15" width="150" height="15" blankWhenNull="true" fontSize="9.0">
+            <expression><![CDATA[$P{RECHNUNG}.getZahlungsfrist()]]></expression>
+        </element>
 
-            <textField>
-                <reportElement x="0" y="30" width="120" height="15" uuid="11111111-1111-1111-1111-111111111118"/>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("ZEITRAUM") + ":"]]></textFieldExpression>
-            </textField>
-            <textField>
-                <reportElement x="120" y="30" width="200" height="15" uuid="11111111-1111-1111-1111-111111111119"/>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getVon().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + " - " + $P{RECHNUNG}.getBis().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))]]></textFieldExpression>
-            </textField>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111118" x="0" y="30" width="120" height="15" fontSize="9.0">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("ZEITRAUM") + ":"]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111119" x="120" y="30" width="200" height="15" fontSize="9.0">
+            <expression><![CDATA[$P{RECHNUNG}.getVon().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + " - " + $P{RECHNUNG}.getBis().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))]]></expression>
+        </element>
 
-            <textField>
-                <reportElement x="0" y="50" width="120" height="15" uuid="11111111-1111-1111-1111-11111111111a"/>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("RECHNUNGSSTELLER") + ":"]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="120" y="50" width="200" height="15" uuid="11111111-1111-1111-1111-11111111111b"/>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getStellerName()]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="120" y="65" width="200" height="15" uuid="11111111-1111-1111-1111-11111111111c"/>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getStellerStrasse()]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="120" y="80" width="200" height="15" uuid="11111111-1111-1111-1111-11111111111d"/>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getStellerPlzOrt()]]></textFieldExpression>
-            </textField>
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111111a" x="0" y="50" width="120" height="15" fontSize="9.0">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("RECHNUNGSSTELLER") + ":"]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111111b" x="120" y="50" width="200" height="15" blankWhenNull="true" fontSize="9.0">
+            <expression><![CDATA[$P{RECHNUNG}.getStellerName()]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111111c" x="120" y="65" width="200" height="15" blankWhenNull="true" fontSize="9.0">
+            <expression><![CDATA[$P{RECHNUNG}.getStellerStrasse()]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111111d" x="120" y="80" width="200" height="15" blankWhenNull="true" fontSize="9.0">
+            <expression><![CDATA[$P{RECHNUNG}.getStellerPlzOrt()]]></expression>
+        </element>
 
-            <!-- Title: Stromrechnung -->
-            <textField>
-                <reportElement x="0" y="120" width="555" height="30" forecolor="#0099CC" uuid="11111111-1111-1111-1111-11111111111e"/>
-                <textElement><font size="18" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("STROMRECHNUNG")]]></textFieldExpression>
-            </textField>
+        <!-- Title: Stromrechnung -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111111e" x="0" y="120" width="555" height="30" forecolor="#0099CC" fontSize="18.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("STROMRECHNUNG")]]></expression>
+        </element>
 
-            <!-- Subtitle: Unit name -->
-            <textField>
-                <reportElement x="0" y="150" width="555" height="20" forecolor="#0099CC" uuid="11111111-1111-1111-1111-11111111111f"/>
-                <textElement><font size="12" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getEinheitName()]]></textFieldExpression>
-            </textField>
+        <!-- Subtitle: Unit name -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111111f" x="0" y="150" width="555" height="20" forecolor="#0099CC" fontSize="12.0" bold="true">
+            <expression><![CDATA[$P{RECHNUNG}.getEinheitName()]]></expression>
+        </element>
 
-            <!-- Intro text -->
-            <textField>
-                <reportElement x="0" y="175" width="555" height="15" forecolor="#666666" uuid="11111111-1111-1111-1111-111111111120"/>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("RECHNUNG_ZUSAMMENSETZUNG")]]></textFieldExpression>
-            </textField>
-        </band>
+        <!-- Intro text -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111120" x="0" y="175" width="555" height="15" forecolor="#666666" fontSize="9.0">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("RECHNUNG_ZUSAMMENSETZUNG")]]></expression>
+        </element>
     </title>
 
     <!-- Column Header - Table header -->
-    <columnHeader>
-        <band height="45" splitType="Stretch">
-            <!-- Messpunkt row -->
-            <textField>
-                <reportElement mode="Opaque" x="0" y="0" width="555" height="20" backcolor="#F8F8F8" uuid="11111111-1111-1111-1111-111111111121"/>
-                <box><bottomPen lineWidth="1.0" lineColor="#EEEEEE"/></box>
-                <textElement verticalAlignment="Middle"><font size="9" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("MESSPUNKT") + ": " + ($P{RECHNUNG}.getMesspunkt() != null ? $P{RECHNUNG}.getMesspunkt() : "-") + " - " + $P{TRANSLATIONS}.get("ENERGIEBEZUG")]]></textFieldExpression>
-            </textField>
+    <columnHeader height="45">
+        <!-- Messpunkt row -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111121" mode="Opaque" x="0" y="0" width="555" height="20" backcolor="#F8F8F8" fontSize="9.0" bold="true" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("MESSPUNKT") + ": " + ($P{RECHNUNG}.getMesspunkt() != null ? $P{RECHNUNG}.getMesspunkt() : "-") + " - " + $P{TRANSLATIONS}.get("ENERGIEBEZUG")]]></expression>
+            <box>
+                <bottomPen lineWidth="1.0" lineColor="#EEEEEE"/>
+            </box>
+        </element>
 
-            <!-- Table headers -->
-            <textField>
-                <reportElement mode="Opaque" x="0" y="25" width="305" height="20" backcolor="#F8F8F8" forecolor="#0099CC" uuid="11111111-1111-1111-1111-111111111122"/>
-                <box><bottomPen lineWidth="2.0" lineColor="#0099CC"/></box>
-                <textElement verticalAlignment="Middle"><font size="9" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("BEZEICHNUNG")]]></textFieldExpression>
-            </textField>
-            <textField>
-                <reportElement mode="Opaque" x="305" y="25" width="35" height="20" backcolor="#F8F8F8" forecolor="#0099CC" uuid="11111111-1111-1111-1111-111111111123"/>
-                <box><bottomPen lineWidth="2.0" lineColor="#0099CC"/></box>
-                <textElement textAlignment="Right" verticalAlignment="Middle"><font size="9" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("MENGE")]]></textFieldExpression>
-            </textField>
-            <textField>
-                <reportElement mode="Opaque" x="340" y="25" width="70" height="20" backcolor="#F8F8F8" forecolor="#0099CC" uuid="11111111-1111-1111-1111-111111111124"/>
-                <box><bottomPen lineWidth="2.0" lineColor="#0099CC"/></box>
-                <textElement textAlignment="Right" verticalAlignment="Middle"><font size="9" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("PREIS")]]></textFieldExpression>
-            </textField>
-            <textField>
-                <reportElement mode="Opaque" x="410" y="25" width="70" height="20" backcolor="#F8F8F8" forecolor="#0099CC" uuid="11111111-1111-1111-1111-111111111125"/>
-                <box><bottomPen lineWidth="2.0" lineColor="#0099CC"/></box>
-                <textElement textAlignment="Right" verticalAlignment="Middle"><font size="9" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("EINHEIT_LABEL")]]></textFieldExpression>
-            </textField>
-            <textField>
-                <reportElement mode="Opaque" x="480" y="25" width="75" height="20" backcolor="#F8F8F8" forecolor="#0099CC" uuid="11111111-1111-1111-1111-111111111126"/>
-                <box><bottomPen lineWidth="2.0" lineColor="#0099CC"/></box>
-                <textElement textAlignment="Right" verticalAlignment="Middle"><font size="9" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("TOTAL") + " CHF"]]></textFieldExpression>
-            </textField>
-        </band>
+        <!-- Table headers -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111122" mode="Opaque" x="0" y="25" width="305" height="20" backcolor="#F8F8F8" forecolor="#0099CC" fontSize="9.0" bold="true" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("BEZEICHNUNG")]]></expression>
+            <box>
+                <bottomPen lineWidth="2.0" lineColor="#0099CC"/>
+            </box>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111123" mode="Opaque" x="305" y="25" width="35" height="20" backcolor="#F8F8F8" forecolor="#0099CC" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("MENGE")]]></expression>
+            <box>
+                <bottomPen lineWidth="2.0" lineColor="#0099CC"/>
+            </box>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111124" mode="Opaque" x="340" y="25" width="70" height="20" backcolor="#F8F8F8" forecolor="#0099CC" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("PREIS")]]></expression>
+            <box>
+                <bottomPen lineWidth="2.0" lineColor="#0099CC"/>
+            </box>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111125" mode="Opaque" x="410" y="25" width="70" height="20" backcolor="#F8F8F8" forecolor="#0099CC" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("EINHEIT_LABEL")]]></expression>
+            <box>
+                <bottomPen lineWidth="2.0" lineColor="#0099CC"/>
+            </box>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111126" mode="Opaque" x="480" y="25" width="75" height="20" backcolor="#F8F8F8" forecolor="#0099CC" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("TOTAL") + " CHF"]]></expression>
+            <box>
+                <bottomPen lineWidth="2.0" lineColor="#0099CC"/>
+            </box>
+        </element>
     </columnHeader>
 
     <!-- Detail Band - Tariff lines -->
     <detail>
-        <band height="18" splitType="Stretch">
-            <textField>
-                <reportElement x="0" y="0" width="305" height="18" uuid="11111111-1111-1111-1111-111111111127"/>
-                <box><bottomPen lineWidth="0.5" lineColor="#EEEEEE"/></box>
-                <textElement verticalAlignment="Middle"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$F{bezeichnung} + " (" + $F{von}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + " - " + $F{bis}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + ")"]]></textFieldExpression>
-            </textField>
-            <textField pattern="#,##0">
-                <reportElement x="305" y="0" width="35" height="18" uuid="11111111-1111-1111-1111-111111111128"/>
-                <box><bottomPen lineWidth="0.5" lineColor="#EEEEEE"/></box>
-                <textElement textAlignment="Right" verticalAlignment="Middle"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$F{menge}]]></textFieldExpression>
-            </textField>
-            <textField pattern="#,##0.00000">
-                <reportElement x="340" y="0" width="70" height="18" uuid="11111111-1111-1111-1111-111111111129"/>
-                <box><bottomPen lineWidth="0.5" lineColor="#EEEEEE"/></box>
-                <textElement textAlignment="Right" verticalAlignment="Middle"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$F{preis}]]></textFieldExpression>
-            </textField>
-            <staticText>
-                <reportElement x="410" y="0" width="70" height="18" uuid="11111111-1111-1111-1111-11111111112a"/>
-                <box><bottomPen lineWidth="0.5" lineColor="#EEEEEE"/></box>
-                <textElement textAlignment="Right" verticalAlignment="Middle"><font size="8"/></textElement>
+        <band height="18">
+            <element kind="textField" uuid="11111111-1111-1111-1111-111111111127" x="0" y="0" width="305" height="18" fontSize="9.0" vTextAlign="Middle">
+                <expression><![CDATA[$F{bezeichnung} + " (" + $F{von}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + " - " + $F{bis}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + ")"]]></expression>
+                <box>
+                    <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
+                </box>
+            </element>
+            <element kind="textField" uuid="11111111-1111-1111-1111-111111111128" x="305" y="0" width="35" height="18" pattern="#,##0" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[$F{menge}]]></expression>
+                <box>
+                    <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
+                </box>
+            </element>
+            <element kind="textField" uuid="11111111-1111-1111-1111-111111111129" x="340" y="0" width="70" height="18" pattern="#,##0.00000" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[$F{preis}]]></expression>
+                <box>
+                    <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
+                </box>
+            </element>
+            <element kind="staticText" uuid="11111111-1111-1111-1111-11111111112a" x="410" y="0" width="70" height="18" fontSize="8.0" hTextAlign="Right" vTextAlign="Middle">
                 <text><![CDATA[CHF / kWh]]></text>
-            </staticText>
-            <textField pattern="#,##0.00">
-                <reportElement x="480" y="0" width="75" height="18" uuid="11111111-1111-1111-1111-11111111112b"/>
-                <box><bottomPen lineWidth="0.5" lineColor="#EEEEEE"/></box>
-                <textElement textAlignment="Right" verticalAlignment="Middle"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$F{betrag}]]></textFieldExpression>
-            </textField>
+                <box>
+                    <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
+                </box>
+            </element>
+            <element kind="textField" uuid="11111111-1111-1111-1111-11111111112b" x="480" y="0" width="75" height="18" pattern="#,##0.00" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[$F{betrag}]]></expression>
+                <box>
+                    <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
+                </box>
+            </element>
         </band>
     </detail>
 
     <!-- Last Page Footer - QR Payment Slip at bottom of last page -->
-    <lastPageFooter>
-        <band height="300" splitType="Stretch">
-            <!-- Horizontal dashed line at top (scissors cut line) -->
-            <line>
-                <reportElement x="-20" y="0" width="595" height="1" uuid="11111111-1111-1111-1111-111111111140"/>
-                <graphicElement>
-                    <pen lineWidth="0.5" lineStyle="Dashed"/>
-                </graphicElement>
-            </line>
+    <lastPageFooter height="300">
+        <!-- Horizontal dashed line at top (scissors cut line) -->
+        <element kind="line" uuid="11111111-1111-1111-1111-111111111140" x="-20" y="0" width="595" height="1">
+            <pen lineWidth="0.5" lineStyle="Dashed"/>
+        </element>
 
-            <!-- Vertical dashed line between Empfangsschein and Zahlteil (at 62mm = 176pt from left edge) -->
-            <line>
-                <reportElement x="156" y="0" width="1" height="297" uuid="11111111-1111-1111-1111-111111111141"/>
-                <graphicElement>
-                    <pen lineWidth="0.5" lineStyle="Dashed"/>
-                </graphicElement>
-            </line>
+        <!-- Vertical dashed line between Empfangsschein and Zahlteil (at 62mm = 176pt from left edge) -->
+        <element kind="line" uuid="11111111-1111-1111-1111-111111111141" x="156" y="0" width="1" height="297">
+            <pen lineWidth="0.5" lineStyle="Dashed"/>
+        </element>
 
-            <!-- ============================================== -->
-            <!-- EMPFANGSSCHEIN (Receipt) - Left side (62mm)    -->
-            <!-- ============================================== -->
+        <!-- ============================================== -->
+        <!-- EMPFANGSSCHEIN (Receipt) - Left side (62mm)    -->
+        <!-- ============================================== -->
 
-            <!-- Title: Empfangsschein -->
-            <textField>
-                <reportElement x="-6" y="14" width="148" height="18" uuid="11111111-1111-1111-1111-111111111142"/>
-                <textElement><font size="11" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("QR_EMPFANGSSCHEIN")]]></textFieldExpression>
-            </textField>
+        <!-- Title: Empfangsschein -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111142" x="-6" y="14" width="148" height="18" fontSize="11.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_EMPFANGSSCHEIN")]]></expression>
+        </element>
 
-            <!-- Konto / Zahlbar an -->
-            <textField>
-                <reportElement x="-6" y="38" width="148" height="10" uuid="11111111-1111-1111-1111-111111111143"/>
-                <textElement><font size="6" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("QR_KONTO_ZAHLBAR_AN")]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="-6" y="48" width="148" height="10" uuid="11111111-1111-1111-1111-111111111144"/>
-                <textElement><font size="8"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getIban() != null ? $P{RECHNUNG}.getIban().replaceAll("(.{4})", "$1 ").trim() : ""]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="-6" y="58" width="148" height="10" uuid="11111111-1111-1111-1111-111111111145"/>
-                <textElement><font size="8"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getStellerName()]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="-6" y="68" width="148" height="9" uuid="11111111-1111-1111-1111-111111111146"/>
-                <textElement><font size="7"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getStellerStrasse()]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="-6" y="77" width="148" height="9" uuid="11111111-1111-1111-1111-111111111147"/>
-                <textElement><font size="7"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getStellerPlzOrt()]]></textFieldExpression>
-            </textField>
+        <!-- Konto / Zahlbar an -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111143" x="-6" y="38" width="148" height="10" fontSize="6.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_KONTO_ZAHLBAR_AN")]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111144" x="-6" y="48" width="148" height="10" blankWhenNull="true" fontSize="8.0">
+            <expression><![CDATA[$P{RECHNUNG}.getIban() != null ? $P{RECHNUNG}.getIban().replaceAll("(.{4})", "$1 ").trim() : ""]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111145" x="-6" y="58" width="148" height="10" blankWhenNull="true" fontSize="8.0">
+            <expression><![CDATA[$P{RECHNUNG}.getStellerName()]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111146" x="-6" y="68" width="148" height="9" blankWhenNull="true" fontSize="7.0">
+            <expression><![CDATA[$P{RECHNUNG}.getStellerStrasse()]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111147" x="-6" y="77" width="148" height="9" blankWhenNull="true" fontSize="7.0">
+            <expression><![CDATA[$P{RECHNUNG}.getStellerPlzOrt()]]></expression>
+        </element>
 
-            <!-- Zahlbar durch -->
-            <textField>
-                <reportElement x="-6" y="95" width="148" height="10" uuid="11111111-1111-1111-1111-111111111148"/>
-                <textElement><font size="6" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("QR_ZAHLBAR_DURCH")]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="-6" y="105" width="148" height="10" uuid="11111111-1111-1111-1111-111111111149"/>
-                <textElement><font size="8"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getMieterName()]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="-6" y="115" width="148" height="9" uuid="11111111-1111-1111-1111-11111111114a"/>
-                <textElement><font size="7"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getMieterStrasse()]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="-6" y="124" width="148" height="9" uuid="11111111-1111-1111-1111-11111111114b"/>
-                <textElement><font size="7"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getMieterPlzOrt()]]></textFieldExpression>
-            </textField>
+        <!-- Zahlbar durch -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111148" x="-6" y="95" width="148" height="10" fontSize="6.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_ZAHLBAR_DURCH")]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111149" x="-6" y="105" width="148" height="10" blankWhenNull="true" fontSize="8.0">
+            <expression><![CDATA[$P{RECHNUNG}.getMieterName()]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111114a" x="-6" y="115" width="148" height="9" blankWhenNull="true" fontSize="7.0">
+            <expression><![CDATA[$P{RECHNUNG}.getMieterStrasse()]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111114b" x="-6" y="124" width="148" height="9" blankWhenNull="true" fontSize="7.0">
+            <expression><![CDATA[$P{RECHNUNG}.getMieterPlzOrt()]]></expression>
+        </element>
 
-            <!-- Währung / Betrag (Empfangsschein) -->
-            <textField>
-                <reportElement x="-6" y="145" width="40" height="10" uuid="11111111-1111-1111-1111-11111111114c"/>
-                <textElement><font size="6" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("QR_WAEHRUNG")]]></textFieldExpression>
-            </textField>
-            <staticText>
-                <reportElement x="-6" y="155" width="40" height="12" uuid="11111111-1111-1111-1111-11111111114d"/>
-                <textElement><font size="8"/></textElement>
-                <text><![CDATA[CHF]]></text>
-            </staticText>
-            <textField>
-                <reportElement x="40" y="145" width="60" height="10" uuid="11111111-1111-1111-1111-11111111114e"/>
-                <textElement><font size="6" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("QR_BETRAG")]]></textFieldExpression>
-            </textField>
-            <textField pattern="#,##0.00" isBlankWhenNull="true">
-                <reportElement x="40" y="155" width="80" height="12" uuid="11111111-1111-1111-1111-11111111114f"/>
-                <textElement><font size="8"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getEndBetrag()]]></textFieldExpression>
-            </textField>
+        <!-- Währung / Betrag (Empfangsschein) -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111114c" x="-6" y="145" width="40" height="10" fontSize="6.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_WAEHRUNG")]]></expression>
+        </element>
+        <element kind="staticText" uuid="11111111-1111-1111-1111-11111111114d" x="-6" y="155" width="40" height="12" fontSize="8.0">
+            <text><![CDATA[CHF]]></text>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111114e" x="40" y="145" width="60" height="10" fontSize="6.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_BETRAG")]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111114f" x="40" y="155" width="80" height="12" pattern="#,##0.00" blankWhenNull="true" fontSize="8.0">
+            <expression><![CDATA[$P{RECHNUNG}.getEndBetrag()]]></expression>
+        </element>
 
-            <!-- Annahmestelle -->
-            <textField>
-                <reportElement x="-6" y="180" width="148" height="12" uuid="11111111-1111-1111-1111-111111111150"/>
-                <textElement textAlignment="Right"><font size="6" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("QR_ANNAHMESTELLE")]]></textFieldExpression>
-            </textField>
+        <!-- Annahmestelle -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111150" x="-6" y="180" width="148" height="12" fontSize="6.0" bold="true" hTextAlign="Right">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_ANNAHMESTELLE")]]></expression>
+        </element>
 
-            <!-- ============================================== -->
-            <!-- ZAHLTEIL (Payment part) - Right side           -->
-            <!-- ============================================== -->
+        <!-- ============================================== -->
+        <!-- ZAHLTEIL (Payment part) - Right side           -->
+        <!-- ============================================== -->
 
-            <!-- Title: Zahlteil -->
-            <textField>
-                <reportElement x="171" y="14" width="200" height="18" uuid="11111111-1111-1111-1111-111111111151"/>
-                <textElement><font size="11" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("QR_ZAHLTEIL")]]></textFieldExpression>
-            </textField>
+        <!-- Title: Zahlteil -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111151" x="171" y="14" width="200" height="18" fontSize="11.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_ZAHLTEIL")]]></expression>
+        </element>
 
-            <!-- QR-Code Image (46mm x 46mm = 130pt x 130pt) -->
-            <image scaleImage="RetainShape" onErrorType="Blank">
-                <reportElement x="171" y="38" width="130" height="130" uuid="11111111-1111-1111-1111-111111111152"/>
-                <imageExpression><![CDATA[$P{QR_CODE_IMAGE}]]></imageExpression>
-            </image>
+        <!-- QR-Code Image (46mm x 46mm = 130pt x 130pt) -->
+        <element kind="image" uuid="11111111-1111-1111-1111-111111111152" x="171" y="38" width="130" height="130" scaleImage="RetainShape" onErrorType="Blank">
+            <expression><![CDATA[$P{QR_CODE_IMAGE}]]></expression>
+        </element>
 
-            <!-- Währung / Betrag (below QR code in Zahlteil) -->
-            <textField>
-                <reportElement x="171" y="175" width="40" height="12" uuid="11111111-1111-1111-1111-111111111153"/>
-                <textElement><font size="8" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("QR_WAEHRUNG")]]></textFieldExpression>
-            </textField>
-            <staticText>
-                <reportElement x="171" y="187" width="40" height="14" uuid="11111111-1111-1111-1111-111111111154"/>
-                <textElement><font size="10"/></textElement>
-                <text><![CDATA[CHF]]></text>
-            </staticText>
-            <textField>
-                <reportElement x="221" y="175" width="60" height="12" uuid="11111111-1111-1111-1111-111111111155"/>
-                <textElement><font size="8" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("QR_BETRAG")]]></textFieldExpression>
-            </textField>
-            <textField pattern="#,##0.00" isBlankWhenNull="true">
-                <reportElement x="221" y="187" width="80" height="14" uuid="11111111-1111-1111-1111-111111111156"/>
-                <textElement><font size="10"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getEndBetrag()]]></textFieldExpression>
-            </textField>
+        <!-- Währung / Betrag (below QR code in Zahlteil) -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111153" x="171" y="175" width="40" height="12" fontSize="8.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_WAEHRUNG")]]></expression>
+        </element>
+        <element kind="staticText" uuid="11111111-1111-1111-1111-111111111154" x="171" y="187" width="40" height="14" fontSize="10.0">
+            <text><![CDATA[CHF]]></text>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111155" x="221" y="175" width="60" height="12" fontSize="8.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_BETRAG")]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111156" x="221" y="187" width="80" height="14" pattern="#,##0.00" blankWhenNull="true" fontSize="10.0">
+            <expression><![CDATA[$P{RECHNUNG}.getEndBetrag()]]></expression>
+        </element>
 
-            <!-- Details section (right of QR code) -->
-            <!-- Konto / Zahlbar an -->
-            <textField>
-                <reportElement x="330" y="38" width="225" height="12" uuid="11111111-1111-1111-1111-111111111157"/>
-                <textElement><font size="8" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("QR_KONTO_ZAHLBAR_AN")]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="330" y="50" width="225" height="12" uuid="11111111-1111-1111-1111-111111111158"/>
-                <textElement><font size="10"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getIban() != null ? $P{RECHNUNG}.getIban().replaceAll("(.{4})", "$1 ").trim() : ""]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="330" y="62" width="225" height="12" uuid="11111111-1111-1111-1111-111111111159"/>
-                <textElement><font size="10"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getStellerName()]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="330" y="74" width="225" height="11" uuid="11111111-1111-1111-1111-11111111115a"/>
-                <textElement><font size="8"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getStellerStrasse()]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="330" y="85" width="225" height="11" uuid="11111111-1111-1111-1111-11111111115b"/>
-                <textElement><font size="8"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getStellerPlzOrt()]]></textFieldExpression>
-            </textField>
+        <!-- Details section (right of QR code) -->
+        <!-- Konto / Zahlbar an -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111157" x="330" y="38" width="225" height="12" fontSize="8.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_KONTO_ZAHLBAR_AN")]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111158" x="330" y="50" width="225" height="12" blankWhenNull="true" fontSize="10.0">
+            <expression><![CDATA[$P{RECHNUNG}.getIban() != null ? $P{RECHNUNG}.getIban().replaceAll("(.{4})", "$1 ").trim() : ""]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111159" x="330" y="62" width="225" height="12" blankWhenNull="true" fontSize="10.0">
+            <expression><![CDATA[$P{RECHNUNG}.getStellerName()]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111115a" x="330" y="74" width="225" height="11" blankWhenNull="true" fontSize="8.0">
+            <expression><![CDATA[$P{RECHNUNG}.getStellerStrasse()]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111115b" x="330" y="85" width="225" height="11" blankWhenNull="true" fontSize="8.0">
+            <expression><![CDATA[$P{RECHNUNG}.getStellerPlzOrt()]]></expression>
+        </element>
 
-            <!-- Zusätzliche Informationen -->
-            <textField>
-                <reportElement x="330" y="105" width="225" height="12" uuid="11111111-1111-1111-1111-11111111115c"/>
-                <textElement><font size="8" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("QR_ZUSAETZLICHE_INFOS")]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="330" y="117" width="225" height="12" uuid="11111111-1111-1111-1111-11111111115d"/>
-                <textElement><font size="10"/></textElement>
-                <textFieldExpression><![CDATA["Stromrechnung " + $P{RECHNUNG}.getEinheitName()]]></textFieldExpression>
-            </textField>
+        <!-- Zusätzliche Informationen -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111115c" x="330" y="105" width="225" height="12" fontSize="8.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_ZUSAETZLICHE_INFOS")]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111115d" x="330" y="117" width="225" height="12" blankWhenNull="true" fontSize="10.0">
+            <expression><![CDATA["Stromrechnung " + $P{RECHNUNG}.getEinheitName()]]></expression>
+        </element>
 
-            <!-- Zahlbar durch -->
-            <textField>
-                <reportElement x="330" y="138" width="225" height="12" uuid="11111111-1111-1111-1111-11111111115e"/>
-                <textElement><font size="8" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("QR_ZAHLBAR_DURCH")]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="330" y="150" width="225" height="12" uuid="11111111-1111-1111-1111-11111111115f"/>
-                <textElement><font size="10"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getMieterName()]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="330" y="162" width="225" height="11" uuid="11111111-1111-1111-1111-111111111160"/>
-                <textElement><font size="8"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getMieterStrasse()]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="330" y="173" width="225" height="11" uuid="11111111-1111-1111-1111-111111111161"/>
-                <textElement><font size="8"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getMieterPlzOrt()]]></textFieldExpression>
-            </textField>
-        </band>
+        <!-- Zahlbar durch -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111115e" x="330" y="138" width="225" height="12" fontSize="8.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_ZAHLBAR_DURCH")]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111115f" x="330" y="150" width="225" height="12" blankWhenNull="true" fontSize="10.0">
+            <expression><![CDATA[$P{RECHNUNG}.getMieterName()]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111160" x="330" y="162" width="225" height="11" blankWhenNull="true" fontSize="8.0">
+            <expression><![CDATA[$P{RECHNUNG}.getMieterStrasse()]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111161" x="330" y="173" width="225" height="11" blankWhenNull="true" fontSize="8.0">
+            <expression><![CDATA[$P{RECHNUNG}.getMieterPlzOrt()]]></expression>
+        </element>
     </lastPageFooter>
 
     <!-- Summary Band - Totals and thanks -->
-    <summary>
-        <band height="120" splitType="Stretch">
-            <!-- Total row -->
-            <textField>
-                <reportElement x="0" y="5" width="480" height="18" uuid="11111111-1111-1111-1111-11111111112c"/>
-                <box topPadding="3"><topPen lineWidth="2.0" lineColor="#0099CC"/></box>
-                <textElement verticalAlignment="Middle"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("TOTAL") + ":"]]></textFieldExpression>
-            </textField>
-            <textField pattern="#,##0.00">
-                <reportElement x="480" y="5" width="75" height="18" uuid="11111111-1111-1111-1111-11111111112d"/>
-                <box topPadding="3"><topPen lineWidth="2.0" lineColor="#0099CC"/></box>
-                <textElement textAlignment="Right" verticalAlignment="Middle"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getTotalBetrag()]]></textFieldExpression>
-            </textField>
+    <summary height="120">
+        <!-- Total row -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111112c" x="0" y="5" width="480" height="18" fontSize="9.0" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("TOTAL") + ":"]]></expression>
+            <box topPadding="3">
+                <topPen lineWidth="2.0" lineColor="#0099CC"/>
+            </box>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111112d" x="480" y="5" width="75" height="18" pattern="#,##0.00" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+            <expression><![CDATA[$P{RECHNUNG}.getTotalBetrag()]]></expression>
+            <box topPadding="3">
+                <topPen lineWidth="2.0" lineColor="#0099CC"/>
+            </box>
+        </element>
 
-            <!-- Rounding row (conditional) -->
-            <textField>
-                <reportElement x="0" y="23" width="480" height="18" uuid="11111111-1111-1111-1111-11111111112e">
-                    <printWhenExpression><![CDATA[Math.abs($P{RECHNUNG}.getRundung()) > 0.001]]></printWhenExpression>
-                </reportElement>
-                <textElement verticalAlignment="Middle"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("RUNDUNG") + ":"]]></textFieldExpression>
-            </textField>
-            <textField pattern="#,##0.00">
-                <reportElement x="480" y="23" width="75" height="18" uuid="11111111-1111-1111-1111-11111111112f">
-                    <printWhenExpression><![CDATA[Math.abs($P{RECHNUNG}.getRundung()) > 0.001]]></printWhenExpression>
-                </reportElement>
-                <textElement textAlignment="Right" verticalAlignment="Middle"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getRundung()]]></textFieldExpression>
-            </textField>
+        <!-- Rounding row (conditional) -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111112e" x="0" y="23" width="480" height="18" fontSize="9.0" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("RUNDUNG") + ":"]]></expression>
+            <printWhenExpression><![CDATA[Math.abs($P{RECHNUNG}.getRundung()) > 0.001]]></printWhenExpression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-11111111112f" x="480" y="23" width="75" height="18" pattern="#,##0.00" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+            <expression><![CDATA[$P{RECHNUNG}.getRundung()]]></expression>
+            <printWhenExpression><![CDATA[Math.abs($P{RECHNUNG}.getRundung()) > 0.001]]></printWhenExpression>
+        </element>
 
-            <!-- Final total row -->
-            <textField>
-                <reportElement mode="Opaque" x="0" y="45" width="480" height="25" backcolor="#F0F8FF" uuid="11111111-1111-1111-1111-111111111130"/>
-                <textElement verticalAlignment="Middle"><font size="11" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("TOTAL_ZU_BEZAHLEN") + ":"]]></textFieldExpression>
-            </textField>
-            <textField pattern="#,##0.00">
-                <reportElement mode="Opaque" x="480" y="45" width="75" height="25" backcolor="#F0F8FF" uuid="11111111-1111-1111-1111-111111111131"/>
-                <textElement textAlignment="Right" verticalAlignment="Middle"><font size="11" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{RECHNUNG}.getEndBetrag()]]></textFieldExpression>
-            </textField>
+        <!-- Final total row -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111130" mode="Opaque" x="0" y="45" width="480" height="25" backcolor="#F0F8FF" fontSize="11.0" bold="true" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("TOTAL_ZU_BEZAHLEN") + ":"]]></expression>
+        </element>
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111131" mode="Opaque" x="480" y="45" width="75" height="25" backcolor="#F0F8FF" pattern="#,##0.00" fontSize="11.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
+            <expression><![CDATA[$P{RECHNUNG}.getEndBetrag()]]></expression>
+        </element>
 
-            <!-- Thanks text -->
-            <textField>
-                <reportElement x="0" y="85" width="555" height="20" uuid="11111111-1111-1111-1111-111111111132"/>
-                <textElement><font size="10"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("BESTEN_DANK")]]></textFieldExpression>
-            </textField>
-        </band>
+        <!-- Thanks text -->
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111132" x="0" y="85" width="555" height="20" fontSize="10.0">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("BESTEN_DANK")]]></expression>
+        </element>
     </summary>
 </jasperReport>

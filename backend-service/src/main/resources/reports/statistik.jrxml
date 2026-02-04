@@ -1,8 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
-              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
-              name="statistik" pageWidth="595" pageHeight="842" columnWidth="555"
+<jasperReport name="statistik" pageWidth="595" pageHeight="842" columnWidth="555"
               leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20"
               uuid="33333333-3333-3333-3333-333333333333">
 
@@ -32,299 +28,229 @@
     <field name="differenzDE" class="java.lang.Double"/>
 
     <!-- Title Band - Report Header -->
-    <title>
-        <band height="130" splitType="Stretch">
-            <!-- Title: Statistik Report -->
-            <textField>
-                <reportElement x="0" y="0" width="555" height="30" forecolor="#4CAF50" uuid="33333333-3333-3333-3333-333333333301"/>
-                <textElement><font size="18" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("STATISTIK_REPORT")]]></textFieldExpression>
-            </textField>
+    <title height="130">
+        <!-- Title: Statistik Report -->
+        <element kind="textField" uuid="33333333-3333-3333-3333-333333333301" x="0" y="0" width="555" height="30" forecolor="#4CAF50" fontSize="18.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("STATISTIK_REPORT")]]></expression>
+        </element>
 
-            <!-- Subtitle: Zeitraum -->
-            <textField>
-                <reportElement x="0" y="30" width="80" height="15" forecolor="#666666" uuid="33333333-3333-3333-3333-333333333302"/>
-                <textElement><font size="10"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("ZEITRAUM") + ":"]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="80" y="30" width="475" height="15" forecolor="#666666" uuid="33333333-3333-3333-3333-333333333303"/>
-                <textElement><font size="10"/></textElement>
-                <textFieldExpression><![CDATA[$P{ZEITRAUM}]]></textFieldExpression>
-            </textField>
+        <!-- Subtitle: Zeitraum -->
+        <element kind="textField" uuid="33333333-3333-3333-3333-333333333302" x="0" y="30" width="80" height="15" forecolor="#666666" fontSize="10.0">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("ZEITRAUM") + ":"]]></expression>
+        </element>
+        <element kind="textField" uuid="33333333-3333-3333-3333-333333333303" x="80" y="30" width="475" height="15" forecolor="#666666" blankWhenNull="true" fontSize="10.0">
+            <expression><![CDATA[$P{ZEITRAUM}]]></expression>
+        </element>
 
-            <!-- Übersicht section -->
-            <textField>
-                <reportElement x="0" y="55" width="555" height="20" forecolor="#333333" uuid="33333333-3333-3333-3333-333333333304"/>
-                <box><bottomPen lineWidth="2.0" lineColor="#4CAF50"/></box>
-                <textElement verticalAlignment="Middle"><font size="14" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("STATISTIK_UEBERSICHT")]]></textFieldExpression>
-            </textField>
+        <!-- Übersicht section -->
+        <element kind="textField" uuid="33333333-3333-3333-3333-333333333304" x="0" y="55" width="555" height="20" forecolor="#333333" fontSize="14.0" bold="true" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("STATISTIK_UEBERSICHT")]]></expression>
+            <box>
+                <bottomPen lineWidth="2.0" lineColor="#4CAF50"/>
+            </box>
+        </element>
 
-            <!-- Messwerte vorhanden bis -->
-            <textField>
-                <reportElement x="0" y="80" width="180" height="15" uuid="33333333-3333-3333-3333-333333333305"/>
-                <textElement><font size="10" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("MESSWERTE_VORHANDEN_BIS") + ":"]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="180" y="80" width="375" height="15" uuid="33333333-3333-3333-3333-333333333306"/>
-                <textElement><font size="10"/></textElement>
-                <textFieldExpression><![CDATA[$P{STATISTIK}.getMesswerteBisDate() != null ? $P{STATISTIK}.getMesswerteBisDate().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) : "-"]]></textFieldExpression>
-            </textField>
+        <!-- Messwerte vorhanden bis -->
+        <element kind="textField" uuid="33333333-3333-3333-3333-333333333305" x="0" y="80" width="180" height="15" fontSize="10.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("MESSWERTE_VORHANDEN_BIS") + ":"]]></expression>
+        </element>
+        <element kind="textField" uuid="33333333-3333-3333-3333-333333333306" x="180" y="80" width="375" height="15" blankWhenNull="true" fontSize="10.0">
+            <expression><![CDATA[$P{STATISTIK}.getMesswerteBisDate() != null ? $P{STATISTIK}.getMesswerteBisDate().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) : "-"]]></expression>
+        </element>
 
-            <!-- Datenstatus -->
-            <textField>
-                <reportElement x="0" y="95" width="180" height="15" uuid="33333333-3333-3333-3333-333333333307"/>
-                <textElement><font size="10" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("DATENSTATUS") + ":"]]></textFieldExpression>
-            </textField>
-            <textField>
-                <reportElement x="180" y="95" width="375" height="15" forecolor="#4CAF50" uuid="33333333-3333-3333-3333-333333333308">
-                    <printWhenExpression><![CDATA[$P{STATISTIK}.isDatenVollstaendig()]]></printWhenExpression>
-                </reportElement>
-                <textElement><font size="10"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("DATEN_VOLLSTAENDIG")]]></textFieldExpression>
-            </textField>
-            <textField>
-                <reportElement x="180" y="95" width="375" height="15" forecolor="#F44336" uuid="33333333-3333-3333-3333-333333333309">
-                    <printWhenExpression><![CDATA[!$P{STATISTIK}.isDatenVollstaendig()]]></printWhenExpression>
-                </reportElement>
-                <textElement><font size="10"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("DATEN_UNVOLLSTAENDIG")]]></textFieldExpression>
-            </textField>
+        <!-- Datenstatus -->
+        <element kind="textField" uuid="33333333-3333-3333-3333-333333333307" x="0" y="95" width="180" height="15" fontSize="10.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("DATENSTATUS") + ":"]]></expression>
+        </element>
+        <element kind="textField" uuid="33333333-3333-3333-3333-333333333308" x="180" y="95" width="375" height="15" forecolor="#4CAF50" fontSize="10.0">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("DATEN_VOLLSTAENDIG")]]></expression>
+            <printWhenExpression><![CDATA[$P{STATISTIK}.isDatenVollstaendig()]]></printWhenExpression>
+        </element>
+        <element kind="textField" uuid="33333333-3333-3333-3333-333333333309" x="180" y="95" width="375" height="15" forecolor="#F44336" fontSize="10.0">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("DATEN_UNVOLLSTAENDIG")]]></expression>
+            <printWhenExpression><![CDATA[!$P{STATISTIK}.isDatenVollstaendig()]]></printWhenExpression>
+        </element>
 
-            <!-- Fehlende Einheiten -->
-            <textField>
-                <reportElement x="0" y="110" width="180" height="15" uuid="33333333-3333-3333-3333-33333333330a">
-                    <printWhenExpression><![CDATA[!$P{STATISTIK}.getFehlendeEinheiten().isEmpty()]]></printWhenExpression>
-                </reportElement>
-                <textElement><font size="10" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("FEHLENDE_EINHEITEN") + ":"]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="180" y="110" width="375" height="15" uuid="33333333-3333-3333-3333-33333333330b">
-                    <printWhenExpression><![CDATA[!$P{STATISTIK}.getFehlendeEinheiten().isEmpty()]]></printWhenExpression>
-                </reportElement>
-                <textElement><font size="10"/></textElement>
-                <textFieldExpression><![CDATA[String.join(", ", $P{STATISTIK}.getFehlendeEinheiten())]]></textFieldExpression>
-            </textField>
-        </band>
+        <!-- Fehlende Einheiten -->
+        <element kind="textField" uuid="33333333-3333-3333-3333-33333333330a" x="0" y="110" width="180" height="15" fontSize="10.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("FEHLENDE_EINHEITEN") + ":"]]></expression>
+            <printWhenExpression><![CDATA[!$P{STATISTIK}.getFehlendeEinheiten().isEmpty()]]></printWhenExpression>
+        </element>
+        <element kind="textField" uuid="33333333-3333-3333-3333-33333333330b" x="180" y="110" width="375" height="15" blankWhenNull="true" fontSize="10.0">
+            <expression><![CDATA[String.join(", ", $P{STATISTIK}.getFehlendeEinheiten())]]></expression>
+            <printWhenExpression><![CDATA[!$P{STATISTIK}.getFehlendeEinheiten().isEmpty()]]></printWhenExpression>
+        </element>
     </title>
 
     <!-- Detail Band - One band per month -->
     <detail>
-        <band height="220" splitType="Stretch">
+        <band height="220">
             <!-- Month header -->
-            <textField>
-                <reportElement x="0" y="10" width="555" height="25" forecolor="#333333" uuid="33333333-3333-3333-3333-33333333330c"/>
-                <box><bottomPen lineWidth="2.0" lineColor="#4CAF50"/></box>
-                <textElement verticalAlignment="Middle"><font size="14" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[java.time.Month.of($F{monat}).getDisplayName(java.time.format.TextStyle.FULL, "de".equals($P{SPRACHE}) ? java.util.Locale.GERMAN : java.util.Locale.ENGLISH) + " " + $F{jahr} + " (" + $F{von}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + " - " + $F{bis}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + ")"]]></textFieldExpression>
-            </textField>
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333330c" x="0" y="10" width="555" height="25" forecolor="#333333" fontSize="14.0" bold="true" vTextAlign="Middle">
+                <expression><![CDATA[java.time.Month.of($F{monat}).getDisplayName(java.time.format.TextStyle.FULL, "de".equals($P{SPRACHE}) ? java.util.Locale.GERMAN : java.util.Locale.ENGLISH) + " " + $F{jahr} + " (" + $F{von}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + " - " + $F{bis}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + ")"]]></expression>
+                <box>
+                    <bottomPen lineWidth="2.0" lineColor="#4CAF50"/>
+                </box>
+            </element>
 
             <!-- Datenstatus -->
-            <textField>
-                <reportElement x="0" y="40" width="120" height="15" uuid="33333333-3333-3333-3333-33333333330d"/>
-                <textElement><font size="9" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("DATENSTATUS") + ":"]]></textFieldExpression>
-            </textField>
-            <textField>
-                <reportElement x="120" y="40" width="200" height="15" forecolor="#4CAF50" uuid="33333333-3333-3333-3333-33333333330e">
-                    <printWhenExpression><![CDATA[$F{datenVollstaendig}]]></printWhenExpression>
-                </reportElement>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("DATEN_VOLLSTAENDIG")]]></textFieldExpression>
-            </textField>
-            <textField>
-                <reportElement x="120" y="40" width="200" height="15" forecolor="#F44336" uuid="33333333-3333-3333-3333-33333333330f">
-                    <printWhenExpression><![CDATA[!$F{datenVollstaendig}]]></printWhenExpression>
-                </reportElement>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("DATEN_UNVOLLSTAENDIG")]]></textFieldExpression>
-            </textField>
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333330d" x="0" y="40" width="120" height="15" fontSize="9.0" bold="true">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("DATENSTATUS") + ":"]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333330e" x="120" y="40" width="200" height="15" forecolor="#4CAF50" fontSize="9.0">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("DATEN_VOLLSTAENDIG")]]></expression>
+                <printWhenExpression><![CDATA[$F{datenVollstaendig}]]></printWhenExpression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333330f" x="120" y="40" width="200" height="15" forecolor="#F44336" fontSize="9.0">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("DATEN_UNVOLLSTAENDIG")]]></expression>
+                <printWhenExpression><![CDATA[!$F{datenVollstaendig}]]></printWhenExpression>
+            </element>
 
             <!-- Werte section header -->
-            <textField>
-                <reportElement x="0" y="60" width="200" height="18" forecolor="#666666" uuid="33333333-3333-3333-3333-333333333310"/>
-                <textElement><font size="12" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("WERT")]]></textFieldExpression>
-            </textField>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333310" x="0" y="60" width="200" height="18" forecolor="#666666" fontSize="12.0" bold="true">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("WERT")]]></expression>
+            </element>
 
             <!-- Sums table header -->
-            <textField>
-                <reportElement mode="Opaque" x="0" y="78" width="355" height="18" backcolor="#F5F5F5" uuid="33333333-3333-3333-3333-333333333311"/>
-                <box><pen lineWidth="0.5" lineColor="#DDDDDD"/></box>
-                <textElement verticalAlignment="Middle"><font size="9" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("BESCHREIBUNG")]]></textFieldExpression>
-            </textField>
-            <staticText>
-                <reportElement mode="Opaque" x="355" y="78" width="200" height="18" backcolor="#F5F5F5" uuid="33333333-3333-3333-3333-333333333312"/>
-                <box><pen lineWidth="0.5" lineColor="#DDDDDD"/></box>
-                <textElement textAlignment="Right" verticalAlignment="Middle"><font size="9" isBold="true"/></textElement>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333311" mode="Opaque" x="0" y="78" width="355" height="18" backcolor="#F5F5F5" fontSize="9.0" bold="true" vTextAlign="Middle">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("BESCHREIBUNG")]]></expression>
+                <box>
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
+            <element kind="staticText" uuid="33333333-3333-3333-3333-333333333312" mode="Opaque" x="355" y="78" width="200" height="18" backcolor="#F5F5F5" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
                 <text><![CDATA[kWh]]></text>
-            </staticText>
+                <box>
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
 
             <!-- Row: Produktion Total -->
-            <textField>
-                <reportElement x="0" y="96" width="355" height="16" uuid="33333333-3333-3333-3333-333333333313"/>
-                <box><pen lineWidth="0.5" lineColor="#DDDDDD"/></box>
-                <textElement verticalAlignment="Middle"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("PRODUKTION_TOTAL")]]></textFieldExpression>
-            </textField>
-            <textField pattern="#,##0.000" isBlankWhenNull="true">
-                <reportElement x="355" y="96" width="200" height="16" uuid="33333333-3333-3333-3333-333333333314"/>
-                <box><pen lineWidth="0.5" lineColor="#DDDDDD"/></box>
-                <textElement textAlignment="Right" verticalAlignment="Middle"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$F{summeProducerTotal}]]></textFieldExpression>
-            </textField>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333313" x="0" y="96" width="355" height="16" fontSize="9.0" vTextAlign="Middle">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("PRODUKTION_TOTAL")]]></expression>
+                <box>
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333314" x="355" y="96" width="200" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[$F{summeProducerTotal}]]></expression>
+                <box>
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
 
             <!-- Row: Verbrauch Total -->
-            <textField>
-                <reportElement x="0" y="112" width="355" height="16" uuid="33333333-3333-3333-3333-333333333315"/>
-                <box><pen lineWidth="0.5" lineColor="#DDDDDD"/></box>
-                <textElement verticalAlignment="Middle"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("VERBRAUCH_TOTAL")]]></textFieldExpression>
-            </textField>
-            <textField pattern="#,##0.000" isBlankWhenNull="true">
-                <reportElement x="355" y="112" width="200" height="16" uuid="33333333-3333-3333-3333-333333333316"/>
-                <box><pen lineWidth="0.5" lineColor="#DDDDDD"/></box>
-                <textElement textAlignment="Right" verticalAlignment="Middle"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$F{summeConsumerTotal}]]></textFieldExpression>
-            </textField>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333315" x="0" y="112" width="355" height="16" fontSize="9.0" vTextAlign="Middle">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("VERBRAUCH_TOTAL")]]></expression>
+                <box>
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333316" x="355" y="112" width="200" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[$F{summeConsumerTotal}]]></expression>
+                <box>
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
 
             <!-- Row: ZEV Producer (A) -->
-            <textField>
-                <reportElement x="0" y="128" width="355" height="16" uuid="33333333-3333-3333-3333-333333333317"/>
-                <box><pen lineWidth="0.5" lineColor="#DDDDDD"/></box>
-                <textElement verticalAlignment="Middle"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("ZEV_PRODUCER") + " (A)"]]></textFieldExpression>
-            </textField>
-            <textField pattern="#,##0.000" isBlankWhenNull="true">
-                <reportElement x="355" y="128" width="200" height="16" uuid="33333333-3333-3333-3333-333333333318"/>
-                <box><pen lineWidth="0.5" lineColor="#DDDDDD"/></box>
-                <textElement textAlignment="Right" verticalAlignment="Middle"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$F{summeProducerZev}]]></textFieldExpression>
-            </textField>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333317" x="0" y="128" width="355" height="16" fontSize="9.0" vTextAlign="Middle">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("ZEV_PRODUCER") + " (A)"]]></expression>
+                <box>
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333318" x="355" y="128" width="200" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[$F{summeProducerZev}]]></expression>
+                <box>
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
 
             <!-- Row: ZEV Consumer (B) -->
-            <textField>
-                <reportElement x="0" y="144" width="355" height="16" uuid="33333333-3333-3333-3333-333333333319"/>
-                <box><pen lineWidth="0.5" lineColor="#DDDDDD"/></box>
-                <textElement verticalAlignment="Middle"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("ZEV_CONSUMER") + " (B)"]]></textFieldExpression>
-            </textField>
-            <textField pattern="#,##0.000" isBlankWhenNull="true">
-                <reportElement x="355" y="144" width="200" height="16" uuid="33333333-3333-3333-3333-33333333331a"/>
-                <box><pen lineWidth="0.5" lineColor="#DDDDDD"/></box>
-                <textElement textAlignment="Right" verticalAlignment="Middle"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$F{summeConsumerZev}]]></textFieldExpression>
-            </textField>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333319" x="0" y="144" width="355" height="16" fontSize="9.0" vTextAlign="Middle">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("ZEV_CONSUMER") + " (B)"]]></expression>
+                <box>
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331a" x="355" y="144" width="200" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[$F{summeConsumerZev}]]></expression>
+                <box>
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
 
             <!-- Row: ZEV Consumer Berechnet (C) -->
-            <textField>
-                <reportElement x="0" y="160" width="355" height="16" uuid="33333333-3333-3333-3333-33333333331b"/>
-                <box><pen lineWidth="0.5" lineColor="#DDDDDD"/></box>
-                <textElement verticalAlignment="Middle"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("ZEV_CONSUMER_BERECHNET") + " (C)"]]></textFieldExpression>
-            </textField>
-            <textField pattern="#,##0.000" isBlankWhenNull="true">
-                <reportElement x="355" y="160" width="200" height="16" uuid="33333333-3333-3333-3333-33333333331c"/>
-                <box><pen lineWidth="0.5" lineColor="#DDDDDD"/></box>
-                <textElement textAlignment="Right" verticalAlignment="Middle"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$F{summeConsumerZevCalculated}]]></textFieldExpression>
-            </textField>
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331b" x="0" y="160" width="355" height="16" fontSize="9.0" vTextAlign="Middle">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("ZEV_CONSUMER_BERECHNET") + " (C)"]]></expression>
+                <box>
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331c" x="355" y="160" width="200" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[$F{summeConsumerZevCalculated}]]></expression>
+                <box>
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
 
             <!-- Summen Vergleich section -->
-            <textField>
-                <reportElement x="0" y="185" width="200" height="18" forecolor="#666666" uuid="33333333-3333-3333-3333-33333333331d"/>
-                <textElement><font size="12" isBold="true"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("SUMMEN_VERGLEICH")]]></textFieldExpression>
-            </textField>
-            <textField>
-                <reportElement x="200" y="185" width="355" height="15" forecolor="#999999" uuid="33333333-3333-3333-3333-33333333331e"/>
-                <textElement><font size="8"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("TOLERANZ") + ": " + String.format("%.3f", $P{STATISTIK}.getToleranz()) + " kWh"]]></textFieldExpression>
-            </textField>
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331d" x="0" y="185" width="200" height="18" forecolor="#666666" fontSize="12.0" bold="true">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("SUMMEN_VERGLEICH")]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331e" x="200" y="185" width="355" height="15" forecolor="#999999" fontSize="8.0">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("TOLERANZ") + ": " + String.format("%.3f", $P{STATISTIK}.getToleranz()) + " kWh"]]></expression>
+            </element>
 
             <!-- Comparison: A = B -->
-            <staticText>
-                <reportElement x="0" y="202" width="50" height="15" uuid="33333333-3333-3333-3333-33333333331f"/>
-                <textElement><font size="9"/></textElement>
+            <element kind="staticText" uuid="33333333-3333-3333-3333-33333333331f" x="0" y="202" width="50" height="15" fontSize="9.0">
                 <text><![CDATA[A = B:]]></text>
-            </staticText>
-            <textField>
-                <reportElement x="50" y="202" width="150" height="15" forecolor="#4CAF50" uuid="33333333-3333-3333-3333-333333333320">
-                    <printWhenExpression><![CDATA[$F{summenCDGleich}]]></printWhenExpression>
-                </reportElement>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA["✓ " + $P{TRANSLATIONS}.get("GLEICH")]]></textFieldExpression>
-            </textField>
-            <textField>
-                <reportElement x="50" y="202" width="150" height="15" forecolor="#F44336" uuid="33333333-3333-3333-3333-333333333321">
-                    <printWhenExpression><![CDATA[!$F{summenCDGleich}]]></printWhenExpression>
-                </reportElement>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + String.format("%+.3f", $F{differenzCD}) + " kWh)"]]></textFieldExpression>
-            </textField>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333320" x="50" y="202" width="150" height="15" forecolor="#4CAF50" fontSize="9.0">
+                <expression><![CDATA["✓ " + $P{TRANSLATIONS}.get("GLEICH")]]></expression>
+                <printWhenExpression><![CDATA[$F{summenCDGleich}]]></printWhenExpression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333321" x="50" y="202" width="150" height="15" forecolor="#F44336" fontSize="9.0">
+                <expression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + String.format("%+.3f", $F{differenzCD}) + " kWh)"]]></expression>
+                <printWhenExpression><![CDATA[!$F{summenCDGleich}]]></printWhenExpression>
+            </element>
 
             <!-- Comparison: A = C -->
-            <staticText>
-                <reportElement x="200" y="202" width="50" height="15" uuid="33333333-3333-3333-3333-333333333322"/>
-                <textElement><font size="9"/></textElement>
+            <element kind="staticText" uuid="33333333-3333-3333-3333-333333333322" x="200" y="202" width="50" height="15" fontSize="9.0">
                 <text><![CDATA[A = C:]]></text>
-            </staticText>
-            <textField>
-                <reportElement x="250" y="202" width="150" height="15" forecolor="#4CAF50" uuid="33333333-3333-3333-3333-333333333323">
-                    <printWhenExpression><![CDATA[$F{summenCEGleich}]]></printWhenExpression>
-                </reportElement>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA["✓ " + $P{TRANSLATIONS}.get("GLEICH")]]></textFieldExpression>
-            </textField>
-            <textField>
-                <reportElement x="250" y="202" width="150" height="15" forecolor="#F44336" uuid="33333333-3333-3333-3333-333333333324">
-                    <printWhenExpression><![CDATA[!$F{summenCEGleich}]]></printWhenExpression>
-                </reportElement>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + String.format("%+.3f", $F{differenzCE}) + " kWh)"]]></textFieldExpression>
-            </textField>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333323" x="250" y="202" width="150" height="15" forecolor="#4CAF50" fontSize="9.0">
+                <expression><![CDATA["✓ " + $P{TRANSLATIONS}.get("GLEICH")]]></expression>
+                <printWhenExpression><![CDATA[$F{summenCEGleich}]]></printWhenExpression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333324" x="250" y="202" width="150" height="15" forecolor="#F44336" fontSize="9.0">
+                <expression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + String.format("%+.3f", $F{differenzCE}) + " kWh)"]]></expression>
+                <printWhenExpression><![CDATA[!$F{summenCEGleich}]]></printWhenExpression>
+            </element>
 
             <!-- Comparison: B = C -->
-            <staticText>
-                <reportElement x="400" y="202" width="50" height="15" uuid="33333333-3333-3333-3333-333333333325"/>
-                <textElement><font size="9"/></textElement>
+            <element kind="staticText" uuid="33333333-3333-3333-3333-333333333325" x="400" y="202" width="50" height="15" fontSize="9.0">
                 <text><![CDATA[B = C:]]></text>
-            </staticText>
-            <textField>
-                <reportElement x="450" y="202" width="105" height="15" forecolor="#4CAF50" uuid="33333333-3333-3333-3333-333333333326">
-                    <printWhenExpression><![CDATA[$F{summenDEGleich}]]></printWhenExpression>
-                </reportElement>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA["✓ " + $P{TRANSLATIONS}.get("GLEICH")]]></textFieldExpression>
-            </textField>
-            <textField>
-                <reportElement x="450" y="202" width="105" height="15" forecolor="#F44336" uuid="33333333-3333-3333-3333-333333333327">
-                    <printWhenExpression><![CDATA[!$F{summenDEGleich}]]></printWhenExpression>
-                </reportElement>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + String.format("%+.3f", $F{differenzDE}) + " kWh)"]]></textFieldExpression>
-            </textField>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333326" x="450" y="202" width="105" height="15" forecolor="#4CAF50" fontSize="9.0">
+                <expression><![CDATA["✓ " + $P{TRANSLATIONS}.get("GLEICH")]]></expression>
+                <printWhenExpression><![CDATA[$F{summenDEGleich}]]></printWhenExpression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333327" x="450" y="202" width="105" height="15" forecolor="#F44336" fontSize="9.0">
+                <expression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + String.format("%+.3f", $F{differenzDE}) + " kWh)"]]></expression>
+                <printWhenExpression><![CDATA[!$F{summenDEGleich}]]></printWhenExpression>
+            </element>
         </band>
     </detail>
 
     <!-- Page Footer -->
-    <pageFooter>
-        <band height="30">
-            <textField>
-                <reportElement x="0" y="10" width="200" height="15" forecolor="#666666" uuid="33333333-3333-3333-3333-333333333328"/>
-                <textElement><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$P{TRANSLATIONS}.get("GENERIERT_AM") + ": " + $P{GENERIERT_AM}]]></textFieldExpression>
-            </textField>
-            <textField>
-                <reportElement x="455" y="10" width="100" height="15" forecolor="#666666" uuid="33333333-3333-3333-3333-333333333329"/>
-                <textElement textAlignment="Right"><font size="9"/></textElement>
-                <textFieldExpression><![CDATA[$V{PAGE_NUMBER}]]></textFieldExpression>
-            </textField>
-        </band>
+    <pageFooter height="30">
+        <element kind="textField" uuid="33333333-3333-3333-3333-333333333328" x="0" y="10" width="200" height="15" forecolor="#666666" fontSize="9.0">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("GENERIERT_AM") + ": " + $P{GENERIERT_AM}]]></expression>
+        </element>
+        <element kind="textField" uuid="33333333-3333-3333-3333-333333333329" x="455" y="10" width="100" height="15" forecolor="#666666" fontSize="9.0" hTextAlign="Right">
+            <expression><![CDATA[$V{PAGE_NUMBER}]]></expression>
+        </element>
     </pageFooter>
 </jasperReport>

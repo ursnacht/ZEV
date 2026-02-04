@@ -2,6 +2,8 @@ server:
   port: 8090
 
 spring:
+  jackson:
+    use-jackson2-defaults: true
   application:
     name: backend-service
   ai:

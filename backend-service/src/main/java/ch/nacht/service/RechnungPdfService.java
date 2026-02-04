@@ -6,6 +6,7 @@ import ch.nacht.repository.TranslationRepository;
 import net.codecrete.qrbill.generator.*;
 import net.sf.jasperreports.engine.*;
 import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
+import net.sf.jasperreports.engine.util.JRLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -40,20 +41,22 @@ public class RechnungPdfService {
     public void init() {
         try {
             // Compile main invoice template
-            InputStream reportStream = getClass().getResourceAsStream("/reports/rechnung.jrxml");
+            InputStream reportStream = getClass().getResourceAsStream("/reports/rechnung.jasper");
             if (reportStream == null) {
-                throw new RuntimeException("Could not find rechnung.jrxml template");
+                throw new RuntimeException("Could not find rechnung.jasper template");
             }
-            compiledReport = JasperCompileManager.compileReport(reportStream);
-            log.info("Compiled rechnung.jrxml template successfully");
+            //compiledReport = JasperCompileManager.compileReport(reportStream);
+            compiledReport = (JasperReport) JRLoader.loadObject(reportStream);
+            log.info("Compiled rechnung.jasper template successfully");
 
             // Compile QR-Bill sub-report template
-            InputStream qrStream = getClass().getResourceAsStream("/reports/qr-zahlteil.jrxml");
+            InputStream qrStream = getClass().getResourceAsStream("/reports/qr-zahlteil.jasper");
             if (qrStream == null) {
-                throw new RuntimeException("Could not find qr-zahlteil.jrxml template");
+                throw new RuntimeException("Could not find qr-zahlteil.jasper template");
             }
-            compiledQrReport = JasperCompileManager.compileReport(qrStream);
-            log.info("Compiled qr-zahlteil.jrxml template successfully");
+            //compiledQrReport = JasperCompileManager.compileReport(qrStream);
+            compiledQrReport = (JasperReport) JRLoader.loadObject(qrStream);
+            log.info("Compiled qr-zahlteil.jasper template successfully");
 
         } catch (JRException e) {
             log.error("Failed to compile JasperReports templates: {}", e.getMessage(), e);
@@ -82,13 +85,11 @@ public class RechnungPdfService {
         parameters.put("QR_CODE_IMAGE", qrCodeStream);
 
         // TarifZeilen als DataSource für das Detail-Band
-        JRBeanCollectionDataSource tarifDataSource =
-            new JRBeanCollectionDataSource(rechnung.getTarifZeilen());
+        JRBeanCollectionDataSource tarifDataSource = new JRBeanCollectionDataSource(rechnung.getTarifZeilen());
 
         try {
             ByteArrayOutputStream os = new ByteArrayOutputStream();
-            JasperPrint jasperPrint = JasperFillManager.fillReport(
-                compiledReport, parameters, tarifDataSource);
+            JasperPrint jasperPrint = JasperFillManager.fillReport(compiledReport, parameters, tarifDataSource);
             JasperExportManager.exportReportToPdfStream(jasperPrint, os);
 
             log.info("Invoice PDF generated successfully for unit: {}, size: {} bytes",

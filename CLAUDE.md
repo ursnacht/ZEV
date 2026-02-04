@@ -15,7 +15,7 @@ ZEV (Zusammenschluss zum Eigenverbrauch) is a solar power distribution applicati
 
 ## Tech Stack Versions
 
-- Spring Boot 3.5.6
+- Spring Boot 4.0.1
 - Angular 21.1.0
 - TypeScript 5.9.3
 - Playwright 1.58.0 (E2E tests)

@@ -101,7 +101,7 @@ public class EinheitMatchingService {
                 var usage = chatResponse.getMetadata().getUsage();
                 log.info("Anthropic Token Usage - Input: {} tokens, Output: {} tokens",
                         usage.getPromptTokens(),
-                        usage.getGenerationTokens());
+                        usage.getCompletionTokens());
 
                 // Try to access native usage for cache metrics (requires Spring AI 1.1.0+)
                 if (usage.getNativeUsage() != null) {
