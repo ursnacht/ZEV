@@ -36,4 +36,13 @@ class JasperTemplateCompileTest {
         assertNotNull(report);
         System.out.println("statistik.jrxml compiled successfully");
     }
+
+    @Test
+    void testEinheitSummenTemplateCompiles() throws Exception {
+        InputStream stream = getClass().getResourceAsStream("/reports/einheit-summen.jrxml");
+        assertNotNull(stream, "einheit-summen.jrxml not found");
+        JasperReport report = JasperCompileManager.compileReport(stream);
+        assertNotNull(report);
+        System.out.println("einheit-summen.jrxml compiled successfully");
+    }
 }

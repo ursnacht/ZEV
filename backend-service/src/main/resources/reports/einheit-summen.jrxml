@@ -1,0 +1,100 @@
+<jasperReport name="einheit-summen" pageWidth="555" pageHeight="842" columnWidth="555"
+              leftMargin="0" rightMargin="0" topMargin="0" bottomMargin="0"
+              uuid="44444444-4444-4444-4444-444444444444">
+
+    <!-- Parameters -->
+    <parameter name="TRANSLATIONS" class="java.util.Map"/>
+    <parameter name="SPRACHE" class="java.lang.String"/>
+
+    <!-- Fields from EinheitSummenDTO -->
+    <field name="einheitName" class="java.lang.String"/>
+    <field name="einheitTyp" class="ch.nacht.entity.EinheitTyp"/>
+    <field name="summeTotal" class="java.lang.Double"/>
+    <field name="summeZev" class="java.lang.Double"/>
+    <field name="summeZevCalculated" class="java.lang.Double"/>
+
+    <!-- Column Header - Section title + table header -->
+    <columnHeader height="38">
+        <!-- Section title: Summen pro Einheit -->
+        <element kind="textField" uuid="44444444-4444-4444-4444-444444444401" x="0" y="0" width="555" height="18" forecolor="#666666" fontSize="12.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("SUMMEN_PRO_EINHEIT")]]></expression>
+        </element>
+
+        <!-- Table header row -->
+        <element kind="textField" uuid="44444444-4444-4444-4444-444444444402" mode="Opaque" x="0" y="18" width="170" height="18" backcolor="#F5F5F5" fontSize="9.0" bold="true" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("EINHEIT")]]></expression>
+            <box leftPadding="4" rightPadding="4">
+                <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+            </box>
+        </element>
+        <element kind="textField" uuid="44444444-4444-4444-4444-444444444403" mode="Opaque" x="170" y="18" width="85" height="18" backcolor="#F5F5F5" fontSize="9.0" bold="true" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("TYP")]]></expression>
+            <box leftPadding="4" rightPadding="4">
+                <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+            </box>
+        </element>
+        <element kind="staticText" uuid="44444444-4444-4444-4444-444444444404" mode="Opaque" x="255" y="18" width="100" height="18" backcolor="#F5F5F5" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
+            <text><![CDATA[Total (kWh)]]></text>
+            <box leftPadding="4" rightPadding="4">
+                <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+            </box>
+        </element>
+        <element kind="staticText" uuid="44444444-4444-4444-4444-444444444405" mode="Opaque" x="355" y="18" width="100" height="18" backcolor="#F5F5F5" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
+            <text><![CDATA[ZEV (kWh)]]></text>
+            <box leftPadding="4" rightPadding="4">
+                <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+            </box>
+        </element>
+        <element kind="textField" uuid="44444444-4444-4444-4444-444444444406" mode="Opaque" x="455" y="18" width="100" height="18" backcolor="#F5F5F5" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("ZEV_BERECHNET") + " (kWh)"]]></expression>
+            <box leftPadding="4" rightPadding="4">
+                <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+            </box>
+        </element>
+    </columnHeader>
+
+    <!-- Detail Band - One row per Einheit -->
+    <detail>
+        <band height="16">
+            <!-- Einheit Name -->
+            <element kind="textField" uuid="44444444-4444-4444-4444-444444444410" x="0" y="0" width="170" height="16" fontSize="9.0" vTextAlign="Middle">
+                <expression><![CDATA[$F{einheitName}]]></expression>
+                <box leftPadding="4" rightPadding="4">
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
+
+            <!-- Typ (translated) -->
+            <element kind="textField" uuid="44444444-4444-4444-4444-444444444411" x="170" y="0" width="85" height="16" fontSize="9.0" vTextAlign="Middle">
+                <expression><![CDATA[$F{einheitTyp}.name().equals("PRODUCER") ? $P{TRANSLATIONS}.get("PRODUZENT") : $P{TRANSLATIONS}.get("KONSUMENT")]]></expression>
+                <box leftPadding="4" rightPadding="4">
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
+
+            <!-- Total (kWh) -->
+            <element kind="textField" uuid="44444444-4444-4444-4444-444444444412" x="255" y="0" width="100" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[$F{summeTotal}]]></expression>
+                <box leftPadding="4" rightPadding="4">
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
+
+            <!-- ZEV (kWh) -->
+            <element kind="textField" uuid="44444444-4444-4444-4444-444444444413" x="355" y="0" width="100" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[$F{summeZev}]]></expression>
+                <box leftPadding="4" rightPadding="4">
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
+
+            <!-- ZEV berechnet (kWh) - only for CONSUMER, "-" for PRODUCER -->
+            <element kind="textField" uuid="44444444-4444-4444-4444-444444444414" x="455" y="0" width="100" height="16" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[$F{einheitTyp}.name().equals("CONSUMER") ? ($F{summeZevCalculated} != null ? String.format("%,.3f", $F{summeZevCalculated}) : "-") : "-"]]></expression>
+                <box leftPadding="4" rightPadding="4">
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
+        </band>
+    </detail>
+</jasperReport>

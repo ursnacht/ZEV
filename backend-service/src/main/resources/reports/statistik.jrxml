@@ -8,6 +8,7 @@
     <parameter name="SPRACHE" class="java.lang.String"/>
     <parameter name="ZEITRAUM" class="java.lang.String"/>
     <parameter name="GENERIERT_AM" class="java.lang.String"/>
+    <parameter name="EINHEIT_SUMMEN_SUBREPORT" class="net.sf.jasperreports.engine.JasperReport"/>
 
     <!-- Fields for MonatsStatistik detail band -->
     <field name="jahr" class="java.lang.Integer"/>
@@ -26,6 +27,17 @@
     <field name="differenzCE" class="java.lang.Double"/>
     <field name="summenDEGleich" class="java.lang.Boolean"/>
     <field name="differenzDE" class="java.lang.Double"/>
+    <field name="einheitSummen" class="java.util.List"/>
+
+    <!-- Variable: Maximum of all sums for bar scaling -->
+    <variable name="maxSumme" calculation="Nothing" resetType="None" class="java.lang.Double">
+        <expression><![CDATA[Math.max(0.0, Math.max(Math.max(Math.max(Math.max(
+            ($F{summeProducerTotal} != null ? $F{summeProducerTotal} : 0.0),
+            ($F{summeConsumerTotal} != null ? $F{summeConsumerTotal} : 0.0)),
+            ($F{summeProducerZev} != null ? $F{summeProducerZev} : 0.0)),
+            ($F{summeConsumerZev} != null ? $F{summeConsumerZev} : 0.0)),
+            ($F{summeConsumerZevCalculated} != null ? $F{summeConsumerZevCalculated} : 0.0)))]]></expression>
+    </variable>
 
     <!-- Title Band - Report Header -->
     <title height="130">
@@ -84,7 +96,7 @@
 
     <!-- Detail Band - One band per month -->
     <detail>
-        <band height="220">
+        <band height="280">
             <!-- Month header -->
             <element kind="textField" uuid="33333333-3333-3333-3333-33333333330c" x="0" y="10" width="555" height="25" forecolor="#333333" fontSize="14.0" bold="true" vTextAlign="Middle">
                 <expression><![CDATA[java.time.Month.of($F{monat}).getDisplayName(java.time.format.TextStyle.FULL, "de".equals($P{SPRACHE}) ? java.util.Locale.GERMAN : java.util.Locale.ENGLISH) + " " + $F{jahr} + " (" + $F{von}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + " - " + $F{bis}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + ")"]]></expression>
@@ -112,87 +124,107 @@
             </element>
 
             <!-- Sums table header -->
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333311" mode="Opaque" x="0" y="78" width="355" height="18" backcolor="#F5F5F5" fontSize="9.0" bold="true" vTextAlign="Middle">
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333311" mode="Opaque" x="0" y="78" width="170" height="18" backcolor="#F5F5F5" fontSize="9.0" bold="true" vTextAlign="Middle">
                 <expression><![CDATA[$P{TRANSLATIONS}.get("BESCHREIBUNG")]]></expression>
-                <box>
+                <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
             </element>
-            <element kind="staticText" uuid="33333333-3333-3333-3333-333333333312" mode="Opaque" x="355" y="78" width="200" height="18" backcolor="#F5F5F5" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
+            <element kind="staticText" uuid="33333333-3333-3333-3333-333333333312" mode="Opaque" x="170" y="78" width="100" height="18" backcolor="#F5F5F5" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
                 <text><![CDATA[kWh]]></text>
-                <box>
+                <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
             </element>
 
             <!-- Row: Produktion Total -->
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333313" x="0" y="96" width="355" height="16" fontSize="9.0" vTextAlign="Middle">
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333313" x="0" y="96" width="170" height="16" fontSize="9.0" vTextAlign="Middle">
                 <expression><![CDATA[$P{TRANSLATIONS}.get("PRODUKTION_TOTAL")]]></expression>
-                <box>
+                <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
             </element>
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333314" x="355" y="96" width="200" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333314" x="170" y="96" width="100" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
                 <expression><![CDATA[$F{summeProducerTotal}]]></expression>
-                <box>
+                <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
+            </element>
+            <!-- Bar: Produktion Total (#4CAF50 Green) -->
+            <element kind="image" uuid="33333333-3333-3333-3333-333333333341" x="280" y="97" width="275" height="14" scaleImage="FillFrame">
+                <expression><![CDATA[ch.nacht.util.BarImageHelper.createBar($F{summeProducerTotal}, $V{maxSumme}, 275, 14, new java.awt.Color(76, 175, 80))]]></expression>
             </element>
 
             <!-- Row: Verbrauch Total -->
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333315" x="0" y="112" width="355" height="16" fontSize="9.0" vTextAlign="Middle">
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333315" x="0" y="112" width="170" height="16" fontSize="9.0" vTextAlign="Middle">
                 <expression><![CDATA[$P{TRANSLATIONS}.get("VERBRAUCH_TOTAL")]]></expression>
-                <box>
+                <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
             </element>
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333316" x="355" y="112" width="200" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333316" x="170" y="112" width="100" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
                 <expression><![CDATA[$F{summeConsumerTotal}]]></expression>
-                <box>
+                <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
+            </element>
+            <!-- Bar: Verbrauch Total (#2196F3 Blue) -->
+            <element kind="image" uuid="33333333-3333-3333-3333-333333333342" x="280" y="113" width="275" height="14" scaleImage="FillFrame">
+                <expression><![CDATA[ch.nacht.util.BarImageHelper.createBar($F{summeConsumerTotal}, $V{maxSumme}, 275, 14, new java.awt.Color(33, 150, 243))]]></expression>
             </element>
 
             <!-- Row: ZEV Producer (A) -->
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333317" x="0" y="128" width="355" height="16" fontSize="9.0" vTextAlign="Middle">
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333317" x="0" y="128" width="170" height="16" fontSize="9.0" vTextAlign="Middle">
                 <expression><![CDATA[$P{TRANSLATIONS}.get("ZEV_PRODUCER") + " (A)"]]></expression>
-                <box>
+                <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
             </element>
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333318" x="355" y="128" width="200" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333318" x="170" y="128" width="100" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
                 <expression><![CDATA[$F{summeProducerZev}]]></expression>
-                <box>
+                <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
+            </element>
+            <!-- Bar: ZEV Producer A (#FF9800 Orange) -->
+            <element kind="image" uuid="33333333-3333-3333-3333-333333333343" x="280" y="129" width="275" height="14" scaleImage="FillFrame">
+                <expression><![CDATA[ch.nacht.util.BarImageHelper.createBar($F{summeProducerZev}, $V{maxSumme}, 275, 14, new java.awt.Color(255, 152, 0))]]></expression>
             </element>
 
             <!-- Row: ZEV Consumer (B) -->
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333319" x="0" y="144" width="355" height="16" fontSize="9.0" vTextAlign="Middle">
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333319" x="0" y="144" width="170" height="16" fontSize="9.0" vTextAlign="Middle">
                 <expression><![CDATA[$P{TRANSLATIONS}.get("ZEV_CONSUMER") + " (B)"]]></expression>
-                <box>
+                <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
             </element>
-            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331a" x="355" y="144" width="200" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331a" x="170" y="144" width="100" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
                 <expression><![CDATA[$F{summeConsumerZev}]]></expression>
-                <box>
+                <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
+            </element>
+            <!-- Bar: ZEV Consumer B (#9C27B0 Purple) -->
+            <element kind="image" uuid="33333333-3333-3333-3333-333333333344" x="280" y="145" width="275" height="14" scaleImage="FillFrame">
+                <expression><![CDATA[ch.nacht.util.BarImageHelper.createBar($F{summeConsumerZev}, $V{maxSumme}, 275, 14, new java.awt.Color(156, 39, 176))]]></expression>
             </element>
 
             <!-- Row: ZEV Consumer Berechnet (C) -->
-            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331b" x="0" y="160" width="355" height="16" fontSize="9.0" vTextAlign="Middle">
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331b" x="0" y="160" width="170" height="16" fontSize="9.0" vTextAlign="Middle">
                 <expression><![CDATA[$P{TRANSLATIONS}.get("ZEV_CONSUMER_BERECHNET") + " (C)"]]></expression>
-                <box>
+                <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
             </element>
-            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331c" x="355" y="160" width="200" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331c" x="170" y="160" width="100" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
                 <expression><![CDATA[$F{summeConsumerZevCalculated}]]></expression>
-                <box>
+                <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
+            </element>
+            <!-- Bar: ZEV Consumer Berechnet C (#00BCD4 Cyan) -->
+            <element kind="image" uuid="33333333-3333-3333-3333-333333333345" x="280" y="161" width="275" height="14" scaleImage="FillFrame">
+                <expression><![CDATA[ch.nacht.util.BarImageHelper.createBar($F{summeConsumerZevCalculated}, $V{maxSumme}, 275, 14, new java.awt.Color(0, 188, 212))]]></expression>
             </element>
 
             <!-- Summen Vergleich section -->
@@ -240,6 +272,19 @@
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333327" x="450" y="202" width="105" height="15" forecolor="#F44336" fontSize="9.0">
                 <expression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + String.format("%+.3f", $F{differenzDE}) + " kWh)"]]></expression>
                 <printWhenExpression><![CDATA[!$F{summenDEGleich}]]></printWhenExpression>
+            </element>
+
+            <!-- Subreport: Summen pro Einheit -->
+            <element kind="subreport" uuid="33333333-3333-3333-3333-333333333330" x="0" y="225" width="555" height="50">
+                <printWhenExpression><![CDATA[$F{einheitSummen} != null && !$F{einheitSummen}.isEmpty()]]></printWhenExpression>
+                <parameter name="TRANSLATIONS">
+                    <expression><![CDATA[$P{TRANSLATIONS}]]></expression>
+                </parameter>
+                <parameter name="SPRACHE">
+                    <expression><![CDATA[$P{SPRACHE}]]></expression>
+                </parameter>
+                <dataSourceExpression><![CDATA[new net.sf.jasperreports.engine.data.JRBeanCollectionDataSource($F{einheitSummen})]]></dataSourceExpression>
+                <expression><![CDATA[$P{EINHEIT_SUMMEN_SUBREPORT}]]></expression>
             </element>
         </band>
     </detail>

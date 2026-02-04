@@ -30,6 +30,7 @@ public class StatistikPdfService {
     private final TranslationRepository translationRepository;
 
     private JasperReport compiledReport;
+    private JasperReport compiledEinheitSummenReport;
 
     public StatistikPdfService(TranslationRepository translationRepository) {
         this.translationRepository = translationRepository;
@@ -44,8 +45,14 @@ public class StatistikPdfService {
                 throw new RuntimeException("Could not find statistik.jasper template");
             }
             compiledReport = (JasperReport) JRLoader.loadObject(reportStream);
-            // compiledReport = JasperCompileManager.compileReport(reportStream);
-            log.info("Compiled statistik.jasper template successfully");
+            log.info("Loaded statistik.jasper template successfully");
+
+            InputStream subreportStream = getClass().getResourceAsStream("/reports/einheit-summen.jasper");
+            if (subreportStream == null) {
+                throw new RuntimeException("Could not find einheit-summen.jasper template");
+            }
+            compiledEinheitSummenReport = (JasperReport) JRLoader.loadObject(subreportStream);
+            log.info("Loaded einheit-summen.jasper template successfully");
         } catch (JRException e) {
             log.error("Failed to compile JasperReports template: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to compile JasperReports template", e);
@@ -74,6 +81,7 @@ public class StatistikPdfService {
         parameters.put("SPRACHE", sprache);
         parameters.put("ZEITRAUM", zeitraum);
         parameters.put("GENERIERT_AM", generiertAm);
+        parameters.put("EINHEIT_SUMMEN_SUBREPORT", compiledEinheitSummenReport);
 
         // Monate als DataSource für das Detail-Band
         JRBeanCollectionDataSource monateDataSource =
