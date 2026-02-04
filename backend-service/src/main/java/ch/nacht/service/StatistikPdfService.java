@@ -39,7 +39,6 @@ public class StatistikPdfService {
     @PostConstruct
     public void init() {
         try {
-            // InputStream reportStream = getClass().getResourceAsStream("/reports/statistik.jrxml");
             InputStream reportStream = getClass().getResourceAsStream("/reports/statistik.jasper");
             if (reportStream == null) {
                 throw new RuntimeException("Could not find statistik.jasper template");
@@ -54,8 +53,8 @@ public class StatistikPdfService {
             compiledEinheitSummenReport = (JasperReport) JRLoader.loadObject(subreportStream);
             log.info("Loaded einheit-summen.jasper template successfully");
         } catch (JRException e) {
-            log.error("Failed to compile JasperReports template: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to compile JasperReports template", e);
+            log.error("Failed to load JasperReports template: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to load JasperReports template", e);
         }
     }
 

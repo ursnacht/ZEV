@@ -40,27 +40,25 @@ public class RechnungPdfService {
     @PostConstruct
     public void init() {
         try {
-            // Compile main invoice template
+            // main invoice template
             InputStream reportStream = getClass().getResourceAsStream("/reports/rechnung.jasper");
             if (reportStream == null) {
                 throw new RuntimeException("Could not find rechnung.jasper template");
             }
-            //compiledReport = JasperCompileManager.compileReport(reportStream);
             compiledReport = (JasperReport) JRLoader.loadObject(reportStream);
-            log.info("Compiled rechnung.jasper template successfully");
+            log.info("Loaded rechnung.jasper template successfully");
 
-            // Compile QR-Bill sub-report template
+            // QR-Bill sub-report template
             InputStream qrStream = getClass().getResourceAsStream("/reports/qr-zahlteil.jasper");
             if (qrStream == null) {
                 throw new RuntimeException("Could not find qr-zahlteil.jasper template");
             }
-            //compiledQrReport = JasperCompileManager.compileReport(qrStream);
             compiledQrReport = (JasperReport) JRLoader.loadObject(qrStream);
-            log.info("Compiled qr-zahlteil.jasper template successfully");
+            log.info("Loaded qr-zahlteil.jasper template successfully");
 
         } catch (JRException e) {
-            log.error("Failed to compile JasperReports templates: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to compile JasperReports templates", e);
+            log.error("Failed to load JasperReports templates: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to load JasperReports templates", e);
         }
     }
 
