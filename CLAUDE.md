@@ -8,10 +8,18 @@ ZEV (Zusammenschluss zum Eigenverbrauch) is a solar power distribution applicati
 
 ## Prerequisites
 
-- Java 17+
+- Java 21
 - Maven 3.6+
 - Node.js 20.19.0+
 - Docker & Docker Compose
+
+## Tech Stack Versions
+
+- Spring Boot 3.5.6
+- Angular 21.1.0
+- TypeScript 5.9.3
+- Playwright 1.58.0 (E2E tests)
+- Jasmine 5.13.0 / Karma (unit tests)
 
 ## Build & Test Commands
 
@@ -246,15 +254,31 @@ Bei der Code-Generierung diese Dateien als Vorlage verwenden und deren Struktur 
 Feature specs are in `/Specs/`:
 - `SPEC.md` - Template for new feature specifications
 - `generell.md` - General requirements (i18n, design system, testing)
+- `Anleitung-keycloak.md` - Keycloak configuration guide
 - `Mandantenfähigkeit.md` - Multi-tenancy implementation
 - `Tarifverwaltung.md` - Tariff management
 - `Tarifverwaltung-Tarif-kopieren.md` - Copy tariff functionality
+- `TarifValidierung.md` - Tariff validation
 - `Quartale.md` - Quarterly periods management
 - `RechnungenGenerieren.md` - Invoice generation
+- `Einzahlungsschein.md` - Payment slip (Swiss QR Bill)
 - `Statistik.md` - Statistics and reporting
 - `Metriken.md` - Prometheus metrics integration
+- `Metriken-persistieren.md` - Metrics persistence
+- `Metrik_mit_Label.md` - Metrics with labels
 - `SpaltenbreiteVeränderbar.md` - Resizable table columns
-- `Anleitung-keycloak.md` - Keycloak configuration guide
+- `Mieterverwaltung.md` - Tenant management
+- `Einstellungen.md` - Settings
+- `Startseite.md` - Homepage
+- `Kebabmenü.md` - Kebab menu (row actions)
+- `Hamburgermenü.md` - Hamburger menu (navigation)
+- `Icons.md` - Icon system
+- `DeleteTranslations.md` - Translation deletion
+- `Messwerte-mit-KI.md` - AI-assisted measurement upload
+- `MQTT-SmartMeter.md` - MQTT smart meter integration
+- `RefactoringProducer.md` - Producer refactoring
+- `PDF-Bibliothek-Wechsel_Umsetzungsplan.md` - PDF library switch
+- `GCP-Deployment_Umsetzungsplan.md` - GCP deployment
 
 Specs with `_Umsetzungsplan` suffix contain implementation plans.
 
