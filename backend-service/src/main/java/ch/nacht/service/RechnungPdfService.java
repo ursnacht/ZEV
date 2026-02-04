@@ -31,7 +31,6 @@ public class RechnungPdfService {
     private final TranslationRepository translationRepository;
 
     private JasperReport compiledReport;
-    private JasperReport compiledQrReport;
 
     public RechnungPdfService(TranslationRepository translationRepository) {
         this.translationRepository = translationRepository;
@@ -47,15 +46,6 @@ public class RechnungPdfService {
             }
             compiledReport = (JasperReport) JRLoader.loadObject(reportStream);
             log.info("Loaded rechnung.jasper template successfully");
-
-            // QR-Bill sub-report template
-            InputStream qrStream = getClass().getResourceAsStream("/reports/qr-zahlteil.jasper");
-            if (qrStream == null) {
-                throw new RuntimeException("Could not find qr-zahlteil.jasper template");
-            }
-            compiledQrReport = (JasperReport) JRLoader.loadObject(qrStream);
-            log.info("Loaded qr-zahlteil.jasper template successfully");
-
         } catch (JRException e) {
             log.error("Failed to load JasperReports templates: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to load JasperReports templates", e);
@@ -79,7 +69,6 @@ public class RechnungPdfService {
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("RECHNUNG", rechnung);
         parameters.put("TRANSLATIONS", translations);
-        parameters.put("QR_SUBREPORT", compiledQrReport);
         parameters.put("QR_CODE_IMAGE", qrCodeStream);
 
         // TarifZeilen als DataSource für das Detail-Band

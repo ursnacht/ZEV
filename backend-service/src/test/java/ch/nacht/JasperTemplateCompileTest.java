@@ -20,15 +20,6 @@ class JasperTemplateCompileTest {
     }
 
     @Test
-    void testQrZahlteilTemplateCompiles() throws Exception {
-        InputStream stream = getClass().getResourceAsStream("/reports/qr-zahlteil.jrxml");
-        assertNotNull(stream, "qr-zahlteil.jrxml not found");
-        JasperReport report = JasperCompileManager.compileReport(stream);
-        assertNotNull(report);
-        System.out.println("qr-zahlteil.jrxml compiled successfully");
-    }
-
-    @Test
     void testStatistikTemplateCompiles() throws Exception {
         InputStream stream = getClass().getResourceAsStream("/reports/statistik.jrxml");
         assertNotNull(stream, "statistik.jrxml not found");
