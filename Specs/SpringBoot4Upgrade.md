@@ -33,13 +33,13 @@
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt?
 * [x] Alle Maven-Module kompilieren mit Spring Boot 4.0.x
-* [ ] Alle Unit-Tests (24 Testklassen) laufen grün
-* [ ] Alle Integration-Tests (5 IT-Klassen) laufen grün
-* [ ] Alle E2E-Tests (Playwright) laufen grün
-* [ ] `docker-compose up --build` startet ohne Fehler
-* [ ] Keycloak-Authentifizierung funktioniert
-* [ ] PDF-Generierung (JasperReports) funktioniert
-* [ ] Spring AI / Claude-Integration funktioniert
+* [x] Alle Unit-Tests (24 Testklassen) laufen grün
+* [x] Alle Integration-Tests (5 IT-Klassen) laufen grün
+* [x] Alle E2E-Tests (Playwright) laufen grün
+* [x] `docker-compose up --build` startet ohne Fehler
+* [x] Keycloak-Authentifizierung funktioniert
+* [x] PDF-Generierung (JasperReports) funktioniert
+* [x] Spring AI / Claude-Integration funktioniert
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 

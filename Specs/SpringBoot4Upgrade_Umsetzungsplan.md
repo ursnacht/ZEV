@@ -40,18 +40,18 @@ Upgrade der ZEV-Anwendung von Spring Boot 3.5.6 auf Spring Boot 4.0.x. Das Upgra
 
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
-| [x] | 1. Kompatibilitätsprüfung | Drittbibliotheken auf Spring Boot 4-Kompatibilität prüfen |
-| [x] | 2. Parent POM | Spring Boot Parent 3.5.6 → 4.0.1 |
-| [x] | 3. Backend Starter-Renames | `spring-boot-starter-web` → `webmvc`, `aop` → `aspectj`, `oauth2-resource-server` → `security-oauth2-resource-server` |
-| [x] | 4. Admin-Service Starter-Renames | `spring-boot-starter-web` → `webmvc`, Spring Boot Admin 4.0.0-M1 |
-| [x] | 5. Frontend-Service Starter-Renames | `spring-boot-starter-web` → `webmvc` |
-| [x] | 6. Test-Annotationen migrieren | `@MockBean` → `@MockitoBean` in 6 Controller-Tests |
-| [x] | 7. Jackson 3 Kompatibilität | `spring-boot-jackson2` Modul + `use-jackson2-defaults: true` |
-| [x] | 8. Spring AI aktualisieren | `spring-ai-anthropic-spring-boot-starter` 1.0.0-M6 → 2.0.0-RC2 |
-| [x] | 9. TestContainers vereinheitlichen | Alle auf 2.0.3, Artifact-Rename `testcontainers-postgresql`, Package-Rename |
-| [x] | 10. Kompilierung und Tests | 227/230 Tests grün. 3 Fehler in JasperTemplateCompileTest (JRXML-Templates müssen für JasperReports 7.x angepasst werden) |
-| [ ] | 11. Integrationstests | `mvn verify` — TestContainers-Tests prüfen |
-| [ ] | 12. Docker-Compose testen | `docker-compose up --build` — Gesamtstack validieren |
+| [x]    | 1. Kompatibilitätsprüfung | Drittbibliotheken auf Spring Boot 4-Kompatibilität prüfen |
+| [x]    | 2. Parent POM | Spring Boot Parent 3.5.6 → 4.0.1 |
+| [x]    | 3. Backend Starter-Renames | `spring-boot-starter-web` → `webmvc`, `aop` → `aspectj`, `oauth2-resource-server` → `security-oauth2-resource-server` |
+| [x]    | 4. Admin-Service Starter-Renames | `spring-boot-starter-web` → `webmvc`, Spring Boot Admin 4.0.0-M1 |
+| [x]    | 5. Frontend-Service Starter-Renames | `spring-boot-starter-web` → `webmvc` |
+| [x]    | 6. Test-Annotationen migrieren | `@MockBean` → `@MockitoBean` in 6 Controller-Tests |
+| [x]    | 7. Jackson 3 Kompatibilität | `spring-boot-jackson2` Modul + `use-jackson2-defaults: true` |
+| [x]    | 8. Spring AI aktualisieren | `spring-ai-anthropic-spring-boot-starter` 1.0.0-M6 → 2.0.0-RC2 |
+| [x]    | 9. TestContainers vereinheitlichen | Alle auf 2.0.3, Artifact-Rename `testcontainers-postgresql`, Package-Rename |
+| [x]    | 10. Kompilierung und Tests | 227/230 Tests grün. 3 Fehler in JasperTemplateCompileTest (JRXML-Templates müssen für JasperReports 7.x angepasst werden) |
+| [x]    | 11. Integrationstests | `mvn verify` — TestContainers-Tests prüfen |
+| [x]    | 12. Docker-Compose testen | `docker-compose up --build` — Gesamtstack validieren |
 
 ---
 
