@@ -7,7 +7,6 @@
     <!-- Parameters -->
     <parameter name="RECHNUNG" class="ch.nacht.dto.RechnungDTO"/>
     <parameter name="TRANSLATIONS" class="java.util.Map"/>
-    <parameter name="QR_SUBREPORT" class="net.sf.jasperreports.engine.JasperReport"/>
     <parameter name="QR_CODE_IMAGE" class="java.io.InputStream"/>
 
     <!-- Fields for TarifZeile detail band -->
@@ -167,14 +166,14 @@
     </detail>
 
     <!-- Last Page Footer - QR Payment Slip at bottom of last page -->
-    <lastPageFooter height="300">
+    <lastPageFooter height="250">
         <!-- Horizontal dashed line at top (scissors cut line) -->
         <element kind="line" uuid="11111111-1111-1111-1111-111111111140" x="-20" y="0" width="595" height="1">
             <pen lineWidth="0.5" lineStyle="Dashed"/>
         </element>
 
         <!-- Vertical dashed line between Empfangsschein and Zahlteil (at 62mm = 176pt from left edge) -->
-        <element kind="line" uuid="11111111-1111-1111-1111-111111111141" x="156" y="0" width="1" height="297">
+        <element kind="line" uuid="11111111-1111-1111-1111-111111111141" x="156" y="0" width="1" height="247">
             <pen lineWidth="0.5" lineStyle="Dashed"/>
         </element>
 
