@@ -3,13 +3,21 @@
     "allow": [
       "Bash(cat:*)",
       "Bash(npm run e2e:*)",
-      "Bash(npx playwright test:*)"
+      "Bash(npx playwright test:*)",
+      "WebSearch",
+      "WebFetch(domain:www.sdat-ch.ch)",
+      "WebFetch(domain:www.ebixhelp.ch)",
+      "WebFetch(domain:doc.smart-me.com)",
+      "WebFetch(domain:www.meonet.ch)",
+      "WebFetch(domain:wiki.smart-me.com)",
+      "WebFetch(domain:www.electrosuisse.ch)",
+      "WebFetch(domain:www.zevvy.org)"
     ],
     "deny": [],
     "ask": []
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "zev-db"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
