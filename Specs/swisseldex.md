@@ -68,11 +68,11 @@ swisseldex:
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   Swisseldex    │────▶│  SFTP Polling    │────▶│  ebIX Parser    │
-│   Datahub       │     │  (Scheduled)     │     │  (XML → Entity) │
+│   Swisseldex    │────>│  SFTP Polling   │────>│  ebIX Parser    │
+│   Datahub       │     │  (Scheduled)    │     │  (XML → Entity) │
 └─────────────────┘     └────────┬────────┘     └────────┬────────┘
-                                 │                        │
-                                 ▼                        ▼
+                                 │                       │
+                                 ▼                       ▼
                         ┌─────────────────┐     ┌─────────────────┐
                         │  Archivierung   │     │   messwerte     │
                         │  (Rohdaten XML) │     │  (Datenbank)    │
