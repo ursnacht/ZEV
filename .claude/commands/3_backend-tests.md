@@ -48,7 +48,7 @@ Dieser Skill arbeitet UNABHÄNGIG vom Kontext der aktuellen Session.
 
 ## Unit Tests (`*Test.java`)
 
-* **Tool:** JUnit 5 (Jupiter) mit AssertJ
+* **Tool:** JUnit 5 (Jupiter) mit Mockito
 * **Namenskonvention:** `*Test.java`
 * **Ausführung:** Maven Surefire Plugin (`mvn test`)
 * **Mocking:** Mockito für alle Abhängigkeiten
@@ -138,7 +138,7 @@ Beispiele:
 ### Hinweise
 - @SpringBootTest vermeiden - Spring Context minimieren
 - ArgumentCaptor für komplexe Validierungen
-- @MockBean sparsam einsetzen (deutet auf Architekturproblem hin)
+- `@MockitoBean` sparsam einsetzen (deutet auf Architekturproblem hin)
 - Post-Test Teardown: Testcontainer herunterfahren, Testdaten löschen
 
 ### Controller Test Struktur
@@ -149,7 +149,7 @@ package ch.nacht.controller;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -163,10 +163,10 @@ public class XxxControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private XxxService xxxService;
 
-    @MockBean
+    @MockitoBean
     private OrganizationContextService organizationContextService;
 
     private ObjectMapper objectMapper;

@@ -231,7 +231,7 @@ describe('XxxComponent', () => {
 * Tests im Watch-Mode (re-run bei Änderungen)
   * `npm.cmd test -- --watch=true`
 * Einzelne Test-Datei
-  * `npm.cmd test -- --include=**/tarif.service.spec.tsv`
+  * `npm.cmd test -- --include=**/tarif.service.spec.ts`
 * Mit Code-Coverage Report
   * `npm.cmd test -- --code-coverage --browsers=ChromeHeadless --watch=false`
 
