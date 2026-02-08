@@ -108,7 +108,7 @@ mvn test
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│ frontend-service│────▶│ backend-service │────▶│  admin-service  │
+│ frontend-service│────>│ backend-service │────>│  admin-service  │
 │   (Angular 21)  │     │ (Spring Boot)   │     │ (Spring Boot)   │
 └────────┬────────┘     └────────┬────────┘     └─────────────────┘
          │                       │
@@ -119,7 +119,7 @@ mvn test
 └─────────────────┘     └─────────────────┘
 
 ┌─────────────────┐     ┌─────────────────┐
-│   Prometheus    │────▶│     Grafana     │
+│   Prometheus    │────>│     Grafana     │
 │   (Metrics)     │     │  (Dashboards)   │
 └─────────────────┘     └─────────────────┘
 ```
