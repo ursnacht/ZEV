@@ -117,34 +117,152 @@ describe('XxxService', () => {
 
 ## Component Tests
 
-### Datei-Struktur (exakt einhalten)
+### List-Component Test (exakt einhalten)
 ```typescript
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { XxxComponent } from './xxx.component';
+import { XxxListComponent } from './xxx-list.component';
 import { XxxService } from '../../services/xxx.service';
 import { TranslationService } from '../../services/translation.service';
 import { of, throwError } from 'rxjs';
 
-describe('XxxComponent', () => {
-  let component: XxxComponent;
-  let fixture: ComponentFixture<XxxComponent>;
-  let xxxServiceSpy: jasmine.SpyObj<XxxService>;
+describe('XxxListComponent', () => {
+  let component: XxxListComponent;
+  let fixture: ComponentFixture<XxxListComponent>;
 
-  const mockData = { /* ... */ };
+  // Services IMMER als jasmine.SpyObj mocken
+  let xxxServiceSpy: jasmine.SpyObj<XxxService>;
+  let translationServiceSpy: jasmine.SpyObj<TranslationService>;
+
+  // Testdaten als Konstanten
+  const mockItems: Xxx[] = [
+    { id: 1, /* ... alle Properties */ },
+    { id: 2, /* ... alle Properties */ }
+  ];
 
   beforeEach(async () => {
-    xxxServiceSpy = jasmine.createSpyObj('XxxService', ['getAll', 'create', 'update', 'delete']);
-    xxxServiceSpy.getAll.and.returnValue(of([]));
+    // SpyObj mit ALLEN Methoden die im Component verwendet werden
+    xxxServiceSpy = jasmine.createSpyObj('XxxService', [
+      'getAllXxx', 'createXxx', 'updateXxx', 'deleteXxx'
+    ]);
+    xxxServiceSpy.getAllXxx.and.returnValue(of(mockItems));
+    xxxServiceSpy.createXxx.and.returnValue(of(mockItems[0]));
+    xxxServiceSpy.updateXxx.and.returnValue(of(mockItems[0]));
+    xxxServiceSpy.deleteXxx.and.returnValue(of(void 0));
 
+    // TranslationService: translate gibt Key zurück
+    translationServiceSpy = jasmine.createSpyObj('TranslationService', ['translate']);
+    translationServiceSpy.translate.and.callFake((key: string) => key);
+
+    // Standalone Component wird in imports importiert (NICHT in declarations)
     await TestBed.configureTestingModule({
-      imports: [XxxComponent],
+      imports: [XxxListComponent],
       providers: [
         { provide: XxxService, useValue: xxxServiceSpy },
+        { provide: TranslationService, useValue: translationServiceSpy }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(XxxListComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+
+  // Test-Gruppen: initialization → CRUD → sorting → messages
+
+  describe('initialization', () => {
+    it('should load items on init', () => {
+      expect(xxxServiceSpy.getAllXxx).toHaveBeenCalled();
+      expect(component.items.length).toBe(2);
+    });
+  });
+
+  describe('onCreateNew', () => {
+    it('should set showForm to true and selectedItem to null', () => {
+      component.onCreateNew();
+      expect(component.showForm).toBeTrue();
+      expect(component.selectedItem).toBeNull();
+    });
+  });
+
+  describe('onEdit', () => {
+    it('should set showForm to true with copied item', () => {
+      component.onEdit(mockItems[0]);
+      expect(component.showForm).toBeTrue();
+      expect(component.selectedItem).toEqual(mockItems[0]);
+      expect(component.selectedItem).not.toBe(mockItems[0]); // Kopie, nicht Referenz
+    });
+  });
+
+  describe('onFormSubmit', () => {
+    it('should call create for new item', () => {
+      const newItem = { /* ... ohne id */ } as Xxx;
+      component.onFormSubmit(newItem);
+      expect(xxxServiceSpy.createXxx).toHaveBeenCalledWith(newItem);
+    });
+
+    it('should call update for existing item', () => {
+      component.onFormSubmit(mockItems[0]);
+      expect(xxxServiceSpy.updateXxx).toHaveBeenCalledWith(mockItems[0].id, mockItems[0]);
+    });
+
+    it('should show error message on failure', () => {
+      xxxServiceSpy.createXxx.and.returnValue(throwError(() => ({ error: 'Fehler' })));
+      component.onFormSubmit({ /* ... ohne id */ } as Xxx);
+      expect(component.messageType).toBe('error');
+    });
+  });
+
+  describe('onDelete', () => {
+    it('should call delete and reload', () => {
+      spyOn(window, 'confirm').and.returnValue(true);
+      component.onDelete(1);
+      expect(xxxServiceSpy.deleteXxx).toHaveBeenCalledWith(1);
+    });
+
+    it('should not call delete when cancelled', () => {
+      spyOn(window, 'confirm').and.returnValue(false);
+      component.onDelete(1);
+      expect(xxxServiceSpy.deleteXxx).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('messages', () => {
+    it('should auto-dismiss success message after 5s', fakeAsync(() => {
+      component.showForm = false;
+      xxxServiceSpy.deleteXxx.and.returnValue(of(void 0));
+      spyOn(window, 'confirm').and.returnValue(true);
+      component.onDelete(1);
+      expect(component.message).not.toBe('');
+      tick(5000);
+      expect(component.message).toBe('');
+    }));
+  });
+});
+```
+
+### Form-Component Test (exakt einhalten)
+```typescript
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { XxxFormComponent } from './xxx-form.component';
+import { TranslationService } from '../../services/translation.service';
+
+describe('XxxFormComponent', () => {
+  let component: XxxFormComponent;
+  let fixture: ComponentFixture<XxxFormComponent>;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [XxxFormComponent],
+      providers: [
         { provide: TranslationService, useValue: { translate: (k: string) => k } }
       ]
     }).compileComponents();
 
-    fixture = TestBed.createComponent(XxxComponent);
+    fixture = TestBed.createComponent(XxxFormComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
@@ -154,20 +272,64 @@ describe('XxxComponent', () => {
   });
 
   describe('initialization', () => {
-    it('should load data on init', () => {
-      expect(xxxServiceSpy.getAll).toHaveBeenCalled();
+    it('should set default values when no input', () => {
+      expect(component.formData).toBeDefined();
+      // Prüfe Default-Werte
+    });
+
+    it('should copy input data when provided', () => {
+      const input = { id: 1, /* ... */ };
+      component.item = input;
+      component.ngOnInit();
+      expect(component.formData).toEqual(input);
+      expect(component.formData).not.toBe(input); // Kopie
     });
   });
 
-  describe('methodName', () => {
-    it('should description', () => {
-      // Arrange
-      // Act
-      // Assert
+  describe('isFormValid', () => {
+    it('should return false when required field empty', () => {
+      component.formData = { /* leere Felder */ } as Xxx;
+      expect(component.isFormValid()).toBeFalse();
+    });
+
+    it('should return true when all required fields filled', () => {
+      component.formData = { /* alle Felder */ };
+      expect(component.isFormValid()).toBeTrue();
+    });
+  });
+
+  describe('events', () => {
+    it('should emit save on valid submit', () => {
+      spyOn(component.save, 'emit');
+      component.formData = { /* gültige Daten */ };
+      component.onSubmit();
+      expect(component.save.emit).toHaveBeenCalledWith(component.formData);
+    });
+
+    it('should not emit save on invalid submit', () => {
+      spyOn(component.save, 'emit');
+      component.formData = { /* ungültige Daten */ } as Xxx;
+      component.onSubmit();
+      expect(component.save.emit).not.toHaveBeenCalled();
+    });
+
+    it('should emit cancel', () => {
+      spyOn(component.cancel, 'emit');
+      component.onCancel();
+      expect(component.cancel.emit).toHaveBeenCalled();
     });
   });
 });
 ```
+
+**Verbindliche Regeln für Component-Tests:**
+* Standalone Components in `imports` (nicht `declarations`)
+* Services als `jasmine.createSpyObj` mit ALLEN verwendeten Methoden
+* TranslationService-Mock: `translate: (k: string) => k` (gibt Key zurück)
+* Testdaten als `const` oben im describe-Block
+* Prüfe dass `onEdit` eine Kopie erstellt (nicht die Referenz)
+* Teste Success- und Error-Pfade bei CRUD-Operationen
+* `fakeAsync`/`tick` für setTimeout-Tests (Message auto-dismiss)
 
 ### Naming-Konvention für describe/it Blöcke
 

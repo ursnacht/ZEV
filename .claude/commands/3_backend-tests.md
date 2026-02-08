@@ -61,8 +61,11 @@ Dieser Skill arbeitet UNABHÄNGIG vom Kontext der aktuellen Session.
 package ch.nacht.service;
 
 // 1. Projekt-Imports (alphabetisch)
-import ch.nacht.entity....;
-import ch.nacht.repository....;
+import ch.nacht.entity.[Entity];
+import ch.nacht.repository.[Entity]Repository;
+import ch.nacht.service.[Entity]Service;
+import ch.nacht.service.HibernateFilterService;
+import ch.nacht.service.OrganizationContextService;
 
 // 2. JUnit/Mockito-Imports
 import org.junit.jupiter.api.BeforeEach;
@@ -81,36 +84,120 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class XxxServiceTest {
+public class [Entity]ServiceTest {
 
     @Mock
-    private XxxRepository xxxRepository;
+    private [Entity]Repository [entity]Repository;
+
+    // IMMER mocken - Multi-Tenancy Dependencies
+    @Mock
+    private OrganizationContextService organizationContextService;
+
+    @Mock
+    private HibernateFilterService hibernateFilterService;
 
     @InjectMocks
-    private XxxService xxxService;
+    private [Entity]Service [entity]Service;
 
-    private Xxx testEntity;
+    // Testdaten als Instanzvariablen
+    private [Entity] test[Entity]1;
+    private [Entity] test[Entity]2;
 
     @BeforeEach
     void setUp() {
-        testEntity = new Xxx(...);
-        testEntity.setId(1L);
+        // Testdaten initialisieren mit allen Pflichtfeldern
+        test[Entity]1 = new [Entity]();
+        test[Entity]1.setId(1L);
+        test[Entity]1.setOrgId(UUID.randomUUID());
+        // ... weitere Felder
+
+        test[Entity]2 = new [Entity]();
+        test[Entity]2.setId(2L);
+        test[Entity]2.setOrgId(test[Entity]1.getOrgId());
+        // ... weitere Felder
+    }
+
+    // Test-Reihenfolge: getAll → getById → save → delete → Business-Logic
+
+    @Test
+    void getAll[Entities]_ReturnsList() {
+        // Arrange
+        when([entity]Repository.findAllByOrderBy...()).thenReturn(List.of(test[Entity]1, test[Entity]2));
+
+        // Act
+        List<[Entity]> result = [entity]Service.getAll[Entities]();
+
+        // Assert
+        assertEquals(2, result.size());
+        verify(hibernateFilterService).enableOrgFilter();
+        verify([entity]Repository).findAllByOrderBy...();
     }
 
     @Test
-    void methodName_Scenario_ExpectedResult() {
-        // Arrange
-        when(repository.method()).thenReturn(...);
+    void get[Entity]ById_Found_Returns[Entity]() {
+        when([entity]Repository.findById(1L)).thenReturn(Optional.of(test[Entity]1));
+
+        Optional<[Entity]> result = [entity]Service.get[Entity]ById(1L);
+
+        assertTrue(result.isPresent());
+        verify(hibernateFilterService).enableOrgFilter();
+    }
+
+    @Test
+    void get[Entity]ById_NotFound_ReturnsEmpty() {
+        when([entity]Repository.findById(99L)).thenReturn(Optional.empty());
+
+        Optional<[Entity]> result = [entity]Service.get[Entity]ById(99L);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void save[Entity]_ValidNew[Entity]_SavesSuccessfully() {
+        // Arrange - neue Entity (ohne ID)
+        [Entity] new[Entity] = new [Entity]();
+        // ... Felder setzen
+        UUID orgId = UUID.randomUUID();
+        when(organizationContextService.getCurrentOrgId()).thenReturn(orgId);
+        when([entity]Repository.save(any())).thenReturn(test[Entity]1);
 
         // Act
-        Result result = service.method();
+        [Entity] result = [entity]Service.save[Entity](new[Entity]);
 
         // Assert
         assertNotNull(result);
-        verify(repository).method();
+        verify(organizationContextService).getCurrentOrgId();
+        verify([entity]Repository).save(any());
+    }
+
+    @Test
+    void delete[Entity]_Exists_ReturnsTrue() {
+        when([entity]Repository.existsById(1L)).thenReturn(true);
+
+        boolean result = [entity]Service.delete[Entity](1L);
+
+        assertTrue(result);
+        verify([entity]Repository).deleteById(1L);
+    }
+
+    @Test
+    void delete[Entity]_NotExists_ReturnsFalse() {
+        when([entity]Repository.existsById(99L)).thenReturn(false);
+
+        boolean result = [entity]Service.delete[Entity](99L);
+
+        assertFalse(result);
+        verify([entity]Repository, never()).deleteById(any());
     }
 }
 ```
+
+**Verbindliche Regeln für Service-Tests:**
+* `OrganizationContextService` und `HibernateFilterService` IMMER als `@Mock` deklarieren
+* `verify(hibernateFilterService).enableOrgFilter()` in Tests prüfen
+* Für neue Entities: `verify(organizationContextService).getCurrentOrgId()` prüfen
+* Zwei Testdaten-Objekte in `@BeforeEach` initialisieren
+* Arrange/Act/Assert Struktur in jedem Test
 
 ### Naming-Konvention für Test-Methoden
 ```
