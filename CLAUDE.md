@@ -367,8 +367,8 @@ Bei der Code-Generierung diese Dateien als Vorlage verwenden und deren Struktur 
 ## Specifications
 
 Feature specs are in `/Specs/`:
-- `SPEC.md` - Template for new feature specifications
-- `generell.md` - General requirements (i18n, design system, testing)
+- `SPEC.md` - Template for new feature specifications (8 sections: Ziel & Kontext, Funktionale Anforderungen, Akzeptanzkriterien, NFR, Edge Cases, Abhängigkeiten & betroffene Funktionalität, Abgrenzung, Offene Fragen)
+- `generell.md` - General requirements (i18n, design system, multi-tenancy, error handling, code templates, testing)
 - `Mandantenfähigkeit.md` - Multi-tenancy implementation
 - `Tarifverwaltung.md` - Tariff management
 - `Tarifverwaltung-Tarif-kopieren.md` - Copy tariff functionality
