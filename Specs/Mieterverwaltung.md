@@ -28,12 +28,12 @@
 * Vorlage für Layout: Tarifverwaltung
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
-* [ ] Die Mieterverwaltung ist aus dem Menü mit der Rolle "zev_admin" aufrufbar
-* [ ] Mieter können erfasst, bearbeitet und gelöscht werden (Kebabmenü)
-* [ ] Falls "Mietende" erfasst ist, muss dieses nach dem "Mietbeginn" liegen
-* [ ] Die Zeitspannen von mehreren Mietern der gleichen Einheiten dürfen sich nicht überschneiden. 
-* [ ] Nur der Mieter mit dem jüngsten Mietbeginn einer Einheit darf kein Mietende haben (aktueller Mieter). Die andern Mieter müssen ein Mietend haben.
-* [ ] Bei einem Mieterwechsel innerhalb eines Quartals, muss für jeden Mieter eine Quartalsrechnung erstellt werden.
+* [x] Die Mieterverwaltung ist aus dem Menü mit der Rolle "zev_admin" aufrufbar
+* [x] Mieter können erfasst, bearbeitet und gelöscht werden (Kebabmenü)
+* [x] Falls "Mietende" erfasst ist, muss dieses nach dem "Mietbeginn" liegen
+* [x] Die Zeitspannen von mehreren Mietern der gleichen Einheiten dürfen sich nicht überschneiden.
+* [x] Nur der Mieter mit dem jüngsten Mietbeginn einer Einheit darf kein Mietende haben (aktueller Mieter). Die andern Mieter müssen ein Mietend haben.
+* [x] Bei einem Mieterwechsel innerhalb eines Quartals, muss für jeden Mieter eine Quartalsrechnung erstellt werden.
 
 
 ## 3. Nicht-funktionale Anforderungen (NFR)
