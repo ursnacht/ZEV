@@ -63,7 +63,8 @@ Für jedes Akzeptanzkriterium systematisch prüfen:
 - `@Filter` / `@FilterDef` auf Entity?
 
 ### Phase 3: Ergebnis-Bericht
-Erstelle einen Bericht im folgenden Format:
+* Erstelle eine neue Datei: `[Spec-Name]_Akzeptanzkriterien-Check.md` im gleichen Verzeichnis (/Specs/) mit einem
+  Bericht im folgenden Format:
 
 ```markdown
 # Akzeptanzkriterien-Check: [Feature-Name]

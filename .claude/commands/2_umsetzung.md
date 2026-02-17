@@ -3,7 +3,7 @@
 Setze einen Umsetzungsplan schrittweise um.
 
 ## Input
-* Umsetzungsplan: $ARGUMENTS (z.B. `Specs/Tarifverwaltung_Umsetzungsplan.md` oder kurz `Tarifverwaltung`)
+* Umsetzungsplan: $ARGUMENTS (z.B. `Specs/Mieterverwaltung_Umsetzungsplan.md` oder kurz `Mieterverwaltung`)
 
 ## Vorgehen
 1. **Lies den Umsetzungsplan** - Verstehe alle Phasen und deren Status
