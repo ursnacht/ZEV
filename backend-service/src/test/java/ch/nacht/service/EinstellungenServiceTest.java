@@ -187,6 +187,19 @@ public class EinstellungenServiceTest {
         assertTrue(exception.getMessage().contains("Error reading settings from JSON"));
     }
 
+    @Test
+    void getEinstellungenOrThrow_OrganisationNichtGefunden_ThrowsIllegalStateException() {
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(organisationRepository.findById(testOrgId)).thenReturn(Optional.empty());
+
+        IllegalStateException exception = assertThrows(
+            IllegalStateException.class,
+            () -> einstellungenService.getEinstellungenOrThrow()
+        );
+
+        assertTrue(exception.getMessage().contains("nicht konfiguriert"));
+    }
+
     // ==================== Multi-Tenant Isolation Tests ====================
 
     @Test
@@ -198,6 +211,26 @@ public class EinstellungenServiceTest {
         when(organisationRepository.findById(orgId1)).thenReturn(Optional.empty());
 
         einstellungenService.getEinstellungen();
+
+        verify(organisationRepository).findById(orgId1);
+        verify(organisationRepository, never()).findById(orgId2);
+    }
+
+    @Test
+    void saveEinstellungen_VerwendetCurrentOrgId() {
+        Long orgId1 = 1L;
+        Long orgId2 = 2L;
+
+        when(organizationContextService.getCurrentOrgId()).thenReturn(orgId1);
+        when(organisationRepository.findById(orgId1)).thenReturn(Optional.of(testOrganisation));
+        when(organisationRepository.save(any(Organisation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        RechnungKonfigurationDTO.StellerDTO steller = new RechnungKonfigurationDTO.StellerDTO(
+            "Test", "Strasse 1", "1000", "Ort"
+        );
+        EinstellungenDTO dto = new EinstellungenDTO(null, new RechnungKonfigurationDTO("30 Tage", "CH7006300016946459910", steller));
+
+        einstellungenService.saveEinstellungen(dto);
 
         verify(organisationRepository).findById(orgId1);
         verify(organisationRepository, never()).findById(orgId2);

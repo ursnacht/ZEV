@@ -239,6 +239,81 @@ public class EinstellungenControllerTest {
     }
 
     @Test
+    void saveEinstellungen_MissingStellerStrasse_ReturnsBadRequest() throws Exception {
+        String json = """
+            {
+                "rechnung": {
+                    "zahlungsfrist": "30 Tage",
+                    "iban": "CH7006300016946459910",
+                    "steller": {
+                        "name": "Urs Nacht",
+                        "strasse": "",
+                        "plz": "3044",
+                        "ort": "Innerberg"
+                    }
+                }
+            }
+            """;
+
+        mockMvc.perform(put("/api/einstellungen")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json))
+            .andExpect(status().isBadRequest());
+
+        verify(einstellungenService, never()).saveEinstellungen(any());
+    }
+
+    @Test
+    void saveEinstellungen_MissingStellerPlz_ReturnsBadRequest() throws Exception {
+        String json = """
+            {
+                "rechnung": {
+                    "zahlungsfrist": "30 Tage",
+                    "iban": "CH7006300016946459910",
+                    "steller": {
+                        "name": "Urs Nacht",
+                        "strasse": "Hangstrasse 14a",
+                        "plz": "",
+                        "ort": "Innerberg"
+                    }
+                }
+            }
+            """;
+
+        mockMvc.perform(put("/api/einstellungen")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json))
+            .andExpect(status().isBadRequest());
+
+        verify(einstellungenService, never()).saveEinstellungen(any());
+    }
+
+    @Test
+    void saveEinstellungen_MissingStellerOrt_ReturnsBadRequest() throws Exception {
+        String json = """
+            {
+                "rechnung": {
+                    "zahlungsfrist": "30 Tage",
+                    "iban": "CH7006300016946459910",
+                    "steller": {
+                        "name": "Urs Nacht",
+                        "strasse": "Hangstrasse 14a",
+                        "plz": "3044",
+                        "ort": ""
+                    }
+                }
+            }
+            """;
+
+        mockMvc.perform(put("/api/einstellungen")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json))
+            .andExpect(status().isBadRequest());
+
+        verify(einstellungenService, never()).saveEinstellungen(any());
+    }
+
+    @Test
     void saveEinstellungen_JsonConversionError_ReturnsBadRequest() throws Exception {
         when(einstellungenService.saveEinstellungen(any(EinstellungenDTO.class)))
             .thenThrow(new IllegalArgumentException("Error converting settings to JSON"));
