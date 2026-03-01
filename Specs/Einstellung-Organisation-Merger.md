@@ -47,16 +47,16 @@
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
-* [ ] Die Tabelle `zev.einstellungen` existiert nach der Migration nicht mehr.
-* [ ] Die Tabelle `zev.organisation` besitzt die Spalte `konfiguration JSONB` (nullable).
-* [ ] Bestehende Einstellungs-Daten sind nach der Migration korrekt in `organisation.konfiguration` vorhanden — keine Daten gehen verloren.
-* [ ] `GET /api/einstellungen` liefert `200 OK` mit korrekten Daten für einen Mandanten, dessen Einstellungen konfiguriert sind.
-* [ ] `GET /api/einstellungen` liefert `204 No Content` für einen Mandanten ohne Einstellungen (`konfiguration IS NULL`).
-* [ ] `PUT /api/einstellungen` speichert die Einstellungen korrekt in `organisation.konfiguration`.
-* [ ] Die Klassen `Einstellungen.java` und `EinstellungenRepository.java` existieren nicht mehr im Backend.
-* [ ] `EinstellungenService` verwendet `OrganisationRepository`, nicht `EinstellungenRepository`.
-* [ ] Alle Backend-Unit-Tests laufen grün (`mvn test`).
-* [ ] Das Frontend verhält sich identisch wie vor dem Merge — keine sichtbaren Änderungen.
+* [x] Die Tabelle `zev.einstellungen` existiert nach der Migration nicht mehr.
+* [x] Die Tabelle `zev.organisation` besitzt die Spalte `konfiguration JSONB` (nullable).
+* [x] Bestehende Einstellungs-Daten sind nach der Migration korrekt in `organisation.konfiguration` vorhanden — keine Daten gehen verloren.
+* [x] `GET /api/einstellungen` liefert `200 OK` mit korrekten Daten für einen Mandanten, dessen Einstellungen konfiguriert sind.
+* [x] `GET /api/einstellungen` liefert `204 No Content` für einen Mandanten ohne Einstellungen (`konfiguration IS NULL`).
+* [x] `PUT /api/einstellungen` speichert die Einstellungen korrekt in `organisation.konfiguration`.
+* [x] Die Klassen `Einstellungen.java` und `EinstellungenRepository.java` existieren nicht mehr im Backend.
+* [x] `EinstellungenService` verwendet `OrganisationRepository`, nicht `EinstellungenRepository`.
+* [x] Alle Backend-Unit-Tests laufen grün (`mvn test`).
+* [x] Das Frontend verhält sich identisch wie vor dem Merge — keine sichtbaren Änderungen.
 
 ---
 
