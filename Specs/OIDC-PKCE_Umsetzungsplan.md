@@ -31,10 +31,10 @@ Der Keycloak-Client `zev-frontend` erzwingt PKCE aktuell nicht serverseitig — 
 
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
-| [ ] | 1. docker-compose.yml | `--import-realm` aktivieren und `--features=organization` ergänzen |
-| [ ] | 2. Realm-Export: PKCE-Enforcement | `pkce.code.challenge.method: S256` im `zev-frontend`-Client setzen, unnötige Flows deaktivieren, `webOrigins` einschränken |
-| [ ] | 3. Realm-Export: Client Scopes | Standard-Client-Scopes (`profile`, `openid`) und optionalen Scope `organization` konfigurieren |
-| [ ] | 4. Frontend: PKCE-Konfiguration | `pkceMethod: 'S256'` und scope `openid profile organization` in `app.config.ts` |
+| [x] | 1. docker-compose.yml | `--import-realm` aktivieren und `--features=organization` ergänzen |
+| [x] | 2. Realm-Export: PKCE-Enforcement | `pkce.code.challenge.method: S256` im `zev-frontend`-Client setzen, unnötige Flows deaktivieren, `webOrigins` einschränken |
+| [x] | 3. Realm-Export: Client Scopes | Standard-Client-Scopes (`profile`, `openid`) und optionalen Scope `organization` konfigurieren |
+| [x] | 4. Frontend: PKCE-Konfiguration | `pkceMethod: 'S256'` und scope `openid profile organization` in `app.config.ts` |
 | [ ] | 5. Manuelle Verifikation | Login-Flow testen, Browser-Netzwerk-Tab prüfen, PKCE-Ablehnung ohne `code_challenge` verifizieren |
 
 ---

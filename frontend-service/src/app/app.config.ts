@@ -27,7 +27,8 @@ export const appConfig: ApplicationConfig = {
             initOptions: {
                 onLoad: 'login-required',
                 checkLoginIframe: false,
-                scope: 'openid organization'
+                pkceMethod: 'S256',
+                scope: 'openid profile organization'
             }
         }),
         {

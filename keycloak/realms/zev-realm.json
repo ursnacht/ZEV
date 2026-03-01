@@ -6,11 +6,28 @@
             "clientId": "zev-frontend",
             "enabled": true,
             "publicClient": true,
+            "standardFlowEnabled": true,
+            "implicitFlowEnabled": false,
+            "directAccessGrantsEnabled": false,
+            "serviceAccountsEnabled": false,
             "redirectUris": [
                 "http://localhost:4200/*"
             ],
             "webOrigins": [
-                "*"
+                "http://localhost:4200"
+            ],
+            "attributes": {
+                "pkce.code.challenge.method": "S256"
+            },
+            "defaultClientScopes": [
+                "openid",
+                "profile",
+                "email",
+                "roles",
+                "web-origins"
+            ],
+            "optionalClientScopes": [
+                "organization"
             ]
         }
     ],

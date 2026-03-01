@@ -36,7 +36,8 @@ services:
       KC_DB_PASSWORD: postgres
     command:
       - start-dev
-#      - --import-realm
+      - --import-realm
+      - --features=organization
     ports:
       - "9000:9000"
     depends_on:
