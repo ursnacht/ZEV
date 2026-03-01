@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Service for managing tenant-specific settings.
@@ -40,7 +39,7 @@ public class EinstellungenService {
      */
     @Transactional(readOnly = true)
     public EinstellungenDTO getEinstellungen() {
-        UUID orgId = organizationContextService.getCurrentOrgId();
+        Long orgId = organizationContextService.getCurrentOrgId();
         log.debug("Getting settings for org: {}", orgId);
 
         Optional<Einstellungen> einstellungen = einstellungenRepository.findByOrgId(orgId);
@@ -71,7 +70,7 @@ public class EinstellungenService {
      */
     @Transactional
     public EinstellungenDTO saveEinstellungen(EinstellungenDTO dto) {
-        UUID orgId = organizationContextService.getCurrentOrgId();
+        Long orgId = organizationContextService.getCurrentOrgId();
         log.info("Saving settings for org: {}", orgId);
 
         String konfigurationJson = toJson(dto.getRechnung());

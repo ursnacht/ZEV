@@ -22,7 +22,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
+
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -49,11 +49,11 @@ public class MesswerteServiceTest {
 
     private Einheit consumerEinheit;
     private Einheit producerEinheit;
-    private UUID testOrgId;
+    private Long testOrgId;
 
     @BeforeEach
     void setUp() {
-        testOrgId = UUID.randomUUID();
+        testOrgId = 1L;
 
         consumerEinheit = new Einheit("Wohnung A", EinheitTyp.CONSUMER);
         consumerEinheit.setId(1L);

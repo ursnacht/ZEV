@@ -2,6 +2,7 @@ package ch.nacht.controller;
 
 import ch.nacht.entity.Mieter;
 import ch.nacht.service.MieterService;
+import ch.nacht.service.OrganisationService;
 import ch.nacht.service.OrganizationContextService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -39,6 +40,9 @@ public class MieterControllerTest {
 
     @MockitoBean
     private OrganizationContextService organizationContextService;
+
+    @MockitoBean
+    private OrganisationService organisationService;
 
     private ObjectMapper objectMapper;
 

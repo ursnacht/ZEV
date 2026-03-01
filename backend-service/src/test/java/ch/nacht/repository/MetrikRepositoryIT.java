@@ -2,6 +2,7 @@ package ch.nacht.repository;
 
 import ch.nacht.AbstractIntegrationTest;
 import ch.nacht.entity.Metrik;
+import ch.nacht.entity.Organisation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +10,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,12 +27,26 @@ class MetrikRepositoryIT extends AbstractIntegrationTest {
     @Autowired
     private MetrikRepository metrikRepository;
 
-    private static final UUID TEST_ORG_ID = UUID.fromString("c2c9ba74-de18-4491-9489-8185629edd93");
-    private static final UUID OTHER_ORG_ID = UUID.fromString("d3d0cb85-ef29-5502-0590-9296730fee04");
+    @Autowired
+    private OrganisationRepository organisationRepository;
+
+    private Long TEST_ORG_ID;
+    private Long OTHER_ORG_ID;
 
     @BeforeEach
     void setUp() {
         metrikRepository.deleteAll();
+        Organisation org1 = new Organisation();
+        org1.setKeycloakOrgId(UUID.fromString("c2c9ba74-de18-4491-9489-8185629edd93"));
+        org1.setName("Test Organisation 1");
+        org1.setErstelltAm(LocalDateTime.now());
+        TEST_ORG_ID = organisationRepository.save(org1).getId();
+
+        Organisation org2 = new Organisation();
+        org2.setKeycloakOrgId(UUID.fromString("d3d0cb85-ef29-5502-0590-9296730fee04"));
+        org2.setName("Test Organisation 2");
+        org2.setErstelltAm(LocalDateTime.now());
+        OTHER_ORG_ID = organisationRepository.save(org2).getId();
     }
 
     @Test

@@ -6,6 +6,7 @@ import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.service.EinheitMatchingService;
 import ch.nacht.service.EinheitService;
+import ch.nacht.service.OrganisationService;
 import ch.nacht.service.OrganizationContextService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,9 @@ public class EinheitControllerTest {
 
     @MockitoBean
     private OrganizationContextService organizationContextService;
+
+    @MockitoBean
+    private OrganisationService organisationService;
 
     @Autowired
     private ObjectMapper objectMapper;

@@ -4,6 +4,7 @@ import ch.nacht.AbstractIntegrationTest;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Messwerte;
+import ch.nacht.entity.Organisation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,7 +36,10 @@ class MesswerteRepositoryIT extends AbstractIntegrationTest {
     @Autowired
     private EinheitRepository einheitRepository;
 
-    private static final UUID TEST_ORG_ID = UUID.fromString("c2c9ba74-de18-4491-9489-8185629edd93");
+    @Autowired
+    private OrganisationRepository organisationRepository;
+
+    private Long TEST_ORG_ID;
 
     private Einheit producer;
     private Einheit consumer1;
@@ -43,9 +47,14 @@ class MesswerteRepositoryIT extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // Clean up
+        // Clean up (FK-Reihenfolge beachten: messwerte → einheit, dann Organisation anlegen)
         messwerteRepository.deleteAll();
         einheitRepository.deleteAll();
+        Organisation org = new Organisation();
+        org.setKeycloakOrgId(UUID.fromString("c2c9ba74-de18-4491-9489-8185629edd93"));
+        org.setName("Test Organisation");
+        org.setErstelltAm(LocalDateTime.now());
+        TEST_ORG_ID = organisationRepository.save(org).getId();
 
         // Create test units with org_id
         producer = createEinheit("Solaranlage", EinheitTyp.PRODUCER);

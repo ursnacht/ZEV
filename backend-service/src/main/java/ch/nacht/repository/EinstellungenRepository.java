@@ -5,7 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Repository for Einstellungen entities.
@@ -19,5 +18,5 @@ public interface EinstellungenRepository extends JpaRepository<Einstellungen, Lo
      * @param orgId The organization (tenant) ID
      * @return Optional containing the settings if found
      */
-    Optional<Einstellungen> findByOrgId(UUID orgId);
+    Optional<Einstellungen> findByOrgId(Long orgId);
 }

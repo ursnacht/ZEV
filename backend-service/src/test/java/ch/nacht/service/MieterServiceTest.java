@@ -15,7 +15,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
+
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -39,11 +39,11 @@ public class MieterServiceTest {
     private MieterService mieterService;
 
     private Mieter testMieter;
-    private UUID testOrgId;
+    private Long testOrgId;
 
     @BeforeEach
     void setUp() {
-        testOrgId = UUID.randomUUID();
+        testOrgId = 1L;
 
         testMieter = new Mieter("Max Muster", LocalDate.of(2024, 1, 1), 1L);
         testMieter.setId(1L);

@@ -3,6 +3,7 @@ package ch.nacht.repository;
 import ch.nacht.AbstractIntegrationTest;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
+import ch.nacht.entity.Organisation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +11,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -27,11 +29,19 @@ class EinheitRepositoryIT extends AbstractIntegrationTest {
     @Autowired
     private EinheitRepository einheitRepository;
 
-    private static final UUID TEST_ORG_ID = UUID.fromString("c2c9ba74-de18-4491-9489-8185629edd93");
+    @Autowired
+    private OrganisationRepository organisationRepository;
+
+    private Long TEST_ORG_ID;
 
     @BeforeEach
     void setUp() {
         einheitRepository.deleteAll();
+        Organisation org = new Organisation();
+        org.setKeycloakOrgId(UUID.fromString("c2c9ba74-de18-4491-9489-8185629edd93"));
+        org.setName("Test Organisation");
+        org.setErstelltAm(LocalDateTime.now());
+        TEST_ORG_ID = organisationRepository.save(org).getId();
     }
 
     private Einheit createEinheit(String name, EinheitTyp typ) {

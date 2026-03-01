@@ -1,6 +1,7 @@
 package ch.nacht.controller;
 
 import ch.nacht.entity.Translation;
+import ch.nacht.service.OrganisationService;
 import ch.nacht.service.OrganizationContextService;
 import ch.nacht.service.TranslationService;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,9 @@ class TranslationControllerTest {
 
     @MockitoBean
     private OrganizationContextService organizationContextService;
+
+    @MockitoBean
+    private OrganisationService organisationService;
 
     @Test
     void shouldDeleteTranslationWithDotsInKey() throws Exception {

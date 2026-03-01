@@ -13,7 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
-import java.util.UUID;
+
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,13 +31,13 @@ public class EinstellungenServiceTest {
     @InjectMocks
     private EinstellungenService einstellungenService;
 
-    private UUID testOrgId;
+    private Long testOrgId;
     private Einstellungen testEinstellungen;
     private String validKonfigurationJson;
 
     @BeforeEach
     void setUp() {
-        testOrgId = UUID.randomUUID();
+        testOrgId = 1L;
         validKonfigurationJson = """
             {"zahlungsfrist":"30 Tage","iban":"CH7006300016946459910","steller":{"name":"Urs Nacht","strasse":"Hangstrasse 14a","plz":"3044","ort":"Innerberg"}}""";
 
@@ -199,8 +199,8 @@ public class EinstellungenServiceTest {
 
     @Test
     void getEinstellungen_UsesCurrentOrgId() {
-        UUID orgId1 = UUID.randomUUID();
-        UUID orgId2 = UUID.randomUUID();
+        Long orgId1 = 1L;
+        Long orgId2 = 2L;
 
         when(organizationContextService.getCurrentOrgId()).thenReturn(orgId1);
         when(einstellungenRepository.findByOrgId(orgId1)).thenReturn(Optional.empty());

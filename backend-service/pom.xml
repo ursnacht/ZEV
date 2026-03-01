@@ -192,7 +192,7 @@
       <plugin>
         <groupId>org.flywaydb</groupId>
         <artifactId>flyway-maven-plugin</artifactId>
-        <version>10.10.0</version>
+        <version>11.14.1</version>
         <configuration>
           <url>jdbc:postgresql://localhost:5432/zev</url>
           <user>postgres</user>

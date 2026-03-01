@@ -16,7 +16,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -89,7 +88,7 @@ public class MetricsService {
     /**
      * Hilfsmethode um die aktuelle Org-ID zu holen.
      */
-    private UUID getCurrentOrgId() {
+    private Long getCurrentOrgId() {
         return organizationContextService.getCurrentOrgId();
     }
 
@@ -97,7 +96,7 @@ public class MetricsService {
      * Sucht eine Metrik nach Name für die aktuelle Organisation.
      */
     private java.util.Optional<Metrik> findMetrikByName(String name) {
-        UUID orgId = getCurrentOrgId();
+        Long orgId = getCurrentOrgId();
         if (orgId == null) {
             return java.util.Optional.empty();
         }
@@ -129,7 +128,7 @@ public class MetricsService {
     }
 
     private void saveMetrik(String name, String jsonValue) {
-        UUID orgId = getCurrentOrgId();
+        Long orgId = getCurrentOrgId();
         if (orgId == null) {
             log.warn("Keine Organisation im Kontext - Metrik '{}' wird nicht gespeichert", name);
             return;

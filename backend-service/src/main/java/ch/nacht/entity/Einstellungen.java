@@ -5,8 +5,6 @@ import jakarta.validation.constraints.NotNull;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import java.util.UUID;
-
 /**
  * Entity for tenant-specific settings.
  * Each tenant (org_id) has exactly one settings record.
@@ -25,7 +23,7 @@ public class Einstellungen {
 
     @NotNull
     @Column(name = "org_id", nullable = false, unique = true)
-    private UUID orgId;
+    private Long orgId;
 
     @NotNull
     @JdbcTypeCode(SqlTypes.JSON)
@@ -35,7 +33,7 @@ public class Einstellungen {
     public Einstellungen() {
     }
 
-    public Einstellungen(UUID orgId, String konfiguration) {
+    public Einstellungen(Long orgId, String konfiguration) {
         this.orgId = orgId;
         this.konfiguration = konfiguration;
     }
@@ -48,11 +46,11 @@ public class Einstellungen {
         this.id = id;
     }
 
-    public UUID getOrgId() {
+    public Long getOrgId() {
         return orgId;
     }
 
-    public void setOrgId(UUID orgId) {
+    public void setOrgId(Long orgId) {
         this.orgId = orgId;
     }
 

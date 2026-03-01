@@ -1,6 +1,7 @@
 package ch.nacht.repository;
 
 import ch.nacht.AbstractIntegrationTest;
+import ch.nacht.entity.Organisation;
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,6 +13,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,11 +31,19 @@ class TarifRepositoryIT extends AbstractIntegrationTest {
     @Autowired
     private TarifRepository tarifRepository;
 
-    private static final UUID TEST_ORG_ID = UUID.fromString("c2c9ba74-de18-4491-9489-8185629edd93");
+    @Autowired
+    private OrganisationRepository organisationRepository;
+
+    private Long TEST_ORG_ID;
 
     @BeforeEach
     void setUp() {
         tarifRepository.deleteAll();
+        Organisation org = new Organisation();
+        org.setKeycloakOrgId(UUID.fromString("c2c9ba74-de18-4491-9489-8185629edd93"));
+        org.setName("Test Organisation");
+        org.setErstelltAm(LocalDateTime.now());
+        TEST_ORG_ID = organisationRepository.save(org).getId();
     }
 
     private Tarif createTarif(String bezeichnung, TarifTyp typ, BigDecimal preis, LocalDate von, LocalDate bis) {

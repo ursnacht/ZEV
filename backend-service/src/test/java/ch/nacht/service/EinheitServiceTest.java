@@ -15,7 +15,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
+
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -39,11 +39,11 @@ public class EinheitServiceTest {
 
     private Einheit consumerEinheit;
     private Einheit producerEinheit;
-    private UUID testOrgId;
+    private Long testOrgId;
 
     @BeforeEach
     void setUp() {
-        testOrgId = UUID.randomUUID();
+        testOrgId = 1L;
 
         consumerEinheit = new Einheit("Wohnung A", EinheitTyp.CONSUMER);
         consumerEinheit.setId(1L);
@@ -126,7 +126,7 @@ public class EinheitServiceTest {
 
     @Test
     void createEinheit_SetsOrgIdFromContext() {
-        UUID orgId = UUID.randomUUID();
+        Long orgId = 2L;
         Einheit newEinheit = new Einheit("Wohnung C", EinheitTyp.CONSUMER);
         when(organizationContextService.getCurrentOrgId()).thenReturn(orgId);
         when(einheitRepository.save(newEinheit)).thenReturn(newEinheit);
@@ -167,9 +167,9 @@ public class EinheitServiceTest {
 
     @Test
     void updateEinheit_PreservesOrgId() {
-        UUID originalOrgId = consumerEinheit.getOrgId();
+        Long originalOrgId = consumerEinheit.getOrgId();
         Einheit updatedData = new Einheit("Wohnung A Updated", EinheitTyp.PRODUCER);
-        updatedData.setOrgId(UUID.randomUUID()); // different orgId should be overwritten
+        updatedData.setOrgId(99L); // different orgId should be overwritten
 
         when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumerEinheit));
         when(einheitRepository.save(updatedData)).thenReturn(updatedData);

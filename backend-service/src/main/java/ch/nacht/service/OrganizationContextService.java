@@ -5,7 +5,6 @@ import org.springframework.web.context.annotation.RequestScope;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Service für den Organisationskontext des aktuellen Requests.
@@ -15,35 +14,35 @@ import java.util.UUID;
 @RequestScope
 public class OrganizationContextService {
 
-    private UUID currentOrgId;
-    private List<UUID> availableOrgIds = new ArrayList<>();
+    private Long currentOrgId;
+    private List<Long> availableOrgIds = new ArrayList<>();
     private String currentOrgName;
 
     /**
      * Liefert die aktuelle Organisations-ID.
      */
-    public UUID getCurrentOrgId() {
+    public Long getCurrentOrgId() {
         return currentOrgId;
     }
 
     /**
      * Setzt die aktuelle Organisations-ID.
      */
-    public void setCurrentOrgId(UUID orgId) {
+    public void setCurrentOrgId(Long orgId) {
         this.currentOrgId = orgId;
     }
 
     /**
      * Liefert alle verfügbaren Organisations-IDs des Benutzers.
      */
-    public List<UUID> getAvailableOrgIds() {
+    public List<Long> getAvailableOrgIds() {
         return availableOrgIds;
     }
 
     /**
      * Setzt die verfügbaren Organisations-IDs.
      */
-    public void setAvailableOrgIds(List<UUID> orgIds) {
+    public void setAvailableOrgIds(List<Long> orgIds) {
         this.availableOrgIds = orgIds != null ? orgIds : new ArrayList<>();
     }
 

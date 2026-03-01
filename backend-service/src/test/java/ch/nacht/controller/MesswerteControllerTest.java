@@ -5,6 +5,7 @@ import ch.nacht.entity.EinheitTyp;
 import ch.nacht.service.EinheitService;
 import ch.nacht.service.MesswerteService;
 import ch.nacht.service.MetricsService;
+import ch.nacht.service.OrganisationService;
 import ch.nacht.service.OrganizationContextService;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +53,9 @@ public class MesswerteControllerTest {
 
     @MockitoBean
     private OrganizationContextService organizationContextService;
+
+    @MockitoBean
+    private OrganisationService organisationService;
 
     private Einheit testEinheit;
 

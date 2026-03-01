@@ -19,13 +19,14 @@ public abstract class AbstractIntegrationTest {
         postgres = new PostgreSQLContainer("postgres:16-alpine")
                 .withDatabaseName("zev")
                 .withUsername("test")
-                .withPassword("test");
+                .withPassword("test")
+                .withInitScript("create-schema.sql");
         postgres.start();
     }
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
-        registry.add("spring.flyway.enabled", () -> "true");
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
+        registry.add("spring.flyway.enabled", () -> "false");
     }
 }

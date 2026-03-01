@@ -9,7 +9,6 @@ import org.hibernate.annotations.Filter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.UUID;
 
 /**
  * Entity representing a tariff with validity period.
@@ -25,7 +24,7 @@ public class Tarif {
     private Long id;
 
     @Column(name = "org_id", nullable = false)
-    private UUID orgId;
+    private Long orgId;
 
     @NotBlank(message = "Bezeichnung is required")
     @Size(max = 30, message = "Bezeichnung must not exceed 30 characters")
@@ -109,11 +108,11 @@ public class Tarif {
         this.gueltigBis = gueltigBis;
     }
 
-    public UUID getOrgId() {
+    public Long getOrgId() {
         return orgId;
     }
 
-    public void setOrgId(UUID orgId) {
+    public void setOrgId(Long orgId) {
         this.orgId = orgId;
     }
 

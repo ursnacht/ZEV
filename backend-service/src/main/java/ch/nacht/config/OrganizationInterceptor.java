@@ -1,9 +1,13 @@
 package ch.nacht.config;
 
+import ch.nacht.entity.Organisation;
 import ch.nacht.exception.NoOrganizationException;
+import ch.nacht.service.OrganisationService;
 import ch.nacht.service.OrganizationContextService;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
@@ -20,6 +24,7 @@ import java.util.UUID;
 /**
  * Interceptor für die Extraktion der Organisations-ID aus dem JWT-Token.
  * Aktiviert bei authentifizierten Requests den Organisationskontext.
+ * Mappt die Keycloak-UUID auf die interne Organisations-ID (BIGINT).
  */
 @Component
 public class OrganizationInterceptor implements HandlerInterceptor {
@@ -27,9 +32,12 @@ public class OrganizationInterceptor implements HandlerInterceptor {
     private static final Logger log = LoggerFactory.getLogger(OrganizationInterceptor.class);
 
     private final OrganizationContextService organizationContextService;
+    private final OrganisationService organisationService;
 
-    public OrganizationInterceptor(OrganizationContextService organizationContextService) {
+    public OrganizationInterceptor(OrganizationContextService organizationContextService,
+                                   OrganisationService organisationService) {
         this.organizationContextService = organizationContextService;
+        this.organisationService = organisationService;
     }
 
     @Override
@@ -52,7 +60,7 @@ public class OrganizationInterceptor implements HandlerInterceptor {
     }
 
     /**
-     * Extrahiert die Organisationen aus dem JWT-Token.
+     * Extrahiert die Organisationen aus dem JWT-Token und mappt sie auf interne IDs.
      * JWT-Struktur (Keycloak Organizations):
      * {
      *   "organizations": {
@@ -72,9 +80,9 @@ public class OrganizationInterceptor implements HandlerInterceptor {
                 return;
             }
 
-            List<UUID> orgIds = new ArrayList<>();
+            List<Long> orgIds = new ArrayList<>();
             String firstOrgAlias = null;
-            UUID firstOrgId = null;
+            Long firstOrgId = null;
 
             // JWT-Struktur: {"alias": {"id": "uuid"}}
             for (Map.Entry<String, Object> entry : organizations.entrySet()) {
@@ -86,16 +94,18 @@ public class OrganizationInterceptor implements HandlerInterceptor {
 
                     if (idString != null) {
                         try {
-                            UUID orgId = UUID.fromString(idString);
-                            orgIds.add(orgId);
+                            UUID keycloakOrgId = UUID.fromString(idString);
+                            Organisation org = organisationService.findOrCreate(keycloakOrgId, alias);
+                            orgIds.add(org.getId());
 
                             // Erste Organisation als aktuelle setzen
                             if (firstOrgId == null) {
-                                firstOrgId = orgId;
+                                firstOrgId = org.getId();
                                 firstOrgAlias = alias;
                             }
 
-                            log.debug("Organisation gefunden: {} (Alias: {})", orgId, alias);
+                            log.debug("Organisation gemappt: keycloak_id={}, intern={} (Alias: {})",
+                                    keycloakOrgId, org.getId(), alias);
                         } catch (IllegalArgumentException e) {
                             log.warn("Ungültige Organisations-UUID im Token: {}", idString);
                         }
@@ -108,7 +118,7 @@ public class OrganizationInterceptor implements HandlerInterceptor {
                 organizationContextService.setCurrentOrgId(firstOrgId);
                 organizationContextService.setCurrentOrgName(firstOrgAlias);
 
-                log.info("Organisationskontext gesetzt - Benutzer: {}, aktuelle Org: {} ({}), verfügbare Orgs: {}",
+                log.info("Organisationskontext gesetzt - Benutzer: {}, aktuelle Org-ID: {} ({}), verfügbare Orgs: {}",
                         jwtAuth.getToken().getSubject(),
                         firstOrgId,
                         firstOrgAlias,

@@ -1,4 +1,4 @@
-@FilterDef(name = "orgFilter", parameters = @ParamDef(name = "orgId", type = java.util.UUID.class))
+@FilterDef(name = "orgFilter", parameters = @ParamDef(name = "orgId", type = Long.class))
 package ch.nacht.entity;
 
 import org.hibernate.annotations.FilterDef;

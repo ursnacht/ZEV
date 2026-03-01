@@ -5,7 +5,6 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 /**
  * Metriken-Entity für die Persistierung von Anwendungsmetriken.
@@ -25,7 +24,7 @@ public class Metrik {
     private Long id;
 
     @Column(name = "org_id", nullable = false)
-    private UUID orgId;
+    private Long orgId;
 
     @Column(nullable = false)
     private String name;
@@ -84,11 +83,11 @@ public class Metrik {
         this.zeitstempel = zeitstempel;
     }
 
-    public UUID getOrgId() {
+    public Long getOrgId() {
         return orgId;
     }
 
-    public void setOrgId(UUID orgId) {
+    public void setOrgId(Long orgId) {
         this.orgId = orgId;
     }
 }

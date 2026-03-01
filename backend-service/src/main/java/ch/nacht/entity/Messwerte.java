@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.Filter;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "messwerte", schema = "zev")
@@ -17,7 +16,7 @@ public class Messwerte {
     private Long id;
 
     @Column(name = "org_id", nullable = false)
-    private UUID orgId;
+    private Long orgId;
 
     @Column(name = "zeit", nullable = false)
     private LocalDateTime zeit;
@@ -93,11 +92,11 @@ public class Messwerte {
         this.einheit = einheit;
     }
 
-    public UUID getOrgId() {
+    public Long getOrgId() {
         return orgId;
     }
 
-    public void setOrgId(UUID orgId) {
+    public void setOrgId(Long orgId) {
         this.orgId = orgId;
     }
 

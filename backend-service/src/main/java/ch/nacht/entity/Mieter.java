@@ -7,7 +7,6 @@ import jakarta.validation.constraints.Size;
 import org.hibernate.annotations.Filter;
 
 import java.time.LocalDate;
-import java.util.UUID;
 
 /**
  * Entity representing a tenant with lease period.
@@ -23,7 +22,7 @@ public class Mieter {
     private Long id;
 
     @Column(name = "org_id", nullable = false)
-    private UUID orgId;
+    private Long orgId;
 
     @NotBlank(message = "Name is required")
     @Size(max = 150, message = "Name must not exceed 150 characters")
@@ -73,11 +72,11 @@ public class Mieter {
         this.id = id;
     }
 
-    public UUID getOrgId() {
+    public Long getOrgId() {
         return orgId;
     }
 
-    public void setOrgId(UUID orgId) {
+    public void setOrgId(Long orgId) {
         this.orgId = orgId;
     }
 

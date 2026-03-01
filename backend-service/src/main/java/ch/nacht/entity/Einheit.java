@@ -6,8 +6,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.hibernate.annotations.Filter;
 
-import java.util.UUID;
-
 @Entity
 @Table(name = "einheit", schema = "zev")
 @Filter(name = "orgFilter", condition = "org_id = :orgId")
@@ -19,7 +17,7 @@ public class Einheit {
     private Long id;
 
     @Column(name = "org_id", nullable = false)
-    private UUID orgId;
+    private Long orgId;
 
     @NotBlank(message = "Name is required")
     @Size(min = 2, max = 30, message = "Name must be between 2 and 30 characters")
@@ -75,11 +73,11 @@ public class Einheit {
         this.messpunkt = messpunkt;
     }
 
-    public UUID getOrgId() {
+    public Long getOrgId() {
         return orgId;
     }
 
-    public void setOrgId(UUID orgId) {
+    public void setOrgId(Long orgId) {
         this.orgId = orgId;
     }
 

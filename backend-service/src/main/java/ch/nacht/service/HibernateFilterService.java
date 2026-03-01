@@ -6,8 +6,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.UUID;
-
 /**
  * Service zum Aktivieren des Hibernate orgFilter für Multi-Tenancy.
  */
@@ -30,7 +28,7 @@ public class HibernateFilterService {
      * Muss innerhalb einer Transaktion aufgerufen werden.
      */
     public void enableOrgFilter() {
-        UUID orgId = organizationContextService.getCurrentOrgId();
+        Long orgId = organizationContextService.getCurrentOrgId();
         if (orgId != null) {
             try {
                 Session session = entityManager.unwrap(Session.class);

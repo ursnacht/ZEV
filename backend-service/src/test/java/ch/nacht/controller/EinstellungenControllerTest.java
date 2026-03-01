@@ -3,6 +3,7 @@ package ch.nacht.controller;
 import ch.nacht.dto.EinstellungenDTO;
 import ch.nacht.dto.RechnungKonfigurationDTO;
 import ch.nacht.service.EinstellungenService;
+import ch.nacht.service.OrganisationService;
 import ch.nacht.service.OrganizationContextService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +33,9 @@ public class EinstellungenControllerTest {
 
     @MockitoBean
     private OrganizationContextService organizationContextService;
+
+    @MockitoBean
+    private OrganisationService organisationService;
 
     private ObjectMapper objectMapper;
 
