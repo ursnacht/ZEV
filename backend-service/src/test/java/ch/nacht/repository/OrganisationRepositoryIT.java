@@ -140,4 +140,31 @@ class OrganisationRepositoryIT extends AbstractIntegrationTest {
         assertThat(org2.getId()).isNotNull();
         assertThat(org1.getId()).isNotEqualTo(org2.getId());
     }
+
+    @Test
+    void konfiguration_WirdGespeichertUndGeladen() {
+        // Given
+        Organisation org = createOrganisation(KEYCLOAK_ORG_ID, "Test Org");
+        org.setKonfiguration("{\"zahlungsfrist\":\"30 Tage\"}");
+        Organisation saved = organisationRepository.save(org);
+
+        // When
+        Organisation loaded = organisationRepository.findById(saved.getId()).orElseThrow();
+
+        // Then
+        assertThat(loaded.getKonfiguration()).contains("30 Tage");
+    }
+
+    @Test
+    void konfiguration_IstNullbar() {
+        // Given — konfiguration nicht gesetzt
+        Organisation org = createOrganisation(OTHER_KEYCLOAK_ORG_ID, "Org ohne Einstellungen");
+        Organisation saved = organisationRepository.save(org);
+
+        // When
+        Organisation loaded = organisationRepository.findById(saved.getId()).orElseThrow();
+
+        // Then
+        assertThat(loaded.getKonfiguration()).isNull();
+    }
 }

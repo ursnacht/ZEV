@@ -2,8 +2,9 @@ package ch.nacht.service;
 
 import ch.nacht.dto.EinstellungenDTO;
 import ch.nacht.dto.RechnungKonfigurationDTO;
-import ch.nacht.entity.Einstellungen;
-import ch.nacht.repository.EinstellungenRepository;
+import ch.nacht.entity.Organisation;
+import ch.nacht.repository.OrganisationRepository;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -11,10 +12,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
-
 /**
  * Service for managing tenant-specific settings.
+ * Settings are stored as JSONB in the organisation table.
  */
 @Service
 public class EinstellungenService {
@@ -22,18 +22,18 @@ public class EinstellungenService {
     private static final Logger log = LoggerFactory.getLogger(EinstellungenService.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
-    private final EinstellungenRepository einstellungenRepository;
+    private final OrganisationRepository organisationRepository;
     private final OrganizationContextService organizationContextService;
 
-    public EinstellungenService(EinstellungenRepository einstellungenRepository,
-                                 OrganizationContextService organizationContextService) {
-        this.einstellungenRepository = einstellungenRepository;
+    public EinstellungenService(OrganisationRepository organisationRepository,
+                                OrganizationContextService organizationContextService) {
+        this.organisationRepository = organisationRepository;
         this.organizationContextService = organizationContextService;
     }
 
     /**
      * Get settings for the current tenant.
-     * Returns null if no settings exist yet.
+     * Returns null if no settings exist yet (konfiguration is null).
      *
      * @return EinstellungenDTO or null if not configured
      */
@@ -42,8 +42,10 @@ public class EinstellungenService {
         Long orgId = organizationContextService.getCurrentOrgId();
         log.debug("Getting settings for org: {}", orgId);
 
-        Optional<Einstellungen> einstellungen = einstellungenRepository.findByOrgId(orgId);
-        return einstellungen.map(this::toDTO).orElse(null);
+        return organisationRepository.findById(orgId)
+                .filter(org -> org.getKonfiguration() != null)
+                .map(this::toDTO)
+                .orElse(null);
     }
 
     /**
@@ -73,30 +75,21 @@ public class EinstellungenService {
         Long orgId = organizationContextService.getCurrentOrgId();
         log.info("Saving settings for org: {}", orgId);
 
-        String konfigurationJson = toJson(dto.getRechnung());
-        Optional<Einstellungen> existing = einstellungenRepository.findByOrgId(orgId);
+        Organisation org = organisationRepository.findById(orgId)
+                .orElseThrow(() -> new IllegalStateException("Organisation nicht gefunden: " + orgId));
 
-        Einstellungen einstellungen;
-        if (existing.isPresent()) {
-            einstellungen = existing.get();
-            einstellungen.setKonfiguration(konfigurationJson);
-            log.debug("Updating existing settings");
-        } else {
-            einstellungen = new Einstellungen(orgId, konfigurationJson);
-            log.debug("Creating new settings");
-        }
-
-        Einstellungen saved = einstellungenRepository.save(einstellungen);
-        log.info("Settings saved with ID: {}", saved.getId());
+        org.setKonfiguration(toJson(dto.getRechnung()));
+        Organisation saved = organisationRepository.save(org);
+        log.info("Settings saved for organisation ID: {}", saved.getId());
         return toDTO(saved);
     }
 
     /**
      * Convert entity to DTO.
      */
-    private EinstellungenDTO toDTO(Einstellungen entity) {
-        RechnungKonfigurationDTO konfiguration = fromJson(entity.getKonfiguration());
-        return new EinstellungenDTO(entity.getId(), konfiguration);
+    private EinstellungenDTO toDTO(Organisation org) {
+        RechnungKonfigurationDTO konfiguration = fromJson(org.getKonfiguration());
+        return new EinstellungenDTO(org.getId(), konfiguration);
     }
 
     /**

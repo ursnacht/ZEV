@@ -7,6 +7,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -33,6 +35,10 @@ public class Organisation {
 
     @Column(name = "erstellt_am", nullable = false)
     private LocalDateTime erstelltAm;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "konfiguration", columnDefinition = "jsonb")
+    private String konfiguration;
 
     public Organisation() {}
 
@@ -66,6 +72,14 @@ public class Organisation {
 
     public void setErstelltAm(LocalDateTime erstelltAm) {
         this.erstelltAm = erstelltAm;
+    }
+
+    public String getKonfiguration() {
+        return konfiguration;
+    }
+
+    public void setKonfiguration(String konfiguration) {
+        this.konfiguration = konfiguration;
     }
 
     @Override

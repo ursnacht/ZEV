@@ -147,4 +147,19 @@ public class OrganisationServiceTest {
         assertSame(existingOrg, result);
         verify(organisationRepository, never()).save(any());
     }
+
+    @Test
+    void findOrCreate_NameUpdate_UeberschreibtKonfigurationNicht() {
+        // Arrange
+        existingOrg.setKonfiguration("{\"zahlungsfrist\":\"30 Tage\"}");
+        when(organisationRepository.findByKeycloakOrgId(keycloakOrgId)).thenReturn(Optional.of(existingOrg));
+        when(organisationRepository.save(existingOrg)).thenReturn(existingOrg);
+
+        // Act
+        Organisation result = organisationService.findOrCreate(keycloakOrgId, "Neuer Name");
+
+        // Assert
+        assertEquals("Neuer Name", result.getName());
+        assertEquals("{\"zahlungsfrist\":\"30 Tage\"}", result.getKonfiguration());
+    }
 }
