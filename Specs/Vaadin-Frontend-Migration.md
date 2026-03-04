@@ -295,6 +295,7 @@ Alle bestehenden Module des Angular-Frontends werden als Vaadin-Views re-impleme
 ### Externe Design-System-Abhängigkeit
 * Das bestehende `@zev/design-system` (npm, CSS-Klassen) wird **nicht** in Vaadin verwendet
 * Styling erfolgt via Vaadin Lumo Theme (Customization via CSS Custom Properties / `@CssImport`)
+* Die CSS Custom Properties (tokens.css) werden so weit sinnvoll und möglich übernommen:  Lumo-Theme-Properties überschreiben  (Mapping von CSS-Variablen auf Lumo-Variablen).
 * Die Vaadin-Komponenten ersetzen die Design-System-Komponenten 1:1:
 
 | Design System (Angular) | Vaadin Äquivalent |
@@ -314,7 +315,7 @@ Alle bestehenden Module des Angular-Frontends werden als Vaadin-Views re-impleme
 ## 7. Abgrenzung / Out of Scope
 
 * **Mobile-Optimierung:** Kein responsives Layout für Smartphones (Vaadin-Standard-Responsiveness genügt)
-* **Design System weiterentwickeln:** Das `@zev/design-system` npm-Paket wird nicht migriert, sondern durch Vaadin Lumo ersetzt
+* **Design System weiterentwickeln:** Das `@zev/design-system` npm-Paket wird nicht migriert, sondern durch Vaadin Lumo ersetzt (Mapping von CSS-Variablen auf Lumo-Variablen)
 * **Angular beibehalten:** Kein Hybrid-Betrieb (Angular + Vaadin gleichzeitig)
 * **Migration bestehender E2E-Tests:** Playwright-Tests werden neu geschrieben (Selektoren ändern sich grundlegend)
 * **Offline-Fähigkeit / PWA:** Kein Service Worker / Offline-Modus
