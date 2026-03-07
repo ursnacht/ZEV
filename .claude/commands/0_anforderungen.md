@@ -3,10 +3,11 @@
 Erstelle ein vollständiges Anforderungsdokument (Spec) aus den eingegebenen Anforderungen.
 
 ## Input
-* Erster Parameter: Name des Features (z.B. `Zahlungsverwaltung`)
-* Weitere Parameter / Freitext: Die rohen Anforderungen, Wünsche und Rahmenbedingungen
 
 $ARGUMENTS
+
+* **Feature-Name** (erster Parameter): z.B. `Zahlungsverwaltung`
+* **Anforderungen** (Rest): Rohe Anforderungen, Wünsche und Rahmenbedingungen
 
 ## Vorgehen
 1. **Analysiere die Eingabe** - Lies und verstehe alle angegebenen Anforderungen

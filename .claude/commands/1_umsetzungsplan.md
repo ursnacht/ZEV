@@ -9,7 +9,10 @@ Erstelle einen detaillierten Umsetzungsplan für eine Spezifikation.
 1. **Analysiere die Spezifikation** - Lies und verstehe alle Anforderungen
 2. **Recherchiere den Code** - Finde relevante bestehende Komponenten und Patterns
 3. **Prüfe Abhängigkeiten** - Identifiziere betroffene Module (Backend, Frontend, DB)
-4. **Stelle Rückfragen** bei Unklarheiten BEVOR du den Plan erstellst
+4. **Prüfe offene Fragen** - Lies Abschnitt "8. Offene Fragen" der Spec:
+   - Fragen mit Antwort (` --> ...`): als Annahme in den Plan übernehmen
+   - Fragen ohne Antwort, die den Scope oder die Architektur beeinflussen: **Rückfrage stellen BEVOR du den Plan erstellst**
+   - Fragen ohne Antwort, die Details betreffen: als Annahme treffen und unter "Offene Punkte / Annahmen" dokumentieren
 
 ## Output
 * Erstelle eine neue Datei: `[Spec-Name]_Umsetzungsplan.md` im gleichen Verzeichnis (/Specs/)

@@ -381,41 +381,12 @@ describe('XxxComponent', () => {
 
 ---
 
-## Hinweise für Tester
-### Unit Tests interaktiv ausführen
+## Ausführung
 
-`cd frontend-service`
+Nach dem Erstellen der Tests ausführen und Fehler beheben bis alle Tests grün sind:
 
-* Alle Tests einmalig (headless)
-  * `npm.cmd test -- --browsers=ChromeHeadless --watch=false`
-* Tests mit Live-Browser (interaktiv)
-  * `npm.cmd test`
-* Tests im Watch-Mode (re-run bei Änderungen)
-  * `npm.cmd test -- --watch=true`
-* Einzelne Test-Datei
-  * `npm.cmd test -- --include=**/tarif.service.spec.ts`
-* Mit Code-Coverage Report
-  * `npm.cmd test -- --code-coverage --browsers=ChromeHeadless --watch=false`
-
-### npm test ausführen
-`cd frontend-service`
-`npm.cmd test`
-
-#### Was passiert?
-1. Chrome öffnet sich - Ein Browser-Fenster erscheint mit der Karma-Testseite
-2. Tests laufen automatisch - Ergebnisse werden im Browser und Terminal angezeigt
-3. Watch-Mode aktiv - Bei Dateiänderungen laufen Tests automatisch neu
-
-#### Browser-Ansicht
-Die Karma-Seite zeigt:
-* Grüne Punkte = erfolgreiche Tests
-* Rote Punkte = fehlgeschlagene Tests
-* Klick auf einen Test zeigt Details
-
-#### Beenden
-Drücke Ctrl+C im Terminal, um Karma zu stoppen.
-
-#### Ohne Browser-Fenster (headless)
-`npm.cmd test -- --browsers=ChromeHeadless --watch=false`
-
-Dies ist nützlich für CI/CD oder wenn du kein Browser-Fenster möchtest.
+| Befehl | Beschreibung |
+|--------|--------------|
+| `npm.cmd test -- --browsers=ChromeHeadless --watch=false` | Alle Tests (headless, einmalig) |
+| `npm.cmd test -- --include=**/tarif.service.spec.ts` | Einzelne Test-Datei |
+| `npm.cmd test -- --code-coverage --browsers=ChromeHeadless --watch=false` | Mit Coverage-Report |

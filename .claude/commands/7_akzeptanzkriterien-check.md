@@ -62,9 +62,9 @@ Für jedes Akzeptanzkriterium systematisch prüfen:
 - `org_id` Spalte in Migration?
 - `@Filter` / `@FilterDef` auf Entity?
 
-### Phase 3: Ergebnis-Bericht
-* Erstelle eine neue Datei: `[Spec-Name]_Akzeptanzkriterien-Check.md` im gleichen Verzeichnis (/Specs/) mit einem
-  Bericht im folgenden Format:
+### Phase 3: Ergebnis-Bericht + Spec aktualisieren
+
+1. Zeige dem User den Bericht im folgenden Format **im Chat** (keine separate Datei erstellen):
 
 ```markdown
 # Akzeptanzkriterien-Check: [Feature-Name]
@@ -73,25 +73,17 @@ Für jedes Akzeptanzkriterium systematisch prüfen:
 
 | # | Kriterium | Status | Nachweis |
 |---|-----------|--------|----------|
-| 1 | Beschreibung... | OK | Route `/xyz` in app.routes.ts, Menüeintrag vorhanden |
-| 2 | Beschreibung... | OK | `MieterService.save()` validiert Überlappung |
-| 3 | Beschreibung... | FEHLT | Keine Validierung für Mietende > Mietbeginn gefunden |
-
-## Erfüllte Kriterien
-- [x] Kriterium 1...
-- [x] Kriterium 2...
-
-## Nicht erfüllte Kriterien
-- [ ] Kriterium 3... → **Grund:** ...
+| 1 | Beschreibung... | ✅ OK | Route `/xyz` in app.routes.ts:42, Menüeintrag vorhanden |
+| 2 | Beschreibung... | ✅ OK | `MieterService.save()` validiert Überlappung (MieterService.java:87) |
+| 3 | Beschreibung... | ❌ FEHLT | Keine Validierung für Mietende > Mietbeginn gefunden |
 
 ## Zusätzliche Befunde
 - Befunde die nicht direkt ein Akzeptanzkriterium betreffen, aber relevant sind
 ```
 
-### Phase 4: Spec aktualisieren
-1. **Nur erfüllte Kriterien** von `[ ]` auf `[x]` ändern
-2. Nicht erfüllte Kriterien bleiben als `[ ]`
-3. Zeige dem User die Zusammenfassung und frage, ob die Spec aktualisiert werden soll
+2. Aktualisiere direkt im Anschluss die Checkboxen in der Spec-Datei:
+   * **Nur erfüllte Kriterien** von `[ ]` auf `[x]` ändern
+   * Nicht erfüllte Kriterien bleiben als `[ ]`
 
 ---
 
@@ -113,8 +105,7 @@ Für jedes Akzeptanzkriterium systematisch prüfen:
 ## Wichtige Regeln
 * **Konservativ bewerten** - Im Zweifel als "FEHLT" markieren
 * **Nachweis liefern** - Für jedes "OK" den konkreten Code-Ort angeben (Datei:Zeile)
-* **Keine Code-Änderungen** - Nur die Spec-Datei wird aktualisiert (Checkboxen)
-* **User fragen** - Vor dem Aktualisieren der Spec die Ergebnisse zeigen und Bestätigung einholen
+* **Keine Code-Änderungen** - Nur die Spec-Datei wird aktualisiert (Checkboxen), keine neue Datei erstellen
 
 ## Referenz
 * CLAUDE.md - Projekt-Architektur

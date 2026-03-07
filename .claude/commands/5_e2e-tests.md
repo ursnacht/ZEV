@@ -105,17 +105,53 @@ async function navigateToFeature(page: Page): Promise<void> {
 }
 
 /**
- * Helper to create a unique test name
+ * Helper to create a unique test item name
  */
 function generateTestName(prefix: string = 'E2E Test'): string {
     return `${prefix} ${Date.now()}`;
 }
 
-test.describe('Feature Name', () => {
-    test.afterAll(async ({ browser }) => {
-        // Cleanup: Delete test data created during tests
-    });
+/**
+ * Helper to delete an item by name via the UI (kebab menu)
+ */
+async function deleteItemByName(page: Page, name: string): Promise<void> {
+    console.log(`Cleanup: Attempting to delete "${name}"`);
+    try {
+        page.removeAllListeners('dialog');
+        await navigateToFeature(page);
+        await waitForTableWithData(page, 5000);
 
+        const row = page.locator(`tr:has-text("${name}")`);
+        if (await row.isVisible().catch(() => false)) {
+            page.on('dialog', async dialog => { await dialog.accept(); });
+            await row.locator('.zev-kebab-button').click();
+            await page.waitForTimeout(300);
+            await row.locator('.zev-kebab-menu__item--danger').click();
+            await page.waitForTimeout(1000);
+            page.removeAllListeners('dialog');
+        } else {
+            console.log(`Cleanup: "${name}" not found (may already be deleted)`);
+        }
+    } catch (error) {
+        console.log(`Cleanup: Error deleting "${name}": ${error}`);
+        page.removeAllListeners('dialog');
+    }
+}
+
+// Reset tracking before each test
+test.beforeEach(() => {
+    createdItemNames = [];
+});
+
+// Cleanup after each test
+test.afterEach(async ({ page }) => {
+    for (const name of createdItemNames) {
+        await deleteItemByName(page, name);
+    }
+    createdItemNames = [];
+});
+
+test.describe('Feature Name', () => {
     test('should navigate to feature page', async ({ page }) => {
         await navigateToFeature(page);
         await expect(page.locator('.zev-container h1')).toBeVisible();
@@ -123,22 +159,24 @@ test.describe('Feature Name', () => {
 
     test('should create new item successfully', async ({ page }) => {
         await navigateToFeature(page);
+        const name = generateTestName();
 
-        // Fill form
+        // Fill form fields (IDs aus dem HTML-Template lesen)
+        await page.locator('#fieldName').fill(name);
         // ...
 
-        // Submit and verify
+        await page.locator('button[type="submit"]').click();
         const success = await waitForFormResult(page);
         expect(success).toBe(true);
+
+        createdItemNames.push(name); // Für Cleanup registrieren
     });
 
     test('should show validation error for invalid input', async ({ page }) => {
         await navigateToFeature(page);
 
-        // Submit empty form
-        // ...
-
-        // Verify validation
+        // Formular leer absenden
+        await page.locator('button[type="submit"]').click();
         await expect(page.locator('.zev-form-error')).toBeVisible();
     });
 
@@ -148,27 +186,31 @@ test.describe('Feature Name', () => {
         const row = page.locator('.zev-table tbody tr').first();
         await clickKebabMenuItem(page, row, 'edit');
 
-        // Verify edit form appears
-        // ...
+        // Formular erscheint mit vorausgefüllten Daten
+        await expect(page.locator('form')).toBeVisible();
     });
 
     test('should delete item via kebab menu', async ({ page }) => {
         await navigateToFeature(page);
 
-        const row = page.locator('.zev-table tbody tr').first();
-        await clickKebabMenuItem(page, row, 'delete');
+        const rows = page.locator('.zev-table tbody tr');
+        const countBefore = await rows.count();
 
-        // Confirm deletion
-        // ...
+        page.on('dialog', async dialog => { await dialog.accept(); });
+        await clickKebabMenuItem(page, rows.first(), 'delete');
+        await page.waitForTimeout(1000);
+
+        await expect(rows).toHaveCount(countBefore - 1);
     });
 });
 ```
 
 ## Best Practices
-* **Selektoren:** Bevorzuge `data-testid` Attribute, dann CSS-Klassen
-* **Isolation:** Jeder Test sollte unabhängig sein
-* **Aufräumen:** Testdaten nach dem Test bereinigen
-* **Warten:** `await expect()` statt feste Timeouts
+* **Selektoren:** CSS-Klassen aus dem Design System (`.zev-table`, `.zev-kebab-button`, etc.) und Formular-IDs aus den HTML-Templates – kein `data-testid` (wird im Projekt nicht verwendet)
+* **Cleanup:** Immer `afterEach` (nicht `afterAll`) + `beforeEach` zum Zurücksetzen des Tracking-Arrays
+* **Erstellte Items registrieren:** Direkt nach erfolgreichem Create `createdItemNames.push(name)` aufrufen
+* **Dialog-Handler:** Vor dem Auslösen registrieren, nach dem Test mit `removeAllListeners('dialog')` bereinigen
+* **Warten:** `await expect()` statt feste Timeouts; `page.waitForTimeout()` nur für UI-Animationen
 * **Helper nutzen:** Immer die Helpers aus `tests/helpers.ts` verwenden
 
 ## Ausführung

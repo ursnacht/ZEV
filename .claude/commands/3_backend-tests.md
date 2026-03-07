@@ -49,9 +49,8 @@ Dieser Skill arbeitet UNABHÄNGIG vom Kontext der aktuellen Session.
 ## Unit Tests (`*Test.java`)
 
 * **Tool:** JUnit 5 (Jupiter) mit Mockito
-* **Namenskonvention:** `*Test.java`
-* **Ausführung:** Maven Surefire Plugin (`mvn test`)
-* **Mocking:** Mockito für alle Abhängigkeiten
+* **Namenskonvention:** `*Test.java` → wird von Maven **Surefire** ausgeführt (`mvn test`)
+* **Mocking:** Mockito für alle Abhängigkeiten – keine Spring-Context-Initialisierung
 * **Scope:** Einzelne Klassen/Methoden isoliert testen
 * **Fokus:** Service-Logik, Validierungen, Edge Cases
 
@@ -217,16 +216,15 @@ Beispiele:
 ## Integration Tests (`*IT.java`)
 
 * **Tool:** Spring Test Slices (@WebMvcTest, @DataJpaTest, @JsonTest)
-* **Namenskonvention:** `*IT.java`
-* **Ausführung:** Maven Failsafe Plugin (`mvn verify`)
-* **Datenbank:** Testcontainers (PostgreSQL) - keine In-Memory-DB
+* **Namenskonvention:** `*IT.java` → wird von Maven **Failsafe** ausgeführt (`mvn verify`)
+* **Datenbank:** Testcontainers (PostgreSQL) – keine In-Memory-DB
 * **Scope:** Repository-Queries, Controller-Endpoints
 
-### Hinweise
-- @SpringBootTest vermeiden - Spring Context minimieren
-- ArgumentCaptor für komplexe Validierungen
-- `@MockitoBean` sparsam einsetzen (deutet auf Architekturproblem hin)
-- Post-Test Teardown: Testcontainer herunterfahren, Testdaten löschen
+### Verbindliche Regeln
+* **KEIN `@SpringBootTest`** – immer minimale Spring Test Slices verwenden (`@WebMvcTest`, `@DataJpaTest`)
+* `@MockitoBean` sparsam einsetzen (deutet auf Architekturproblem hin)
+* ArgumentCaptor für komplexe Argument-Validierungen verwenden
+* Post-Test Teardown: Testdaten löschen
 
 ### Controller Test Struktur
 

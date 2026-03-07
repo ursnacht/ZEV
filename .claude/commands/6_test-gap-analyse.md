@@ -162,6 +162,29 @@ Ausgabe als Markdown-Tabellen mit:
 
 ---
 
+## Optionale Coverage-Analyse
+
+Falls `all` oder `frontend` als Input angegeben, zusätzlich den Frontend-Coverage-Report auswerten:
+
+```bash
+cd frontend-service && npm.cmd test -- --code-coverage --browsers=ChromeHeadless --watch=false
+```
+
+Der Report erscheint in `frontend-service/coverage/`. Relevante Metriken aus `index.html` oder dem Terminal-Output extrahieren und im Bericht ergänzen:
+
+```markdown
+## Frontend Coverage (optional)
+
+| Datei | Statements | Branches | Functions | Lines |
+|-------|-----------|----------|-----------|-------|
+| tarif.service.ts | 92% | 80% | 100% | 92% |
+| ... | ... | ... | ... | ... |
+```
+
+Coverage-Lücken (< 70%) als **Hohe Priorität** in die Empfehlungen aufnehmen.
+
+---
+
 ## Ausführung
 
 Nach der Analyse:
@@ -174,6 +197,5 @@ Nach der Analyse:
 ## Hinweise
 
 - Diese Analyse ist READ-ONLY - es werden keine Dateien erstellt oder geändert
-- Die Analyse basiert auf Dateinamen-Konventionen
-- Qualität der vorhandenen Tests wird NICHT geprüft (nur Existenz)
-- Für Test-Qualitäts-Analyse: Tests manuell reviewen oder Coverage-Report nutzen
+- Die Existenzprüfung basiert auf Dateinamen-Konventionen
+- Die Coverage-Analyse ist optional und nur bei laufender Umgebung möglich
