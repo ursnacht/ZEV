@@ -92,7 +92,8 @@ export class NavigationComponent implements OnInit, OnDestroy {
     }
     const firstName = this.userProfile.firstName || '';
     const lastName = this.userProfile.lastName || '';
-    return `${firstName} ${lastName}`.trim();
+    const fullName = `${firstName} ${lastName}`.trim();
+    return fullName || this.userProfile.username || '';
   }
 
   get userDisplayName(): string {
