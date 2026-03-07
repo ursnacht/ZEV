@@ -393,6 +393,7 @@ Feature specs are in `/Specs/`:
 - `RefactoringProducer.md` - Producer refactoring
 - `SpringBoot4Upgrade.md` - Spring Boot 4 upgrade
 - `Statistik-PDF_Summen-pro-Einheit_Umsetzungsplan.md` - Statistics PDF unit summaries
+- `DarkMode.md` - Dark/Light mode toggle
 
 Specs with `_Umsetzungsplan` suffix contain implementation plans. Pure implementation plans (no separate spec):
 - `PDF-Bibliothek-Wechsel_Umsetzungsplan.md` - PDF library switch
