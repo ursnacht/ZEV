@@ -81,10 +81,12 @@
       <artifactId>qrbill-generator</artifactId>
       <version>3.3.0</version>
     </dependency>
+    <!-- Spring Boot 4: Starter statt nur flyway-core -->
     <dependency>
-      <groupId>org.flywaydb</groupId>
-      <artifactId>flyway-core</artifactId>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-flyway</artifactId>
     </dependency>
+    <!-- Datenbank-spezifisches Modul (z.B. PostgreSQL) -->
     <dependency>
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-database-postgresql</artifactId>

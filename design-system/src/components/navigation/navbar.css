@@ -206,16 +206,30 @@ button.zev-navbar__link:hover {
   background-color: var(--color-gray-200);
 }
 
+/* Dark Mode: text stays white (--color-white is repurposed as dark bg in dark mode) */
+[data-theme="dark"] .zev-navbar__title,
+[data-theme="dark"] .zev-navbar__link,
+[data-theme="dark"] .zev-navbar__username,
+[data-theme="dark"] button.zev-navbar__link {
+  color: #ffffff;
+}
+
 [data-theme="dark"] .zev-navbar__link:hover,
 [data-theme="dark"] .zev-navbar__link--active,
 [data-theme="dark"] button.zev-navbar__link:hover {
+  color: #ffffff;
   background-color: var(--color-gray-400);
 }
 
 [data-theme="dark"] button.zev-navbar__link:hover {
+  color: #ffffff !important;
   background-color: var(--color-gray-400) !important;
 }
 
 [data-theme="dark"] .zev-navbar__menu--open {
   box-shadow: -4px 4px 6px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .zev-hamburger .bar {
+  background-color: #ffffff;
 }
