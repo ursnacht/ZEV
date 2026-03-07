@@ -137,6 +137,20 @@ input[type="date"].zev-input {
   box-sizing: border-box;
 }
 
+/* Dark Mode */
+[data-theme="dark"] .zev-input,
+[data-theme="dark"] .zev-select {
+  background-color: var(--color-gray-200);
+  color: var(--color-gray-800);
+  border-color: var(--color-gray-400);
+}
+
+[data-theme="dark"] .zev-input:disabled,
+[data-theme="dark"] .zev-select:disabled {
+  background-color: var(--color-gray-300);
+  color: var(--color-gray-500);
+}
+
 /* Responsive: Stack on small screens */
 @media (max-width: 600px) {
   .zev-date-range-row {

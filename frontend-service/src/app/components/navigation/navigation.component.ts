@@ -5,6 +5,7 @@ import { filter } from 'rxjs/operators';
 
 import Keycloak from 'keycloak-js';
 import { KeycloakProfile } from 'keycloak-js';
+import { ThemeService } from '../../services/theme.service';
 import { TranslationService } from '../../services/translation.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
@@ -23,6 +24,10 @@ export class NavigationComponent implements OnInit, OnDestroy {
   private readonly keycloak = inject(Keycloak);
   private readonly router = inject(Router);
   private routerSubscription: Subscription | null = null;
+
+  private readonly themeService = inject(ThemeService);
+
+  readonly isDarkMode = this.themeService.isDarkMode;
 
   isMenuOpen = false;
   isCompact = false;
@@ -101,6 +106,10 @@ export class NavigationComponent implements OnInit, OnDestroy {
   logout() {
     this.keycloak.logout();
     this.closeMenu();
+  }
+
+  toggleDarkMode(): void {
+    this.themeService.toggleTheme();
   }
 
   switchLanguage() {

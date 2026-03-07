@@ -100,3 +100,129 @@
   --table-resize-handle-hover-color: var(--color-primary);
   --table-column-min-width: 50px;
 }
+
+/* =====================================================================
+ * Dark Mode – applied when data-theme="dark" is set on <html>
+ * Color palette: Catppuccin Mocha / Bootstrap 5.3 Dark reference
+ * ===================================================================== */
+[data-theme="dark"] {
+  /* Neutral (backgrounds & surfaces, dark to light) */
+  --color-white: #1e1e2e;
+  --color-gray-50: #181825;
+  --color-gray-100: #1e1e2e;
+  --color-gray-200: #27273a;
+  --color-gray-300: #313244;
+  --color-gray-400: #45475a;
+  --color-gray-500: #585b70;
+  --color-gray-600: #a6adc8;
+  --color-gray-700: #bac2de;
+  --color-gray-800: #cdd6f4;
+  --color-gray-900: #cdd6f4;
+
+  /* Primary (lighter green for dark backgrounds) */
+  --color-primary: #69db7c;
+  --color-primary-hover: #51cf66;
+  --color-primary-light: #8ce99a;
+  --color-primary-dark: #2f9e44;
+
+  /* Secondary (lighter blue) */
+  --color-secondary: #74c0fc;
+  --color-secondary-hover: #4dabf7;
+  --color-secondary-active: #339af0;
+  --color-secondary-light: #a5d8ff;
+  --color-secondary-dark: #1c7ed6;
+
+  /* Danger */
+  --color-danger: #ff6b6b;
+  --color-danger-hover: #fa5252;
+  --color-danger-light: #ffa8a8;
+  --color-danger-dark: #e03131;
+
+  /* Success */
+  --color-success-bg: #1c3829;
+  --color-success-text: #69db7c;
+  --color-success-border: #2f9e44;
+
+  /* Error */
+  --color-error-bg: #3b1219;
+  --color-error-text: #ff6b6b;
+  --color-error-border: #c92a2a;
+
+  /* Shadows */
+  --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* System preference fallback: applies dark mode when OS is dark
+   and the user has not yet explicitly chosen a theme */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-white: #1e1e2e;
+    --color-gray-50: #181825;
+    --color-gray-100: #1e1e2e;
+    --color-gray-200: #27273a;
+    --color-gray-300: #313244;
+    --color-gray-400: #45475a;
+    --color-gray-500: #585b70;
+    --color-gray-600: #a6adc8;
+    --color-gray-700: #bac2de;
+    --color-gray-800: #cdd6f4;
+    --color-gray-900: #cdd6f4;
+    --color-primary: #69db7c;
+    --color-primary-hover: #51cf66;
+    --color-primary-light: #8ce99a;
+    --color-primary-dark: #2f9e44;
+    --color-secondary: #74c0fc;
+    --color-secondary-hover: #4dabf7;
+    --color-secondary-active: #339af0;
+    --color-secondary-light: #a5d8ff;
+    --color-secondary-dark: #1c7ed6;
+    --color-danger: #ff6b6b;
+    --color-danger-hover: #fa5252;
+    --color-danger-light: #ffa8a8;
+    --color-danger-dark: #e03131;
+    --color-success-bg: #1c3829;
+    --color-success-text: #69db7c;
+    --color-success-border: #2f9e44;
+    --color-error-bg: #3b1219;
+    --color-error-text: #ff6b6b;
+    --color-error-border: #c92a2a;
+    --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Always print in light mode */
+@media print {
+  [data-theme="dark"] {
+    --color-white: #ffffff;
+    --color-gray-50: #f8f8f8;
+    --color-gray-100: #f5f5f5;
+    --color-gray-200: #f9f9f9;
+    --color-gray-300: #e0e0e0;
+    --color-gray-400: #ddd;
+    --color-gray-500: #ccc;
+    --color-gray-600: #666;
+    --color-gray-700: #555;
+    --color-gray-800: #333;
+    --color-gray-900: #2c3e50;
+    --color-primary: #4CAF50;
+    --color-primary-hover: #45a049;
+    --color-primary-light: #81C784;
+    --color-primary-dark: #388E3C;
+    --color-secondary: #2196F3;
+    --color-secondary-hover: #0b7dda;
+    --color-secondary-active: #3498db;
+    --color-secondary-light: #64B5F6;
+    --color-secondary-dark: #1976D2;
+    --color-danger: #f44336;
+    --color-danger-hover: #da190b;
+    --color-danger-light: #EF5350;
+    --color-danger-dark: #C62828;
+    --color-success-bg: #d4edda;
+    --color-success-text: #155724;
+    --color-success-border: #c3e6cb;
+    --color-error-bg: #f8d7da;
+    --color-error-text: #721c24;
+    --color-error-border: #f5c6cb;
+    --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+}

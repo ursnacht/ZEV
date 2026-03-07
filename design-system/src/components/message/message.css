@@ -45,6 +45,19 @@
   border-color: #17a2b8;
 }
 
+/* Dark Mode */
+[data-theme="dark"] .zev-message--warning {
+  background-color: #3d2c00;
+  color: #ffd43b;
+  border-color: #e67700;
+}
+
+[data-theme="dark"] .zev-message--info {
+  background-color: #0d2d3a;
+  color: #74c0fc;
+  border-color: #1971c2;
+}
+
 /* Dismissible Message */
 .zev-message--dismissible {
   cursor: pointer;

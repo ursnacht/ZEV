@@ -12,6 +12,9 @@
           {{ userDisplayName }}
         </span>
       }
+      <button class="zev-hamburger" (click)="toggleDarkMode()" [attr.aria-label]="isDarkMode() ? ('LIGHT_MODE' | translate) : ('DARK_MODE' | translate)">
+        <app-icon [name]="isDarkMode() ? 'sun' : 'moon'"></app-icon>
+      </button>
       <button class="zev-hamburger" (click)="toggleMenu()" [class.active]="isMenuOpen" aria-label="Menu">
         <span class="bar"></span>
         <span class="bar"></span>
@@ -96,6 +99,12 @@
           <app-icon name="globe"></app-icon>
           {{ 'TRANSLATION_EDITOR' | translate }}
         </a>
+      </li>
+      <li>
+        <button (click)="toggleDarkMode()" class="zev-navbar__link">
+          <app-icon [name]="isDarkMode() ? 'sun' : 'moon'"></app-icon>
+          {{ (isDarkMode() ? 'LIGHT_MODE' : 'DARK_MODE') | translate }}
+        </button>
       </li>
       <li>
         <button (click)="switchLanguage()" class="zev-navbar__link">

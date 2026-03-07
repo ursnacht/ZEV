@@ -44,3 +44,8 @@
 .zev-card--interactive:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
+
+/* Dark Mode */
+[data-theme="dark"] .zev-card--interactive:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}

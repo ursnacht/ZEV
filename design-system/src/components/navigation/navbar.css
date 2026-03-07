@@ -192,3 +192,30 @@ button.zev-navbar__link:hover {
 .zev-navbar__link--static:hover {
   background-color: transparent;
 }
+
+/* Dark Mode: use dark surface for navbar instead of primary green */
+[data-theme="dark"] .zev-navbar {
+  background-color: var(--color-gray-300);
+}
+
+[data-theme="dark"] .zev-navbar__container {
+  background-color: var(--color-gray-300);
+}
+
+[data-theme="dark"] .zev-navbar__menu {
+  background-color: var(--color-gray-200);
+}
+
+[data-theme="dark"] .zev-navbar__link:hover,
+[data-theme="dark"] .zev-navbar__link--active,
+[data-theme="dark"] button.zev-navbar__link:hover {
+  background-color: var(--color-gray-400);
+}
+
+[data-theme="dark"] button.zev-navbar__link:hover {
+  background-color: var(--color-gray-400) !important;
+}
+
+[data-theme="dark"] .zev-navbar__menu--open {
+  box-shadow: -4px 4px 6px rgba(0, 0, 0, 0.4);
+}

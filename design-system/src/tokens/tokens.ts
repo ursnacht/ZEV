@@ -115,8 +115,54 @@ export const layout = {
   calculationMaxWidth: '800px',
 } as const;
 
+export const darkColors = {
+  primary: {
+    base: '#69db7c',
+    hover: '#51cf66',
+    light: '#8ce99a',
+    dark: '#2f9e44',
+  },
+  secondary: {
+    base: '#74c0fc',
+    hover: '#4dabf7',
+    active: '#339af0',
+    light: '#a5d8ff',
+    dark: '#1c7ed6',
+  },
+  danger: {
+    base: '#ff6b6b',
+    hover: '#fa5252',
+    light: '#ffa8a8',
+    dark: '#e03131',
+  },
+  success: {
+    background: '#1c3829',
+    text: '#69db7c',
+    border: '#2f9e44',
+  },
+  error: {
+    background: '#3b1219',
+    text: '#ff6b6b',
+    border: '#c92a2a',
+  },
+  neutral: {
+    white: '#1e1e2e',
+    gray50: '#181825',
+    gray100: '#1e1e2e',
+    gray200: '#27273a',
+    gray300: '#313244',
+    gray400: '#45475a',
+    gray500: '#585b70',
+    gray600: '#a6adc8',
+    gray700: '#bac2de',
+    gray800: '#cdd6f4',
+    gray900: '#cdd6f4',
+  },
+} as const;
+
 // Type exports for consumers
 export type ColorToken = typeof colors;
+export type DarkColorToken = typeof darkColors;
 export type SpacingToken = typeof spacing;
 export type TypographyToken = typeof typography;
 export type BorderRadiusToken = typeof borderRadius;
