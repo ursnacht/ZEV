@@ -233,3 +233,7 @@ button.zev-navbar__link:hover {
 [data-theme="dark"] .zev-hamburger .bar {
   background-color: #ffffff;
 }
+
+[data-theme="dark"] .zev-hamburger .zev-icon {
+  color: #ffffff;
+}
