@@ -14,5 +14,11 @@ public enum TarifTyp {
      * VNB (Verteilnetzbetreiber) - Grid energy from network operator.
      * Calculated from messwerte.total - messwerte.zev_calculated
      */
-    VNB
+    VNB,
+
+    /**
+     * GRUNDGEBUEHR - Monthly fixed fee per electricity meter.
+     * Calculated as: number of full calendar months × fixed price per meter.
+     */
+    GRUNDGEBUEHR
 }

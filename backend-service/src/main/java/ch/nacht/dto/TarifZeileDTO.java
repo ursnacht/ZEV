@@ -17,6 +17,7 @@ public class TarifZeileDTO {
     private double preis;      // CHF/kWh
     private double betrag;     // CHF
     private TarifTyp typ;
+    private String mengeneinheit; // "kWh" for ZEV/VNB, "Monate" for GRUNDGEBUEHR
 
     public TarifZeileDTO() {
     }
@@ -29,6 +30,18 @@ public class TarifZeileDTO {
         this.preis = preis;
         this.betrag = betrag;
         this.typ = typ;
+        this.mengeneinheit = "kWh";
+    }
+
+    public TarifZeileDTO(String bezeichnung, LocalDate von, LocalDate bis, double menge, double preis, double betrag, TarifTyp typ, String mengeneinheit) {
+        this.bezeichnung = bezeichnung;
+        this.von = von;
+        this.bis = bis;
+        this.menge = menge;
+        this.preis = preis;
+        this.betrag = betrag;
+        this.typ = typ;
+        this.mengeneinheit = mengeneinheit;
     }
 
     public String getBezeichnung() {
@@ -85,5 +98,13 @@ public class TarifZeileDTO {
 
     public void setTyp(TarifTyp typ) {
         this.typ = typ;
+    }
+
+    public String getMengeneinheit() {
+        return mengeneinheit;
+    }
+
+    public void setMengeneinheit(String mengeneinheit) {
+        this.mengeneinheit = mengeneinheit;
     }
 }

@@ -1,6 +1,7 @@
 export enum TarifTyp {
   ZEV = 'ZEV',
-  VNB = 'VNB'
+  VNB = 'VNB',
+  GRUNDGEBUEHR = 'GRUNDGEBUEHR'
 }
 
 export interface Tarif {

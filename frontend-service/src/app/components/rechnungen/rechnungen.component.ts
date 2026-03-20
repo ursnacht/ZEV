@@ -20,12 +20,14 @@ export class RechnungenComponent implements OnInit {
   dateFrom: string = '';
   dateTo: string = '';
   selectedEinheitIds: Set<number> = new Set();
-  consumers: Einheit[] = [];
+  einheiten: Einheit[] = [];
   loading = false;
   generating = false;
   message = '';
   messageType: 'success' | 'error' | '' = '';
   generatedRechnungen: GeneratedRechnung[] = [];
+
+  readonly EinheitTyp = EinheitTyp;
 
   constructor(
     private einheitService: EinheitService,
@@ -34,7 +36,7 @@ export class RechnungenComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.loadConsumers();
+    this.loadEinheiten();
     this.setDefaultDates();
   }
 
@@ -55,14 +57,15 @@ export class RechnungenComponent implements OnInit {
     return `${year}-${month}-${day}`;
   }
 
-  loadConsumers(): void {
+  loadEinheiten(): void {
     this.loading = true;
     this.einheitService.getAllEinheiten().subscribe({
       next: (data) => {
-        // Filter only consumers and sort by name
-        this.consumers = data
-          .filter(e => e.typ === EinheitTyp.CONSUMER)
-          .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        // Sort: CONSUMER before PRODUCER, then alphabetically by name
+        this.einheiten = data.sort((a, b) => {
+          if (a.typ !== b.typ) return a.typ === EinheitTyp.CONSUMER ? -1 : 1;
+          return (a.name || '').localeCompare(b.name || '');
+        });
         this.loading = false;
       },
       error: (error) => {
@@ -84,18 +87,18 @@ export class RechnungenComponent implements OnInit {
   }
 
   allSelected(): boolean {
-    return this.consumers.length > 0 && this.selectedEinheitIds.size === this.consumers.length;
+    return this.einheiten.length > 0 && this.selectedEinheitIds.size === this.einheiten.length;
   }
 
   someSelected(): boolean {
-    return this.selectedEinheitIds.size > 0 && this.selectedEinheitIds.size < this.consumers.length;
+    return this.selectedEinheitIds.size > 0 && this.selectedEinheitIds.size < this.einheiten.length;
   }
 
   onSelectAllToggle(): void {
     if (this.allSelected()) {
       this.selectedEinheitIds.clear();
     } else {
-      this.consumers.forEach(e => {
+      this.einheiten.forEach(e => {
         if (e.id) {
           this.selectedEinheitIds.add(e.id);
         }
@@ -171,9 +174,11 @@ export class RechnungenComponent implements OnInit {
   private showMessage(message: string, type: 'success' | 'error'): void {
     this.message = message;
     this.messageType = type;
-    setTimeout(() => {
-      this.message = '';
-      this.messageType = '';
-    }, 5000);
+    if (type === 'success') {
+      setTimeout(() => {
+        this.message = '';
+        this.messageType = '';
+      }, 5000);
+    }
   }
 }

@@ -49,6 +49,7 @@ Das Design System (`/design-system`) enthält alle wiederverwendbaren UI-Kompone
 * Komponenten-CSS-Dateien minimal halten (nur komponentenspezifische Styles)
 * Neue wiederverwendbare Styles in `design-system/src/components/` hinzufügen
 * Nach Änderungen am Design System: `cd design-system && npm run build`
+* Ändere nach dem Build des Backends NIEMALS ein DB-Migrationsskript
 
 ### Multi-Tenancy
 * Jede Entity muss eine `org_id` (UUID) Spalte haben

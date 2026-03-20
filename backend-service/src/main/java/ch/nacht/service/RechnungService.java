@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Year;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -53,20 +54,28 @@ public class RechnungService {
     /**
      * Calculate invoices for the given unit IDs and time period.
      * Creates separate invoices for each tenant within the period.
+     * Producers receive invoices with GRUNDGEBUEHR lines only.
      *
      * @param einheitIds List of unit IDs to generate invoices for
      * @param von Start date (inclusive)
      * @param bis End date (inclusive)
      * @return List of calculated invoice DTOs
-     * @throws IllegalStateException if tariffs don't cover the entire period
+     * @throws IllegalStateException if tariffs don't cover the entire period (consumers only)
      */
     @Transactional(readOnly = true)
     public List<RechnungDTO> berechneRechnungen(List<Long> einheitIds, LocalDate von, LocalDate bis) {
         hibernateFilterService.enableOrgFilter();
         log.info("Calculating invoices for {} units from {} to {}", einheitIds.size(), von, bis);
 
-        // Validate tariff coverage before calculating any invoices
-        tarifService.validateTarifAbdeckung(von, bis);
+        // Validate ZEV/VNB tariff coverage only if consumer units are selected
+        boolean hasConsumers = einheitIds.stream()
+                .anyMatch(id -> einheitRepository.findById(id)
+                        .map(e -> e.getTyp() == EinheitTyp.CONSUMER)
+                        .orElse(false));
+
+        if (hasConsumers) {
+            tarifService.validateTarifAbdeckung(von, bis);
+        }
 
         List<RechnungDTO> rechnungen = new ArrayList<>();
 
@@ -96,8 +105,16 @@ public class RechnungService {
                                     einheit.getName(), m.getName(), effektivVon, effektivBis, rechnung.getEndBetrag());
                         }
                     }
-                } else {
-                    log.warn("Skipping unit {} - not a consumer", einheit.getName());
+                } else if (einheit.getTyp() == EinheitTyp.PRODUCER) {
+                    // Producers receive GRUNDGEBUEHR lines only
+                    RechnungDTO rechnung = berechneProduzentenRechnung(einheit, von, bis);
+                    if (!rechnung.getTarifZeilen().isEmpty()) {
+                        rechnungen.add(rechnung);
+                        log.debug("Calculated producer invoice for unit {}: {} CHF",
+                                einheit.getName(), rechnung.getEndBetrag());
+                    } else {
+                        log.debug("Skipping producer unit {} - no GRUNDGEBUEHR tariffs found", einheit.getName());
+                    }
                 }
             });
         }
@@ -107,7 +124,7 @@ public class RechnungService {
     }
 
     /**
-     * Calculate a single invoice for a unit, optional tenant, and time period.
+     * Calculate a single invoice for a consumer unit, optional tenant, and time period.
      *
      * @param einheit The unit to generate invoice for
      * @param mieter The tenant (can be null for vacant units)
@@ -150,6 +167,12 @@ public class RechnungService {
         // Calculate VNB tariff lines (based on total - zevCalculated measurements)
         totalBetrag += berechneTarifZeilen(rechnung, einheit, von, bis, vnbTarife, TarifTyp.VNB);
 
+        // Calculate GRUNDGEBUEHR lines (optional - no error if no tariff found)
+        List<Tarif> grundgebuehrTarife = tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis);
+        if (!grundgebuehrTarife.isEmpty()) {
+            totalBetrag += berechneGrundgebuehrZeilen(rechnung, von, bis, grundgebuehrTarife);
+        }
+
         // Calculate totals with rounding to 5 Rappen
         double endBetrag = roundTo5Rappen(totalBetrag);
         double rundung = endBetrag - totalBetrag;
@@ -173,7 +196,113 @@ public class RechnungService {
     }
 
     /**
-     * Calculate tariff lines for a specific tariff type.
+     * Calculate an invoice for a producer unit containing only GRUNDGEBUEHR lines.
+     *
+     * @param einheit The producer unit
+     * @param von Start date (inclusive)
+     * @param bis End date (inclusive)
+     * @return Calculated invoice DTO (may have empty tarifZeilen if no GRUNDGEBUEHR tariffs exist)
+     */
+    private RechnungDTO berechneProduzentenRechnung(Einheit einheit, LocalDate von, LocalDate bis) {
+        RechnungDTO rechnung = new RechnungDTO();
+        rechnung.setEinheitId(einheit.getId());
+        rechnung.setEinheitName(einheit.getName());
+        rechnung.setMesspunkt(einheit.getMesspunkt());
+        rechnung.setVon(von);
+        rechnung.setBis(bis);
+        rechnung.setErstellungsdatum(LocalDate.now());
+
+        List<Tarif> tarife = tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis);
+        double total = berechneGrundgebuehrZeilen(rechnung, von, bis, tarife);
+        double endBetrag = roundTo5Rappen(total);
+
+        rechnung.setTotalBetrag(total);
+        rechnung.setRundung(endBetrag - total);
+        rechnung.setEndBetrag(endBetrag);
+
+        EinstellungenDTO einstellungen = einstellungenService.getEinstellungenOrThrow();
+        RechnungKonfigurationDTO config = einstellungen.getRechnung();
+        RechnungKonfigurationDTO.StellerDTO steller = config.getSteller();
+
+        rechnung.setZahlungsfrist(config.getZahlungsfrist());
+        rechnung.setIban(config.getIban());
+        rechnung.setStellerName(steller.getName());
+        rechnung.setStellerStrasse(steller.getStrasse());
+        rechnung.setStellerPlzOrt(steller.getPlz() + " " + steller.getOrt());
+
+        return rechnung;
+    }
+
+    /**
+     * Calculate GRUNDGEBUEHR tariff lines based on full calendar months.
+     * A month is counted only if both its first and last day lie within the effective period.
+     *
+     * @param rechnung The invoice DTO to add lines to
+     * @param von Invoice start date
+     * @param bis Invoice end date
+     * @param tarife List of applicable GRUNDGEBUEHR tariffs
+     * @return Total amount for all GRUNDGEBUEHR lines
+     */
+    private double berechneGrundgebuehrZeilen(RechnungDTO rechnung, LocalDate von, LocalDate bis,
+                                               List<Tarif> tarife) {
+        double total = 0.0;
+
+        for (Tarif tarif : tarife) {
+            LocalDate effVon = tarif.getGueltigVon().isBefore(von) ? von : tarif.getGueltigVon();
+            LocalDate effBis = tarif.getGueltigBis().isAfter(bis) ? bis : tarif.getGueltigBis();
+
+            int monate = zaehleVolleMonate(effVon, effBis);
+            if (monate <= 0) {
+                continue;
+            }
+
+            double preis = tarif.getPreis().doubleValue();
+            double betrag = monate * preis;
+
+            rechnung.addTarifZeile(new TarifZeileDTO(
+                    tarif.getBezeichnung(),
+                    effVon,
+                    effBis,
+                    monate,
+                    preis,
+                    betrag,
+                    TarifTyp.GRUNDGEBUEHR,
+                    "MONAT"
+            ));
+            total += betrag;
+
+            log.debug("GRUNDGEBUEHR line ({} to {}): {} Monate * {} = {} CHF",
+                    effVon, effBis, monate, preis, betrag);
+        }
+
+        return total;
+    }
+
+    /**
+     * Count full calendar months within the period [von, bis] (inclusive).
+     * A month is counted as full if both its first and last day lie within the period.
+     *
+     * @param von Start date (inclusive)
+     * @param bis End date (inclusive)
+     * @return Number of full calendar months
+     */
+    private int zaehleVolleMonate(LocalDate von, LocalDate bis) {
+        int count = 0;
+        LocalDate monthStart = von.withDayOfMonth(1);
+        while (!monthStart.isAfter(bis)) {
+            LocalDate monthEnd = monthStart.withDayOfMonth(
+                    monthStart.getMonth().length(Year.isLeap(monthStart.getYear()))
+            );
+            if (!monthStart.isBefore(von) && !monthEnd.isAfter(bis)) {
+                count++;
+            }
+            monthStart = monthStart.plusMonths(1);
+        }
+        return count;
+    }
+
+    /**
+     * Calculate tariff lines for a specific tariff type (ZEV or VNB).
      * For each tariff, queries the actual measurements for that tariff's validity period.
      *
      * @param rechnung The invoice DTO to add lines to
@@ -227,7 +356,8 @@ public class RechnungService {
                 menge,
                 preis,
                 betrag,
-                typ
+                typ,
+                "KWH"
             );
             rechnung.addTarifZeile(zeile);
             totalBetrag += betrag;

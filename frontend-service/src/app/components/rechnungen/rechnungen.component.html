@@ -9,28 +9,28 @@
 
   <form (ngSubmit)="onGenerate()">
     <div class="zev-form-group">
-      <label>{{ 'KONSUMENTEN_WAEHLEN' | translate }}:</label>
+      <label>{{ 'EINHEITEN_WAEHLEN' | translate }}:</label>
       <div class="zev-checkbox-group zev-checkbox-group--scrollable">
         <div class="zev-checkbox-item zev-checkbox-item--select-all">
-          <input type="checkbox" id="consumer-select-all"
+          <input type="checkbox" id="einheit-select-all"
             [checked]="allSelected()" [indeterminate]="someSelected()" (change)="onSelectAllToggle()">
-            <label for="consumer-select-all">
+            <label for="einheit-select-all">
               <strong>{{ 'ALLE_AUSWAEHLEN' | translate }}</strong>
             </label>
           </div>
-          @for (consumer of consumers; track consumer) {
+          @for (einheit of einheiten; track einheit) {
             <div class="zev-checkbox-item">
-              <input type="checkbox" [id]="'consumer-' + consumer.id" [value]="consumer.id"
-                [checked]="selectedEinheitIds.has(consumer.id!)" (change)="onEinheitToggle(consumer.id!)">
-                <label [for]="'consumer-' + consumer.id">
-                  {{ consumer.name }}
+              <input type="checkbox" [id]="'einheit-' + einheit.id" [value]="einheit.id"
+                [checked]="selectedEinheitIds.has(einheit.id!)" (change)="onEinheitToggle(einheit.id!)">
+                <label [for]="'einheit-' + einheit.id">
+                  {{ einheit.name }} [{{ (einheit.typ === EinheitTyp.CONSUMER ? 'KONSUMENT' : 'PRODUZENT') | translate }}]
                 </label>
               </div>
             }
           </div>
-          @if (consumers.length === 0 && !loading) {
+          @if (einheiten.length === 0 && !loading) {
             <div class="zev-form-hint">
-              {{ 'KEINE_KONSUMENTEN_VORHANDEN' | translate }}
+              {{ 'KEINE_EINHEITEN_VORHANDEN' | translate }}
             </div>
           }
         </div>

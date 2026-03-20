@@ -26,7 +26,8 @@ export class TarifFormComponent implements OnInit {
 
   tarifTypOptions = [
     { value: TarifTyp.ZEV, label: 'ZEV (Solarstrom)' },
-    { value: TarifTyp.VNB, label: 'VNB (Netzstrom)' }
+    { value: TarifTyp.VNB, label: 'VNB (Netzstrom)' },
+    { value: TarifTyp.GRUNDGEBUEHR, label: 'Grundgebühr (CHF/Monat/Zähler)' }
   ];
 
   ngOnInit(): void {

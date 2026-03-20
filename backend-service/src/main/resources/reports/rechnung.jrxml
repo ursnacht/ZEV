@@ -16,6 +16,7 @@
     <field name="menge" class="java.lang.Double"/>
     <field name="preis" class="java.lang.Double"/>
     <field name="betrag" class="java.lang.Double"/>
+    <field name="mengeneinheit" class="java.lang.String"/>
 
     <!-- Variables -->
     <variable name="HAS_MULTIPLE_TARIFFS" class="java.lang.Boolean" calculation="System">
@@ -150,8 +151,8 @@
                     <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
                 </box>
             </element>
-            <element kind="staticText" uuid="11111111-1111-1111-1111-11111111112a" x="410" y="0" width="70" height="18" fontSize="8.0" hTextAlign="Right" vTextAlign="Middle">
-                <text><![CDATA[CHF / kWh]]></text>
+            <element kind="textField" uuid="11111111-1111-1111-1111-11111111112a" x="410" y="0" width="70" height="18" fontSize="8.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA["CHF / " + $P{TRANSLATIONS}.get($F{mengeneinheit})]]></expression>
                 <box>
                     <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
                 </box>

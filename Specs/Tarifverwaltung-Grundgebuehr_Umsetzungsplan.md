@@ -28,14 +28,14 @@ Einführung des neuen Tariftyps `GRUNDGEBUEHR` (monatlicher Festpreis pro Stromz
 
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
-| [ ] | 1. Backend – TarifTyp Enum | `GRUNDGEBUEHR` als neuen Wert in `TarifTyp.java` ergänzen |
-| [ ] | 2. Backend – TarifZeileDTO | Feld `mengeneinheit` (String) hinzufügen; wird für PDF-Zeile benötigt (kWh vs. Monate) |
-| [ ] | 3. Backend – RechnungService | Grundgebühr-Berechnung (volle Monate) + PRODUCER-Support in `berechneRechnungen` |
-| [ ] | 4. Backend – rechnung.jrxml | Statisches `CHF / kWh` durch dynamisches `$F{mengeneinheit}` ersetzen; Field deklarieren |
-| [ ] | 5. Frontend – tarif.model.ts | `GRUNDGEBUEHR` zum `TarifTyp`-Enum ergänzen |
-| [ ] | 6. Frontend – TarifFormComponent | `GRUNDGEBUEHR`-Option im Tariftyp-Dropdown ergänzen |
-| [ ] | 7. Frontend – RechnungenComponent | Alle Einheiten (CONSUMER + PRODUCER) laden und mit Typ-Label anzeigen |
-| [ ] | 8. Übersetzungen | Flyway-Migration V49 für neue Translation-Keys |
+| [x] | 1. Backend – TarifTyp Enum | `GRUNDGEBUEHR` als neuen Wert in `TarifTyp.java` ergänzen |
+| [x] | 2. Backend – TarifZeileDTO | Feld `mengeneinheit` (String) hinzufügen; wird für PDF-Zeile benötigt (kWh vs. Monate) |
+| [x] | 3. Backend – RechnungService | Grundgebühr-Berechnung (volle Monate) + PRODUCER-Support in `berechneRechnungen` |
+| [x] | 4. Backend – rechnung.jrxml | Statisches `CHF / kWh` durch dynamisches `$F{mengeneinheit}` ersetzen; Field deklarieren |
+| [x] | 5. Frontend – tarif.model.ts | `GRUNDGEBUEHR` zum `TarifTyp`-Enum ergänzen |
+| [x] | 6. Frontend – TarifFormComponent | `GRUNDGEBUEHR`-Option im Tariftyp-Dropdown ergänzen |
+| [x] | 7. Frontend – RechnungenComponent | Alle Einheiten (CONSUMER + PRODUCER) laden und mit Typ-Label anzeigen |
+| [x] | 8. Übersetzungen | Flyway-Migration V49 für neue Translation-Keys |
 
 ---
 
@@ -61,7 +61,7 @@ public enum TarifTyp {
 
 Neues Feld `mengeneinheit` (String) ergänzen:
 - Für ZEV/VNB-Zeilen: `"kWh"`
-- Für GRUNDGEBUEHR-Zeilen: `"Monate"`
+- Für GRUNDGEBUEHR-Zeilen: `"MONAT"`
 
 **Konstruktor anpassen:**
 ```java
@@ -108,7 +108,7 @@ private double berechneGrundgebuehrZeilen(RechnungDTO rechnung,
 
         rechnung.addTarifZeile(new TarifZeileDTO(
             tarif.getBezeichnung(), effVon, effBis,
-            monate, preis, betrag, TarifTyp.GRUNDGEBUEHR, "Monate"
+            monate, preis, betrag, TarifTyp.GRUNDGEBUEHR, "MONAT"
         ));
         total += betrag;
     }
