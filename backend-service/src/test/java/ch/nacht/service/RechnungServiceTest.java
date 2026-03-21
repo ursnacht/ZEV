@@ -281,6 +281,7 @@ public class RechnungServiceTest {
         LocalDate von = LocalDate.of(2024, 1, 1);
         LocalDate bis = LocalDate.of(2024, 1, 31);
 
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumer));
         doThrow(new IllegalStateException("ZEV-Tarif fehlt"))
             .when(tarifService).validateTarifAbdeckung(von, bis);
 
@@ -306,8 +307,12 @@ public class RechnungServiceTest {
         when(einheitRepository.findById(2L)).thenReturn(Optional.of(producer));
         when(mieterService.getMieterForQuartal(eq(1L), any(), any())).thenReturn(Collections.emptyList());
 
-        when(tarifService.getTarifeForZeitraum(any(), any(), any()))
+        when(tarifService.getTarifeForZeitraum(eq(TarifTyp.ZEV), any(), any()))
             .thenReturn(Collections.singletonList(zevTarif2024));
+        when(tarifService.getTarifeForZeitraum(eq(TarifTyp.VNB), any(), any()))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+        when(tarifService.getTarifeForZeitraum(eq(TarifTyp.GRUNDGEBUEHR), any(), any()))
+            .thenReturn(Collections.emptyList());
         when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(any(), any(), any()))
             .thenReturn(100.0);
         when(messwerteRepository.sumTotalByEinheitAndZeitBetween(any(), any(), any()))
