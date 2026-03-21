@@ -62,10 +62,11 @@ describe('TarifFormComponent', () => {
       expect(component.formData.gueltigBis).toBe('2024-12-31');
     });
 
-    it('should have two tarif type options', () => {
-      expect(component.tarifTypOptions.length).toBe(2);
+    it('should have three tarif type options', () => {
+      expect(component.tarifTypOptions.length).toBe(3);
       expect(component.tarifTypOptions[0].value).toBe(TarifTyp.ZEV);
       expect(component.tarifTypOptions[1].value).toBe(TarifTyp.VNB);
+      expect(component.tarifTypOptions[2].value).toBe(TarifTyp.GRUNDGEBUEHR);
     });
   });
 

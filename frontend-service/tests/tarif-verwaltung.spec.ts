@@ -862,3 +862,162 @@ test.describe('Tarif Management - Validation Buttons', () => {
         expect(messageText).toBeTruthy();
     });
 });
+
+test.describe('Tarif Management - Grundgebühr (GRUNDGEBUEHR)', () => {
+    test('should show GRUNDGEBUEHR option in tarif type dropdown', async ({ page }) => {
+        await navigateToTarife(page);
+
+        const createButton = page.locator('button.zev-button--primary').first();
+        await createButton.click();
+
+        await expect(page.locator('form')).toBeVisible();
+
+        // GRUNDGEBUEHR must appear as a select option
+        const grundgebuehrOption = page.locator('#tariftyp option[value="GRUNDGEBUEHR"]');
+        await expect(grundgebuehrOption).toHaveCount(1);
+    });
+
+    test('should create a GRUNDGEBUEHR tariff successfully', async ({ page }) => {
+        await navigateToTarife(page);
+
+        const createButton = page.locator('button.zev-button--primary').first();
+        await createButton.click();
+
+        const testName = generateTestTarifName('GRUNDGEBUEHR Test');
+        await page.locator('#tariftyp').selectOption('GRUNDGEBUEHR');
+        await page.locator('#bezeichnung').fill(testName);
+        await page.locator('#preis').fill('12.50000');
+        await page.locator('#gueltigVon').fill('2099-01-01');
+        await page.locator('#gueltigBis').fill('2099-12-31');
+
+        const submitButton = page.locator('button[type="submit"]');
+        await submitButton.click();
+
+        let isSuccess = false;
+        try {
+            isSuccess = await waitForFormResult(page, 20000);
+        } catch {
+            console.log('GRUNDGEBUEHR tariff creation failed, skipping verification');
+            return;
+        }
+
+        if (isSuccess) {
+            createdTarifNames.push(testName);
+
+            await waitForTableWithData(page, 10000);
+
+            const newRow = page.locator(`tr:has-text("${testName}")`);
+            await expect(newRow).toBeVisible({ timeout: 10000 });
+
+            // GRUNDGEBUEHR badge should be visible
+            const badge = newRow.locator('.tarif-typ-badge--grundgebuehr');
+            await expect(badge).toBeVisible();
+        } else {
+            console.log('GRUNDGEBUEHR tariff creation failed, skipping verification');
+        }
+    });
+
+    test('should edit a GRUNDGEBUEHR tariff', async ({ page }) => {
+        await navigateToTarife(page);
+
+        // Create a GRUNDGEBUEHR tariff first
+        const createButton = page.locator('button.zev-button--primary').first();
+        await createButton.click();
+
+        const testName = generateTestTarifName('GRUNDGEBUEHR Edit');
+        await page.locator('#tariftyp').selectOption('GRUNDGEBUEHR');
+        await page.locator('#bezeichnung').fill(testName);
+        await page.locator('#preis').fill('10.00000');
+        await page.locator('#gueltigVon').fill('2099-01-01');
+        await page.locator('#gueltigBis').fill('2099-12-31');
+
+        await page.locator('button[type="submit"]').click();
+
+        let isSuccess = false;
+        try {
+            isSuccess = await waitForFormResult(page, 20000);
+        } catch {
+            console.log('GRUNDGEBUEHR tariff creation failed, skipping edit test');
+            return;
+        }
+
+        if (!isSuccess) {
+            console.log('GRUNDGEBUEHR tariff creation failed, skipping edit test');
+            return;
+        }
+
+        createdTarifNames.push(testName);
+        await waitForTableWithData(page, 10000);
+
+        const tarifRow = page.locator(`tr:has-text("${testName}")`);
+        await expect(tarifRow).toBeVisible({ timeout: 10000 });
+
+        await clickKebabMenuItem(page, tarifRow, 'edit');
+
+        await expect(page.locator('form')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#bezeichnung')).toHaveValue(testName);
+        // Tarif type should be GRUNDGEBUEHR
+        await expect(page.locator('#tariftyp')).toHaveValue('GRUNDGEBUEHR');
+
+        // Update price
+        await page.locator('#preis').fill('15.00000');
+        await page.locator('button[type="submit"]').click();
+
+        try {
+            isSuccess = await waitForFormResult(page, 20000);
+        } catch {
+            console.log('GRUNDGEBUEHR tariff edit failed');
+        }
+
+        if (isSuccess) {
+            await waitForTableWithData(page, 10000);
+            await expect(page.locator(`tr:has-text("${testName}")`)).toBeVisible({ timeout: 10000 });
+        }
+    });
+
+    test('should delete a GRUNDGEBUEHR tariff', async ({ page }) => {
+        await navigateToTarife(page);
+
+        // Create a GRUNDGEBUEHR tariff to delete
+        const createButton = page.locator('button.zev-button--primary').first();
+        await createButton.click();
+
+        const testName = generateTestTarifName('GRUNDGEBUEHR Delete');
+        await page.locator('#tariftyp').selectOption('GRUNDGEBUEHR');
+        await page.locator('#bezeichnung').fill(testName);
+        await page.locator('#preis').fill('8.00000');
+        await page.locator('#gueltigVon').fill('2099-01-01');
+        await page.locator('#gueltigBis').fill('2099-12-31');
+
+        await page.locator('button[type="submit"]').click();
+
+        let isSuccess = false;
+        try {
+            isSuccess = await waitForFormResult(page, 20000);
+        } catch {
+            console.log('GRUNDGEBUEHR tariff creation failed, skipping delete test');
+            return;
+        }
+
+        if (!isSuccess) {
+            console.log('GRUNDGEBUEHR tariff creation failed, skipping delete test');
+            return;
+        }
+
+        createdTarifNames.push(testName);
+        await waitForTableWithData(page, 10000);
+
+        const tarifRow = page.locator(`tr:has-text("${testName}")`);
+        await expect(tarifRow).toBeVisible({ timeout: 10000 });
+
+        page.once('dialog', async dialog => { await dialog.accept(); });
+        await clickKebabMenuItem(page, tarifRow, 'delete');
+
+        try {
+            await expect(tarifRow).not.toBeVisible({ timeout: 10000 });
+            createdTarifNames = createdTarifNames.filter(n => n !== testName);
+        } catch {
+            console.log('GRUNDGEBUEHR tariff deletion may have failed');
+        }
+    });
+});

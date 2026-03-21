@@ -98,7 +98,7 @@ export async function navigateToHome(page: Page): Promise<void> {
  * Open hamburger menu
  */
 export async function openHamburgerMenu(page: Page): Promise<void> {
-    const hamburger = page.locator('.zev-hamburger');
+    const hamburger = page.locator('.zev-hamburger[aria-label="Menu"]');
     await hamburger.waitFor({ state: 'visible', timeout: 5000 });
     await hamburger.click();
     // Wait for menu animation

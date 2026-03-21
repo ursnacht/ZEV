@@ -26,8 +26,8 @@ test.describe('ZEV App', () => {
         // Wait for the navbar to be visible first
         await page.locator('.zev-navbar').waitFor({ state: 'visible', timeout: 10000 });
 
-        // Check that hamburger button exists
-        const hamburgerButton = page.locator('.zev-hamburger');
+        // Check that the menu hamburger button exists
+        const hamburgerButton = page.locator('.zev-hamburger[aria-label="Menu"]');
         await expect(hamburgerButton).toBeVisible();
     });
 
@@ -40,7 +40,7 @@ test.describe('ZEV App', () => {
         // Wait for the navbar to be visible
         await page.locator('.zev-navbar').waitFor({ state: 'visible', timeout: 10000 });
 
-        const hamburgerButton = page.locator('.zev-hamburger');
+        const hamburgerButton = page.locator('.zev-hamburger[aria-label="Menu"]');
         const menu = page.locator('.zev-navbar__menu');
 
         // Menu should not be open initially
