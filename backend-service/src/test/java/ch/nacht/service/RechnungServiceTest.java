@@ -440,4 +440,332 @@ public class RechnungServiceTest {
         assertEquals(10.10, RechnungService.roundTo5Rappen(10.08));
         assertEquals(10.10, RechnungService.roundTo5Rappen(10.10));
     }
+
+    // ─── GRUNDGEBUEHR: zaehleVolleMonate (indirekt via berechneRechnung) ─────────
+
+    @Test
+    void berechneRechnung_GrundgebuehrFullQuarter_ThreeMonths() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Tarif grundgebuehr = new Tarif(
+            "Grundgebühr 2024", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
+        );
+
+        when(tarifService.getTarifeForZeitraum(TarifTyp.ZEV, von, bis))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.VNB, von, bis))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(Collections.singletonList(grundgebuehr));
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(150.0);
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
+
+        TarifZeileDTO grundgebuehrZeile = rechnung.getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR)
+            .findFirst().orElseThrow();
+
+        assertEquals(3.0, grundgebuehrZeile.getMenge(), 0.001); // 3 volle Monate: Jan, Feb, Mär
+        assertEquals(5.0, grundgebuehrZeile.getPreis(), 0.00001);
+        assertEquals(15.0, grundgebuehrZeile.getBetrag(), 0.01);
+    }
+
+    @Test
+    void berechneRechnung_GrundgebuehrPartialStartMonth_ExcludesIncompleteMonth() {
+        // Rechnungsperiode beginnt am 15. Januar → Januar wird nicht gezählt
+        LocalDate von = LocalDate.of(2024, 1, 15);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Tarif grundgebuehr = new Tarif(
+            "Grundgebühr 2024", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
+        );
+
+        when(tarifService.getTarifeForZeitraum(TarifTyp.ZEV, von, bis))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.VNB, von, bis))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(Collections.singletonList(grundgebuehr));
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(150.0);
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
+
+        TarifZeileDTO grundgebuehrZeile = rechnung.getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR)
+            .findFirst().orElseThrow();
+
+        assertEquals(2.0, grundgebuehrZeile.getMenge(), 0.001); // Nur Feb + Mär
+        assertEquals(10.0, grundgebuehrZeile.getBetrag(), 0.01);
+    }
+
+    @Test
+    void berechneRechnung_GrundgebuehrPartialEndMonth_ExcludesIncompleteMonth() {
+        // Rechnungsperiode endet am 15. März → März wird nicht gezählt
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 15);
+
+        Tarif grundgebuehr = new Tarif(
+            "Grundgebühr 2024", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
+        );
+
+        when(tarifService.getTarifeForZeitraum(TarifTyp.ZEV, von, bis))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.VNB, von, bis))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(Collections.singletonList(grundgebuehr));
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(150.0);
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
+
+        TarifZeileDTO grundgebuehrZeile = rechnung.getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR)
+            .findFirst().orElseThrow();
+
+        assertEquals(2.0, grundgebuehrZeile.getMenge(), 0.001); // Nur Jan + Feb
+    }
+
+    @Test
+    void berechneRechnung_GrundgebuehrLessThanOneMonth_NoLineAdded() {
+        // Rechnungsperiode weniger als 1 Monat → 0 volle Monate → keine Zeile
+        LocalDate von = LocalDate.of(2024, 1, 15);
+        LocalDate bis = LocalDate.of(2024, 1, 28);
+
+        Tarif grundgebuehr = new Tarif(
+            "Grundgebühr 2024", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
+        );
+
+        when(tarifService.getTarifeForZeitraum(TarifTyp.ZEV, von, bis))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.VNB, von, bis))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(Collections.singletonList(grundgebuehr));
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(150.0);
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
+
+        long grundgebuehrZeilen = rechnung.getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR)
+            .count();
+
+        assertEquals(0, grundgebuehrZeilen);
+    }
+
+    @Test
+    void berechneRechnung_GrundgebuehrOptional_NoErrorWhenNoTarif() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 1, 31);
+
+        when(tarifService.getTarifeForZeitraum(TarifTyp.ZEV, von, bis))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.VNB, von, bis))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(Collections.emptyList());
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(150.0);
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
+
+        // Kein Fehler, keine GRUNDGEBUEHR-Zeile, nur ZEV + VNB
+        assertEquals(2, rechnung.getTarifZeilen().size());
+        assertTrue(rechnung.getTarifZeilen().stream().noneMatch(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR));
+    }
+
+    @Test
+    void berechneRechnung_GrundgebuehrIncludedInTotal() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 1, 31);
+
+        Tarif grundgebuehr = new Tarif(
+            "Grundgebühr", TarifTyp.GRUNDGEBUEHR, new BigDecimal("10.00000"),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
+        );
+
+        when(tarifService.getTarifeForZeitraum(TarifTyp.ZEV, von, bis))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.VNB, von, bis))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(Collections.singletonList(grundgebuehr));
+        // 100 kWh ZEV * 0.20 = 20.00, 50 kWh VNB * 0.34 = 17.00, Grundgebühr 1 * 10 = 10.00 → Total 47.00
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(150.0);
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
+
+        assertEquals(47.0, rechnung.getTotalBetrag(), 0.01);
+        assertEquals(47.0, rechnung.getEndBetrag(), 0.01);
+        assertEquals(3, rechnung.getTarifZeilen().size());
+    }
+
+    // ─── GRUNDGEBUEHR: mengeneinheit ─────────────────────────────────────────────
+
+    @Test
+    void berechneRechnung_ZevVnbZeilen_HaveKwhMengeneinheit() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 1, 31);
+
+        when(tarifService.getTarifeForZeitraum(TarifTyp.ZEV, von, bis))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.VNB, von, bis))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(150.0);
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
+
+        rechnung.getTarifZeilen().forEach(z ->
+            assertEquals("KWH", z.getMengeneinheit(),
+                "Erwartet KWH für Typ " + z.getTyp())
+        );
+    }
+
+    @Test
+    void berechneRechnung_GrundgebuehrZeile_HasMonatMengeneinheit() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 1, 31);
+
+        Tarif grundgebuehr = new Tarif(
+            "Grundgebühr", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
+        );
+
+        when(tarifService.getTarifeForZeitraum(TarifTyp.ZEV, von, bis))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.VNB, von, bis))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(Collections.singletonList(grundgebuehr));
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(150.0);
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
+
+        TarifZeileDTO grundgebuehrZeile = rechnung.getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR)
+            .findFirst().orElseThrow();
+
+        assertEquals("MONAT", grundgebuehrZeile.getMengeneinheit());
+    }
+
+    // ─── GRUNDGEBUEHR: Produzenten-Rechnungen ────────────────────────────────────
+
+    @Test
+    void berechneRechnungen_ProducerWithGrundgebuehr_GetsInvoice() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Einheit producer = new Einheit("Solaranlage", EinheitTyp.PRODUCER);
+        producer.setId(2L);
+
+        Tarif grundgebuehr = new Tarif(
+            "Grundgebühr 2024", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
+        );
+
+        when(einheitRepository.findById(2L)).thenReturn(Optional.of(producer));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(Collections.singletonList(grundgebuehr));
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(2L), von, bis);
+
+        assertEquals(1, rechnungen.size());
+        RechnungDTO rechnung = rechnungen.get(0);
+        assertEquals("Solaranlage", rechnung.getEinheitName());
+        assertNull(rechnung.getMieterName());
+
+        // 3 Monate * 5.00 = 15.00
+        assertEquals(1, rechnung.getTarifZeilen().size());
+        assertEquals(TarifTyp.GRUNDGEBUEHR, rechnung.getTarifZeilen().get(0).getTyp());
+        assertEquals(3.0, rechnung.getTarifZeilen().get(0).getMenge(), 0.001);
+        assertEquals(15.0, rechnung.getEndBetrag(), 0.01);
+    }
+
+    @Test
+    void berechneRechnungen_ProducerWithoutGrundgebuehr_NotIncluded() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Einheit producer = new Einheit("Solaranlage", EinheitTyp.PRODUCER);
+        producer.setId(2L);
+
+        when(einheitRepository.findById(2L)).thenReturn(Optional.of(producer));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(Collections.emptyList());
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(2L), von, bis);
+
+        // Kein GRUNDGEBUEHR-Tarif → keine Rechnung für Produzenten
+        assertEquals(0, rechnungen.size());
+    }
+
+    @Test
+    void berechneRechnungen_ProducerOnly_SkipsZevVnbValidation() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Einheit producer = new Einheit("Solaranlage", EinheitTyp.PRODUCER);
+        producer.setId(2L);
+
+        when(einheitRepository.findById(2L)).thenReturn(Optional.of(producer));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(Collections.emptyList());
+
+        rechnungService.berechneRechnungen(List.of(2L), von, bis);
+
+        // validateTarifAbdeckung darf bei reinen Produzenten NICHT aufgerufen werden
+        verify(tarifService, never()).validateTarifAbdeckung(any(), any());
+    }
+
+    @Test
+    void berechneRechnungen_ProducerHasNoZevVnbLines() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 1, 31);
+
+        Einheit producer = new Einheit("Solaranlage", EinheitTyp.PRODUCER);
+        producer.setId(2L);
+
+        Tarif grundgebuehr = new Tarif(
+            "Grundgebühr", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
+        );
+
+        when(einheitRepository.findById(2L)).thenReturn(Optional.of(producer));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(Collections.singletonList(grundgebuehr));
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(2L), von, bis);
+
+        assertEquals(1, rechnungen.size());
+        // Keine ZEV- oder VNB-Zeilen auf der Produzenten-Rechnung
+        assertTrue(rechnungen.get(0).getTarifZeilen().stream()
+            .noneMatch(z -> z.getTyp() == TarifTyp.ZEV || z.getTyp() == TarifTyp.VNB));
+    }
 }
