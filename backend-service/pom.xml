@@ -233,6 +233,13 @@
         <groupId>com.pro-crafting.tools</groupId>
         <artifactId>jasperreports-maven-plugin</artifactId>
         <version>4.0.1</version>
+        <dependencies>
+          <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>${log4j2.version}</version>
+          </dependency>
+        </dependencies>
         <executions>
           <execution>
             <phase>prepare-package</phase>
