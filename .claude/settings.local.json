@@ -11,7 +11,12 @@
       "WebFetch(domain:www.meonet.ch)",
       "WebFetch(domain:wiki.smart-me.com)",
       "WebFetch(domain:www.electrosuisse.ch)",
-      "WebFetch(domain:www.zevvy.org)"
+      "WebFetch(domain:www.zevvy.org)",
+      "Bash(mvn compile:*)",
+      "Bash(mvn test:*)",
+      "Bash(npm.cmd test:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

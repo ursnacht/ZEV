@@ -8,7 +8,7 @@ ZEV (Zusammenschluss zum Eigenverbrauch) is a solar power distribution applicati
 
 ## Prerequisites
 
-- Java 21
+- Java 25
 - Maven 3.6+
 - Node.js 20.19.0+
 - Docker & Docker Compose
