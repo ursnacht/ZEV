@@ -10,6 +10,7 @@ target/
 .project
 .settings/
 /backend-service/logs/
+node_modules/
 
 # Environment files with secrets
 .env

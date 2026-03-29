@@ -1,7 +1,13 @@
-node_modules/
-dist/
 .angular/
+dist/
 node/
+node_modules/
 playwright-report/data/
 package-lock.json
 *.log
+
+# Frontend test results
+test-results/
+playwright-report/
+
+src/assets/frontend-licenses.json

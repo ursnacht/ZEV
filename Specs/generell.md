@@ -13,7 +13,7 @@
 ## 3. Technische Spezifikationen (Technical Specs)
 
 ### Backend
-* Spring Boot 4 mit Java 21
+* Spring Boot 4 mit Java 25
 
 ### Frontend
 * Angular 21 mit TypeScript
