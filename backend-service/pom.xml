@@ -206,6 +206,30 @@
         </configuration>
       </plugin>
       <plugin>
+        <groupId>org.cyclonedx</groupId>
+        <artifactId>cyclonedx-maven-plugin</artifactId>
+        <version>2.9.1</version>
+        <configuration>
+          <projectType>library</projectType>
+          <schemaVersion>1.6</schemaVersion>
+          <includeBomSerialNumber>true</includeBomSerialNumber>
+          <includeCompileScope>true</includeCompileScope>
+          <includeProvidedScope>true</includeProvidedScope>
+          <includeRuntimeScope>true</includeRuntimeScope>
+          <includeSystemScope>false</includeSystemScope>
+          <includeTestScope>false</includeTestScope>
+          <outputFormat>json</outputFormat>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>prepare-package</phase>
+            <goals>
+              <goal>makeBom</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>com.pro-crafting.tools</groupId>
         <artifactId>jasperreports-maven-plugin</artifactId>
         <version>4.0.1</version>

@@ -101,6 +101,13 @@
         </a>
       </li>
       <li>
+        <a routerLink="/lizenzen" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
+          (click)="closeMenu()">
+          <app-icon name="shield"></app-icon>
+          {{ 'LIZENZEN' | translate }}
+        </a>
+      </li>
+      <li>
         <button (click)="toggleDarkMode()" class="zev-navbar__link">
           <app-icon [name]="isDarkMode() ? 'sun' : 'moon'"></app-icon>
           {{ (isDarkMode() ? 'LIGHT_MODE' : 'DARK_MODE') | translate }}

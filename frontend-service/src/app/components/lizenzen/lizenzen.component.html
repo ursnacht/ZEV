@@ -1,0 +1,130 @@
+<div class="zev-container">
+  <h1>
+    <app-icon name="shield"></app-icon>
+    {{ 'LIZENZEN' | translate }}
+  </h1>
+
+  <!-- Backend Libraries -->
+  <div class="zev-panel">
+    <h2>{{ 'LIZENZEN_BACKEND' | translate }}</h2>
+
+    @if (backendError) {
+      <div class="zev-message zev-message--error">
+        {{ 'LIZENZEN_FEHLER_BACKEND' | translate }}
+      </div>
+    }
+
+    @if (!backendError) {
+      <div class="zev-form-group">
+        <input
+          class="zev-input"
+          type="text"
+          [(ngModel)]="backendFilter"
+          (ngModelChange)="onBackendFilterChange()"
+          [placeholder]="'LIZENZ_SUCHEN' | translate"
+        />
+      </div>
+
+      @if (backendLoading) {
+        <div class="zev-spinner"></div>
+      } @else if (filteredBackend.length === 0 && backendLizenzen.length === 0) {
+        <p class="zev-empty-state">{{ 'LIZENZEN_LEER' | translate }}</p>
+      } @else if (filteredBackend.length === 0) {
+        <p class="zev-empty-state">{{ 'KEINE_ERGEBNISSE' | translate }}</p>
+      } @else {
+        <table class="zev-table">
+          <thead>
+            <tr>
+              <th>{{ 'LIZENZ_NAME' | translate }}</th>
+              <th>{{ 'LIZENZ_VERSION' | translate }}</th>
+              <th>{{ 'LIZENZ_LIZENZ' | translate }}</th>
+              <th>{{ 'LIZENZ_HERSTELLER' | translate }}</th>
+              <th>{{ 'LIZENZ_HASH' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (lizenz of filteredBackend; track lizenz.name) {
+              <tr>
+                <td>{{ lizenz.name }}</td>
+                <td>{{ lizenz.version }}</td>
+                <td>{{ lizenz.license }}</td>
+                <td>{{ lizenz.publisher || '–' }}</td>
+                <td>
+                  @if (getBestHash(lizenz); as hash) {
+                    <span class="hash-cell" [title]="hash.algorithm + ': ' + hash.value">
+                      {{ truncateHash(hash.value) }}&hellip;
+                    </span>
+                  } @else {
+                    {{ 'LIZENZ_KEIN_HASH' | translate }}
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    }
+  </div>
+
+  <!-- Frontend Libraries -->
+  <div class="zev-panel">
+    <h2>{{ 'LIZENZEN_FRONTEND' | translate }}</h2>
+
+    @if (frontendError) {
+      <div class="zev-message zev-message--error">
+        {{ 'LIZENZEN_FEHLER_FRONTEND' | translate }}
+      </div>
+    }
+
+    @if (!frontendError) {
+      <div class="zev-form-group">
+        <input
+          class="zev-input"
+          type="text"
+          [(ngModel)]="frontendFilter"
+          (ngModelChange)="onFrontendFilterChange()"
+          [placeholder]="'LIZENZ_SUCHEN' | translate"
+        />
+      </div>
+
+      @if (frontendLoading) {
+        <div class="zev-spinner"></div>
+      } @else if (filteredFrontend.length === 0 && frontendLizenzen.length === 0) {
+        <p class="zev-empty-state">{{ 'LIZENZEN_LEER' | translate }}</p>
+      } @else if (filteredFrontend.length === 0) {
+        <p class="zev-empty-state">{{ 'KEINE_ERGEBNISSE' | translate }}</p>
+      } @else {
+        <table class="zev-table">
+          <thead>
+            <tr>
+              <th>{{ 'LIZENZ_NAME' | translate }}</th>
+              <th>{{ 'LIZENZ_VERSION' | translate }}</th>
+              <th>{{ 'LIZENZ_LIZENZ' | translate }}</th>
+              <th>{{ 'LIZENZ_HERSTELLER' | translate }}</th>
+              <th>{{ 'LIZENZ_HASH' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (lizenz of filteredFrontend; track lizenz.name) {
+              <tr>
+                <td>{{ lizenz.name }}</td>
+                <td>{{ lizenz.version }}</td>
+                <td>{{ lizenz.license }}</td>
+                <td>{{ lizenz.publisher || '–' }}</td>
+                <td>
+                  @if (getBestHash(lizenz); as hash) {
+                    <span class="hash-cell" [title]="hash.algorithm + ': ' + hash.value">
+                      {{ truncateHash(hash.value) }}&hellip;
+                    </span>
+                  } @else {
+                    {{ 'LIZENZ_KEIN_HASH' | translate }}
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    }
+  </div>
+</div>

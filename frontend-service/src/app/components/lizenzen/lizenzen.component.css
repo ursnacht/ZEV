@@ -1,0 +1,6 @@
+.hash-cell {
+  font-family: monospace;
+  font-size: 0.85em;
+  cursor: help;
+  color: var(--zev-text-secondary, #6b7280);
+}

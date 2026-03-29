@@ -26,6 +26,11 @@ Implementierung einer SBOM-Generierung (CycloneDX) für Backend und Frontend sow
 | Frontend Routing | `frontend-service/src/app/app.routes.ts` | Änderung |
 | Frontend Navigation | `frontend-service/src/app/components/navigation/navigation.component.html` | Änderung |
 | DB Migration | `backend-service/src/main/resources/db/migration/V53__Add_Lizenzen_Translations.sql` | Neu |
+| Backend Unit-Test | `backend-service/src/test/java/ch/nacht/service/LizenzenServiceTest.java` | Neu |
+| Backend Controller-Test | `backend-service/src/test/java/ch/nacht/controller/LizenzenControllerTest.java` | Neu |
+| Test-Ressource | `backend-service/src/test/resources/test-sbom/valid-bom.json` | Neu |
+| Test-Ressource | `backend-service/src/test/resources/test-sbom/empty-components-bom.json` | Neu |
+| Test-Ressource | `backend-service/src/test/resources/test-sbom/no-components-bom.json` | Neu |
 
 ---
 
@@ -33,18 +38,19 @@ Implementierung einer SBOM-Generierung (CycloneDX) für Backend und Frontend sow
 
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
-| [ ] | 1. Maven SBOM-Plugin | `cyclonedx-maven-plugin` in `backend-service/pom.xml` konfigurieren |
-| [ ] | 2. npm Lizenz-Script | `generate-licenses.js` + `prebuild`-Integration + devDependency |
-| [ ] | 3. Backend DTOs | `LizenzenDTO` und `LizenzenHashDTO` erstellen |
-| [ ] | 4. Backend Service | `LizenzenService` liest und normalisiert `backend-bom.json` |
-| [ ] | 5. Backend Cache | Cache `lizenzen` in `CacheConfig` registrieren |
-| [ ] | 6. Backend Controller | `LizenzenController` mit `GET /api/lizenzen` und `@Cacheable` |
-| [ ] | 7. Frontend Model | TypeScript-Interfaces `Lizenz` und `LizenzHash` |
-| [ ] | 8. Frontend Service | `LizenzenService` für Backend-Call + Frontend-Asset-Load |
-| [ ] | 9. Frontend Komponente | `LizenzenComponent` mit zwei Tabellen und Suchfeldern |
-| [ ] | 10. Routing | Route `/lizenzen` in `app.routes.ts` |
-| [ ] | 11. Navigation | Menüeintrag „Lizenzen" in `navigation.component.html` |
-| [ ] | 12. Übersetzungen | Flyway-Migration V53 für Translation-Keys |
+| [x] | 1. Maven SBOM-Plugin | `cyclonedx-maven-plugin` in `backend-service/pom.xml` konfigurieren |
+| [x] | 2. npm Lizenz-Script | `generate-licenses.js` + `prebuild`-Integration + devDependency |
+| [x] | 3. Backend DTOs | `LizenzenDTO` und `LizenzenHashDTO` erstellen |
+| [x] | 4. Backend Service | `LizenzenService` liest und normalisiert `backend-bom.json` |
+| [x] | 5. Backend Cache | Cache `lizenzen` in `CacheConfig` registrieren |
+| [x] | 6. Backend Controller | `LizenzenController` mit `GET /api/lizenzen` und `@Cacheable` |
+| [x] | 7. Frontend Model | TypeScript-Interfaces `Lizenz` und `LizenzHash` |
+| [x] | 8. Frontend Service | `LizenzenService` für Backend-Call + Frontend-Asset-Load |
+| [x] | 9. Frontend Komponente | `LizenzenComponent` mit zwei Tabellen und Suchfeldern |
+| [x] | 10. Routing | Route `/lizenzen` in `app.routes.ts` |
+| [x] | 11. Navigation | Menüeintrag „Lizenzen" in `navigation.component.html` |
+| [x] | 12. Übersetzungen | Flyway-Migration V53 für Translation-Keys |
+| [x] | 13. Backend-Tests | `LizenzenServiceTest` (21 Unit-Tests) und `LizenzenControllerTest` (7 Controller-Tests) |
 
 ---
 
@@ -70,24 +76,26 @@ Plugin zur `<build><plugins>`-Sektion hinzufügen:
     <includeRuntimeScope>true</includeRuntimeScope>
     <includeSystemScope>false</includeSystemScope>
     <includeTestScope>false</includeTestScope>
-    <outputName>backend-bom</outputName>
     <outputFormat>json</outputFormat>
-    <outputDirectory>${project.build.outputDirectory}/sbom</outputDirectory>
   </configuration>
   <executions>
     <execution>
-      <phase>package</phase>
+      <phase>prepare-package</phase>
       <goals>
-        <goal>makeAggregateBom</goal>
+        <goal>makeBom</goal>
       </goals>
     </execution>
   </executions>
 </plugin>
 ```
 
-Ergebnis: `target/classes/sbom/backend-bom.json` → Classpath-Ressource `sbom/backend-bom.json`
+Ergebnis: `target/classes/META-INF/sbom/application.cdx.json` → Classpath-Ressource `META-INF/sbom/application.cdx.json`
 
-> **Wichtig:** `outputDirectory` zeigt auf `${project.build.outputDirectory}/sbom`, sodass die Datei direkt im Classpath landet (kein `src/main/resources`-Commit nötig).
+> **Erkenntnisse aus der Umsetzung:**
+> * `outputName` und `outputDirectory` beeinflussen nur den separaten Build-Output in `target/`; die Classpath-Ressource landet **immer** am Standard-Pfad `META-INF/sbom/application.cdx.json` (Spring-Boot-Konvention).
+> * Phase muss `prepare-package` sein (nicht `package`), damit die Datei **vor** dem Spring-Boot-Repackaging in `target/classes/` liegt und korrekt in den Fat-JAR eingebettet wird.
+> * Goal `makeBom` (nicht `makeAggregateBom`) verwenden, da nur der `backend-service` betrachtet wird.
+> * Maven-Repository-Hashes im SBOM: nur MD5 und SHA-1 (kein SHA-256/SHA-512). Die Frontend-Hash-Prioritätsliste muss SHA-1 enthalten.
 
 ---
 
@@ -237,7 +245,7 @@ import java.util.List;
 public class LizenzenService {
 
     private static final Logger log = LoggerFactory.getLogger(LizenzenService.class);
-    private static final String BOM_PATH = "sbom/backend-bom.json";
+    private static final String BOM_PATH = "META-INF/sbom/application.cdx.json";
 
     private final ObjectMapper objectMapper;
 
@@ -473,7 +481,7 @@ export class LizenzenService {
 - Zwei Datenlisten: `backendLizenzen` / `frontendLizenzen` (jeweils alle + gefiltert)
 - Zwei separate Suchfelder (`backendFilter` / `frontendFilter`), Filterung case-insensitive auf `name` und `license`
 - Tabellenspalten: Name, Version, Lizenz, Hersteller, Hash
-- Hash-Anzeige: `getBestHash(lizenz)` liefert stärksten Hash (SHA-512 > SHA-256 > MD5) oder `null`; in der Tabelle: 12-Zeichen-Kürzel + `title`-Attribut für vollständigen Wert
+- Hash-Anzeige: `getBestHash(lizenz)` liefert stärksten Hash (SHA-512 > SHA-256 > SHA-384 > SHA-1 > MD5) oder `null`; in der Tabelle: 12-Zeichen-Kürzel + `title`-Attribut für vollständigen Wert
 - Leerstate: „KEINE_ERGEBNISSE" wenn Suchergebnis leer; „KEINE_LIZENZEN" wenn Liste selbst leer
 - Fehlerstate: `backendError` / `frontendError` Boolean + `.zev-message--error`-Block
 - Seitentitel mit `<app-icon name="shield">` (Feather-Icon)
@@ -481,7 +489,7 @@ export class LizenzenService {
 **Hash-Priorisierung (TypeScript-Hilfsfunktion):**
 
 ```typescript
-private readonly HASH_PRIORITY = ['SHA-512', 'SHA-256', 'SHA-384', 'MD5'];
+private readonly HASH_PRIORITY = ['SHA-512', 'SHA-256', 'SHA-384', 'SHA-1', 'MD5'];
 
 getBestHash(lizenz: Lizenz): { algorithm: string; value: string } | null {
   for (const alg of this.HASH_PRIORITY) {
@@ -556,6 +564,70 @@ ON CONFLICT (key) DO NOTHING;
 
 ---
 
+### Phase 13: Backend-Tests
+
+#### Anpassung LizenzenService für Testbarkeit
+
+`static final`-Konstante auf ein injizierbares Instanzfeld umgestellt; package-privater Konstruktor für Tests ergänzt:
+
+```java
+static final String DEFAULT_BOM_PATH = "META-INF/sbom/application.cdx.json";
+
+private final ObjectMapper objectMapper;
+private final String bomPath;
+
+@Autowired                          // explizit: Spring nutzt diesen Konstruktor
+public LizenzenService(ObjectMapper objectMapper) {
+    this(objectMapper, DEFAULT_BOM_PATH);
+}
+
+// Package-private: nur für Tests mit abweichendem BOM-Pfad
+LizenzenService(ObjectMapper objectMapper, String bomPath) {
+    this.objectMapper = objectMapper;
+    this.bomPath = bomPath;
+}
+```
+
+> **Erkenntnis:** Bei mehreren Konstruktoren sucht Spring ohne `@Autowired` nach einem No-Arg-Konstruktor → `BeanInstantiationException`. `@Autowired` am öffentlichen Konstruktor macht die Wahl eindeutig.
+
+#### Test-Ressourcen
+
+Drei minimale CycloneDX-JSON-Dateien in `src/test/resources/test-sbom/`:
+
+| Datei | Zweck |
+|-------|-------|
+| `valid-bom.json` | 6 Komponenten mit allen Variationen (SPDX-ID, Lizenz-Name, kein Publisher, group-Fallback, website-/vcs-Ref, mehrere Hashes, leere Hashes, fehlende Hashes, Komponente ohne Name) |
+| `empty-components-bom.json` | `"components": []` – Leerlist-Test |
+| `no-components-bom.json` | Kein `components`-Feld – fehlende-Node-Test |
+
+> Bewusst anderer Pfad als `META-INF/sbom/` gewählt, um die Produktions-SBOM nicht zu überschatten.
+
+#### LizenzenServiceTest (21 Unit-Tests, kein Spring-Kontext)
+
+| Kategorie | Tests |
+|-----------|-------|
+| Happy Path | Nicht-leere Liste, Komponente ohne Name wird übersprungen, alphabetische Sortierung |
+| Lizenz-Parsing | SPDX-ID bevorzugt, Lizenz-Name als Fallback, kein Eintrag → `"Unknown"` |
+| Publisher-Parsing | `publisher`-Feld, `group`-Fallback, keines → `null` |
+| URL-Parsing | `website`-Ref, `vcs`-Ref, nur `other`-Ref → `null`, kein Ref → `null` |
+| Hash-Parsing | Anzahl, MD5-Wert, SHA-1-Wert, leeres Array, fehlendes Feld → leer |
+| BOM-Struktur | Leeres Array → leer, fehlendes Feld → leer |
+| Fehlerbehandlung | Datei nicht gefunden → `IllegalStateException("SBOM-Datei nicht verfügbar")` |
+
+#### LizenzenControllerTest (7 Controller-Tests, `@WebMvcTest`)
+
+| Test | Erwartung |
+|------|-----------|
+| `getLizenzen_ReturnsListOfComponents` | HTTP 200, Array-Grösse korrekt |
+| `getLizenzen_ReturnsCorrectFields` | Alle DTO-Felder (`name`, `version`, `license`, `publisher`, `url`) in JSON |
+| `getLizenzen_ReturnsHashesInResponse` | Hash-Array mit `algorithm` + `value` |
+| `getLizenzen_EmptyList_ReturnsEmptyArray` | HTTP 200, leeres JSON-Array |
+| `getLizenzen_SbomUnavailable_Returns503` | `IllegalStateException` → HTTP 503 |
+| `getLizenzen_SbomUnreadable_Returns503` | `IllegalStateException` (andere Meldung) → HTTP 503 |
+| `getLizenzen_ComponentWithNullPublisher_SerializesNull` | `publisher`-Feld nicht im JSON vorhanden |
+
+---
+
 ## Validierungen
 
 ### Backend-Validierungen
@@ -575,10 +647,26 @@ ON CONFLICT (key) DO NOTHING;
 
 ## Offene Punkte / Annahmen
 
-1. **Annahme:** `cyclonedx-maven-plugin` Version 2.9.1 ist aktuell (Stand März 2026). Version ggf. auf Maven Central verifizieren.
-2. **Annahme:** `outputDirectory=${project.build.outputDirectory}/sbom` funktioniert mit dem Plugin; ggf. muss `goal` auf `makeBom` (statt `makeAggregateBom`) umgestellt werden, falls nur `backend-service` betrachtet wird (kein Multi-Modul-Aggregat).
-3. **Annahme:** `license-checker-rseidelsohn` ≥ 4.x ist kompatibel mit Node 20.
-4. **Annahme:** Die `frontend-licenses.json` wird nicht ins Git committed (`.gitignore`-Eintrag für `src/assets/frontend-licenses.json` im Frontend-Service empfohlen, oder eine leere Placeholder-Datei committen).
-5. **Annahme:** Der `CacheManager`-Bean wird auf einen gemeinsamen `CaffeineSpec` umgestellt; da `lizenzen`-Daten nie ablaufen müssten, ist die 15-min-TTL eine konservative Wahl (kein Nachteil bei statischen Daten).
-6. **Annahme:** `hasRole('zev')` im Backend-Controller deckt auch `zev_admin` ab (wie im restlichen Projekt).
-7. **Annahme:** Die `@PreAuthorize`-Annotation auf Klassen-Ebene schützt alle Methoden; bei Erweiterungen auf Methoden-Ebene anpassen.
+1. **Bestätigt:** `cyclonedx-maven-plugin` 2.9.1 generiert 230 Backend-Komponenten mit MD5- und SHA-1-Hashes (Maven Central liefert keine SHA-256/SHA-512).
+2. **Bestätigt:** `outputDirectory`/`outputName` beeinflussen nur den separaten Build-Output in `target/`; der Classpath-Pfad ist immer `META-INF/sbom/application.cdx.json` (Spring-Boot-Standard). Die Parameter wurden aus der Plugin-Konfiguration entfernt.
+3. **Bestätigt:** Goal `makeBom` (nicht `makeAggregateBom`) ist korrekt für Single-Module-Builds.
+4. **Bestätigt:** Phase `prepare-package` ist zwingend notwendig – bei `package` besteht das Risiko, dass Spring Boot das JAR vor dem CycloneDX-Output repackaged. Mit `prepare-package` ist die Reihenfolge sicher.
+5. **Bestätigt:** `license-checker-rseidelsohn` 4.x ist kompatibel mit Node 20; generiert 19 Frontend-Einträge mit SHA-512-Hashes aus `package-lock.json`.
+6. **Offen:** Die `frontend-licenses.json` ist generiert, aber nicht in `.gitignore` eingetragen. Empfehlung: Eintrag in `frontend-service/.gitignore` für `src/assets/frontend-licenses.json` hinzufügen, da die Datei bei jedem Build neu erstellt wird.
+7. **Bestätigt:** `hasRole('zev')` deckt auch `zev_admin` ab (wie im restlichen Projekt).
+8. **Bestätigt:** Der gemeinsame `CacheManager` mit 15-min-TTL für `"statistik"` und `"lizenzen"` funktioniert korrekt.
+9. **Bestätigt:** Bei mehreren Konstruktoren in einer `@Service`-Klasse ist `@Autowired` am öffentlichen Konstruktor zwingend, sonst `BeanInstantiationException` zur Laufzeit.
+10. **Bestätigt:** Test-BOM-Ressourcen unter `test-sbom/` (statt `META-INF/sbom/`) ablegen, damit die Produktions-SBOM im Classpath nicht überschattet wird.
+
+## Build-Anleitung
+
+Damit die SBOM im JAR und Docker-Image verfügbar ist, muss vor `docker-compose up --build` immer zuerst der Maven-Build laufen:
+
+```bash
+cd backend-service
+mvn package -DskipTests
+cd ..
+docker-compose up --build
+```
+
+Der `cyclonedx-maven-plugin` läuft in der `prepare-package`-Phase und bettet `META-INF/sbom/application.cdx.json` in `target/classes/` ein, bevor Spring Boot das Fat-JAR zusammenstellt.

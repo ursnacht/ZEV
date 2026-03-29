@@ -1,0 +1,54 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:test-serial",
+  "components": [
+    {
+      "name": "spring-core",
+      "version": "6.0.0",
+      "publisher": "Pivotal",
+      "licenses": [{"license": {"id": "Apache-2.0"}}],
+      "externalReferences": [
+        {"type": "website", "url": "https://spring.io"},
+        {"type": "other", "url": "https://other.example.com"}
+      ],
+      "hashes": [
+        {"alg": "MD5", "content": "aabbccddeeff0011"},
+        {"alg": "SHA-1", "content": "112233445566778899aabb"}
+      ]
+    },
+    {
+      "name": "jackson-core",
+      "version": "2.15.0",
+      "group": "com.fasterxml.jackson",
+      "licenses": [{"license": {"name": "Apache License 2.0"}}],
+      "externalReferences": [
+        {"type": "vcs", "url": "https://github.com/FasterXML/jackson-core"}
+      ],
+      "hashes": [
+        {"alg": "SHA-1", "content": "ffeeddccbbaa998877665544"}
+      ]
+    },
+    {
+      "name": "commons-io",
+      "version": "2.11.0"
+    },
+    {
+      "version": "1.0.0"
+    },
+    {
+      "name": "zebra-lib",
+      "version": "3.0.0",
+      "licenses": [{"license": {"id": "MIT"}}],
+      "externalReferences": [
+        {"type": "other", "url": "https://irrelevant.example.com"}
+      ],
+      "hashes": []
+    },
+    {
+      "name": "alpha-lib",
+      "version": "1.0.0",
+      "licenses": [{"license": {"id": "MIT"}}]
+    }
+  ]
+}

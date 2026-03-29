@@ -10,6 +10,7 @@ import { TarifListComponent } from './components/tarif-list/tarif-list.component
 import { MieterListComponent } from './components/mieter-list/mieter-list.component';
 import { EinstellungenComponent } from './components/einstellungen/einstellungen.component';
 import { DesignSystemShowcaseComponent } from './components/design-system-showcase/design-system-showcase.component';
+import { LizenzenComponent } from './components/lizenzen/lizenzen.component';
 import { TranslationEditorComponent } from './components/translation-editor/translation-editor.component';
 
 import { AuthGuard } from './guards/auth.guard';
@@ -27,5 +28,6 @@ export const routes: Routes = [
   { path: 'mieter', component: MieterListComponent, canActivate: [AuthGuard], data: { roles: ['zev_admin'] } },
   { path: 'design-system', component: DesignSystemShowcaseComponent, canActivate: [AuthGuard], data: { roles: ['zev'] } },
   { path: 'einstellungen', component: EinstellungenComponent, canActivate: [AuthGuard], data: { roles: ['zev_admin'] } },
-  { path: 'translations', component: TranslationEditorComponent, canActivate: [AuthGuard], data: { roles: ['zev_admin'] } }
+  { path: 'translations', component: TranslationEditorComponent, canActivate: [AuthGuard], data: { roles: ['zev_admin'] } },
+  { path: 'lizenzen', component: LizenzenComponent, canActivate: [AuthGuard], data: { roles: ['zev', 'zev_admin'] } }
 ];
