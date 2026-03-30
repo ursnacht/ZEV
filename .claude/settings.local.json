@@ -16,7 +16,15 @@
       "Bash(mvn test:*)",
       "Bash(npm.cmd test:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(find C:/data/git/ZEV/backend-service/src/main/resources -name *.properties -o -name *.yml)",
+      "Bash(sort find:*)",
+      "Bash(find C:/data/git/ZEV/backend-service/src/main/java/ch/nacht -name *Lizenz* -o -name *Lizenzen*)",
+      "Bash(mkdir -p \"C:/data/git/glue-starter/frontend-service/src/assets\")",
+      "Bash(mkdir -p \"C:/data/git/glue-starter/frontend-service/scripts\")",
+      "Bash(npm install:*)",
+      "Bash(npx ng:*)",
+      "Bash(npm run:*)"
     ],
     "deny": [],
     "ask": []

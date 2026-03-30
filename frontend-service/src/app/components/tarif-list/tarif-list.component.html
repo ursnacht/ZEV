@@ -86,7 +86,7 @@
               <tr>
                 <td>
                   <span class="tarif-typ-badge" [class.tarif-typ-badge--zev]="tarif.tariftyp === 'ZEV'" [class.tarif-typ-badge--vnb]="tarif.tariftyp === 'VNB'">
-                    {{ tarif.tariftyp }}
+                    {{ ('TARIFTYP_' + tarif.tariftyp) | translate }}
                   </span>
                 </td>
                 <td>{{ tarif.bezeichnung }}</td>

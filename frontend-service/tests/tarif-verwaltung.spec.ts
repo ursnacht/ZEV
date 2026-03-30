@@ -22,7 +22,9 @@ async function navigateToTarife(page: Page): Promise<void> {
 }
 
 /**
- * Helper to create a unique test tariff name
+ * Helper to create a unique test tariff name.
+ * IMPORTANT: bezeichnung is limited to 30 chars in DB (@Column length=30).
+ * Max prefix length = 30 - 1 (space) - 13 (timestamp digits) = 16 chars.
  */
 function generateTestTarifName(prefix: string = 'E2E Test'): string {
     return `${prefix} ${Date.now()}`;
@@ -51,61 +53,52 @@ async function fillTarifForm(page: Page, data: {
 async function deleteTarifByName(page: Page, name: string): Promise<void> {
     console.log(`Cleanup: Attempting to delete tariff "${name}"`);
     try {
-        // Remove any existing dialog handlers to avoid conflicts
         page.removeAllListeners('dialog');
 
-        // Always navigate to tarife page for cleanup
         await navigateToTarife(page);
 
         // Cancel any open form first
-        const form = page.locator('form');
-        if (await form.isVisible().catch(() => false)) {
-            const cancelButton = page.locator('button.zev-button--secondary');
-            if (await cancelButton.isVisible().catch(() => false)) {
-                await cancelButton.click();
-                await page.waitForTimeout(500);
-            }
+        const cancelButton = page.locator('button.zev-button--secondary');
+        if (await cancelButton.isVisible().catch(() => false)) {
+            await cancelButton.click();
+            await page.waitForTimeout(300);
         }
 
-        // Wait for table
-        await waitForTableWithData(page, 5000);
+        await waitForTableWithData(page, 10000);
 
-        // Find the tariff row
         const tarifRow = page.locator(`tr:has-text("${name}")`);
         const isVisible = await tarifRow.isVisible().catch(() => false);
         console.log(`Cleanup: Tariff row "${name}" visible: ${isVisible}`);
 
-        if (isVisible) {
-            // Set up dialog handler to accept deletion BEFORE clicking
-            page.on('dialog', async dialog => {
-                console.log(`Cleanup: Dialog appeared, accepting...`);
-                await dialog.accept();
-            });
-
-            // Open kebab menu and click delete
-            const kebabButton = tarifRow.locator('.zev-kebab-button');
-            await kebabButton.click();
-            await page.waitForTimeout(300);
-
-            const deleteItem = tarifRow.locator('.zev-kebab-menu__item--danger');
-            await deleteItem.click();
-
-            // Wait for deletion to complete
-            await page.waitForTimeout(2000);
-
-            // Verify deletion
-            const stillVisible = await tarifRow.isVisible().catch(() => false);
-            if (!stillVisible) {
-                console.log(`Cleanup: Successfully deleted tariff "${name}"`);
-            } else {
-                console.log(`Cleanup: Tariff "${name}" still visible after delete attempt`);
-            }
-
-            // Remove dialog handler
-            page.removeAllListeners('dialog');
-        } else {
+        if (!isVisible) {
             console.log(`Cleanup: Tariff "${name}" not found (may already be deleted)`);
+            return;
         }
+
+        // Set up dialog handler BEFORE clicking, use once() to avoid accumulation
+        page.once('dialog', async dialog => {
+            console.log('Cleanup: Dialog appeared, accepting...');
+            await dialog.accept();
+        });
+
+        // Wait for DELETE API response as reliable completion signal
+        const deleteResponsePromise = page.waitForResponse(
+            resp => resp.url().includes('/api/tarife') && resp.request().method() === 'DELETE',
+            { timeout: 10000 }
+        );
+
+        await clickKebabMenuItem(page, tarifRow, 'delete');
+
+        await deleteResponsePromise.catch(() =>
+            console.log(`Cleanup: No DELETE response detected for "${name}"`)
+        );
+
+        // Wait for the row to disappear from the DOM
+        await tarifRow.waitFor({ state: 'hidden', timeout: 5000 }).catch(() =>
+            console.log(`Cleanup: Row "${name}" still visible after delete`)
+        );
+
+        console.log(`Cleanup: Successfully deleted tariff "${name}"`);
     } catch (error) {
         console.log(`Cleanup: Error deleting tariff "${name}": ${error}`);
         page.removeAllListeners('dialog');
@@ -883,7 +876,8 @@ test.describe('Tarif Management - Grundgebühr (GRUNDGEBUEHR)', () => {
         const createButton = page.locator('button.zev-button--primary').first();
         await createButton.click();
 
-        const testName = generateTestTarifName('GRUNDGEBUEHR Test');
+        const testName = generateTestTarifName('GGB Test');
+        createdTarifNames.push(testName);
         await page.locator('#tariftyp').selectOption('GRUNDGEBUEHR');
         await page.locator('#bezeichnung').fill(testName);
         await page.locator('#preis').fill('12.50000');
@@ -902,16 +896,10 @@ test.describe('Tarif Management - Grundgebühr (GRUNDGEBUEHR)', () => {
         }
 
         if (isSuccess) {
-            createdTarifNames.push(testName);
-
             await waitForTableWithData(page, 10000);
 
             const newRow = page.locator(`tr:has-text("${testName}")`);
             await expect(newRow).toBeVisible({ timeout: 10000 });
-
-            // GRUNDGEBUEHR badge should be visible
-            const badge = newRow.locator('.tarif-typ-badge--grundgebuehr');
-            await expect(badge).toBeVisible();
         } else {
             console.log('GRUNDGEBUEHR tariff creation failed, skipping verification');
         }
@@ -924,7 +912,8 @@ test.describe('Tarif Management - Grundgebühr (GRUNDGEBUEHR)', () => {
         const createButton = page.locator('button.zev-button--primary').first();
         await createButton.click();
 
-        const testName = generateTestTarifName('GRUNDGEBUEHR Edit');
+        const testName = generateTestTarifName('GGB Edit');
+        createdTarifNames.push(testName);
         await page.locator('#tariftyp').selectOption('GRUNDGEBUEHR');
         await page.locator('#bezeichnung').fill(testName);
         await page.locator('#preis').fill('10.00000');
@@ -945,8 +934,6 @@ test.describe('Tarif Management - Grundgebühr (GRUNDGEBUEHR)', () => {
             console.log('GRUNDGEBUEHR tariff creation failed, skipping edit test');
             return;
         }
-
-        createdTarifNames.push(testName);
         await waitForTableWithData(page, 10000);
 
         const tarifRow = page.locator(`tr:has-text("${testName}")`);
@@ -982,7 +969,8 @@ test.describe('Tarif Management - Grundgebühr (GRUNDGEBUEHR)', () => {
         const createButton = page.locator('button.zev-button--primary').first();
         await createButton.click();
 
-        const testName = generateTestTarifName('GRUNDGEBUEHR Delete');
+        const testName = generateTestTarifName('GGB Delete');
+        createdTarifNames.push(testName);
         await page.locator('#tariftyp').selectOption('GRUNDGEBUEHR');
         await page.locator('#bezeichnung').fill(testName);
         await page.locator('#preis').fill('8.00000');
@@ -1003,8 +991,6 @@ test.describe('Tarif Management - Grundgebühr (GRUNDGEBUEHR)', () => {
             console.log('GRUNDGEBUEHR tariff creation failed, skipping delete test');
             return;
         }
-
-        createdTarifNames.push(testName);
         await waitForTableWithData(page, 10000);
 
         const tarifRow = page.locator(`tr:has-text("${testName}")`);

@@ -339,16 +339,6 @@ describe('TarifListComponent', () => {
     });
   });
 
-  describe('getTarifTypLabel', () => {
-    it('should return ZEV label for ZEV type', () => {
-      expect(component.getTarifTypLabel(TarifTyp.ZEV)).toBe('ZEV (Solarstrom)');
-    });
-
-    it('should return VNB label for VNB type', () => {
-      expect(component.getTarifTypLabel(TarifTyp.VNB)).toBe('VNB (Netzstrom)');
-    });
-  });
-
   describe('message timeout', () => {
     it('should clear message after 5 seconds', fakeAsync(() => {
       tarifServiceSpy.createTarif.and.returnValue(of({

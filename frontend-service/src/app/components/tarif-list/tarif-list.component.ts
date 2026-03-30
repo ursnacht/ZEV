@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TarifService } from '../../services/tarif.service';
-import { Tarif, TarifTyp, ValidationResult } from '../../models/tarif.model';
+import { Tarif, ValidationResult } from '../../models/tarif.model';
 import { TarifFormComponent } from '../tarif-form/tarif-form.component';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { SwissDatePipe } from '../../pipes/swiss-date.pipe';
@@ -166,10 +166,6 @@ export class TarifListComponent implements OnInit {
 
   formatPreis(preis: number): string {
     return preis.toFixed(5);
-  }
-
-  getTarifTypLabel(typ: TarifTyp): string {
-    return typ === TarifTyp.ZEV ? 'ZEV (Solarstrom)' : 'VNB (Netzstrom)';
   }
 
   onValidateQuartale(): void {
