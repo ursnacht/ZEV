@@ -24,7 +24,9 @@
       "Bash(mkdir -p \"C:/data/git/glue-starter/frontend-service/scripts\")",
       "Bash(npm install:*)",
       "Bash(npx ng:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(grep -r \"ignoringRequestMatchers\\\\|permitAll\\\\|permitAll\\(\\)\" C:datagitzevbackend-service --include=*.java)",
+      "Bash(xargs grep:*)"
     ],
     "deny": [],
     "ask": []
