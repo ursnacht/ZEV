@@ -72,7 +72,7 @@ public class OrganizationInterceptor implements HandlerInterceptor {
     @SuppressWarnings("unchecked")
     private void extractOrganizations(JwtAuthenticationToken jwtAuth) {
         try {
-            Map<String, Object> organizations = jwtAuth.getToken().getClaim("organizations");
+            Map<String, Object> organizations = jwtAuth.getToken().getClaim("organization");
 
             if (organizations == null || organizations.isEmpty()) {
                 log.warn("Keine Organisationen im JWT-Token für Benutzer: {}",
