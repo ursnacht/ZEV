@@ -9,14 +9,12 @@ Erstelle Unit- und Integrationstests für Backend-Code.
 
 ## Unabhängige Ausführung
 
-Dieser Skill arbeitet UNABHÄNGIG vom Kontext der aktuellen Session.
+Dieser Skill arbeitet UNABHÄNGIG vom Kontext der aktuellen Session und kann auch mit einem neuen Agenten ausgeführt werden.
 
 **Analysiere NUR:**
 1. Die Spec-Datei (falls angegeben)
 2. Den tatsächlich implementierten Code
 3. Bestehende Tests als Vorlage
-
-**IGNORIERE** jeglichen Kontext aus der vorherigen Konversation.
 
 ---
 

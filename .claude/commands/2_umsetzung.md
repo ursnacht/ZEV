@@ -21,8 +21,10 @@ Setze einen Umsetzungsplan schrittweise um.
     * **Komponenten-CSS minimal halten:** Nur komponentenspezifische Styles, keine Duplikate
     * **Design System bauen:** Nach Änderungen `cd design-system && npm run build`
     * **Design System Showcase:** bei neu erstellten Komponenten oder Styles ergänzen
-* **Datenbank:** Flyway-Migrationen in `backend-service/src/main/resources/db/migration/`
+* **Datenbank:** 
+  * **Flyway-Migrationen** in `backend-service/src/main/resources/db/migration/`
   * **Naming:** Migrations `V[nummer]__[beschreibung].sql`
+  * **Spalten-Kommentare:** Jede neue Spalte mit `COMMENT ON COLUMN app.[tabelle].[spalte] IS '...'` dokumentieren
 * **Code-Vorlagen:** Verwende die Vorlagen aus CLAUDE.md (Abschnitt "Code-Vorlagen für deterministische Generierung")
 
 ## Validierung nach jeder Phase
