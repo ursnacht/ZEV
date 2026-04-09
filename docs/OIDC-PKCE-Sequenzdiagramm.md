@@ -18,6 +18,7 @@ participant KC as Keycloak (OIDC/IdP)
     KC->>User: HTTP 302 Redirect → redirect_uri<br/>(?code=AUTH_CODE&state=STATE)
     User->>App: GET /callback?code=AUTH_CODE&state=STATE
     Note over App: State validieren (CSRF-Schutz)
+    Note over App,KC: Backchannel: Sichere Verbindung Server-to-Server
     App->>KC: POST /token<br/>(grant_type=authorization_code, code=AUTH_CODE,<br/>redirect_uri, client_id, code_verifier)
     Note over KC: code_challenge == BASE64URL(SHA256(code_verifier))?<br/>PKCE-Validierung erfolgreich
     KC->>App: Token Response<br/>(access_token, id_token, refresh_token, expires_in)
