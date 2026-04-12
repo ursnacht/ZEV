@@ -14,7 +14,7 @@
 * -
 
 ### FR-3: Layout
-* Füge auf der Startseite ein passendes Bild ein.
+* Das Bild `assets/vZEV.png` wird auf der Startseite angezeigt.
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 * [ ] Dem Benutzer wird nach dem Login die neue Startseite angezeigt.
