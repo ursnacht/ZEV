@@ -52,6 +52,13 @@
         </a>
       </li>
       <li>
+        <a routerLink="/debitoren" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
+          (click)="closeMenu()">
+          <app-icon name="credit-card"></app-icon>
+          {{ 'DEBITORKONTROLLE' | translate }}
+        </a>
+      </li>
+      <li>
         <a routerLink="/upload" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
          (click)="closeMenu()">
          <app-icon name="upload"></app-icon>

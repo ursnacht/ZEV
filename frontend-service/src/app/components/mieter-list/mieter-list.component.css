@@ -9,16 +9,6 @@
   margin-bottom: var(--spacing-md);
 }
 
-.mieter-aktuell {
-  display: inline-block;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  background-color: #e8f5e9;
-  color: #2e7d32;
-}
-
 .zev-message--clickable {
   cursor: pointer;
   padding-right: var(--spacing-xl);

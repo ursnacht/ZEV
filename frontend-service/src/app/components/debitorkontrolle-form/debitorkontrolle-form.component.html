@@ -1,0 +1,69 @@
+<div class="form-container">
+  <h2>{{ formData.id ? ('DEBITOR_BEARBEITEN' | translate) : ('NEUER_DEBITOR' | translate) }}</h2>
+
+  <form (ngSubmit)="onSubmit()">
+    <div class="zev-form-group">
+      <label for="mieterId">{{ 'MIETER' | translate }}:</label>
+      <select id="mieterId" class="zev-select" [(ngModel)]="formData.mieterId" name="mieterId"
+        required (ngModelChange)="onMieterChange()">
+        <option [value]="0" disabled>{{ 'MIETER_AUSWAEHLEN' | translate }}</option>
+        @for (m of mieter; track m) {
+          <option [value]="m.id">{{ getMieterDisplayName(m) }}</option>
+        }
+      </select>
+      @if (Number(formData.mieterId) === 0) {
+        <div class="zev-form-error">{{ 'MIETER_IST_ERFORDERLICH' | translate }}</div>
+      }
+    </div>
+
+    <div class="zev-form-group">
+      <label>{{ 'EINHEIT' | translate }}:</label>
+      <input type="text" class="zev-input" [value]="selectedEinheitName" readonly />
+    </div>
+
+    <div class="zev-form-group">
+      <label for="betrag">{{ 'BETRAG' | translate }} (CHF):</label>
+      <input type="number" id="betrag" class="zev-input" [(ngModel)]="formData.betrag" name="betrag"
+        required min="0.01" step="0.01" />
+      @if (Number(formData.betrag) <= 0) {
+        <div class="zev-form-error">{{ 'BETRAG_UNGUELTIG' | translate }}</div>
+      }
+    </div>
+
+    <div class="zev-form-row">
+      <div class="zev-form-group">
+        <label for="datumVon">{{ 'DATUM_VON' | translate }}:</label>
+        <input type="date" id="datumVon" class="zev-input" [(ngModel)]="formData.datumVon" name="datumVon" required />
+      </div>
+      <div class="zev-form-group">
+        <label for="datumBis">{{ 'DATUM_BIS' | translate }}:</label>
+        <input type="date" id="datumBis" class="zev-input" [(ngModel)]="formData.datumBis" name="datumBis" required />
+      </div>
+    </div>
+
+    @if (formData.datumVon && formData.datumBis && formData.datumVon > formData.datumBis) {
+      <div class="zev-form-error">{{ 'DATUM_VON_MUSS_VOR_DATUM_BIS_LIEGEN' | translate }}</div>
+    }
+
+    <div class="zev-form-group">
+      <label for="zahldatum">{{ 'ZAHLDATUM' | translate }}:</label>
+      <input type="date" id="zahldatum" class="zev-input" [(ngModel)]="formData.zahldatum" name="zahldatum" />
+      <div class="zev-form-hint">{{ 'ZAHLDATUM_HINT' | translate }}</div>
+    </div>
+
+    @if (!isZahldatumValid()) {
+      <div class="zev-form-error">{{ 'ZAHLDATUM_VOR_DATUM_BIS' | translate }}</div>
+    }
+
+    <div class="form-actions">
+      <button type="submit" class="zev-button zev-button--primary" [disabled]="!isFormValid()">
+        <app-icon name="check"></app-icon>
+        {{ formData.id ? ('AKTUALISIEREN' | translate) : ('ERSTELLEN' | translate) }}
+      </button>
+      <button type="button" class="zev-button zev-button--secondary" (click)="onCancel()">
+        <app-icon name="x"></app-icon>
+        {{ 'ABBRECHEN' | translate }}
+      </button>
+    </div>
+  </form>
+</div>

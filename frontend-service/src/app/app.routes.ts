@@ -12,6 +12,7 @@ import { EinstellungenComponent } from './components/einstellungen/einstellungen
 import { DesignSystemShowcaseComponent } from './components/design-system-showcase/design-system-showcase.component';
 import { LizenzenComponent } from './components/lizenzen/lizenzen.component';
 import { TranslationEditorComponent } from './components/translation-editor/translation-editor.component';
+import { DebitorkontrolleListComponent } from './components/debitorkontrolle-list/debitorkontrolle-list.component';
 
 import { AuthGuard } from './guards/auth.guard';
 
@@ -24,6 +25,7 @@ export const routes: Routes = [
   { path: 'chart', component: MesswerteChartComponent, canActivate: [AuthGuard], data: { roles: ['zev'] } },
   { path: 'statistik', component: StatistikComponent, canActivate: [AuthGuard], data: { roles: ['zev'] } },
   { path: 'rechnungen', component: RechnungenComponent, canActivate: [AuthGuard], data: { roles: ['zev_admin'] } },
+  { path: 'debitoren', component: DebitorkontrolleListComponent, canActivate: [AuthGuard], data: { roles: ['zev_admin'] } },
   { path: 'tarife', component: TarifListComponent, canActivate: [AuthGuard], data: { roles: ['zev_admin'] } },
   { path: 'mieter', component: MieterListComponent, canActivate: [AuthGuard], data: { roles: ['zev_admin'] } },
   { path: 'design-system', component: DesignSystemShowcaseComponent, canActivate: [AuthGuard], data: { roles: ['zev'] } },

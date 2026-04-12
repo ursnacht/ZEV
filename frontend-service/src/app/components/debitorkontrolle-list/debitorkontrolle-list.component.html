@@ -1,0 +1,129 @@
+<div class="zev-container">
+  <h1><app-icon name="credit-card" size="lg"></app-icon> {{ 'DEBITORKONTROLLE' | translate }}</h1>
+
+  @if (message) {
+    <div class="zev-message" [ngClass]="'zev-message--' + messageType"
+      [class.zev-message--dismissible]="messageType === 'error'" (click)="messageType === 'error' && dismissMessage()">
+      <span>{{ message | translate }}</span>
+      @if (messageType === 'error') {
+        <span class="zev-message__dismiss">&times;</span>
+      }
+    </div>
+  }
+
+  @if (!showForm) {
+    <div>
+      <app-quarter-selector
+        [selectedVon]="dateFrom"
+        [selectedBis]="dateTo"
+        (quarterSelected)="onQuarterSelected($event)">
+      </app-quarter-selector>
+
+      <div class="zev-date-range-row">
+        <div class="zev-form-group">
+          <label for="dateFrom">{{ 'DATUM_VON' | translate }}:</label>
+          <input type="date" id="dateFrom" class="zev-input" [(ngModel)]="dateFrom" (ngModelChange)="onDateChange()">
+        </div>
+        <div class="zev-form-group">
+          <label for="dateTo">{{ 'DATUM_BIS' | translate }}:</label>
+          <input type="date" id="dateTo" class="zev-input" [(ngModel)]="dateTo" (ngModelChange)="onDateChange()">
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button class="zev-button zev-button--primary" (click)="onCreateNew()">
+          <app-icon name="plus"></app-icon>
+          {{ 'NEUER_DEBITOR' | translate }}
+        </button>
+      </div>
+
+      @if (debitoren.length > 0) {
+        <table class="zev-table" appColumnResize>
+          <thead>
+            <tr>
+              <th class="zev-table__header--sortable" (click)="onSort('mieterName')">
+                {{ 'MIETER' | translate }}
+                @if (sortColumn === 'mieterName') {
+                  <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+                }
+              </th>
+              <th class="zev-table__number zev-table__header--sortable" (click)="onSort('betrag')">
+                {{ 'BETRAG' | translate }} (CHF)
+                @if (sortColumn === 'betrag') {
+                  <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+                }
+              </th>
+              <th class="zev-table__header--sortable" (click)="onSort('datumVon')">
+                {{ 'DATUM_VON' | translate }}
+                @if (sortColumn === 'datumVon') {
+                  <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+                }
+              </th>
+              <th class="zev-table__header--sortable" (click)="onSort('datumBis')">
+                {{ 'DATUM_BIS' | translate }}
+                @if (sortColumn === 'datumBis') {
+                  <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+                }
+              </th>
+              <th class="zev-table__header--sortable" (click)="onSort('zahldatum')">
+                {{ 'ZAHLDATUM' | translate }}
+                @if (sortColumn === 'zahldatum') {
+                  <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+                }
+              </th>
+              <th class="zev-table__header--sortable" (click)="onSort('status')">
+                {{ 'STATUS' | translate }}
+                @if (sortColumn === 'status') {
+                  <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+                }
+              </th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (debitor of debitoren; track debitor) {
+              <tr>
+                <td>
+                  {{ debitor.mieterName || '-' }}
+                  @if (debitor.einheitName) {
+                    <span class="debitor-einheit">({{ debitor.einheitName }})</span>
+                  }
+                </td>
+                <td class="zev-table__number">{{ debitor.betrag | number:'1.2-2' }}</td>
+                <td>{{ debitor.datumVon | swissDate }}</td>
+                <td>{{ debitor.datumBis | swissDate }}</td>
+                <td>{{ debitor.zahldatum ? (debitor.zahldatum | swissDate) : '-' }}</td>
+                <td>
+                  <span class="zev-status" [class.zev-status--warning]="isOffen(debitor)"
+                    [class.zev-status--success]="!isOffen(debitor)">
+                    {{ (isOffen(debitor) ? 'STATUS_OFFEN' : 'STATUS_BEZAHLT') | translate }}
+                  </span>
+                </td>
+                <td>
+                  <app-kebab-menu
+                    [items]="menuItems"
+                    (itemClick)="onMenuAction($event, debitor)">
+                  </app-kebab-menu>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+
+      @if (debitoren.length === 0) {
+        <p class="zev-empty-state">{{ 'KEINE_DEBITOREN' | translate }}</p>
+      }
+    </div>
+  }
+
+  @if (showForm) {
+    <app-debitorkontrolle-form
+      [debitor]="selectedDebitor"
+      [mieter]="mieter"
+      [einheiten]="einheiten"
+      (save)="onFormSubmit($event)"
+      (cancel)="onFormCancel()">
+    </app-debitorkontrolle-form>
+  }
+</div>

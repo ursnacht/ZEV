@@ -26,6 +26,7 @@
 
 ### FR-3: Layout
 * Vorlage für Layout: Tarifverwaltung
+* Mieter ohne Mietende ("aktueller Mieter") werden in der Spalte "Mietende" mit dem Design-System-Badge `zev-status--success` ("Aktuell") dargestellt.
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 * [x] Die Mieterverwaltung ist aus dem Menü mit der Rolle "zev_admin" aufrufbar

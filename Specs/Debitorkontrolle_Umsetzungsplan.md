@@ -35,19 +35,19 @@ Implementierung einer persistenten Debitorenkontrolle: Beim Generieren von Rechn
 
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
-| [ ] | 1. DB-Migration: Debitor-Tabelle | V55: Neue Tabelle `debitor` mit Unique-Constraint und CASCADE |
-| [ ] | 2. Backend-Entity | `Debitor.java` mit `@Filter` und Validierungen |
-| [ ] | 3. Backend-DTO | `DebitorDTO.java` mit `mieterName` und `einheitName` (JOIN-Felder) |
-| [ ] | 4. Backend-Repository | `DebitorRepository.java` mit JOIN-Query und Upsert |
-| [ ] | 5. Backend-Service | `DebitorService.java` mit CRUD und Validierungslogik |
-| [ ] | 6. Backend-Controller | `DebitorController.java` mit GET/POST/PUT/DELETE |
-| [ ] | 7. RechnungController anpassen | `DebitorService` injizieren, Upsert nach PDF-Generierung aufrufen |
-| [ ] | 8. Frontend-Model | `debitor.model.ts` |
-| [ ] | 9. Frontend-Service | `debitor.service.ts` mit API-Calls |
-| [ ] | 10. Frontend-Komponenten | List- und Form-Komponente |
-| [ ] | 11. Routing | Route `/debitoren` in `app.routes.ts` |
-| [ ] | 12. Navigation | Menüeintrag nach "Rechnungen" in `navigation.component.html` |
-| [ ] | 13. Übersetzungen | V56: Translation-Keys für alle UI-Texte |
+| [x] | 1. DB-Migration: Debitor-Tabelle | V55: Neue Tabelle `debitor` mit Unique-Constraint und CASCADE |
+| [x] | 2. Backend-Entity | `Debitor.java` mit `@Filter` und Validierungen |
+| [x] | 3. Backend-DTO | `DebitorDTO.java` mit `mieterName` und `einheitName` (JOIN-Felder) |
+| [x] | 4. Backend-Repository | `DebitorRepository.java` mit JOIN-Query und Upsert |
+| [x] | 5. Backend-Service | `DebitorService.java` mit CRUD und Validierungslogik |
+| [x] | 6. Backend-Controller | `DebitorController.java` mit GET/POST/PUT/DELETE |
+| [x] | 7. RechnungController anpassen | `DebitorService` injizieren, Upsert nach PDF-Generierung aufrufen |
+| [x] | 8. Frontend-Model | `debitor.model.ts` |
+| [x] | 9. Frontend-Service | `debitor.service.ts` mit API-Calls |
+| [x] | 10. Frontend-Komponenten | List- und Form-Komponente |
+| [x] | 11. Routing | Route `/debitoren` in `app.routes.ts` |
+| [x] | 12. Navigation | Menüeintrag nach "Rechnungen" in `navigation.component.html` |
+| [x] | 13. Übersetzungen | V56: Translation-Keys für alle UI-Texte |
 
 ---
 

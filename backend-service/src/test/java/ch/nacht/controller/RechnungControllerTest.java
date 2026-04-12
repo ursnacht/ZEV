@@ -1,6 +1,7 @@
 package ch.nacht.controller;
 
 import ch.nacht.dto.RechnungDTO;
+import ch.nacht.service.DebitorService;
 import ch.nacht.service.OrganisationService;
 import ch.nacht.service.OrganizationContextService;
 import ch.nacht.service.RechnungPdfService;
@@ -17,6 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -49,6 +51,9 @@ public class RechnungControllerTest {
 
     @MockitoBean
     private OrganizationContextService organizationContextService;
+
+    @MockitoBean
+    private DebitorService debitorService;
 
     @MockitoBean
     private OrganisationService organisationService;
@@ -104,6 +109,11 @@ public class RechnungControllerTest {
         verify(rechnungStorageService).clearAll();
         verify(rechnungService).berechneRechnungen(List.of(1L),
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 3, 31));
+        verify(debitorService).upsertFromRechnung(
+            eq(10L),
+            eq(BigDecimal.valueOf(125.50).setScale(2)),
+            eq(LocalDate.of(2024, 1, 1)),
+            eq(LocalDate.of(2024, 3, 31)));
     }
 
     @Test
@@ -257,6 +267,36 @@ public class RechnungControllerTest {
             .andExpect(jsonPath("$.count", is(1)));
 
         verify(rechnungStorageService).sanitizeKey("Gewerbe EG");
+        verifyNoInteractions(debitorService);
+    }
+
+    @Test
+    void generateRechnungen_WithMieter_CallsDebitorUpsert() throws Exception {
+        when(rechnungService.berechneRechnungen(anyList(), any(), any()))
+            .thenReturn(List.of(testRechnung));
+        when(rechnungPdfService.generatePdf(any(RechnungDTO.class), anyString()))
+            .thenReturn(new byte[]{1, 2, 3});
+        when(rechnungStorageService.sanitizeKey(anyString())).thenReturn("Wohnung_1_10");
+        when(rechnungStorageService.getFilename(anyString())).thenReturn("Wohnung_1_10.pdf");
+
+        String request = """
+            {
+                "von": "2024-01-01",
+                "bis": "2024-03-31",
+                "einheitIds": [1]
+            }
+            """;
+
+        mockMvc.perform(post("/api/rechnungen/generate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request))
+            .andExpect(status().isOk());
+
+        verify(debitorService).upsertFromRechnung(
+            eq(10L),
+            eq(BigDecimal.valueOf(125.50).setScale(2)),
+            eq(LocalDate.of(2024, 1, 1)),
+            eq(LocalDate.of(2024, 3, 31)));
     }
 
     // ==================== GET /api/rechnungen/download/{key} ====================

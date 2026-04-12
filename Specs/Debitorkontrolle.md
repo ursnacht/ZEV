@@ -55,8 +55,9 @@
      * Datum von (Schweizer Format `dd.MM.yyyy`)
      * Datum bis (Schweizer Format)
      * Zahldatum (Schweizer Format, "-" wenn leer)
-     * Status ("Bezahlt" / "Offen", abgeleitet vom Zahldatum)
+     * Status ("Bezahlt" / "Offen", abgeleitet vom Zahldatum): "Offen" → Design-System-Badge `zev-status--warning`, "Bezahlt" → `zev-status--success`
      * Aktionen (Kebab-Menü: Bearbeiten, Löschen)
+  4. Alle Tabellenspalten sind sortierbar (Klick auf Spaltenheader, Pfeil-Indikator); Standardsortierung: Mieter aufsteigend
   4. Leerstate-Meldung wenn keine Einträge vorhanden
 * **Formular** (Inline, analog Mieterverwaltung):
   * Mieter-Name (Auswahl Mieter mit Dropdown-Liste mit Name Mieter und Einheit, Pflicht)

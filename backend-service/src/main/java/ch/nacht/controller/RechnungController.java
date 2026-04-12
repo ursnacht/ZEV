@@ -1,6 +1,7 @@
 package ch.nacht.controller;
 
 import ch.nacht.dto.RechnungDTO;
+import ch.nacht.service.DebitorService;
 import ch.nacht.service.RechnungPdfService;
 import ch.nacht.service.RechnungService;
 import ch.nacht.service.RechnungStorageService;
@@ -11,8 +12,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,13 +36,16 @@ public class RechnungController {
     private final RechnungService rechnungService;
     private final RechnungPdfService rechnungPdfService;
     private final RechnungStorageService rechnungStorageService;
+    private final DebitorService debitorService;
 
     public RechnungController(RechnungService rechnungService,
                               RechnungPdfService rechnungPdfService,
-                              RechnungStorageService rechnungStorageService) {
+                              RechnungStorageService rechnungStorageService,
+                              DebitorService debitorService) {
         this.rechnungService = rechnungService;
         this.rechnungPdfService = rechnungPdfService;
         this.rechnungStorageService = rechnungStorageService;
+        this.debitorService = debitorService;
         log.info("RechnungController initialized");
     }
 
@@ -48,6 +55,7 @@ public class RechnungController {
      * @param request Request containing date range and unit IDs
      * @return List of generated invoice metadata
      */
+    @Transactional
     @PostMapping("/generate")
     public ResponseEntity<Map<String, Object>> generateRechnungen(@RequestBody GenerateRequest request) {
         log.info("Generating invoices for {} units from {} to {}",
@@ -94,6 +102,16 @@ public class RechnungController {
                         : rechnung.getEinheitName();
                 String key = rechnungStorageService.sanitizeKey(keyBase);
                 rechnungStorageService.store(key, pdf);
+
+                // Persist debitor entry for invoices with mieter (upsert)
+                if (rechnung.getMieterId() != null) {
+                    debitorService.upsertFromRechnung(
+                            rechnung.getMieterId(),
+                            BigDecimal.valueOf(rechnung.getEndBetrag()).setScale(2, RoundingMode.HALF_UP),
+                            rechnung.getVon(),
+                            rechnung.getBis()
+                    );
+                }
 
                 Map<String, Object> meta = new HashMap<>();
                 meta.put("einheitId", rechnung.getEinheitId());
