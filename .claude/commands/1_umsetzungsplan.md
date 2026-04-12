@@ -17,7 +17,7 @@ Erstelle einen detaillierten Umsetzungsplan für eine Spezifikation.
    - Fragen ohne Antwort, die Details betreffen: als Annahme treffen und unter "Offene Punkte / Annahmen" dokumentieren
 
 ## Output
-* Erstelle eine neue Datei: `Specs/[Feature-Name]_Umsetzungsplan.md`
+* Erstelle einen neuen Umsetzungsplan in: `Specs/[Feature-Name]_Umsetzungsplan.md`
 * Der Umsetzungsplan enthält folgende Kapitel:
     - **Zusammenfassung:** 2-3 Sätze: Was wird implementiert und warum
     - **Betroffene Komponenten:** Liste aller zu ändernden/erstellenden Dateien

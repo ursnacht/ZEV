@@ -28,3 +28,4 @@ $ARGUMENTS
 * `Specs/[Feature-Name]_Umsetzungsplan.md` - der zu ergänzende Umsetzungsplan (falls vorhanden) 
 * `Specs/SPEC.md` – Template-Struktur
 * `Specs/generell.md` – Allgemeine Projektanforderungen (i18n, Design System, Multi-Tenancy)
+* `Specs/Übersetzungsverwaltung.md` – Beispiel einer vollständigen Spec
