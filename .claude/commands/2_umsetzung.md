@@ -3,10 +3,12 @@
 Setze einen Umsetzungsplan schrittweise um.
 
 ## Input
-* Umsetzungsplan: $ARGUMENTS (z.B. `Specs/Mieterverwaltung_Umsetzungsplan.md` oder kurz `Mieterverwaltung`)
+
+* **Feature-Name**: $ARGUMENTS (z.B. `Debitorkontrolle`) → liest `Specs/[Feature-Name]_Umsetzungsplan.md`  
+  Falls nicht angegeben: aus dem Konversations-Kontext ableiten (z.B. wenn zuvor `/0_anforderungen` oder `/1_umsetzungsplan` ausgeführt wurde); nur wenn unklar: nachfragen.
 
 ## Vorgehen
-1. **Lies den Umsetzungsplan** - Verstehe alle Phasen und deren Status
+1. **Lies den Umsetzungsplan** `Specs/[Feature-Name]_Umsetzungsplan.md` – verstehe alle Phasen und deren Status
 2. **Identifiziere nächste Phase** - Finde die erste Phase mit `[ ]` (nicht erledigt)
 3. **Implementiere die Phase** - Setze die beschriebenen Änderungen um (Patterns unten beachten!)
 4. **Kompiliere und prüfe** - Stelle sicher, dass der Code kompiliert (siehe Validierung)

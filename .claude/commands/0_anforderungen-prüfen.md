@@ -4,16 +4,15 @@ Erstelle einen strukturierten Bericht über Vollständigkeit, Korrektheit und Um
 
 ## Input
 
-$ARGUMENTS
-
-* **Feature-Name** (erster Parameter): z.B. `Zahlungsverwaltung` → liest `Specs/Zahlungsverwaltung.md`
+* **Feature-Name**: $ARGUMENTS (z.B. `Debitorkontrolle`) → liest `Specs/[Feature-Name].md`  
+  Falls nicht angegeben: aus dem Konversations-Kontext ableiten (z.B. wenn zuvor `/0_anforderungen` ausgeführt wurde); nur wenn unklar: nachfragen.
 
 ---
 
 ## Vorgehen
 
 ### Phase 1: Dokument lesen
-1. Lies `Specs/[FeatureName].md`
+1. Lies `Specs/[Feature-Name].md`
 2. Lies `Specs/SPEC.md` (Template-Struktur) zum Abgleich
 3. Lies `Specs/generell.md` (allgemeine Anforderungen)
 

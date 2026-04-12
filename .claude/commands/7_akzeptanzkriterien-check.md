@@ -3,27 +3,27 @@
 Prüft ob alle Akzeptanzkriterien einer Spec im Code erfüllt sind und aktualisiert die Checkboxen.
 
 ## Input
-* Spezifikation: $ARGUMENTS (z.B. `Specs/Mieterverwaltung.md` oder kurz `Mieterverwaltung`)
+
+* **Feature-Name**: $ARGUMENTS (z.B. `Debitorkontrolle`) → liest `Specs/[Feature-Name].md`  
+  Falls nicht angegeben: aus dem Konversations-Kontext ableiten (z.B. wenn zuvor `/0_anforderungen` oder `/1_umsetzungsplan` ausgeführt wurde); nur wenn unklar: nachfragen.
 
 ---
 
 ## Unabhängige Ausführung
 
-Dieser Skill arbeitet UNABHÄNGIG vom Kontext der aktuellen Session.
+Dieser Skill arbeitet UNABHÄNGIG vom Kontext der aktuellen Session und kann auch mit einem neuen Agenten ausgeführt werden.
 
 **Analysiere NUR:**
-1. Die Spec-Datei (Akzeptanzkriterien und funktionale Anforderungen)
+1. Die Anforderungen in `Specs/[Feature-Name].md`
 2. Den tatsächlich implementierten Code
 3. Bestehende Tests und deren Ergebnisse
-
-**IGNORIERE** jeglichen Kontext aus der vorherigen Konversation.
 
 ---
 
 ## Vorgehen
 
 ### Phase 1: Akzeptanzkriterien extrahieren
-1. Lies die Spec-Datei
+1. Lies die Anforderungen `Specs/[Feature-Name].md`
 2. Extrahiere alle Akzeptanzkriterien (Zeilen mit `[ ]` oder `[x]` im Abschnitt "Akzeptanzkriterien")
 3. Extrahiere zusätzlich prüfbare Anforderungen aus:
    - Funktionale Anforderungen (FR-1, FR-2, FR-3)

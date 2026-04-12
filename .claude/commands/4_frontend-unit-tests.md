@@ -1,29 +1,29 @@
 # Erstelle Frontend-Unit-Tests
 
-Erstelle Unit Tests für die angegebene Angular-Komponente oder Service.
+Erstelle Frontend-Unit-Tests für die Angular-Komponente oder den Service, die aus Anforderungen generiert worden sind.
 
 ## Input
-* Ziel-Datei: $ARGUMENTS (z.B. `einheit-form.component.ts` oder `einheit.service.ts`)
+
+* **Feature-Name**: $ARGUMENTS (z.B. `Debitorkontrolle`) → liest `Specs/[Feature-Name].md`  
+  Falls nicht angegeben: aus dem Konversations-Kontext ableiten (z.B. wenn zuvor `/0_anforderungen` oder `/1_umsetzungsplan` ausgeführt wurde); nur wenn unklar: nachfragen.
 
 ---
 
 ## Unabhängige Ausführung
 
-Dieser Skill arbeitet UNABHÄNGIG vom Kontext der aktuellen Session.
+Dieser Skill arbeitet UNABHÄNGIG vom Kontext der aktuellen Session und kann auch mit einem neuen Agenten ausgeführt werden.
 
 **Analysiere NUR:**
-1. Die Spec-Datei (falls angegeben)
+1. Die Anforderungen in `Specs/[Feature-Name].md`
 2. Den tatsächlich implementierten Code
 3. Bestehende Tests als Vorlage
-
-**IGNORIERE** jeglichen Kontext aus der vorherigen Konversation.
 
 ---
 
 ## Vorgehen
 
 ### Phase 1: Unabhängige Code-Analyse
-1. Lies die Spec-Datei (falls vorhanden) - extrahiere Anforderungen
+1. Lies die Anforderungen `Specs/[Feature-Name].md`
 2. Finde alle relevanten Implementierungs-Dateien mit Glob/Grep:
    - `frontend-service/src/app/**/*.ts`
 3. Analysiere die Ziel-Datei:

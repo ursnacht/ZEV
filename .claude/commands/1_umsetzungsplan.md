@@ -3,10 +3,12 @@
 Erstelle einen detaillierten Umsetzungsplan für eine Spezifikation.
 
 ## Input
-* Spezifikation: $ARGUMENTS (z.B. `Specs/Mieterverwaltung.md` oder kurz `Mieterverwaltung`)
+
+* **Feature-Name**: $ARGUMENTS (z.B. `Debitorkontrolle`) → liest `Specs/[Feature-Name].md`  
+  Falls nicht angegeben: aus dem Konversations-Kontext ableiten (z.B. wenn zuvor `/0_anforderungen` ausgeführt wurde); nur wenn unklar: nachfragen.
 
 ## Vorgehen
-1. **Analysiere die Spezifikation** - Lies und verstehe alle Anforderungen
+1. **Analysiere die Spezifikation** in `Specs/[Feature-Name].md` - Lies und verstehe alle Anforderungen
 2. **Recherchiere den Code** - Finde relevante bestehende Komponenten und Patterns
 3. **Prüfe Abhängigkeiten** - Identifiziere betroffene Module (Backend, Frontend, DB)
 4. **Prüfe offene Fragen** - Lies Abschnitt "8. Offene Fragen" der Spec:
@@ -15,7 +17,7 @@ Erstelle einen detaillierten Umsetzungsplan für eine Spezifikation.
    - Fragen ohne Antwort, die Details betreffen: als Annahme treffen und unter "Offene Punkte / Annahmen" dokumentieren
 
 ## Output
-* Erstelle eine neue Datei: `[Spec-Name]_Umsetzungsplan.md` im gleichen Verzeichnis (/Specs/)
+* Erstelle eine neue Datei: `Specs/[Feature-Name]_Umsetzungsplan.md`
 * Der Umsetzungsplan enthält folgende Kapitel:
     - **Zusammenfassung:** 2-3 Sätze: Was wird implementiert und warum
     - **Betroffene Komponenten:** Liste aller zu ändernden/erstellenden Dateien

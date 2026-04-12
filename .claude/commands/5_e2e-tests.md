@@ -1,29 +1,29 @@
 # Erstelle E2E-Tests
 
-Erstelle End-to-End Tests mit Playwright für komplette User Flows.
+Erstelle End-to-End Tests mit Playwright für komplette User Flows, die aus Anforderungen generiert worden sind.
 
 ## Input
-* Ziel: $ARGUMENTS (z.B. `Tarifverwaltung` oder `Specs/Tarifverwaltung_Umsetzungsplan.md`)
+
+* **Feature-Name**: $ARGUMENTS (z.B. `Debitorkontrolle`) → liest `Specs/[Feature-Name].md`  
+  Falls nicht angegeben: aus dem Konversations-Kontext ableiten (z.B. wenn zuvor `/0_anforderungen` oder `/1_umsetzungsplan` ausgeführt wurde); nur wenn unklar: nachfragen.
 
 ---
 
 ## Unabhängige Ausführung
 
-Dieser Skill arbeitet UNABHÄNGIG vom Kontext der aktuellen Session.
+Dieser Skill arbeitet UNABHÄNGIG vom Kontext der aktuellen Session und kann auch mit einem neuen Agenten ausgeführt werden.
 
 **Analysiere NUR:**
-1. Die Spec-Datei (falls angegeben)
+1. Die Anforderungen in `Specs/[Feature-Name].md`
 2. Die tatsächlich implementierten Komponenten und Routes
 3. Bestehende E2E-Tests als Vorlage
-
-**IGNORIERE** jeglichen Kontext aus der vorherigen Konversation.
 
 ---
 
 ## Vorgehen
 
 ### Phase 1: Unabhängige Code-Analyse
-1. Lies die Spec-Datei (falls vorhanden) - extrahiere User Stories und Akzeptanzkriterien
+1. Lies die Anforderungen `Specs/[Feature-Name].md` - extrahiere User Stories und Akzeptanzkriterien
 2. Analysiere die Routing-Konfiguration: `frontend-service/src/app/app.routes.ts`
 3. Finde relevante Komponenten mit Glob/Grep:
    - `frontend-service/src/app/components/**/*.html`

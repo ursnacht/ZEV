@@ -19,10 +19,12 @@ $ARGUMENTS
 
 ## Output
 * Ergänze die bestehende Anforderungsdatei: `Specs/[Feature-Name].md`
+* Ergänze den bestehenden Umsetzungsplan (falls vorhanden): `Specs/[Feature-Name]_Umsetzungsplan.md`
 * Weiche nicht von der Struktur des Templates `Specs/SPEC.md` ab
 * Implementiere die neuen Anforderungen im Anwendungscode
 
 ## Referenz
 * `Specs/[Feature-Name].md` - das bestehende und zu ergänzende Anforderungsdokument
+* `Specs/[Feature-Name]_Umsetzungsplan.md` - der zu ergänzende Umsetzungsplan (falls vorhanden) 
 * `Specs/SPEC.md` – Template-Struktur
 * `Specs/generell.md` – Allgemeine Projektanforderungen (i18n, Design System, Multi-Tenancy)

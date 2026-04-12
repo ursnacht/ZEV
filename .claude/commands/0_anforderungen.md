@@ -17,7 +17,7 @@ $ARGUMENTS
 5. **Stelle Rückfragen** bei wesentlichen Unklarheiten, die den Scope beeinflussen - BEVOR du das Dokument erstellst
 
 ## Output
-* Erstelle eine neue Datei: `Specs/[FeatureName].md`
+* Erstelle eine neue Datei: `Specs/[Feature-Name].md`
 * Verwende exakt die Struktur des Templates `Specs/SPEC.md`
 * Der Feature-Name als H1-Titel (erster Parameter)
 
