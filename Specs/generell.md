@@ -49,7 +49,7 @@ Das Design System (`/design-system`) enthält alle wiederverwendbaren UI-Kompone
 * Komponenten-CSS-Dateien minimal halten (nur komponentenspezifische Styles)
 * Neue wiederverwendbare Styles in `design-system/src/components/` hinzufügen
 * Nach Änderungen am Design System: `cd design-system && npm run build`
-* Ändere NIEMALS ein DB-Migrationsskript bevor du nicht mit dem  MCP-Server 'zev-db' geprüft hast, ob es nicht bereits ausgeführt worden ist.
+* Ändere NIEMALS ein BESTEHENDES DB-Migrationsskript bevor du nicht mit dem MCP-Server 'zev-db' geprüft hast, ob es nicht bereits ausgeführt worden ist.
 
 ### Multi-Tenancy
 * Jede Entity muss eine `org_id` (UUID) Spalte haben
