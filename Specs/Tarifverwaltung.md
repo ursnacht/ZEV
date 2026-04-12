@@ -21,10 +21,15 @@
     * Tariftyp
       * "ZEV" für Strombezug aus dem ZEV, bisher rechnung.tarif.zev (messwerte.zev_calculated)
       * "VNB" für Strombezug vom Verteilnetzbetreiber, bisher rechnung.tarif.ewb (messwerte.total - messwerte.zev_calculated)
+      * "GRUNDGEBUEHR" für eine fixe Grundgebühr (z.B. Messgebühr, Netznutzungspauschale)
     * Tarif: Genauigkeit 5 Nachkommastellen
     * gueltig_von: Datum
     * gueltig_bis: Datum
-  * Alle Spalten sind Pflicht 
+  * Alle Spalten sind Pflicht
+* **Badge-Darstellung Tariftyp** (Tarifverwaltungstabelle):
+  * `ZEV` → hellgrüner Hintergrund, dunkelgrüne Schrift (`.tarif-typ-badge--zev`)
+  * `VNB` → hellorangefarbener Hintergrund, dunkle Schrift (`.tarif-typ-badge--vnb`)
+  * `GRUNDGEBUEHR` → anthrazitfarbener Hintergrund (#424242), weisse Schrift (`.tarif-typ-badge--grundgebuehr`)
 * Rechnungen 
   * Für den Zeitbereich einer Rechnung (i.d.R. ein Quartal) können mehrere Tarife gültig sein, da diese monatlich angepasst werden.
   * Der Stromverbrauch muss pro Zeile für den Gültigkeitsbereich des Tarifes und nicht der Rechnung berechnet werden.

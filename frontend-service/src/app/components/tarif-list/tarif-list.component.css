@@ -26,6 +26,11 @@
   color: #e65100;
 }
 
+.tarif-typ-badge--grundgebuehr {
+  background-color: #424242;
+  color: #ffffff;
+}
+
 .button-row {
   display: flex;
   gap: var(--spacing-sm);
