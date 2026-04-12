@@ -51,6 +51,11 @@ Das Design System (`/design-system`) enthält alle wiederverwendbaren UI-Kompone
 * Nach Änderungen am Design System: `cd design-system && npm run build`
 * Ändere NIEMALS ein BESTEHENDES DB-Migrationsskript bevor du nicht mit dem MCP-Server 'zev-db' geprüft hast, ob es nicht bereits ausgeführt worden ist.
 
+### Navigation
+* In der Navigationsbar (rechts, links vom Darkmode-Toggle) wird Vorname und Nachname des eingeloggten Benutzers angezeigt
+* Fallback: Benutzername (username), falls kein Vor-/Nachname in Keycloak hinterlegt
+* Kein Org-Alias in diesem Bereich
+
 ### Multi-Tenancy
 * Jede Entity muss eine `org_id` (UUID) Spalte haben
 * Hibernate-Filter (`@Filter`, `@FilterDef`) für automatische Mandantentrennung verwenden
