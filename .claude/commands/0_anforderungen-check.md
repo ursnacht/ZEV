@@ -45,7 +45,7 @@ Erstelle einen strukturierten Bericht über Vollständigkeit, Korrektheit und Um
 - Wird serverseitiges Setzen (nicht vom Client) spezifiziert?
 
 **i18n:**
-- Sind alle UI-Texte als via `TranslationService` gefordert?
+- Sind alle UI-Texte via `TranslationService` gefordert?
 - Sind neue Translations als Abhängigkeit vermerkt?
 
 **Persistierung:**
