@@ -1,6 +1,7 @@
 {
     "realm": "zev",
     "enabled": true,
+    "organizationsEnabled": true,
     "clients": [
         {
             "clientId": "zev-frontend",
