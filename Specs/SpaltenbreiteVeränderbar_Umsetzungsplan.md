@@ -36,6 +36,7 @@ Implementierung einer Column-Resize-Funktionalität für alle Tabellen im Fronte
 | [x] | 5. Tarif-List | Directive auf Tarif-Tabelle anwenden |
 | [x] | 6. Translation-Editor | CSS-Klasse migrieren und Directive anwenden |
 | [ ] | 7. Design System Build | Design System neu bauen |
+| [x] | 8. Spaltenbreiten-Isolation | Andere Spalten bleiben beim Resize unverändert |
 
 ## Technische Details
 
@@ -115,6 +116,16 @@ Anwendung der Directive auf alle drei Tabellen:
 | Mindestbreite | Spalte darf nicht schmaler als Header-Text werden |
 | Letzte Spalte | Kein Resize-Handle auf letzter Spalte |
 | Doppelklick | Auto-Fit: Spalte passt sich an breitesten Inhalt an |
+
+### Phase 8: Spaltenbreiten-Isolation
+Mit `table-layout: auto` (Browser-Standard) verteilt der Browser nach jeder Breitenänderung den verfügbaren Platz neu auf alle Spalten. Um das zu verhindern:
+
+1. Beim ersten Resize (`onMouseDown`) werden alle Spaltenbreiten als explizite Pixel-Werte auf die `<th>`-Elemente geschrieben (`offsetWidth`).
+2. Die Tabelle wechselt auf `table-layout: fixed` – der Browser ändert danach keine andere Spalte mehr.
+3. Die Tabellenbreite (`width`) wird von `100%` auf den gemessenen `offsetWidth`-Px-Wert umgestellt und wächst/schrumpft mit der gezogenen Spalte (`startTableWidth + (newWidth - startWidth)`).
+4. Am Elternelement der Tabelle wird `overflow-x: auto` gesetzt, damit bei breiteren Spalten ein horizontaler Scrollbalken erscheint statt dass der Inhalt abgeschnitten wird.
+
+Gleiches gilt für den Auto-Fit bei Doppelklick (`autoFitColumn`).
 
 ## Nicht-funktionale Anforderungen
 

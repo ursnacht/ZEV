@@ -25,6 +25,7 @@
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 * [ ] Der Benutzer kann mit der Maus den Strich ziehen und die Spaltenbreite verändern.
 * [ ] Beim Loslassen der Maustaste behält die Spalte die gewählte Breite.
+* [ ] Beim Verändern einer Spaltenbreite behalten alle anderen Spalten ihre bisherige Breite.
 
 
 ## 4. Nicht-funktionale Anforderungen (NFR)

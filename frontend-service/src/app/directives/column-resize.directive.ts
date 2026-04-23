@@ -12,6 +12,7 @@ export class ColumnResizeDirective implements AfterViewInit, OnDestroy {
   private currentTh: HTMLTableCellElement | null = null;
   private startX = 0;
   private startWidth = 0;
+  private startTableWidth = 0;
 
   private mouseMoveListener: (() => void) | null = null;
   private mouseUpListener: (() => void) | null = null;
@@ -66,15 +67,43 @@ export class ColumnResizeDirective implements AfterViewInit, OnDestroy {
     });
   }
 
+  // Lock all column widths to px and switch to table-layout: fixed so that
+  // resizing one column does not cause the browser to redistribute other columns.
+  // Must be called before the first resize or auto-fit.
+  private lockAllColumnWidths(): void {
+    if (this.table.style.tableLayout === 'fixed') return;
+
+    const headerCells = Array.from(this.table.querySelectorAll('thead th'));
+    const tableWidth = this.table.offsetWidth;
+
+    headerCells.forEach(th => {
+      const width = (th as HTMLElement).offsetWidth;
+      this.renderer.setStyle(th, 'width', `${width}px`);
+      this.renderer.setStyle(th, 'min-width', `${width}px`);
+    });
+
+    this.renderer.setStyle(this.table, 'width', `${tableWidth}px`);
+    this.renderer.setStyle(this.table, 'table-layout', 'fixed');
+
+    // Allow horizontal scroll when columns grow wider than the container
+    const parent = this.table.parentElement;
+    if (parent) {
+      this.renderer.setStyle(parent, 'overflow-x', 'auto');
+    }
+  }
+
   private onMouseDown(event: MouseEvent, th: HTMLTableCellElement, handle: HTMLElement): void {
     event.preventDefault();
     event.stopPropagation();
+
+    this.lockAllColumnWidths();
 
     this.isResizing = true;
     this.currentHandle = handle;
     this.currentTh = th;
     this.startX = event.pageX;
     this.startWidth = th.offsetWidth;
+    this.startTableWidth = parseInt(this.table.style.width, 10);
 
     this.renderer.addClass(this.table, 'zev-table--resizing');
     this.renderer.addClass(handle, 'zev-table__resize-handle--active');
@@ -95,6 +124,10 @@ export class ColumnResizeDirective implements AfterViewInit, OnDestroy {
 
       this.renderer.setStyle(this.currentTh, 'width', `${newWidth}px`);
       this.renderer.setStyle(this.currentTh, 'min-width', `${newWidth}px`);
+
+      // Grow/shrink the table with the column so other columns are unaffected
+      const tableDiff = newWidth - this.startWidth;
+      this.renderer.setStyle(this.table, 'width', `${this.startTableWidth + tableDiff}px`);
     });
   };
 
@@ -117,21 +150,25 @@ export class ColumnResizeDirective implements AfterViewInit, OnDestroy {
   };
 
   private autoFitColumn(th: HTMLTableCellElement, columnIndex: number): void {
-    // Get all cells in this column (header + body)
-    const headerCell = th;
+    this.lockAllColumnWidths();
+
+    const oldWidth = th.offsetWidth;
     const bodyCells = this.table.querySelectorAll(`tbody tr td:nth-child(${columnIndex + 1})`);
 
-    // Calculate max width needed
-    let maxWidth = this.measureContentWidth(headerCell);
-
+    let maxWidth = this.measureContentWidth(th);
     bodyCells.forEach(cell => {
       const cellWidth = this.measureContentWidth(cell as HTMLElement);
       maxWidth = Math.max(maxWidth, cellWidth);
     });
 
-    // Apply the width
+    const widthDiff = maxWidth - oldWidth;
     this.renderer.setStyle(th, 'width', `${maxWidth}px`);
     this.renderer.setStyle(th, 'min-width', `${maxWidth}px`);
+
+    const currentTableWidth = parseInt(this.table.style.width, 10);
+    if (currentTableWidth > 0) {
+      this.renderer.setStyle(this.table, 'width', `${currentTableWidth + widthDiff}px`);
+    }
   }
 
   private measureContentWidth(cell: HTMLElement): number {
