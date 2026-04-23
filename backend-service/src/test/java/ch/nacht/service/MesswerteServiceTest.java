@@ -44,6 +44,9 @@ public class MesswerteServiceTest {
     @Mock
     private HibernateFilterService hibernateFilterService;
 
+    @Mock
+    private CalculationProgressService calculationProgressService;
+
     @InjectMocks
     private MesswerteService messwerteService;
 

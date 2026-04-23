@@ -2,6 +2,7 @@ package ch.nacht.controller;
 
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
+import ch.nacht.service.CalculationProgressService;
 import ch.nacht.service.EinheitService;
 import ch.nacht.service.MesswerteService;
 import ch.nacht.service.MetricsService;
@@ -53,6 +54,9 @@ public class MesswerteControllerTest {
 
     @MockitoBean
     private OrganizationContextService organizationContextService;
+
+    @MockitoBean
+    private CalculationProgressService calculationProgressService;
 
     @MockitoBean
     private OrganisationService organisationService;
