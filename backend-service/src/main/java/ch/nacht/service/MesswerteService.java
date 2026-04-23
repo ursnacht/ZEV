@@ -33,15 +33,18 @@ public class MesswerteService {
     private final EinheitRepository einheitRepository;
     private final OrganizationContextService organizationContextService;
     private final HibernateFilterService hibernateFilterService;
+    private final CalculationProgressService calculationProgressService;
 
     public MesswerteService(MesswerteRepository messwerteRepository,
                             EinheitRepository einheitRepository,
                             OrganizationContextService organizationContextService,
-                            HibernateFilterService hibernateFilterService) {
+                            HibernateFilterService hibernateFilterService,
+                            CalculationProgressService calculationProgressService) {
         this.messwerteRepository = messwerteRepository;
         this.einheitRepository = einheitRepository;
         this.organizationContextService = organizationContextService;
         this.hibernateFilterService = hibernateFilterService;
+        this.calculationProgressService = calculationProgressService;
         log.info("MesswerteService initialized");
     }
 
@@ -154,6 +157,9 @@ public class MesswerteService {
         List<LocalDateTime> distinctZeiten = messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo);
         log.info("Found {} distinct timestamps to process", distinctZeiten.size());
 
+        Long orgId = organizationContextService.getCurrentOrgId();
+        calculationProgressService.startCalculation(orgId, distinctZeiten.size());
+
         int processedTimestamps = 0;
         int processedRecords = 0;
         BigDecimal totalSolarProduced = BigDecimal.ZERO;
@@ -223,6 +229,7 @@ public class MesswerteService {
             }
 
             processedTimestamps++;
+            calculationProgressService.updateProgress(orgId, processedTimestamps);
 
             if (processedTimestamps % 100 == 0) {
                 log.debug("Progress: {} timestamps processed", processedTimestamps);

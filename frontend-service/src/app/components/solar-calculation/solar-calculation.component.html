@@ -49,6 +49,20 @@
     </div>
   </form>
 
+  @if (calculating || progressTotal > 0) {
+    <div class="progress-container">
+      <div class="progress-bar" [class.progress-bar--indeterminate]="progressTotal === 0">
+        <div class="progress-bar__fill" [style.width.%]="progressPercent"></div>
+      </div>
+      @if (progressTotal > 0) {
+        <div class="progress-label">
+          {{ progressProcessed }} / {{ progressTotal }} {{ 'ZEITSTEMPEL_VERARBEITET' | translate }}
+          ({{ progressPercent }}%)
+        </div>
+      }
+    </div>
+  }
+
   @if (result) {
     <div class="result-summary">
       <h2>{{ 'ZUSAMMENFASSUNG' | translate }}</h2>

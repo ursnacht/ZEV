@@ -1,9 +1,11 @@
 package ch.nacht.controller;
 
 import ch.nacht.entity.Einheit;
+import ch.nacht.service.CalculationProgressService;
 import ch.nacht.service.EinheitService;
 import ch.nacht.service.MesswerteService;
 import ch.nacht.service.MetricsService;
+import ch.nacht.service.OrganizationContextService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -24,12 +26,18 @@ public class MesswerteController {
     private final MesswerteService messwerteService;
     private final MetricsService metricsService;
     private final EinheitService einheitService;
+    private final CalculationProgressService calculationProgressService;
+    private final OrganizationContextService organizationContextService;
 
     public MesswerteController(MesswerteService messwerteService, MetricsService metricsService,
-                               EinheitService einheitService) {
+                               EinheitService einheitService,
+                               CalculationProgressService calculationProgressService,
+                               OrganizationContextService organizationContextService) {
         this.messwerteService = messwerteService;
         this.metricsService = metricsService;
         this.einheitService = einheitService;
+        this.calculationProgressService = calculationProgressService;
+        this.organizationContextService = organizationContextService;
         log.info("MesswerteController initialized");
     }
 
@@ -137,5 +145,15 @@ public class MesswerteController {
                     einheitId, e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
+    }
+
+    @GetMapping("/calculation-progress")
+    @PreAuthorize("hasRole('zev_admin')")
+    public ResponseEntity<Map<String, Object>> getCalculationProgress() {
+        CalculationProgressService.CalculationProgress progress =
+                calculationProgressService.getProgress(organizationContextService.getCurrentOrgId());
+        return ResponseEntity.ok(Map.of(
+                "total", progress.total(),
+                "processed", progress.processed()));
     }
 }

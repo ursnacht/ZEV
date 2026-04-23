@@ -14,6 +14,11 @@ export interface CalculationResponse {
   message?: string;
 }
 
+export interface CalculationProgress {
+  total: number;
+  processed: number;
+}
+
 export interface MesswertData {
   zeit: string;
   total: number;
@@ -35,6 +40,10 @@ export class MesswerteService {
       .set('algorithm', algorithm);
 
     return this.http.post<CalculationResponse>(`${this.apiUrl}/calculate-distribution`, null, { params });
+  }
+
+  getCalculationProgress(): Observable<CalculationProgress> {
+    return this.http.get<CalculationProgress>(`${this.apiUrl}/calculation-progress`);
   }
 
   getMesswerteByEinheit(einheitId: number, dateFrom: string, dateTo: string): Observable<MesswertData[]> {

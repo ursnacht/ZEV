@@ -1,6 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { interval, Subscription } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 import { MesswerteService, CalculationResponse } from '../../services/messwerte.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { SwissDatePipe } from '../../pipes/swiss-date.pipe';
@@ -15,7 +17,7 @@ import { IconComponent } from '../icon/icon.component';
   templateUrl: './solar-calculation.component.html',
   styleUrls: ['./solar-calculation.component.css']
 })
-export class SolarCalculationComponent {
+export class SolarCalculationComponent implements OnDestroy {
   dateFrom: string = '';
   dateTo: string = '';
   algorithm: string = 'PROPORTIONAL';
@@ -24,10 +26,20 @@ export class SolarCalculationComponent {
   messageType: 'success' | 'error' | '' = '';
   result: CalculationResponse | null = null;
 
+  progressTotal = 0;
+  progressProcessed = 0;
+  progressPercent = 0;
+
+  private progressSubscription: Subscription | null = null;
+
   constructor(
     private messwerteService: MesswerteService,
     private translationService: TranslationService
   ) { }
+
+  ngOnDestroy(): void {
+    this.stopProgressPolling();
+  }
 
   onDateFromChange(): void {
     if (this.dateFrom) {
@@ -60,11 +72,19 @@ export class SolarCalculationComponent {
 
     this.calculating = true;
     this.result = null;
+    this.progressTotal = 0;
+    this.progressProcessed = 0;
+    this.progressPercent = 0;
+    this.startProgressPolling();
 
     this.messwerteService.calculateDistribution(this.dateFrom, this.dateTo, this.algorithm).subscribe({
       next: (response) => {
+        this.stopProgressPolling();
         if (response.status === 'success') {
           this.result = response;
+          this.progressProcessed = response.processedTimestamps;
+          this.progressTotal = response.processedTimestamps;
+          this.progressPercent = 100;
           this.showMessage(this.translationService.translate('BERECHNUNG_ERFOLGREICH'), 'success');
         } else {
           this.showMessage(`Fehler: ${response.message}`, 'error');
@@ -72,10 +92,31 @@ export class SolarCalculationComponent {
         this.calculating = false;
       },
       error: (error) => {
+        this.stopProgressPolling();
         this.showMessage(`Fehler: ${error.message}`, 'error');
         this.calculating = false;
       }
     });
+  }
+
+  private startProgressPolling(): void {
+    this.progressSubscription = interval(500).pipe(
+      switchMap(() => this.messwerteService.getCalculationProgress())
+    ).subscribe({
+      next: (progress) => {
+        this.progressTotal = progress.total;
+        this.progressProcessed = progress.processed;
+        this.progressPercent = progress.total > 0
+          ? Math.round((progress.processed / progress.total) * 100)
+          : 0;
+      },
+      error: () => {}
+    });
+  }
+
+  private stopProgressPolling(): void {
+    this.progressSubscription?.unsubscribe();
+    this.progressSubscription = null;
   }
 
   private showMessage(message: string, type: 'success' | 'error'): void {
