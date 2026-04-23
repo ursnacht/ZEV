@@ -2,12 +2,23 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
-import { EinheitService, EinheitMatchResponse } from '../../services/einheit.service';
+import { EinheitService } from '../../services/einheit.service';
 import { Einheit } from '../../models/einheit.model';
 import { TranslationService } from '../../services/translation.service';
 
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
+
+export type UploadStatus = 'pending' | 'matching' | 'ready' | 'uploading' | 'done' | 'error';
+
+export interface UploadEntry {
+  file: File;
+  einheitId: number | null;
+  date: string;
+  status: UploadStatus;
+  errorMessage: string | null;
+  matchConfidence: number | null;
+}
 
 @Component({
   selector: 'app-messwerte-upload',
@@ -17,19 +28,12 @@ import { IconComponent } from '../icon/icon.component';
   styleUrls: ['./messwerte-upload.component.css']
 })
 export class MesswerteUploadComponent implements OnInit {
-  date: string = '';
-  einheitId: number | null = null;
   einheiten: Einheit[] = [];
-  file: File | null = null;
-  uploading = false;
+  entries: UploadEntry[] = [];
+  importing = false;
   message = '';
   messageType: 'success' | 'error' | 'warning' | '' = '';
   isDragOver = false;
-
-  // KI-Matching properties
-  isMatching = false;
-  matchResult: EinheitMatchResponse | null = null;
-  private readonly CONFIDENCE_THRESHOLD = 0.8;
 
   constructor(
     private http: HttpClient,
@@ -49,9 +53,6 @@ export class MesswerteUploadComponent implements OnInit {
           const nameB = (b.name || '').toLowerCase();
           return nameA.localeCompare(nameB);
         });
-        if (this.einheiten.length > 0) {
-          this.einheitId = this.einheiten[0].id || null;
-        }
       },
       error: (error) => {
         this.showMessage('Fehler beim Laden der Einheiten: ' + error.message, 'error');
@@ -61,8 +62,9 @@ export class MesswerteUploadComponent implements OnInit {
 
   onFileChange(event: any): void {
     const files = event.target.files;
-    if (files.length > 0) {
-      this.handleFile(files[0]);
+    if (files && files.length > 0) {
+      this.addFiles(files);
+      event.target.value = '';
     }
   }
 
@@ -85,69 +87,76 @@ export class MesswerteUploadComponent implements OnInit {
 
     const files = event.dataTransfer?.files;
     if (files && files.length > 0) {
-      const file = files[0];
-      if (file.name.endsWith('.csv')) {
-        this.handleFile(file);
-      } else {
-        this.showMessage(this.translationService.translate('NUR_CSV_DATEIEN'), 'error');
-      }
+      this.addFiles(files);
     }
   }
 
-  private handleFile(file: File): void {
-    this.file = file;
-    this.extractDateFromFile(file);
-    this.matchEinheitByFilename(file.name);
+  removeEntry(entry: UploadEntry): void {
+    this.entries = this.entries.filter(e => e !== entry);
   }
 
-  private matchEinheitByFilename(filename: string): void {
-    this.isMatching = true;
-    this.matchResult = null;
+  get isAnyMatching(): boolean {
+    return this.entries.some(e => e.status === 'matching');
+  }
 
-    this.einheitService.matchEinheitByFilename(filename).subscribe({
-      next: (result) => {
-        this.isMatching = false;
-        this.matchResult = result;
+  get canImport(): boolean {
+    return (
+      this.entries.length > 0 &&
+      !this.importing &&
+      !this.isAnyMatching &&
+      this.entries.every(e => e.einheitId !== null && e.date !== '' && e.status !== 'uploading')
+    );
+  }
 
-        if (result.matched && result.einheitId && result.confidence > this.CONFIDENCE_THRESHOLD) {
-          // High confidence match - auto-select
-          this.einheitId = result.einheitId;
-          this.showMessage(
-            this.translationService.translate('EINHEIT_ERKANNT') + ': ' + result.einheitName,
-            'success'
-          );
-        } else if (result.matched && result.confidence <= this.CONFIDENCE_THRESHOLD) {
-          // Low confidence match - suggest but don't auto-select
-          if (result.einheitId) {
-            this.einheitId = result.einheitId;
+  importAll(): void {
+    const toImport = this.entries.filter(e => e.status === 'ready' || e.status === 'error');
+    if (toImport.length === 0) return;
+
+    this.importing = true;
+    let successCount = 0;
+    const total = toImport.length;
+
+    const processNext = (index: number): void => {
+      if (index >= toImport.length) {
+        this.importing = false;
+        this.entries = this.entries.filter(e => e.status !== 'done');
+        this.showMessage(
+          this.translationService.translate('DATEIEN_IMPORT_ERGEBNIS')
+            .replace('{success}', String(successCount))
+            .replace('{total}', String(total)),
+          successCount === total ? 'success' : 'error'
+        );
+        return;
+      }
+
+      const entry = toImport[index];
+      entry.status = 'uploading';
+
+      const formData = new FormData();
+      formData.append('date', entry.date);
+      formData.append('einheitId', entry.einheitId!.toString());
+      formData.append('file', entry.file);
+
+      this.http.post<any>('http://localhost:8090/api/messwerte/upload', formData).subscribe({
+        next: (response) => {
+          if (response.status === 'success') {
+            entry.status = 'done';
+            successCount++;
+          } else {
+            entry.status = 'error';
+            entry.errorMessage = response.message;
           }
-          this.showMessage(
-            this.translationService.translate('EINHEIT_BITTE_PRUEFEN'),
-            'warning'
-          );
-        } else if (!result.matched && result.message) {
-          // Error from backend (e.g. invalid API key, service unavailable)
-          this.showMessage(result.message, 'error');
+          processNext(index + 1);
+        },
+        error: (error) => {
+          entry.status = 'error';
+          entry.errorMessage = error.message;
+          processNext(index + 1);
         }
-      },
-      error: (error) => {
-        this.isMatching = false;
-        this.matchResult = null;
-        // Show error message from HTTP error
-        const message = error.error?.message || error.message ||
-          this.translationService.translate('KI_NICHT_VERFUEGBAR');
-        this.showMessage(message, 'error');
-      }
-    });
-  }
+      });
+    };
 
-  removeFile(event: Event): void {
-    event.stopPropagation();
-    this.file = null;
-    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    if (fileInput) {
-      fileInput.value = '';
-    }
+    processNext(0);
   }
 
   formatFileSize(bytes: number): string {
@@ -158,27 +167,73 @@ export class MesswerteUploadComponent implements OnInit {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 
-  private extractDateFromFile(file: File): void {
+  private addFiles(files: FileList | File[]): void {
+    const fileArray = Array.from(files as FileList);
+    const newFiles = fileArray.filter(f => {
+      if (!f.name.endsWith('.csv')) {
+        this.showMessage(`${f.name}: ${this.translationService.translate('NUR_CSV_DATEIEN')}`, 'error');
+        return false;
+      }
+      if (this.entries.some(e => e.file.name === f.name)) {
+        this.showMessage(
+          `${f.name}: ${this.translationService.translate('DATEI_BEREITS_IN_LISTE')}`, 'error'
+        );
+        return false;
+      }
+      return true;
+    });
+
+    const newEntries: UploadEntry[] = newFiles.map(f => ({
+      file: f,
+      einheitId: this.einheiten.length > 0 ? (this.einheiten[0].id ?? null) : null,
+      date: '',
+      status: 'matching' as UploadStatus,
+      errorMessage: null,
+      matchConfidence: null,
+    }));
+
+    this.entries = [...this.entries, ...newEntries];
+
+    newEntries.forEach(entry => {
+      this.extractDateFromFile(entry);
+      this.matchEinheitForEntry(entry);
+    });
+  }
+
+  private matchEinheitForEntry(entry: UploadEntry): void {
+    this.einheitService.matchEinheitByFilename(entry.file.name).subscribe({
+      next: (result) => {
+        entry.matchConfidence = result.confidence;
+        if (result.matched && result.einheitId) {
+          entry.einheitId = result.einheitId;
+        }
+        entry.status = 'ready';
+      },
+      error: () => {
+        entry.matchConfidence = null;
+        entry.status = 'ready';
+      }
+    });
+  }
+
+  private extractDateFromFile(entry: UploadEntry): void {
     const reader = new FileReader();
     reader.onload = (e) => {
       const content = e.target?.result as string;
       if (content) {
         const lines = content.split('\n');
         if (lines.length >= 2) {
-          const secondLine = lines[1];
-          const firstColumn = secondLine.split(',')[0];
-          const parsedDate = this.parseEnglishDate(firstColumn);
+          const parsedDate = this.parseEnglishDate(lines[1].split(',')[0]);
           if (parsedDate) {
-            this.date = parsedDate;
+            entry.date = parsedDate;
           }
         }
       }
     };
-    reader.readAsText(file);
+    reader.readAsText(entry.file);
   }
 
   private parseEnglishDate(dateStr: string): string | null {
-    // Parse format: "Tue Jul 01 2025" (EEE MMM dd yyyy)
     const months: { [key: string]: string } = {
       'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
       'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
@@ -198,50 +253,14 @@ export class MesswerteUploadComponent implements OnInit {
     return null;
   }
 
-  onSubmit(): void {
-    if (!this.date || !this.einheitId || !this.file) {
-      this.showMessage(this.translationService.translate('BITTE_ALLE_FELDER_AUSFUELLEN'), 'error');
-      return;
-    }
-
-    this.uploading = true;
-    const formData = new FormData();
-    formData.append('date', this.date);
-    formData.append('einheitId', this.einheitId.toString());
-    formData.append('file', this.file);
-
-    this.http.post<any>('http://localhost:8090/api/messwerte/upload', formData).subscribe({
-      next: (response) => {
-        if (response.status === 'success') {
-          this.showMessage(`Erfolgreich! ${response.count} Messwerte für ${response.einheitName} hochgeladen.`, 'success');
-          this.resetForm();
-        } else {
-          this.showMessage(`Fehler: ${response.message}`, 'error');
-        }
-        this.uploading = false;
-      },
-      error: (error) => {
-        this.showMessage(`Fehler: ${error.message}`, 'error');
-        this.uploading = false;
-      }
-    });
-  }
-
   private showMessage(message: string, type: 'success' | 'error' | 'warning'): void {
     this.message = message;
     this.messageType = type;
-    setTimeout(() => {
-      this.message = '';
-      this.messageType = '';
-    }, 5000);
-  }
-
-  private resetForm(): void {
-    // Keep the date and einheit for the next upload
-    this.file = null;
-    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    if (fileInput) {
-      fileInput.value = '';
+    if (type === 'success') {
+      setTimeout(() => {
+        this.message = '';
+        this.messageType = '';
+      }, 5000);
     }
   }
 }

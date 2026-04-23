@@ -1,5 +1,41 @@
-/* Nutzt globale .container Klasse vom Design System */
-/* Nur component-spezifische Overrides hier */
-.container {
-  max-width: 600px; /* Engerer Container für Upload-Formular */
+.zev-table {
+  margin-top: var(--spacing-lg);
+}
+
+.upload-row--done td {
+  opacity: 0.5;
+}
+
+.upload-row--error td {
+  background-color: var(--color-danger-50, #fef2f2);
+}
+
+.upload-row__filename {
+  font-size: var(--font-size-sm);
+  word-break: break-all;
+  max-width: 220px;
+}
+
+.upload-row__filesize {
+  display: block;
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--color-text-muted, #6b7280);
+}
+
+.upload-row__einheit {
+  min-width: 200px;
+}
+
+table .zev-select {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-sm);
+}
+
+table .zev-input {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-sm);
+}
+
+.zev-form-actions {
+  margin-top: var(--spacing-md);
 }
