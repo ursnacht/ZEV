@@ -122,3 +122,102 @@
   color: var(--zev-color-danger, #dc3545);
   background-color: var(--zev-color-danger-light, #f8d7da);
 }
+
+/* Dark Mode */
+[data-theme="dark"] .zev-drop-zone {
+  border-color: var(--color-gray-400);
+  background-color: var(--color-gray-200);
+}
+
+[data-theme="dark"] .zev-drop-zone:hover,
+[data-theme="dark"] .zev-drop-zone--active {
+  border-color: var(--color-primary);
+  background-color: var(--color-gray-300);
+}
+
+[data-theme="dark"] .zev-drop-zone--has-file {
+  border-color: var(--color-primary-dark);
+  background-color: var(--color-success-bg);
+}
+
+[data-theme="dark"] .zev-drop-zone__icon {
+  color: var(--color-gray-600);
+}
+
+[data-theme="dark"] .zev-drop-zone:hover .zev-drop-zone__icon,
+[data-theme="dark"] .zev-drop-zone--active .zev-drop-zone__icon {
+  color: var(--color-primary);
+}
+
+[data-theme="dark"] .zev-drop-zone__text,
+[data-theme="dark"] .zev-drop-zone__file-name {
+  color: var(--color-gray-800);
+}
+
+[data-theme="dark"] .zev-drop-zone__hint,
+[data-theme="dark"] .zev-drop-zone__file-size {
+  color: var(--color-gray-600);
+}
+
+[data-theme="dark"] .zev-drop-zone__file-icon {
+  color: var(--color-success-text);
+}
+
+[data-theme="dark"] .zev-drop-zone__remove {
+  color: var(--color-gray-600);
+}
+
+[data-theme="dark"] .zev-drop-zone__remove:hover {
+  color: var(--color-danger);
+  background-color: var(--color-error-bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .zev-drop-zone {
+    border-color: var(--color-gray-400);
+    background-color: var(--color-gray-200);
+  }
+
+  :root:not([data-theme="light"]) .zev-drop-zone:hover,
+  :root:not([data-theme="light"]) .zev-drop-zone--active {
+    border-color: var(--color-primary);
+    background-color: var(--color-gray-300);
+  }
+
+  :root:not([data-theme="light"]) .zev-drop-zone--has-file {
+    border-color: var(--color-primary-dark);
+    background-color: var(--color-success-bg);
+  }
+
+  :root:not([data-theme="light"]) .zev-drop-zone__icon {
+    color: var(--color-gray-600);
+  }
+
+  :root:not([data-theme="light"]) .zev-drop-zone:hover .zev-drop-zone__icon,
+  :root:not([data-theme="light"]) .zev-drop-zone--active .zev-drop-zone__icon {
+    color: var(--color-primary);
+  }
+
+  :root:not([data-theme="light"]) .zev-drop-zone__text,
+  :root:not([data-theme="light"]) .zev-drop-zone__file-name {
+    color: var(--color-gray-800);
+  }
+
+  :root:not([data-theme="light"]) .zev-drop-zone__hint,
+  :root:not([data-theme="light"]) .zev-drop-zone__file-size {
+    color: var(--color-gray-600);
+  }
+
+  :root:not([data-theme="light"]) .zev-drop-zone__file-icon {
+    color: var(--color-success-text);
+  }
+
+  :root:not([data-theme="light"]) .zev-drop-zone__remove {
+    color: var(--color-gray-600);
+  }
+
+  :root:not([data-theme="light"]) .zev-drop-zone__remove:hover {
+    color: var(--color-danger);
+    background-color: var(--color-error-bg);
+  }
+}

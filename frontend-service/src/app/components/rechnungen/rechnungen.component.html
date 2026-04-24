@@ -8,32 +8,7 @@
   }
 
   <form (ngSubmit)="onGenerate()">
-    <div class="zev-form-group">
-      <label>{{ 'EINHEITEN_WAEHLEN' | translate }}:</label>
-      <div class="zev-checkbox-group zev-checkbox-group--scrollable">
-        <div class="zev-checkbox-item zev-checkbox-item--select-all">
-          <input type="checkbox" id="einheit-select-all"
-            [checked]="allSelected()" [indeterminate]="someSelected()" (change)="onSelectAllToggle()">
-            <label for="einheit-select-all">
-              <strong>{{ 'ALLE_AUSWAEHLEN' | translate }}</strong>
-            </label>
-          </div>
-          @for (einheit of einheiten; track einheit) {
-            <div class="zev-checkbox-item">
-              <input type="checkbox" [id]="'einheit-' + einheit.id" [value]="einheit.id"
-                [checked]="selectedEinheitIds.has(einheit.id!)" (change)="onEinheitToggle(einheit.id!)">
-                <label [for]="'einheit-' + einheit.id">
-                  {{ einheit.name }} [{{ (einheit.typ === EinheitTyp.CONSUMER ? 'KONSUMENT' : 'PRODUZENT') | translate }}]
-                </label>
-              </div>
-            }
-          </div>
-          @if (einheiten.length === 0 && !loading) {
-            <div class="zev-form-hint">
-              {{ 'KEINE_EINHEITEN_VORHANDEN' | translate }}
-            </div>
-          }
-        </div>
+    <app-einheit-selector (selectionChange)="onSelectionChange($event)"></app-einheit-selector>
 
         <app-quarter-selector
           [selectedVon]="dateFrom"
@@ -99,10 +74,4 @@
           </div>
         }
 
-        <!-- Loading State -->
-        @if (loading) {
-          <div class="zev-empty-state">
-            {{ 'LADE_DATEN' | translate }}...
-          </div>
-        }
       </div>

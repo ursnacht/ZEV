@@ -1,18 +1,18 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { EinheitService } from '../../services/einheit.service';
 import { RechnungService, GeneratedRechnung } from '../../services/rechnung.service';
-import { Einheit, EinheitTyp } from '../../models/einheit.model';
+import { Einheit } from '../../models/einheit.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
 import { IconComponent } from '../icon/icon.component';
+import { EinheitSelectorComponent } from '../einheit-selector/einheit-selector.component';
 
 @Component({
   selector: 'app-rechnungen',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe, QuarterSelectorComponent, IconComponent],
+  imports: [CommonModule, FormsModule, TranslatePipe, QuarterSelectorComponent, IconComponent, EinheitSelectorComponent],
   templateUrl: './rechnungen.component.html',
   styleUrls: ['./rechnungen.component.css']
 })
@@ -20,32 +20,28 @@ export class RechnungenComponent implements OnInit {
   dateFrom: string = '';
   dateTo: string = '';
   selectedEinheitIds: Set<number> = new Set();
-  einheiten: Einheit[] = [];
-  loading = false;
   generating = false;
   message = '';
   messageType: 'success' | 'error' | '' = '';
   generatedRechnungen: GeneratedRechnung[] = [];
 
-  readonly EinheitTyp = EinheitTyp;
-
   constructor(
-    private einheitService: EinheitService,
     private rechnungService: RechnungService,
     private translationService: TranslationService
   ) {}
 
   ngOnInit(): void {
-    this.loadEinheiten();
     this.setDefaultDates();
   }
 
+  onSelectionChange(einheiten: Einheit[]): void {
+    this.selectedEinheitIds = new Set(einheiten.map(e => e.id!));
+  }
+
   private setDefaultDates(): void {
-    // Default to previous month
     const now = new Date();
     const firstDayPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const lastDayPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-
     this.dateFrom = this.formatDate(firstDayPrevMonth);
     this.dateTo = this.formatDate(lastDayPrevMonth);
   }
@@ -55,55 +51,6 @@ export class RechnungenComponent implements OnInit {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
-  }
-
-  loadEinheiten(): void {
-    this.loading = true;
-    this.einheitService.getAllEinheiten().subscribe({
-      next: (data) => {
-        // Sort: CONSUMER before PRODUCER, then alphabetically by name
-        this.einheiten = data.sort((a, b) => {
-          if (a.typ !== b.typ) return a.typ === EinheitTyp.CONSUMER ? -1 : 1;
-          return (a.name || '').localeCompare(b.name || '');
-        });
-        this.loading = false;
-      },
-      error: (error) => {
-        this.showMessage(
-          this.translationService.translate('FEHLER_BEIM_LADEN_DER_EINHEITEN') + ': ' + error.message,
-          'error'
-        );
-        this.loading = false;
-      }
-    });
-  }
-
-  onEinheitToggle(einheitId: number): void {
-    if (this.selectedEinheitIds.has(einheitId)) {
-      this.selectedEinheitIds.delete(einheitId);
-    } else {
-      this.selectedEinheitIds.add(einheitId);
-    }
-  }
-
-  allSelected(): boolean {
-    return this.einheiten.length > 0 && this.selectedEinheitIds.size === this.einheiten.length;
-  }
-
-  someSelected(): boolean {
-    return this.selectedEinheitIds.size > 0 && this.selectedEinheitIds.size < this.einheiten.length;
-  }
-
-  onSelectAllToggle(): void {
-    if (this.allSelected()) {
-      this.selectedEinheitIds.clear();
-    } else {
-      this.einheiten.forEach(e => {
-        if (e.id) {
-          this.selectedEinheitIds.add(e.id);
-        }
-      });
-    }
   }
 
   onDateFromChange(): void {

@@ -64,105 +64,26 @@ describe('RechnungenComponent', () => {
   });
 
   describe('initialization', () => {
-    it('should load einheiten on init', () => {
-      expect(einheitServiceSpy.getAllEinheiten).toHaveBeenCalled();
-      expect(component.einheiten.length).toBe(3);
-    });
-
-    it('should sort CONSUMER before PRODUCER', () => {
-      expect(component.einheiten[0].typ).toBe(EinheitTyp.CONSUMER);
-      expect(component.einheiten[1].typ).toBe(EinheitTyp.CONSUMER);
-      expect(component.einheiten[2].typ).toBe(EinheitTyp.PRODUCER);
-    });
-
-    it('should sort consumers alphabetically by name', () => {
-      expect(component.einheiten[0].name).toBe('Wohnung A');
-      expect(component.einheiten[1].name).toBe('Wohnung B');
-    });
-
     it('should set default dates to previous month', () => {
       expect(component.dateFrom).toBeTruthy();
       expect(component.dateTo).toBeTruthy();
-      expect(component.dateFrom.length).toBe(10); // YYYY-MM-DD
+      expect(component.dateFrom.length).toBe(10);
       expect(component.dateTo.length).toBe(10);
     });
-
-    it('should show error message when loading einheiten fails', () => {
-      einheitServiceSpy.getAllEinheiten.and.returnValue(
-        throwError(() => ({ message: 'Network error' }))
-      );
-      component.loadEinheiten();
-      expect(component.messageType).toBe('error');
-      expect(component.message).toContain('Network error');
-    });
   });
 
-  describe('onEinheitToggle', () => {
-    it('should add einheit to selection', () => {
-      component.onEinheitToggle(1);
+  describe('onSelectionChange', () => {
+    it('should update selectedEinheitIds from emitted einheiten', () => {
+      component.onSelectionChange([mockConsumer, mockConsumer2]);
       expect(component.selectedEinheitIds.has(1)).toBeTrue();
+      expect(component.selectedEinheitIds.has(2)).toBeTrue();
+      expect(component.selectedEinheitIds.size).toBe(2);
     });
 
-    it('should remove einheit from selection when already selected', () => {
-      component.selectedEinheitIds.add(1);
-      component.onEinheitToggle(1);
-      expect(component.selectedEinheitIds.has(1)).toBeFalse();
-    });
-  });
-
-  describe('allSelected', () => {
-    it('should return false when nothing selected', () => {
-      expect(component.allSelected()).toBeFalse();
-    });
-
-    it('should return false when some but not all selected', () => {
-      component.selectedEinheitIds.add(1);
-      expect(component.allSelected()).toBeFalse();
-    });
-
-    it('should return true when all einheiten selected', () => {
-      component.einheiten.forEach(e => { if (e.id) component.selectedEinheitIds.add(e.id); });
-      expect(component.allSelected()).toBeTrue();
-    });
-
-    it('should return false when einheiten list is empty', () => {
-      component.einheiten = [];
-      expect(component.allSelected()).toBeFalse();
-    });
-  });
-
-  describe('someSelected', () => {
-    it('should return false when nothing selected', () => {
-      expect(component.someSelected()).toBeFalse();
-    });
-
-    it('should return true when some but not all selected', () => {
-      component.selectedEinheitIds.add(1);
-      expect(component.someSelected()).toBeTrue();
-    });
-
-    it('should return false when all selected', () => {
-      component.einheiten.forEach(e => { if (e.id) component.selectedEinheitIds.add(e.id); });
-      expect(component.someSelected()).toBeFalse();
-    });
-  });
-
-  describe('onSelectAllToggle', () => {
-    it('should select all when none selected', () => {
-      component.onSelectAllToggle();
-      expect(component.selectedEinheitIds.size).toBe(3);
-    });
-
-    it('should deselect all when all selected', () => {
-      component.einheiten.forEach(e => { if (e.id) component.selectedEinheitIds.add(e.id); });
-      component.onSelectAllToggle();
+    it('should clear selectedEinheitIds when empty array emitted', () => {
+      component.onSelectionChange([mockConsumer]);
+      component.onSelectionChange([]);
       expect(component.selectedEinheitIds.size).toBe(0);
-    });
-
-    it('should select all when only some are selected', () => {
-      component.selectedEinheitIds.add(1);
-      component.onSelectAllToggle();
-      expect(component.selectedEinheitIds.size).toBe(3);
     });
   });
 
@@ -170,7 +91,7 @@ describe('RechnungenComponent', () => {
     it('should set dateTo to last day of dateFrom month', () => {
       component.dateFrom = '2024-02-15';
       component.onDateFromChange();
-      expect(component.dateTo).toBe('2024-02-29'); // 2024 is a leap year
+      expect(component.dateTo).toBe('2024-02-29');
     });
 
     it('should set dateTo for non-leap year February', () => {

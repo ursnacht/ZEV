@@ -46,3 +46,14 @@
   color: var(--color-gray-400);
   cursor: not-allowed;
 }
+
+/* Dark Mode */
+[data-theme="dark"] .zev-checkbox-group {
+  border-color: var(--color-gray-400);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .zev-checkbox-group {
+    border-color: var(--color-gray-400);
+  }
+}
