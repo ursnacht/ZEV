@@ -1,4 +1,5 @@
 import { Component, OnDestroy } from '@angular/core';
+import { WithMessage } from '../../utils/with-message';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { interval, Subscription } from 'rxjs';
@@ -17,13 +18,12 @@ import { IconComponent } from '../icon/icon.component';
   templateUrl: './solar-calculation.component.html',
   styleUrls: ['./solar-calculation.component.css']
 })
-export class SolarCalculationComponent implements OnDestroy {
+export class SolarCalculationComponent extends WithMessage implements OnDestroy {
   dateFrom: string = '';
   dateTo: string = '';
   algorithm: string = 'PROPORTIONAL';
   calculating = false;
-  message = '';
-  messageType: 'success' | 'error' | '' = '';
+
   result: CalculationResponse | null = null;
 
   progressTotal = 0;
@@ -35,7 +35,7 @@ export class SolarCalculationComponent implements OnDestroy {
   constructor(
     private messwerteService: MesswerteService,
     private translationService: TranslationService
-  ) { }
+  ) { super(); }
 
   ngOnDestroy(): void {
     this.stopProgressPolling();
@@ -119,12 +119,4 @@ export class SolarCalculationComponent implements OnDestroy {
     this.progressSubscription = null;
   }
 
-  private showMessage(message: string, type: 'success' | 'error'): void {
-    this.message = message;
-    this.messageType = type;
-    setTimeout(() => {
-      this.message = '';
-      this.messageType = '';
-    }, 5000);
-  }
 }

@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { WithMessage } from '../../utils/with-message';
 import { EinstellungenService } from '../../services/einstellungen.service';
 import { Einstellungen, RechnungKonfiguration, Steller } from '../../models/einstellungen.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
@@ -14,7 +15,7 @@ import { IconComponent } from '../icon/icon.component';
   templateUrl: './einstellungen.component.html',
   styleUrls: ['./einstellungen.component.css']
 })
-export class EinstellungenComponent implements OnInit {
+export class EinstellungenComponent extends WithMessage implements OnInit {
   formData: RechnungKonfiguration = {
     zahlungsfrist: '',
     iban: '',
@@ -27,14 +28,13 @@ export class EinstellungenComponent implements OnInit {
   };
 
   einstellungenId: number | undefined;
-  message = '';
-  messageType: 'success' | 'error' = 'success';
+
   loading = true;
 
   constructor(
     private einstellungenService: EinstellungenService,
     private translationService: TranslationService
-  ) {}
+  ) { super(); }
 
   ngOnInit(): void {
     this.loadEinstellungen();
@@ -108,17 +108,4 @@ export class EinstellungenComponent implements OnInit {
     return ibanRegex.test(cleanIban);
   }
 
-  private showMessage(message: string, type: 'success' | 'error'): void {
-    this.message = message;
-    this.messageType = type;
-    if (type === 'success') {
-      setTimeout(() => {
-        this.message = '';
-      }, 5000);
-    }
-  }
-
-  dismissMessage(): void {
-    this.message = '';
-  }
 }

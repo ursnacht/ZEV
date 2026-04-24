@@ -1,4 +1,5 @@
 import { Component, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { WithMessage } from '../../utils/with-message';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
@@ -27,20 +28,19 @@ interface ChartData {
   templateUrl: './messwerte-chart.component.html',
   styleUrls: ['./messwerte-chart.component.css']
 })
-export class MesswerteChartComponent implements OnDestroy {
+export class MesswerteChartComponent extends WithMessage implements OnDestroy {
   dateFrom: string = '';
   dateTo: string = '';
   selectedEinheiten: Einheit[] = [];
   loading = false;
-  message = '';
-  messageType: 'success' | 'error' | '' = '';
+
   charts: ChartData[] = [];
 
   constructor(
     private messwerteService: MesswerteService,
     private translationService: TranslationService,
     private cdr: ChangeDetectorRef
-  ) {}
+  ) { super(); }
 
   ngOnDestroy(): void {
     this.charts.forEach(chartData => { if (chartData.chart) chartData.chart.destroy(); });
@@ -174,9 +174,4 @@ export class MesswerteChartComponent implements OnDestroy {
     chartData.chart = new Chart(ctx, config);
   }
 
-  private showMessage(message: string, type: 'success' | 'error'): void {
-    this.message = message;
-    this.messageType = type;
-    setTimeout(() => { this.message = ''; this.messageType = ''; }, 5000);
-  }
 }

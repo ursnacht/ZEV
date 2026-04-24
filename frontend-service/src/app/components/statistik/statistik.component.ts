@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { WithMessage } from '../../utils/with-message';
 import { StatistikService } from '../../services/statistik.service';
 import { Statistik, MonatsStatistik, TagMitAbweichung } from '../../models/statistik.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
@@ -16,12 +17,11 @@ import { IconComponent } from '../icon/icon.component';
   templateUrl: './statistik.component.html',
   styleUrls: ['./statistik.component.css']
 })
-export class StatistikComponent implements OnInit {
+export class StatistikComponent extends WithMessage implements OnInit {
   dateFrom: string = '';
   dateTo: string = '';
   loading = false;
-  message = '';
-  messageType: 'success' | 'error' | '' = '';
+
 
   statistik: Statistik | null = null;
   expandedMonths: Set<number> = new Set();
@@ -30,7 +30,7 @@ export class StatistikComponent implements OnInit {
   constructor(
     private statistikService: StatistikService,
     private translationService: TranslationService
-  ) { }
+  ) { super(); }
 
   ngOnInit(): void {
     this.setDefaultDateRange();
@@ -198,12 +198,4 @@ export class StatistikComponent implements OnInit {
     return colors[type] || '#999';
   }
 
-  private showMessage(message: string, type: 'success' | 'error'): void {
-    this.message = message;
-    this.messageType = type;
-    setTimeout(() => {
-      this.message = '';
-      this.messageType = '';
-    }, 5000);
-  }
 }

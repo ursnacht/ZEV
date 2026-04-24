@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { WithMessage } from '../../utils/with-message';
 import { RechnungService, GeneratedRechnung } from '../../services/rechnung.service';
 import { Einheit } from '../../models/einheit.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
@@ -16,19 +17,18 @@ import { EinheitSelectorComponent } from '../einheit-selector/einheit-selector.c
   templateUrl: './rechnungen.component.html',
   styleUrls: ['./rechnungen.component.css']
 })
-export class RechnungenComponent implements OnInit {
+export class RechnungenComponent extends WithMessage implements OnInit {
   dateFrom: string = '';
   dateTo: string = '';
   selectedEinheitIds: Set<number> = new Set();
   generating = false;
-  message = '';
-  messageType: 'success' | 'error' | '' = '';
+
   generatedRechnungen: GeneratedRechnung[] = [];
 
   constructor(
     private rechnungService: RechnungService,
     private translationService: TranslationService
-  ) {}
+  ) { super(); }
 
   ngOnInit(): void {
     this.setDefaultDates();
@@ -118,14 +118,4 @@ export class RechnungenComponent implements OnInit {
     return betrag.toFixed(2);
   }
 
-  private showMessage(message: string, type: 'success' | 'error'): void {
-    this.message = message;
-    this.messageType = type;
-    if (type === 'success') {
-      setTimeout(() => {
-        this.message = '';
-        this.messageType = '';
-      }, 5000);
-    }
-  }
 }

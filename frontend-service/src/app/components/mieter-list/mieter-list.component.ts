@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { WithMessage } from '../../utils/with-message';
 import { MieterService } from '../../services/mieter.service';
 import { EinheitService } from '../../services/einheit.service';
 import { Mieter } from '../../models/mieter.model';
@@ -19,13 +20,12 @@ import { IconComponent } from '../icon/icon.component';
   templateUrl: './mieter-list.component.html',
   styleUrls: ['./mieter-list.component.css']
 })
-export class MieterListComponent implements OnInit {
+export class MieterListComponent extends WithMessage implements OnInit {
   mieter: Mieter[] = [];
   einheiten: Einheit[] = [];
   selectedMieter: Mieter | null = null;
   showForm = false;
-  message = '';
-  messageType: 'success' | 'error' = 'success';
+
   sortColumn: 'einheitId' | 'name' | 'strasse' | 'plzOrt' | 'mietbeginn' | 'mietende' | null = 'einheitId';
   sortDirection: 'asc' | 'desc' = 'asc';
 
@@ -39,7 +39,7 @@ export class MieterListComponent implements OnInit {
     private mieterService: MieterService,
     private einheitService: EinheitService,
     private translationService: TranslationService
-  ) { }
+  ) { super(); }
 
   ngOnInit(): void {
     this.loadEinheiten();
@@ -207,17 +207,4 @@ export class MieterListComponent implements OnInit {
     return parts.join(' ');
   }
 
-  private showMessage(message: string, type: 'success' | 'error'): void {
-    this.message = message;
-    this.messageType = type;
-    if (type === 'success') {
-      setTimeout(() => {
-        this.message = '';
-      }, 5000);
-    }
-  }
-
-  dismissMessage(): void {
-    this.message = '';
-  }
 }

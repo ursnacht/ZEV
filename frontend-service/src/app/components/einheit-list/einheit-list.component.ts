@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { WithMessage } from '../../utils/with-message';
 import { CommonModule } from '@angular/common';
 import { EinheitService } from '../../services/einheit.service';
 import { Einheit } from '../../models/einheit.model';
@@ -16,12 +17,11 @@ import { IconComponent } from '../icon/icon.component';
   templateUrl: './einheit-list.component.html',
   styleUrls: ['./einheit-list.component.css']
 })
-export class EinheitListComponent implements OnInit {
+export class EinheitListComponent extends WithMessage implements OnInit {
   einheiten: Einheit[] = [];
   selectedEinheit: Einheit | null = null;
   showForm = false;
-  message = '';
-  messageType: 'success' | 'error' = 'success';
+
   sortColumn: 'id' | 'name' | 'typ' | 'messpunkt' | null = 'name';
   sortDirection: 'asc' | 'desc' = 'asc';
 
@@ -33,7 +33,7 @@ export class EinheitListComponent implements OnInit {
   constructor(
     private einheitService: EinheitService,
     private translationService: TranslationService
-  ) { }
+  ) { super(); }
 
   ngOnInit(): void {
     this.loadEinheiten();
@@ -148,11 +148,4 @@ export class EinheitListComponent implements OnInit {
     });
   }
 
-  private showMessage(message: string, type: 'success' | 'error'): void {
-    this.message = message;
-    this.messageType = type;
-    setTimeout(() => {
-      this.message = '';
-    }, 5000);
-  }
 }

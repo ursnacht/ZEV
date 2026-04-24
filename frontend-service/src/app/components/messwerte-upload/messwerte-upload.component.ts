@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { WithMessage } from '../../utils/with-message';
 import { EinheitService } from '../../services/einheit.service';
 import { Einheit } from '../../models/einheit.model';
 import { TranslationService } from '../../services/translation.service';
@@ -27,19 +28,18 @@ export interface UploadEntry {
   templateUrl: './messwerte-upload.component.html',
   styleUrls: ['./messwerte-upload.component.css']
 })
-export class MesswerteUploadComponent implements OnInit {
+export class MesswerteUploadComponent extends WithMessage implements OnInit {
   einheiten: Einheit[] = [];
   entries: UploadEntry[] = [];
   importing = false;
-  message = '';
-  messageType: 'success' | 'error' | 'warning' | '' = '';
+
   isDragOver = false;
 
   constructor(
     private http: HttpClient,
     private einheitService: EinheitService,
     private translationService: TranslationService
-  ) { }
+  ) { super(); }
 
   ngOnInit(): void {
     this.loadEinheiten();
@@ -253,14 +253,4 @@ export class MesswerteUploadComponent implements OnInit {
     return null;
   }
 
-  private showMessage(message: string, type: 'success' | 'error' | 'warning'): void {
-    this.message = message;
-    this.messageType = type;
-    if (type === 'success') {
-      setTimeout(() => {
-        this.message = '';
-        this.messageType = '';
-      }, 5000);
-    }
-  }
 }

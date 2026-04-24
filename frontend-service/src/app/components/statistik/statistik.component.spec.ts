@@ -474,13 +474,13 @@ describe('StatistikComponent', () => {
       expect(component.messageType).toBe('');
     }));
 
-    it('should auto-dismiss error messages after 5s', fakeAsync(() => {
+    it('should not auto-dismiss error messages', fakeAsync(() => {
       component.dateFrom = '';
       component.onSubmit();
       expect(component.messageType).toBe('error');
       tick(5000);
-      expect(component.message).toBe('');
-      expect(component.messageType).toBe('');
+      expect(component.messageType).toBe('error');
+      expect(component.message).not.toBe('');
     }));
   });
 });

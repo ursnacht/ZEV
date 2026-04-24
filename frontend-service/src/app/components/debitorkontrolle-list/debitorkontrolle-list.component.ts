@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { WithMessage } from '../../utils/with-message';
 import { DebitorService } from '../../services/debitor.service';
 import { EinheitService } from '../../services/einheit.service';
 import { MieterService } from '../../services/mieter.service';
@@ -27,7 +28,7 @@ import { IconComponent } from '../icon/icon.component';
   templateUrl: './debitorkontrolle-list.component.html',
   styleUrls: ['./debitorkontrolle-list.component.css']
 })
-export class DebitorkontrolleListComponent implements OnInit {
+export class DebitorkontrolleListComponent extends WithMessage implements OnInit {
   debitoren: Debitor[] = [];
   einheiten: Einheit[] = [];
   mieter: Mieter[] = [];
@@ -35,8 +36,7 @@ export class DebitorkontrolleListComponent implements OnInit {
   showForm = false;
   dateFrom: string = '';
   dateTo: string = '';
-  message = '';
-  messageType: 'success' | 'error' = 'success';
+
   sortColumn: 'mieterName' | 'betrag' | 'datumVon' | 'datumBis' | 'zahldatum' | 'status' | null = 'mieterName';
   sortDirection: 'asc' | 'desc' = 'asc';
 
@@ -50,7 +50,7 @@ export class DebitorkontrolleListComponent implements OnInit {
     private einheitService: EinheitService,
     private mieterService: MieterService,
     private translationService: TranslationService
-  ) {}
+  ) { super(); }
 
   ngOnInit(): void {
     this.setDefaultQuarter();
@@ -227,15 +227,4 @@ export class DebitorkontrolleListComponent implements OnInit {
     return e ? e.name : '';
   }
 
-  showMessage(message: string, type: 'success' | 'error'): void {
-    this.message = message;
-    this.messageType = type;
-    if (type === 'success') {
-      setTimeout(() => { this.message = ''; }, 5000);
-    }
-  }
-
-  dismissMessage(): void {
-    this.message = '';
-  }
 }
