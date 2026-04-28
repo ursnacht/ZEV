@@ -16,15 +16,19 @@
 }
 
 .zev-table__row--selected {
-  background-color: #eff6ff;
+  background-color: var(--color-gray-400);
 }
 
-[data-theme="dark"] .zev-table__row--selected {
-  background-color: rgba(116, 192, 252, 0.1);
+[data-theme="dark"] .zev-table__row--selected:hover {
+  background-color: var(--color-gray-300);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .zev-table__row--selected {
-    background-color: rgba(116, 192, 252, 0.1);
+    background-color: var(--color-gray-200);
+  }
+
+  :root:not([data-theme="light"]) .zev-table__row--selected:hover {
+    background-color: var(--color-gray-300);
   }
 }

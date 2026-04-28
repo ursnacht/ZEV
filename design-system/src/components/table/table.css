@@ -33,6 +33,16 @@
   background-color: var(--color-gray-100);
 }
 
+[data-theme="dark"] .zev-table tr:hover {
+  background-color: var(--color-gray-300);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .zev-table tr:hover {
+    background-color: var(--color-gray-300);
+  }
+}
+
 .zev-table--striped tbody tr:nth-child(odd) {
   background-color: var(--color-gray-50);
 }
