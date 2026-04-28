@@ -3,6 +3,7 @@ import { WithMessage } from '../../utils/with-message';
 import { CommonModule } from '@angular/common';
 import { EinheitService } from '../../services/einheit.service';
 import { Einheit } from '../../models/einheit.model';
+import { EinheitTypPipe } from '../../pipes/einheit-typ.pipe';
 import { EinheitFormComponent } from '../einheit-form/einheit-form.component';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
@@ -13,7 +14,7 @@ import { IconComponent } from '../icon/icon.component';
 @Component({
   selector: 'app-einheit-list',
   standalone: true,
-  imports: [CommonModule, EinheitFormComponent, TranslatePipe, KebabMenuComponent, ColumnResizeDirective, IconComponent],
+  imports: [CommonModule, EinheitFormComponent, TranslatePipe, EinheitTypPipe, KebabMenuComponent, ColumnResizeDirective, IconComponent],
   templateUrl: './einheit-list.component.html',
   styleUrls: ['./einheit-list.component.css']
 })

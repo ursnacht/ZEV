@@ -40,7 +40,7 @@
 
         @for (chartData of charts; track chartData.einheitId) {
           <div class="zev-panel zev-panel--chart">
-            <h3 class="zev-panel__title">{{ chartData.einheitName }} ({{ chartData.einheitTyp }})</h3>
+            <h3 class="zev-panel__title">{{ chartData.einheitName }} [{{ chartData.einheitTyp | einheitTyp }}]</h3>
             <div class="zev-panel__content">
               <canvas [id]="'chart-' + chartData.einheitId"></canvas>
             </div>

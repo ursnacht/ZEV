@@ -57,7 +57,7 @@
               <tr>
                 <td>{{ einheit.id }}</td>
                 <td>{{ einheit.name }}</td>
-                <td>{{ einheit.typ }}</td>
+                <td>{{ einheit.typ | einheitTyp }}</td>
                 <td>{{ einheit.messpunkt || '-' }}</td>
                 <td>
                   <app-kebab-menu

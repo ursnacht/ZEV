@@ -3,12 +3,12 @@ import { CommonModule } from '@angular/common';
 import { EinheitService } from '../../services/einheit.service';
 import { Einheit, EinheitTyp } from '../../models/einheit.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
-import { TranslationService } from '../../services/translation.service';
+import { EinheitTypPipe } from '../../pipes/einheit-typ.pipe';
 
 @Component({
   selector: 'app-einheit-selector',
   standalone: true,
-  imports: [CommonModule, TranslatePipe],
+  imports: [CommonModule, TranslatePipe, EinheitTypPipe],
   templateUrl: './einheit-selector.component.html',
   styleUrls: ['./einheit-selector.component.css']
 })
@@ -19,10 +19,7 @@ export class EinheitSelectorComponent implements OnInit {
   einheiten: Einheit[] = [];
   selectedEinheitIds: Set<number> = new Set();
 
-  constructor(
-    private einheitService: EinheitService,
-    private translationService: TranslationService
-  ) {}
+  constructor(private einheitService: EinheitService) {}
 
   ngOnInit(): void {
     this.einheitService.getAllEinheiten().subscribe({
@@ -34,12 +31,6 @@ export class EinheitSelectorComponent implements OnInit {
       },
       error: () => {}
     });
-  }
-
-  getEinheitTypLabel(typ: string): string {
-    return typ === EinheitTyp.CONSUMER
-      ? this.translationService.translate('KONSUMENT')
-      : this.translationService.translate('PRODUZENT');
   }
 
   allSelected(): boolean {

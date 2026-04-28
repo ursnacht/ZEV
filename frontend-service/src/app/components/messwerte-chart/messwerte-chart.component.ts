@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { MesswerteService, MesswertData } from '../../services/messwerte.service';
 import { Einheit } from '../../models/einheit.model';
+import { EinheitTypPipe } from '../../pipes/einheit-typ.pipe';
 import { forkJoin } from 'rxjs';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
@@ -24,7 +25,7 @@ interface ChartData {
 @Component({
   selector: 'app-messwerte-chart',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe, QuarterSelectorComponent, IconComponent, EinheitSelectorComponent],
+  imports: [CommonModule, FormsModule, TranslatePipe, EinheitTypPipe, QuarterSelectorComponent, IconComponent, EinheitSelectorComponent],
   templateUrl: './messwerte-chart.component.html',
   styleUrls: ['./messwerte-chart.component.css']
 })

@@ -13,7 +13,7 @@
         <input type="checkbox" [id]="'einheit-' + einheit.id" [value]="einheit.id"
           [checked]="selectedEinheitIds.has(einheit.id!)" (change)="onEinheitToggle(einheit.id!)">
         <label [for]="'einheit-' + einheit.id">
-          {{ einheit.name }} [{{ getEinheitTypLabel(einheit.typ) }}]
+          {{ einheit.name }} [{{ einheit.typ | einheitTyp }}]
         </label>
       </div>
     }
