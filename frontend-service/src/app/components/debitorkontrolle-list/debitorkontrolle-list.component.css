@@ -16,5 +16,15 @@
 }
 
 .zev-table__row--selected {
-  background-color: var(--color-primary-50, #eff6ff);
+  background-color: #eff6ff;
+}
+
+[data-theme="dark"] .zev-table__row--selected {
+  background-color: rgba(116, 192, 252, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .zev-table__row--selected {
+    background-color: rgba(116, 192, 252, 0.1);
+  }
 }
