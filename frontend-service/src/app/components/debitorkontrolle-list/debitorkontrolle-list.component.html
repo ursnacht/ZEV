@@ -35,12 +35,23 @@
           <app-icon name="plus"></app-icon>
           {{ 'NEUER_DEBITOR' | translate }}
         </button>
+        @if (selectedIds.size > 0) {
+          <button class="zev-button zev-button--danger" (click)="onDeleteSelected()">
+            <app-icon name="trash-2"></app-icon>
+            {{ 'AUSWAHL_LOESCHEN' | translate }} ({{ selectedIds.size }})
+          </button>
+        }
       </div>
 
       @if (debitoren.length > 0) {
         <table class="zev-table" appColumnResize>
           <thead>
             <tr>
+              <th class="zev-table__checkbox-col">
+                <input type="checkbox" class="zev-checkbox"
+                  [checked]="allSelected()" [indeterminate]="someSelected()"
+                  (change)="onToggleSelectAll()">
+              </th>
               <th class="zev-table__header--sortable" (click)="onSort('mieterName')">
                 {{ 'MIETER' | translate }}
                 @if (sortColumn === 'mieterName') {
@@ -82,7 +93,12 @@
           </thead>
           <tbody>
             @for (debitor of debitoren; track debitor) {
-              <tr>
+              <tr [class.zev-table__row--selected]="isSelected(debitor.id)">
+                <td class="zev-table__checkbox-col">
+                  <input type="checkbox" class="zev-checkbox"
+                    [checked]="isSelected(debitor.id)"
+                    (change)="onToggleSelect(debitor.id)">
+                </td>
                 <td>
                   {{ debitor.mieterName || '-' }}
                   @if (debitor.einheitName) {

@@ -3,3 +3,18 @@
   font-size: 0.875rem;
   margin-left: 0.25rem;
 }
+
+.button-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.zev-table__checkbox-col {
+  width: 2.5rem;
+  text-align: center;
+}
+
+.zev-table__row--selected {
+  background-color: var(--color-primary-50, #eff6ff);
+}

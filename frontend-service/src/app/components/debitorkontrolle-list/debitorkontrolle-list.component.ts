@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { forkJoin } from 'rxjs';
 import { WithMessage } from '../../utils/with-message';
 import { DebitorService } from '../../services/debitor.service';
 import { EinheitService } from '../../services/einheit.service';
@@ -36,6 +37,8 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
   showForm = false;
   dateFrom: string = '';
   dateTo: string = '';
+
+  selectedIds: Set<number> = new Set();
 
   sortColumn: 'mieterName' | 'betrag' | 'datumVon' | 'datumBis' | 'zahldatum' | 'status' | null = 'mieterName';
   sortDirection: 'asc' | 'desc' = 'asc';
@@ -95,6 +98,7 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
 
   loadDebitoren(): void {
     if (!this.dateFrom || !this.dateTo) return;
+    this.selectedIds.clear();
     this.debitorService.getDebitoren(this.dateFrom, this.dateTo).subscribe({
       next: (data) => { this.debitoren = data; this.applySorting(); },
       error: () => {
@@ -174,6 +178,53 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
   onFormCancel(): void {
     this.showForm = false;
     this.selectedDebitor = null;
+  }
+
+  isSelected(id: number | undefined): boolean {
+    return !!id && this.selectedIds.has(id);
+  }
+
+  allSelected(): boolean {
+    return this.debitoren.length > 0 && this.selectedIds.size === this.debitoren.length;
+  }
+
+  someSelected(): boolean {
+    return this.selectedIds.size > 0 && this.selectedIds.size < this.debitoren.length;
+  }
+
+  onToggleSelect(id: number | undefined): void {
+    if (!id) return;
+    if (this.selectedIds.has(id)) {
+      this.selectedIds.delete(id);
+    } else {
+      this.selectedIds.add(id);
+    }
+  }
+
+  onToggleSelectAll(): void {
+    if (this.allSelected()) {
+      this.selectedIds.clear();
+    } else {
+      this.debitoren.forEach(d => { if (d.id) this.selectedIds.add(d.id); });
+    }
+  }
+
+  onDeleteSelected(): void {
+    const ids = Array.from(this.selectedIds);
+    if (ids.length === 0) return;
+    const confirmation = `${this.translationService.translate('DEBITOREN_LOESCHEN_BESTAETIGUNG')} (${ids.length})`;
+    if (!confirm(confirmation)) return;
+
+    forkJoin(ids.map(id => this.debitorService.deleteDebitor(id))).subscribe({
+      next: () => {
+        this.showMessage('DEBITOREN_GELOESCHT', 'success');
+        this.loadDebitoren();
+      },
+      error: () => {
+        this.showMessage('FEHLER_SAMMEL_LOESCHEN_DEBITOR', 'error');
+        this.loadDebitoren();
+      }
+    });
   }
 
   onSort(column: 'mieterName' | 'betrag' | 'datumVon' | 'datumBis' | 'zahldatum' | 'status'): void {

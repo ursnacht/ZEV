@@ -15,6 +15,7 @@
 5. Der Benutzer kann einzelne Einträge über das Kebab-Menü bearbeiten oder löschen.
 6. Beim Bearbeiten kann insbesondere das Zahldatum erfasst werden.
 7. Neue Einträge können manuell über den Button "Neu erfassen" hinzugefügt werden.
+8. Der Benutzer kann über Checkboxen mehrere Einträge auswählen und mit einem Klick gemeinsam löschen.
 
 ### FR-2: Persistierung
 * Neue Datenbanktabelle `debitor` mit folgenden Spalten:
@@ -50,6 +51,7 @@
   1. Quartal-Selektor oben (`QuarterSelectorComponent` + manuelle Von/Bis-Datumfelder, analog `/rechnungen`)
   2. Button "Neu erfassen" (öffnet Formular)
   3. Tabelle mit Debitor-Einträgen (analog Mieterverwaltung):
+     * Checkbox (erste Spalte; Header-Checkbox selektiert/deselektiert alle sichtbaren Einträge)
      * Mieter (Name + Einheitname, z.B. "Max Muster (EG links)")
      * Betrag (CHF, rechtsbündig)
      * Datum von (Schweizer Format `dd.MM.yyyy`)
@@ -59,6 +61,7 @@
      * Aktionen (Kebab-Menü: Bearbeiten, Löschen)
   4. Alle Tabellenspalten sind sortierbar (Klick auf Spaltenheader, Pfeil-Indikator); Standardsortierung: Mieter aufsteigend
   4. Leerstate-Meldung wenn keine Einträge vorhanden
+  5. Sobald mindestens ein Eintrag selektiert ist, erscheint der Button "Auswahl löschen (N)" oberhalb der Tabelle; Klick öffnet Bestätigungsdialog und löscht alle selektierten Einträge
 * **Formular** (Inline, analog Mieterverwaltung):
   * Mieter-Name (Auswahl Mieter mit Dropdown-Liste mit Name Mieter und Einheit, Pflicht)
   * Einheit-Name (read-only, wird abgefüllt wenn Mieter gewählt wird)
@@ -75,7 +78,11 @@
 * [ ] Einträge ohne Zahldatum werden als "Offen" angezeigt, Einträge mit Zahldatum als "Bezahlt"
 * [ ] Debitor-Einträge können manuell über das Formular erstellt werden
 * [ ] Debitor-Einträge können bearbeitet werden (insbesondere Zahldatum kann nacherfasst werden)
-* [ ] Debitor-Einträge können mit Bestätigung gelöscht werden
+* [ ] Debitor-Einträge können einzeln mit Bestätigung gelöscht werden
+* [ ] Mehrere Debitor-Einträge können per Checkbox selektiert und gemeinsam gelöscht werden
+* [ ] Die Header-Checkbox selektiert/deselektiert alle sichtbaren Einträge (Indeterminate-State bei Teilauswahl)
+* [ ] Der Button "Auswahl löschen (N)" ist nur sichtbar wenn mindestens ein Eintrag selektiert ist
+* [ ] Beim Quartalswechsel und Neuladen der Liste wird die Selektion zurückgesetzt
 * [ ] `betrag` ist Pflichtfeld (positiver Wert)
 * [ ] `datum_von` und `datum_bis` sind Pflichtfelder; `datum_von` muss ≤ `datum_bis` sein
 * [ ] `zahldatum` ist optional; wenn angegeben, muss es ≥ `datum_bis` sein (keine Vorauszahlung)
@@ -107,7 +114,8 @@
 * **Manuell erstellter Eintrag:** `mieter_id` ist Pflicht
 * **Leere Liste für gewähltes Quartal:** Meldung "Keine Debitoren für diesen Zeitraum" anzeigen
 * **Netzwerkfehler:** Fehlermeldung anzeigen (Error-Message bleibt bis dismissed, Success auto-dismiss 5s)
-* **Löschen:** Bestätigungsdialog vor dem Löschen
+* **Löschen (einzeln):** Bestätigungsdialog vor dem Löschen
+* **Sammel-Löschen:** Bestätigungsdialog mit Anzahl der zu löschenden Einträge; bei Fehler wird eine Fehlermeldung angezeigt und die Liste neu geladen
 * **Ungültiger Betrag (0 oder negativ):** Validierungsfehler im Formular
 
 ## 6. Abhängigkeiten & betroffene Funktionalität
