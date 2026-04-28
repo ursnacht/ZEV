@@ -231,8 +231,8 @@ test.describe('Einheiten Management - Create Einheit', () => {
             const newRow = page.locator(`tr:has-text("${testName}")`);
             await expect(newRow).toBeVisible({ timeout: 10000 });
 
-            // Verify typ column shows CONSUMER
-            await expect(newRow).toContainText('CONSUMER');
+            // Verify typ column shows translated label
+            await expect(newRow).toContainText('Konsument');
         }
     });
 
@@ -268,7 +268,7 @@ test.describe('Einheiten Management - Create Einheit', () => {
             const newRow = page.locator(`tr:has-text("${testName}")`);
             await expect(newRow).toBeVisible({ timeout: 10000 });
 
-            await expect(newRow).toContainText('PRODUCER');
+            await expect(newRow).toContainText('Produzent');
         }
     });
 
