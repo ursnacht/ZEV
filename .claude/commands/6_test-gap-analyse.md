@@ -8,16 +8,27 @@ Führt eine umfassende Analyse aller fehlenden Tests im Projekt durch.
 
 ---
 
-## Unabhängige Ausführung
+## Sub-Agent Ausführung
 
-Dieser Skill arbeitet UNABHÄNGIG vom Kontext der aktuellen Session.
+> **Als Sub-Agent:** Überspringe diesen Abschnitt und fahre direkt mit **Vorgehen** fort. Analysiere NUR:
+> 1. Tatsächlich vorhandene Implementierungs-Dateien
+> 2. Tatsächlich vorhandene Test-Dateien
+> 3. Projekt-Konventionen aus CLAUDE.md
 
-**Analysiere NUR:**
-1. Tatsächlich vorhandene Implementierungs-Dateien
-2. Tatsächlich vorhandene Test-Dateien
-3. Projekt-Konventionen aus CLAUDE.md
+Starte einen neuen Sub-Agenten mit dem `Agent`-Tool:
 
-**IGNORIERE** jeglichen Kontext aus der vorherigen Konversation.
+- **description:** `"Test-Gap-Analyse: [all/backend/frontend/e2e]"`
+- **prompt:**
+
+```
+Du führst eine umfassende Test-Gap-Analyse durch.
+Scope: [all/backend/frontend/e2e] (default: all)
+
+Lies: .claude/commands/6_test-gap-analyse.md
+Fahre ab Abschnitt "Vorgehen" fort.
+```
+
+- **Hinweis:** Ersetze `[all/backend/frontend/e2e]` im `prompt` mit dem tatsächlichen Wert aus `$ARGUMENTS` (default: `all`).
 
 ---
 

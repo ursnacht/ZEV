@@ -125,6 +125,19 @@ public class DebitorServiceTest {
         assertNull(result.get(0).getEinheitName());
     }
 
+    @Test
+    void getDebitoren_EinheitNotFound_EinheitNameIsNull() {
+        when(debitorRepository.findByDatumVonBetween(VON, BIS)).thenReturn(List.of(testDebitor1));
+        when(mieterRepository.findById(10L)).thenReturn(Optional.of(testMieter));
+        when(einheitRepository.findById(5L)).thenReturn(Optional.empty());
+
+        List<DebitorDTO> result = debitorService.getDebitoren(VON, BIS);
+
+        assertEquals(1, result.size());
+        assertEquals("Max Muster", result.get(0).getMieterName());
+        assertNull(result.get(0).getEinheitName());
+    }
+
     // ==================== getDebitorById ====================
 
     @Test
@@ -260,6 +273,15 @@ public class DebitorServiceTest {
         assertThrows(IllegalArgumentException.class, () -> debitorService.create(dto));
     }
 
+    @Test
+    void create_NullDatumBis_ThrowsIllegalArgumentException() {
+        DebitorDTO dto = buildValidDTO();
+        dto.setDatumBis(null);
+
+        assertThrows(IllegalArgumentException.class, () -> debitorService.create(dto));
+        verifyNoInteractions(debitorRepository);
+    }
+
     // ==================== update ====================
 
     @Test
@@ -294,6 +316,43 @@ public class DebitorServiceTest {
 
         assertThrows(IllegalArgumentException.class, () -> debitorService.update(1L, dto));
         verify(debitorRepository, never()).save(any());
+    }
+
+    @Test
+    void update_DatumVonAfterDatumBis_ThrowsIllegalArgumentException() {
+        DebitorDTO dto = buildValidDTO();
+        dto.setDatumVon(BIS.plusDays(1));
+        dto.setDatumBis(VON);
+        when(debitorRepository.findById(1L)).thenReturn(Optional.of(testDebitor1));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> debitorService.update(1L, dto));
+        assertEquals("Datum von muss vor oder gleich Datum bis liegen", ex.getMessage());
+        verify(debitorRepository, never()).save(any());
+    }
+
+    @Test
+    void update_ZahldatumBeforeDatumBis_ThrowsIllegalArgumentException() {
+        DebitorDTO dto = buildValidDTO();
+        dto.setZahldatum(BIS.minusDays(1));
+        when(debitorRepository.findById(1L)).thenReturn(Optional.of(testDebitor1));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> debitorService.update(1L, dto));
+        assertEquals("Zahldatum darf nicht vor Datum bis liegen", ex.getMessage());
+        verify(debitorRepository, never()).save(any());
+    }
+
+    @Test
+    void update_WithValidZahldatum_UpdatesSuccessfully() {
+        DebitorDTO dto = buildValidDTO();
+        dto.setZahldatum(BIS.plusDays(5));
+        when(debitorRepository.findById(1L)).thenReturn(Optional.of(testDebitor1));
+        when(debitorRepository.save(testDebitor1)).thenReturn(testDebitor1);
+        when(mieterRepository.findById(any())).thenReturn(Optional.empty());
+
+        assertDoesNotThrow(() -> debitorService.update(1L, dto));
+        verify(debitorRepository).save(testDebitor1);
     }
 
     // ==================== delete ====================

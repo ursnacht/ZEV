@@ -94,6 +94,20 @@ public class DebitorControllerTest {
             .andExpect(jsonPath("$", hasSize(0)));
     }
 
+    @Test
+    void getDebitoren_MissingVonParam_ReturnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/debitoren")
+                .param("bis", "2024-03-31"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getDebitoren_MissingBisParam_ReturnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/debitoren")
+                .param("von", "2024-01-01"))
+            .andExpect(status().isBadRequest());
+    }
+
     // ==================== POST /api/debitoren ====================
 
     @Test

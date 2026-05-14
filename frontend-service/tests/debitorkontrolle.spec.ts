@@ -83,7 +83,9 @@ async function deleteDebitorByDate(page: Page, datumVon: string): Promise<void> 
     try {
         page.removeAllListeners('dialog');
         await navigateToDebitorkontrolle(page);
-        await setDateRange(page, datumVon, datumVon.replace('-01-', '-12-').replace('-01', '-31'));
+        // Use the whole year as range to safely find any test entry regardless of month
+        const year = datumVon.substring(0, 4);
+        await setDateRange(page, `${year}-01-01`, `${year}-12-31`);
 
         // Wait a moment for load
         await page.waitForTimeout(1000);
@@ -400,7 +402,8 @@ test.describe('Debitorkontrolle - Form Validation', () => {
         await page.locator('#datumVon').fill('2025-12-31');
         await page.locator('#datumBis').fill('2025-01-01');
 
-        const errorMessage = page.locator('.zev-form-error');
+        // Multiple .zev-form-error elements may be visible; use first() to avoid strict-mode violation
+        const errorMessage = page.locator('.zev-form-error').first();
         await expect(errorMessage).toBeVisible();
 
         const submitButton = page.locator('button[type="submit"]');
@@ -419,7 +422,8 @@ test.describe('Debitorkontrolle - Form Validation', () => {
         await page.locator('#datumBis').fill('2025-03-31');
         await page.locator('#zahldatum').fill('2025-02-01'); // Before datumBis
 
-        const errorMessage = page.locator('.zev-form-error');
+        // Multiple .zev-form-error elements may be visible; use first() to avoid strict-mode violation
+        const errorMessage = page.locator('.zev-form-error').first();
         await expect(errorMessage).toBeVisible();
 
         const submitButton = page.locator('button[type="submit"]');
@@ -709,6 +713,187 @@ test.describe('Debitorkontrolle - Date Filter', () => {
         const hasEmpty = await emptyState.isVisible({ timeout: 3000 }).catch(() => false);
 
         expect(hasTable || hasEmpty).toBeTruthy();
+    });
+
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Checkbox & Bulk Delete
+// ──────────────────────────────────────────────────────────────────────────────
+
+test.describe('Debitorkontrolle - Checkbox and Bulk Delete', () => {
+
+    /**
+     * Create a debitor and return whether it succeeded
+     */
+    async function createTestDebitor(page: Page, datumVon: string, datumBis: string, betrag: string = '10.00'): Promise<boolean> {
+        await openCreateForm(page);
+        const mieterId = await getFirstMieterOptionValue(page);
+        if (!mieterId) {
+            console.log('No mieter available, skipping debitor creation');
+            return false;
+        }
+        await fillDebitorForm(page, { mieterId, betrag, datumVon, datumBis });
+        await page.locator('button[type="submit"]').click();
+        let success = false;
+        try {
+            success = await waitForFormResult(page, 20000);
+        } catch {
+            console.log('Debitor creation failed');
+        }
+        return success;
+    }
+
+    test('should not show "Auswahl löschen" button when nothing is selected', async ({ page }) => {
+        await navigateToDebitorkontrolle(page);
+
+        const deleteSelectedButton = page.locator('button.zev-button--danger');
+        await expect(deleteSelectedButton).not.toBeVisible();
+    });
+
+    test('should show "Auswahl löschen (N)" button when a row is checked', async ({ page }) => {
+        await navigateToDebitorkontrolle(page);
+
+        const date1 = '2099-07-01';
+        const date1Bis = '2099-07-31';
+
+        const success = await createTestDebitor(page, date1, date1Bis);
+        if (!success) {
+            console.log('Could not create debitor, skipping checkbox visibility test');
+            return;
+        }
+        createdDebitorDates.push(date1);
+
+        await setDateRange(page, date1, date1Bis);
+        await waitForTableWithData(page, 10000);
+
+        // Check the first row checkbox
+        const firstRowCheckbox = page.locator('.zev-table tbody tr').first().locator('input[type="checkbox"]');
+        await firstRowCheckbox.click();
+
+        // The "Auswahl löschen" button should now appear
+        const deleteSelectedButton = page.locator('button.zev-button--danger');
+        await expect(deleteSelectedButton).toBeVisible();
+        await expect(deleteSelectedButton).toContainText('1');
+    });
+
+    test('should hide "Auswahl löschen" button when selection is cleared', async ({ page }) => {
+        await navigateToDebitorkontrolle(page);
+
+        const date1 = '2099-08-01';
+        const date1Bis = '2099-08-31';
+
+        const success = await createTestDebitor(page, date1, date1Bis);
+        if (!success) {
+            console.log('Could not create debitor, skipping checkbox hide test');
+            return;
+        }
+        createdDebitorDates.push(date1);
+
+        await setDateRange(page, date1, date1Bis);
+        await waitForTableWithData(page, 10000);
+
+        const firstRowCheckbox = page.locator('.zev-table tbody tr').first().locator('input[type="checkbox"]');
+
+        // Check → button appears
+        await firstRowCheckbox.click();
+        await expect(page.locator('button.zev-button--danger')).toBeVisible();
+
+        // Uncheck → button disappears
+        await firstRowCheckbox.click();
+        await expect(page.locator('button.zev-button--danger')).not.toBeVisible();
+    });
+
+    test('should select all rows via header checkbox and show correct count', async ({ page }) => {
+        await navigateToDebitorkontrolle(page);
+
+        const date1 = '2099-09-01';
+        const date1Bis = '2099-09-30';
+
+        const success = await createTestDebitor(page, date1, date1Bis);
+        if (!success) {
+            console.log('Could not create debitor, skipping header checkbox test');
+            return;
+        }
+        createdDebitorDates.push(date1);
+
+        await setDateRange(page, date1, date1Bis);
+        await waitForTableWithData(page, 10000);
+
+        const rowCount = await page.locator('.zev-table tbody tr').count();
+
+        // Click header checkbox to select all
+        const headerCheckbox = page.locator('.zev-table thead input[type="checkbox"]');
+        await headerCheckbox.click();
+
+        // "Auswahl löschen (N)" should show N = rowCount
+        const deleteSelectedButton = page.locator('button.zev-button--danger');
+        await expect(deleteSelectedButton).toBeVisible();
+        await expect(deleteSelectedButton).toContainText(`${rowCount}`);
+    });
+
+    test('should reset selection when date range changes', async ({ page }) => {
+        await navigateToDebitorkontrolle(page);
+
+        const date1 = '2099-10-01';
+        const date1Bis = '2099-10-31';
+
+        const success = await createTestDebitor(page, date1, date1Bis);
+        if (!success) {
+            console.log('Could not create debitor, skipping selection reset test');
+            return;
+        }
+        createdDebitorDates.push(date1);
+
+        await setDateRange(page, date1, date1Bis);
+        await waitForTableWithData(page, 10000);
+
+        // Check a row
+        const firstRowCheckbox = page.locator('.zev-table tbody tr').first().locator('input[type="checkbox"]');
+        await firstRowCheckbox.click();
+        await expect(page.locator('button.zev-button--danger')).toBeVisible();
+
+        // Change date range (triggers list reload → selection reset)
+        await setDateRange(page, '1900-01-01', '1900-03-31');
+        await page.waitForTimeout(500);
+
+        // Selection button should no longer be visible (empty list or cleared selection)
+        await expect(page.locator('button.zev-button--danger')).not.toBeVisible();
+    });
+
+    test('should bulk delete selected rows via "Auswahl löschen" button', async ({ page }) => {
+        await navigateToDebitorkontrolle(page);
+
+        const date1 = '2099-11-01';
+        const date1Bis = '2099-11-30';
+
+        const success = await createTestDebitor(page, date1, date1Bis);
+        if (!success) {
+            console.log('Could not create debitor, skipping bulk delete test');
+            return;
+        }
+        createdDebitorDates.push(date1);
+
+        await setDateRange(page, date1, date1Bis);
+        await waitForTableWithData(page, 10000);
+
+        // Select the row
+        const firstRowCheckbox = page.locator('.zev-table tbody tr').first().locator('input[type="checkbox"]');
+        await firstRowCheckbox.click();
+
+        // Accept the confirmation dialog and click "Auswahl löschen"
+        page.once('dialog', async dialog => { await dialog.accept(); });
+        await page.locator('button.zev-button--danger').click();
+        await page.waitForTimeout(1500);
+        page.removeAllListeners('dialog');
+
+        // Row should be gone; remove from cleanup since it's already deleted
+        const rowStillVisible = await page.locator(`tr:has-text("${formatToSwiss(date1)}")`).isVisible().catch(() => false);
+        if (!rowStillVisible) {
+            createdDebitorDates = createdDebitorDates.filter(d => d !== date1);
+        }
+
+        expect(rowStillVisible).toBe(false);
     });
 
 });

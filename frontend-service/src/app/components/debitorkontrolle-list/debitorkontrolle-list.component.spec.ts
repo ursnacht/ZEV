@@ -456,4 +456,174 @@ describe('DebitorkontrolleListComponent', () => {
       expect(component.message).toBe('FEHLER_LADEN_DEBITOREN');
     }));
   });
+
+  describe('isSelected', () => {
+    it('should return false when id is undefined', () => {
+      expect(component.isSelected(undefined)).toBeFalse();
+    });
+
+    it('should return false when id is not in selectedIds', () => {
+      component.selectedIds.clear();
+      expect(component.isSelected(1)).toBeFalse();
+    });
+
+    it('should return true when id is in selectedIds', () => {
+      component.selectedIds.add(1);
+      expect(component.isSelected(1)).toBeTrue();
+    });
+  });
+
+  describe('allSelected', () => {
+    it('should return false when debitoren is empty', () => {
+      component.debitoren = [];
+      expect(component.allSelected()).toBeFalse();
+    });
+
+    it('should return false when no items are selected', () => {
+      component.debitoren = mockDebitoren;
+      component.selectedIds.clear();
+      expect(component.allSelected()).toBeFalse();
+    });
+
+    it('should return false when only some items are selected', () => {
+      component.debitoren = mockDebitoren;
+      component.selectedIds.clear();
+      component.selectedIds.add(1);
+      expect(component.allSelected()).toBeFalse();
+    });
+
+    it('should return true when all items are selected', () => {
+      component.debitoren = mockDebitoren;
+      component.selectedIds.clear();
+      mockDebitoren.forEach(d => { if (d.id) component.selectedIds.add(d.id); });
+      expect(component.allSelected()).toBeTrue();
+    });
+  });
+
+  describe('someSelected', () => {
+    it('should return false when no items are selected', () => {
+      component.debitoren = mockDebitoren;
+      component.selectedIds.clear();
+      expect(component.someSelected()).toBeFalse();
+    });
+
+    it('should return true when some but not all items are selected', () => {
+      component.debitoren = mockDebitoren;
+      component.selectedIds.clear();
+      component.selectedIds.add(1);
+      expect(component.someSelected()).toBeTrue();
+    });
+
+    it('should return false when all items are selected', () => {
+      component.debitoren = mockDebitoren;
+      component.selectedIds.clear();
+      mockDebitoren.forEach(d => { if (d.id) component.selectedIds.add(d.id); });
+      expect(component.someSelected()).toBeFalse();
+    });
+  });
+
+  describe('onToggleSelect', () => {
+    it('should do nothing when id is undefined', () => {
+      component.selectedIds.clear();
+      component.onToggleSelect(undefined);
+      expect(component.selectedIds.size).toBe(0);
+    });
+
+    it('should add id to selectedIds when not selected', () => {
+      component.selectedIds.clear();
+      component.onToggleSelect(1);
+      expect(component.selectedIds.has(1)).toBeTrue();
+    });
+
+    it('should remove id from selectedIds when already selected', () => {
+      component.selectedIds.add(1);
+      component.onToggleSelect(1);
+      expect(component.selectedIds.has(1)).toBeFalse();
+    });
+  });
+
+  describe('onToggleSelectAll', () => {
+    it('should select all debitoren when not all are selected', () => {
+      component.debitoren = mockDebitoren;
+      component.selectedIds.clear();
+      component.onToggleSelectAll();
+      expect(component.selectedIds.size).toBe(mockDebitoren.length);
+      mockDebitoren.forEach(d => {
+        if (d.id) expect(component.selectedIds.has(d.id)).toBeTrue();
+      });
+    });
+
+    it('should deselect all when all are already selected', () => {
+      component.debitoren = mockDebitoren;
+      mockDebitoren.forEach(d => { if (d.id) component.selectedIds.add(d.id); });
+      component.onToggleSelectAll();
+      expect(component.selectedIds.size).toBe(0);
+    });
+
+    it('should select all when only some are selected', () => {
+      component.debitoren = mockDebitoren;
+      component.selectedIds.clear();
+      component.selectedIds.add(1);
+      component.onToggleSelectAll();
+      expect(component.selectedIds.size).toBe(mockDebitoren.length);
+    });
+  });
+
+  describe('onDeleteSelected', () => {
+    beforeEach(() => {
+      spyOn(window, 'confirm').and.returnValue(true);
+      component.debitoren = mockDebitoren;
+      component.selectedIds.clear();
+      mockDebitoren.forEach(d => { if (d.id) component.selectedIds.add(d.id); });
+    });
+
+    it('should do nothing when no ids are selected', () => {
+      component.selectedIds.clear();
+      component.onDeleteSelected();
+      expect(debitorServiceSpy.deleteDebitor).not.toHaveBeenCalled();
+    });
+
+    it('should show confirm dialog with count', () => {
+      component.onDeleteSelected();
+      expect(translationServiceSpy.translate).toHaveBeenCalledWith('DEBITOREN_LOESCHEN_BESTAETIGUNG');
+    });
+
+    it('should not delete when user cancels', () => {
+      (window.confirm as jasmine.Spy).and.returnValue(false);
+      component.onDeleteSelected();
+      expect(debitorServiceSpy.deleteDebitor).not.toHaveBeenCalled();
+    });
+
+    it('should call deleteDebitor for each selected id', () => {
+      component.onDeleteSelected();
+      expect(debitorServiceSpy.deleteDebitor).toHaveBeenCalledWith(1);
+      expect(debitorServiceSpy.deleteDebitor).toHaveBeenCalledWith(2);
+    });
+
+    it('should show success message and reload after deleting all', () => {
+      debitorServiceSpy.getDebitoren.calls.reset();
+      component.onDeleteSelected();
+      expect(component.message).toBe('DEBITOREN_GELOESCHT');
+      expect(component.messageType).toBe('success');
+      expect(debitorServiceSpy.getDebitoren).toHaveBeenCalled();
+    });
+
+    it('should show error message and reload when deletion fails', () => {
+      debitorServiceSpy.deleteDebitor.and.returnValue(throwError(() => new Error('Delete failed')));
+      debitorServiceSpy.getDebitoren.calls.reset();
+      component.onDeleteSelected();
+      expect(component.message).toBe('FEHLER_SAMMEL_LOESCHEN_DEBITOR');
+      expect(component.messageType).toBe('error');
+      expect(debitorServiceSpy.getDebitoren).toHaveBeenCalled();
+    });
+  });
+
+  describe('loadDebitoren - selection reset', () => {
+    it('should clear selectedIds when debitoren are reloaded', () => {
+      component.selectedIds.add(1);
+      component.selectedIds.add(2);
+      component.loadDebitoren();
+      expect(component.selectedIds.size).toBe(0);
+    });
+  });
 });

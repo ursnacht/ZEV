@@ -9,14 +9,27 @@ Erstelle Unit- und Integrationstests für Backend-Code.
 
 ---
 
-## Unabhängige Ausführung
+## Sub-Agent Ausführung
 
-Dieser Skill arbeitet UNABHÄNGIG vom Kontext der aktuellen Session und kann auch mit einem neuen Agenten ausgeführt werden.
+> **Als Sub-Agent:** Überspringe diesen Abschnitt und fahre direkt mit **Vorgehen** fort. Analysiere NUR:
+> 1. Die Anforderungen in `Specs/[Feature-Name].md`
+> 2. Den tatsächlich implementierten Code
+> 3. Bestehende Tests als Vorlage
 
-**Analysiere NUR:**
-1. Die Anforderungen in `Specs/[Feature-Name].md`
-2. Den tatsächlich implementierten Code
-3. Bestehende Tests als Vorlage
+Starte einen neuen Sub-Agenten mit dem `Agent`-Tool:
+
+- **description:** `"Backend-Tests: [Feature-Name]"`
+- **prompt:**
+
+```
+Du erstellst Unit- und Integrationstests für Backend-Code.
+Feature: [Feature-Name]
+
+Lies: .claude/commands/3_backend-tests.md
+Fahre ab Abschnitt "Vorgehen" fort.
+```
+
+- **Hinweis:** Ersetze `[Feature-Name]` im `prompt` mit dem tatsächlichen Wert aus `$ARGUMENTS` (oder dem abgeleiteten Kontext).
 
 ---
 
