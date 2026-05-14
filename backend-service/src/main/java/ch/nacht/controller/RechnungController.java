@@ -101,9 +101,8 @@ public class RechnungController {
                         ? rechnung.getEinheitName() + "_" + rechnung.getMieterId()
                         : rechnung.getEinheitName();
                 String key = rechnungStorageService.sanitizeKey(keyBase);
-                rechnungStorageService.store(key, pdf);
 
-                // Persist debitor entry for invoices with mieter (upsert)
+                // Persist debitor entry before storing PDF: if upsert fails, no PDF is stored
                 if (rechnung.getMieterId() != null) {
                     debitorService.upsertFromRechnung(
                             rechnung.getMieterId(),
@@ -112,6 +111,8 @@ public class RechnungController {
                             rechnung.getBis()
                     );
                 }
+
+                rechnungStorageService.store(key, pdf);
 
                 Map<String, Object> meta = new HashMap<>();
                 meta.put("einheitId", rechnung.getEinheitId());
