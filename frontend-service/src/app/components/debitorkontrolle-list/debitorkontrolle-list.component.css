@@ -1,5 +1,5 @@
 .debitor-einheit {
-  color: var(--color-text-secondary, #6b7280);
+  color: var(--color-gray-600);
   font-size: 0.875rem;
   margin-left: 0.25rem;
 }

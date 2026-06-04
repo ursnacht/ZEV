@@ -7,7 +7,7 @@
 }
 
 .upload-row--error td {
-  background-color: var(--color-danger-50, #fef2f2);
+  background-color: var(--color-error-bg);
 }
 
 .upload-row__filename {
@@ -19,7 +19,7 @@
 .upload-row__filesize {
   display: block;
   font-size: var(--font-size-xs, 0.75rem);
-  color: var(--color-text-muted, #6b7280);
+  color: var(--color-gray-600);
 }
 
 .upload-row__einheit {

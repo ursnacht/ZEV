@@ -67,6 +67,7 @@
   /* Border Radius */
   --radius-sm: 4px;
   --radius-md: 8px;
+  --radius-full: 9999px;
 
   /* Typography */
   --font-family-primary: Arial, sans-serif;
