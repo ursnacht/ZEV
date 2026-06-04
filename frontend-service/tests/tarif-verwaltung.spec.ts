@@ -729,7 +729,7 @@ test.describe('Tarif Management - Validation Buttons', () => {
         await navigateToTarife(page);
 
         // Check for validation buttons (secondary buttons)
-        const buttons = page.locator('.button-row button.zev-button--secondary');
+        const buttons = page.locator('.zev-button-row button.zev-button--secondary');
         const buttonCount = await buttons.count();
 
         // Should have 2 validation buttons

@@ -3,12 +3,6 @@
  * Alle Basis-Styles kommen aus dem Design System
  */
 
-.button-row {
-  display: flex;
-  gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-md);
-}
-
 .zev-message--clickable {
   cursor: pointer;
   padding-right: var(--spacing-xl);

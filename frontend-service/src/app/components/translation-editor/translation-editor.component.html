@@ -22,7 +22,7 @@
           [placeholder]="'ENGLISH_TEXT' | translate">
       </div>
     </div>
-    <div class="zev-form-actions">
+    <div class="zev-form-actions zev-form-actions--equal">
       <button (click)="submitForm()" class="zev-button zev-button--primary" [disabled]="!formTranslation.key">
         <app-icon [name]="editMode ? 'check' : 'plus'"></app-icon>
         {{ (editMode ? 'SAVE' : 'ADD') | translate }}

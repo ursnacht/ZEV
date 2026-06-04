@@ -31,12 +31,6 @@
   color: #ffffff;
 }
 
-.button-row {
-  display: flex;
-  gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-md);
-}
-
 .validation-errors {
   margin: var(--spacing-sm) 0 0 0;
   padding-left: var(--spacing-lg);

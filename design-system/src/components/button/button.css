@@ -66,3 +66,10 @@
 .zev-button--compact {
   padding: var(--spacing-xs) var(--spacing-md);
 }
+
+/* Button Row (toolbar of buttons, e.g. above a table) */
+.zev-button-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}

@@ -31,7 +31,7 @@
       <div class="zev-form-hint">{{ 'MESSPUNKT_HINT' | translate }}</div>
     </div>
 
-    <div class="form-actions">
+    <div class="zev-form-actions zev-form-actions--equal">
       <button type="submit" class="zev-button zev-button--primary" [disabled]="!formData.name.trim()">
         <app-icon name="check"></app-icon>
         {{ formData.id ? ('AKTUALISIEREN' | translate) : ('ERSTELLEN' | translate) }}
