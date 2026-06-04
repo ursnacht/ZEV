@@ -16,7 +16,7 @@ ZEV (Zusammenschluss zum Eigenverbrauch) is a solar power distribution applicati
 ## Tech Stack Versions
 
 ### Core
-- Spring Boot 4.0.1
+- Spring Boot 4.0.6
 - Angular 21.1.0
 - TypeScript 5.9.3
 - PostgreSQL 16 (Alpine)
@@ -24,9 +24,9 @@ ZEV (Zusammenschluss zum Eigenverbrauch) is a solar power distribution applicati
 ### Key Backend Dependencies
 - JasperReports 7.0.3 (Jakarta EE, PDF generation)
 - Swiss QR Bill Generator 3.3.0 (payment slips)
-- Spring AI Anthropic 2.0.0-M1 (model: `claude-haiku-4-5-20251001`)
+- Spring AI Anthropic 2.0.0-M8 (model: `claude-haiku-4-5-20251001`)
 - Caffeine (in-memory cache)
-- Spring Boot Admin 4.0.0-M1
+- Spring Boot Admin 4.0.4
 - Flyway (schema migrations)
 
 ### Key Frontend Dependencies
@@ -37,7 +37,7 @@ ZEV (Zusammenschluss zum Eigenverbrauch) is a solar power distribution applicati
 - Playwright 1.58.0 (E2E tests)
 - Jasmine 5.13.0 / Karma (unit tests)
 - TestContainers 2.0.3 (integration tests)
-- ArchUnit 1.3.0 (architecture tests)
+- ArchUnit 1.4.2 (architecture tests)
 
 ## Build & Test Commands
 
@@ -449,4 +449,4 @@ Direct database access options:
 
 ## AI Integration
 
-The backend uses Spring AI Anthropic (2.0.0-M1) with model `claude-haiku-4-5-20251001` for AI-powered unit matching during CSV measurement upload (`EinheitMatchingService`). Configuration: max_tokens=100, temperature=0.0. Requires `ANTHROPIC_API_KEY` environment variable (see `.env.example`).
+The backend uses Spring AI Anthropic (2.0.0-M8) with model `claude-haiku-4-5-20251001` for AI-powered unit matching during CSV measurement upload (`EinheitMatchingService`). Configuration: max_tokens=100, temperature=0.0. Requires `ANTHROPIC_API_KEY` environment variable (see `.env.example`).

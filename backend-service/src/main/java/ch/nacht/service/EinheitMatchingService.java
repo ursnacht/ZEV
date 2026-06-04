@@ -4,7 +4,6 @@ import ch.nacht.dto.EinheitMatchResponseDTO;
 import ch.nacht.entity.Einheit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.stereotype.Service;
@@ -90,8 +89,7 @@ public class EinheitMatchingService {
     }
 
     /**
-     * Log token usage metadata from the ChatResponse.
-     * When Spring AI 1.1.0+ is available, this will also log cacheCreationInputTokens and cacheReadInputTokens.
+     * Log token usage metadata from the ChatResponse via the portable Usage API.
      */
     private void logTokenUsage(ChatResponse chatResponse) {
         try {
@@ -102,17 +100,6 @@ public class EinheitMatchingService {
                 log.info("Anthropic Token Usage - Input: {} tokens, Output: {} tokens",
                         usage.getPromptTokens(),
                         usage.getCompletionTokens());
-
-                // Try to access native usage for cache metrics (requires Spring AI 1.1.0+)
-                if (usage.getNativeUsage() != null) {
-                    Object nativeUsage = usage.getNativeUsage();
-                    if (nativeUsage instanceof AnthropicApi.Usage anthropicUsage) {
-                        log.debug("Native Anthropic Usage - Input: {}, Output: {}",
-                                anthropicUsage.inputTokens(), anthropicUsage.outputTokens());
-                        // Note: cacheCreationInputTokens() and cacheReadInputTokens()
-                        // are available in Spring AI 1.1.0+
-                    }
-                }
             }
         } catch (Exception e) {
             log.warn("Could not read token usage metadata: {}", e.getMessage());

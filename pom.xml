@@ -6,7 +6,7 @@
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>4.0.4</version>
+    <version>4.0.6</version>
     <relativePath/>
   </parent>
 
@@ -27,5 +27,6 @@
   <properties>
     <java.version>25</java.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <spring-boot-admin.version>4.0.4</spring-boot-admin.version>
   </properties>
 </project>
