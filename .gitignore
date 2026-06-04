@@ -16,3 +16,6 @@ node_modules/
 .env
 .env.local
 .env.*.local
+
+# Windows reserved-name artifact (e.g. from a stray `> NUL` redirect)
+/NUL
