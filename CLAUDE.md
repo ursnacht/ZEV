@@ -22,8 +22,8 @@ ZEV (Zusammenschluss zum Eigenverbrauch) is a solar power distribution applicati
 - PostgreSQL 16 (Alpine)
 
 ### Key Backend Dependencies
-- JasperReports 7.0.3 (Jakarta EE, PDF generation)
-- Swiss QR Bill Generator 3.3.0 (payment slips)
+- JasperReports 7.0.7 (Jakarta EE, PDF generation)
+- Swiss QR Bill Generator 3.4.0 (payment slips)
 - Spring AI Anthropic 2.0.0-M8 (model: `claude-haiku-4-5-20251001`)
 - Caffeine (in-memory cache)
 - Spring Boot Admin 4.0.4
@@ -36,7 +36,7 @@ ZEV (Zusammenschluss zum Eigenverbrauch) is a solar power distribution applicati
 ### Testing
 - Playwright 1.58.0 (E2E tests)
 - Jasmine 5.13.0 / Karma (unit tests)
-- TestContainers 2.0.3 (integration tests)
+- TestContainers 2.0.5 (integration tests)
 - ArchUnit 1.4.2 (architecture tests)
 
 ## Build & Test Commands
