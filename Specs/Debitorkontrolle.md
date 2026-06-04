@@ -71,28 +71,28 @@
   * Zahldatum (Datum, optional)
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
-* [ ] Beim Generieren von Rechnungen wird für jede Rechnung **mit Mieter** automatisch ein Debitor-Eintrag persistiert (Produzenten und Leerstand werden übersprungen)
-* [ ] Die Seite "Debitorkontrolle" ist aus dem Menü mit der Rolle `zev_admin` erreichbar
-* [ ] Die Quartal-Auswahl filtert die angezeigte Liste korrekt (Einträge mit `datum_von` im gewählten Quartal)
-* [ ] Die Tabelle zeigt Mieter mit Name und Einheitname in einer Spalte an
-* [ ] Einträge ohne Zahldatum werden als "Offen" angezeigt, Einträge mit Zahldatum als "Bezahlt"
-* [ ] Debitor-Einträge können manuell über das Formular erstellt werden
-* [ ] Debitor-Einträge können bearbeitet werden (insbesondere Zahldatum kann nacherfasst werden)
-* [ ] Debitor-Einträge können einzeln mit Bestätigung gelöscht werden
-* [ ] Mehrere Debitor-Einträge können per Checkbox selektiert und gemeinsam gelöscht werden
-* [ ] Die Header-Checkbox selektiert/deselektiert alle sichtbaren Einträge (Indeterminate-State bei Teilauswahl)
-* [ ] Der Button "Auswahl löschen (N)" ist nur sichtbar wenn mindestens ein Eintrag selektiert ist
-* [ ] Beim Quartalswechsel und Neuladen der Liste wird die Selektion zurückgesetzt
-* [ ] `betrag` ist Pflichtfeld (positiver Wert)
-* [ ] `datum_von` und `datum_bis` sind Pflichtfelder; `datum_von` muss ≤ `datum_bis` sein
-* [ ] `zahldatum` ist optional; wenn angegeben, muss es ≥ `datum_bis` sein (keine Vorauszahlung)
-* [ ] Löschen eines Debitor-Eintrags erfordert eine Bestätigung (Confirm-Dialog)
-* [ ] Bei leerer Liste wird eine Hinweismeldung angezeigt ("Keine Debitoren für diesen Zeitraum")
-* [ ] Netzwerkfehler werden als Fehlermeldung angezeigt (bleibt bis dismissed)
-* [ ] Alle UI-Texte kommen via `TranslationService` (i18n)
-* [ ] Multi-Tenancy: Jeder Mandant sieht ausschliesslich seine eigenen Debitor-Einträge
-* [ ] `org_id` wird serverseitig aus dem JWT gesetzt, nicht vom Client übergeben
-* [ ] Die Darstellung verwendet das Design System
+            * [x] Beim Generieren von Rechnungen wird für jede Rechnung **mit Mieter** automatisch ein Debitor-Eintrag persistiert (Produzenten und Leerstand werden übersprungen)
+* [x] Die Seite "Debitorkontrolle" ist aus dem Menü mit der Rolle `zev_admin` erreichbar
+* [x] Die Quartal-Auswahl filtert die angezeigte Liste korrekt (Einträge mit `datum_von` im gewählten Quartal)
+* [x] Die Tabelle zeigt Mieter mit Name und Einheitname in einer Spalte an
+* [x] Einträge ohne Zahldatum werden als "Offen" angezeigt, Einträge mit Zahldatum als "Bezahlt"
+* [x] Debitor-Einträge können manuell über das Formular erstellt werden
+* [x] Debitor-Einträge können bearbeitet werden (insbesondere Zahldatum kann nacherfasst werden)
+* [x] Debitor-Einträge können einzeln mit Bestätigung gelöscht werden
+* [x] Mehrere Debitor-Einträge können per Checkbox selektiert und gemeinsam gelöscht werden
+* [x] Die Header-Checkbox selektiert/deselektiert alle sichtbaren Einträge (Indeterminate-State bei Teilauswahl)
+* [x] Der Button "Auswahl löschen (N)" ist nur sichtbar wenn mindestens ein Eintrag selektiert ist
+* [x] Beim Quartalswechsel und Neuladen der Liste wird die Selektion zurückgesetzt
+* [x] `betrag` ist Pflichtfeld (positiver Wert)
+* [x] `datum_von` und `datum_bis` sind Pflichtfelder; `datum_von` muss ≤ `datum_bis` sein
+* [x] `zahldatum` ist optional; wenn angegeben, muss es ≥ `datum_bis` sein (keine Vorauszahlung)
+* [x] Löschen eines Debitor-Eintrags erfordert eine Bestätigung (Confirm-Dialog)
+* [x] Bei leerer Liste wird eine Hinweismeldung angezeigt ("Keine Debitoren für diesen Zeitraum")
+* [x] Netzwerkfehler werden als Fehlermeldung angezeigt (bleibt bis dismissed)
+* [x] Alle UI-Texte kommen via `TranslationService` (i18n)
+* [x] Multi-Tenancy: Jeder Mandant sieht ausschliesslich seine eigenen Debitor-Einträge
+* [x] `org_id` wird serverseitig aus dem JWT gesetzt, nicht vom Client übergeben
+* [x] Die Darstellung verwendet das Design System
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
