@@ -3,14 +3,16 @@
  * A drag-and-drop file upload area
  */
 
+@import '../../tokens/tokens.css';
+
 .zev-drop-zone {
-  border: 2px dashed var(--zev-color-border, #ccc);
+  border: 2px dashed var(--color-gray-400);
   border-radius: 8px;
   padding: 2rem;
   text-align: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  background-color: var(--zev-color-background-subtle, #f8f9fa);
+  background-color: var(--color-gray-200);
   min-height: 150px;
   display: flex;
   align-items: center;
@@ -18,20 +20,20 @@
 }
 
 .zev-drop-zone:hover {
-  border-color: var(--zev-color-primary, #007bff);
-  background-color: var(--zev-color-primary-light, #e7f1ff);
+  border-color: var(--color-primary);
+  background-color: var(--color-gray-300);
 }
 
 .zev-drop-zone--active {
-  border-color: var(--zev-color-primary, #007bff);
-  background-color: var(--zev-color-primary-light, #e7f1ff);
+  border-color: var(--color-primary);
+  background-color: var(--color-gray-300);
   border-style: solid;
 }
 
 .zev-drop-zone--has-file {
   border-style: solid;
-  border-color: var(--zev-color-success, #28a745);
-  background-color: var(--zev-color-success-light, #d4edda);
+  border-color: var(--color-primary-dark);
+  background-color: var(--color-success-bg);
 }
 
 .zev-drop-zone__input {
@@ -46,25 +48,25 @@
 }
 
 .zev-drop-zone__icon {
-  color: var(--zev-color-text-muted, #6c757d);
+  color: var(--color-gray-600);
   margin-bottom: 0.5rem;
 }
 
 .zev-drop-zone:hover .zev-drop-zone__icon,
 .zev-drop-zone--active .zev-drop-zone__icon {
-  color: var(--zev-color-primary, #007bff);
+  color: var(--color-primary);
 }
 
 .zev-drop-zone__text {
   font-size: 1rem;
   font-weight: 500;
-  color: var(--zev-color-text, #333);
+  color: var(--color-gray-800);
   margin: 0;
 }
 
 .zev-drop-zone__hint {
   font-size: 0.875rem;
-  color: var(--zev-color-text-muted, #6c757d);
+  color: var(--color-gray-600);
   margin: 0;
 }
 
@@ -78,7 +80,7 @@
 }
 
 .zev-drop-zone__file-icon {
-  color: var(--zev-color-success, #28a745);
+  color: var(--color-success-text);
   flex-shrink: 0;
 }
 
@@ -92,7 +94,7 @@
 
 .zev-drop-zone__file-name {
   font-weight: 500;
-  color: var(--zev-color-text, #333);
+  color: var(--color-gray-800);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -101,7 +103,7 @@
 
 .zev-drop-zone__file-size {
   font-size: 0.875rem;
-  color: var(--zev-color-text-muted, #6c757d);
+  color: var(--color-gray-600);
 }
 
 .zev-drop-zone__remove {
@@ -109,7 +111,7 @@
   border: none;
   padding: 0.25rem;
   cursor: pointer;
-  color: var(--zev-color-text-muted, #6c757d);
+  color: var(--color-gray-600);
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -119,105 +121,6 @@
 }
 
 .zev-drop-zone__remove:hover {
-  color: var(--zev-color-danger, #dc3545);
-  background-color: var(--zev-color-danger-light, #f8d7da);
-}
-
-/* Dark Mode */
-[data-theme="dark"] .zev-drop-zone {
-  border-color: var(--color-gray-400);
-  background-color: var(--color-gray-200);
-}
-
-[data-theme="dark"] .zev-drop-zone:hover,
-[data-theme="dark"] .zev-drop-zone--active {
-  border-color: var(--color-primary);
-  background-color: var(--color-gray-300);
-}
-
-[data-theme="dark"] .zev-drop-zone--has-file {
-  border-color: var(--color-primary-dark);
-  background-color: var(--color-success-bg);
-}
-
-[data-theme="dark"] .zev-drop-zone__icon {
-  color: var(--color-gray-600);
-}
-
-[data-theme="dark"] .zev-drop-zone:hover .zev-drop-zone__icon,
-[data-theme="dark"] .zev-drop-zone--active .zev-drop-zone__icon {
-  color: var(--color-primary);
-}
-
-[data-theme="dark"] .zev-drop-zone__text,
-[data-theme="dark"] .zev-drop-zone__file-name {
-  color: var(--color-gray-800);
-}
-
-[data-theme="dark"] .zev-drop-zone__hint,
-[data-theme="dark"] .zev-drop-zone__file-size {
-  color: var(--color-gray-600);
-}
-
-[data-theme="dark"] .zev-drop-zone__file-icon {
-  color: var(--color-success-text);
-}
-
-[data-theme="dark"] .zev-drop-zone__remove {
-  color: var(--color-gray-600);
-}
-
-[data-theme="dark"] .zev-drop-zone__remove:hover {
   color: var(--color-danger);
   background-color: var(--color-error-bg);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .zev-drop-zone {
-    border-color: var(--color-gray-400);
-    background-color: var(--color-gray-200);
-  }
-
-  :root:not([data-theme="light"]) .zev-drop-zone:hover,
-  :root:not([data-theme="light"]) .zev-drop-zone--active {
-    border-color: var(--color-primary);
-    background-color: var(--color-gray-300);
-  }
-
-  :root:not([data-theme="light"]) .zev-drop-zone--has-file {
-    border-color: var(--color-primary-dark);
-    background-color: var(--color-success-bg);
-  }
-
-  :root:not([data-theme="light"]) .zev-drop-zone__icon {
-    color: var(--color-gray-600);
-  }
-
-  :root:not([data-theme="light"]) .zev-drop-zone:hover .zev-drop-zone__icon,
-  :root:not([data-theme="light"]) .zev-drop-zone--active .zev-drop-zone__icon {
-    color: var(--color-primary);
-  }
-
-  :root:not([data-theme="light"]) .zev-drop-zone__text,
-  :root:not([data-theme="light"]) .zev-drop-zone__file-name {
-    color: var(--color-gray-800);
-  }
-
-  :root:not([data-theme="light"]) .zev-drop-zone__hint,
-  :root:not([data-theme="light"]) .zev-drop-zone__file-size {
-    color: var(--color-gray-600);
-  }
-
-  :root:not([data-theme="light"]) .zev-drop-zone__file-icon {
-    color: var(--color-success-text);
-  }
-
-  :root:not([data-theme="light"]) .zev-drop-zone__remove {
-    color: var(--color-gray-600);
-  }
-
-  :root:not([data-theme="light"]) .zev-drop-zone__remove:hover {
-    color: var(--color-danger);
-    background-color: var(--color-error-bg);
-  }
 }

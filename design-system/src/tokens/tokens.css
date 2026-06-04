@@ -33,6 +33,11 @@
   --color-error-text: #721c24;
   --color-error-border: #f5c6cb;
 
+  /* Semantic solid status colors (traffic-light dots, status text) */
+  --color-success: #4CAF50;
+  --color-warning: #FF9800;
+  --color-error: #f44336;
+
   /* Neutral Colors */
   --color-white: #ffffff;
   --color-gray-50: #f8f8f8;
@@ -68,14 +73,17 @@
   --font-size-xs: 12px;
   --font-size-sm: 13px;
   --font-size-base: 14px;
+  --font-size-md: 16px;
   --font-size-lg: 1.2em;
   --font-size-xl: 24px;
+  --font-size-xxl: 32px;
   --font-weight-normal: 400;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
 
   /* Shadows */
   --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
 
   /* Transitions */
   --transition-fast: 0.3s;
@@ -150,8 +158,14 @@
   --color-error-text: #ff6b6b;
   --color-error-border: #c92a2a;
 
+  /* Semantic solid status colors */
+  --color-success: #69db7c;
+  --color-warning: #ffd43b;
+  --color-error: #ff6b6b;
+
   /* Shadows */
   --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.6);
 }
 
 /* System preference fallback: applies dark mode when OS is dark
@@ -190,7 +204,11 @@
     --color-error-bg: #3b1219;
     --color-error-text: #ff6b6b;
     --color-error-border: #c92a2a;
+    --color-success: #69db7c;
+    --color-warning: #ffd43b;
+    --color-error: #ff6b6b;
     --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.6);
   }
 }
 
@@ -227,6 +245,10 @@
     --color-error-bg: #f8d7da;
     --color-error-text: #721c24;
     --color-error-border: #f5c6cb;
+    --color-success: #4CAF50;
+    --color-warning: #FF9800;
+    --color-error: #f44336;
     --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
   }
 }
