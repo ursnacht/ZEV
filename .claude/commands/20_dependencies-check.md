@@ -127,9 +127,39 @@ Verifizieren, dass nichts bricht:
 
 ---
 
+## Optional: Frontend-Dependencies (npm)
+
+Die JavaScript-Module `frontend-service` (Angular-Runtime + Dev/Test-Tooling) und
+`design-system` (CSS/TS-Build, nur devDependencies) werden über npm statt Maven versioniert.
+Falls auch diese geprüft werden sollen:
+
+```bash
+cd frontend-service && npm.cmd outdated
+cd design-system    && npm.cmd outdated
+```
+
+> **Hinweis:** `npm outdated` liefert Exit-Code 1, sobald veraltete Pakete existieren – das ist
+> **kein** Fehler, sondern erwartetes Verhalten (analog zu `npm audit` in `21_vulnerabilities-check`).
+
+Klassifikation analog zum Maven-Teil:
+- **`Wanted` vs. `Latest`**: `Wanted` = höchste Version im erlaubten SemVer-Range der `package.json`
+  (risikoarm, per `npm update` erreichbar). `Latest` darüber = Major-Bump → Changelog/Breaking
+  Changes prüfen.
+- **Runtime vs. Dev**: `dependencies` (z.B. `@angular/*`, `rxjs`, `zone.js`, `chart.js`,
+  `keycloak-*`) sind ausgeliefert → kritischer als reines Build-/Test-Tooling in `devDependencies`.
+
+> **Angular-Upgrade-Gate:** `keycloak-angular` / `keycloak-js` koppeln an die Angular-Major-Version
+> (aktuell Angular 21, `keycloak-angular ^21.0.0` / `keycloak-js ^25.0.0`). Angular-Major-Upgrades
+> daher **nicht** ohne Kompatibilitäts-Check der Keycloak-Adapter durchführen.
+
+---
+
 ## Referenz
 
 * CLAUDE.md — Abschnitt „Tech Stack Versions" (dokumentierte Soll-Versionen)
 * `pom.xml` — Root: Parent-Version + zentrale Properties (`spring-boot-admin.version`)
 * `backend-service/pom.xml` — die meisten selbst gepinnten Dependencies
+* `frontend-service/package.json`, `design-system/package.json` — npm-Module (optionaler Teil)
+* `.claude/commands/21_vulnerabilities-check.md` — Sicherheits-Perspektive (Schwesterkommando)
 * [Maven Versions Plugin](https://www.mojohaus.org/versions/versions-maven-plugin/)
+* [npm outdated](https://docs.npmjs.com/cli/commands/npm-outdated)
