@@ -138,17 +138,17 @@ mvn test
 
 ### REST API Endpoints
 
-| Controller | Base Path | Auth |
-|------------|-----------|------|
-| EinheitController | `/api/einheit` | zev |
-| MesswerteController | `/api/messwerte` | zev |
-| TranslationController | `/api/translations` | zev |
-| TarifController | `/api/tarife` | zev_admin |
-| MieterController | `/api/mieter` | zev_admin |
+| Controller              | Base Path            | Auth      |
+|-------------------------|----------------------|-----------|
+| EinheitController       | `/api/einheit`       | zev       |
+| MesswerteController     | `/api/messwerte`     | zev       |
+| TranslationController   | `/api/translations`  | zev       |
+| TarifController         | `/api/tarife`        | zev_admin |
+| MieterController        | `/api/mieter`        | zev_admin |
 | EinstellungenController | `/api/einstellungen` | zev_admin |
-| RechnungController | `/api/rechnungen` | zev_admin |
-| StatistikController | `/api/statistik` | zev |
-| PingController | `/ping` | public |
+| RechnungController      | `/api/rechnungen`    | zev_admin |
+| StatistikController     | `/api/statistik`     | zev       |
+| PingController          | `/ping`              | public    |
 
 **Key Backend Components:**
 - `EinheitController` - CRUD for units (consumers/producers)
@@ -204,20 +204,20 @@ mvn test
 
 ### Frontend Routes & Roles
 
-| Route | Component | Roles |
-|-------|-----------|-------|
-| `/startseite` | StartseiteComponent | zev, zev_admin |
-| `/upload` | MesswerteUploadComponent | zev, zev_admin |
-| `/einheiten` | EinheitListComponent | zev, zev_admin |
-| `/solar-calculation` | SolarCalculationComponent | zev, zev_admin |
-| `/chart` | MesswerteChartComponent | zev |
-| `/statistik` | StatistikComponent | zev |
-| `/rechnungen` | RechnungenComponent | zev_admin |
-| `/tarife` | TarifListComponent | zev_admin |
-| `/mieter` | MieterListComponent | zev_admin |
-| `/einstellungen` | EinstellungenComponent | zev_admin |
-| `/translations` | TranslationEditorComponent | zev_admin |
-| `/design-system` | DesignSystemShowcaseComponent | zev |
+| Route                | Component                     | Roles          |
+|----------------------|-------------------------------|----------------|
+| `/startseite`        | StartseiteComponent           | zev, zev_admin |
+| `/upload`            | MesswerteUploadComponent      | zev, zev_admin |
+| `/einheiten`         | EinheitListComponent          | zev, zev_admin |
+| `/solar-calculation` | SolarCalculationComponent     | zev, zev_admin |
+| `/chart`             | MesswerteChartComponent       | zev            |
+| `/statistik`         | StatistikComponent            | zev            |
+| `/rechnungen`        | RechnungenComponent           | zev_admin      |
+| `/tarife`            | TarifListComponent            | zev_admin      |
+| `/mieter`            | MieterListComponent           | zev_admin      |
+| `/einstellungen`     | EinstellungenComponent        | zev_admin      |
+| `/translations`      | TranslationEditorComponent    | zev_admin      |
+| `/design-system`     | DesignSystemShowcaseComponent | zev            |
 
 ## Key Conventions
 
@@ -242,6 +242,15 @@ mvn test
 - Flyway migrations in `backend-service/src/main/resources/db/migration/`
 - Migration naming: `V[number]__[description].sql`
 - Schema: `zev` (application), `keycloak` (identity)
+
+#### Lokale flyway Befehle
+| Befehl                                  | Zweck                                                                   |
+|-----------------------------------------|-------------------------------------------------------------------------|
+| mvn -pl backend-service flyway:info     | Status aller Migrationen anzeigen (welche angewendet, welche pending)   |
+| mvn -pl backend-service flyway:migrate  | Ausstehende Migrationen auf die lokale DB anwenden                      |
+| mvn -pl backend-service flyway:validate | Geprüfte Migrationen gegen Checksums validieren                         |
+| mvn -pl backend-service flyway:clean    | Alle Objekte im Schema löschen (nur Dev!)                               |
+| mvn -pl backend-service flyway:repair   | flyway_schema_history reparieren (z.B. nach fehlgeschlagener Migration) |
 
 #### Entity Relationship Diagram
 
@@ -332,36 +341,36 @@ Bei der Code-Generierung diese Dateien als Vorlage verwenden und deren Struktur 
 
 ### Backend
 
-| Neuer Code | Vorlage |
-|------------|---------|
-| Entity | `backend-service/src/main/java/ch/nacht/entity/Tarif.java` |
-| Repository | `backend-service/src/main/java/ch/nacht/repository/TarifRepository.java` |
-| Service | `backend-service/src/main/java/ch/nacht/service/TarifService.java` |
-| Controller | `backend-service/src/main/java/ch/nacht/controller/TarifController.java` |
-| Service Test | `backend-service/src/test/java/ch/nacht/service/TarifServiceTest.java` |
+| Neuer Code      | Vorlage                                                                      |
+|-----------------|------------------------------------------------------------------------------|
+| Entity          | `backend-service/src/main/java/ch/nacht/entity/Tarif.java`                   |
+| Repository      | `backend-service/src/main/java/ch/nacht/repository/TarifRepository.java`     |
+| Service         | `backend-service/src/main/java/ch/nacht/service/TarifService.java`           |
+| Controller      | `backend-service/src/main/java/ch/nacht/controller/TarifController.java`     |
+| Service Test    | `backend-service/src/test/java/ch/nacht/service/TarifServiceTest.java`       |
 | Controller Test | `backend-service/src/test/java/ch/nacht/controller/TarifControllerTest.java` |
 
 ### Frontend
 
-| Neuer Code | Vorlage |
-|------------|---------|
-| Model | `frontend-service/src/app/models/tarif.model.ts` |
-| Service | `frontend-service/src/app/services/tarif.service.ts` |
-| List-Component | `frontend-service/src/app/components/tarif-list/` |
-| Form-Component | `frontend-service/src/app/components/tarif-form/` |
-| Directive | `frontend-service/src/app/directives/column-resize.directive.ts` |
-| Pipe | `frontend-service/src/app/pipes/swiss-date.pipe.ts` |
-| Utility | `frontend-service/src/app/utils/date-utils.ts` |
-| Service Unit Test | `frontend-service/src/app/services/tarif.service.spec.ts` |
+| Neuer Code          | Vorlage                                                                       |
+|---------------------|-------------------------------------------------------------------------------|
+| Model               | `frontend-service/src/app/models/tarif.model.ts`                              |
+| Service             | `frontend-service/src/app/services/tarif.service.ts`                          |
+| List-Component      | `frontend-service/src/app/components/tarif-list/`                             |
+| Form-Component      | `frontend-service/src/app/components/tarif-form/`                             |
+| Directive           | `frontend-service/src/app/directives/column-resize.directive.ts`              |
+| Pipe                | `frontend-service/src/app/pipes/swiss-date.pipe.ts`                           |
+| Utility             | `frontend-service/src/app/utils/date-utils.ts`                                |
+| Service Unit Test   | `frontend-service/src/app/services/tarif.service.spec.ts`                     |
 | Component Unit Test | `frontend-service/src/app/components/tarif-form/tarif-form.component.spec.ts` |
-| Directive Unit Test | `frontend-service/src/app/directives/column-resize.directive.spec.ts` |
-| Pipe Unit Test | `frontend-service/src/app/pipes/swiss-date.pipe.spec.ts` |
-| E2E Test | `frontend-service/tests/tarif-verwaltung.spec.ts` |
+| Directive Unit Test | `frontend-service/src/app/directives/column-resize.directive.spec.ts`         |
+| Pipe Unit Test      | `frontend-service/src/app/pipes/swiss-date.pipe.spec.ts`                      |
+| E2E Test            | `frontend-service/tests/tarif-verwaltung.spec.ts`                             |
 
 ### Umsetzungsplan
 
-| Neuer Plan | Vorlage |
-|------------|---------|
+| Neuer Plan             | Vorlage                                   |
+|------------------------|-------------------------------------------|
 | Feature-Umsetzungsplan | `Specs/Tarifverwaltung_Umsetzungsplan.md` |
 
 ## Specifications
@@ -412,15 +421,15 @@ Additional documentation in `/docs/`:
 
 **Services:**
 
-| Service | Image / Build | Port | Notes |
-|---------|--------------|------|-------|
-| postgres | postgres:16-alpine | 5432 | DB: zev, User: postgres/postgres, healthcheck |
-| keycloak | quay.io/keycloak/keycloak:latest | 9000 | Admin: admin/admin, uses postgres (schema: keycloak) |
-| backend-service | ./backend-service | 8090 | Depends on postgres, admin-service |
-| admin-service | ./admin-service | 8081 | Spring Boot Admin dashboard |
-| frontend-service | ./frontend-service | 4200→8080 | Nginx, depends on backend + admin |
-| prometheus | prom/prometheus:latest | 9090 | Scrapes backend, admin, frontend actuator |
-| grafana | grafana/grafana:latest | 3000 | Admin: admin/admin, provisioned dashboards |
+| Service          | Image / Build                    | Port      | Notes                                                |
+|------------------|----------------------------------|-----------|------------------------------------------------------|
+| postgres         | postgres:16-alpine               | 5432      | DB: zev, User: postgres/postgres, healthcheck        |
+| keycloak         | quay.io/keycloak/keycloak:latest | 9000      | Admin: admin/admin, uses postgres (schema: keycloak) |
+| backend-service  | ./backend-service                | 8090      | Depends on postgres, admin-service                   |
+| admin-service    | ./admin-service                  | 8081      | Spring Boot Admin dashboard                          |
+| frontend-service | ./frontend-service               | 4200→8080 | Nginx, depends on backend + admin                    |
+| prometheus       | prom/prometheus:latest           | 9090      | Scrapes backend, admin, frontend actuator            |
+| grafana          | grafana/grafana:latest           | 3000      | Admin: admin/admin, provisioned dashboards           |
 
 Network: `zev-network` (bridge)
 
