@@ -25,6 +25,7 @@ public class TranslationController {
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('zev')")
     public ResponseEntity<Map<String, Map<String, String>>> getAllTranslations() {
         log.info("Fetching all translations");
         List<Translation> translations = translationService.getAllTranslations();

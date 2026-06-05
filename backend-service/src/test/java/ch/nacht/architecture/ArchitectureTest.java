@@ -1,15 +1,22 @@
 package ch.nacht.architecture;
 
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.ConditionEvents;
+import com.tngtech.archunit.lang.SimpleConditionEvent;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.persistence.Entity;
@@ -284,6 +291,77 @@ class ArchitectureTest {
                 .that().resideInAPackage("..repository..")
                 .and().haveSimpleNameEndingWith("Repository")
                 .should().beAssignableTo(JpaRepository.class);
+
+            rule.check(importedClasses);
+        }
+    }
+
+    @Nested
+    @DisplayName("Security-Invarianten")
+    class SecurityRules {
+
+        /**
+         * Jeder REST-Endpoint muss autorisiert sein – entweder per klassen-weitem
+         * @PreAuthorize oder einzeln je Mapping-Methode. Verhindert vergessene
+         * Autorisierung (Broken Access Control, OWASP A01).
+         * Ausnahme: PingController (/ping) ist bewusst oeffentlich.
+         */
+        @Test
+        @DisplayName("Jeder Controller-Endpoint ist mit @PreAuthorize abgesichert")
+        void everyEndpointMustBeAuthorized() {
+            ArchCondition<JavaClass> authorizeEveryEndpoint =
+                new ArchCondition<>("@PreAuthorize auf Klassenebene oder auf jeder Mapping-Methode haben") {
+                    @Override
+                    public void check(JavaClass controller, ConditionEvents events) {
+                        // Klassen-weites @PreAuthorize deckt alle Methoden ab
+                        if (controller.isAnnotatedWith(PreAuthorize.class)) {
+                            return;
+                        }
+                        for (JavaMethod method : controller.getMethods()) {
+                            boolean isEndpoint = method.isMetaAnnotatedWith(RequestMapping.class);
+                            if (isEndpoint && !method.isAnnotatedWith(PreAuthorize.class)) {
+                                events.add(SimpleConditionEvent.violated(method,
+                                    method.getFullName() + " ist ein Endpoint ohne @PreAuthorize"));
+                            }
+                        }
+                    }
+                };
+
+            ArchRule rule = classes()
+                .that().resideInAPackage("..controller..")
+                .and().areAnnotatedWith(RestController.class)
+                .and().haveSimpleNameNotContaining("Ping") // PingController: bewusst public (/ping)
+                .should(authorizeEveryEndpoint);
+
+            rule.check(importedClasses);
+        }
+
+        /**
+         * Jede mandantenfaehige Entity muss ein org_id-Feld tragen (Mandanten-Trennung).
+         * Translation = global (keine Mandanten-Daten), Organisation = der Mandant selbst.
+         */
+        @Test
+        @DisplayName("Jede Entity hat ein org_id-Feld (Mandanten-Trennung)")
+        void everyEntityMustHaveOrgId() {
+            ArchCondition<JavaClass> haveOrgIdField =
+                new ArchCondition<>("ein Feld 'orgId' fuer die Mandanten-Trennung haben") {
+                    @Override
+                    public void check(JavaClass entity, ConditionEvents events) {
+                        boolean hasOrgId = entity.getAllFields().stream()
+                            .anyMatch(field -> field.getName().equals("orgId"));
+                        if (!hasOrgId) {
+                            events.add(SimpleConditionEvent.violated(entity,
+                                entity.getSimpleName() + " hat kein org_id-Feld (Mandanten-Trennung)"));
+                        }
+                    }
+                };
+
+            ArchRule rule = classes()
+                .that().resideInAPackage("..entity..")
+                .and().areAnnotatedWith(Entity.class)
+                .and().haveSimpleNameNotContaining("Translation")
+                .and().haveSimpleNameNotContaining("Organisation")
+                .should(haveOrgIdField);
 
             rule.check(importedClasses);
         }

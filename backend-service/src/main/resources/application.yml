@@ -49,20 +49,17 @@ spring:
 management:
   endpoints:
     web:
+      # Security: nur unkritische Endpoints exponieren. /actuator/** ist (fuer
+      # Prometheus/SBA) unauthentifiziert erreichbar (siehe SecurityConfig), daher
+      # duerfen env/heapdump/configprops/loggers NICHT freigegeben werden.
       exposure:
-        include: "*"
+        include: "health,info,prometheus"
       cors:
         allowed-origins: "http://localhost:8081,http://admin-service:8081"
         allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
   endpoint:
     health:
-      show-details: ALWAYS
-    env:
-      show-values: ALWAYS
-    configprops:
-      show-values: ALWAYS
-    loggers:
-      enabled: true
+      show-details: when_authorized
   prometheus:
     metrics:
       export:

@@ -40,7 +40,7 @@ public class StatistikService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "statistik", key = "#von.toString() + '-' + #bis.toString()")
+    @Cacheable(value = "statistik", key = "#von.toString() + '-' + #bis.toString() + '-' + @organizationContextService.getCurrentOrgId()")
     public StatistikDTO getStatistik(LocalDate von, LocalDate bis) {
         hibernateFilterService.enableOrgFilter();
         logger.info("Berechne Statistik für Zeitraum {} bis {}", von, bis);

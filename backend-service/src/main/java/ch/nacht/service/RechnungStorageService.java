@@ -22,54 +22,69 @@ public class RechnungStorageService {
 
     private final Map<String, StoredPdf> storage = new ConcurrentHashMap<>();
 
+    private final OrganizationContextService organizationContextService;
+
+    public RechnungStorageService(OrganizationContextService organizationContextService) {
+        this.organizationContextService = organizationContextService;
+    }
+
     /**
-     * Store a PDF with the given key (unit name).
+     * Build the tenant-scoped internal storage key.
+     * The PDFs are isolated per organisation, so a {@code zev_admin} of one tenant
+     * can never retrieve another tenant's invoice via a guessed unit-name key.
+     */
+    private String orgScopedKey(String key) {
+        return organizationContextService.getCurrentOrgId() + ":" + sanitizeKey(key);
+    }
+
+    /**
+     * Store a PDF with the given key (unit name), scoped to the current organisation.
      *
      * @param key The storage key (sanitized unit name)
      * @param pdf The PDF bytes
      */
     public void store(String key, byte[] pdf) {
-        String sanitizedKey = sanitizeKey(key);
-        storage.put(sanitizedKey, new StoredPdf(pdf, Instant.now()));
-        log.debug("Stored PDF with key: {}, size: {} bytes", sanitizedKey, pdf.length);
+        storage.put(orgScopedKey(key), new StoredPdf(pdf, Instant.now()));
+        log.debug("Stored PDF with key: {}, size: {} bytes", sanitizeKey(key), pdf.length);
     }
 
     /**
-     * Retrieve a PDF by key.
+     * Retrieve a PDF by key within the current organisation.
      *
      * @param key The storage key
      * @return The PDF bytes if found and not expired
      */
     public Optional<byte[]> get(String key) {
-        String sanitizedKey = sanitizeKey(key);
-        StoredPdf stored = storage.get(sanitizedKey);
+        StoredPdf stored = storage.get(orgScopedKey(key));
         if (stored != null && !isExpired(stored)) {
-            log.debug("Retrieved PDF with key: {}", sanitizedKey);
+            log.debug("Retrieved PDF with key: {}", sanitizeKey(key));
             return Optional.of(stored.pdf);
         }
-        log.debug("PDF not found or expired for key: {}", sanitizedKey);
+        log.debug("PDF not found or expired for key: {}", sanitizeKey(key));
         return Optional.empty();
     }
 
     /**
-     * Check if a PDF exists for the given key.
+     * Check if a PDF exists for the given key within the current organisation.
      *
      * @param key The storage key
      * @return true if PDF exists and is not expired
      */
     public boolean exists(String key) {
-        String sanitizedKey = sanitizeKey(key);
-        StoredPdf stored = storage.get(sanitizedKey);
+        StoredPdf stored = storage.get(orgScopedKey(key));
         return stored != null && !isExpired(stored);
     }
 
     /**
-     * Clear all stored PDFs (e.g., when generating new batch).
+     * Clear the stored PDFs of the current organisation (e.g., when generating a new batch).
+     * Other tenants' PDFs are not affected.
      */
     public void clearAll() {
-        int count = storage.size();
-        storage.clear();
-        log.info("Cleared {} stored PDFs", count);
+        String prefix = organizationContextService.getCurrentOrgId() + ":";
+        int before = storage.size();
+        storage.keySet().removeIf(k -> k.startsWith(prefix));
+        log.info("Cleared {} stored PDFs for org {}", before - storage.size(),
+                organizationContextService.getCurrentOrgId());
     }
 
     /**
