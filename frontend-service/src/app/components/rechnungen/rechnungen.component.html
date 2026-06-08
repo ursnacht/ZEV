@@ -8,7 +8,7 @@
   }
 
   <form (ngSubmit)="onGenerate()">
-    <app-einheit-selector (selectionChange)="onSelectionChange($event)"></app-einheit-selector>
+    <app-einheit-selector [onlyConsumers]="true" (selectionChange)="onSelectionChange($event)"></app-einheit-selector>
 
         <app-quarter-selector
           [selectedVon]="dateFrom"

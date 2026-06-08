@@ -10,6 +10,7 @@
   1. Wahl "Rechnungen" im Menü
   2. Eingabe des Zeitraumes analog zur Statistikseite mit Berechnung von "Datum bis"
   3. Wahl der Konsumenten mit Checkboxen analog zur Seite "Grafiken Messwerte" inkl. "alle auswählen"
+     * **"Alle auswählen" selektiert NUR Konsumenten** (keine Produzenten), da Rechnungen ausschliesslich für Konsumenten generiert werden.
   4. Button "Generieren"
   5. Die Rechnungen können nach der Generierung einzeln heruntergeladen werden, solange die Seite nicht verlassen wird.
 * Als Admin möchte ich oben in der Liste der generierten Rechnungen das **Total der Beträge** sehen, damit ich die Gesamtsumme der generierten Rechnungen auf einen Blick erfasse.
@@ -17,6 +18,11 @@
     * Über der Tabelle der generierten Rechnungen wird ein Total angezeigt (Summe der Endbeträge aller generierten Rechnungen, in CHF, zwei Nachkommastellen).
     * Das Total wird nur angezeigt, wenn mindestens eine Rechnung generiert wurde.
     * Der Text "Gesamtbetrag" ist mehrsprachig (Translation-Key `GESAMTBETRAG`).
+* Als Admin möchte ich, dass "Alle auswählen" auf der Rechnungen-Seite ausschliesslich Konsumenten markiert.
+  * **Akzeptanzkriterien:**
+    * Klick auf "Alle auswählen" selektiert alle Konsumenten, jedoch keine Produzenten.
+    * Die "Alle auswählen"-Checkbox gilt als vollständig markiert, wenn alle Konsumenten selektiert sind (Produzenten werden dabei ignoriert).
+    * Das Verhalten gilt nur auf der Rechnungen-Seite; andere Seiten (z.B. Grafiken/Messwerte) selektieren weiterhin alle Einheiten.
 
 ## 3. Technische Spezifikationen (Technical Specs)
 * Erweiterung der Einheit

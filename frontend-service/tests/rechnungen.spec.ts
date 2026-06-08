@@ -4,7 +4,8 @@ import { navigateViaMenu, waitForFormResult, waitForTableWithData } from './help
 /**
  * tests / rechnungen.spec.ts
  * E2E tests for the Rechnungen (Invoice Generation) page
- * Tests cover: navigation, unit selection (CONSUMER + PRODUCER), date entry, invoice generation
+ * Tests cover: navigation, unit selection (select-all selects ONLY consumers),
+ * date entry, invoice generation, and the total amount shown above the results.
  */
 
 /**
@@ -105,41 +106,47 @@ test.describe('Rechnungen - Einheiten Auswahl (FR-3: Produzenten)', () => {
         await expect(selectAllLabel).toBeVisible();
     });
 
-    test('should toggle all units when select-all is clicked', async ({ page }) => {
+    test('select-all should select ONLY consumers, not producers', async ({ page }) => {
         await navigateToRechnungen(page);
         await page.waitForTimeout(2000);
 
-        const unitCheckboxes = page.locator('.zev-checkbox-item:not(.zev-checkbox-item--select-all) input[type="checkbox"]');
-        const unitCount = await unitCheckboxes.count();
+        const items = page.locator('.zev-checkbox-item:not(.zev-checkbox-item--select-all)');
+        const itemCount = await items.count();
 
-        if (unitCount === 0) {
-            console.log('No units available, skipping select-all test');
+        if (itemCount === 0) {
+            console.log('No units available, skipping consumer-only select-all test');
             return;
         }
 
-        // Deselect all first
+        // Click select-all (page starts with nothing selected)
         const selectAll = page.locator('#einheit-select-all');
-        if (await selectAll.isChecked()) {
-            await selectAll.click();
-            await page.waitForTimeout(300);
-        }
-
-        // Click select-all to select all
         await selectAll.click();
         await page.waitForTimeout(300);
 
-        // All individual checkboxes should now be checked
-        for (let i = 0; i < unitCount; i++) {
-            await expect(unitCheckboxes.nth(i)).toBeChecked();
-        }
+        // Type label is localized: DE "Produzent"/"Konsument", EN "Producer"/"Consumer"
+        const isProducer = (label: string) => /produzent|producer/i.test(label);
 
-        // Click select-all again to deselect all
+        // Consumers must be checked, producers must NOT be checked
+        let sawConsumer = false;
+        for (let i = 0; i < itemCount; i++) {
+            const item = items.nth(i);
+            const labelText = (await item.locator('label').textContent()) ?? '';
+            const checkbox = item.locator('input[type="checkbox"]');
+            if (isProducer(labelText)) {
+                await expect(checkbox).not.toBeChecked();
+            } else {
+                sawConsumer = true;
+                await expect(checkbox).toBeChecked();
+            }
+        }
+        // The test data is expected to contain at least one consumer
+        expect(sawConsumer).toBe(true);
+
+        // Clicking select-all again deselects the consumers
         await selectAll.click();
         await page.waitForTimeout(300);
-
-        // All should be unchecked
-        for (let i = 0; i < unitCount; i++) {
-            await expect(unitCheckboxes.nth(i)).not.toBeChecked();
+        for (let i = 0; i < itemCount; i++) {
+            await expect(items.nth(i).locator('input[type="checkbox"]')).not.toBeChecked();
         }
     });
 
@@ -314,6 +321,36 @@ test.describe('Rechnungen - Invoice Generation', () => {
             const downloadButtons = page.locator('.zev-panel .zev-button--secondary');
             const downloadCount = await downloadButtons.count();
             expect(downloadCount).toBeGreaterThan(0);
+        }
+    });
+
+    test('should display the total amount above the results table after generation', async ({ page }) => {
+        await navigateToRechnungen(page);
+        await page.waitForTimeout(2000);
+
+        const unitCheckboxes = page.locator('.zev-checkbox-item:not(.zev-checkbox-item--select-all) input[type="checkbox"]');
+        if (await unitCheckboxes.count() === 0) {
+            console.log('No units available, skipping total test');
+            return;
+        }
+
+        await page.locator('#einheit-select-all').click();
+        await page.waitForTimeout(300);
+
+        await page.locator('#dateFrom').fill('2099-01-01');
+        await page.locator('#dateTo').fill('2099-03-31');
+
+        await page.locator('button[type="submit"]').click();
+
+        const successMessage = page.locator('.zev-message--success');
+        const errorMessage = page.locator('.zev-message--error');
+        await expect(successMessage.or(errorMessage)).toBeVisible({ timeout: 30000 });
+
+        // Total is only shown when invoices were actually generated
+        if (await successMessage.isVisible().catch(() => false)) {
+            const total = page.locator('.zev-rechnungen-total');
+            await expect(total).toBeVisible();
+            await expect(total).toContainText('CHF');
         }
     });
 });

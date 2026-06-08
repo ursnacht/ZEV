@@ -373,3 +373,14 @@ Berechnung:
 - **`rechnungen.component.css`**: Klasse `.zev-rechnungen-total` (Design-System-Tokens `--font-size-lg`, `--font-weight-semibold`, Spacing).
 - **Übersetzung**: Flyway `V61__Add_Rechnung_Gesamtbetrag_Translation.sql`, Key `GESAMTBETRAG` (de: "Gesamtbetrag", en: "Total amount").
 - **Rein clientseitig**: keine Backend-Änderung nötig – die Endbeträge liegen bereits in der Generierungs-Antwort vor.
+- **E2E**: `tests/rechnungen.spec.ts` – Test prüft, dass das Total (`.zev-rechnungen-total`, inkl. "CHF") nach erfolgreicher Generierung über der Tabelle erscheint.
+
+### "Alle auswählen" selektiert nur Konsumenten (Frontend)
+
+Auf der Rechnungen-Seite markiert "Alle auswählen" ausschliesslich Konsumenten.
+
+- **`einheit-selector.component.ts`**: neuer `@Input() onlyConsumers` (default `false`). Neuer Getter `selectableEinheiten` (alle bzw. nur `CONSUMER`). `onSelectAllToggle()`/`allSelected()`/`someSelected()` arbeiten auf `selectableEinheiten` statt auf allen Einheiten – **rückwärtskompatibel** (default = alle, wie bisher, z.B. Chart-Seite).
+- **`rechnungen.component.html`**: `<app-einheit-selector [onlyConsumers]="true" ...>`.
+- **Wiederverwendung**: Der Selector wird auch von `messwerte-chart` genutzt – dort ohne Input, Verhalten unverändert.
+- **Tests**: neuer `einheit-selector.component.spec.ts` (Default = alle inkl. Produzenten; `onlyConsumers` = nur Konsumenten). E2E in `tests/rechnungen.spec.ts`: Select-all markiert Konsumenten (checked), Produzenten bleiben unmarkiert.
+- **Keine neuen Texte/Backend**: rein clientseitig.

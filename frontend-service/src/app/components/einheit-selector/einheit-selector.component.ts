@@ -1,4 +1,4 @@
-import { Component, OnInit, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { EinheitService } from '../../services/einheit.service';
 import { Einheit, EinheitTyp } from '../../models/einheit.model';
@@ -13,11 +13,20 @@ import { EinheitTypPipe } from '../../pipes/einheit-typ.pipe';
   styleUrls: ['./einheit-selector.component.css']
 })
 export class EinheitSelectorComponent implements OnInit {
+  /** Wenn true, selektiert "Alle auswählen" nur Konsumenten (z.B. für Rechnungen). */
+  @Input() onlyConsumers = false;
   @Output() selectionChange = new EventEmitter<Einheit[]>();
 
   readonly EinheitTyp = EinheitTyp;
   einheiten: Einheit[] = [];
   selectedEinheitIds: Set<number> = new Set();
+
+  /** Einheiten, die "Alle auswählen" betreffen (alle bzw. nur Konsumenten). */
+  get selectableEinheiten(): Einheit[] {
+    return this.onlyConsumers
+      ? this.einheiten.filter(e => e.typ === EinheitTyp.CONSUMER)
+      : this.einheiten;
+  }
 
   constructor(private einheitService: EinheitService) {}
 
@@ -34,18 +43,20 @@ export class EinheitSelectorComponent implements OnInit {
   }
 
   allSelected(): boolean {
-    return this.einheiten.length > 0 && this.selectedEinheitIds.size === this.einheiten.length;
+    const selectable = this.selectableEinheiten;
+    return selectable.length > 0 && selectable.every(e => e.id != null && this.selectedEinheitIds.has(e.id));
   }
 
   someSelected(): boolean {
-    return this.selectedEinheitIds.size > 0 && this.selectedEinheitIds.size < this.einheiten.length;
+    const selectedCount = this.selectableEinheiten.filter(e => e.id != null && this.selectedEinheitIds.has(e.id)).length;
+    return selectedCount > 0 && selectedCount < this.selectableEinheiten.length;
   }
 
   onSelectAllToggle(): void {
     if (this.allSelected()) {
-      this.selectedEinheitIds.clear();
+      this.selectableEinheiten.forEach(e => { if (e.id) this.selectedEinheitIds.delete(e.id); });
     } else {
-      this.einheiten.forEach(e => { if (e.id) this.selectedEinheitIds.add(e.id); });
+      this.selectableEinheiten.forEach(e => { if (e.id) this.selectedEinheitIds.add(e.id); });
     }
     this.emitSelection();
   }

@@ -22,6 +22,7 @@ $ARGUMENTS
 * Ergänze den bestehenden Umsetzungsplan (falls vorhanden): `Specs/[Feature-Name]_Umsetzungsplan.md`
 * Weiche nicht von der Struktur des Templates `Specs/SPEC.md` ab
 * Implementiere die neuen Anforderungen im Anwendungscode
+* Passe die bestehenden Tests falls nötig an
 
 ## Referenz
 * `Specs/[Feature-Name].md` - das bestehende und zu ergänzende Anforderungsdokument
