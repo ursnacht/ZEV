@@ -359,3 +359,17 @@ Berechnung:
 3. **Temporäre Speicherung:** PDFs werden 30 Minuten im Speicher gehalten
 4. **Nur Consumer:** Rechnungen werden nur für Einheiten vom Typ CONSUMER generiert
 5. **Validierung:** Mietername und Messpunkt müssen für Rechnungsgenerierung vorhanden sein
+
+---
+
+## Nachträgliche Ergänzungen
+
+### Total der generierten Rechnungen (Frontend)
+
+Über der Tabelle der generierten Rechnungen wird die Summe aller Endbeträge angezeigt.
+
+- **`rechnungen.component.ts`**: Methode `getTotalBetrag()` summiert `endBetrag` aller `generatedRechnungen`.
+- **`rechnungen.component.html`**: Total-Zeile (`zev-rechnungen-total`) zwischen temporär-Hinweis und Tabelle, innerhalb des bestehenden `@if (generatedRechnungen.length > 0)`-Blocks (also nur sichtbar wenn Rechnungen vorhanden).
+- **`rechnungen.component.css`**: Klasse `.zev-rechnungen-total` (Design-System-Tokens `--font-size-lg`, `--font-weight-semibold`, Spacing).
+- **Übersetzung**: Flyway `V61__Add_Rechnung_Gesamtbetrag_Translation.sql`, Key `GESAMTBETRAG` (de: "Gesamtbetrag", en: "Total amount").
+- **Rein clientseitig**: keine Backend-Änderung nötig – die Endbeträge liegen bereits in der Generierungs-Antwort vor.

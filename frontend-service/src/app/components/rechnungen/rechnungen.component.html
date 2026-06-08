@@ -44,6 +44,9 @@
             <h3 class="zev-panel__title">{{ 'GENERIERTE_RECHNUNGEN' | translate }}</h3>
             <div class="zev-panel__content">
               <p class="zev-text-muted">{{ 'RECHNUNGEN_TEMPORAER_HINWEIS' | translate }}</p>
+              <p class="zev-rechnungen-total">
+                {{ 'GESAMTBETRAG' | translate }}: <strong>{{ formatBetrag(getTotalBetrag()) }} CHF</strong>
+              </p>
               <table class="zev-table">
                 <thead>
                   <tr>

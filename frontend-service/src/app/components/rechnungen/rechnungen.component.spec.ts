@@ -242,6 +242,30 @@ describe('RechnungenComponent', () => {
     });
   });
 
+  describe('getTotalBetrag', () => {
+    it('should return 0 when no rechnungen generated', () => {
+      component.generatedRechnungen = [];
+      expect(component.getTotalBetrag()).toBe(0);
+    });
+
+    it('should sum endBetrag of all generated rechnungen', () => {
+      component.generatedRechnungen = [
+        { ...mockRechnung, endBetrag: 100.50 },
+        { ...mockRechnung, endBetrag: 49.50 },
+        { ...mockRechnung, endBetrag: 0.25 }
+      ];
+      expect(component.getTotalBetrag()).toBeCloseTo(150.25, 2);
+    });
+
+    it('should match formatBetrag output for the total', () => {
+      component.generatedRechnungen = [
+        { ...mockRechnung, endBetrag: 10 },
+        { ...mockRechnung, endBetrag: 5.5 }
+      ];
+      expect(component.formatBetrag(component.getTotalBetrag())).toBe('15.50');
+    });
+  });
+
   describe('error message persistence', () => {
     it('should not auto-dismiss error messages', fakeAsync(() => {
       component.dateFrom = '';

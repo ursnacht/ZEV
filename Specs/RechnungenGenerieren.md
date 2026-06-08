@@ -12,6 +12,11 @@
   3. Wahl der Konsumenten mit Checkboxen analog zur Seite "Grafiken Messwerte" inkl. "alle auswählen"
   4. Button "Generieren"
   5. Die Rechnungen können nach der Generierung einzeln heruntergeladen werden, solange die Seite nicht verlassen wird.
+* Als Admin möchte ich oben in der Liste der generierten Rechnungen das **Total der Beträge** sehen, damit ich die Gesamtsumme der generierten Rechnungen auf einen Blick erfasse.
+  * **Akzeptanzkriterien:**
+    * Über der Tabelle der generierten Rechnungen wird ein Total angezeigt (Summe der Endbeträge aller generierten Rechnungen, in CHF, zwei Nachkommastellen).
+    * Das Total wird nur angezeigt, wenn mindestens eine Rechnung generiert wurde.
+    * Der Text "Gesamtbetrag" ist mehrsprachig (Translation-Key `GESAMTBETRAG`).
 
 ## 3. Technische Spezifikationen (Technical Specs)
 * Erweiterung der Einheit

@@ -118,4 +118,8 @@ export class RechnungenComponent extends WithMessage implements OnInit {
     return betrag.toFixed(2);
   }
 
+  getTotalBetrag(): number {
+    return this.generatedRechnungen.reduce((sum, rechnung) => sum + rechnung.endBetrag, 0);
+  }
+
 }

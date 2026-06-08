@@ -1,4 +1,10 @@
 /*
  * Rechnungen Component
- * Alle Styles kommen aus dem Design System
+ * Styles weitgehend aus dem Design System; nur die Total-Zeile ist komponentenspezifisch.
  */
+
+.zev-rechnungen-total {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  margin: var(--spacing-sm) 0 var(--spacing-md);
+}
