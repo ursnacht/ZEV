@@ -138,17 +138,19 @@ mvn test
 
 ### REST API Endpoints
 
-| Controller              | Base Path            | Auth      |
-|-------------------------|----------------------|-----------|
-| EinheitController       | `/api/einheit`       | zev       |
-| MesswerteController     | `/api/messwerte`     | zev       |
-| TranslationController   | `/api/translations`  | zev       |
-| TarifController         | `/api/tarife`        | zev_admin |
-| MieterController        | `/api/mieter`        | zev_admin |
-| EinstellungenController | `/api/einstellungen` | zev_admin |
-| RechnungController      | `/api/rechnungen`    | zev_admin |
-| StatistikController     | `/api/statistik`     | zev       |
-| PingController          | `/ping`              | public    |
+| Controller              | Base Path            | Auth                          |
+|-------------------------|----------------------|-------------------------------|
+| EinheitController       | `/api/einheit`       | zev (read) / zev_admin (write) |
+| MesswerteController     | `/api/messwerte`     | zev (read) / zev_admin (write) |
+| TranslationController   | `/api/translations`  | zev (read) / zev_admin (write) |
+| TarifController         | `/api/tarife`        | zev_admin                     |
+| MieterController        | `/api/mieter`        | zev_admin                     |
+| DebitorController       | `/api/debitoren`     | zev_admin                     |
+| EinstellungenController | `/api/einstellungen` | zev_admin                     |
+| RechnungController      | `/api/rechnungen`    | zev_admin                     |
+| StatistikController     | `/api/statistik`     | zev                           |
+| LizenzenController      | `/api/lizenzen`      | zev                           |
+| PingController          | `/ping`              | public                        |
 
 **Key Backend Components:**
 - `EinheitController` - CRUD for units (consumers/producers)

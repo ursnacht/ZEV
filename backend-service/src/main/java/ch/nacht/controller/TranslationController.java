@@ -8,6 +8,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
+
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -49,7 +51,7 @@ public class TranslationController {
 
     @PostMapping
     @PreAuthorize("hasRole('zev_admin')")
-    public ResponseEntity<Translation> createTranslation(@RequestBody Translation translation) {
+    public ResponseEntity<Translation> createTranslation(@Valid @RequestBody Translation translation) {
         log.info("Creating new translation with key: {}", translation.getKey());
         Translation saved = translationService.saveTranslation(translation);
         log.info("Created translation: {}", saved.getKey());
@@ -59,7 +61,7 @@ public class TranslationController {
     @PutMapping("/{key:.+}")
     @PreAuthorize("hasRole('zev_admin')")
     public ResponseEntity<Translation> updateTranslation(@PathVariable String key,
-            @RequestBody Translation translation) {
+            @Valid @RequestBody Translation translation) {
         log.info("Updating translation with key: {}", key);
         if (!key.equals(translation.getKey())) {
             log.warn("Translation key mismatch - path: {}, body: {}", key, translation.getKey());

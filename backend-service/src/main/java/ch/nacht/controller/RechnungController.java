@@ -15,6 +15,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -57,7 +61,7 @@ public class RechnungController {
      */
     @Transactional
     @PostMapping("/generate")
-    public ResponseEntity<Map<String, Object>> generateRechnungen(@RequestBody GenerateRequest request) {
+    public ResponseEntity<Map<String, Object>> generateRechnungen(@Valid @RequestBody GenerateRequest request) {
         log.info("Generating invoices for {} units from {} to {}",
                 request.einheitIds.size(), request.von, request.bis);
 
@@ -171,8 +175,11 @@ public class RechnungController {
      * Request body for invoice generation.
      */
     public static class GenerateRequest {
+        @NotNull(message = "von is required")
         public LocalDate von;
+        @NotNull(message = "bis is required")
         public LocalDate bis;
+        @NotEmpty(message = "einheitIds must not be empty")
         public List<Long> einheitIds;
         public String sprache;
     }

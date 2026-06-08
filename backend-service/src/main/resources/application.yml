@@ -45,6 +45,11 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: http://localhost:9000/realms/zev
+          # Optionale Audience-Validierung des aud-Claims (Spring-Boot-nativ, A07).
+          # Leer/auskommentiert = aus (nur Issuer-/Timestamp-Pruefung). Zum Aktivieren
+          # den erwarteten Wert (z.B. Keycloak-Client/Resource) eintragen:
+          # audiences:
+          #  - zev-frontend
 
 management:
   endpoints:

@@ -130,7 +130,7 @@ public class RechnungControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.error").exists());
+            .andExpect(jsonPath("$.von").exists());
 
         verifyNoInteractions(rechnungService);
     }
@@ -149,7 +149,7 @@ public class RechnungControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.error").exists());
+            .andExpect(jsonPath("$.bis").exists());
 
         verifyNoInteractions(rechnungService);
     }
@@ -187,7 +187,7 @@ public class RechnungControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.error").exists());
+            .andExpect(jsonPath("$.einheitIds").exists());
 
         verifyNoInteractions(rechnungService);
     }
