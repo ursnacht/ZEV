@@ -5,6 +5,7 @@ import { filter } from 'rxjs/operators';
 
 import Keycloak from 'keycloak-js';
 import { KeycloakProfile } from 'keycloak-js';
+import { AuthService } from '../../services/auth.service';
 import { ThemeService } from '../../services/theme.service';
 import { TranslationService } from '../../services/translation.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
@@ -25,6 +26,7 @@ export class NavigationComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private routerSubscription: Subscription | null = null;
 
+  private readonly authService = inject(AuthService);
   private readonly themeService = inject(ThemeService);
 
   readonly isDarkMode = this.themeService.isDarkMode;
@@ -105,8 +107,13 @@ export class NavigationComponent implements OnInit, OnDestroy {
   }
 
   logout() {
-    this.keycloak.logout();
     this.closeMenu();
+    // Notify the backend while the token is still valid, then always redirect to the
+    // Keycloak logout - even if the notification fails - so the user can always log out.
+    this.authService.notifyLogout().subscribe({
+      next: () => this.keycloak.logout(),
+      error: () => this.keycloak.logout()
+    });
   }
 
   toggleDarkMode(): void {
