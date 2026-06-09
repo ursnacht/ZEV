@@ -365,3 +365,49 @@ ON CONFLICT (key) DO NOTHING;
 3. **Annahme:** Produzenten-Rechnungen ohne Grundgebühr (leere tarifZeilen) werden **nicht** generiert (defensive Filterung in `berechneRechnungen`).
 4. **Annahme:** Da GRUNDGEBUEHR in der Quartals-/Jahresvalidierung optional ist, wird `validateTarifAbdeckung` **nicht** für GRUNDGEBUEHR aufgerufen – konsistent mit Spec-Entscheid.
 5. **Annahme:** Die `mengeneinheit` für kWh-Zeilen wird direkt im bestehenden `berechneTarifZeilen`-Aufruf als Literal `"kWh"` gesetzt (kein separater Translation-Key nötig, da das PDF-Layout bereits `CHF / kWh` als bekannte Einheit zeigt).
+
+---
+
+## Erweiterung: Konfigurierbare Produzenten-Verrechnung (FR-7)
+
+Ein `GRUNDGEBUEHR`-Tarif erhält das Flag `produzentVerrechnen`. Konsumenten zahlen die Grundgebühr immer; Produzenten nur bei `produzentVerrechnen = true`. Standardwert `false` (auch für bestehende Tarife).
+
+### Betroffene Komponenten
+
+| Typ | Datei | Änderungsart |
+|-----|-------|--------------|
+| Backend Entity | `backend-service/src/main/java/ch/nacht/entity/Tarif.java` | Änderung |
+| Backend Service | `backend-service/src/main/java/ch/nacht/service/RechnungService.java` | Änderung |
+| DB Migration | `backend-service/src/main/resources/db/migration/V62__Add_Produzent_Verrechnen_To_Tarif.sql` | Neu |
+| DB Migration | `backend-service/src/main/resources/db/migration/V63__Add_Produzent_Verrechnen_Translations.sql` | Neu |
+| Frontend Model | `frontend-service/src/app/models/tarif.model.ts` | Änderung |
+| Frontend Component | `frontend-service/src/app/components/tarif-form/tarif-form.component.ts` | Änderung |
+| Frontend Template | `frontend-service/src/app/components/tarif-form/tarif-form.component.html` | Änderung |
+| Frontend Template | `frontend-service/src/app/components/tarif-list/tarif-list.component.html` | Änderung |
+| DB Migration | `backend-service/src/main/resources/db/migration/V64__Add_Tarif_Produzent_Spalte_Translations.sql` | Neu |
+
+### Phasen-Tabelle
+
+| Status | Phase | Beschreibung |
+|--------|-------|--------------|
+| [x] | E1. Backend – Entity | Feld `produzentVerrechnen` (Spalte `produzent_verrechnen`, default `false`) in `Tarif.java` |
+| [x] | E2. Backend – Migration V62 | Spalte `produzent_verrechnen BOOLEAN NOT NULL DEFAULT FALSE` zu `zev.tarif` |
+| [x] | E3. Backend – RechnungService | `berechneProduzentenRechnung` filtert GRUNDGEBUEHR-Tarife auf `produzentVerrechnen = true`; Konsumenten-Pfad unverändert |
+| [x] | E4. Frontend – Model | `produzentVerrechnen?: boolean` zum `Tarif`-Interface |
+| [x] | E5. Frontend – TarifForm | Default `produzentVerrechnen: false`; Checkbox nur bei Tariftyp `GRUNDGEBUEHR` sichtbar |
+| [x] | E6. Übersetzungen V63 | Keys `TARIF_PRODUZENT_VERRECHNEN`, `TARIF_PRODUZENT_VERRECHNEN_HINT` |
+| [x] | E7. Frontend – TarifList | Spalte „Produzenten" in der Übersichtstabelle: deaktivierte Checkbox (`[checked]`/`disabled`) für GRUNDGEBUEHR, sonst „–" |
+| [x] | E8. Übersetzungen V64 | Keys `TARIF_PRODUZENT_VERRECHNEN_SPALTE`, `JA`, `NEIN` |
+| [x] | E9. Tests | RechnungServiceTest (Produzent flagged/not-flagged, Konsument ignoriert Flag); tarif-form spec (Default, Checkbox-Sichtbarkeit) |
+
+### Detailbeschreibung
+
+**E3 – RechnungService:** Nur der Produzenten-Pfad wird angepasst. In `berechneProduzentenRechnung`:
+```java
+List<Tarif> tarife = tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis).stream()
+        .filter(Tarif::isProduzentVerrechnen)
+        .toList();
+```
+Die bestehende defensive Filterung (`if (!rechnung.getTarifZeilen().isEmpty())` in `berechneRechnungen`) sorgt dafür, dass Produzenten ohne freigegebene Tarife keine Rechnung erhalten.
+
+**E5 – TarifForm:** Checkbox via `@if (formData.tariftyp === TarifTyp.GRUNDGEBUEHR)`. Das Enum wird als `readonly TarifTyp = TarifTyp;` im Component exponiert, damit es im Template referenzierbar ist.

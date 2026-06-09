@@ -21,8 +21,11 @@ export class TarifFormComponent implements OnInit {
     tariftyp: TarifTyp.ZEV,
     preis: 0,
     gueltigVon: '',
-    gueltigBis: ''
+    gueltigBis: '',
+    produzentVerrechnen: false
   };
+
+  readonly TarifTyp = TarifTyp;
 
   tarifTypOptions = [
     { value: TarifTyp.ZEV, label: 'ZEV (Solarstrom)' },

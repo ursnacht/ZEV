@@ -49,6 +49,13 @@ public class Tarif {
     @Column(name = "gueltig_bis", nullable = false)
     private LocalDate gueltigBis;
 
+    /**
+     * Only relevant for {@link TarifTyp#GRUNDGEBUEHR}: if {@code true}, this basic fee
+     * is also charged to producers. Defaults to {@code false}.
+     */
+    @Column(name = "produzent_verrechnen", nullable = false)
+    private boolean produzentVerrechnen = false;
+
     public Tarif() {
     }
 
@@ -116,9 +123,18 @@ public class Tarif {
         this.orgId = orgId;
     }
 
+    public boolean isProduzentVerrechnen() {
+        return produzentVerrechnen;
+    }
+
+    public void setProduzentVerrechnen(boolean produzentVerrechnen) {
+        this.produzentVerrechnen = produzentVerrechnen;
+    }
+
     @Override
     public String toString() {
         return "Tarif{id=" + id + ", orgId=" + orgId + ", bezeichnung='" + bezeichnung + "', tariftyp=" + tariftyp +
-               ", preis=" + preis + ", gueltigVon=" + gueltigVon + ", gueltigBis=" + gueltigBis + "}";
+               ", preis=" + preis + ", gueltigVon=" + gueltigVon + ", gueltigBis=" + gueltigBis +
+               ", produzentVerrechnen=" + produzentVerrechnen + "}";
     }
 }

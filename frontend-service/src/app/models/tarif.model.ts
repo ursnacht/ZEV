@@ -11,6 +11,7 @@ export interface Tarif {
   preis: number;
   gueltigVon: string;  // ISO date format: YYYY-MM-DD
   gueltigBis: string;  // ISO date format: YYYY-MM-DD
+  produzentVerrechnen?: boolean;  // Only relevant for GRUNDGEBUEHR: also charge producers
 }
 
 export interface ValidationResult {

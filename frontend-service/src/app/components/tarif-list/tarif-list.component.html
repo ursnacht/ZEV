@@ -78,6 +78,7 @@
                   </span>
                 }
               </th>
+              <th>{{ 'TARIF_PRODUZENT_VERRECHNEN_SPALTE' | translate }}</th>
               <th></th>
             </tr>
           </thead>
@@ -93,6 +94,14 @@
                 <td class="number">{{ formatPreis(tarif.preis) }}</td>
                 <td>{{ tarif.gueltigVon | swissDate }}</td>
                 <td>{{ tarif.gueltigBis | swissDate }}</td>
+                <td>
+                  @if (tarif.tariftyp === 'GRUNDGEBUEHR') {
+                    <input type="checkbox" class="zev-checkbox" [checked]="tarif.produzentVerrechnen" disabled
+                      [attr.aria-label]="'TARIF_PRODUZENT_VERRECHNEN' | translate" />
+                  } @else {
+                    &ndash;
+                  }
+                </td>
                 <td>
                   <app-kebab-menu
                     [items]="menuItems"

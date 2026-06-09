@@ -17,12 +17,13 @@
 1. Beim Generieren einer Rechnung werden für den Rechnungszeitraum alle gültigen `GRUNDGEBUEHR`-Tarife ermittelt.
 2. Für jeden `GRUNDGEBUEHR`-Tarif wird die Anzahl der vollständigen **Kalendermonate** innerhalb des Überschneidungszeitraums von Tarifgültigkeit und Rechnungszeitraum gezählt.
 3. Der Rechnungsbetrag für diesen Tarifblock = Anzahl Monate × Preis.
-4. Die Grundgebühr wird auf **jede Einheit** (CONSUMER und PRODUCER) angewendet.
+4. Die Grundgebühr wird auf **Konsumenten** (CONSUMER) immer angewendet. Bei **Produzenten** (PRODUCER) wird sie nur angewendet, wenn der Tarif für Produzenten freigegeben ist (siehe FR-7).
 
 ### FR-3: Rechnungen für Produzenten
-* Produzenten (`EinheitTyp.PRODUCER`) erhalten ebenfalls Rechnungen, die ausschliesslich `GRUNDGEBUEHR`-Positionen enthalten.
+* Produzenten (`EinheitTyp.PRODUCER`) erhalten ebenfalls Rechnungen, die ausschliesslich `GRUNDGEBUEHR`-Positionen enthalten – jedoch nur für jene `GRUNDGEBUEHR`-Tarife, die explizit für Produzenten freigegeben sind (Flag `produzentVerrechnen`, siehe FR-7).
 * Im Rechnungsformular (Frontend) können Produzenten analog zu Konsumenten ausgewählt werden (separate Checkbox-Gruppe oder gemeinsame Liste mit Typanzeige).
 * Produzenten haben keinen Mieter; die Rechnung wird auf die Einheit selbst ausgestellt (kein Mieterblock auf dem PDF).
+* Ist für einen ausgewählten Produzenten kein für Produzenten freigegebener `GRUNDGEBUEHR`-Tarif vorhanden, wird für ihn keine Rechnung erzeugt (kein Fehler).
 
 ### FR-4: Darstellung auf der Rechnung (PDF)
 * `GRUNDGEBUEHR`-Zeilen werden nach den `ZEV`- und `VNB`-Zeilen aufgeführt.
@@ -36,15 +37,34 @@
 ### FR-6: Persistierung
 * Kein neues Datenbankschema nötig; die bestehende `tarif`-Tabelle wird verwendet.
 * Neue Flyway-Migration zum Hinzufügen des Enum-Wertes (sofern als DB-Enum gespeichert; bei Varchar-Spalte entfällt dies).
+* Neue Flyway-Migration für die Spalte `produzent_verrechnen` (siehe FR-7).
+
+### FR-7: Produzenten-Verrechnung pro Grundgebühr-Tarif (konfigurierbar)
+* Ein `GRUNDGEBUEHR`-Tarif erhält ein boolesches Flag `produzentVerrechnen` (DB-Spalte `produzent_verrechnen`), das steuert, ob diese Grundgebühr **auch Produzenten** verrechnet wird.
+* In der Tariferfassung wird das Flag als **Checkbox** dargestellt. Die Checkbox ist nur sichtbar, wenn der Tariftyp `GRUNDGEBUEHR` gewählt ist (für `ZEV`/`VNB` irrelevant).
+* Standardwert: `false` (Checkbox nicht angehakt). Bestehende `GRUNDGEBUEHR`-Tarife werden in der Migration mit `false` initialisiert.
+* Die Rechnungsgenerierung berücksichtigt das Flag:
+  * **Konsumenten:** Grundgebühr wird unabhängig vom Flag immer verrechnet.
+  * **Produzenten:** Grundgebühr wird nur verrechnet, wenn `produzentVerrechnen = true`.
+
+### FR-8: Anzeige des Flags in der Tarif-Übersicht
+* In der Übersichtstabelle der Tarife wird eine Spalte „Produzenten" angezeigt, die den Wert des Flags `produzentVerrechnen` darstellt.
+* Für `GRUNDGEBUEHR`-Tarife wird der Wert als **deaktivierte (read-only) Checkbox** dargestellt: angehakt = `true`, leer = `false`. Die Bearbeitung erfolgt ausschliesslich im Tarifformular (FR-7).
+* Für `ZEV`/`VNB`-Tarife (Flag irrelevant) wird ein Platzhalter „–" angezeigt.
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 * [ ] In der Tarifverwaltung kann ein Tarif mit Typ „Grundgebühr" erfasst, bearbeitet und gelöscht werden.
 * [ ] In der Dropdown-Liste der Tariftypen erscheint der Eintrag „Grundgebühr".
-* [ ] Beim Generieren von Rechnungen wird die Grundgebühr für Konsumenten und Produzenten berechnet.
+* [ ] Beim Generieren von Rechnungen wird die Grundgebühr für Konsumenten berechnet; für Produzenten nur bei freigegebenem Tarif (siehe unten).
 * [ ] Die Anzahl Monate wird korrekt berechnet (z. B. 01.01.–31.03. = 3 Monate).
 * [ ] Läuft ein `GRUNDGEBUEHR`-Tarif mitten in einer Rechnungsperiode ab, werden zwei separate Zeilen erzeugt (analog ZEV/VNB).
 * [ ] Produzenten erscheinen im Rechnungsformular und können ausgewählt werden.
 * [ ] Für Produzenten wird eine Rechnung mit nur `GRUNDGEBUEHR`-Positionen generiert (keine ZEV/VNB-Zeilen).
+* [ ] Beim Tariftyp „Grundgebühr" wird im Tarifformular eine Checkbox „Auch Produzenten verrechnen" angezeigt; bei `ZEV`/`VNB` nicht.
+* [ ] Ein `GRUNDGEBUEHR`-Tarif mit `produzentVerrechnen = true` wird Produzenten verrechnet; ein Tarif mit `false` nicht.
+* [ ] Das Flag beeinflusst die Verrechnung bei Konsumenten **nicht** (Konsumenten zahlen die Grundgebühr immer).
+* [ ] Hat ein ausgewählter Produzent nur nicht-freigegebene `GRUNDGEBUEHR`-Tarife, wird für ihn keine Rechnung erzeugt.
+* [ ] In der Tarif-Übersichtstabelle zeigt die Spalte „Produzenten" für `GRUNDGEBUEHR`-Tarife eine deaktivierte Checkbox (angehakt = freigegeben) und für `ZEV`/`VNB` einen Platzhalter „–".
 * [ ] Der `endBetrag` auf der Rechnung enthält die Grundgebühr.
 * [ ] Fehlt ein `GRUNDGEBUEHR`-Tarif für den Rechnungszeitraum, wird keine Grundgebühr berechnet (kein Fehler, da der Typ optional ist – siehe Offene Fragen).
 * [ ] Alle neuen UI-Texte kommen aus dem `TranslationService` (keine hardcodierten Strings).

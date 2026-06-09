@@ -212,7 +212,10 @@ public class RechnungService {
         rechnung.setBis(bis);
         rechnung.setErstellungsdatum(LocalDate.now());
 
-        List<Tarif> tarife = tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis);
+        // Producers are only charged GRUNDGEBUEHR tariffs explicitly flagged for producers
+        List<Tarif> tarife = tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis).stream()
+                .filter(Tarif::isProduzentVerrechnen)
+                .toList();
         double total = berechneGrundgebuehrZeilen(rechnung, von, bis, tarife);
         double endBetrag = roundTo5Rappen(total);
 

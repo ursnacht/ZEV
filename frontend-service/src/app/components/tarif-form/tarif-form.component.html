@@ -14,6 +14,17 @@
       <div class="zev-form-hint">{{ 'TARIFTYP_HINT' | translate }}</div>
     </div>
 
+    @if (formData.tariftyp === TarifTyp.GRUNDGEBUEHR) {
+      <div class="zev-form-group">
+        <div class="zev-checkbox-item">
+          <input type="checkbox" id="produzentVerrechnen" class="zev-checkbox"
+            [(ngModel)]="formData.produzentVerrechnen" name="produzentVerrechnen" />
+          <label for="produzentVerrechnen">{{ 'TARIF_PRODUZENT_VERRECHNEN' | translate }}</label>
+        </div>
+        <div class="zev-form-hint">{{ 'TARIF_PRODUZENT_VERRECHNEN_HINT' | translate }}</div>
+      </div>
+    }
+
     <div class="zev-form-group">
       <label for="bezeichnung">{{ 'BEZEICHNUNG' | translate }}:</label>
       <input type="text" id="bezeichnung" class="zev-input" [(ngModel)]="formData.bezeichnung" name="bezeichnung"

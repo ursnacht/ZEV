@@ -68,6 +68,40 @@ describe('TarifFormComponent', () => {
       expect(component.tarifTypOptions[1].value).toBe(TarifTyp.VNB);
       expect(component.tarifTypOptions[2].value).toBe(TarifTyp.GRUNDGEBUEHR);
     });
+
+    it('should default produzentVerrechnen to false', () => {
+      expect(component.formData.produzentVerrechnen).toBeFalse();
+    });
+  });
+
+  describe('produzentVerrechnen checkbox', () => {
+    it('should not render checkbox for ZEV/VNB tariffs', () => {
+      component.formData.tariftyp = TarifTyp.ZEV;
+      fixture.detectChanges();
+      const checkbox = fixture.nativeElement.querySelector('#produzentVerrechnen');
+      expect(checkbox).toBeNull();
+    });
+
+    it('should render checkbox only for GRUNDGEBUEHR tariffs', () => {
+      component.formData.tariftyp = TarifTyp.GRUNDGEBUEHR;
+      fixture.detectChanges();
+      const checkbox = fixture.nativeElement.querySelector('#produzentVerrechnen');
+      expect(checkbox).not.toBeNull();
+    });
+
+    it('should preserve produzentVerrechnen from input tarif', () => {
+      component.tarif = {
+        id: 1,
+        bezeichnung: 'Grundgebühr',
+        tariftyp: TarifTyp.GRUNDGEBUEHR,
+        preis: 5,
+        gueltigVon: '2024-01-01',
+        gueltigBis: '2024-12-31',
+        produzentVerrechnen: true
+      };
+      component.ngOnInit();
+      expect(component.formData.produzentVerrechnen).toBeTrue();
+    });
   });
 
   describe('isFormValid', () => {

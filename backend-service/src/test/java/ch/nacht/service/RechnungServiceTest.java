@@ -689,6 +689,7 @@ public class RechnungServiceTest {
             "Grundgebühr 2024", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
         );
+        grundgebuehr.setProduzentVerrechnen(true);
 
         when(einheitRepository.findById(2L)).thenReturn(Optional.of(producer));
         when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
@@ -756,6 +757,7 @@ public class RechnungServiceTest {
             "Grundgebühr", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
         );
+        grundgebuehr.setProduzentVerrechnen(true);
 
         when(einheitRepository.findById(2L)).thenReturn(Optional.of(producer));
         when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
@@ -767,5 +769,63 @@ public class RechnungServiceTest {
         // Keine ZEV- oder VNB-Zeilen auf der Produzenten-Rechnung
         assertTrue(rechnungen.get(0).getTarifZeilen().stream()
             .noneMatch(z -> z.getTyp() == TarifTyp.ZEV || z.getTyp() == TarifTyp.VNB));
+    }
+
+    @Test
+    void berechneRechnungen_ProducerWithGrundgebuehrNotFlagged_NotIncluded() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Einheit producer = new Einheit("Solaranlage", EinheitTyp.PRODUCER);
+        producer.setId(2L);
+
+        Tarif grundgebuehr = new Tarif(
+            "Grundgebühr 2024", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
+        );
+        // produzentVerrechnen defaults to false → producer must NOT be charged
+
+        when(einheitRepository.findById(2L)).thenReturn(Optional.of(producer));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(Collections.singletonList(grundgebuehr));
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(2L), von, bis);
+
+        // GRUNDGEBUEHR not flagged for producers → no invoice
+        assertEquals(0, rechnungen.size());
+    }
+
+    @Test
+    void berechneRechnungen_ConsumerGrundgebuehr_IgnoresProduzentFlag() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        doNothing().when(tarifService).validateTarifAbdeckung(von, bis);
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumer));
+        when(mieterService.getMieterForQuartal(eq(1L), any(), any())).thenReturn(Collections.emptyList());
+
+        when(tarifService.getTarifeForZeitraum(eq(TarifTyp.ZEV), any(), any()))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(tarifService.getTarifeForZeitraum(eq(TarifTyp.VNB), any(), any()))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(150.0);
+
+        Tarif grundgebuehr = new Tarif(
+            "Grundgebühr 2024", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
+        );
+        // Flag is false, but consumers are always charged GRUNDGEBUEHR
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(Collections.singletonList(grundgebuehr));
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(1L), von, bis);
+
+        assertEquals(1, rechnungen.size());
+        // Consumer invoice contains the GRUNDGEBUEHR line regardless of the producer flag
+        assertTrue(rechnungen.get(0).getTarifZeilen().stream()
+            .anyMatch(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR));
     }
 }

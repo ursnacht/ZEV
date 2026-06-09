@@ -17,6 +17,13 @@ $ARGUMENTS
     - Ergänze die Funktionalen Anforderungen, die Akzeptanzkriterien und die Nichtfunktionalen Anforderungen wo nötig.
 5. **Setze die neuen Anforderungen um** gemäss den Vorgaben in `Specs/generell.md`.
 
+## ⚠️ Datenbank-Migrationen (Flyway) – zwingend beachten
+* **Ändere NIEMALS ein bestehendes Migrationsskript** (auch keines, das du in derselben Session erstellt hast), bevor du nicht via MCP-Server `zev-db` geprüft hast, ob es bereits ausgeführt wurde:
+  `SELECT version, success FROM zev.flyway_schema_history WHERE version = '<NR>';`
+* Wurde die Migration bereits ausgeführt (Treffer in `flyway_schema_history`), lege **immer eine neue Migration** mit der nächsthöheren Versionsnummer an – auch für kleine Ergänzungen wie zusätzliche Übersetzungs-Keys.
+* Neue Übersetzungen immer mit `ON CONFLICT (key) DO NOTHING`.
+* Prüfe die höchste vergebene Versionsnummer, bevor du eine neue Migration anlegst (Dateien in `backend-service/src/main/resources/db/migration/`).
+
 ## Output
 * Ergänze die bestehende Anforderungsdatei: `Specs/[Feature-Name].md`
 * Ergänze den bestehenden Umsetzungsplan (falls vorhanden): `Specs/[Feature-Name]_Umsetzungsplan.md`
