@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { navigateViaMenu, waitForFormResult, waitForTableWithData } from './helpers';
+import { getPreviousQuarter, navigateViaMenu, waitForFormResult, waitForTableWithData } from './helpers';
 
 /**
  * tests / rechnungen.spec.ts
@@ -185,18 +185,26 @@ test.describe('Rechnungen - Einheiten Auswahl (FR-3: Produzenten)', () => {
 });
 
 test.describe('Rechnungen - Datumseingabe', () => {
-    test('should default dateFrom to previous month start', async ({ page }) => {
+    test('should default dateFrom to previous quarter start', async ({ page }) => {
         await navigateToRechnungen(page);
 
         const dateFrom = await page.locator('#dateFrom').inputValue();
-        expect(dateFrom).toMatch(/^\d{4}-\d{2}-01$/); // Always first of month
+        expect(dateFrom).toBe(getPreviousQuarter().von);
     });
 
-    test('should default dateTo to previous month end', async ({ page }) => {
+    test('should default dateTo to previous quarter end', async ({ page }) => {
         await navigateToRechnungen(page);
 
         const dateTo = await page.locator('#dateTo').inputValue();
-        expect(dateTo).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        expect(dateTo).toBe(getPreviousQuarter().bis);
+    });
+
+    test('should mark the previous quarter button as active on page load', async ({ page }) => {
+        await navigateToRechnungen(page);
+
+        const activeButton = page.locator('.zev-quarter-button--active');
+        await expect(activeButton).toHaveCount(1);
+        await expect(activeButton).toHaveText(getPreviousQuarter().label);
     });
 
     test('should auto-set dateTo to month end when dateFrom is changed', async ({ page }) => {

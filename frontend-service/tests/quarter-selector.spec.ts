@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { navigateViaMenu } from './helpers';
+import { getPreviousQuarter, navigateViaMenu } from './helpers';
 
 /**
  * tests / quarter-selector.spec.ts
@@ -170,6 +170,24 @@ test.describe('Quarter Selector Component', () => {
             await expect(dateFromInput).toHaveValue(expectedRange.von);
             await expect(dateToInput).toHaveValue(expectedRange.bis);
         });
+
+        test('should default the date range to the previous quarter', async ({ page }) => {
+            await navigateViaMenu(page, '/statistik');
+            await page.locator('h1').filter({ hasText: /Statistik/i }).waitFor({ state: 'visible', timeout: 10000 });
+
+            const previousQuarter = getPreviousQuarter();
+            await expect(page.locator('#dateFrom')).toHaveValue(previousQuarter.von);
+            await expect(page.locator('#dateTo')).toHaveValue(previousQuarter.bis);
+        });
+
+        test('should mark the previous quarter button as active on page load', async ({ page }) => {
+            await navigateViaMenu(page, '/statistik');
+            await page.locator('h1').filter({ hasText: /Statistik/i }).waitFor({ state: 'visible', timeout: 10000 });
+
+            const activeButton = page.locator('.zev-quarter-button--active');
+            await expect(activeButton).toHaveCount(1);
+            await expect(activeButton).toHaveText(getPreviousQuarter().label);
+        });
     });
 
     test.describe('on Messwerte Chart page', () => {
@@ -202,6 +220,24 @@ test.describe('Quarter Selector Component', () => {
             await expect(dateFromInput).toHaveValue(expectedRange.von);
             await expect(dateToInput).toHaveValue(expectedRange.bis);
         });
+
+        test('should default the date range to the previous quarter', async ({ page }) => {
+            await navigateViaMenu(page, '/chart');
+            await page.locator('h1').filter({ hasText: /Messwerte|Grafik/i }).waitFor({ state: 'visible', timeout: 10000 });
+
+            const previousQuarter = getPreviousQuarter();
+            await expect(page.locator('#dateFrom')).toHaveValue(previousQuarter.von);
+            await expect(page.locator('#dateTo')).toHaveValue(previousQuarter.bis);
+        });
+
+        test('should mark the previous quarter button as active on page load', async ({ page }) => {
+            await navigateViaMenu(page, '/chart');
+            await page.locator('h1').filter({ hasText: /Messwerte|Grafik/i }).waitFor({ state: 'visible', timeout: 10000 });
+
+            const activeButton = page.locator('.zev-quarter-button--active');
+            await expect(activeButton).toHaveCount(1);
+            await expect(activeButton).toHaveText(getPreviousQuarter().label);
+        });
     });
 
     test.describe('on Solar Calculation page', () => {
@@ -233,6 +269,24 @@ test.describe('Quarter Selector Component', () => {
 
             await expect(dateFromInput).toHaveValue(expectedRange.von);
             await expect(dateToInput).toHaveValue(expectedRange.bis);
+        });
+
+        test('should default the date range to the previous quarter', async ({ page }) => {
+            await navigateViaMenu(page, '/solar-calculation');
+            await page.locator('h1').filter({ hasText: /Solar|Berechnung/i }).waitFor({ state: 'visible', timeout: 10000 });
+
+            const previousQuarter = getPreviousQuarter();
+            await expect(page.locator('#dateFrom')).toHaveValue(previousQuarter.von);
+            await expect(page.locator('#dateTo')).toHaveValue(previousQuarter.bis);
+        });
+
+        test('should mark the previous quarter button as active on page load', async ({ page }) => {
+            await navigateViaMenu(page, '/solar-calculation');
+            await page.locator('h1').filter({ hasText: /Solar|Berechnung/i }).waitFor({ state: 'visible', timeout: 10000 });
+
+            const activeButton = page.locator('.zev-quarter-button--active');
+            await expect(activeButton).toHaveCount(1);
+            await expect(activeButton).toHaveText(getPreviousQuarter().label);
         });
     });
 });

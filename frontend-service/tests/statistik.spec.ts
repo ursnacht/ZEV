@@ -43,7 +43,7 @@ test.describe('Statistik Page', () => {
     test('should load and display statistics when date range is submitted', async ({ page }) => {
         await navigateToStatistik(page);
 
-        // The form should have default dates pre-filled (previous month)
+        // The form should have default dates pre-filled (previous quarter)
         const dateFromInput = page.locator('#dateFrom');
         const dateToInput = page.locator('#dateTo');
 

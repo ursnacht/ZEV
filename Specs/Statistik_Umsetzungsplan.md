@@ -503,3 +503,16 @@ INSERT INTO translation (key, deutsch, englisch) VALUES
 | Toleranzwert für Summenvergleiche | 0.0009 kWh |
 | Caching | Ja, mit Caffeine (15 Min TTL) |
 | Export-Format | PDF |
+
+---
+
+## Nachträgliche Ergänzungen
+
+### Vorangehendes Quartal beim Öffnen vorselektiert (Frontend)
+
+Beim Öffnen von `/statistik` ist neu das vorangehende Quartal (statt des Vormonats) als Zeitraum vorbelegt.
+
+- **`statistik.component.ts`**: `setDefaultDateRange()` berechnet das Vorquartal relativ zum aktuellen Datum (Jahreswechsel: im Q1 wird Q4 des Vorjahres gesetzt) und belegt `dateFrom`/`dateTo` mit erstem/letztem Tag des Quartals.
+- **Quartal-Button aktiv**: keine Änderung am `QuarterSelectorComponent` nötig – via bestehendem `[selectedVon]`/`[selectedBis]`-Binding.
+- **Tests**: `statistik.component.spec.ts` – Initialisierungs-Tests mit `jasmine.clock().mockDate()` (Vorquartal inkl. Jahreswechsel-Fall). E2E in `tests/quarter-selector.spec.ts` (Abschnitt "on Statistik page"): Default-Daten entsprechen dem Vorquartal, Vorquartal-Button hat `zev-quarter-button--active`.
+- **Keine neuen Texte/Backend**: rein clientseitig.

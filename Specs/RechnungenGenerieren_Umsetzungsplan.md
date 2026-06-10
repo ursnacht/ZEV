@@ -384,3 +384,12 @@ Auf der Rechnungen-Seite markiert "Alle auswählen" ausschliesslich Konsumenten.
 - **Wiederverwendung**: Der Selector wird auch von `messwerte-chart` genutzt – dort ohne Input, Verhalten unverändert.
 - **Tests**: neuer `einheit-selector.component.spec.ts` (Default = alle inkl. Produzenten; `onlyConsumers` = nur Konsumenten). E2E in `tests/rechnungen.spec.ts`: Select-all markiert Konsumenten (checked), Produzenten bleiben unmarkiert.
 - **Keine neuen Texte/Backend**: rein clientseitig.
+
+### Vorangehendes Quartal beim Öffnen vorselektiert (Frontend)
+
+Beim Öffnen von `/rechnungen` ist neu das vorangehende Quartal (statt des Vormonats) als Zeitraum vorbelegt.
+
+- **`rechnungen.component.ts`**: `setDefaultDates()` berechnet das Vorquartal relativ zum aktuellen Datum (Jahreswechsel: im Q1 wird Q4 des Vorjahres gesetzt) und belegt `dateFrom`/`dateTo` mit erstem/letztem Tag des Quartals.
+- **Quartal-Button aktiv**: keine Änderung am `QuarterSelectorComponent` nötig – über das bestehende Binding `[selectedVon]`/`[selectedBis]` wird der passende Button automatisch als aktiv markiert (`isSelected()` vergleicht die Datums-Strings).
+- **Tests**: `rechnungen.component.spec.ts` – Initialisierungs-Tests mit `jasmine.clock().mockDate()` (Vorquartal inkl. Jahreswechsel-Fall). E2E in `tests/rechnungen.spec.ts`: Default-Daten entsprechen Quartalsgrenzen, Vorquartal-Button hat `zev-quarter-button--active`.
+- **Keine neuen Texte/Backend**: rein clientseitig.

@@ -7,7 +7,11 @@
 
 ### 2. Funktionale Anforderungen (Functional Requirements)
 * Es soll ein Filter vorhanden sein, über den ich den Datumsbereich wählen kann, der angezeigt werden soll (analog zur Seite Messwerte)
-    * als Default soll der vorherige Monat gesetzt sein
+    * als Default soll beim Öffnen der Seite das vorangehende Quartal gesetzt sein
+      * "Datum von" und "Datum bis" sind mit dem ersten bzw. letzten Tag des vorangehenden Quartals (relativ zum aktuellen Datum) vorbelegt
+      * der entsprechende Quartal-Button im Quartal-Selektor ist aktiv markiert
+      * Jahreswechsel: im Q1 wird Q4 des Vorjahres vorselektiert
+      * der Zeitraum bleibt manuell änderbar
 * Gib einen Überblick über die Daten:
   * "Messwerte vorhanden bis" mit Angabe des letzten Datums, für das Daten vorhanden sind
   * Angabe, ob für alle Consumer und Producer Daten bis zum Datum "Messwerte vorhanden bis" vorliegen oder Lücken vorhanden sind, d.h. Daten von Einheiten fehlen oder Tage fehlen 

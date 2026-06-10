@@ -49,6 +49,7 @@
 * Neuer Menüeintrag "Debitorkontrolle" (unter "Rechnungen")
 * **Seite:**
   1. Quartal-Selektor oben (`QuarterSelectorComponent` + manuelle Von/Bis-Datumfelder, analog `/rechnungen`)
+     * Beim Öffnen der Seite ist das **vorangehende Quartal** (relativ zum aktuellen Datum) vorselektiert; der entsprechende Quartal-Button ist aktiv markiert und die Liste wird für diesen Zeitraum geladen. Jahreswechsel: Im Q1 wird Q4 des Vorjahres vorselektiert.
   2. Button "Neu erfassen" (öffnet Formular)
   3. Tabelle mit Debitor-Einträgen (analog Mieterverwaltung):
      * Checkbox (erste Spalte; Header-Checkbox selektiert/deselektiert alle sichtbaren Einträge)
@@ -74,6 +75,7 @@
             * [x] Beim Generieren von Rechnungen wird für jede Rechnung **mit Mieter** automatisch ein Debitor-Eintrag persistiert (Produzenten und Leerstand werden übersprungen)
 * [x] Die Seite "Debitorkontrolle" ist aus dem Menü mit der Rolle `zev_admin` erreichbar
 * [x] Die Quartal-Auswahl filtert die angezeigte Liste korrekt (Einträge mit `datum_von` im gewählten Quartal)
+* [x] Beim Öffnen der Seite ist das vorangehende Quartal vorselektiert ("Datum von"/"Datum bis" = erster/letzter Tag des Vorquartals, Quartal-Button aktiv); im Q1 wird Q4 des Vorjahres vorselektiert
 * [x] Die Tabelle zeigt Mieter mit Name und Einheitname in einer Spalte an
 * [x] Einträge ohne Zahldatum werden als "Offen" angezeigt, Einträge mit Zahldatum als "Bezahlt"
 * [x] Debitor-Einträge können manuell über das Formular erstellt werden

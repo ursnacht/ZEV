@@ -218,3 +218,25 @@ export async function waitForTableWithData(page: Page, timeout: number = 10000):
         return false;
     }
 }
+
+/**
+ * Calculates the previous quarter relative to today
+ * (mirrors the default period selection on /rechnungen, /debitoren and /chart).
+ */
+export function getPreviousQuarter(): { label: string; von: string; bis: string } {
+    const now = new Date();
+    let year = now.getFullYear();
+    let quarter = Math.ceil((now.getMonth() + 1) / 3) - 1;
+    if (quarter < 1) {
+        quarter = 4;
+        year--;
+    }
+    const startMonth = (quarter - 1) * 3;
+    const format = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return {
+        label: `Q${quarter}/${year}`,
+        von: format(new Date(year, startMonth, 1)),
+        bis: format(new Date(year, startMonth + 3, 0))
+    };
+}

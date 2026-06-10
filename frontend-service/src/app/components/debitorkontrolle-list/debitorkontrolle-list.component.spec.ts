@@ -101,6 +101,37 @@ describe('DebitorkontrolleListComponent', () => {
       expect(component.dateTo).toBeTruthy();
     });
 
+    describe('default quarter', () => {
+      beforeEach(() => {
+        jasmine.clock().install();
+      });
+
+      afterEach(() => {
+        jasmine.clock().uninstall();
+      });
+
+      it('should preselect the previous quarter', () => {
+        jasmine.clock().mockDate(new Date(2026, 4, 15)); // 15.05.2026 → Q2 → Vorquartal Q1/2026
+        component.ngOnInit();
+        expect(component.dateFrom).toBe('2026-01-01');
+        expect(component.dateTo).toBe('2026-03-31');
+      });
+
+      it('should preselect Q4 of previous year when current quarter is Q1', () => {
+        jasmine.clock().mockDate(new Date(2026, 1, 10)); // 10.02.2026 → Q1 → Vorquartal Q4/2025
+        component.ngOnInit();
+        expect(component.dateFrom).toBe('2025-10-01');
+        expect(component.dateTo).toBe('2025-12-31');
+      });
+
+      it('should load debitoren for the previous quarter', () => {
+        jasmine.clock().mockDate(new Date(2026, 4, 15));
+        debitorServiceSpy.getDebitoren.calls.reset();
+        component.ngOnInit();
+        expect(debitorServiceSpy.getDebitoren).toHaveBeenCalledWith('2026-01-01', '2026-03-31');
+      });
+    });
+
     it('should have menu items for edit and delete', () => {
       expect(component.menuItems.length).toBe(2);
       expect(component.menuItems[0].action).toBe('edit');

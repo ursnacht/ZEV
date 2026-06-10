@@ -23,6 +23,12 @@
     * Klick auf "Alle auswählen" selektiert alle Konsumenten, jedoch keine Produzenten.
     * Die "Alle auswählen"-Checkbox gilt als vollständig markiert, wenn alle Konsumenten selektiert sind (Produzenten werden dabei ignoriert).
     * Das Verhalten gilt nur auf der Rechnungen-Seite; andere Seiten (z.B. Grafiken/Messwerte) selektieren weiterhin alle Einheiten.
+* Als Admin möchte ich, dass beim Öffnen der Seite "Rechnungen" (`/rechnungen`) das vorangehende Quartal vorselektiert ist, damit ich den häufigsten Abrechnungszeitraum nicht manuell wählen muss.
+  * **Akzeptanzkriterien:**
+    * Beim Öffnen von `/rechnungen` sind "Datum von" und "Datum bis" mit dem ersten bzw. letzten Tag des vorangehenden Quartals (relativ zum aktuellen Datum) vorbelegt.
+    * Der entsprechende Quartal-Button im Quartal-Selektor ist beim Öffnen als aktiv markiert.
+    * Jahreswechsel: Befindet sich das aktuelle Datum im Q1, wird Q4 des Vorjahres vorselektiert.
+    * Der Zeitraum bleibt danach manuell änderbar (Quartal-Buttons und Datumsfelder funktionieren wie bisher).
 
 ## 3. Technische Spezifikationen (Technical Specs)
 * Erweiterung der Einheit

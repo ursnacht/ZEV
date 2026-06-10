@@ -1,4 +1,4 @@
-import { Component, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnDestroy, OnInit, ChangeDetectorRef } from '@angular/core';
 import { WithMessage } from '../../utils/with-message';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -29,7 +29,7 @@ interface ChartData {
   templateUrl: './messwerte-chart.component.html',
   styleUrls: ['./messwerte-chart.component.css']
 })
-export class MesswerteChartComponent extends WithMessage implements OnDestroy {
+export class MesswerteChartComponent extends WithMessage implements OnInit, OnDestroy {
   dateFrom: string = '';
   dateTo: string = '';
   selectedEinheiten: Einheit[] = [];
@@ -43,6 +43,10 @@ export class MesswerteChartComponent extends WithMessage implements OnDestroy {
     private cdr: ChangeDetectorRef
   ) { super(); }
 
+  ngOnInit(): void {
+    this.setDefaultDates();
+  }
+
   ngOnDestroy(): void {
     this.charts.forEach(chartData => { if (chartData.chart) chartData.chart.destroy(); });
   }
@@ -51,14 +55,34 @@ export class MesswerteChartComponent extends WithMessage implements OnDestroy {
     this.selectedEinheiten = einheiten;
   }
 
+  /**
+   * Belegt den Zeitraum mit dem vorangehenden Quartal vor
+   * (im Q1 wird Q4 des Vorjahres gesetzt).
+   */
+  private setDefaultDates(): void {
+    const now = new Date();
+    let year = now.getFullYear();
+    let quarter = Math.ceil((now.getMonth() + 1) / 3) - 1;
+    if (quarter < 1) {
+      quarter = 4;
+      year--;
+    }
+    const startMonth = (quarter - 1) * 3;
+    this.dateFrom = this.formatDate(new Date(year, startMonth, 1));
+    this.dateTo = this.formatDate(new Date(year, startMonth + 3, 0));
+  }
+
+  private formatDate(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
   onDateFromChange(): void {
     if (this.dateFrom) {
       const date = new Date(this.dateFrom);
-      const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-      const year = lastDay.getFullYear();
-      const month = String(lastDay.getMonth() + 1).padStart(2, '0');
-      const day = String(lastDay.getDate()).padStart(2, '0');
-      this.dateTo = `${year}-${month}-${day}`;
+      this.dateTo = this.formatDate(new Date(date.getFullYear(), date.getMonth() + 1, 0));
     }
   }
 

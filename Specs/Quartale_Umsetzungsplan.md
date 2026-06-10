@@ -260,3 +260,17 @@ ON CONFLICT (key) DO NOTHING;
 1. **Annahme:** Das aktuelle Quartal ist immer das letzte der 5 angezeigten Quartale, auch wenn es noch nicht abgeschlossen ist.
 2. **Annahme:** Die Quartal-Buttons haben keine Tooltip/Hover-Info mit dem genauen Datumsbereich.
 3. **Annahme:** Es gibt keine Validierung, ob für das gewählte Quartal Messdaten vorhanden sind.
+
+---
+
+## Nachträgliche Ergänzungen
+
+### Vorangehendes Quartal beim Öffnen der Seiten "Messwerte Grafik" und "Solarberechnung" vorselektiert
+
+Beim Öffnen von `/chart` und `/solar-calculation` ist neu das vorangehende Quartal als Zeitraum vorbelegt (bisher waren die Datumsfelder leer).
+
+- **`messwerte-chart.component.ts` / `solar-calculation.component.ts`**: neue Methode `setDefaultDates()` (aufgerufen in `ngOnInit`) berechnet das Vorquartal relativ zum aktuellen Datum (Jahreswechsel: im Q1 wird Q4 des Vorjahres gesetzt) und belegt `dateFrom`/`dateTo` vor.
+- **Quartal-Button aktiv**: keine Änderung am `QuarterSelectorComponent` nötig – via bestehendem `[selectedVon]`/`[selectedBis]`-Binding wird der passende Button automatisch aktiv markiert.
+- **Tests**: neuer `messwerte-chart.component.spec.ts` bzw. angepasster `solar-calculation.component.spec.ts` – Initialisierungs-Tests mit `jasmine.clock().mockDate()` (Vorquartal inkl. Jahreswechsel-Fall). E2E in `tests/quarter-selector.spec.ts` (Abschnitte "on Messwerte Chart page" und "on Solar Calculation page"): Default-Daten entsprechen dem Vorquartal, Vorquartal-Button hat `zev-quarter-button--active`.
+- **Gleiches Verhalten auf anderen Seiten**: `/rechnungen` siehe `RechnungenGenerieren_Umsetzungsplan.md`, `/debitoren` siehe `Debitorkontrolle_Umsetzungsplan.md`, `/statistik` siehe `Statistik_Umsetzungsplan.md`.
+- **Keine neuen Texte/Backend**: rein clientseitig.

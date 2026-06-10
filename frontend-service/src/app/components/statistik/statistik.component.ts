@@ -36,13 +36,21 @@ export class StatistikComponent extends WithMessage implements OnInit {
     this.setDefaultDateRange();
   }
 
+  /**
+   * Belegt den Zeitraum mit dem vorangehenden Quartal vor
+   * (im Q1 wird Q4 des Vorjahres gesetzt).
+   */
   private setDefaultDateRange(): void {
     const now = new Date();
-    const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastDayPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-
-    this.dateFrom = this.formatDate(previousMonth);
-    this.dateTo = this.formatDate(lastDayPrevMonth);
+    let year = now.getFullYear();
+    let quarter = Math.ceil((now.getMonth() + 1) / 3) - 1;
+    if (quarter < 1) {
+      quarter = 4;
+      year--;
+    }
+    const startMonth = (quarter - 1) * 3;
+    this.dateFrom = this.formatDate(new Date(year, startMonth, 1));
+    this.dateTo = this.formatDate(new Date(year, startMonth + 3, 0));
   }
 
   private formatDate(date: Date): string {

@@ -77,13 +77,28 @@ describe('StatistikComponent', () => {
       expect(component.dateTo.length).toBe(10);
     });
 
-    it('should set dateFrom to first day of previous month', () => {
-      const now = new Date();
-      const expectedYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-      const expectedMonth = now.getMonth() === 0 ? 12 : now.getMonth();
-      const expectedDay = '01';
-      const expectedDateFrom = `${expectedYear}-${String(expectedMonth).padStart(2, '0')}-${expectedDay}`;
-      expect(component.dateFrom).toBe(expectedDateFrom);
+    describe('default quarter', () => {
+      beforeEach(() => {
+        jasmine.clock().install();
+      });
+
+      afterEach(() => {
+        jasmine.clock().uninstall();
+      });
+
+      it('should preselect the previous quarter', () => {
+        jasmine.clock().mockDate(new Date(2026, 4, 15)); // 15.05.2026 → Q2 → Vorquartal Q1/2026
+        component.ngOnInit();
+        expect(component.dateFrom).toBe('2026-01-01');
+        expect(component.dateTo).toBe('2026-03-31');
+      });
+
+      it('should preselect Q4 of previous year when current quarter is Q1', () => {
+        jasmine.clock().mockDate(new Date(2026, 1, 10)); // 10.02.2026 → Q1 → Vorquartal Q4/2025
+        component.ngOnInit();
+        expect(component.dateFrom).toBe('2025-10-01');
+        expect(component.dateTo).toBe('2025-12-31');
+      });
     });
 
     it('should initialize statistik as null', () => {

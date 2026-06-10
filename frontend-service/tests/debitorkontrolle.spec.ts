@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { navigateViaMenu, clickKebabMenuItem, waitForFormResult, waitForTableWithData } from './helpers';
+import { getPreviousQuarter, navigateViaMenu, clickKebabMenuItem, waitForFormResult, waitForTableWithData } from './helpers';
 
 /**
  * tests / debitorkontrolle.spec.ts
@@ -145,6 +145,22 @@ test.describe('Debitorkontrolle - Navigation and Display', () => {
         await expect(page.locator('app-quarter-selector')).toBeVisible();
         await expect(page.locator('#dateFrom')).toBeVisible();
         await expect(page.locator('#dateTo')).toBeVisible();
+    });
+
+    test('should default the date range to the previous quarter', async ({ page }) => {
+        await navigateToDebitorkontrolle(page);
+
+        const previousQuarter = getPreviousQuarter();
+        await expect(page.locator('#dateFrom')).toHaveValue(previousQuarter.von);
+        await expect(page.locator('#dateTo')).toHaveValue(previousQuarter.bis);
+    });
+
+    test('should mark the previous quarter button as active on page load', async ({ page }) => {
+        await navigateToDebitorkontrolle(page);
+
+        const activeButton = page.locator('.zev-quarter-button--active');
+        await expect(activeButton).toHaveCount(1);
+        await expect(activeButton).toHaveText(getPreviousQuarter().label);
     });
 
     test('should show correct table columns when data is present', async ({ page }) => {

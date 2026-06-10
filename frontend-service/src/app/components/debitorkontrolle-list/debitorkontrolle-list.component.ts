@@ -62,18 +62,28 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
     this.loadDebitoren();
   }
 
+  /**
+   * Belegt den Zeitraum mit dem vorangehenden Quartal vor
+   * (im Q1 wird Q4 des Vorjahres gesetzt).
+   */
   private setDefaultQuarter(): void {
     const now = new Date();
-    const quarter = Math.floor(now.getMonth() / 3);
-    const year = now.getFullYear();
-    const quarterStart = new Date(year, quarter * 3, 1);
-    const quarterEnd = new Date(year, quarter * 3 + 3, 0);
-    this.dateFrom = this.formatDate(quarterStart);
-    this.dateTo = this.formatDate(quarterEnd);
+    let year = now.getFullYear();
+    let quarter = Math.ceil((now.getMonth() + 1) / 3) - 1;
+    if (quarter < 1) {
+      quarter = 4;
+      year--;
+    }
+    const startMonth = (quarter - 1) * 3;
+    this.dateFrom = this.formatDate(new Date(year, startMonth, 1));
+    this.dateTo = this.formatDate(new Date(year, startMonth + 3, 0));
   }
 
   private formatDate(date: Date): string {
-    return date.toISOString().split('T')[0];
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   loadEinheiten(): void {

@@ -484,3 +484,16 @@ ON CONFLICT (key) DO NOTHING;
 3. **Annahme:** Mieter-Dropdown zeigt alle Mieter des Mandanten (auch mit Mietende), damit auch historische Einträge manuell erfasst werden können.
 4. **Annahme:** Status-Spalte wird nur im Frontend berechnet (kein DB-Feld), da er sich direkt aus `zahldatum IS NULL` ergibt.
 5. **Annahme:** Nächste freie Flyway-Migrationsnummer ist V55 (letzte: `V54__Add_TarifTyp_Translations.sql`).
+
+---
+
+## Nachträgliche Ergänzungen
+
+### Vorangehendes Quartal beim Öffnen vorselektiert (Frontend)
+
+Beim Öffnen von `/debitoren` ist neu das vorangehende Quartal (statt des laufenden Quartals) vorselektiert.
+
+- **`debitorkontrolle-list.component.ts`**: `setDefaultQuarter()` berechnet das Vorquartal relativ zum aktuellen Datum (Jahreswechsel: im Q1 wird Q4 des Vorjahres gesetzt). `formatDate()` formatiert neu über lokale Datumskomponenten statt `toISOString()` (behebt einen latenten Timezone-Fehler: in UTC+1 lieferte `toISOString()` am Quartalsanfang den Vortag).
+- **Quartal-Button aktiv**: keine Änderung am `QuarterSelectorComponent` nötig – via bestehendem `[selectedVon]`/`[selectedBis]`-Binding.
+- **Tests**: `debitorkontrolle-list.component.spec.ts` – Initialisierungs-Tests mit `jasmine.clock().mockDate()` (Vorquartal inkl. Jahreswechsel-Fall). E2E in `tests/debitorkontrolle.spec.ts`: Default-Daten entsprechen dem Vorquartal, Vorquartal-Button hat `zev-quarter-button--active`.
+- **Keine neuen Texte/Backend**: rein clientseitig.

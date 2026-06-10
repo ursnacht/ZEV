@@ -64,11 +64,40 @@ describe('RechnungenComponent', () => {
   });
 
   describe('initialization', () => {
-    it('should set default dates to previous month', () => {
+    beforeEach(() => {
+      jasmine.clock().install();
+    });
+
+    afterEach(() => {
+      jasmine.clock().uninstall();
+    });
+
+    it('should set default dates', () => {
       expect(component.dateFrom).toBeTruthy();
       expect(component.dateTo).toBeTruthy();
       expect(component.dateFrom.length).toBe(10);
       expect(component.dateTo.length).toBe(10);
+    });
+
+    it('should preselect the previous quarter', () => {
+      jasmine.clock().mockDate(new Date(2026, 4, 15)); // 15.05.2026 → Q2 → Vorquartal Q1/2026
+      component.ngOnInit();
+      expect(component.dateFrom).toBe('2026-01-01');
+      expect(component.dateTo).toBe('2026-03-31');
+    });
+
+    it('should preselect Q4 of previous year when current quarter is Q1', () => {
+      jasmine.clock().mockDate(new Date(2026, 1, 10)); // 10.02.2026 → Q1 → Vorquartal Q4/2025
+      component.ngOnInit();
+      expect(component.dateFrom).toBe('2025-10-01');
+      expect(component.dateTo).toBe('2025-12-31');
+    });
+
+    it('should preselect Q3 when current quarter is Q4', () => {
+      jasmine.clock().mockDate(new Date(2026, 10, 1)); // 01.11.2026 → Q4 → Vorquartal Q3/2026
+      component.ngOnInit();
+      expect(component.dateFrom).toBe('2026-07-01');
+      expect(component.dateTo).toBe('2026-09-30');
     });
   });
 

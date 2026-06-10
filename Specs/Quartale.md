@@ -10,6 +10,13 @@
 * **Ablauf / Flow:**
   1. Der Benutzer klickt auf ein Quartal
   2. Datum von und Datum bis werden automatisch gesetzt, können aber immer noch angepasst werden
+* **User Story:** Als Benutzer möchte ich, dass beim Öffnen der Seiten "Messwerte Grafik" (`/chart`) und "Solarberechnung" (`/solar-calculation`) das vorangehende Quartal vorselektiert ist, damit ich den häufigsten Auswertungszeitraum nicht manuell wählen muss.
+  * **Akzeptanzkriterien:**
+    * Beim Öffnen von `/chart` bzw. `/solar-calculation` sind "Datum von" und "Datum bis" mit dem ersten bzw. letzten Tag des vorangehenden Quartals (relativ zum aktuellen Datum) vorbelegt.
+    * Der entsprechende Quartal-Button ist beim Öffnen als aktiv markiert.
+    * Jahreswechsel: Befindet sich das aktuelle Datum im Q1, wird Q4 des Vorjahres vorselektiert.
+    * Der Zeitraum bleibt danach manuell änderbar (Quartal-Buttons und Datumsfelder funktionieren wie bisher).
+    * Hinweis: Das gleiche Default-Verhalten ist für `/rechnungen` in `RechnungenGenerieren.md`, für `/debitoren` in `Debitorkontrolle.md` und für `/statistik` in `Statistik.md` spezifiziert.
 
 ## 3. Technische Spezifikationen (Technical Specs)
 * Die Wahl des Quartals soll über einen schönen Button erfolgen oder gibt es elegantere Möglichkeiten?
