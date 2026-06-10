@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Einheit } from '../models/einheit.model';
+import { getRuntimeConfig } from '../runtime-config';
 
 export interface EinheitMatchResponse {
   einheitId: number | null;
@@ -15,7 +16,7 @@ export interface EinheitMatchResponse {
   providedIn: 'root'
 })
 export class EinheitService {
-  private apiUrl = 'http://localhost:8090/api/einheit';
+  private apiUrl = `${getRuntimeConfig().apiBaseUrl}/api/einheit`;
 
   constructor(private http: HttpClient) {}
 

@@ -2,12 +2,13 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Mieter } from '../models/mieter.model';
+import { getRuntimeConfig } from '../runtime-config';
 
 @Injectable({
   providedIn: 'root'
 })
 export class MieterService {
-  private apiUrl = 'http://localhost:8090/api/mieter';
+  private apiUrl = `${getRuntimeConfig().apiBaseUrl}/api/mieter`;
 
   constructor(private http: HttpClient) {}
 

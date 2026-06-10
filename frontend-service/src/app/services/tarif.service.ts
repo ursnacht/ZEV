@@ -2,12 +2,13 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Tarif, ValidationResult } from '../models/tarif.model';
+import { getRuntimeConfig } from '../runtime-config';
 
 @Injectable({
   providedIn: 'root'
 })
 export class TarifService {
-  private apiUrl = 'http://localhost:8090/api/tarife';
+  private apiUrl = `${getRuntimeConfig().apiBaseUrl}/api/tarife`;
 
   constructor(private http: HttpClient) {}
 

@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { getRuntimeConfig } from '../runtime-config';
 
 export interface CalculationResponse {
   status: string;
@@ -29,7 +30,7 @@ export interface MesswertData {
   providedIn: 'root'
 })
 export class MesswerteService {
-  private apiUrl = 'http://localhost:8090/api/messwerte';
+  private apiUrl = `${getRuntimeConfig().apiBaseUrl}/api/messwerte`;
 
   constructor(private http: HttpClient) { }
 

@@ -1,6 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
+import { getRuntimeConfig } from '../runtime-config';
 
 export interface Translation {
     key: string;
@@ -12,7 +13,7 @@ export interface Translation {
     providedIn: 'root'
 })
 export class TranslationService {
-    private apiUrl = 'http://localhost:8090/api/translations';
+    private apiUrl = `${getRuntimeConfig().apiBaseUrl}/api/translations`;
     private translations: Record<string, Record<string, string>> = { de: {}, en: {} };
 
     currentLang = signal<'de' | 'en'>('de');

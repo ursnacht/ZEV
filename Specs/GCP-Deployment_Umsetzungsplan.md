@@ -72,7 +72,7 @@ Die ZEV-Anwendung soll von der lokalen Docker-Compose-Umgebung in die Google Clo
 | `frontend-service/Dockerfile` | Multi-Stage Build |
 | `admin-service/Dockerfile` | Multi-Stage Build |
 | `keycloak/realms/zev-realm.json` | Produktions-URLs für Redirects |
-| `frontend-service/src/environments/` | GCP Environment-Konfiguration |
+| `frontend-service/src/assets/config.json` | Runtime-Konfiguration (apiBaseUrl, Keycloak-URL/realm/clientId) – wird beim Deployment im Container ersetzt, kein Rebuild nötig |
 
 ## Phasen-Tabelle
 

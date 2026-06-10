@@ -9,6 +9,7 @@ import { TranslationService } from '../../services/translation.service';
 
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
+import { getRuntimeConfig } from '../../runtime-config';
 
 export type UploadStatus = 'pending' | 'matching' | 'ready' | 'uploading' | 'done' | 'error';
 
@@ -137,7 +138,7 @@ export class MesswerteUploadComponent extends WithMessage implements OnInit {
       formData.append('einheitId', entry.einheitId!.toString());
       formData.append('file', entry.file);
 
-      this.http.post<any>('http://localhost:8090/api/messwerte/upload', formData).subscribe({
+      this.http.post<any>(`${getRuntimeConfig().apiBaseUrl}/api/messwerte/upload`, formData).subscribe({
         next: (response) => {
           if (response.status === 'success') {
             entry.status = 'done';

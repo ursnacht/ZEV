@@ -2,12 +2,13 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Statistik } from '../models/statistik.model';
+import { getRuntimeConfig } from '../runtime-config';
 
 @Injectable({
   providedIn: 'root'
 })
 export class StatistikService {
-  private apiUrl = 'http://localhost:8090/api/statistik';
+  private apiUrl = `${getRuntimeConfig().apiBaseUrl}/api/statistik`;
 
   constructor(private http: HttpClient) { }
 

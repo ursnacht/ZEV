@@ -10,32 +10,48 @@ import {
 } from 'keycloak-angular';
 import { routes } from './app.routes';
 import { errorInterceptor } from './interceptors/error.interceptor';
+import { RuntimeConfig } from './runtime-config';
 
-const urlCondition = createInterceptorCondition<IncludeBearerTokenCondition>({
-    urlPattern: /^(http:\/\/localhost:8090)(\/.*)?$/i,
-    bearerPrefix: 'Bearer'
-});
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
-export const appConfig: ApplicationConfig = {
-    providers: [
-        provideKeycloak({
-            config: {
-                url: 'http://localhost:9000',
-                realm: 'zev',
-                clientId: 'zev-frontend'
+/**
+ * Build the application config from the runtime configuration (loaded from assets/config.json).
+ */
+export function buildAppConfig(config: RuntimeConfig): ApplicationConfig {
+    // Attach the bearer token to backend API calls only. When apiBaseUrl is an absolute
+    // URL match that origin; when it is empty (same-origin) match relative /api requests.
+    const apiUrlPattern = config.apiBaseUrl
+        ? new RegExp(`^${escapeRegExp(config.apiBaseUrl)}(/.*)?$`, 'i')
+        : /^\/api(\/.*)?$/i;
+
+    const urlCondition = createInterceptorCondition<IncludeBearerTokenCondition>({
+        urlPattern: apiUrlPattern,
+        bearerPrefix: 'Bearer'
+    });
+
+    return {
+        providers: [
+            provideKeycloak({
+                config: {
+                    url: config.keycloak.url,
+                    realm: config.keycloak.realm,
+                    clientId: config.keycloak.clientId
+                },
+                initOptions: {
+                    onLoad: 'login-required',
+                    checkLoginIframe: false,
+                    pkceMethod: 'S256',
+                    scope: 'openid profile organization'
+                }
+            }),
+            {
+                provide: INCLUDE_BEARER_TOKEN_INTERCEPTOR_CONFIG,
+                useValue: [urlCondition]
             },
-            initOptions: {
-                onLoad: 'login-required',
-                checkLoginIframe: false,
-                pkceMethod: 'S256',
-                scope: 'openid profile organization'
-            }
-        }),
-        {
-            provide: INCLUDE_BEARER_TOKEN_INTERCEPTOR_CONFIG,
-            useValue: [urlCondition]
-        },
-        provideRouter(routes),
-        provideHttpClient(withInterceptors([includeBearerTokenInterceptor, errorInterceptor]))
-    ]
-};
+            provideRouter(routes),
+            provideHttpClient(withInterceptors([includeBearerTokenInterceptor, errorInterceptor]))
+        ]
+    };
+}

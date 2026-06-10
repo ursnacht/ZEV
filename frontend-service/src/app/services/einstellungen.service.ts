@@ -2,12 +2,13 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Einstellungen } from '../models/einstellungen.model';
+import { getRuntimeConfig } from '../runtime-config';
 
 @Injectable({
   providedIn: 'root'
 })
 export class EinstellungenService {
-  private apiUrl = 'http://localhost:8090/api/einstellungen';
+  private apiUrl = `${getRuntimeConfig().apiBaseUrl}/api/einstellungen`;
 
   constructor(private http: HttpClient) {}
 

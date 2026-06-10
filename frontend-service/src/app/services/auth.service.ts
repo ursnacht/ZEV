@@ -1,12 +1,13 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { getRuntimeConfig } from '../runtime-config';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = 'http://localhost:8090/api/auth';
+  private apiUrl = `${getRuntimeConfig().apiBaseUrl}/api/auth`;
 
   constructor(private http: HttpClient) {}
 

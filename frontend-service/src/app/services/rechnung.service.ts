@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { getRuntimeConfig } from '../runtime-config';
 
 export interface GeneratedRechnung {
   einheitId: number;
@@ -27,7 +28,7 @@ export interface GenerateRequest {
   providedIn: 'root'
 })
 export class RechnungService {
-  private apiUrl = 'http://localhost:8090/api/rechnungen';
+  private apiUrl = `${getRuntimeConfig().apiBaseUrl}/api/rechnungen`;
 
   constructor(private http: HttpClient) {}
 
