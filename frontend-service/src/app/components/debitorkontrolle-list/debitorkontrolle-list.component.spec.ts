@@ -132,10 +132,21 @@ describe('DebitorkontrolleListComponent', () => {
       });
     });
 
-    it('should have menu items for edit and delete', () => {
-      expect(component.menuItems.length).toBe(2);
-      expect(component.menuItems[0].action).toBe('edit');
-      expect(component.menuItems[1].action).toBe('delete');
+    it('should have base menu items (edit, heute, gestern, delete) for unpaid entries', () => {
+      const items = component.getMenuItems({ mieterId: 10, betrag: 1, datumVon: '2025-01-01', datumBis: '2025-03-31' });
+      expect(items.map(i => i.action)).toEqual(['edit', 'heute', 'gestern', 'delete']);
+    });
+  });
+
+  describe('getMenuItems', () => {
+    it('should not include zahldatumLoeschen when no zahldatum is set', () => {
+      const items = component.getMenuItems({ mieterId: 10, betrag: 1, datumVon: '2025-01-01', datumBis: '2025-03-31' });
+      expect(items.some(i => i.action === 'zahldatumLoeschen')).toBeFalse();
+    });
+
+    it('should include zahldatumLoeschen when zahldatum is set', () => {
+      const items = component.getMenuItems({ mieterId: 10, betrag: 1, datumVon: '2025-01-01', datumBis: '2025-03-31', zahldatum: '2025-04-10' });
+      expect(items.map(i => i.action)).toEqual(['edit', 'heute', 'gestern', 'zahldatumLoeschen', 'delete']);
     });
   });
 
@@ -289,6 +300,84 @@ describe('DebitorkontrolleListComponent', () => {
       spyOn(component, 'onDelete');
       component.onMenuAction('delete', mockDebitoren[0]);
       expect(component.onDelete).toHaveBeenCalledWith(mockDebitoren[0].id);
+    });
+
+    it('should call setZahldatum with 0 for heute action', () => {
+      spyOn(component, 'setZahldatum');
+      component.onMenuAction('heute', mockDebitoren[0]);
+      expect(component.setZahldatum).toHaveBeenCalledWith(mockDebitoren[0], 0);
+    });
+
+    it('should call setZahldatum with 1 for gestern action', () => {
+      spyOn(component, 'setZahldatum');
+      component.onMenuAction('gestern', mockDebitoren[0]);
+      expect(component.setZahldatum).toHaveBeenCalledWith(mockDebitoren[0], 1);
+    });
+
+    it('should call setZahldatum with null for zahldatumLoeschen action', () => {
+      spyOn(component, 'setZahldatum');
+      component.onMenuAction('zahldatumLoeschen', mockDebitoren[1]);
+      expect(component.setZahldatum).toHaveBeenCalledWith(mockDebitoren[1], null);
+    });
+  });
+
+  describe('setZahldatum', () => {
+    const offen: Debitor = { id: 1, mieterId: 10, betrag: 123.45, datumVon: '2025-01-01', datumBis: '2025-03-31' };
+    const bezahlt: Debitor = { id: 2, mieterId: 11, betrag: 87.60, datumVon: '2025-01-01', datumBis: '2025-03-31', zahldatum: '2025-02-15' };
+
+    beforeEach(() => {
+      jasmine.clock().install();
+      jasmine.clock().mockDate(new Date(2025, 5, 16)); // 16.06.2025
+      debitorServiceSpy.updateDebitor.and.returnValue(of(offen));
+    });
+
+    afterEach(() => {
+      jasmine.clock().uninstall();
+    });
+
+    it('should do nothing when debitor has no id', () => {
+      component.setZahldatum({ mieterId: 10, betrag: 1, datumVon: '2025-01-01', datumBis: '2025-03-31' }, 0);
+      expect(debitorServiceSpy.updateDebitor).not.toHaveBeenCalled();
+    });
+
+    it('should set zahldatum to today for offsetDays 0', () => {
+      component.setZahldatum(offen, 0);
+      expect(debitorServiceSpy.updateDebitor).toHaveBeenCalledWith(1,
+        jasmine.objectContaining({ id: 1, zahldatum: '2025-06-16' }));
+    });
+
+    it('should set zahldatum to yesterday for offsetDays 1', () => {
+      component.setZahldatum(offen, 1);
+      expect(debitorServiceSpy.updateDebitor).toHaveBeenCalledWith(1,
+        jasmine.objectContaining({ id: 1, zahldatum: '2025-06-15' }));
+    });
+
+    it('should clear zahldatum when offsetDays is null', () => {
+      component.setZahldatum(bezahlt, null);
+      expect(debitorServiceSpy.updateDebitor).toHaveBeenCalledWith(2,
+        jasmine.objectContaining({ id: 2, zahldatum: undefined }));
+    });
+
+    it('should show success message and reload on success', () => {
+      debitorServiceSpy.getDebitoren.calls.reset();
+      component.setZahldatum(offen, 0);
+      expect(component.message).toBe('DEBITOR_AKTUALISIERT');
+      expect(component.messageType).toBe('success');
+      expect(debitorServiceSpy.getDebitoren).toHaveBeenCalled();
+    });
+
+    it('should show error message on failure', () => {
+      debitorServiceSpy.updateDebitor.and.returnValue(throwError(() => ({ error: 'ZAHLDATUM_VOR_DATUM_BIS' })));
+      component.setZahldatum(offen, 0);
+      expect(component.message).toBe('ZAHLDATUM_VOR_DATUM_BIS');
+      expect(component.messageType).toBe('error');
+    });
+
+    it('should show default error key when no error body', () => {
+      debitorServiceSpy.updateDebitor.and.returnValue(throwError(() => ({})));
+      component.setZahldatum(offen, 0);
+      expect(component.message).toBe('FEHLER_AKTUALISIEREN_DEBITOR');
+      expect(component.messageType).toBe('error');
     });
   });
 

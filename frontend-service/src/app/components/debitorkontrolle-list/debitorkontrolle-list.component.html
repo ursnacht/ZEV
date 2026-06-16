@@ -117,7 +117,7 @@
                 </td>
                 <td>
                   <app-kebab-menu
-                    [items]="menuItems"
+                    [items]="getMenuItems(debitor)"
                     (itemClick)="onMenuAction($event, debitor)">
                   </app-kebab-menu>
                 </td>

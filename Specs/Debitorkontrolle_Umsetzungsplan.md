@@ -497,3 +497,17 @@ Beim Öffnen von `/debitoren` ist neu das vorangehende Quartal (statt des laufen
 - **Quartal-Button aktiv**: keine Änderung am `QuarterSelectorComponent` nötig – via bestehendem `[selectedVon]`/`[selectedBis]`-Binding.
 - **Tests**: `debitorkontrolle-list.component.spec.ts` – Initialisierungs-Tests mit `jasmine.clock().mockDate()` (Vorquartal inkl. Jahreswechsel-Fall). E2E in `tests/debitorkontrolle.spec.ts`: Default-Daten entsprechen dem Vorquartal, Vorquartal-Button hat `zev-quarter-button--active`.
 - **Keine neuen Texte/Backend**: rein clientseitig.
+
+### Kebab-Schnellaktionen für das Zahldatum (Heute / Gestern / Zahldatum löschen)
+
+Das Kebab-Menü der Debitor-Liste erhält drei zusätzliche Aktionen, die das Zahldatum eines Eintrags direkt (ohne Formular) setzen bzw. entfernen und sofort speichern.
+
+- **`debitorkontrolle-list.component.ts`**:
+  - Neue Menüeinträge: `heute` (Icon `calendar`), `gestern` (Icon `calendar`), `zahldatumLoeschen` (Icon `x`, `danger`).
+  - Da "Zahldatum löschen" nur bei gesetztem Zahldatum sinnvoll ist, liefert `getMenuItems(debitor)` pro Zeile die passende (statische) Item-Liste: ohne Zahldatum `menuItemsOffen` (Bearbeiten, Heute, Gestern, Löschen), mit Zahldatum `menuItemsBezahlt` (zusätzlich Zahldatum löschen vor Löschen). Stabile Referenzen → OnPush-freundlich.
+  - `onMenuAction()` erhält die Fälle `heute`, `gestern`, `zahldatumLoeschen`.
+  - `setZahldatum(debitor, offsetDays | null)` berechnet das Datum lokal (kein `toISOString()`, analog `formatDate()`), erstellt eine Kopie `{ ...debitor, zahldatum }` und ruft `updateDebitor()`. Erfolg → `DEBITOR_AKTUALISIERT` + Reload, Fehler → `error.error || 'FEHLER_AKTUALISIEREN_DEBITOR'`.
+- **`debitorkontrolle-list.component.html`**: `[items]="getMenuItems(debitor)"` statt fixem `menuItems`.
+- **Migration `V65__Add_Debitor_Schnellaktion_Translations.sql`**: Keys `HEUTE`, `GESTERN`, `ZAHLDATUM_LOESCHEN` (DE/EN), `ON CONFLICT (key) DO NOTHING`.
+- **Tests**: Unit-Tests in `debitorkontrolle-list.component.spec.ts` für `getMenuItems` (mit/ohne Zahldatum), `onMenuAction` (heute/gestern/zahldatumLoeschen) und `setZahldatum` (heute/gestern/null, Erfolg/Fehler). E2E in `tests/debitorkontrolle.spec.ts`: Schnellaktionen setzen Status auf "Bezahlt"/"Offen".
+- **Annahme:** Feather-Icons `calendar` (Heute/Gestern) und `x` (Zahldatum löschen).

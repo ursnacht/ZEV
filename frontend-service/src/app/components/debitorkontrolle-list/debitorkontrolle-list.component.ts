@@ -43,10 +43,24 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
   sortColumn: 'mieterName' | 'betrag' | 'datumVon' | 'datumBis' | 'zahldatum' | 'status' | null = 'mieterName';
   sortDirection: 'asc' | 'desc' = 'asc';
 
-  menuItems: KebabMenuItem[] = [
+  menuItemsOffen: KebabMenuItem[] = [
     { label: 'BEARBEITEN', action: 'edit', icon: 'edit-2' },
+    { label: 'HEUTE', action: 'heute', icon: 'calendar' },
+    { label: 'GESTERN', action: 'gestern', icon: 'calendar' },
     { label: 'LOESCHEN', action: 'delete', danger: true, icon: 'trash-2' }
   ];
+
+  menuItemsBezahlt: KebabMenuItem[] = [
+    { label: 'BEARBEITEN', action: 'edit', icon: 'edit-2' },
+    { label: 'HEUTE', action: 'heute', icon: 'calendar' },
+    { label: 'GESTERN', action: 'gestern', icon: 'calendar' },
+    { label: 'ZAHLDATUM_LOESCHEN', action: 'zahldatumLoeschen', danger: true, icon: 'x' },
+    { label: 'LOESCHEN', action: 'delete', danger: true, icon: 'trash-2' }
+  ];
+
+  getMenuItems(debitor: Debitor): KebabMenuItem[] {
+    return debitor.zahldatum ? this.menuItemsBezahlt : this.menuItemsOffen;
+  }
 
   constructor(
     private debitorService: DebitorService,
@@ -156,7 +170,39 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
     switch (action) {
       case 'edit': this.onEdit(debitor); break;
       case 'delete': this.onDelete(debitor.id); break;
+      case 'heute': this.setZahldatum(debitor, 0); break;
+      case 'gestern': this.setZahldatum(debitor, 1); break;
+      case 'zahldatumLoeschen': this.setZahldatum(debitor, null); break;
     }
+  }
+
+  /**
+   * Setzt das Zahldatum direkt (ohne Formular) und speichert sofort.
+   * @param offsetDays Anzahl Tage in der Vergangenheit relativ zu heute
+   *                   (0 = heute, 1 = gestern) oder null, um das Zahldatum zu löschen.
+   */
+  setZahldatum(debitor: Debitor, offsetDays: number | null): void {
+    if (!debitor.id) return;
+
+    let zahldatum: string | undefined;
+    if (offsetDays === null) {
+      zahldatum = undefined;
+    } else {
+      const date = new Date();
+      date.setDate(date.getDate() - offsetDays);
+      zahldatum = this.formatDate(date);
+    }
+
+    const updated: Debitor = { ...debitor, zahldatum };
+    this.debitorService.updateDebitor(debitor.id, updated).subscribe({
+      next: () => {
+        this.showMessage('DEBITOR_AKTUALISIERT', 'success');
+        this.loadDebitoren();
+      },
+      error: (error) => {
+        this.showMessage(error.error || 'FEHLER_AKTUALISIEREN_DEBITOR', 'error');
+      }
+    });
   }
 
   onFormSubmit(debitor: Debitor): void {

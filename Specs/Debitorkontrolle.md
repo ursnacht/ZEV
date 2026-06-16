@@ -14,6 +14,7 @@
 4. Das System zeigt eine Liste aller Debitor-Einträge für das gewählte Quartal an.
 5. Der Benutzer kann einzelne Einträge über das Kebab-Menü bearbeiten oder löschen.
 6. Beim Bearbeiten kann insbesondere das Zahldatum erfasst werden.
+   - Zusätzlich bietet das Kebab-Menü die Schnellaktionen **Heute**, **Gestern** und **Zahldatum löschen**: Wählt der Benutzer "Heute", wird das Zahldatum des Eintrags sofort auf das aktuelle Datum gesetzt; wählt er "Gestern", auf den Vortag. Mit "Zahldatum löschen" wird das Zahldatum sofort entfernt und der Eintrag wechselt zurück auf den Status "Offen". Alle drei Aktionen werden ohne Öffnen des Formulars direkt gespeichert. "Heute"/"Gestern" setzen den Eintrag auf "Bezahlt". Die Aktion "Zahldatum löschen" wird nur angeboten, wenn ein Zahldatum gesetzt ist.
 7. Neue Einträge können manuell über den Button "Neu erfassen" hinzugefügt werden.
 8. Der Benutzer kann über Checkboxen mehrere Einträge auswählen und mit einem Klick gemeinsam löschen.
 
@@ -59,7 +60,7 @@
      * Datum bis (Schweizer Format)
      * Zahldatum (Schweizer Format, "-" wenn leer)
      * Status ("Bezahlt" / "Offen", abgeleitet vom Zahldatum): "Offen" → Design-System-Badge `zev-status--warning`, "Bezahlt" → `zev-status--success`
-     * Aktionen (Kebab-Menü: Bearbeiten, Löschen)
+     * Aktionen (Kebab-Menü: Bearbeiten, **Heute**, **Gestern**, **Zahldatum löschen** (nur wenn Zahldatum gesetzt), Löschen)
   4. Alle Tabellenspalten sind sortierbar (Klick auf Spaltenheader, Pfeil-Indikator); Standardsortierung: Mieter aufsteigend
   4. Leerstate-Meldung wenn keine Einträge vorhanden
   5. Sobald mindestens ein Eintrag selektiert ist, erscheint der Button "Auswahl löschen (N)" oberhalb der Tabelle; Klick öffnet Bestätigungsdialog und löscht alle selektierten Einträge
@@ -80,6 +81,10 @@
 * [x] Einträge ohne Zahldatum werden als "Offen" angezeigt, Einträge mit Zahldatum als "Bezahlt"
 * [x] Debitor-Einträge können manuell über das Formular erstellt werden
 * [x] Debitor-Einträge können bearbeitet werden (insbesondere Zahldatum kann nacherfasst werden)
+* [x] Über das Kebab-Menü kann das Zahldatum mit "Heute" sofort auf das aktuelle Datum gesetzt werden (Status wird "Bezahlt")
+* [x] Über das Kebab-Menü kann das Zahldatum mit "Gestern" sofort auf den Vortag gesetzt werden (Status wird "Bezahlt")
+* [x] Über das Kebab-Menü kann das Zahldatum mit "Zahldatum löschen" sofort entfernt werden (Status wird "Offen"); der Eintrag wird nur angeboten, wenn ein Zahldatum gesetzt ist
+* [x] Die Schnellaktionen "Heute"/"Gestern"/"Zahldatum löschen" speichern direkt (ohne Öffnen des Formulars) und laden die Liste neu
 * [x] Debitor-Einträge können einzeln mit Bestätigung gelöscht werden
 * [x] Mehrere Debitor-Einträge können per Checkbox selektiert und gemeinsam gelöscht werden
 * [x] Die Header-Checkbox selektiert/deselektiert alle sichtbaren Einträge (Indeterminate-State bei Teilauswahl)
@@ -119,6 +124,8 @@
 * **Löschen (einzeln):** Bestätigungsdialog vor dem Löschen
 * **Sammel-Löschen:** Bestätigungsdialog mit Anzahl der zu löschenden Einträge; bei Fehler wird eine Fehlermeldung angezeigt und die Liste neu geladen
 * **Ungültiger Betrag (0 oder negativ):** Validierungsfehler im Formular
+* **Schnellaktion "Heute"/"Gestern" bei zukünftigem `datum_bis`:** Liegt das gesetzte Zahldatum vor `datum_bis`, lehnt das Backend die Aktualisierung ab (`zahldatum >= datum_bis`); die Fehlermeldung wird angezeigt. Im Regelfall (Vorquartal abgerechnet) liegt `datum_bis` in der Vergangenheit, sodass Heute/Gestern gültig sind.
+* **Schnellaktion-Fehler:** Schlägt das direkte Speichern fehl, wird eine Fehlermeldung angezeigt; die Liste bleibt unverändert bzw. wird neu geladen.
 
 ## 6. Abhängigkeiten & betroffene Funktionalität
 * **Voraussetzungen:**

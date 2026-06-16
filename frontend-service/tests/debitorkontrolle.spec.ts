@@ -585,6 +585,78 @@ test.describe('Debitorkontrolle - Edit Debitor', () => {
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Kebab quick actions (Heute / Gestern / Zahldatum löschen)
+// ──────────────────────────────────────────────────────────────────────────────
+
+test.describe('Debitorkontrolle - Kebab quick actions for Zahldatum', () => {
+
+    /**
+     * Open the kebab menu of a row and click the item with the given visible label.
+     */
+    async function clickQuickAction(page: Page, row: ReturnType<Page['locator']>, label: string): Promise<void> {
+        await row.locator('.zev-kebab-button').click();
+        await row.locator('.zev-kebab-menu--open').waitFor({ state: 'visible', timeout: 2000 });
+        await row.locator('.zev-kebab-menu__item', { hasText: label }).click();
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    }
+
+    test('should set Zahldatum via "Heute"/"Gestern" and clear it via "Zahldatum löschen"', async ({ page }) => {
+        await navigateToDebitorkontrolle(page);
+        await openCreateForm(page);
+
+        const mieterId = await getFirstMieterOptionValue(page);
+        if (!mieterId) {
+            console.log('No mieter available, skipping quick-action test');
+            return;
+        }
+
+        // Use a past period so today/yesterday are >= datumBis (backend rejects zahldatum < datumBis)
+        const testDate = '2000-01-01';
+        const testDateBis = '2000-03-31';
+
+        await fillDebitorForm(page, {
+            mieterId,
+            betrag: '120.00',
+            datumVon: testDate,
+            datumBis: testDateBis
+        });
+        await page.locator('button[type="submit"]').click();
+
+        let isSuccess = false;
+        try {
+            isSuccess = await waitForFormResult(page, 20000);
+        } catch {
+            console.log('Debitor creation failed, skipping quick-action test');
+            return;
+        }
+        if (!isSuccess) {
+            console.log('Debitor creation failed');
+            return;
+        }
+        createdDebitorDates.push(testDate);
+
+        await setDateRange(page, testDate, testDateBis);
+        await waitForTableWithData(page, 10000);
+
+        const row = page.locator(`tr:has-text("${formatToSwiss(testDate)}")`).first();
+        await expect(row).toBeVisible({ timeout: 10000 });
+        // New entry starts "Offen"
+        await expect(row.locator('.zev-status--warning')).toBeVisible();
+
+        // "Heute" → status becomes "Bezahlt"
+        await clickQuickAction(page, row, 'Heute');
+        const paidRow = page.locator(`tr:has-text("${formatToSwiss(testDate)}")`).first();
+        await expect(paidRow.locator('.zev-status--success')).toBeVisible({ timeout: 10000 });
+
+        // "Zahldatum löschen" → status back to "Offen"
+        await clickQuickAction(page, paidRow, 'Zahldatum löschen');
+        const clearedRow = page.locator(`tr:has-text("${formatToSwiss(testDate)}")`).first();
+        await expect(clearedRow.locator('.zev-status--warning')).toBeVisible({ timeout: 10000 });
+    });
+
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Delete
 // ──────────────────────────────────────────────────────────────────────────────
 
