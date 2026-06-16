@@ -82,7 +82,10 @@
 
 /* Menu Items */
 .zev-kebab-menu__item {
-  display: block;
+  /* Flex layout so a wrapping label hangs under its first word (next to the
+     icon) instead of falling back under the icon. */
+  display: flex;
+  align-items: flex-start;
   width: 100%;
   padding: var(--spacing-xs) var(--spacing-md);
   margin: 0;

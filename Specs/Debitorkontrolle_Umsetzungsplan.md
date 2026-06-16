@@ -511,3 +511,11 @@ Das Kebab-Menü der Debitor-Liste erhält drei zusätzliche Aktionen, die das Za
 - **Migration `V65__Add_Debitor_Schnellaktion_Translations.sql`**: Keys `HEUTE`, `GESTERN`, `ZAHLDATUM_LOESCHEN` (DE/EN), `ON CONFLICT (key) DO NOTHING`.
 - **Tests**: Unit-Tests in `debitorkontrolle-list.component.spec.ts` für `getMenuItems` (mit/ohne Zahldatum), `onMenuAction` (heute/gestern/zahldatumLoeschen) und `setZahldatum` (heute/gestern/null, Erfolg/Fehler). E2E in `tests/debitorkontrolle.spec.ts`: Schnellaktionen setzen Status auf "Bezahlt"/"Offen".
 - **Annahme:** Feather-Icons `calendar` (Heute/Gestern) und `x` (Zahldatum löschen).
+
+### Hängender Einzug bei umbrechenden Kebab-Menüeinträgen (Design System)
+
+Lange Menü-Labels wie "Zahldatum löschen" brachen auf zwei Zeilen um, wobei die zweite Zeile unter das Icon zurücksprang. Korrektur in `design-system/src/components/kebab-menu/kebab-menu.css`:
+
+- `.zev-kebab-menu__item` von `display: block` auf `display: flex; align-items: flex-start` umgestellt. Dadurch bildet das Label eine eigene Flex-Spalte rechts neben dem Icon; umbrechende Zeilen richten sich am Zeilenanfang (unter dem ersten Wort) aus statt unter dem Icon.
+- Das bestehende `margin-right` des Icons (`.zev-kebab-menu__item .zev-icon`) wirkt im Flex-Layout als Abstand zwischen Icon und Label.
+- Rein gestalterisch, alle Kebab-Menüs profitieren (kein neues Backend, keine Übersetzung). Nach Änderung: `cd design-system && npm run build`.

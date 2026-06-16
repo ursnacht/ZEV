@@ -85,6 +85,7 @@
 * [x] Über das Kebab-Menü kann das Zahldatum mit "Gestern" sofort auf den Vortag gesetzt werden (Status wird "Bezahlt")
 * [x] Über das Kebab-Menü kann das Zahldatum mit "Zahldatum löschen" sofort entfernt werden (Status wird "Offen"); der Eintrag wird nur angeboten, wenn ein Zahldatum gesetzt ist
 * [x] Die Schnellaktionen "Heute"/"Gestern"/"Zahldatum löschen" speichern direkt (ohne Öffnen des Formulars) und laden die Liste neu
+* [x] Bricht ein Kebab-Menüeintrag (z.B. "Zahldatum löschen") auf zwei Zeilen um, wird die zweite Zeile als hängender Einzug unter das erste Wort der ersten Zeile (rechts neben dem Icon) eingerückt – nicht unter das Icon
 * [x] Debitor-Einträge können einzeln mit Bestätigung gelöscht werden
 * [x] Mehrere Debitor-Einträge können per Checkbox selektiert und gemeinsam gelöscht werden
 * [x] Die Header-Checkbox selektiert/deselektiert alle sichtbaren Einträge (Indeterminate-State bei Teilauswahl)
