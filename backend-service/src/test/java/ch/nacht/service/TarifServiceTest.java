@@ -2,6 +2,7 @@ package ch.nacht.service;
 
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
+import ch.nacht.exception.TarifLueckenException;
 import ch.nacht.repository.TarifRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -234,12 +235,12 @@ public class TarifServiceTest {
         when(tarifRepository.findByTariftypAndZeitraumOverlapping(TarifTyp.VNB, von, bis))
             .thenReturn(Collections.singletonList(vnbTarif2024));
 
-        IllegalStateException exception = assertThrows(
-            IllegalStateException.class,
+        TarifLueckenException exception = assertThrows(
+            TarifLueckenException.class,
             () -> tarifService.validateTarifAbdeckung(von, bis)
         );
 
-        assertTrue(exception.getMessage().contains("ZEV"));
+        assertTrue(exception.getLuecken().stream().anyMatch(l -> l.tarifTyp().equals("ZEV")));
     }
 
     @Test
@@ -252,12 +253,12 @@ public class TarifServiceTest {
         when(tarifRepository.findByTariftypAndZeitraumOverlapping(TarifTyp.VNB, von, bis))
             .thenReturn(Collections.emptyList());
 
-        IllegalStateException exception = assertThrows(
-            IllegalStateException.class,
+        TarifLueckenException exception = assertThrows(
+            TarifLueckenException.class,
             () -> tarifService.validateTarifAbdeckung(von, bis)
         );
 
-        assertTrue(exception.getMessage().contains("VNB"));
+        assertTrue(exception.getLuecken().stream().anyMatch(l -> l.tarifTyp().equals("VNB")));
     }
 
     @Test
@@ -287,12 +288,12 @@ public class TarifServiceTest {
         when(tarifRepository.findByTariftypAndZeitraumOverlapping(TarifTyp.VNB, von, bis))
             .thenReturn(Collections.singletonList(vnbTarif2024));
 
-        IllegalStateException exception = assertThrows(
-            IllegalStateException.class,
+        TarifLueckenException exception = assertThrows(
+            TarifLueckenException.class,
             () -> tarifService.validateTarifAbdeckung(von, bis)
         );
 
-        assertTrue(exception.getMessage().contains("ZEV"));
+        assertTrue(exception.getLuecken().stream().anyMatch(l -> l.tarifTyp().equals("ZEV")));
     }
 
     @Test
@@ -335,8 +336,7 @@ public class TarifServiceTest {
         TarifService.ValidationResult result = tarifService.validateQuartale();
 
         assertTrue(result.valid());
-        assertEquals("Keine Tarife vorhanden", result.message());
-        assertTrue(result.errors().isEmpty());
+        assertTrue(result.luecken().isEmpty());
     }
 
     @Test
@@ -353,8 +353,7 @@ public class TarifServiceTest {
         TarifService.ValidationResult result = tarifService.validateQuartale();
 
         assertTrue(result.valid());
-        assertEquals("Alle Quartale sind vollständig abgedeckt", result.message());
-        assertTrue(result.errors().isEmpty());
+        assertTrue(result.luecken().isEmpty());
     }
 
     @Test
@@ -380,10 +379,9 @@ public class TarifServiceTest {
         TarifService.ValidationResult result = tarifService.validateQuartale();
 
         assertFalse(result.valid());
-        assertEquals("Validierungsfehler", result.message());
-        assertFalse(result.errors().isEmpty());
-        assertThat(result.errors().get(0), containsString("Q1/2024"));
-        assertThat(result.errors().get(0), containsString("VNB"));
+        assertFalse(result.luecken().isEmpty());
+        assertThat(result.luecken().get(0).periode(), containsString("Q1/2024"));
+        assertTrue(result.luecken().get(0).luecken().stream().anyMatch(l -> l.tarifTyp().equals("VNB")));
     }
 
     @Test
@@ -409,8 +407,8 @@ public class TarifServiceTest {
         TarifService.ValidationResult result = tarifService.validateQuartale();
 
         assertFalse(result.valid());
-        assertFalse(result.errors().isEmpty());
-        assertThat(result.errors().get(0), containsString("ZEV"));
+        assertFalse(result.luecken().isEmpty());
+        assertTrue(result.luecken().get(0).luecken().stream().anyMatch(l -> l.tarifTyp().equals("ZEV")));
     }
 
     // ==================== validateJahre Tests ====================
@@ -423,8 +421,7 @@ public class TarifServiceTest {
         TarifService.ValidationResult result = tarifService.validateJahre();
 
         assertTrue(result.valid());
-        assertEquals("Keine Tarife vorhanden", result.message());
-        assertTrue(result.errors().isEmpty());
+        assertTrue(result.luecken().isEmpty());
     }
 
     @Test
@@ -447,8 +444,7 @@ public class TarifServiceTest {
         TarifService.ValidationResult result = tarifService.validateJahre();
 
         assertTrue(result.valid());
-        assertEquals("Alle Jahre sind vollständig abgedeckt", result.message());
-        assertTrue(result.errors().isEmpty());
+        assertTrue(result.luecken().isEmpty());
     }
 
     @Test
@@ -471,10 +467,9 @@ public class TarifServiceTest {
         TarifService.ValidationResult result = tarifService.validateJahre();
 
         assertFalse(result.valid());
-        assertEquals("Validierungsfehler", result.message());
-        assertFalse(result.errors().isEmpty());
-        assertThat(result.errors().get(0), containsString("2024"));
-        assertThat(result.errors().get(0), containsString("VNB"));
+        assertFalse(result.luecken().isEmpty());
+        assertThat(result.luecken().get(0).periode(), containsString("2024"));
+        assertTrue(result.luecken().get(0).luecken().stream().anyMatch(l -> l.tarifTyp().equals("VNB")));
     }
 
     @Test
@@ -509,8 +504,8 @@ public class TarifServiceTest {
         TarifService.ValidationResult result = tarifService.validateJahre();
 
         assertFalse(result.valid());
-        assertFalse(result.errors().isEmpty());
-        assertThat(result.errors().get(0), containsString("2025"));
+        assertFalse(result.luecken().isEmpty());
+        assertTrue(result.luecken().stream().anyMatch(p -> p.periode().equals("2025")));
     }
 
     @Test
@@ -534,6 +529,6 @@ public class TarifServiceTest {
 
         assertFalse(result.valid());
         // Check date format is dd.MM.yyyy (Swiss format)
-        assertThat(result.errors().get(0), containsString("01.01.2024"));
+        assertThat(result.luecken().get(0).luecken().get(0).datum(), containsString("01.01.2024"));
     }
 }

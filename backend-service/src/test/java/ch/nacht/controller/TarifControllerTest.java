@@ -2,6 +2,8 @@ package ch.nacht.controller;
 
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
+import ch.nacht.exception.TarifLuecke;
+import ch.nacht.exception.TarifLueckePeriode;
 import ch.nacht.service.OrganisationService;
 import ch.nacht.service.OrganizationContextService;
 import ch.nacht.service.TarifService;
@@ -239,18 +241,13 @@ public class TarifControllerTest {
 
     @Test
     void validateTarife_QuartaleMode_ReturnsValidResult() throws Exception {
-        TarifService.ValidationResult validResult = new TarifService.ValidationResult(
-            true,
-            "Alle Quartale sind vollständig abgedeckt",
-            Collections.emptyList()
-        );
+        TarifService.ValidationResult validResult = new TarifService.ValidationResult(true, Collections.emptyList());
         when(tarifService.validateQuartale()).thenReturn(validResult);
 
         mockMvc.perform(post("/api/tarife/validate?modus=quartale"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.valid", is(true)))
-            .andExpect(jsonPath("$.message", is("Alle Quartale sind vollständig abgedeckt")))
-            .andExpect(jsonPath("$.errors", hasSize(0)));
+            .andExpect(jsonPath("$.luecken", hasSize(0)));
 
         verify(tarifService).validateQuartale();
         verify(tarifService, never()).validateJahre();
@@ -258,18 +255,13 @@ public class TarifControllerTest {
 
     @Test
     void validateTarife_JahreMode_ReturnsValidResult() throws Exception {
-        TarifService.ValidationResult validResult = new TarifService.ValidationResult(
-            true,
-            "Alle Jahre sind vollständig abgedeckt",
-            Collections.emptyList()
-        );
+        TarifService.ValidationResult validResult = new TarifService.ValidationResult(true, Collections.emptyList());
         when(tarifService.validateJahre()).thenReturn(validResult);
 
         mockMvc.perform(post("/api/tarife/validate?modus=jahre"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.valid", is(true)))
-            .andExpect(jsonPath("$.message", is("Alle Jahre sind vollständig abgedeckt")))
-            .andExpect(jsonPath("$.errors", hasSize(0)));
+            .andExpect(jsonPath("$.luecken", hasSize(0)));
 
         verify(tarifService).validateJahre();
         verify(tarifService, never()).validateQuartale();
@@ -277,11 +269,7 @@ public class TarifControllerTest {
 
     @Test
     void validateTarife_DefaultMode_UsesQuartale() throws Exception {
-        TarifService.ValidationResult validResult = new TarifService.ValidationResult(
-            true,
-            "Alle Quartale sind vollständig abgedeckt",
-            Collections.emptyList()
-        );
+        TarifService.ValidationResult validResult = new TarifService.ValidationResult(true, Collections.emptyList());
         when(tarifService.validateQuartale()).thenReturn(validResult);
 
         mockMvc.perform(post("/api/tarife/validate"))
@@ -293,38 +281,34 @@ public class TarifControllerTest {
 
     @Test
     void validateTarife_ValidationErrors_ReturnsErrorsInResponse() throws Exception {
-        List<String> errors = Arrays.asList(
-            "Q1/2024: VNB-Tarif fehlt für: 01.01.2024",
-            "Q2/2024: ZEV-Tarif fehlt für: 01.04.2024"
-        );
         TarifService.ValidationResult invalidResult = new TarifService.ValidationResult(
             false,
-            "Validierungsfehler",
-            errors
+            Arrays.asList(
+                new TarifLueckePeriode("Q1/2024", List.of(new TarifLuecke("VNB", "01.01.2024", false))),
+                new TarifLueckePeriode("Q2/2024", List.of(new TarifLuecke("ZEV", "01.04.2024", false)))
+            )
         );
         when(tarifService.validateQuartale()).thenReturn(invalidResult);
 
         mockMvc.perform(post("/api/tarife/validate?modus=quartale"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.valid", is(false)))
-            .andExpect(jsonPath("$.message", is("Validierungsfehler")))
-            .andExpect(jsonPath("$.errors", hasSize(2)))
-            .andExpect(jsonPath("$.errors[0]", is("Q1/2024: VNB-Tarif fehlt für: 01.01.2024")))
-            .andExpect(jsonPath("$.errors[1]", is("Q2/2024: ZEV-Tarif fehlt für: 01.04.2024")));
+            .andExpect(jsonPath("$.luecken", hasSize(2)))
+            .andExpect(jsonPath("$.luecken[0].periode", is("Q1/2024")))
+            .andExpect(jsonPath("$.luecken[0].luecken[0].tarifTyp", is("VNB")))
+            .andExpect(jsonPath("$.luecken[0].luecken[0].datum", is("01.01.2024")))
+            .andExpect(jsonPath("$.luecken[1].periode", is("Q2/2024")))
+            .andExpect(jsonPath("$.luecken[1].luecken[0].tarifTyp", is("ZEV")));
     }
 
     @Test
     void validateTarife_NoTarife_ReturnsValidWithMessage() throws Exception {
-        TarifService.ValidationResult noTarifeResult = new TarifService.ValidationResult(
-            true,
-            "Keine Tarife vorhanden",
-            Collections.emptyList()
-        );
+        TarifService.ValidationResult noTarifeResult = new TarifService.ValidationResult(true, Collections.emptyList());
         when(tarifService.validateJahre()).thenReturn(noTarifeResult);
 
         mockMvc.perform(post("/api/tarife/validate?modus=jahre"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.valid", is(true)))
-            .andExpect(jsonPath("$.message", is("Keine Tarife vorhanden")));
+            .andExpect(jsonPath("$.luecken", hasSize(0)));
     }
 }

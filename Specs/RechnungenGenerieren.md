@@ -29,6 +29,13 @@
     * Der entsprechende Quartal-Button im Quartal-Selektor ist beim Öffnen als aktiv markiert.
     * Jahreswechsel: Befindet sich das aktuelle Datum im Q1, wird Q4 des Vorjahres vorselektiert.
     * Der Zeitraum bleibt danach manuell änderbar (Quartal-Buttons und Datumsfelder funktionieren wie bisher).
+* Als Admin möchte ich beim Generieren von Rechnungen bei fehlenden/lückenhaften Tarifen die **gleiche, aussagekräftige Validierungsfehlermeldung** sehen wie bei der Tarifvalidierung in der Tarifverwaltung, statt einer generischen "Internal Server Error"-Meldung.
+  * **Akzeptanzkriterien:**
+    * Decken die Tarife (ZEV/VNB) den gewählten Zeitraum nicht lückenlos ab, antwortet der Endpunkt `POST /api/rechnungen/generate` mit **HTTP 400** und der Lücken-Meldung aus `TarifService.validateTarifAbdeckung` (z.B. "Für den Zeitraum fehlen gültige Tarife: ZEV-Tarif fehlt für: 01.01.2024").
+    * Das Frontend zeigt diese Meldung an (Format "Fehler beim Generieren der Rechnungen: \<Meldung\>"), **nicht** "Internal Server Error".
+    * Es wird kein HTTP 500 mehr zurückgegeben, wenn die Validierung fehlschlägt (der `@Transactional`-Endpunkt rollt sauber zurück; die `TarifLueckenException` wird zentral in `GlobalExceptionHandler` auf 400 abgebildet).
+    * Die Meldung stammt aus derselben Quelle (`validateTarifAbdeckung`) wie die Validierung in der Tarifverwaltung – identischer Wortlaut.
+    * **Mehrsprachigkeit:** Das Backend liefert die Lücken **strukturiert** (`{ error: "FEHLER_TARIF_LUECKEN", luecken: [{ tarifTyp, datum, weitere }] }`); das Frontend setzt die Meldung aus Translation-Keys zusammen (`FEHLER_TARIF_LUECKEN`, `TARIF_LUECKE_ZEV`/`TARIF_LUECKE_VNB`, `TARIF_LUECKE_WEITERE`). Datum (`dd.MM.yyyy`) und Tarif-Typ-Code sind sprachneutral. Keine hartcodierten deutschen Texte mehr.
 
 ## 3. Technische Spezifikationen (Technical Specs)
 * Erweiterung der Einheit

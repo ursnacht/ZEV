@@ -9,6 +9,8 @@ import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Mieter;
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
+import ch.nacht.exception.TarifLuecke;
+import ch.nacht.exception.TarifLueckenException;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -282,15 +284,15 @@ public class RechnungServiceTest {
         LocalDate bis = LocalDate.of(2024, 1, 31);
 
         when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumer));
-        doThrow(new IllegalStateException("ZEV-Tarif fehlt"))
+        doThrow(new TarifLueckenException(List.of(new TarifLuecke("ZEV", "01.01.2024", false))))
             .when(tarifService).validateTarifAbdeckung(von, bis);
 
-        IllegalStateException exception = assertThrows(
-            IllegalStateException.class,
+        TarifLueckenException exception = assertThrows(
+            TarifLueckenException.class,
             () -> rechnungService.berechneRechnungen(List.of(1L), von, bis)
         );
 
-        assertTrue(exception.getMessage().contains("ZEV-Tarif"));
+        assertTrue(exception.getLuecken().stream().anyMatch(l -> l.tarifTyp().equals("ZEV")));
         verify(tarifService).validateTarifAbdeckung(von, bis);
     }
 

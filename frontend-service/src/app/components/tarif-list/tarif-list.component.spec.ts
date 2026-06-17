@@ -371,14 +371,12 @@ describe('TarifListComponent', () => {
   describe('onValidateQuartale', () => {
     const validResult: ValidationResult = {
       valid: true,
-      message: 'Alle Quartale sind vollständig abgedeckt',
-      errors: []
+      luecken: []
     };
 
     const invalidResult: ValidationResult = {
       valid: false,
-      message: 'Validierungsfehler',
-      errors: ['Q1/2024: VNB-Tarif fehlt für: 01.01.2024']
+      luecken: [{ periode: 'Q1/2024', luecken: [{ tarifTyp: 'VNB', datum: '01.01.2024', weitere: false }] }]
     };
 
     it('should call validateQuartale on service', () => {
@@ -421,14 +419,15 @@ describe('TarifListComponent', () => {
   describe('onValidateJahre', () => {
     const validResult: ValidationResult = {
       valid: true,
-      message: 'Alle Jahre sind vollständig abgedeckt',
-      errors: []
+      luecken: []
     };
 
     const invalidResult: ValidationResult = {
       valid: false,
-      message: 'Validierungsfehler',
-      errors: ['2024: VNB-Tarif fehlt für: 01.01.2024', '2025: ZEV-Tarif fehlt für: 01.01.2025']
+      luecken: [
+        { periode: '2024', luecken: [{ tarifTyp: 'VNB', datum: '01.01.2024', weitere: false }] },
+        { periode: '2025', luecken: [{ tarifTyp: 'ZEV', datum: '01.01.2025', weitere: false }] }
+      ]
     };
 
     it('should call validateJahre on service', () => {
@@ -471,8 +470,7 @@ describe('TarifListComponent', () => {
     it('should not auto-clear persistent messages', fakeAsync(() => {
       const invalidResult: ValidationResult = {
         valid: false,
-        message: 'Validierungsfehler',
-        errors: ['Q1/2024: Error']
+        luecken: [{ periode: 'Q1/2024', luecken: [{ tarifTyp: 'ZEV', datum: '01.01.2024', weitere: false }] }]
       };
       tarifServiceSpy.validateQuartale.mockReturnValue(of(invalidResult));
 
@@ -490,8 +488,7 @@ describe('TarifListComponent', () => {
     it('should auto-clear success messages', fakeAsync(() => {
       const validResult: ValidationResult = {
         valid: true,
-        message: 'Alle Quartale sind vollständig abgedeckt',
-        errors: []
+        luecken: []
       };
       tarifServiceSpy.validateQuartale.mockReturnValue(of(validResult));
 

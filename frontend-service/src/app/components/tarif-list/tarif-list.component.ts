@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TarifService } from '../../services/tarif.service';
 import { Tarif, ValidationResult } from '../../models/tarif.model';
+import { formatTarifLuecke } from '../../utils/tarif-luecke.util';
 import { TarifFormComponent } from '../tarif-form/tarif-form.component';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { SwissDatePipe } from '../../pipes/swiss-date.pipe';
@@ -188,7 +189,10 @@ export class TarifListComponent implements OnInit {
       this.validationErrors = [];
     } else {
       this.showMessage('VALIDIERUNG_FEHLER', 'error', true);
-      this.validationErrors = result.errors;
+      this.validationErrors = result.luecken.map(periode =>
+        `${periode.periode}: ${periode.luecken
+          .map(luecke => formatTarifLuecke(luecke, this.translationService))
+          .join('; ')}`);
     }
   }
 

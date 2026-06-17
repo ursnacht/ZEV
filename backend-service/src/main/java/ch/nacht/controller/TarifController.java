@@ -107,7 +107,7 @@ public class TarifController {
             result = tarifService.validateQuartale();
         }
 
-        log.info("Validation result: valid={}, errors={}", result.valid(), result.errors().size());
+        log.info("Validation result: valid={}, periods with gaps={}", result.valid(), result.luecken().size());
         return ResponseEntity.ok(result);
     }
 }

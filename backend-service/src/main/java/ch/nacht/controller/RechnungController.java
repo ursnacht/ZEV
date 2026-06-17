@@ -82,16 +82,12 @@ public class RechnungController {
         // Clear previous invoices
         rechnungStorageService.clearAll();
 
-        // Calculate invoices
-        List<RechnungDTO> rechnungen;
-        try {
-            rechnungen = rechnungService.berechneRechnungen(
-                    request.einheitIds, request.von, request.bis);
-        } catch (IllegalStateException e) {
-            // Tariff validation error (e.g. missing tariffs for period)
-            log.warn("Tariff validation failed: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+        // Calculate invoices. A missing-tariff / coverage gap throws IllegalStateException,
+        // which propagates out of this @Transactional method (clean rollback) and is mapped
+        // to HTTP 400 with the validation message by GlobalExceptionHandler. Catching it here
+        // would let the rollback-only transaction fail its commit with a generic 500.
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(
+                request.einheitIds, request.von, request.bis);
 
         // Generate PDFs and store them
         List<Map<String, Object>> generatedList = new ArrayList<>();

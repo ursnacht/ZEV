@@ -27,6 +27,32 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(errors);
     }
 
+    /**
+     * Handles missing tariff coverage when generating invoices. Returns HTTP 400 with
+     * a translation key plus the structured gaps, so the frontend can render the same
+     * translated validation feedback as the tariff management page (instead of a 500).
+     */
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    @ExceptionHandler(TarifLueckenException.class)
+    public ResponseEntity<Map<String, Object>> handleTarifLueckenException(
+            TarifLueckenException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("error", "FEHLER_TARIF_LUECKEN");
+        body.put("luecken", ex.getLuecken());
+        return ResponseEntity.badRequest().body(body);
+    }
+
+    /**
+     * Handles state validation errors (e.g. settings not yet configured). Returns
+     * HTTP 400 with the exception message instead of a generic 500.
+     */
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, String>> handleIllegalStateException(
+            IllegalStateException ex) {
+        return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+    }
+
     @ResponseStatus(HttpStatus.FORBIDDEN)
     @ExceptionHandler(NoOrganizationException.class)
     public ResponseEntity<Map<String, Object>> handleNoOrganizationException(

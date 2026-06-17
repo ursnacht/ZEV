@@ -223,6 +223,23 @@ describe('RechnungenComponent', () => {
       expect(component.message).toContain('Tarif fehlt');
     });
 
+    it('should build a translated message from structured tariff gaps', () => {
+      rechnungServiceSpy.generateRechnungen.mockReturnValue(
+        throwError(() => ({
+          error: {
+            error: 'FEHLER_TARIF_LUECKEN',
+            luecken: [{ tarifTyp: 'ZEV', datum: '01.01.2024', weitere: false }]
+          }
+        }))
+      );
+      component.onGenerate();
+      expect(component.messageType).toBe('error');
+      // translate() is identity-mocked → keys appear verbatim
+      expect(component.message).toContain('FEHLER_TARIF_LUECKEN');
+      expect(component.message).toContain('TARIF_LUECKE_ZEV');
+      expect(component.message).toContain('01.01.2024');
+    });
+
     it('should show error message when canGenerate is false', () => {
       component.selectedEinheitIds.clear();
       component.onGenerate();

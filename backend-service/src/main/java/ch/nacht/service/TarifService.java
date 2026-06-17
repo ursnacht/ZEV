@@ -2,6 +2,9 @@ package ch.nacht.service;
 
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
+import ch.nacht.exception.TarifLuecke;
+import ch.nacht.exception.TarifLueckePeriode;
+import ch.nacht.exception.TarifLueckenException;
 import ch.nacht.repository.TarifRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -136,32 +139,42 @@ public class TarifService {
      *
      * @param von Start date
      * @param bis End date
-     * @throws IllegalStateException if there are gaps in tariff coverage
+     * @throws TarifLueckenException if there are gaps in tariff coverage
      */
     public void validateTarifAbdeckung(LocalDate von, LocalDate bis) {
         log.debug("Validating tariff coverage from {} to {}", von, bis);
 
-        List<String> errors = new ArrayList<>();
-
-        // Check ZEV tariffs
-        List<LocalDate> zevGaps = findCoverageGaps(TarifTyp.ZEV, von, bis);
-        if (!zevGaps.isEmpty()) {
-            errors.add("ZEV-Tarif fehlt für: " + formatDateGaps(zevGaps));
-        }
-
-        // Check VNB tariffs
-        List<LocalDate> vnbGaps = findCoverageGaps(TarifTyp.VNB, von, bis);
-        if (!vnbGaps.isEmpty()) {
-            errors.add("VNB-Tarif fehlt für: " + formatDateGaps(vnbGaps));
-        }
-
-        if (!errors.isEmpty()) {
-            String message = "Für den Zeitraum fehlen gültige Tarife: " + String.join("; ", errors);
-            log.error(message);
-            throw new IllegalStateException(message);
+        List<TarifLuecke> luecken = findTarifLuecken(von, bis);
+        if (!luecken.isEmpty()) {
+            log.warn("Tariff coverage gaps from {} to {}: {}", von, bis, luecken);
+            throw new TarifLueckenException(luecken);
         }
 
         log.debug("Tariff coverage validated successfully");
+    }
+
+    /**
+     * Find tariff coverage gaps (ZEV and VNB) for the given period in a
+     * language-neutral form.
+     *
+     * @param von Start date
+     * @param bis End date
+     * @return List of gaps (empty if fully covered)
+     */
+    private List<TarifLuecke> findTarifLuecken(LocalDate von, LocalDate bis) {
+        List<TarifLuecke> luecken = new ArrayList<>();
+
+        List<LocalDate> zevGaps = findCoverageGaps(TarifTyp.ZEV, von, bis);
+        if (!zevGaps.isEmpty()) {
+            luecken.add(new TarifLuecke("ZEV", zevGaps.get(0).format(DATE_FORMATTER), zevGaps.size() > 1));
+        }
+
+        List<LocalDate> vnbGaps = findCoverageGaps(TarifTyp.VNB, von, bis);
+        if (!vnbGaps.isEmpty()) {
+            luecken.add(new TarifLuecke("VNB", vnbGaps.get(0).format(DATE_FORMATTER), vnbGaps.size() > 1));
+        }
+
+        return luecken;
     }
 
     /**
@@ -210,16 +223,6 @@ public class TarifService {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
     /**
-     * Format date gaps for error message using Swiss date format (dd.MM.yyyy).
-     */
-    private String formatDateGaps(List<LocalDate> gaps) {
-        if (gaps.size() == 1) {
-            return gaps.get(0).format(DATE_FORMATTER);
-        }
-        return gaps.get(0).format(DATE_FORMATTER) + " (und weitere)";
-    }
-
-    /**
      * Validate tariff coverage for all quarters that have at least one tariff.
      *
      * @return ValidationResult with status and error messages
@@ -231,7 +234,7 @@ public class TarifService {
 
         List<Tarif> alleTarife = tarifRepository.findAllByOrderByTariftypAscGueltigVonDesc();
         if (alleTarife.isEmpty()) {
-            return new ValidationResult(true, "Keine Tarife vorhanden", List.of());
+            return new ValidationResult(true, List.of());
         }
 
         Set<String> quartalsToCheck = new HashSet<>();
@@ -239,29 +242,20 @@ public class TarifService {
             addQuartalsForTarif(tarif, quartalsToCheck);
         }
 
-        List<String> errors = new ArrayList<>();
+        List<TarifLueckePeriode> luecken = new ArrayList<>();
         for (String quartal : quartalsToCheck.stream().sorted().toList()) {
             String[] parts = quartal.split("/");
             int q = Integer.parseInt(parts[0].substring(1));
             int year = Integer.parseInt(parts[1]);
 
-            LocalDate von = getQuartalStart(q, year);
-            LocalDate bis = getQuartalEnd(q, year);
-
-            try {
-                validateTarifAbdeckung(von, bis);
-            } catch (IllegalStateException e) {
-                errors.add(quartal + ": " + e.getMessage().replace("Für den Zeitraum fehlen gültige Tarife: ", ""));
+            List<TarifLuecke> periodLuecken = findTarifLuecken(getQuartalStart(q, year), getQuartalEnd(q, year));
+            if (!periodLuecken.isEmpty()) {
+                luecken.add(new TarifLueckePeriode(quartal, periodLuecken));
             }
         }
 
-        if (errors.isEmpty()) {
-            log.info("Quarter validation successful");
-            return new ValidationResult(true, "Alle Quartale sind vollständig abgedeckt", List.of());
-        } else {
-            log.warn("Quarter validation found {} errors", errors.size());
-            return new ValidationResult(false, "Validierungsfehler", errors);
-        }
+        log.info("Quarter validation found {} periods with gaps", luecken.size());
+        return new ValidationResult(luecken.isEmpty(), luecken);
     }
 
     /**
@@ -276,28 +270,20 @@ public class TarifService {
 
         List<Integer> years = tarifRepository.findDistinctYears();
         if (years.isEmpty()) {
-            return new ValidationResult(true, "Keine Tarife vorhanden", List.of());
+            return new ValidationResult(true, List.of());
         }
 
-        List<String> errors = new ArrayList<>();
+        List<TarifLueckePeriode> luecken = new ArrayList<>();
         for (Integer year : years) {
-            LocalDate von = LocalDate.of(year, 1, 1);
-            LocalDate bis = LocalDate.of(year, 12, 31);
-
-            try {
-                validateTarifAbdeckung(von, bis);
-            } catch (IllegalStateException e) {
-                errors.add(year + ": " + e.getMessage().replace("Für den Zeitraum fehlen gültige Tarife: ", ""));
+            List<TarifLuecke> periodLuecken = findTarifLuecken(
+                    LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31));
+            if (!periodLuecken.isEmpty()) {
+                luecken.add(new TarifLueckePeriode(String.valueOf(year), periodLuecken));
             }
         }
 
-        if (errors.isEmpty()) {
-            log.info("Year validation successful");
-            return new ValidationResult(true, "Alle Jahre sind vollständig abgedeckt", List.of());
-        } else {
-            log.warn("Year validation found {} errors", errors.size());
-            return new ValidationResult(false, "Validierungsfehler", errors);
-        }
+        log.info("Year validation found {} periods with gaps", luecken.size());
+        return new ValidationResult(luecken.isEmpty(), luecken);
     }
 
     private void addQuartalsForTarif(Tarif tarif, Set<String> quartals) {
@@ -335,5 +321,5 @@ public class TarifService {
     /**
      * Result of tariff validation.
      */
-    public record ValidationResult(boolean valid, String message, List<String> errors) {}
+    public record ValidationResult(boolean valid, List<TarifLueckePeriode> luecken) {}
 }

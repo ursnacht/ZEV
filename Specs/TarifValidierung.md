@@ -13,6 +13,7 @@
 4. Prüfe nur Jahre, die mind. einen Tarif haben. 
 5. Die Prüfung erfolgt immer für alle Tariftypen.
 6. Zeige bei Validierungsfehlern eine Fehlermeldung an, die die Lücke oder die Lücken auflistet.
+7. Die Lücken-Meldungen sind mehrsprachig: Das Backend liefert die Lücken **strukturiert** pro Periode (`{ periode, luecken: [{ tarifTyp, datum, weitere }] }`); das Frontend setzt die angezeigten Texte aus Translation-Keys zusammen (`TARIF_LUECKE_ZEV`/`TARIF_LUECKE_VNB`, `TARIF_LUECKE_WEITERE`). Periodenlabel (z.B. `Q1/2024`, `2024`), Tarif-Typ-Code und Datum (`dd.MM.yyyy`) sind sprachneutral.
 
 ### FR-2: Persistierung
 * Es findet keine Persistierung statt.
@@ -26,6 +27,7 @@
 * [ ] Die Button stehen rechts vom grünen Button zum Erfassen neuer Tarife.
 * [ ] Die Validierung deckt immer ganze Quartale ab, für die mind. ein Tarif existiert.
 * [ ] Es wird eine Fehlermeldung angezeigt, wenn eine Validierung fehlschlägt.
+* [ ] Die angezeigten Lücken-Meldungen sind mehrsprachig (Translation-Keys statt hartcodierter deutscher Texte); dieselben Keys werden auch beim Generieren von Rechnungen verwendet.
 
 
 ## 4. Nicht-funktionale Anforderungen (NFR)

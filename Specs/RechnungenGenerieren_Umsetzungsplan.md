@@ -393,3 +393,14 @@ Beim Öffnen von `/rechnungen` ist neu das vorangehende Quartal (statt des Vormo
 - **Quartal-Button aktiv**: keine Änderung am `QuarterSelectorComponent` nötig – über das bestehende Binding `[selectedVon]`/`[selectedBis]` wird der passende Button automatisch als aktiv markiert (`isSelected()` vergleicht die Datums-Strings).
 - **Tests**: `rechnungen.component.spec.ts` – Initialisierungs-Tests mit `jasmine.clock().mockDate()` (Vorquartal inkl. Jahreswechsel-Fall). E2E in `tests/rechnungen.spec.ts`: Default-Daten entsprechen Quartalsgrenzen, Vorquartal-Button hat `zev-quarter-button--active`.
 - **Keine neuen Texte/Backend**: rein clientseitig.
+
+### Tarif-Validierungsfehler beim Generieren als 400 statt 500 (Backend)
+
+Beim Generieren von Rechnungen mit fehlenden/lückenhaften Tarifen wurde "Internal Server Error" (HTTP 500) angezeigt statt der aussagekräftigen Lücken-Meldung.
+
+- **Ursache**: `RechnungController.generateRechnungen` ist `@Transactional` (für den Debitor-Upsert eingeführt). `berechneRechnungen` ruft `tarifService.validateTarifAbdeckung()`, das bei Lücken eine `IllegalStateException` wirft. Diese markierte die Transaktion als rollback-only; der lokale `catch` im Controller gab zwar 400 zurück, doch der anschliessende Commit der rollback-only-Transaktion warf `UnexpectedRollbackException` → 500.
+- **`RechnungController`**: lokalen `try/catch (IllegalStateException)` um `berechneRechnungen` entfernt – die Exception propagiert nun aus der `@Transactional`-Methode heraus (sauberer Rollback, kein Commit-Versuch).
+- **`GlobalExceptionHandler`**: neuer `@ExceptionHandler(IllegalStateException.class)` → HTTP 400 mit `{ "error": <message> }`. Damit erreicht die Lücken-Meldung aus `validateTarifAbdeckung` das Frontend (gleicher Wortlaut wie in der Tarifverwaltung).
+- **Frontend**: keine Änderung nötig – `rechnungen.component.ts` zeigt bereits `error.error?.error` an.
+- **Tests**: `RechnungControllerTest.generateRechnungen_TarifValidationFails_ReturnsBadRequest` prüft 400 und dass `$.error` exakt die Lücken-Meldung enthält. (Hinweis: `@WebMvcTest` hat keinen Transaction-Manager, daher trat dort die `UnexpectedRollbackException` nie auf – der Bug war nur produktiv sichtbar.)
+- **Keine neuen Texte/Migrationen**: die Meldung ist backend-generiert (kein Translation-Key); `FEHLER_BEIM_GENERIEREN` existiert bereits.

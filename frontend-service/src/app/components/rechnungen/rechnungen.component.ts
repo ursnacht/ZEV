@@ -9,6 +9,8 @@ import { TranslationService } from '../../services/translation.service';
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
 import { IconComponent } from '../icon/icon.component';
 import { EinheitSelectorComponent } from '../einheit-selector/einheit-selector.component';
+import { TarifLuecke } from '../../models/tarif.model';
+import { formatTarifLuecke } from '../../utils/tarif-luecke.util';
 
 @Component({
   selector: 'app-rechnungen',
@@ -111,12 +113,30 @@ export class RechnungenComponent extends WithMessage implements OnInit {
       },
       error: (error) => {
         this.showMessage(
-          this.translationService.translate('FEHLER_BEIM_GENERIEREN') + ': ' + (error.error?.error || error.message),
+          this.translationService.translate('FEHLER_BEIM_GENERIEREN') + ': ' + this.buildErrorDetail(error),
           'error'
         );
         this.generating = false;
       }
     });
+  }
+
+  /**
+   * Builds the error detail shown after the "FEHLER_BEIM_GENERIEREN" prefix.
+   * For a tariff coverage gap (structured `luecken`), the message is assembled from
+   * translation keys (same wording as the tariff management page). Otherwise the
+   * backend message (or HTTP error) is used as a fallback.
+   */
+  private buildErrorDetail(error: { error?: { error?: string; luecken?: TarifLuecke[] }; message?: string }): string {
+    const body = error?.error;
+    if (body?.luecken && body.error) {
+      const prefix = this.translationService.translate(body.error);
+      const details = body.luecken
+        .map(luecke => formatTarifLuecke(luecke, this.translationService))
+        .join('; ');
+      return `${prefix}: ${details}`;
+    }
+    return body?.error || error?.message || '';
   }
 
   onDownload(rechnung: GeneratedRechnung): void {

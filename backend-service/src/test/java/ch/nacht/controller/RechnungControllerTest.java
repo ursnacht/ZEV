@@ -1,6 +1,8 @@
 package ch.nacht.controller;
 
 import ch.nacht.dto.RechnungDTO;
+import ch.nacht.exception.TarifLuecke;
+import ch.nacht.exception.TarifLueckenException;
 import ch.nacht.service.DebitorService;
 import ch.nacht.service.OrganisationService;
 import ch.nacht.service.OrganizationContextService;
@@ -194,8 +196,10 @@ public class RechnungControllerTest {
 
     @Test
     void generateRechnungen_TarifValidationFails_ReturnsBadRequest() throws Exception {
+        // Missing-tariff / coverage gap surfaces as HTTP 400 with a translation key plus
+        // the structured gaps (same source as the tariff management page), not a generic 500.
         when(rechnungService.berechneRechnungen(anyList(), any(), any()))
-            .thenThrow(new IllegalStateException("Kein Tarif für Zeitraum 2024-01-01 bis 2024-03-31"));
+            .thenThrow(new TarifLueckenException(List.of(new TarifLuecke("ZEV", "01.01.2024", false))));
 
         String request = """
             {
@@ -209,7 +213,9 @@ public class RechnungControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.error").exists());
+            .andExpect(jsonPath("$.error").value("FEHLER_TARIF_LUECKEN"))
+            .andExpect(jsonPath("$.luecken[0].tarifTyp").value("ZEV"))
+            .andExpect(jsonPath("$.luecken[0].datum").value("01.01.2024"));
     }
 
     @Test
