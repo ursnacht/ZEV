@@ -9,7 +9,7 @@
 * **Aktueller Stand:**
   * `ng test` nutzt den Builder `@angular-devkit/build-angular:karma` mit `karma.conf.js`, Chrome-Launcher und `karma-coverage`.
   * Test-Framework ist Jasmine (`describe/it/expect`, `spyOn`, `jasmine.createSpyObj`, Matcher `toBeTrue/toBeFalse`, `.and.returnValue`).
-  * Es existieren **31 `*.spec.ts`-Dateien** (Services, Komponenten, Pipes, Directives, Utils) mit ca. **489 Jasmine-spezifischen API-Stellen**.
+  * Es existieren **32 `*.spec.ts`-Dateien** (Services, Komponenten, Pipes, Directives, Utils) mit ca. **489 Jasmine-spezifischen API-Stellen**.
   * `tsconfig.spec.json` referenziert `types: ["jasmine"]`.
   * E2E-Tests laufen unabhängig über Playwright (`tests/`) und sind **nicht** betroffen.
 
@@ -28,7 +28,7 @@
 * `tsconfig.spec.json`: `types: ["jasmine"]` wird durch die passenden Vitest-Typen ersetzt; `include` umfasst weiterhin alle `*.spec.ts`.
 
 ### FR-3: Migration der bestehenden Spec-Dateien (Jasmine → Vitest)
-Alle 31 `*.spec.ts`-Dateien werden auf Vitest-Idiome migriert, ohne den fachlichen Testinhalt (Assertions/Szenarien) zu verändern:
+Alle 32 `*.spec.ts`-Dateien werden auf Vitest-Idiome migriert, ohne den fachlichen Testinhalt (Assertions/Szenarien) zu verändern:
 * `spyOn(obj, 'm').and.returnValue(x)` → `vi.spyOn(obj, 'm').mockReturnValue(x)`
 * `jasmine.createSpyObj('X', ['a', 'b'])` → Objekt mit `vi.fn()`-Methoden (ggf. über einen kleinen Test-Helper)
 * `spy.and.callFake/throwError/returnValues` → entsprechende `vi.fn()`-Mock-Implementierungen
@@ -91,7 +91,7 @@ Alle 31 `*.spec.ts`-Dateien werden auf Vitest-Idiome migriert, ohne den fachlich
   * `frontend-service/tsconfig.spec.json` – `types`.
   * `frontend-service/karma.conf.js` – wird gelöscht.
   * Neue Test-Setup-Datei (z. B. `src/test-setup.ts`) für die TestBed-/Zone-Initialisierung.
-  * Alle 31 `frontend-service/src/**/*.spec.ts`.
+  * Alle 32 `frontend-service/src/**/*.spec.ts`.
   * Doku: `CLAUDE.md`, ggf. `Specs/generell.md`, `MEMORY.md`.
 * **Datenmigration:** Keine (keine Datenbank-/Laufzeitdaten betroffen).
 
