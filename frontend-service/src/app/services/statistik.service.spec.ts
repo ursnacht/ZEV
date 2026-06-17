@@ -61,7 +61,7 @@ describe('StatistikService', () => {
     it('should return statistik for given date range', () => {
       service.getStatistik('2024-01-01', '2024-03-31').subscribe(statistik => {
         expect(statistik).toEqual(mockStatistik);
-        expect(statistik.datenVollstaendig).toBeTrue();
+        expect(statistik.datenVollstaendig).toBe(true);
         expect(statistik.monate.length).toBe(1);
       });
 
@@ -91,7 +91,7 @@ describe('StatistikService', () => {
       };
 
       service.getStatistik('2024-01-01', '2024-03-31').subscribe(statistik => {
-        expect(statistik.datenVollstaendig).toBeFalse();
+        expect(statistik.datenVollstaendig).toBe(false);
         expect(statistik.fehlendeEinheiten).toContain('Wohnung 3');
       });
 

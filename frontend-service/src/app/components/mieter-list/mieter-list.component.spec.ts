@@ -1,4 +1,6 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { createSpyObj, SpyObj } from '../../../testing/spy';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { fakeAsync, tick } from '../../../testing/fake-async';
 import { MieterListComponent } from './mieter-list.component';
 import { MieterService } from '../../services/mieter.service';
 import { EinheitService } from '../../services/einheit.service';
@@ -10,9 +12,9 @@ import { of, throwError } from 'rxjs';
 describe('MieterListComponent', () => {
   let component: MieterListComponent;
   let fixture: ComponentFixture<MieterListComponent>;
-  let mieterServiceSpy: jasmine.SpyObj<MieterService>;
-  let einheitServiceSpy: jasmine.SpyObj<EinheitService>;
-  let translationServiceSpy: jasmine.SpyObj<TranslationService>;
+  let mieterServiceSpy: SpyObj<MieterService>;
+  let einheitServiceSpy: SpyObj<EinheitService>;
+  let translationServiceSpy: SpyObj<TranslationService>;
 
   const mockEinheiten: Einheit[] = [
     { id: 1, name: 'Wohnung A', typ: EinheitTyp.CONSUMER },
@@ -26,15 +28,15 @@ describe('MieterListComponent', () => {
   ];
 
   beforeEach(async () => {
-    mieterServiceSpy = jasmine.createSpyObj('MieterService', [
+    mieterServiceSpy = createSpyObj<MieterService>('MieterService', [
       'getAllMieter', 'createMieter', 'updateMieter', 'deleteMieter'
     ]);
-    einheitServiceSpy = jasmine.createSpyObj('EinheitService', ['getAllEinheiten']);
-    translationServiceSpy = jasmine.createSpyObj('TranslationService', ['translate']);
+    einheitServiceSpy = createSpyObj<EinheitService>('EinheitService', ['getAllEinheiten']);
+    translationServiceSpy = createSpyObj<TranslationService>('TranslationService', ['translate']);
 
-    mieterServiceSpy.getAllMieter.and.returnValue(of(mockMieter));
-    einheitServiceSpy.getAllEinheiten.and.returnValue(of(mockEinheiten));
-    translationServiceSpy.translate.and.callFake((key: string) => key);
+    mieterServiceSpy.getAllMieter.mockReturnValue(of(mockMieter));
+    einheitServiceSpy.getAllEinheiten.mockReturnValue(of(mockEinheiten));
+    translationServiceSpy.translate.mockImplementation((key: string) => key);
 
     await TestBed.configureTestingModule({
       imports: [MieterListComponent],
@@ -66,11 +68,11 @@ describe('MieterListComponent', () => {
 
     it('should filter einheiten to CONSUMER only', () => {
       expect(component.einheiten.length).toBe(2);
-      expect(component.einheiten.every(e => e.typ === EinheitTyp.CONSUMER)).toBeTrue();
+      expect(component.einheiten.every(e => e.typ === EinheitTyp.CONSUMER)).toBe(true);
     });
 
     it('should not show form initially', () => {
-      expect(component.showForm).toBeFalse();
+      expect(component.showForm).toBe(false);
     });
 
     it('should have default sort by einheitId ascending', () => {
@@ -94,7 +96,7 @@ describe('MieterListComponent', () => {
     });
 
     it('should show error message on failure', () => {
-      mieterServiceSpy.getAllMieter.and.returnValue(throwError(() => new Error('Network error')));
+      mieterServiceSpy.getAllMieter.mockReturnValue(throwError(() => new Error('Network error')));
       component.loadMieter();
       expect(component.message).toBe('FEHLER_LADEN_MIETER');
       expect(component.messageType).toBe('error');
@@ -103,7 +105,7 @@ describe('MieterListComponent', () => {
 
   describe('loadEinheiten', () => {
     it('should show error message on failure', () => {
-      einheitServiceSpy.getAllEinheiten.and.returnValue(throwError(() => new Error('Network error')));
+      einheitServiceSpy.getAllEinheiten.mockReturnValue(throwError(() => new Error('Network error')));
       component.loadEinheiten();
       expect(component.message).toBe('FEHLER_LADEN_EINHEITEN');
       expect(component.messageType).toBe('error');
@@ -125,7 +127,7 @@ describe('MieterListComponent', () => {
       component.selectedMieter = mockMieter[0];
       component.onCreateNew();
       expect(component.selectedMieter).toBeNull();
-      expect(component.showForm).toBeTrue();
+      expect(component.showForm).toBe(true);
     });
   });
 
@@ -134,7 +136,7 @@ describe('MieterListComponent', () => {
       const mieter = mockMieter[0];
       component.onEdit(mieter);
       expect(component.selectedMieter).toEqual(mieter);
-      expect(component.showForm).toBeTrue();
+      expect(component.showForm).toBe(true);
     });
 
     it('should create a copy of the mieter', () => {
@@ -150,7 +152,7 @@ describe('MieterListComponent', () => {
       component.onCopy(mieter);
       expect(component.selectedMieter).toBeTruthy();
       expect(component.selectedMieter!.id).toBeUndefined();
-      expect(component.showForm).toBeTrue();
+      expect(component.showForm).toBe(true);
     });
 
     it('should copy all properties except id', () => {
@@ -164,8 +166,8 @@ describe('MieterListComponent', () => {
 
   describe('onDelete', () => {
     beforeEach(() => {
-      spyOn(window, 'confirm').and.returnValue(true);
-      mieterServiceSpy.deleteMieter.and.returnValue(of(undefined as any));
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      mieterServiceSpy.deleteMieter.mockReturnValue(of(undefined as any));
     });
 
     it('should do nothing when id is undefined', () => {
@@ -185,7 +187,7 @@ describe('MieterListComponent', () => {
     });
 
     it('should reload mieter after successful delete', () => {
-      mieterServiceSpy.getAllMieter.calls.reset();
+      mieterServiceSpy.getAllMieter.mockClear();
       component.onDelete(1);
       expect(mieterServiceSpy.getAllMieter).toHaveBeenCalled();
     });
@@ -197,13 +199,13 @@ describe('MieterListComponent', () => {
     });
 
     it('should not delete when user cancels', () => {
-      (window.confirm as jasmine.Spy).and.returnValue(false);
+      (window.confirm as unknown as ReturnType<typeof vi.fn>).mockReturnValue(false);
       component.onDelete(1);
       expect(mieterServiceSpy.deleteMieter).not.toHaveBeenCalled();
     });
 
     it('should show error message on delete failure', () => {
-      mieterServiceSpy.deleteMieter.and.returnValue(throwError(() => new Error('Delete failed')));
+      mieterServiceSpy.deleteMieter.mockReturnValue(throwError(() => new Error('Delete failed')));
       component.onDelete(1);
       expect(component.message).toBe('FEHLER_LOESCHEN_MIETER');
       expect(component.messageType).toBe('error');
@@ -212,19 +214,19 @@ describe('MieterListComponent', () => {
 
   describe('onMenuAction', () => {
     it('should call onEdit for edit action', () => {
-      spyOn(component, 'onEdit');
+      vi.spyOn(component, 'onEdit').mockImplementation(() => {});
       component.onMenuAction('edit', mockMieter[0]);
       expect(component.onEdit).toHaveBeenCalledWith(mockMieter[0]);
     });
 
     it('should call onCopy for copy action', () => {
-      spyOn(component, 'onCopy');
+      vi.spyOn(component, 'onCopy').mockImplementation(() => {});
       component.onMenuAction('copy', mockMieter[0]);
       expect(component.onCopy).toHaveBeenCalledWith(mockMieter[0]);
     });
 
     it('should call onDelete for delete action', () => {
-      spyOn(component, 'onDelete');
+      vi.spyOn(component, 'onDelete').mockImplementation(() => {});
       component.onMenuAction('delete', mockMieter[0]);
       expect(component.onDelete).toHaveBeenCalledWith(mockMieter[0].id);
     });
@@ -241,7 +243,7 @@ describe('MieterListComponent', () => {
     };
 
     beforeEach(() => {
-      mieterServiceSpy.createMieter.and.returnValue(of({ ...newMieter, id: 3 }));
+      mieterServiceSpy.createMieter.mockReturnValue(of({ ...newMieter, id: 3 }));
     });
 
     it('should call createMieter when mieter has no id', () => {
@@ -252,7 +254,7 @@ describe('MieterListComponent', () => {
     it('should hide form after successful create', () => {
       component.showForm = true;
       component.onFormSubmit(newMieter);
-      expect(component.showForm).toBeFalse();
+      expect(component.showForm).toBe(false);
     });
 
     it('should show success message after create', () => {
@@ -262,14 +264,14 @@ describe('MieterListComponent', () => {
     });
 
     it('should show error message on create failure', () => {
-      mieterServiceSpy.createMieter.and.returnValue(throwError(() => ({ error: 'CUSTOM_ERROR' })));
+      mieterServiceSpy.createMieter.mockReturnValue(throwError(() => ({ error: 'CUSTOM_ERROR' })));
       component.onFormSubmit(newMieter);
       expect(component.message).toBe('CUSTOM_ERROR');
       expect(component.messageType).toBe('error');
     });
 
     it('should show default error message when no error body', () => {
-      mieterServiceSpy.createMieter.and.returnValue(throwError(() => ({})));
+      mieterServiceSpy.createMieter.mockReturnValue(throwError(() => ({})));
       component.onFormSubmit(newMieter);
       expect(component.message).toBe('FEHLER_ERSTELLEN_MIETER');
       expect(component.messageType).toBe('error');
@@ -288,7 +290,7 @@ describe('MieterListComponent', () => {
     };
 
     beforeEach(() => {
-      mieterServiceSpy.updateMieter.and.returnValue(of(existingMieter));
+      mieterServiceSpy.updateMieter.mockReturnValue(of(existingMieter));
     });
 
     it('should call updateMieter when mieter has id', () => {
@@ -299,7 +301,7 @@ describe('MieterListComponent', () => {
     it('should hide form after successful update', () => {
       component.showForm = true;
       component.onFormSubmit(existingMieter);
-      expect(component.showForm).toBeFalse();
+      expect(component.showForm).toBe(false);
     });
 
     it('should show success message after update', () => {
@@ -309,7 +311,7 @@ describe('MieterListComponent', () => {
     });
 
     it('should show error message on update failure', () => {
-      mieterServiceSpy.updateMieter.and.returnValue(throwError(() => ({ error: 'UPDATE_ERROR' })));
+      mieterServiceSpy.updateMieter.mockReturnValue(throwError(() => ({ error: 'UPDATE_ERROR' })));
       component.onFormSubmit(existingMieter);
       expect(component.message).toBe('UPDATE_ERROR');
       expect(component.messageType).toBe('error');
@@ -321,7 +323,7 @@ describe('MieterListComponent', () => {
       component.showForm = true;
       component.selectedMieter = mockMieter[0];
       component.onFormCancel();
-      expect(component.showForm).toBeFalse();
+      expect(component.showForm).toBe(false);
       expect(component.selectedMieter).toBeNull();
     });
   });
@@ -381,7 +383,7 @@ describe('MieterListComponent', () => {
 
   describe('message timeout', () => {
     it('should clear success message after 5 seconds', fakeAsync(() => {
-      mieterServiceSpy.createMieter.and.returnValue(of({
+      mieterServiceSpy.createMieter.mockReturnValue(of({
         id: 3, name: 'Test', mietbeginn: '2024-01-01', einheitId: 1
       }));
 
@@ -393,7 +395,7 @@ describe('MieterListComponent', () => {
     }));
 
     it('should not auto-clear error messages', fakeAsync(() => {
-      mieterServiceSpy.getAllMieter.and.returnValue(throwError(() => new Error('Network error')));
+      mieterServiceSpy.getAllMieter.mockReturnValue(throwError(() => new Error('Network error')));
       component.loadMieter();
 
       expect(component.message).toBe('FEHLER_LADEN_MIETER');

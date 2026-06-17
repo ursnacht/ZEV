@@ -35,7 +35,7 @@ ZEV (Zusammenschluss zum Eigenverbrauch) is a solar power distribution applicati
 
 ### Testing
 - Playwright 1.58.0 (E2E tests)
-- Jasmine 5.13.0 / Karma (unit tests)
+- Vitest 4 (unit tests, via `@angular/build:unit-test`-Builder, jsdom)
 - TestContainers 2.0.5 (integration tests)
 - ArchUnit 1.4.2 (architecture tests)
 
@@ -79,7 +79,9 @@ cd frontend-service
 
 npm install
 npm start           # Dev server at localhost:4200
-npm test            # Unit tests (Jasmine/Karma)
+npm test            # Unit tests (Vitest, single-run, jsdom)
+npm run test:watch  # Unit tests im Watch-Modus
+npm run test:coverage # Unit tests mit Coverage-Report
 npm run e2e         # Playwright E2E tests
 npm run e2e:ui      # Playwright interactive mode
 ```

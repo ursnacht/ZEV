@@ -1,5 +1,5 @@
 import { Component, ViewChild, ElementRef } from '@angular/core';
-import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ColumnResizeDirective } from './column-resize.directive';
 
 @Component({
@@ -33,23 +33,25 @@ describe('ColumnResizeDirective', () => {
   let component: TestHostComponent;
   let tableElement: HTMLTableElement;
 
-  beforeEach(waitForAsync(() => {
-    TestBed.configureTestingModule({
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
       imports: [TestHostComponent]
     }).compileComponents();
-  }));
+  });
 
-  beforeEach((done) => {
+  beforeEach(() => {
     fixture = TestBed.createComponent(TestHostComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
     tableElement = fixture.nativeElement.querySelector('table');
 
     // Wait for setTimeout in directive's ngAfterViewInit
-    setTimeout(() => {
-      fixture.detectChanges();
-      done();
-    }, 10);
+    return new Promise<void>(resolve => {
+      setTimeout(() => {
+        fixture.detectChanges();
+        resolve();
+      }, 10);
+    });
   });
 
   it('should create the directive', () => {
@@ -90,7 +92,7 @@ describe('ColumnResizeDirective', () => {
 
     it('should prevent click from propagating', () => {
       const clickEvent = new MouseEvent('click', { bubbles: true });
-      spyOn(clickEvent, 'stopPropagation');
+      vi.spyOn(clickEvent, 'stopPropagation');
 
       handle.dispatchEvent(clickEvent);
 
@@ -99,8 +101,8 @@ describe('ColumnResizeDirective', () => {
 
     it('should auto-fit column on double-click', () => {
       const dblClickEvent = new MouseEvent('dblclick', { bubbles: true, cancelable: true });
-      spyOn(dblClickEvent, 'preventDefault');
-      spyOn(dblClickEvent, 'stopPropagation');
+      vi.spyOn(dblClickEvent, 'preventDefault');
+      vi.spyOn(dblClickEvent, 'stopPropagation');
 
       // Get initial width
       const initialWidth = firstTh.style.width;
@@ -124,7 +126,7 @@ describe('ColumnResizeDirective', () => {
 
       handle.dispatchEvent(mouseDownEvent);
 
-      expect(tableElement.classList.contains('zev-table--resizing')).toBeTrue();
+      expect(tableElement.classList.contains('zev-table--resizing')).toBe(true);
     });
 
     it('should add active class to handle on mousedown', () => {
@@ -136,7 +138,7 @@ describe('ColumnResizeDirective', () => {
 
       handle.dispatchEvent(mouseDownEvent);
 
-      expect(handle.classList.contains('zev-table__resize-handle--active')).toBeTrue();
+      expect(handle.classList.contains('zev-table__resize-handle--active')).toBe(true);
     });
 
     it('should remove resizing class on mouseup', () => {
@@ -147,12 +149,12 @@ describe('ColumnResizeDirective', () => {
       });
       handle.dispatchEvent(mouseDownEvent);
 
-      expect(tableElement.classList.contains('zev-table--resizing')).toBeTrue();
+      expect(tableElement.classList.contains('zev-table--resizing')).toBe(true);
 
       const mouseUpEvent = new MouseEvent('mouseup', { bubbles: true });
       document.dispatchEvent(mouseUpEvent);
 
-      expect(tableElement.classList.contains('zev-table--resizing')).toBeFalse();
+      expect(tableElement.classList.contains('zev-table--resizing')).toBe(false);
     });
 
     it('should remove active class from handle on mouseup', () => {
@@ -163,12 +165,12 @@ describe('ColumnResizeDirective', () => {
       });
       handle.dispatchEvent(mouseDownEvent);
 
-      expect(handle.classList.contains('zev-table__resize-handle--active')).toBeTrue();
+      expect(handle.classList.contains('zev-table__resize-handle--active')).toBe(true);
 
       const mouseUpEvent = new MouseEvent('mouseup', { bubbles: true });
       document.dispatchEvent(mouseUpEvent);
 
-      expect(handle.classList.contains('zev-table__resize-handle--active')).toBeFalse();
+      expect(handle.classList.contains('zev-table__resize-handle--active')).toBe(false);
     });
   });
 
@@ -204,21 +206,23 @@ describe('ColumnResizeDirective with single column', () => {
   let fixture: ComponentFixture<SingleColumnTestComponent>;
   let tableElement: HTMLTableElement;
 
-  beforeEach(waitForAsync(() => {
-    TestBed.configureTestingModule({
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
       imports: [SingleColumnTestComponent]
     }).compileComponents();
-  }));
+  });
 
-  beforeEach((done) => {
+  beforeEach(() => {
     fixture = TestBed.createComponent(SingleColumnTestComponent);
     fixture.detectChanges();
     tableElement = fixture.nativeElement.querySelector('table');
 
-    setTimeout(() => {
-      fixture.detectChanges();
-      done();
-    }, 10);
+    return new Promise<void>(resolve => {
+      setTimeout(() => {
+        fixture.detectChanges();
+        resolve();
+      }, 10);
+    });
   });
 
   it('should not add any resize handles for single column table', () => {
@@ -244,21 +248,23 @@ describe('ColumnResizeDirective with empty table', () => {
   let fixture: ComponentFixture<EmptyTableTestComponent>;
   let tableElement: HTMLTableElement;
 
-  beforeEach(waitForAsync(() => {
-    TestBed.configureTestingModule({
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
       imports: [EmptyTableTestComponent]
     }).compileComponents();
-  }));
+  });
 
-  beforeEach((done) => {
+  beforeEach(() => {
     fixture = TestBed.createComponent(EmptyTableTestComponent);
     fixture.detectChanges();
     tableElement = fixture.nativeElement.querySelector('table');
 
-    setTimeout(() => {
-      fixture.detectChanges();
-      done();
-    }, 10);
+    return new Promise<void>(resolve => {
+      setTimeout(() => {
+        fixture.detectChanges();
+        resolve();
+      }, 10);
+    });
   });
 
   it('should handle empty table gracefully', () => {

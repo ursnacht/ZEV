@@ -166,7 +166,7 @@ describe('TarifService', () => {
 
     it('should return validation result with errors', () => {
       service.validateQuartale().subscribe(result => {
-        expect(result.valid).toBeFalse();
+        expect(result.valid).toBe(false);
         expect(result.errors.length).toBe(1);
         expect(result.errors[0]).toContain('Q1/2024');
       });
@@ -201,7 +201,7 @@ describe('TarifService', () => {
 
     it('should return validation result with multiple errors', () => {
       service.validateJahre().subscribe(result => {
-        expect(result.valid).toBeFalse();
+        expect(result.valid).toBe(false);
         expect(result.errors.length).toBe(2);
         expect(result.errors[0]).toContain('2024');
         expect(result.errors[1]).toContain('2025');

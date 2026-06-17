@@ -1,4 +1,6 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { createSpyObj, SpyObj } from '../../../testing/spy';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { fakeAsync, tick } from '../../../testing/fake-async';
 import { StatistikComponent } from './statistik.component';
 import { StatistikService } from '../../services/statistik.service';
 import { TranslationService } from '../../services/translation.service';
@@ -8,8 +10,8 @@ import { of, throwError } from 'rxjs';
 describe('StatistikComponent', () => {
   let component: StatistikComponent;
   let fixture: ComponentFixture<StatistikComponent>;
-  let statistikServiceSpy: jasmine.SpyObj<StatistikService>;
-  let translationServiceSpy: jasmine.SpyObj<TranslationService>;
+  let statistikServiceSpy: SpyObj<StatistikService>;
+  let translationServiceSpy: SpyObj<TranslationService>;
 
   const mockMonat: MonatsStatistik = {
     jahr: 2024,
@@ -44,13 +46,13 @@ describe('StatistikComponent', () => {
   };
 
   beforeEach(async () => {
-    statistikServiceSpy = jasmine.createSpyObj('StatistikService', ['getStatistik', 'exportPdf']);
-    statistikServiceSpy.getStatistik.and.returnValue(of(mockStatistik));
-    statistikServiceSpy.exportPdf.and.returnValue(of(new Blob(['pdf'], { type: 'application/pdf' })));
+    statistikServiceSpy = createSpyObj<StatistikService>('StatistikService', ['getStatistik', 'exportPdf']);
+    statistikServiceSpy.getStatistik.mockReturnValue(of(mockStatistik));
+    statistikServiceSpy.exportPdf.mockReturnValue(of(new Blob(['pdf'], { type: 'application/pdf' })));
 
-    translationServiceSpy = jasmine.createSpyObj('TranslationService', ['translate', 'getCurrentLanguage']);
-    translationServiceSpy.translate.and.callFake((key: string) => key);
-    translationServiceSpy.getCurrentLanguage.and.returnValue('de');
+    translationServiceSpy = createSpyObj<TranslationService>('TranslationService', ['translate', 'getCurrentLanguage']);
+    translationServiceSpy.translate.mockImplementation((key: string) => key);
+    translationServiceSpy.getCurrentLanguage.mockReturnValue('de');
 
     await TestBed.configureTestingModule({
       imports: [StatistikComponent],
@@ -79,22 +81,22 @@ describe('StatistikComponent', () => {
 
     describe('default quarter', () => {
       beforeEach(() => {
-        jasmine.clock().install();
+        vi.useFakeTimers();
       });
 
       afterEach(() => {
-        jasmine.clock().uninstall();
+        vi.useRealTimers();
       });
 
       it('should preselect the previous quarter', () => {
-        jasmine.clock().mockDate(new Date(2026, 4, 15)); // 15.05.2026 → Q2 → Vorquartal Q1/2026
+        vi.setSystemTime(new Date(2026, 4, 15)); // 15.05.2026 → Q2 → Vorquartal Q1/2026
         component.ngOnInit();
         expect(component.dateFrom).toBe('2026-01-01');
         expect(component.dateTo).toBe('2026-03-31');
       });
 
       it('should preselect Q4 of previous year when current quarter is Q1', () => {
-        jasmine.clock().mockDate(new Date(2026, 1, 10)); // 10.02.2026 → Q1 → Vorquartal Q4/2025
+        vi.setSystemTime(new Date(2026, 1, 10)); // 10.02.2026 → Q1 → Vorquartal Q4/2025
         component.ngOnInit();
         expect(component.dateFrom).toBe('2025-10-01');
         expect(component.dateTo).toBe('2025-12-31');
@@ -106,11 +108,11 @@ describe('StatistikComponent', () => {
     });
 
     it('should initialize loading as false', () => {
-      expect(component.loading).toBeFalse();
+      expect(component.loading).toBe(false);
     });
 
     it('should initialize expandedGlobalDetails as false', () => {
-      expect(component.expandedGlobalDetails).toBeFalse();
+      expect(component.expandedGlobalDetails).toBe(false);
     });
 
     it('should initialize expandedMonths as empty set', () => {
@@ -171,7 +173,7 @@ describe('StatistikComponent', () => {
 
     it('should set loading to false after success', () => {
       component.onSubmit();
-      expect(component.loading).toBeFalse();
+      expect(component.loading).toBe(false);
     });
 
     it('should show success message with month count', () => {
@@ -210,7 +212,7 @@ describe('StatistikComponent', () => {
     });
 
     it('should show error message on service failure', () => {
-      statistikServiceSpy.getStatistik.and.returnValue(throwError(() => new Error('Network error')));
+      statistikServiceSpy.getStatistik.mockReturnValue(throwError(() => new Error('Network error')));
       component.onSubmit();
       expect(component.messageType).toBe('error');
       expect(component.message).toContain('FEHLER_BEIM_LADEN_DER_DATEN');
@@ -218,16 +220,16 @@ describe('StatistikComponent', () => {
     });
 
     it('should set loading to false on error', () => {
-      statistikServiceSpy.getStatistik.and.returnValue(throwError(() => new Error('fail')));
+      statistikServiceSpy.getStatistik.mockReturnValue(throwError(() => new Error('fail')));
       component.onSubmit();
-      expect(component.loading).toBeFalse();
+      expect(component.loading).toBe(false);
     });
 
     it('should set statistik to null before loading', () => {
       component.statistik = mockStatistik;
       // Use a delayed observable to verify intermediate state
       let statistikDuringLoad: Statistik | null = null;
-      statistikServiceSpy.getStatistik.and.callFake(() => {
+      statistikServiceSpy.getStatistik.mockImplementation(() => {
         statistikDuringLoad = component.statistik;
         return of(mockStatistik);
       });
@@ -262,7 +264,7 @@ describe('StatistikComponent', () => {
     });
 
     it('should show error message on service failure', () => {
-      statistikServiceSpy.exportPdf.and.returnValue(throwError(() => new Error('PDF error')));
+      statistikServiceSpy.exportPdf.mockReturnValue(throwError(() => new Error('PDF error')));
       component.exportPdf();
       expect(component.messageType).toBe('error');
       expect(component.message).toContain('FEHLER_BEIM_EXPORT');
@@ -273,34 +275,34 @@ describe('StatistikComponent', () => {
   describe('toggleMonthDetails', () => {
     it('should add index to expandedMonths when not present', () => {
       component.toggleMonthDetails(0);
-      expect(component.expandedMonths.has(0)).toBeTrue();
+      expect(component.expandedMonths.has(0)).toBe(true);
     });
 
     it('should remove index from expandedMonths when already present', () => {
       component.expandedMonths.add(0);
       component.toggleMonthDetails(0);
-      expect(component.expandedMonths.has(0)).toBeFalse();
+      expect(component.expandedMonths.has(0)).toBe(false);
     });
 
     it('should handle multiple months independently', () => {
       component.toggleMonthDetails(0);
       component.toggleMonthDetails(1);
-      expect(component.expandedMonths.has(0)).toBeTrue();
-      expect(component.expandedMonths.has(1)).toBeTrue();
+      expect(component.expandedMonths.has(0)).toBe(true);
+      expect(component.expandedMonths.has(1)).toBe(true);
       component.toggleMonthDetails(0);
-      expect(component.expandedMonths.has(0)).toBeFalse();
-      expect(component.expandedMonths.has(1)).toBeTrue();
+      expect(component.expandedMonths.has(0)).toBe(false);
+      expect(component.expandedMonths.has(1)).toBe(true);
     });
   });
 
   describe('isMonthExpanded', () => {
     it('should return false when month is not expanded', () => {
-      expect(component.isMonthExpanded(0)).toBeFalse();
+      expect(component.isMonthExpanded(0)).toBe(false);
     });
 
     it('should return true when month is expanded', () => {
       component.expandedMonths.add(0);
-      expect(component.isMonthExpanded(0)).toBeTrue();
+      expect(component.isMonthExpanded(0)).toBe(true);
     });
   });
 
@@ -308,13 +310,13 @@ describe('StatistikComponent', () => {
     it('should toggle expandedGlobalDetails from false to true', () => {
       component.expandedGlobalDetails = false;
       component.toggleGlobalDetails();
-      expect(component.expandedGlobalDetails).toBeTrue();
+      expect(component.expandedGlobalDetails).toBe(true);
     });
 
     it('should toggle expandedGlobalDetails from true to false', () => {
       component.expandedGlobalDetails = true;
       component.toggleGlobalDetails();
-      expect(component.expandedGlobalDetails).toBeFalse();
+      expect(component.expandedGlobalDetails).toBe(false);
     });
   });
 
@@ -338,7 +340,7 @@ describe('StatistikComponent', () => {
       const expectedKeys = ['JANUAR', 'FEBRUAR', 'MAERZ', 'APRIL', 'MAI', 'JUNI',
         'JULI', 'AUGUST', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DEZEMBER'];
       expectedKeys.forEach((key, index) => {
-        translationServiceSpy.translate.calls.reset();
+        translationServiceSpy.translate.mockClear();
         component.getMonthName(index + 1);
         expect(translationServiceSpy.translate).toHaveBeenCalledWith(key);
       });
@@ -412,22 +414,22 @@ describe('StatistikComponent', () => {
   describe('hasAbweichungen', () => {
     it('should return false when all sums are equal', () => {
       const monat: MonatsStatistik = { ...mockMonat, summenCDGleich: true, summenCEGleich: true, summenDEGleich: true };
-      expect(component.hasAbweichungen(monat)).toBeFalse();
+      expect(component.hasAbweichungen(monat)).toBe(false);
     });
 
     it('should return true when CD sums differ', () => {
       const monat: MonatsStatistik = { ...mockMonat, summenCDGleich: false, summenCEGleich: true, summenDEGleich: true };
-      expect(component.hasAbweichungen(monat)).toBeTrue();
+      expect(component.hasAbweichungen(monat)).toBe(true);
     });
 
     it('should return true when CE sums differ', () => {
       const monat: MonatsStatistik = { ...mockMonat, summenCDGleich: true, summenCEGleich: false, summenDEGleich: true };
-      expect(component.hasAbweichungen(monat)).toBeTrue();
+      expect(component.hasAbweichungen(monat)).toBe(true);
     });
 
     it('should return true when DE sums differ', () => {
       const monat: MonatsStatistik = { ...mockMonat, summenCDGleich: true, summenCEGleich: true, summenDEGleich: false };
-      expect(component.hasAbweichungen(monat)).toBeTrue();
+      expect(component.hasAbweichungen(monat)).toBe(true);
     });
   });
 

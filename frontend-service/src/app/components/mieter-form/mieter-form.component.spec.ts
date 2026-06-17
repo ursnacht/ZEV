@@ -84,7 +84,7 @@ describe('MieterFormComponent', () => {
         mietbeginn: '2024-01-01',
         einheitId: 1
       };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when name is only whitespace', () => {
@@ -96,7 +96,7 @@ describe('MieterFormComponent', () => {
         mietbeginn: '2024-01-01',
         einheitId: 1
       };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when strasse is empty', () => {
@@ -108,7 +108,7 @@ describe('MieterFormComponent', () => {
         mietbeginn: '2024-01-01',
         einheitId: 1
       };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when plz is empty', () => {
@@ -120,7 +120,7 @@ describe('MieterFormComponent', () => {
         mietbeginn: '2024-01-01',
         einheitId: 1
       };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when ort is empty', () => {
@@ -132,7 +132,7 @@ describe('MieterFormComponent', () => {
         mietbeginn: '2024-01-01',
         einheitId: 1
       };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when mietbeginn is empty', () => {
@@ -144,7 +144,7 @@ describe('MieterFormComponent', () => {
         mietbeginn: '',
         einheitId: 1
       };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when einheitId is 0', () => {
@@ -156,7 +156,7 @@ describe('MieterFormComponent', () => {
         mietbeginn: '2024-01-01',
         einheitId: 0
       };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when mietende is before mietbeginn', () => {
@@ -169,7 +169,7 @@ describe('MieterFormComponent', () => {
         mietende: '2024-01-01',
         einheitId: 1
       };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return true when all fields are valid', () => {
@@ -181,7 +181,7 @@ describe('MieterFormComponent', () => {
         mietbeginn: '2024-01-01',
         einheitId: 1
       };
-      expect(component.isFormValid()).toBeTrue();
+      expect(component.isFormValid()).toBe(true);
     });
 
     it('should return true when mietende is not set', () => {
@@ -194,7 +194,7 @@ describe('MieterFormComponent', () => {
         mietende: '',
         einheitId: 1
       };
-      expect(component.isFormValid()).toBeTrue();
+      expect(component.isFormValid()).toBe(true);
     });
   });
 
@@ -202,37 +202,37 @@ describe('MieterFormComponent', () => {
     it('should return true when mietende is not set', () => {
       component.formData.mietbeginn = '2024-01-01';
       component.formData.mietende = '';
-      expect(component.isDateRangeValid()).toBeTrue();
+      expect(component.isDateRangeValid()).toBe(true);
     });
 
     it('should return true when both dates are empty', () => {
       component.formData.mietbeginn = '';
       component.formData.mietende = '';
-      expect(component.isDateRangeValid()).toBeTrue();
+      expect(component.isDateRangeValid()).toBe(true);
     });
 
     it('should return true when mietende is after mietbeginn', () => {
       component.formData.mietbeginn = '2024-01-01';
       component.formData.mietende = '2024-12-31';
-      expect(component.isDateRangeValid()).toBeTrue();
+      expect(component.isDateRangeValid()).toBe(true);
     });
 
     it('should return false when mietende is before mietbeginn', () => {
       component.formData.mietbeginn = '2024-12-31';
       component.formData.mietende = '2024-01-01';
-      expect(component.isDateRangeValid()).toBeFalse();
+      expect(component.isDateRangeValid()).toBe(false);
     });
 
     it('should return false when mietende equals mietbeginn', () => {
       component.formData.mietbeginn = '2024-06-15';
       component.formData.mietende = '2024-06-15';
-      expect(component.isDateRangeValid()).toBeFalse();
+      expect(component.isDateRangeValid()).toBe(false);
     });
   });
 
   describe('events', () => {
     it('should emit save event with form data on valid submit', () => {
-      const saveSpy = spyOn(component.save, 'emit');
+      const saveSpy = vi.spyOn(component.save, 'emit');
       component.formData = {
         name: 'Max Muster',
         strasse: 'Musterstr. 1',
@@ -248,7 +248,7 @@ describe('MieterFormComponent', () => {
     });
 
     it('should not emit save event on invalid submit', () => {
-      const saveSpy = spyOn(component.save, 'emit');
+      const saveSpy = vi.spyOn(component.save, 'emit');
       component.formData = {
         name: '',
         strasse: '',
@@ -264,7 +264,7 @@ describe('MieterFormComponent', () => {
     });
 
     it('should emit cancel event', () => {
-      const cancelSpy = spyOn(component.cancel, 'emit');
+      const cancelSpy = vi.spyOn(component.cancel, 'emit');
 
       component.onCancel();
 
@@ -272,7 +272,7 @@ describe('MieterFormComponent', () => {
     });
 
     it('should convert empty mietende to undefined on submit', () => {
-      const saveSpy = spyOn(component.save, 'emit');
+      const saveSpy = vi.spyOn(component.save, 'emit');
       component.formData = {
         name: 'Max',
         strasse: 'Str. 1',
@@ -285,7 +285,7 @@ describe('MieterFormComponent', () => {
 
       component.onSubmit();
 
-      const emittedMieter = saveSpy.calls.first().args[0] as Mieter;
+      const emittedMieter = saveSpy.mock.calls[0][0] as Mieter;
       expect(emittedMieter.mietende).toBeUndefined();
     });
   });

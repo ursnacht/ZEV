@@ -1,4 +1,6 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { createSpyObj, SpyObj } from '../../../testing/spy';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { fakeAsync, tick } from '../../../testing/fake-async';
 import { SolarCalculationComponent } from './solar-calculation.component';
 import { MesswerteService, CalculationResponse } from '../../services/messwerte.service';
 import { TranslationService } from '../../services/translation.service';
@@ -7,8 +9,8 @@ import { of, throwError } from 'rxjs';
 describe('SolarCalculationComponent', () => {
   let component: SolarCalculationComponent;
   let fixture: ComponentFixture<SolarCalculationComponent>;
-  let messwerteServiceSpy: jasmine.SpyObj<MesswerteService>;
-  let translationServiceSpy: jasmine.SpyObj<TranslationService>;
+  let messwerteServiceSpy: SpyObj<MesswerteService>;
+  let translationServiceSpy: SpyObj<TranslationService>;
 
   const mockCalculationResponse: CalculationResponse = {
     status: 'success',
@@ -23,12 +25,12 @@ describe('SolarCalculationComponent', () => {
   };
 
   beforeEach(async () => {
-    messwerteServiceSpy = jasmine.createSpyObj('MesswerteService', ['calculateDistribution']);
-    messwerteServiceSpy.calculateDistribution.and.returnValue(of(mockCalculationResponse));
+    messwerteServiceSpy = createSpyObj<MesswerteService>('MesswerteService', ['calculateDistribution']);
+    messwerteServiceSpy.calculateDistribution.mockReturnValue(of(mockCalculationResponse));
 
-    translationServiceSpy = jasmine.createSpyObj('TranslationService', ['translate', 'getCurrentLanguage']);
-    translationServiceSpy.translate.and.callFake((key: string) => key);
-    translationServiceSpy.getCurrentLanguage.and.returnValue('de');
+    translationServiceSpy = createSpyObj<TranslationService>('TranslationService', ['translate', 'getCurrentLanguage']);
+    translationServiceSpy.translate.mockImplementation((key: string) => key);
+    translationServiceSpy.getCurrentLanguage.mockReturnValue('de');
 
     await TestBed.configureTestingModule({
       imports: [SolarCalculationComponent],
@@ -57,22 +59,22 @@ describe('SolarCalculationComponent', () => {
 
     describe('default quarter', () => {
       beforeEach(() => {
-        jasmine.clock().install();
+        vi.useFakeTimers();
       });
 
       afterEach(() => {
-        jasmine.clock().uninstall();
+        vi.useRealTimers();
       });
 
       it('should preselect the previous quarter', () => {
-        jasmine.clock().mockDate(new Date(2026, 4, 15)); // 15.05.2026 → Q2 → Vorquartal Q1/2026
+        vi.setSystemTime(new Date(2026, 4, 15)); // 15.05.2026 → Q2 → Vorquartal Q1/2026
         component.ngOnInit();
         expect(component.dateFrom).toBe('2026-01-01');
         expect(component.dateTo).toBe('2026-03-31');
       });
 
       it('should preselect Q4 of previous year when current quarter is Q1', () => {
-        jasmine.clock().mockDate(new Date(2026, 1, 10)); // 10.02.2026 → Q1 → Vorquartal Q4/2025
+        vi.setSystemTime(new Date(2026, 1, 10)); // 10.02.2026 → Q1 → Vorquartal Q4/2025
         component.ngOnInit();
         expect(component.dateFrom).toBe('2025-10-01');
         expect(component.dateTo).toBe('2025-12-31');
@@ -84,7 +86,7 @@ describe('SolarCalculationComponent', () => {
     });
 
     it('should initialize calculating as false', () => {
-      expect(component.calculating).toBeFalse();
+      expect(component.calculating).toBe(false);
     });
 
     it('should initialize result as null', () => {
@@ -178,13 +180,13 @@ describe('SolarCalculationComponent', () => {
 
     it('should set calculating to false after success', () => {
       component.onSubmit();
-      expect(component.calculating).toBeFalse();
+      expect(component.calculating).toBe(false);
     });
 
     it('should set result to null before calculating', () => {
       component.result = mockCalculationResponse;
       let resultDuringCalc: CalculationResponse | null = null;
-      messwerteServiceSpy.calculateDistribution.and.callFake(() => {
+      messwerteServiceSpy.calculateDistribution.mockImplementation(() => {
         resultDuringCalc = component.result;
         return of(mockCalculationResponse);
       });
@@ -218,16 +220,16 @@ describe('SolarCalculationComponent', () => {
     });
 
     it('should show error message on service error', () => {
-      messwerteServiceSpy.calculateDistribution.and.returnValue(throwError(() => new Error('Network error')));
+      messwerteServiceSpy.calculateDistribution.mockReturnValue(throwError(() => new Error('Network error')));
       component.onSubmit();
       expect(component.messageType).toBe('error');
       expect(component.message).toContain('Network error');
     });
 
     it('should set calculating to false on error', () => {
-      messwerteServiceSpy.calculateDistribution.and.returnValue(throwError(() => new Error('fail')));
+      messwerteServiceSpy.calculateDistribution.mockReturnValue(throwError(() => new Error('fail')));
       component.onSubmit();
-      expect(component.calculating).toBeFalse();
+      expect(component.calculating).toBe(false);
     });
 
     it('should show error message when response status is not success', () => {
@@ -236,7 +238,7 @@ describe('SolarCalculationComponent', () => {
         status: 'error',
         message: 'Kein Tarif gefunden'
       };
-      messwerteServiceSpy.calculateDistribution.and.returnValue(of(failResponse));
+      messwerteServiceSpy.calculateDistribution.mockReturnValue(of(failResponse));
       component.onSubmit();
       expect(component.messageType).toBe('error');
       expect(component.message).toContain('Kein Tarif gefunden');
@@ -248,7 +250,7 @@ describe('SolarCalculationComponent', () => {
         status: 'error',
         message: 'Fehler'
       };
-      messwerteServiceSpy.calculateDistribution.and.returnValue(of(failResponse));
+      messwerteServiceSpy.calculateDistribution.mockReturnValue(of(failResponse));
       component.onSubmit();
       expect(component.result).toBeNull();
     });
@@ -259,9 +261,9 @@ describe('SolarCalculationComponent', () => {
         status: 'error',
         message: 'Fehler'
       };
-      messwerteServiceSpy.calculateDistribution.and.returnValue(of(failResponse));
+      messwerteServiceSpy.calculateDistribution.mockReturnValue(of(failResponse));
       component.onSubmit();
-      expect(component.calculating).toBeFalse();
+      expect(component.calculating).toBe(false);
     });
   });
 

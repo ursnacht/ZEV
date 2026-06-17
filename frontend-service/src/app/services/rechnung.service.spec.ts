@@ -1,3 +1,4 @@
+import { createSpyObj, SpyObj } from '../../testing/spy';
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { RechnungService, GenerateRequest, GenerateResponse, GeneratedRechnung } from './rechnung.service';
@@ -103,10 +104,10 @@ describe('RechnungService', () => {
 
   describe('downloadRechnung', () => {
     it('should make GET request to download endpoint with blob response type', () => {
-      spyOn(window.URL, 'createObjectURL').and.returnValue('blob:fake-url');
-      spyOn(window.URL, 'revokeObjectURL');
-      const linkSpy = jasmine.createSpyObj('a', ['click']);
-      spyOn(document, 'createElement').and.returnValue(linkSpy as HTMLAnchorElement);
+      vi.spyOn(window.URL, 'createObjectURL').mockReturnValue('blob:fake-url');
+      vi.spyOn(window.URL, 'revokeObjectURL');
+      const linkSpy = createSpyObj<HTMLAnchorElement>('a', ['click']);
+      vi.spyOn(document, 'createElement').mockReturnValue(linkSpy as unknown as HTMLAnchorElement);
 
       service.downloadRechnung('Wohnung_1', 'Wohnung_1.pdf');
 
@@ -117,10 +118,10 @@ describe('RechnungService', () => {
     });
 
     it('should set correct filename on the download link', () => {
-      spyOn(window.URL, 'createObjectURL').and.returnValue('blob:fake-url');
-      spyOn(window.URL, 'revokeObjectURL');
-      const linkSpy = jasmine.createSpyObj('a', ['click']);
-      spyOn(document, 'createElement').and.returnValue(linkSpy as HTMLAnchorElement);
+      vi.spyOn(window.URL, 'createObjectURL').mockReturnValue('blob:fake-url');
+      vi.spyOn(window.URL, 'revokeObjectURL');
+      const linkSpy = createSpyObj<HTMLAnchorElement>('a', ['click']);
+      vi.spyOn(document, 'createElement').mockReturnValue(linkSpy as unknown as HTMLAnchorElement);
 
       service.downloadRechnung('Wohnung_1', 'Wohnung_1.pdf');
 
@@ -132,10 +133,10 @@ describe('RechnungService', () => {
     });
 
     it('should revoke object URL after download', () => {
-      const revokeUrlSpy = spyOn(window.URL, 'revokeObjectURL');
-      spyOn(window.URL, 'createObjectURL').and.returnValue('blob:fake-url');
-      const linkSpy = jasmine.createSpyObj('a', ['click']);
-      spyOn(document, 'createElement').and.returnValue(linkSpy as HTMLAnchorElement);
+      const revokeUrlSpy = vi.spyOn(window.URL, 'revokeObjectURL');
+      vi.spyOn(window.URL, 'createObjectURL').mockReturnValue('blob:fake-url');
+      const linkSpy = createSpyObj<HTMLAnchorElement>('a', ['click']);
+      vi.spyOn(document, 'createElement').mockReturnValue(linkSpy as unknown as HTMLAnchorElement);
 
       service.downloadRechnung('Wohnung_1', 'Wohnung_1.pdf');
 
@@ -146,14 +147,14 @@ describe('RechnungService', () => {
     });
 
     it('should handle download error gracefully without throwing', () => {
-      const consoleSpy = spyOn(console, 'error');
+      const consoleSpy = vi.spyOn(console, 'error');
 
       service.downloadRechnung('invalid_key', 'invalid.pdf');
 
       const req = httpMock.expectOne(`${apiUrl}/download/invalid_key`);
       req.error(new ProgressEvent('error'));
 
-      expect(consoleSpy).toHaveBeenCalledWith('Download failed:', jasmine.anything());
+      expect(consoleSpy).toHaveBeenCalledWith('Download failed:', expect.anything());
     });
   });
 });

@@ -9,6 +9,8 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
+    "test:watch": "ng test --watch",
+    "test:coverage": "ng test --coverage",
     "e2e": "playwright test",
     "e2e:ci": "playwright test --reporter=list",
     "e2e:ui": "playwright test --ui"
@@ -39,15 +41,11 @@
     "@angular/cli": "^21.2.5",
     "@angular/compiler-cli": "^21.2.6",
     "@playwright/test": "^1.58.0",
-    "@types/jasmine": "^5.1.13",
     "@types/keycloak-js": "^2.5.4",
-    "jasmine-core": "^5.13.0",
-    "karma": "^6.4.4",
-    "karma-chrome-launcher": "^3.2.0",
-    "karma-coverage": "^2.2.1",
-    "karma-jasmine": "^5.1.0",
-    "karma-jasmine-html-reporter": "^2.1.0",
+    "@vitest/coverage-v8": "^4.1.9",
+    "jsdom": "^29.1.1",
     "license-checker-rseidelsohn": "^4.4.2",
-    "typescript": "~5.9.3"
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.9"
   }
 }

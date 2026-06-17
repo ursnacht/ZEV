@@ -1,3 +1,4 @@
+import { createSpyObj, SpyObj } from '../../../testing/spy';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { LizenzenComponent } from './lizenzen.component';
 import { LizenzenService } from '../../services/lizenzen.service';
@@ -8,8 +9,8 @@ import { of, throwError } from 'rxjs';
 describe('LizenzenComponent', () => {
   let component: LizenzenComponent;
   let fixture: ComponentFixture<LizenzenComponent>;
-  let lizenzenServiceSpy: jasmine.SpyObj<LizenzenService>;
-  let translationServiceSpy: jasmine.SpyObj<TranslationService>;
+  let lizenzenServiceSpy: SpyObj<LizenzenService>;
+  let translationServiceSpy: SpyObj<TranslationService>;
 
   const mockBackendLizenzen: Lizenz[] = [
     {
@@ -45,15 +46,15 @@ describe('LizenzenComponent', () => {
   ];
 
   beforeEach(async () => {
-    lizenzenServiceSpy = jasmine.createSpyObj('LizenzenService', [
+    lizenzenServiceSpy = createSpyObj<LizenzenService>('LizenzenService', [
       'getBackendLizenzen',
       'getFrontendLizenzen'
     ]);
-    lizenzenServiceSpy.getBackendLizenzen.and.returnValue(of(mockBackendLizenzen));
-    lizenzenServiceSpy.getFrontendLizenzen.and.returnValue(of(mockFrontendLizenzen));
+    lizenzenServiceSpy.getBackendLizenzen.mockReturnValue(of(mockBackendLizenzen));
+    lizenzenServiceSpy.getFrontendLizenzen.mockReturnValue(of(mockFrontendLizenzen));
 
-    translationServiceSpy = jasmine.createSpyObj('TranslationService', ['translate']);
-    translationServiceSpy.translate.and.callFake((key: string) => key);
+    translationServiceSpy = createSpyObj<TranslationService>('TranslationService', ['translate']);
+    translationServiceSpy.translate.mockImplementation((key: string) => key);
 
     await TestBed.configureTestingModule({
       imports: [LizenzenComponent],
@@ -86,58 +87,58 @@ describe('LizenzenComponent', () => {
     });
 
     it('should set backendLoading to false after load', () => {
-      expect(component.backendLoading).toBeFalse();
+      expect(component.backendLoading).toBe(false);
     });
 
     it('should set frontendLoading to false after load', () => {
-      expect(component.frontendLoading).toBeFalse();
+      expect(component.frontendLoading).toBe(false);
     });
 
     it('should set backendError to false on success', () => {
-      expect(component.backendError).toBeFalse();
+      expect(component.backendError).toBe(false);
     });
 
     it('should set frontendError to false on success', () => {
-      expect(component.frontendError).toBeFalse();
+      expect(component.frontendError).toBe(false);
     });
   });
 
   describe('loadBackendLizenzen', () => {
     it('should set backendError to true on failure', () => {
-      lizenzenServiceSpy.getBackendLizenzen.and.returnValue(throwError(() => new Error('Network error')));
+      lizenzenServiceSpy.getBackendLizenzen.mockReturnValue(throwError(() => new Error('Network error')));
       component.loadBackendLizenzen();
-      expect(component.backendError).toBeTrue();
-      expect(component.backendLoading).toBeFalse();
+      expect(component.backendError).toBe(true);
+      expect(component.backendLoading).toBe(false);
     });
 
     it('should reset backendError before loading', () => {
       component.backendError = true;
-      lizenzenServiceSpy.getBackendLizenzen.and.returnValue(of([]));
+      lizenzenServiceSpy.getBackendLizenzen.mockReturnValue(of([]));
       component.loadBackendLizenzen();
-      expect(component.backendError).toBeFalse();
+      expect(component.backendError).toBe(false);
     });
 
     it('should set backendLoading to true before loading', () => {
-      lizenzenServiceSpy.getBackendLizenzen.and.returnValue(of(mockBackendLizenzen));
+      lizenzenServiceSpy.getBackendLizenzen.mockReturnValue(of(mockBackendLizenzen));
       component.backendLoading = false;
       component.loadBackendLizenzen();
-      expect(component.backendLoading).toBeFalse(); // false after synchronous completion
+      expect(component.backendLoading).toBe(false); // false after synchronous completion
     });
   });
 
   describe('loadFrontendLizenzen', () => {
     it('should set frontendError to true on failure', () => {
-      lizenzenServiceSpy.getFrontendLizenzen.and.returnValue(throwError(() => new Error('Network error')));
+      lizenzenServiceSpy.getFrontendLizenzen.mockReturnValue(throwError(() => new Error('Network error')));
       component.loadFrontendLizenzen();
-      expect(component.frontendError).toBeTrue();
-      expect(component.frontendLoading).toBeFalse();
+      expect(component.frontendError).toBe(true);
+      expect(component.frontendLoading).toBe(false);
     });
 
     it('should reset frontendError before loading', () => {
       component.frontendError = true;
-      lizenzenServiceSpy.getFrontendLizenzen.and.returnValue(of([]));
+      lizenzenServiceSpy.getFrontendLizenzen.mockReturnValue(of([]));
       component.loadFrontendLizenzen();
-      expect(component.frontendError).toBeFalse();
+      expect(component.frontendError).toBe(false);
     });
   });
 

@@ -1,4 +1,6 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { createSpyObj, SpyObj } from '../../../testing/spy';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { fakeAsync, tick } from '../../../testing/fake-async';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { MesswerteUploadComponent, UploadEntry } from './messwerte-upload.component';
 import { EinheitService, EinheitMatchResponse } from '../../services/einheit.service';
@@ -9,7 +11,7 @@ import { of, throwError } from 'rxjs';
 describe('MesswerteUploadComponent', () => {
   let component: MesswerteUploadComponent;
   let fixture: ComponentFixture<MesswerteUploadComponent>;
-  let einheitServiceSpy: jasmine.SpyObj<EinheitService>;
+  let einheitServiceSpy: SpyObj<EinheitService>;
   let httpMock: HttpTestingController;
 
   const mockEinheiten: Einheit[] = [
@@ -42,12 +44,12 @@ describe('MesswerteUploadComponent', () => {
   }
 
   beforeEach(async () => {
-    einheitServiceSpy = jasmine.createSpyObj('EinheitService', [
+    einheitServiceSpy = createSpyObj<EinheitService>('EinheitService', [
       'getAllEinheiten',
       'matchEinheitByFilename'
     ]);
-    einheitServiceSpy.getAllEinheiten.and.returnValue(of(mockEinheiten));
-    einheitServiceSpy.matchEinheitByFilename.and.returnValue(of(mockMatchResponse));
+    einheitServiceSpy.getAllEinheiten.mockReturnValue(of(mockEinheiten));
+    einheitServiceSpy.matchEinheitByFilename.mockReturnValue(of(mockMatchResponse));
 
     await TestBed.configureTestingModule({
       imports: [MesswerteUploadComponent, HttpClientTestingModule],
@@ -88,7 +90,7 @@ describe('MesswerteUploadComponent', () => {
     });
 
     it('should show error when loading einheiten fails', () => {
-      einheitServiceSpy.getAllEinheiten.and.returnValue(throwError(() => new Error('Network error')));
+      einheitServiceSpy.getAllEinheiten.mockReturnValue(throwError(() => new Error('Network error')));
       component.loadEinheiten();
       expect(component.messageType).toBe('error');
     });
@@ -96,7 +98,7 @@ describe('MesswerteUploadComponent', () => {
 
   describe('isAnyMatching', () => {
     it('should return false when entries is empty', () => {
-      expect(component.isAnyMatching).toBeFalse();
+      expect(component.isAnyMatching).toBe(false);
     });
 
     it('should return true when at least one entry is matching', () => {
@@ -104,48 +106,48 @@ describe('MesswerteUploadComponent', () => {
         { file: makeCsvFile(), einheitId: 1, date: '', status: 'ready', errorMessage: null, matchConfidence: null },
         { file: makeCsvFile('b.csv'), einheitId: 1, date: '', status: 'matching', errorMessage: null, matchConfidence: null }
       ];
-      expect(component.isAnyMatching).toBeTrue();
+      expect(component.isAnyMatching).toBe(true);
     });
 
     it('should return false when all entries are ready', () => {
       component.entries = [
         { file: makeCsvFile(), einheitId: 1, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null }
       ];
-      expect(component.isAnyMatching).toBeFalse();
+      expect(component.isAnyMatching).toBe(false);
     });
   });
 
   describe('canImport', () => {
     it('should return false when entries is empty', () => {
-      expect(component.canImport).toBeFalse();
+      expect(component.canImport).toBe(false);
     });
 
     it('should return false when any entry is matching', () => {
       component.entries = [
         { file: makeCsvFile(), einheitId: 1, date: '2025-01-01', status: 'matching', errorMessage: null, matchConfidence: null }
       ];
-      expect(component.canImport).toBeFalse();
+      expect(component.canImport).toBe(false);
     });
 
     it('should return false when any entry has no einheitId', () => {
       component.entries = [
         { file: makeCsvFile(), einheitId: null, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null }
       ];
-      expect(component.canImport).toBeFalse();
+      expect(component.canImport).toBe(false);
     });
 
     it('should return false when any entry has no date', () => {
       component.entries = [
         { file: makeCsvFile(), einheitId: 1, date: '', status: 'ready', errorMessage: null, matchConfidence: null }
       ];
-      expect(component.canImport).toBeFalse();
+      expect(component.canImport).toBe(false);
     });
 
     it('should return true when all entries are valid and ready', () => {
       component.entries = [
         { file: makeCsvFile(), einheitId: 1, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null }
       ];
-      expect(component.canImport).toBeTrue();
+      expect(component.canImport).toBe(true);
     });
   });
 
@@ -169,20 +171,20 @@ describe('MesswerteUploadComponent', () => {
   describe('drag and drop', () => {
     it('should set isDragOver on dragover', () => {
       component.onDragOver(new DragEvent('dragover'));
-      expect(component.isDragOver).toBeTrue();
+      expect(component.isDragOver).toBe(true);
     });
 
     it('should reset isDragOver on dragleave', () => {
       component.isDragOver = true;
       component.onDragLeave(new DragEvent('dragleave'));
-      expect(component.isDragOver).toBeFalse();
+      expect(component.isDragOver).toBe(false);
     });
 
     it('should reset isDragOver on drop', fakeAsync(() => {
       component.isDragOver = true;
       dropFiles([makeCsvFile()]);
       tick();
-      expect(component.isDragOver).toBeFalse();
+      expect(component.isDragOver).toBe(false);
     }));
 
     it('should add CSV file to entries on drop', fakeAsync(() => {
@@ -221,7 +223,7 @@ describe('MesswerteUploadComponent', () => {
     }));
 
     it('should set entry status to ready even on match error', fakeAsync(() => {
-      einheitServiceSpy.matchEinheitByFilename.and.returnValue(throwError(() => new Error('fail')));
+      einheitServiceSpy.matchEinheitByFilename.mockReturnValue(throwError(() => new Error('fail')));
       dropFiles([makeCsvFile()]);
       tick();
       expect(component.entries[0].status).toBe('ready');
@@ -232,7 +234,7 @@ describe('MesswerteUploadComponent', () => {
     it('should do nothing when no ready entries exist', () => {
       component.entries = [];
       component.importAll();
-      expect(component.importing).toBeFalse();
+      expect(component.importing).toBe(false);
     });
 
     it('should upload entries and show success message', fakeAsync(() => {
@@ -272,7 +274,7 @@ describe('MesswerteUploadComponent', () => {
       req.flush({ status: 'success' });
       tick();
 
-      expect(component.importing).toBeFalse();
+      expect(component.importing).toBe(false);
     }));
   });
 

@@ -9,5 +9,6 @@ package-lock.json
 # Frontend test results
 test-results/
 playwright-report/
+coverage/
 
 src/assets/frontend-licenses.json

@@ -1,13 +1,14 @@
+import { createSpyObj, SpyObj } from '../../testing/spy';
 import { TestBed } from '@angular/core/testing';
 import { TranslatePipe } from './translate.pipe';
 import { TranslationService } from '../services/translation.service';
 
 describe('TranslatePipe', () => {
   let pipe: TranslatePipe;
-  let translationServiceSpy: jasmine.SpyObj<TranslationService>;
+  let translationServiceSpy: SpyObj<TranslationService>;
 
   beforeEach(() => {
-    translationServiceSpy = jasmine.createSpyObj('TranslationService', ['translate']);
+    translationServiceSpy = createSpyObj<TranslationService>('TranslationService', ['translate']);
 
     TestBed.configureTestingModule({
       providers: [
@@ -25,7 +26,7 @@ describe('TranslatePipe', () => {
 
   describe('transform', () => {
     it('should return the translated string for a known key', () => {
-      translationServiceSpy.translate.and.returnValue('Einheit');
+      translationServiceSpy.translate.mockReturnValue('Einheit');
 
       const result = pipe.transform('einheit.title');
 
@@ -34,7 +35,7 @@ describe('TranslatePipe', () => {
     });
 
     it('should return the key when translation is missing', () => {
-      translationServiceSpy.translate.and.returnValue('some.missing.key');
+      translationServiceSpy.translate.mockReturnValue('some.missing.key');
 
       const result = pipe.transform('some.missing.key');
 
@@ -42,7 +43,7 @@ describe('TranslatePipe', () => {
     });
 
     it('should return empty string when translation is empty', () => {
-      translationServiceSpy.translate.and.returnValue('');
+      translationServiceSpy.translate.mockReturnValue('');
 
       const result = pipe.transform('empty.key');
 
@@ -50,20 +51,20 @@ describe('TranslatePipe', () => {
     });
 
     it('should delegate to TranslationService.translate', () => {
-      translationServiceSpy.translate.and.returnValue('Tarife');
+      translationServiceSpy.translate.mockReturnValue('Tarife');
 
       pipe.transform('tarif.list.title');
 
-      expect(translationServiceSpy.translate).toHaveBeenCalledOnceWith('tarif.list.title');
+      expect(translationServiceSpy.translate).toHaveBeenCalledExactlyOnceWith('tarif.list.title');
     });
 
     it('should return updated translation after language change', () => {
-      translationServiceSpy.translate.and.returnValue('Units');
+      translationServiceSpy.translate.mockReturnValue('Units');
 
       const resultEn = pipe.transform('einheit.title');
       expect(resultEn).toBe('Units');
 
-      translationServiceSpy.translate.and.returnValue('Einheiten');
+      translationServiceSpy.translate.mockReturnValue('Einheiten');
 
       const resultDe = pipe.transform('einheit.title');
       expect(resultDe).toBe('Einheiten');

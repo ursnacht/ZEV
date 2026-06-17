@@ -92,17 +92,19 @@ describe('TranslationService', () => {
       req.flush(mockTranslations);
     });
 
-    it('should set translationsLoaded to true on success', (done) => {
+    it('should set translationsLoaded to true on success', () => {
       service.loadTranslations();
 
       const req = httpMock.expectOne(apiUrl);
       req.flush(mockTranslations);
 
-      service.translationsLoaded.subscribe(loaded => {
-        if (loaded) {
-          expect(loaded).toBeTrue();
-          done();
-        }
+      return new Promise<void>(resolve => {
+        service.translationsLoaded.subscribe(loaded => {
+          if (loaded) {
+            expect(loaded).toBe(true);
+            resolve();
+          }
+        });
       });
     });
   });

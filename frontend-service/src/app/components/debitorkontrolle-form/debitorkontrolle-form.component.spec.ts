@@ -91,57 +91,57 @@ describe('DebitorkontrolleFormComponent', () => {
   describe('isFormValid', () => {
     it('should return false when mieterId is 0', () => {
       component.formData = { mieterId: 0, betrag: 100, datumVon: '2025-01-01', datumBis: '2025-03-31' };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when betrag is 0', () => {
       component.formData = { mieterId: 10, betrag: 0, datumVon: '2025-01-01', datumBis: '2025-03-31' };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when betrag is negative', () => {
       component.formData = { mieterId: 10, betrag: -5, datumVon: '2025-01-01', datumBis: '2025-03-31' };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when datumVon is empty', () => {
       component.formData = { mieterId: 10, betrag: 100, datumVon: '', datumBis: '2025-03-31' };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when datumBis is empty', () => {
       component.formData = { mieterId: 10, betrag: 100, datumVon: '2025-01-01', datumBis: '' };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when datumVon is after datumBis', () => {
       component.formData = { mieterId: 10, betrag: 100, datumVon: '2025-03-31', datumBis: '2025-01-01' };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when zahldatum is before datumBis', () => {
       component.formData = { mieterId: 10, betrag: 100, datumVon: '2025-01-01', datumBis: '2025-03-31', zahldatum: '2025-02-01' };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return true when all required fields are valid', () => {
       component.formData = { mieterId: 10, betrag: 100, datumVon: '2025-01-01', datumBis: '2025-03-31' };
-      expect(component.isFormValid()).toBeTrue();
+      expect(component.isFormValid()).toBe(true);
     });
 
     it('should return true when zahldatum equals datumBis', () => {
       component.formData = { mieterId: 10, betrag: 100, datumVon: '2025-01-01', datumBis: '2025-03-31', zahldatum: '2025-03-31' };
-      expect(component.isFormValid()).toBeTrue();
+      expect(component.isFormValid()).toBe(true);
     });
 
     it('should return true when zahldatum is after datumBis', () => {
       component.formData = { mieterId: 10, betrag: 100, datumVon: '2025-01-01', datumBis: '2025-03-31', zahldatum: '2025-04-15' };
-      expect(component.isFormValid()).toBeTrue();
+      expect(component.isFormValid()).toBe(true);
     });
 
     it('should return true when zahldatum is not set', () => {
       component.formData = { mieterId: 10, betrag: 100, datumVon: '2025-01-01', datumBis: '2025-03-31', zahldatum: undefined };
-      expect(component.isFormValid()).toBeTrue();
+      expect(component.isFormValid()).toBe(true);
     });
   });
 
@@ -149,25 +149,25 @@ describe('DebitorkontrolleFormComponent', () => {
     it('should return true when zahldatum is not set', () => {
       component.formData.datumBis = '2025-03-31';
       component.formData.zahldatum = undefined;
-      expect(component.isZahldatumValid()).toBeTrue();
+      expect(component.isZahldatumValid()).toBe(true);
     });
 
     it('should return true when zahldatum equals datumBis', () => {
       component.formData.datumBis = '2025-03-31';
       component.formData.zahldatum = '2025-03-31';
-      expect(component.isZahldatumValid()).toBeTrue();
+      expect(component.isZahldatumValid()).toBe(true);
     });
 
     it('should return true when zahldatum is after datumBis', () => {
       component.formData.datumBis = '2025-03-31';
       component.formData.zahldatum = '2025-04-10';
-      expect(component.isZahldatumValid()).toBeTrue();
+      expect(component.isZahldatumValid()).toBe(true);
     });
 
     it('should return false when zahldatum is before datumBis', () => {
       component.formData.datumBis = '2025-03-31';
       component.formData.zahldatum = '2025-02-01';
-      expect(component.isZahldatumValid()).toBeFalse();
+      expect(component.isZahldatumValid()).toBe(false);
     });
   });
 
@@ -200,7 +200,7 @@ describe('DebitorkontrolleFormComponent', () => {
 
   describe('events', () => {
     it('should emit save event with form data on valid submit', () => {
-      const saveSpy = spyOn(component.save, 'emit');
+      const saveSpy = vi.spyOn(component.save, 'emit');
       component.formData = { mieterId: 10, betrag: 100, datumVon: '2025-01-01', datumBis: '2025-03-31' };
 
       component.onSubmit();
@@ -209,7 +209,7 @@ describe('DebitorkontrolleFormComponent', () => {
     });
 
     it('should not emit save event on invalid submit', () => {
-      const saveSpy = spyOn(component.save, 'emit');
+      const saveSpy = vi.spyOn(component.save, 'emit');
       component.formData = { mieterId: 0, betrag: 0, datumVon: '', datumBis: '' };
 
       component.onSubmit();
@@ -218,39 +218,39 @@ describe('DebitorkontrolleFormComponent', () => {
     });
 
     it('should convert mieterId to Number on save', () => {
-      const saveSpy = spyOn(component.save, 'emit');
+      const saveSpy = vi.spyOn(component.save, 'emit');
       component.formData = { mieterId: '10' as any, betrag: 100, datumVon: '2025-01-01', datumBis: '2025-03-31' };
 
       component.onSubmit();
 
-      const emitted = saveSpy.calls.first().args[0] as Debitor;
+      const emitted = saveSpy.mock.calls[0][0] as Debitor;
       expect(typeof emitted.mieterId).toBe('number');
       expect(emitted.mieterId).toBe(10);
     });
 
     it('should convert betrag to Number on save', () => {
-      const saveSpy = spyOn(component.save, 'emit');
+      const saveSpy = vi.spyOn(component.save, 'emit');
       component.formData = { mieterId: 10, betrag: '99.90' as any, datumVon: '2025-01-01', datumBis: '2025-03-31' };
 
       component.onSubmit();
 
-      const emitted = saveSpy.calls.first().args[0] as Debitor;
+      const emitted = saveSpy.mock.calls[0][0] as Debitor;
       expect(typeof emitted.betrag).toBe('number');
       expect(emitted.betrag).toBe(99.90);
     });
 
     it('should convert empty zahldatum to undefined on save', () => {
-      const saveSpy = spyOn(component.save, 'emit');
+      const saveSpy = vi.spyOn(component.save, 'emit');
       component.formData = { mieterId: 10, betrag: 100, datumVon: '2025-01-01', datumBis: '2025-03-31', zahldatum: '' };
 
       component.onSubmit();
 
-      const emitted = saveSpy.calls.first().args[0] as Debitor;
+      const emitted = saveSpy.mock.calls[0][0] as Debitor;
       expect(emitted.zahldatum).toBeUndefined();
     });
 
     it('should emit cancel event', () => {
-      const cancelSpy = spyOn(component.cancel, 'emit');
+      const cancelSpy = vi.spyOn(component.cancel, 'emit');
       component.onCancel();
       expect(cancelSpy).toHaveBeenCalled();
     });

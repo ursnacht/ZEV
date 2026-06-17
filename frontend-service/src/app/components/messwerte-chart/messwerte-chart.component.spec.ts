@@ -1,3 +1,4 @@
+import { createSpyObj, SpyObj } from '../../../testing/spy';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MesswerteChartComponent } from './messwerte-chart.component';
 import { MesswerteService } from '../../services/messwerte.service';
@@ -9,23 +10,23 @@ import { of } from 'rxjs';
 describe('MesswerteChartComponent', () => {
   let component: MesswerteChartComponent;
   let fixture: ComponentFixture<MesswerteChartComponent>;
-  let messwerteServiceSpy: jasmine.SpyObj<MesswerteService>;
-  let einheitServiceSpy: jasmine.SpyObj<EinheitService>;
-  let translationServiceSpy: jasmine.SpyObj<TranslationService>;
+  let messwerteServiceSpy: SpyObj<MesswerteService>;
+  let einheitServiceSpy: SpyObj<EinheitService>;
+  let translationServiceSpy: SpyObj<TranslationService>;
 
   const mockConsumer: Einheit = { id: 1, name: 'Wohnung A', typ: EinheitTyp.CONSUMER };
   const mockProducer: Einheit = { id: 2, name: 'Solar Anlage', typ: EinheitTyp.PRODUCER };
 
   beforeEach(async () => {
-    messwerteServiceSpy = jasmine.createSpyObj('MesswerteService', ['getMesswerteByEinheit']);
-    messwerteServiceSpy.getMesswerteByEinheit.and.returnValue(of([]));
+    messwerteServiceSpy = createSpyObj<MesswerteService>('MesswerteService', ['getMesswerteByEinheit']);
+    messwerteServiceSpy.getMesswerteByEinheit.mockReturnValue(of([]));
 
-    einheitServiceSpy = jasmine.createSpyObj('EinheitService', ['getAllEinheiten']);
-    einheitServiceSpy.getAllEinheiten.and.returnValue(of([mockConsumer, mockProducer]));
+    einheitServiceSpy = createSpyObj<EinheitService>('EinheitService', ['getAllEinheiten']);
+    einheitServiceSpy.getAllEinheiten.mockReturnValue(of([mockConsumer, mockProducer]));
 
-    translationServiceSpy = jasmine.createSpyObj('TranslationService', ['translate', 'getCurrentLanguage']);
-    translationServiceSpy.translate.and.callFake((key: string) => key);
-    translationServiceSpy.getCurrentLanguage.and.returnValue('de');
+    translationServiceSpy = createSpyObj<TranslationService>('TranslationService', ['translate', 'getCurrentLanguage']);
+    translationServiceSpy.translate.mockImplementation((key: string) => key);
+    translationServiceSpy.getCurrentLanguage.mockReturnValue('de');
 
     await TestBed.configureTestingModule({
       imports: [MesswerteChartComponent],
@@ -47,11 +48,11 @@ describe('MesswerteChartComponent', () => {
 
   describe('initialization', () => {
     beforeEach(() => {
-      jasmine.clock().install();
+      vi.useFakeTimers();
     });
 
     afterEach(() => {
-      jasmine.clock().uninstall();
+      vi.useRealTimers();
     });
 
     it('should set default dates', () => {
@@ -62,21 +63,21 @@ describe('MesswerteChartComponent', () => {
     });
 
     it('should preselect the previous quarter', () => {
-      jasmine.clock().mockDate(new Date(2026, 4, 15)); // 15.05.2026 → Q2 → Vorquartal Q1/2026
+      vi.setSystemTime(new Date(2026, 4, 15)); // 15.05.2026 → Q2 → Vorquartal Q1/2026
       component.ngOnInit();
       expect(component.dateFrom).toBe('2026-01-01');
       expect(component.dateTo).toBe('2026-03-31');
     });
 
     it('should preselect Q4 of previous year when current quarter is Q1', () => {
-      jasmine.clock().mockDate(new Date(2026, 1, 10)); // 10.02.2026 → Q1 → Vorquartal Q4/2025
+      vi.setSystemTime(new Date(2026, 1, 10)); // 10.02.2026 → Q1 → Vorquartal Q4/2025
       component.ngOnInit();
       expect(component.dateFrom).toBe('2025-10-01');
       expect(component.dateTo).toBe('2025-12-31');
     });
 
     it('should preselect Q3 when current quarter is Q4', () => {
-      jasmine.clock().mockDate(new Date(2026, 10, 1)); // 01.11.2026 → Q4 → Vorquartal Q3/2026
+      vi.setSystemTime(new Date(2026, 10, 1)); // 01.11.2026 → Q4 → Vorquartal Q3/2026
       component.ngOnInit();
       expect(component.dateFrom).toBe('2026-07-01');
       expect(component.dateTo).toBe('2026-09-30');

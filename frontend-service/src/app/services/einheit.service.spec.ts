@@ -152,7 +152,7 @@ describe('EinheitService', () => {
 
       service.matchEinheitByFilename(filename).subscribe(response => {
         expect(response).toEqual(mockMatchResponse);
-        expect(response.matched).toBeTrue();
+        expect(response.matched).toBe(true);
         expect(response.einheitId).toBe(1);
         expect(response.einheitName).toBe('Allgemein');
         expect(response.confidence).toBe(0.9);
@@ -176,7 +176,7 @@ describe('EinheitService', () => {
 
       service.matchEinheitByFilename(filename).subscribe(response => {
         expect(response).toEqual(notMatchedResponse);
-        expect(response.matched).toBeFalse();
+        expect(response.matched).toBe(false);
         expect(response.einheitId).toBeNull();
         expect(response.message).toBe('Keine passende Einheit gefunden');
       });
@@ -198,7 +198,7 @@ describe('EinheitService', () => {
 
       service.matchEinheitByFilename(filename).subscribe(response => {
         expect(response).toEqual(errorResponse);
-        expect(response.matched).toBeFalse();
+        expect(response.matched).toBe(false);
         expect(response.message).toBe('KI-Service nicht verfügbar');
       });
 

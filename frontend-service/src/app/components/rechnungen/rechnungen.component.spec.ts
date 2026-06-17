@@ -1,4 +1,6 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { createSpyObj, SpyObj } from '../../../testing/spy';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { fakeAsync, tick } from '../../../testing/fake-async';
 import { RechnungenComponent } from './rechnungen.component';
 import { EinheitService } from '../../services/einheit.service';
 import { RechnungService, GeneratedRechnung, GenerateResponse } from '../../services/rechnung.service';
@@ -9,9 +11,9 @@ import { of, throwError } from 'rxjs';
 describe('RechnungenComponent', () => {
   let component: RechnungenComponent;
   let fixture: ComponentFixture<RechnungenComponent>;
-  let einheitServiceSpy: jasmine.SpyObj<EinheitService>;
-  let rechnungServiceSpy: jasmine.SpyObj<RechnungService>;
-  let translationServiceSpy: jasmine.SpyObj<TranslationService>;
+  let einheitServiceSpy: SpyObj<EinheitService>;
+  let rechnungServiceSpy: SpyObj<RechnungService>;
+  let translationServiceSpy: SpyObj<TranslationService>;
 
   const mockConsumer: Einheit = { id: 1, name: 'Wohnung A', typ: EinheitTyp.CONSUMER };
   const mockConsumer2: Einheit = { id: 2, name: 'Wohnung B', typ: EinheitTyp.CONSUMER };
@@ -34,16 +36,16 @@ describe('RechnungenComponent', () => {
   };
 
   beforeEach(async () => {
-    einheitServiceSpy = jasmine.createSpyObj('EinheitService', ['getAllEinheiten']);
-    einheitServiceSpy.getAllEinheiten.and.returnValue(of(mockEinheiten));
+    einheitServiceSpy = createSpyObj<EinheitService>('EinheitService', ['getAllEinheiten']);
+    einheitServiceSpy.getAllEinheiten.mockReturnValue(of(mockEinheiten));
 
-    rechnungServiceSpy = jasmine.createSpyObj('RechnungService', ['generateRechnungen', 'downloadRechnung']);
-    rechnungServiceSpy.generateRechnungen.and.returnValue(of(mockGenerateResponse));
-    rechnungServiceSpy.downloadRechnung.and.returnValue(undefined);
+    rechnungServiceSpy = createSpyObj<RechnungService>('RechnungService', ['generateRechnungen', 'downloadRechnung']);
+    rechnungServiceSpy.generateRechnungen.mockReturnValue(of(mockGenerateResponse));
+    rechnungServiceSpy.downloadRechnung.mockReturnValue(undefined);
 
-    translationServiceSpy = jasmine.createSpyObj('TranslationService', ['translate', 'getCurrentLanguage']);
-    translationServiceSpy.translate.and.callFake((key: string) => key);
-    translationServiceSpy.getCurrentLanguage.and.returnValue('de');
+    translationServiceSpy = createSpyObj<TranslationService>('TranslationService', ['translate', 'getCurrentLanguage']);
+    translationServiceSpy.translate.mockImplementation((key: string) => key);
+    translationServiceSpy.getCurrentLanguage.mockReturnValue('de');
 
     await TestBed.configureTestingModule({
       imports: [RechnungenComponent],
@@ -65,11 +67,11 @@ describe('RechnungenComponent', () => {
 
   describe('initialization', () => {
     beforeEach(() => {
-      jasmine.clock().install();
+      vi.useFakeTimers();
     });
 
     afterEach(() => {
-      jasmine.clock().uninstall();
+      vi.useRealTimers();
     });
 
     it('should set default dates', () => {
@@ -80,21 +82,21 @@ describe('RechnungenComponent', () => {
     });
 
     it('should preselect the previous quarter', () => {
-      jasmine.clock().mockDate(new Date(2026, 4, 15)); // 15.05.2026 → Q2 → Vorquartal Q1/2026
+      vi.setSystemTime(new Date(2026, 4, 15)); // 15.05.2026 → Q2 → Vorquartal Q1/2026
       component.ngOnInit();
       expect(component.dateFrom).toBe('2026-01-01');
       expect(component.dateTo).toBe('2026-03-31');
     });
 
     it('should preselect Q4 of previous year when current quarter is Q1', () => {
-      jasmine.clock().mockDate(new Date(2026, 1, 10)); // 10.02.2026 → Q1 → Vorquartal Q4/2025
+      vi.setSystemTime(new Date(2026, 1, 10)); // 10.02.2026 → Q1 → Vorquartal Q4/2025
       component.ngOnInit();
       expect(component.dateFrom).toBe('2025-10-01');
       expect(component.dateTo).toBe('2025-12-31');
     });
 
     it('should preselect Q3 when current quarter is Q4', () => {
-      jasmine.clock().mockDate(new Date(2026, 10, 1)); // 01.11.2026 → Q4 → Vorquartal Q3/2026
+      vi.setSystemTime(new Date(2026, 10, 1)); // 01.11.2026 → Q4 → Vorquartal Q3/2026
       component.ngOnInit();
       expect(component.dateFrom).toBe('2026-07-01');
       expect(component.dateTo).toBe('2026-09-30');
@@ -104,8 +106,8 @@ describe('RechnungenComponent', () => {
   describe('onSelectionChange', () => {
     it('should update selectedEinheitIds from emitted einheiten', () => {
       component.onSelectionChange([mockConsumer, mockConsumer2]);
-      expect(component.selectedEinheitIds.has(1)).toBeTrue();
-      expect(component.selectedEinheitIds.has(2)).toBeTrue();
+      expect(component.selectedEinheitIds.has(1)).toBe(true);
+      expect(component.selectedEinheitIds.has(2)).toBe(true);
       expect(component.selectedEinheitIds.size).toBe(2);
     });
 
@@ -150,20 +152,20 @@ describe('RechnungenComponent', () => {
       component.dateFrom = '';
       component.dateTo = '2024-12-31';
       component.selectedEinheitIds.add(1);
-      expect(component.canGenerate()).toBeFalse();
+      expect(component.canGenerate()).toBe(false);
     });
 
     it('should return false when dateTo is empty', () => {
       component.dateFrom = '2024-01-01';
       component.dateTo = '';
       component.selectedEinheitIds.add(1);
-      expect(component.canGenerate()).toBeFalse();
+      expect(component.canGenerate()).toBe(false);
     });
 
     it('should return false when no einheiten selected', () => {
       component.dateFrom = '2024-01-01';
       component.dateTo = '2024-12-31';
-      expect(component.canGenerate()).toBeFalse();
+      expect(component.canGenerate()).toBe(false);
     });
 
     it('should return false when generating is in progress', () => {
@@ -171,14 +173,14 @@ describe('RechnungenComponent', () => {
       component.dateTo = '2024-12-31';
       component.selectedEinheitIds.add(1);
       component.generating = true;
-      expect(component.canGenerate()).toBeFalse();
+      expect(component.canGenerate()).toBe(false);
     });
 
     it('should return true when all conditions are met', () => {
       component.dateFrom = '2024-01-01';
       component.dateTo = '2024-12-31';
       component.selectedEinheitIds.add(1);
-      expect(component.canGenerate()).toBeTrue();
+      expect(component.canGenerate()).toBe(true);
     });
   });
 
@@ -213,7 +215,7 @@ describe('RechnungenComponent', () => {
     }));
 
     it('should show error message on failure', () => {
-      rechnungServiceSpy.generateRechnungen.and.returnValue(
+      rechnungServiceSpy.generateRechnungen.mockReturnValue(
         throwError(() => ({ error: { error: 'Tarif fehlt' } }))
       );
       component.onGenerate();
@@ -238,15 +240,15 @@ describe('RechnungenComponent', () => {
 
     it('should reset generating flag after success', () => {
       component.onGenerate();
-      expect(component.generating).toBeFalse();
+      expect(component.generating).toBe(false);
     });
 
     it('should reset generating flag after error', () => {
-      rechnungServiceSpy.generateRechnungen.and.returnValue(
+      rechnungServiceSpy.generateRechnungen.mockReturnValue(
         throwError(() => ({ message: 'error' }))
       );
       component.onGenerate();
-      expect(component.generating).toBeFalse();
+      expect(component.generating).toBe(false);
     });
   });
 

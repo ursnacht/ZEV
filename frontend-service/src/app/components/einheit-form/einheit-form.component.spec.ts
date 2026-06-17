@@ -87,7 +87,7 @@ describe('EinheitFormComponent', () => {
 
   describe('events', () => {
     it('should emit save event with form data on valid submit', () => {
-      const saveSpy = spyOn(component.save, 'emit');
+      const saveSpy = vi.spyOn(component.save, 'emit');
       component.formData = {
         name: 'Test Einheit',
         typ: EinheitTyp.CONSUMER,
@@ -100,7 +100,7 @@ describe('EinheitFormComponent', () => {
     });
 
     it('should not emit save event when name is empty', () => {
-      const saveSpy = spyOn(component.save, 'emit');
+      const saveSpy = vi.spyOn(component.save, 'emit');
       component.formData = {
         name: '',
         typ: EinheitTyp.CONSUMER
@@ -112,7 +112,7 @@ describe('EinheitFormComponent', () => {
     });
 
     it('should not emit save event when name is only whitespace', () => {
-      const saveSpy = spyOn(component.save, 'emit');
+      const saveSpy = vi.spyOn(component.save, 'emit');
       component.formData = {
         name: '   ',
         typ: EinheitTyp.CONSUMER
@@ -124,7 +124,7 @@ describe('EinheitFormComponent', () => {
     });
 
     it('should emit cancel event', () => {
-      const cancelSpy = spyOn(component.cancel, 'emit');
+      const cancelSpy = vi.spyOn(component.cancel, 'emit');
 
       component.onCancel();
 
@@ -140,10 +140,10 @@ describe('EinheitFormComponent', () => {
         messpunkt: 'MP-100'
       };
 
-      const saveSpy = spyOn(component.save, 'emit');
+      const saveSpy = vi.spyOn(component.save, 'emit');
       component.onSubmit();
 
-      expect(saveSpy).toHaveBeenCalledWith(jasmine.objectContaining({
+      expect(saveSpy).toHaveBeenCalledWith(expect.objectContaining({
         typ: EinheitTyp.CONSUMER
       }));
     });
@@ -155,10 +155,10 @@ describe('EinheitFormComponent', () => {
         messpunkt: 'MP-200'
       };
 
-      const saveSpy = spyOn(component.save, 'emit');
+      const saveSpy = vi.spyOn(component.save, 'emit');
       component.onSubmit();
 
-      expect(saveSpy).toHaveBeenCalledWith(jasmine.objectContaining({
+      expect(saveSpy).toHaveBeenCalledWith(expect.objectContaining({
         typ: EinheitTyp.PRODUCER
       }));
     });
@@ -170,10 +170,10 @@ describe('EinheitFormComponent', () => {
         messpunkt: 'MP-SOLAR-001'
       };
 
-      const saveSpy = spyOn(component.save, 'emit');
+      const saveSpy = vi.spyOn(component.save, 'emit');
       component.onSubmit();
 
-      expect(saveSpy).toHaveBeenCalledWith(jasmine.objectContaining({
+      expect(saveSpy).toHaveBeenCalledWith(expect.objectContaining({
         messpunkt: 'MP-SOLAR-001'
       }));
     });
@@ -181,7 +181,7 @@ describe('EinheitFormComponent', () => {
 
   describe('optional fields', () => {
     it('should allow submission without messpunkt', () => {
-      const saveSpy = spyOn(component.save, 'emit');
+      const saveSpy = vi.spyOn(component.save, 'emit');
       component.formData = {
         name: 'Test Einheit',
         typ: EinheitTyp.CONSUMER

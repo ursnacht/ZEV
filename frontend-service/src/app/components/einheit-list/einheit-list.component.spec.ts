@@ -1,4 +1,6 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { createSpyObj, SpyObj } from '../../../testing/spy';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { fakeAsync, tick } from '../../../testing/fake-async';
 import { EinheitListComponent } from './einheit-list.component';
 import { EinheitService } from '../../services/einheit.service';
 import { TranslationService } from '../../services/translation.service';
@@ -8,8 +10,8 @@ import { of, throwError } from 'rxjs';
 describe('EinheitListComponent', () => {
   let component: EinheitListComponent;
   let fixture: ComponentFixture<EinheitListComponent>;
-  let einheitServiceSpy: jasmine.SpyObj<EinheitService>;
-  let translationServiceSpy: jasmine.SpyObj<TranslationService>;
+  let einheitServiceSpy: SpyObj<EinheitService>;
+  let translationServiceSpy: SpyObj<TranslationService>;
 
   const mockEinheiten: Einheit[] = [
     { id: 1, name: 'Wohnung A', typ: EinheitTyp.CONSUMER, messpunkt: 'MP-001' },
@@ -17,13 +19,13 @@ describe('EinheitListComponent', () => {
   ];
 
   beforeEach(async () => {
-    einheitServiceSpy = jasmine.createSpyObj('EinheitService', [
+    einheitServiceSpy = createSpyObj<EinheitService>('EinheitService', [
       'getAllEinheiten', 'createEinheit', 'updateEinheit', 'deleteEinheit'
     ]);
-    translationServiceSpy = jasmine.createSpyObj('TranslationService', ['translate']);
+    translationServiceSpy = createSpyObj<TranslationService>('TranslationService', ['translate']);
 
-    einheitServiceSpy.getAllEinheiten.and.returnValue(of(mockEinheiten));
-    translationServiceSpy.translate.and.callFake((key: string) => key);
+    einheitServiceSpy.getAllEinheiten.mockReturnValue(of(mockEinheiten));
+    translationServiceSpy.translate.mockImplementation((key: string) => key);
 
     await TestBed.configureTestingModule({
       imports: [EinheitListComponent],
@@ -49,7 +51,7 @@ describe('EinheitListComponent', () => {
     });
 
     it('should not show form initially', () => {
-      expect(component.showForm).toBeFalse();
+      expect(component.showForm).toBe(false);
     });
 
     it('should have default sort by name ascending', () => {
@@ -72,7 +74,7 @@ describe('EinheitListComponent', () => {
     });
 
     it('should show error message on failure', () => {
-      einheitServiceSpy.getAllEinheiten.and.returnValue(throwError(() => new Error('Network error')));
+      einheitServiceSpy.getAllEinheiten.mockReturnValue(throwError(() => new Error('Network error')));
       component.loadEinheiten();
       expect(component.message).toContain('Fehler beim Laden');
       expect(component.messageType).toBe('error');
@@ -84,7 +86,7 @@ describe('EinheitListComponent', () => {
       component.selectedEinheit = mockEinheiten[0];
       component.onCreateNew();
       expect(component.selectedEinheit).toBeNull();
-      expect(component.showForm).toBeTrue();
+      expect(component.showForm).toBe(true);
     });
   });
 
@@ -93,7 +95,7 @@ describe('EinheitListComponent', () => {
       const einheit = mockEinheiten[0];
       component.onEdit(einheit);
       expect(component.selectedEinheit).toEqual(einheit);
-      expect(component.showForm).toBeTrue();
+      expect(component.showForm).toBe(true);
     });
 
     it('should create a copy of the einheit', () => {
@@ -105,8 +107,8 @@ describe('EinheitListComponent', () => {
 
   describe('onDelete', () => {
     beforeEach(() => {
-      spyOn(window, 'confirm').and.returnValue(true);
-      einheitServiceSpy.deleteEinheit.and.returnValue(of(undefined as any));
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      einheitServiceSpy.deleteEinheit.mockReturnValue(of(undefined as any));
     });
 
     it('should do nothing when id is undefined', () => {
@@ -126,7 +128,7 @@ describe('EinheitListComponent', () => {
     });
 
     it('should reload einheiten after successful delete', () => {
-      einheitServiceSpy.getAllEinheiten.calls.reset();
+      einheitServiceSpy.getAllEinheiten.mockClear();
       component.onDelete(1);
       expect(einheitServiceSpy.getAllEinheiten).toHaveBeenCalled();
     });
@@ -138,13 +140,13 @@ describe('EinheitListComponent', () => {
     });
 
     it('should not delete when user cancels', () => {
-      (window.confirm as jasmine.Spy).and.returnValue(false);
+      (window.confirm as unknown as ReturnType<typeof vi.fn>).mockReturnValue(false);
       component.onDelete(1);
       expect(einheitServiceSpy.deleteEinheit).not.toHaveBeenCalled();
     });
 
     it('should show error message on delete failure', () => {
-      einheitServiceSpy.deleteEinheit.and.returnValue(throwError(() => new Error('Delete failed')));
+      einheitServiceSpy.deleteEinheit.mockReturnValue(throwError(() => new Error('Delete failed')));
       component.onDelete(1);
       expect(component.message).toContain('Fehler beim Löschen');
       expect(component.messageType).toBe('error');
@@ -153,13 +155,13 @@ describe('EinheitListComponent', () => {
 
   describe('onMenuAction', () => {
     it('should call onEdit for edit action', () => {
-      spyOn(component, 'onEdit');
+      vi.spyOn(component, 'onEdit').mockImplementation(() => {});
       component.onMenuAction('edit', mockEinheiten[0]);
       expect(component.onEdit).toHaveBeenCalledWith(mockEinheiten[0]);
     });
 
     it('should call onDelete for delete action', () => {
-      spyOn(component, 'onDelete');
+      vi.spyOn(component, 'onDelete').mockImplementation(() => {});
       component.onMenuAction('delete', mockEinheiten[0]);
       expect(component.onDelete).toHaveBeenCalledWith(mockEinheiten[0].id);
     });
@@ -172,7 +174,7 @@ describe('EinheitListComponent', () => {
     };
 
     beforeEach(() => {
-      einheitServiceSpy.createEinheit.and.returnValue(of({ ...newEinheit, id: 3 }));
+      einheitServiceSpy.createEinheit.mockReturnValue(of({ ...newEinheit, id: 3 }));
     });
 
     it('should call createEinheit when einheit has no id', () => {
@@ -183,7 +185,7 @@ describe('EinheitListComponent', () => {
     it('should hide form after successful create', () => {
       component.showForm = true;
       component.onFormSubmit(newEinheit);
-      expect(component.showForm).toBeFalse();
+      expect(component.showForm).toBe(false);
     });
 
     it('should show success message after create', () => {
@@ -193,13 +195,13 @@ describe('EinheitListComponent', () => {
     });
 
     it('should reload einheiten after create', () => {
-      einheitServiceSpy.getAllEinheiten.calls.reset();
+      einheitServiceSpy.getAllEinheiten.mockClear();
       component.onFormSubmit(newEinheit);
       expect(einheitServiceSpy.getAllEinheiten).toHaveBeenCalled();
     });
 
     it('should show error message on create failure', () => {
-      einheitServiceSpy.createEinheit.and.returnValue(throwError(() => new Error('Create failed')));
+      einheitServiceSpy.createEinheit.mockReturnValue(throwError(() => new Error('Create failed')));
       component.onFormSubmit(newEinheit);
       expect(component.message).toContain('Fehler beim Erstellen');
       expect(component.messageType).toBe('error');
@@ -214,7 +216,7 @@ describe('EinheitListComponent', () => {
     };
 
     beforeEach(() => {
-      einheitServiceSpy.updateEinheit.and.returnValue(of(existingEinheit));
+      einheitServiceSpy.updateEinheit.mockReturnValue(of(existingEinheit));
     });
 
     it('should call updateEinheit when einheit has id', () => {
@@ -225,7 +227,7 @@ describe('EinheitListComponent', () => {
     it('should hide form after successful update', () => {
       component.showForm = true;
       component.onFormSubmit(existingEinheit);
-      expect(component.showForm).toBeFalse();
+      expect(component.showForm).toBe(false);
     });
 
     it('should show success message after update', () => {
@@ -235,7 +237,7 @@ describe('EinheitListComponent', () => {
     });
 
     it('should show error message on update failure', () => {
-      einheitServiceSpy.updateEinheit.and.returnValue(throwError(() => new Error('Update failed')));
+      einheitServiceSpy.updateEinheit.mockReturnValue(throwError(() => new Error('Update failed')));
       component.onFormSubmit(existingEinheit);
       expect(component.message).toContain('Fehler beim Aktualisieren');
       expect(component.messageType).toBe('error');
@@ -247,7 +249,7 @@ describe('EinheitListComponent', () => {
       component.showForm = true;
       component.selectedEinheit = mockEinheiten[0];
       component.onFormCancel();
-      expect(component.showForm).toBeFalse();
+      expect(component.showForm).toBe(false);
       expect(component.selectedEinheit).toBeNull();
     });
   });
@@ -299,7 +301,7 @@ describe('EinheitListComponent', () => {
 
   describe('message timeout', () => {
     it('should clear message after 5 seconds', fakeAsync(() => {
-      einheitServiceSpy.createEinheit.and.returnValue(of({
+      einheitServiceSpy.createEinheit.mockReturnValue(of({
         id: 3, name: 'Test', typ: EinheitTyp.CONSUMER
       }));
 

@@ -39,7 +39,7 @@ describe('QuarterSelectorComponent', () => {
       // Either year is smaller, or same year with smaller quarter
       const isChronological = firstYear < lastYear ||
         (firstYear === lastYear && firstQ < lastQ);
-      expect(isChronological).toBeTrue();
+      expect(isChronological).toBe(true);
     });
 
     it('should format quarter labels correctly', () => {
@@ -95,7 +95,7 @@ describe('QuarterSelectorComponent', () => {
 
   describe('selectQuarter', () => {
     it('should emit quarterSelected event with von and bis', () => {
-      spyOn(component.quarterSelected, 'emit');
+      vi.spyOn(component.quarterSelected, 'emit');
 
       const testQuarter = component.quarters[0];
       component.selectQuarter(testQuarter);
@@ -107,7 +107,7 @@ describe('QuarterSelectorComponent', () => {
     });
 
     it('should emit correct values for each quarter', () => {
-      spyOn(component.quarterSelected, 'emit');
+      vi.spyOn(component.quarterSelected, 'emit');
 
       component.quarters.forEach(q => {
         component.selectQuarter(q);
@@ -125,7 +125,7 @@ describe('QuarterSelectorComponent', () => {
       component.selectedVon = testQuarter.von;
       component.selectedBis = testQuarter.bis;
 
-      expect(component.isSelected(testQuarter)).toBeTrue();
+      expect(component.isSelected(testQuarter)).toBe(true);
     });
 
     it('should return false when selectedVon does not match', () => {
@@ -133,7 +133,7 @@ describe('QuarterSelectorComponent', () => {
       component.selectedVon = '2000-01-01';
       component.selectedBis = testQuarter.bis;
 
-      expect(component.isSelected(testQuarter)).toBeFalse();
+      expect(component.isSelected(testQuarter)).toBe(false);
     });
 
     it('should return false when selectedBis does not match', () => {
@@ -141,14 +141,14 @@ describe('QuarterSelectorComponent', () => {
       component.selectedVon = testQuarter.von;
       component.selectedBis = '2000-12-31';
 
-      expect(component.isSelected(testQuarter)).toBeFalse();
+      expect(component.isSelected(testQuarter)).toBe(false);
     });
 
     it('should return false when both inputs are empty', () => {
       component.selectedVon = '';
       component.selectedBis = '';
 
-      expect(component.isSelected(component.quarters[0])).toBeFalse();
+      expect(component.isSelected(component.quarters[0])).toBe(false);
     });
 
     it('should return false for non-matching quarter', () => {
@@ -157,7 +157,7 @@ describe('QuarterSelectorComponent', () => {
       component.selectedVon = firstQuarter.von;
       component.selectedBis = firstQuarter.bis;
 
-      expect(component.isSelected(lastQuarter)).toBeFalse();
+      expect(component.isSelected(lastQuarter)).toBe(false);
     });
   });
 

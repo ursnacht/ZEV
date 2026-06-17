@@ -70,7 +70,7 @@ describe('TarifFormComponent', () => {
     });
 
     it('should default produzentVerrechnen to false', () => {
-      expect(component.formData.produzentVerrechnen).toBeFalse();
+      expect(component.formData.produzentVerrechnen).toBe(false);
     });
   });
 
@@ -100,7 +100,7 @@ describe('TarifFormComponent', () => {
         produzentVerrechnen: true
       };
       component.ngOnInit();
-      expect(component.formData.produzentVerrechnen).toBeTrue();
+      expect(component.formData.produzentVerrechnen).toBe(true);
     });
   });
 
@@ -113,7 +113,7 @@ describe('TarifFormComponent', () => {
         gueltigVon: '2024-01-01',
         gueltigBis: '2024-12-31'
       };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when bezeichnung is only whitespace', () => {
@@ -124,7 +124,7 @@ describe('TarifFormComponent', () => {
         gueltigVon: '2024-01-01',
         gueltigBis: '2024-12-31'
       };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when preis is zero', () => {
@@ -135,7 +135,7 @@ describe('TarifFormComponent', () => {
         gueltigVon: '2024-01-01',
         gueltigBis: '2024-12-31'
       };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when preis is negative', () => {
@@ -146,7 +146,7 @@ describe('TarifFormComponent', () => {
         gueltigVon: '2024-01-01',
         gueltigBis: '2024-12-31'
       };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when gueltigVon is empty', () => {
@@ -157,7 +157,7 @@ describe('TarifFormComponent', () => {
         gueltigVon: '',
         gueltigBis: '2024-12-31'
       };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when gueltigBis is empty', () => {
@@ -168,7 +168,7 @@ describe('TarifFormComponent', () => {
         gueltigVon: '2024-01-01',
         gueltigBis: ''
       };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when gueltigVon is after gueltigBis', () => {
@@ -179,7 +179,7 @@ describe('TarifFormComponent', () => {
         gueltigVon: '2024-12-31',
         gueltigBis: '2024-01-01'
       };
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return true when all fields are valid', () => {
@@ -190,7 +190,7 @@ describe('TarifFormComponent', () => {
         gueltigVon: '2024-01-01',
         gueltigBis: '2024-12-31'
       };
-      expect(component.isFormValid()).toBeTrue();
+      expect(component.isFormValid()).toBe(true);
     });
 
     it('should return true when gueltigVon equals gueltigBis', () => {
@@ -201,7 +201,7 @@ describe('TarifFormComponent', () => {
         gueltigVon: '2024-06-15',
         gueltigBis: '2024-06-15'
       };
-      expect(component.isFormValid()).toBeTrue();
+      expect(component.isFormValid()).toBe(true);
     });
   });
 
@@ -209,31 +209,31 @@ describe('TarifFormComponent', () => {
     it('should return true when dates are not entered yet', () => {
       component.formData.gueltigVon = '';
       component.formData.gueltigBis = '';
-      expect(component.isDateRangeValid()).toBeTrue();
+      expect(component.isDateRangeValid()).toBe(true);
     });
 
     it('should return true when only gueltigVon is empty', () => {
       component.formData.gueltigVon = '';
       component.formData.gueltigBis = '2024-12-31';
-      expect(component.isDateRangeValid()).toBeTrue();
+      expect(component.isDateRangeValid()).toBe(true);
     });
 
     it('should return true when gueltigVon is before gueltigBis', () => {
       component.formData.gueltigVon = '2024-01-01';
       component.formData.gueltigBis = '2024-12-31';
-      expect(component.isDateRangeValid()).toBeTrue();
+      expect(component.isDateRangeValid()).toBe(true);
     });
 
     it('should return false when gueltigVon is after gueltigBis', () => {
       component.formData.gueltigVon = '2024-12-31';
       component.formData.gueltigBis = '2024-01-01';
-      expect(component.isDateRangeValid()).toBeFalse();
+      expect(component.isDateRangeValid()).toBe(false);
     });
   });
 
   describe('events', () => {
     it('should emit save event with form data on valid submit', () => {
-      const saveSpy = spyOn(component.save, 'emit');
+      const saveSpy = vi.spyOn(component.save, 'emit');
       component.formData = {
         bezeichnung: 'Test Tarif',
         tariftyp: TarifTyp.ZEV,
@@ -248,7 +248,7 @@ describe('TarifFormComponent', () => {
     });
 
     it('should not emit save event on invalid submit', () => {
-      const saveSpy = spyOn(component.save, 'emit');
+      const saveSpy = vi.spyOn(component.save, 'emit');
       component.formData = {
         bezeichnung: '',
         tariftyp: TarifTyp.ZEV,
@@ -263,7 +263,7 @@ describe('TarifFormComponent', () => {
     });
 
     it('should emit cancel event', () => {
-      const cancelSpy = spyOn(component.cancel, 'emit');
+      const cancelSpy = vi.spyOn(component.cancel, 'emit');
 
       component.onCancel();
 

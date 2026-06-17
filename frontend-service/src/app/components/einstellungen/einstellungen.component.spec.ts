@@ -1,4 +1,6 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { createSpyObj, SpyObj } from '../../../testing/spy';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { fakeAsync, tick } from '../../../testing/fake-async';
 import { EinstellungenComponent } from './einstellungen.component';
 import { EinstellungenService } from '../../services/einstellungen.service';
 import { TranslationService } from '../../services/translation.service';
@@ -8,7 +10,7 @@ import { of, throwError } from 'rxjs';
 describe('EinstellungenComponent', () => {
   let component: EinstellungenComponent;
   let fixture: ComponentFixture<EinstellungenComponent>;
-  let einstellungenServiceSpy: jasmine.SpyObj<EinstellungenService>;
+  let einstellungenServiceSpy: SpyObj<EinstellungenService>;
 
   const mockEinstellungen: Einstellungen = {
     id: 1,
@@ -29,8 +31,8 @@ describe('EinstellungenComponent', () => {
   };
 
   beforeEach(async () => {
-    einstellungenServiceSpy = jasmine.createSpyObj('EinstellungenService', ['getEinstellungen', 'saveEinstellungen']);
-    einstellungenServiceSpy.getEinstellungen.and.returnValue(of(mockEinstellungen));
+    einstellungenServiceSpy = createSpyObj<EinstellungenService>('EinstellungenService', ['getEinstellungen', 'saveEinstellungen']);
+    einstellungenServiceSpy.getEinstellungen.mockReturnValue(of(mockEinstellungen));
 
     await TestBed.configureTestingModule({
       imports: [EinstellungenComponent],
@@ -68,11 +70,11 @@ describe('EinstellungenComponent', () => {
     });
 
     it('should set loading to false after load', () => {
-      expect(component.loading).toBeFalse();
+      expect(component.loading).toBe(false);
     });
 
     it('should initialize with empty form when no settings exist', () => {
-      einstellungenServiceSpy.getEinstellungen.and.returnValue(of(null));
+      einstellungenServiceSpy.getEinstellungen.mockReturnValue(of(null));
       component.loadEinstellungen();
 
       expect(component.formData.zahlungsfrist).toBe('30 Tage'); // still from initial load
@@ -87,7 +89,7 @@ describe('EinstellungenComponent', () => {
           steller: null as any
         }
       };
-      einstellungenServiceSpy.getEinstellungen.and.returnValue(of(dataWithoutSteller));
+      einstellungenServiceSpy.getEinstellungen.mockReturnValue(of(dataWithoutSteller));
 
       component.loadEinstellungen();
 
@@ -95,7 +97,7 @@ describe('EinstellungenComponent', () => {
     });
 
     it('should show error message on load failure', () => {
-      einstellungenServiceSpy.getEinstellungen.and.returnValue(throwError(() => ({ status: 500 })));
+      einstellungenServiceSpy.getEinstellungen.mockReturnValue(throwError(() => ({ status: 500 })));
 
       component.loadEinstellungen();
 
@@ -104,7 +106,7 @@ describe('EinstellungenComponent', () => {
     });
 
     it('should not show error message on 204 No Content', () => {
-      einstellungenServiceSpy.getEinstellungen.and.returnValue(throwError(() => ({ status: 204 })));
+      einstellungenServiceSpy.getEinstellungen.mockReturnValue(throwError(() => ({ status: 204 })));
 
       component.message = '';
       component.loadEinstellungen();
@@ -128,84 +130,84 @@ describe('EinstellungenComponent', () => {
     });
 
     it('should return true when all fields are valid', () => {
-      expect(component.isFormValid()).toBeTrue();
+      expect(component.isFormValid()).toBe(true);
     });
 
     it('should return false when zahlungsfrist is empty', () => {
       component.formData.zahlungsfrist = '';
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when zahlungsfrist is only whitespace', () => {
       component.formData.zahlungsfrist = '   ';
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when iban is empty', () => {
       component.formData.iban = '';
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when iban is invalid format', () => {
       component.formData.iban = 'DE89370400440532013000';
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when steller name is empty', () => {
       component.formData.steller.name = '';
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when steller strasse is empty', () => {
       component.formData.steller.strasse = '';
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when steller plz is empty', () => {
       component.formData.steller.plz = '';
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when steller ort is empty', () => {
       component.formData.steller.ort = '';
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return false when steller name is only whitespace', () => {
       component.formData.steller.name = '   ';
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
   });
 
   describe('isIbanValid', () => {
     it('should return true for valid Swiss IBAN without spaces', () => {
       component.formData.iban = 'CH7006300016946459910';
-      expect(component.isIbanValid()).toBeTrue();
+      expect(component.isIbanValid()).toBe(true);
     });
 
     it('should return true for valid Swiss IBAN with spaces', () => {
       component.formData.iban = 'CH70 0630 0016 9464 5991 0';
-      expect(component.isIbanValid()).toBeTrue();
+      expect(component.isIbanValid()).toBe(true);
     });
 
     it('should return true when iban is empty (not entered yet)', () => {
       component.formData.iban = '';
-      expect(component.isIbanValid()).toBeTrue();
+      expect(component.isIbanValid()).toBe(true);
     });
 
     it('should return false for non-Swiss IBAN', () => {
       component.formData.iban = 'DE89370400440532013000';
-      expect(component.isIbanValid()).toBeFalse();
+      expect(component.isIbanValid()).toBe(false);
     });
 
     it('should return false for IBAN with too few digits', () => {
       component.formData.iban = 'CH700630001694';
-      expect(component.isIbanValid()).toBeFalse();
+      expect(component.isIbanValid()).toBe(false);
     });
 
     it('should return false for IBAN with letters after CH prefix', () => {
       component.formData.iban = 'CH70ABCD0016946459910';
-      expect(component.isIbanValid()).toBeFalse();
+      expect(component.isIbanValid()).toBe(false);
     });
   });
 
@@ -225,7 +227,7 @@ describe('EinstellungenComponent', () => {
 
     it('should save einstellungen on valid submit', () => {
       const savedEinstellungen: Einstellungen = { id: 1, rechnung: component.formData };
-      einstellungenServiceSpy.saveEinstellungen.and.returnValue(of(savedEinstellungen));
+      einstellungenServiceSpy.saveEinstellungen.mockReturnValue(of(savedEinstellungen));
 
       component.onSubmit();
 
@@ -234,7 +236,7 @@ describe('EinstellungenComponent', () => {
 
     it('should set einstellungenId after successful save', () => {
       const savedEinstellungen: Einstellungen = { id: 5, rechnung: component.formData };
-      einstellungenServiceSpy.saveEinstellungen.and.returnValue(of(savedEinstellungen));
+      einstellungenServiceSpy.saveEinstellungen.mockReturnValue(of(savedEinstellungen));
 
       component.einstellungenId = undefined;
       component.onSubmit();
@@ -245,7 +247,7 @@ describe('EinstellungenComponent', () => {
 
     it('should show success message after save', () => {
       const savedEinstellungen: Einstellungen = { id: 1, rechnung: component.formData };
-      einstellungenServiceSpy.saveEinstellungen.and.returnValue(of(savedEinstellungen));
+      einstellungenServiceSpy.saveEinstellungen.mockReturnValue(of(savedEinstellungen));
 
       component.onSubmit();
 
@@ -262,7 +264,7 @@ describe('EinstellungenComponent', () => {
     });
 
     it('should show error message on save failure', () => {
-      einstellungenServiceSpy.saveEinstellungen.and.returnValue(throwError(() => ({ error: 'Server Error' })));
+      einstellungenServiceSpy.saveEinstellungen.mockReturnValue(throwError(() => ({ error: 'Server Error' })));
 
       component.onSubmit();
 
@@ -271,7 +273,7 @@ describe('EinstellungenComponent', () => {
     });
 
     it('should show default error message when error has no body', () => {
-      einstellungenServiceSpy.saveEinstellungen.and.returnValue(throwError(() => ({ error: null })));
+      einstellungenServiceSpy.saveEinstellungen.mockReturnValue(throwError(() => ({ error: null })));
 
       component.onSubmit();
 
@@ -282,22 +284,22 @@ describe('EinstellungenComponent', () => {
     it('should pass existing id when updating', () => {
       component.einstellungenId = 1;
       const savedEinstellungen: Einstellungen = { id: 1, rechnung: component.formData };
-      einstellungenServiceSpy.saveEinstellungen.and.returnValue(of(savedEinstellungen));
+      einstellungenServiceSpy.saveEinstellungen.mockReturnValue(of(savedEinstellungen));
 
       component.onSubmit();
 
-      const savedArg = einstellungenServiceSpy.saveEinstellungen.calls.mostRecent().args[0];
+      const savedArg = einstellungenServiceSpy.saveEinstellungen.mock.lastCall![0];
       expect(savedArg.id).toBe(1);
     });
 
     it('should pass undefined id when creating new', () => {
       component.einstellungenId = undefined;
       const savedEinstellungen: Einstellungen = { id: 2, rechnung: component.formData };
-      einstellungenServiceSpy.saveEinstellungen.and.returnValue(of(savedEinstellungen));
+      einstellungenServiceSpy.saveEinstellungen.mockReturnValue(of(savedEinstellungen));
 
       component.onSubmit();
 
-      const savedArg = einstellungenServiceSpy.saveEinstellungen.calls.mostRecent().args[0];
+      const savedArg = einstellungenServiceSpy.saveEinstellungen.mock.lastCall![0];
       expect(savedArg.id).toBeUndefined();
     });
   });
@@ -305,7 +307,7 @@ describe('EinstellungenComponent', () => {
   describe('messages', () => {
     it('should auto-dismiss success message after timeout', fakeAsync(() => {
       const savedEinstellungen: Einstellungen = { id: 1, rechnung: component.formData };
-      einstellungenServiceSpy.saveEinstellungen.and.returnValue(of(savedEinstellungen));
+      einstellungenServiceSpy.saveEinstellungen.mockReturnValue(of(savedEinstellungen));
       component.formData = { ...mockEinstellungen.rechnung };
 
       component.onSubmit();
@@ -316,7 +318,7 @@ describe('EinstellungenComponent', () => {
     }));
 
     it('should not auto-dismiss error message', fakeAsync(() => {
-      einstellungenServiceSpy.saveEinstellungen.and.returnValue(throwError(() => ({ error: 'Error' })));
+      einstellungenServiceSpy.saveEinstellungen.mockReturnValue(throwError(() => ({ error: 'Error' })));
       component.formData = { ...mockEinstellungen.rechnung };
 
       component.onSubmit();

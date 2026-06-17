@@ -1,3 +1,4 @@
+import { createSpyObj, SpyObj } from '../../../testing/spy';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { EinheitSelectorComponent } from './einheit-selector.component';
 import { EinheitService } from '../../services/einheit.service';
@@ -8,18 +9,18 @@ import { of } from 'rxjs';
 describe('EinheitSelectorComponent', () => {
   let component: EinheitSelectorComponent;
   let fixture: ComponentFixture<EinheitSelectorComponent>;
-  let einheitServiceSpy: jasmine.SpyObj<EinheitService>;
+  let einheitServiceSpy: SpyObj<EinheitService>;
 
   const consumer1: Einheit = { id: 1, name: 'Wohnung A', typ: EinheitTyp.CONSUMER };
   const consumer2: Einheit = { id: 2, name: 'Wohnung B', typ: EinheitTyp.CONSUMER };
   const producer: Einheit = { id: 3, name: 'Solar Anlage', typ: EinheitTyp.PRODUCER };
 
   beforeEach(async () => {
-    einheitServiceSpy = jasmine.createSpyObj('EinheitService', ['getAllEinheiten']);
-    einheitServiceSpy.getAllEinheiten.and.returnValue(of([]));
+    einheitServiceSpy = createSpyObj<EinheitService>('EinheitService', ['getAllEinheiten']);
+    einheitServiceSpy.getAllEinheiten.mockReturnValue(of([]));
 
-    const translationServiceSpy = jasmine.createSpyObj('TranslationService', ['translate']);
-    translationServiceSpy.translate.and.callFake((key: string) => key);
+    const translationServiceSpy = createSpyObj<TranslationService>('TranslationService', ['translate']);
+    translationServiceSpy.translate.mockImplementation((key: string) => key);
 
     await TestBed.configureTestingModule({
       imports: [EinheitSelectorComponent],
@@ -53,17 +54,17 @@ describe('EinheitSelectorComponent', () => {
   describe('onSelectAllToggle (default - alle)', () => {
     it('should select all einheiten including producers', () => {
       component.onSelectAllToggle();
-      expect(component.selectedEinheitIds.has(1)).toBeTrue();
-      expect(component.selectedEinheitIds.has(2)).toBeTrue();
-      expect(component.selectedEinheitIds.has(3)).toBeTrue();
-      expect(component.allSelected()).toBeTrue();
+      expect(component.selectedEinheitIds.has(1)).toBe(true);
+      expect(component.selectedEinheitIds.has(2)).toBe(true);
+      expect(component.selectedEinheitIds.has(3)).toBe(true);
+      expect(component.allSelected()).toBe(true);
     });
 
     it('should clear selection on second toggle', () => {
       component.onSelectAllToggle();
       component.onSelectAllToggle();
       expect(component.selectedEinheitIds.size).toBe(0);
-      expect(component.allSelected()).toBeFalse();
+      expect(component.allSelected()).toBe(false);
     });
   });
 
@@ -74,15 +75,15 @@ describe('EinheitSelectorComponent', () => {
 
     it('should select ONLY consumers, not producers', () => {
       component.onSelectAllToggle();
-      expect(component.selectedEinheitIds.has(1)).toBeTrue();
-      expect(component.selectedEinheitIds.has(2)).toBeTrue();
-      expect(component.selectedEinheitIds.has(3)).toBeFalse();
+      expect(component.selectedEinheitIds.has(1)).toBe(true);
+      expect(component.selectedEinheitIds.has(2)).toBe(true);
+      expect(component.selectedEinheitIds.has(3)).toBe(false);
     });
 
     it('should report allSelected as true when all consumers are selected', () => {
       component.onSelectAllToggle();
-      expect(component.allSelected()).toBeTrue();
-      expect(component.someSelected()).toBeFalse();
+      expect(component.allSelected()).toBe(true);
+      expect(component.someSelected()).toBe(false);
     });
 
     it('should emit only the selected consumers', () => {

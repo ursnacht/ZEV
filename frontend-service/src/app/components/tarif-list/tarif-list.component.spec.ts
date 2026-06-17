@@ -1,4 +1,6 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { createSpyObj, SpyObj } from '../../../testing/spy';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { fakeAsync, tick } from '../../../testing/fake-async';
 import { TarifListComponent } from './tarif-list.component';
 import { TarifService } from '../../services/tarif.service';
 import { TranslationService } from '../../services/translation.service';
@@ -8,8 +10,8 @@ import { of, throwError } from 'rxjs';
 describe('TarifListComponent', () => {
   let component: TarifListComponent;
   let fixture: ComponentFixture<TarifListComponent>;
-  let tarifServiceSpy: jasmine.SpyObj<TarifService>;
-  let translationServiceSpy: jasmine.SpyObj<TranslationService>;
+  let tarifServiceSpy: SpyObj<TarifService>;
+  let translationServiceSpy: SpyObj<TranslationService>;
 
   const mockTarife: Tarif[] = [
     {
@@ -31,13 +33,13 @@ describe('TarifListComponent', () => {
   ];
 
   beforeEach(async () => {
-    tarifServiceSpy = jasmine.createSpyObj('TarifService', [
+    tarifServiceSpy = createSpyObj<TarifService>('TarifService', [
       'getAllTarife', 'createTarif', 'updateTarif', 'deleteTarif', 'validateQuartale', 'validateJahre'
     ]);
-    translationServiceSpy = jasmine.createSpyObj('TranslationService', ['translate']);
+    translationServiceSpy = createSpyObj<TranslationService>('TranslationService', ['translate']);
 
-    tarifServiceSpy.getAllTarife.and.returnValue(of(mockTarife));
-    translationServiceSpy.translate.and.callFake((key: string) => key);
+    tarifServiceSpy.getAllTarife.mockReturnValue(of(mockTarife));
+    translationServiceSpy.translate.mockImplementation((key: string) => key);
 
     await TestBed.configureTestingModule({
       imports: [TarifListComponent],
@@ -63,7 +65,7 @@ describe('TarifListComponent', () => {
     });
 
     it('should not show form initially', () => {
-      expect(component.showForm).toBeFalse();
+      expect(component.showForm).toBe(false);
     });
 
     it('should have default sort by tariftyp ascending', () => {
@@ -87,7 +89,7 @@ describe('TarifListComponent', () => {
     });
 
     it('should show error message on failure', () => {
-      tarifServiceSpy.getAllTarife.and.returnValue(throwError(() => new Error('Network error')));
+      tarifServiceSpy.getAllTarife.mockReturnValue(throwError(() => new Error('Network error')));
       component.loadTarife();
       expect(component.message).toBe('FEHLER_LADEN_TARIFE');
       expect(component.messageType).toBe('error');
@@ -99,7 +101,7 @@ describe('TarifListComponent', () => {
       component.selectedTarif = mockTarife[0];
       component.onCreateNew();
       expect(component.selectedTarif).toBeNull();
-      expect(component.showForm).toBeTrue();
+      expect(component.showForm).toBe(true);
     });
   });
 
@@ -108,7 +110,7 @@ describe('TarifListComponent', () => {
       const tarif = mockTarife[0];
       component.onEdit(tarif);
       expect(component.selectedTarif).toEqual(tarif);
-      expect(component.showForm).toBeTrue();
+      expect(component.showForm).toBe(true);
     });
 
     it('should create a copy of the tarif', () => {
@@ -124,7 +126,7 @@ describe('TarifListComponent', () => {
       component.onCopy(tarif);
       expect(component.selectedTarif).toBeTruthy();
       expect(component.selectedTarif!.id).toBeUndefined();
-      expect(component.showForm).toBeTrue();
+      expect(component.showForm).toBe(true);
     });
 
     it('should copy all properties except id', () => {
@@ -146,8 +148,8 @@ describe('TarifListComponent', () => {
 
   describe('onDelete', () => {
     beforeEach(() => {
-      spyOn(window, 'confirm').and.returnValue(true);
-      tarifServiceSpy.deleteTarif.and.returnValue(of(undefined));
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      tarifServiceSpy.deleteTarif.mockReturnValue(of(undefined));
     });
 
     it('should do nothing when id is undefined', () => {
@@ -167,7 +169,7 @@ describe('TarifListComponent', () => {
     });
 
     it('should reload tarife after successful delete', () => {
-      tarifServiceSpy.getAllTarife.calls.reset();
+      tarifServiceSpy.getAllTarife.mockClear();
       component.onDelete(1);
       expect(tarifServiceSpy.getAllTarife).toHaveBeenCalled();
     });
@@ -179,13 +181,13 @@ describe('TarifListComponent', () => {
     });
 
     it('should not delete when user cancels', () => {
-      (window.confirm as jasmine.Spy).and.returnValue(false);
+      (window.confirm as unknown as ReturnType<typeof vi.fn>).mockReturnValue(false);
       component.onDelete(1);
       expect(tarifServiceSpy.deleteTarif).not.toHaveBeenCalled();
     });
 
     it('should show error message on delete failure', () => {
-      tarifServiceSpy.deleteTarif.and.returnValue(throwError(() => new Error('Delete failed')));
+      tarifServiceSpy.deleteTarif.mockReturnValue(throwError(() => new Error('Delete failed')));
       component.onDelete(1);
       expect(component.message).toBe('FEHLER_LOESCHEN_TARIF');
       expect(component.messageType).toBe('error');
@@ -194,19 +196,19 @@ describe('TarifListComponent', () => {
 
   describe('onMenuAction', () => {
     it('should call onEdit for edit action', () => {
-      spyOn(component, 'onEdit');
+      vi.spyOn(component, 'onEdit').mockImplementation(() => {});
       component.onMenuAction('edit', mockTarife[0]);
       expect(component.onEdit).toHaveBeenCalledWith(mockTarife[0]);
     });
 
     it('should call onCopy for copy action', () => {
-      spyOn(component, 'onCopy');
+      vi.spyOn(component, 'onCopy').mockImplementation(() => {});
       component.onMenuAction('copy', mockTarife[0]);
       expect(component.onCopy).toHaveBeenCalledWith(mockTarife[0]);
     });
 
     it('should call onDelete for delete action', () => {
-      spyOn(component, 'onDelete');
+      vi.spyOn(component, 'onDelete').mockImplementation(() => {});
       component.onMenuAction('delete', mockTarife[0]);
       expect(component.onDelete).toHaveBeenCalledWith(mockTarife[0].id);
     });
@@ -222,7 +224,7 @@ describe('TarifListComponent', () => {
     };
 
     beforeEach(() => {
-      tarifServiceSpy.createTarif.and.returnValue(of({ ...newTarif, id: 3 }));
+      tarifServiceSpy.createTarif.mockReturnValue(of({ ...newTarif, id: 3 }));
     });
 
     it('should call createTarif when tarif has no id', () => {
@@ -233,7 +235,7 @@ describe('TarifListComponent', () => {
     it('should hide form after successful create', () => {
       component.showForm = true;
       component.onFormSubmit(newTarif);
-      expect(component.showForm).toBeFalse();
+      expect(component.showForm).toBe(false);
     });
 
     it('should show success message after create', () => {
@@ -243,13 +245,13 @@ describe('TarifListComponent', () => {
     });
 
     it('should reload tarife after create', () => {
-      tarifServiceSpy.getAllTarife.calls.reset();
+      tarifServiceSpy.getAllTarife.mockClear();
       component.onFormSubmit(newTarif);
       expect(tarifServiceSpy.getAllTarife).toHaveBeenCalled();
     });
 
     it('should show error message on create failure', () => {
-      tarifServiceSpy.createTarif.and.returnValue(throwError(() => ({ error: 'CUSTOM_ERROR' })));
+      tarifServiceSpy.createTarif.mockReturnValue(throwError(() => ({ error: 'CUSTOM_ERROR' })));
       component.onFormSubmit(newTarif);
       expect(component.message).toBe('CUSTOM_ERROR');
       expect(component.messageType).toBe('error');
@@ -267,7 +269,7 @@ describe('TarifListComponent', () => {
     };
 
     beforeEach(() => {
-      tarifServiceSpy.updateTarif.and.returnValue(of(existingTarif));
+      tarifServiceSpy.updateTarif.mockReturnValue(of(existingTarif));
     });
 
     it('should call updateTarif when tarif has id', () => {
@@ -278,7 +280,7 @@ describe('TarifListComponent', () => {
     it('should hide form after successful update', () => {
       component.showForm = true;
       component.onFormSubmit(existingTarif);
-      expect(component.showForm).toBeFalse();
+      expect(component.showForm).toBe(false);
     });
 
     it('should show success message after update', () => {
@@ -293,7 +295,7 @@ describe('TarifListComponent', () => {
       component.showForm = true;
       component.selectedTarif = mockTarife[0];
       component.onFormCancel();
-      expect(component.showForm).toBeFalse();
+      expect(component.showForm).toBe(false);
       expect(component.selectedTarif).toBeNull();
     });
   });
@@ -341,7 +343,7 @@ describe('TarifListComponent', () => {
 
   describe('message timeout', () => {
     it('should clear message after 5 seconds', fakeAsync(() => {
-      tarifServiceSpy.createTarif.and.returnValue(of({
+      tarifServiceSpy.createTarif.mockReturnValue(of({
         id: 1,
         bezeichnung: 'Test',
         tariftyp: TarifTyp.ZEV,
@@ -380,13 +382,13 @@ describe('TarifListComponent', () => {
     };
 
     it('should call validateQuartale on service', () => {
-      tarifServiceSpy.validateQuartale.and.returnValue(of(validResult));
+      tarifServiceSpy.validateQuartale.mockReturnValue(of(validResult));
       component.onValidateQuartale();
       expect(tarifServiceSpy.validateQuartale).toHaveBeenCalled();
     });
 
     it('should show success message when valid', () => {
-      tarifServiceSpy.validateQuartale.and.returnValue(of(validResult));
+      tarifServiceSpy.validateQuartale.mockReturnValue(of(validResult));
       component.onValidateQuartale();
       expect(component.message).toBe('VALIDIERUNG_ERFOLGREICH');
       expect(component.messageType).toBe('success');
@@ -394,7 +396,7 @@ describe('TarifListComponent', () => {
     });
 
     it('should show error message with errors when invalid', () => {
-      tarifServiceSpy.validateQuartale.and.returnValue(of(invalidResult));
+      tarifServiceSpy.validateQuartale.mockReturnValue(of(invalidResult));
       component.onValidateQuartale();
       expect(component.message).toBe('VALIDIERUNG_FEHLER');
       expect(component.messageType).toBe('error');
@@ -403,13 +405,13 @@ describe('TarifListComponent', () => {
     });
 
     it('should set message as persistent when validation fails', () => {
-      tarifServiceSpy.validateQuartale.and.returnValue(of(invalidResult));
+      tarifServiceSpy.validateQuartale.mockReturnValue(of(invalidResult));
       component.onValidateQuartale();
-      expect(component.messagePersistent).toBeTrue();
+      expect(component.messagePersistent).toBe(true);
     });
 
     it('should show error message on service error', () => {
-      tarifServiceSpy.validateQuartale.and.returnValue(throwError(() => new Error('Network error')));
+      tarifServiceSpy.validateQuartale.mockReturnValue(throwError(() => new Error('Network error')));
       component.onValidateQuartale();
       expect(component.message).toBe('FEHLER_VALIDIERUNG');
       expect(component.messageType).toBe('error');
@@ -430,20 +432,20 @@ describe('TarifListComponent', () => {
     };
 
     it('should call validateJahre on service', () => {
-      tarifServiceSpy.validateJahre.and.returnValue(of(validResult));
+      tarifServiceSpy.validateJahre.mockReturnValue(of(validResult));
       component.onValidateJahre();
       expect(tarifServiceSpy.validateJahre).toHaveBeenCalled();
     });
 
     it('should show success message when valid', () => {
-      tarifServiceSpy.validateJahre.and.returnValue(of(validResult));
+      tarifServiceSpy.validateJahre.mockReturnValue(of(validResult));
       component.onValidateJahre();
       expect(component.message).toBe('VALIDIERUNG_ERFOLGREICH');
       expect(component.messageType).toBe('success');
     });
 
     it('should show multiple errors when invalid', () => {
-      tarifServiceSpy.validateJahre.and.returnValue(of(invalidResult));
+      tarifServiceSpy.validateJahre.mockReturnValue(of(invalidResult));
       component.onValidateJahre();
       expect(component.validationErrors.length).toBe(2);
       expect(component.validationErrors[0]).toContain('2024');
@@ -461,7 +463,7 @@ describe('TarifListComponent', () => {
 
       expect(component.message).toBe('');
       expect(component.validationErrors).toEqual([]);
-      expect(component.messagePersistent).toBeFalse();
+      expect(component.messagePersistent).toBe(false);
     });
   });
 
@@ -472,12 +474,12 @@ describe('TarifListComponent', () => {
         message: 'Validierungsfehler',
         errors: ['Q1/2024: Error']
       };
-      tarifServiceSpy.validateQuartale.and.returnValue(of(invalidResult));
+      tarifServiceSpy.validateQuartale.mockReturnValue(of(invalidResult));
 
       component.onValidateQuartale();
 
       expect(component.message).toBe('VALIDIERUNG_FEHLER');
-      expect(component.messagePersistent).toBeTrue();
+      expect(component.messagePersistent).toBe(true);
 
       tick(5000);
 
@@ -491,12 +493,12 @@ describe('TarifListComponent', () => {
         message: 'Alle Quartale sind vollständig abgedeckt',
         errors: []
       };
-      tarifServiceSpy.validateQuartale.and.returnValue(of(validResult));
+      tarifServiceSpy.validateQuartale.mockReturnValue(of(validResult));
 
       component.onValidateQuartale();
 
       expect(component.message).toBe('VALIDIERUNG_ERFOLGREICH');
-      expect(component.messagePersistent).toBeFalse();
+      expect(component.messagePersistent).toBe(false);
 
       tick(5000);
 

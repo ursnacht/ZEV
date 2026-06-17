@@ -2,7 +2,7 @@
 
 ## Zusammenfassung
 
-Die Frontend-Unit-/Component-Tests werden von Jasmine + Karma auf **Vitest** umgestellt, ausgeführt über den Angular-Builder `@angular-devkit/build-angular:unit-test` (Runner `vitest`, Umgebung `jsdom`, headless). Karma und Jasmine werden vollständig entfernt, alle **32 `*.spec.ts`-Dateien** werden 1:1 auf Vitest-Idiome migriert (keine inhaltlichen Test-Änderungen). E2E (Playwright) und der Produktions-Build bleiben unangetastet.
+Die Frontend-Unit-/Component-Tests werden von Jasmine + Karma auf **Vitest** umgestellt, ausgeführt über den Angular-Builder `@angular/build:unit-test` (Runner `vitest`, Umgebung `jsdom`, headless). Karma und Jasmine werden vollständig entfernt, alle **32 `*.spec.ts`-Dateien** werden 1:1 auf Vitest-Idiome migriert (keine inhaltlichen Test-Änderungen). E2E (Playwright) und der Produktions-Build bleiben unangetastet.
 
 ---
 
@@ -30,19 +30,26 @@ Die Frontend-Unit-/Component-Tests werden von Jasmine + Karma auf **Vitest** umg
 
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
-| [ ] | 1. Dependencies | `karma*`/`jasmine*`/`@types/jasmine` entfernen; `vitest`, `jsdom`, Coverage-Provider (`@vitest/coverage-v8`) gemäß Builder-Vorgabe ergänzen |
-| [ ] | 2. angular.json `test`-Target | Builder `:karma` → `:unit-test`; Runner `vitest`, Umgebung `jsdom`, `tsConfig`, `buildTarget`, `setupFiles`; Karma-/Polyfill-Optionen anpassen |
-| [ ] | 3. tsconfig.spec.json | `types: ["jasmine"]` → Vitest-Globals (`["vitest/globals"]` o. ä.); `include` weiterhin alle `*.spec.ts` |
-| [ ] | 4. Test-Setup & Bootstrap | `src/test-setup.ts` neu (Zone-Testing-Init / TestBed-Env); `karma.conf.js` und `src/test.ts` löschen |
-| [ ] | 5. Spy-Helper | `src/testing/spy.ts` mit `createSpyObj()` auf `vi.fn()`-Basis (typisierter Ersatz) |
-| [ ] | 6a. Migration: Services (11) | `services/*.spec.ts` migrieren (HttpClientTestingModule bleibt) |
-| [ ] | 6b. Migration: Pipes/Directives/Utils (4) | `pipes/*`, `directives/*`, `utils/*` migrieren |
-| [ ] | 6c. Migration: Komponenten – einfach (14) | Restliche `components/*.spec.ts` migrieren |
-| [ ] | 6d. Migration: Komponenten – jsdom-kritisch (3) | `messwerte-chart` (Chart.js/Canvas), `rechnungen` + `statistik` (Blob/Download) inkl. jsdom-Mocks |
-| [ ] | 7. jsdom-Edge-Cases | `URL.createObjectURL`/`revokeObjectURL`, Canvas `getContext`, Timer-Mocks (`jasmine.clock` → `vi.useFakeTimers`/`setSystemTime`) |
-| [ ] | 8. npm-Scripts | `test` (single-run), `test:watch`, `test:coverage` |
-| [ ] | 9. Doku | `CLAUDE.md`, `Specs/generell.md`, `MEMORY.md` auf Vitest umstellen |
-| [ ] | 10. Verifikation | Volle Suite grün, Exit-Code-Verhalten, Coverage-Report, `ng build` (dev+prod) & Playwright unverändert |
+| [x] | 1. Dependencies | `karma*`/`jasmine*`/`@types/jasmine` entfernt; `vitest@4.1.9`, `jsdom@29`, `@vitest/coverage-v8@4` ergänzt |
+| [x] | 2. angular.json `test`-Target | Builder `@angular-devkit/build-angular:karma` → **`@angular/build:unit-test`**; `runner: "vitest"`, `setupFiles`, `tsConfig`. `buildTarget` weggelassen (Default `build:development`); jsdom ist Vitest-Default ohne `browsers` |
+| [x] | 3. tsconfig.spec.json | `types: ["jasmine"]` → `["vitest/globals"]`; `include` um `src/test-setup.ts` ergänzt |
+| [x] | 4. Test-Setup & Bootstrap | `src/test-setup.ts` neu (jsdom-Shims; TestBed-/Zone-Init macht der Builder automatisch); `karma.conf.js` und `src/test.ts` gelöscht |
+| [x] | 5. Spy-Helper | `src/testing/spy.ts` mit `createSpyObj()` + Typ `SpyObj<T>` auf `vi.fn()`-Basis |
+| [x] | 6a. Migration: Services (11) | `services/*.spec.ts` migriert (HttpClientTestingModule bleibt) |
+| [x] | 6b. Migration: Pipes/Directives/Utils (4) | `pipes/*`, `directives/*`, `utils/*` migriert (column-resize: `waitForAsync`→`async/await`, `done`→Promise) |
+| [x] | 6c. Migration: Komponenten – einfach (14) | Restliche `components/*.spec.ts` migriert |
+| [x] | 6d. Migration: Komponenten – jsdom-kritisch (3) | `messwerte-chart` (lief ohne Canvas-Mock), `rechnungen` + `statistik` migriert |
+| [x] | 7. jsdom-Edge-Cases | `URL.createObjectURL`/`revokeObjectURL` + `DataTransfer`/`DragEvent`-Shims in `src/test-setup.ts`; `jasmine.clock`→`vi.useFakeTimers`/`setSystemTime`. Canvas `getContext` nicht nötig |
+| [x] | 8. npm-Scripts | `test` (single-run), `test:watch`, `test:coverage` ergänzt |
+| [x] | 9. Doku | `CLAUDE.md` (Testing + Befehle), `MEMORY.md` aktualisiert. `generell.md` nennt kein Test-Framework → keine Änderung |
+| [x] | 10. Verifikation | 727 Tests grün (32 Dateien), `npm test` Exit 0 single-run, Coverage → `coverage/frontend-service`, `ng build` dev+prod OK, Playwright unberührt, Verifikations-Grep leer |
+
+### Wichtige Abweichungen / Erkenntnisse aus der Umsetzung
+* **Builder-Paket:** Der `unit-test`-Builder liegt in **`@angular/build`** (nicht `@angular-devkit/build-angular`). Korrekt: `@angular/build:unit-test`. Peer: `vitest ^4`.
+* **TestBed/Zone-Init automatisch:** Der Builder initialisiert TestBed + `zone.js/testing` selbst → `src/test-setup.ts` dient nur jsdom-Shims; `globals: true` und jsdom sind Builder-Defaults (keine vitest-Imports in Specs nötig).
+* **`fakeAsync`/`tick`/`waitForAsync` funktionieren NICHT** unter Vitest: zone.js (0.15) patcht den Vitest-Runner nicht → „Expected to be running in 'ProxyZone'". Lösung: `fakeAsync`/`tick`-Shim auf Vitest-Faketimer-Basis (`src/testing/fake-async.ts`), `waitForAsync(()=>{…})` → `async ()=>{ await … }`. (Spec-Edge-Case #2 hatte dies vorgesehen.)
+* **`vi.spyOn` ruft per Default durch** (anders als Jasmines `spyOn`): Delegations-Spies (`onEdit`/`onDelete`/…) brauchen `.mockImplementation(() => {})`.
+* **`done`-Callbacks** (column-resize, translation.service) → Promise-basiert umgestellt (Vitest hat keinen `done`-Parameter).
 
 ---
 
@@ -50,7 +57,7 @@ Die Frontend-Unit-/Component-Tests werden von Jasmine + Karma auf **Vitest** umg
 
 ### Phase 1: Dependencies
 **Entfernen** (`devDependencies`): `karma`, `karma-chrome-launcher`, `karma-coverage`, `karma-jasmine`, `karma-jasmine-html-reporter`, `jasmine-core`, `@types/jasmine`.
-**Ergänzen:** `vitest`, `jsdom`, `@vitest/coverage-v8` (Coverage-Provider). Versionen passend zur vom `@angular-devkit/build-angular@^21` `unit-test`-Builder erwarteten Variante wählen (Peer-Vorgaben des Builders beachten).
+**Ergänzen:** `vitest`, `jsdom`, `@vitest/coverage-v8` (Coverage-Provider). Versionen passend zur vom `@angular/build@^21` `unit-test`-Builder (Peer: vitest ^4.0.8) erwarteten Variante wählen (Peer-Vorgaben des Builders beachten).
 
 ### Phase 2: angular.json `test`-Target
 Aktuell:
@@ -69,7 +76,7 @@ Aktuell:
 Ziel (Optionsnamen gemäß Schema des installierten `unit-test`-Builders verifizieren):
 ```json
 "test": {
-  "builder": "@angular-devkit/build-angular:unit-test",
+  "builder": "@angular/build:unit-test",
   "options": {
     "tsConfig": "tsconfig.spec.json",
     "buildTarget": "frontend-service::development",
@@ -125,7 +132,7 @@ Nach jedem Batch `npm test` ausführen → Batch muss grün sein, bevor der näc
 (Exakte Flags gemäß `unit-test`-Builder-Schema; ggf. `--no-watch` für single-run absichern.)
 
 ### Phase 9: Doku
-* `CLAUDE.md`: Testing-Abschnitt „Jasmine 5.13.0 / Karma" → „Vitest (via `@angular-devkit/build-angular:unit-test`, jsdom)"; `npm test`-Beschreibung anpassen.
+* `CLAUDE.md`: Testing-Abschnitt „Jasmine 5.13.0 / Karma" → „Vitest (via `@angular/build:unit-test`, jsdom)"; `npm test`-Beschreibung anpassen.
 * `Specs/generell.md`: Prüfen, ob Test-Framework genannt ist → aktualisieren.
 * `MEMORY.md`: Hinweis „Frontend Tests: HttpClientTestingModule …" um Vitest-Kontext ergänzen (HttpClientTestingModule bleibt).
 
@@ -178,7 +185,7 @@ grep -rE "jasmine\.|\.and\.(returnValue|callFake|throwError|returnValues)|toBeTr
 ## Offene Punkte / Annahmen
 
 Aus Spec-Abschnitt 8 (alle mit eingebetteter Annahme – als Annahme übernommen):
-1. **Builder-Status:** `@angular-devkit/build-angular:unit-test` ist in Angular 21 als experimentell markiert → **akzeptiert/gewählt**. Exakte Options-Namen (`runner`, `buildTarget`, `setupFiles`, `environment`, Coverage) werden gegen das Schema der installierten `@angular-devkit/build-angular`-Version verifiziert.
+1. **Builder-Status:** `@angular/build:unit-test` ist in Angular 21 als experimentell markiert → **akzeptiert/gewählt**. Exakte Options-Namen (`runner`, `buildTarget`, `setupFiles`, `environment`, Coverage) werden gegen das Schema der installierten `@angular-devkit/build-angular`-Version verifiziert.
 2. **Coverage-Provider:** `v8` (`@vitest/coverage-v8`) – schnell, ausreichend.
 3. **Zusatz-Scripts:** `test:watch` und `test:coverage` werden ergänzt; `test` bleibt single-run.
 4. **CI-Pipeline:** Im Repo existiert **keine** (`.github/workflows` nicht vorhanden) → Akzeptanzkriterium „CI ohne Chrome" ist aktuell gegenstandslos; bei späterer CI-Einführung direkt mit Vitest aufsetzen. Kein Handlungsbedarf in diesem Schritt.
