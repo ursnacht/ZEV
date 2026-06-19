@@ -242,6 +242,14 @@ describe('StatistikComponent', () => {
     beforeEach(() => {
       component.dateFrom = '2024-02-01';
       component.dateTo = '2024-02-29';
+      vi.spyOn(window.URL, 'createObjectURL').mockReturnValue('blob:fake-url');
+      vi.spyOn(window.URL, 'revokeObjectURL').mockImplementation(() => {});
+      const linkSpy = createSpyObj<HTMLAnchorElement>('a', ['click']);
+      vi.spyOn(document, 'createElement').mockReturnValue(linkSpy as unknown as HTMLAnchorElement);
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
     });
 
     it('should call exportPdf with correct params', () => {

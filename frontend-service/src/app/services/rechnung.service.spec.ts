@@ -147,7 +147,7 @@ describe('RechnungService', () => {
     });
 
     it('should handle download error gracefully without throwing', () => {
-      const consoleSpy = vi.spyOn(console, 'error');
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       service.downloadRechnung('invalid_key', 'invalid.pdf');
 
