@@ -8,10 +8,10 @@ flowchart TB
         W3["Stromzähler Wago 3"]
         BKW["Stromzähler BKW<br/>(gPlug)"]
         ROUTER{{"Router"}}
-        RPI["Raspberry Pi<br/>VPN-Server"]
+        RPI["Raspberry Pi<br/>VPN-Client<br/>MQTT-Gateway"]
     end
 
-    NAS["NAS<br/>ZEV-Verwaltung<br/>VPN-Client<br/>SFTP-Client"]
+    NAS["NAS<br/>ZEV-Verwaltung<br/>VPN-Server<br/>MQTT-Broker"]
 
     W1 -- "Modbus TCP" --> ROUTER
     W2 -- "Modbus TCP" --> ROUTER
