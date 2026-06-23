@@ -76,8 +76,8 @@ export class NavigationComponent implements OnInit, OnDestroy {
   private extractOrganization(): void {
     try {
       const token = this.keycloak.tokenParsed;
-      if (token && token['organizations']) {
-        const organizations = token['organizations'] as Record<string, { id: string }>;
+      if (token && token['organization']) {
+        const organizations = token['organization'] as Record<string, { id: string }>;
         const aliases = Object.keys(organizations);
         if (aliases.length > 0) {
           this.organizationAlias = aliases[0];
