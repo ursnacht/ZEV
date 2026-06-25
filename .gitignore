@@ -19,3 +19,6 @@ node_modules/
 
 # Windows reserved-name artifact (e.g. from a stray `> NUL` redirect)
 /NUL
+
+# Exportierte Docker-Image-Archive (siehe scripts/build-pi-images.ps1)
+zev-images-*.tar.gz
