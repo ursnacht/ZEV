@@ -52,6 +52,21 @@ docker run --rm hello-world
 > separate Paket `docker-compose` (mit Bindestrich) wird nicht benötigt – das
 > Plugin (`docker compose`, ohne Bindestrich) reicht.
 
+## Automatisierung (Schritte 1 + 2)
+
+Die beiden folgenden Schritte (Bauen + Exportieren/Komprimieren) erledigt das
+Skript `scripts/build-pi-images.ps1` in einem Lauf:
+
+```powershell
+# Standard: linux/arm64, Tag "arm64" -> /data/ZEV/zev-images-arm64.tar.gz
+./scripts/build-pi-images.ps1
+
+# 32-Bit-OS:
+./scripts/build-pi-images.ps1 -Platform linux/arm/v7 -Tag armv7
+```
+
+Wer die Schritte manuell nachvollziehen möchte, folgt 1 + 2 unten.
+
 ## 1. Images für die Pi-Plattform bauen
 
 Jeden Service einzeln mit Buildx für die Ziel-Plattform bauen und ins lokale
