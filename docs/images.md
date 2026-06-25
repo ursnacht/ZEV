@@ -162,6 +162,45 @@ docker compose ps
 docker compose logs -f backend-service
 ```
 
+## Alternative: Übertragung über eine private Registry (Synology NAS)
+
+Die Schritte 2–4 (Exportieren → Übertragen → Laden) lassen sich durch eine private
+Docker-Registry ersetzen. Das lohnt sich, sobald **wiederholt** deployt wird: der
+Pi-Deploy wird dann zu `docker compose pull && docker compose up -d`.
+
+Eine Synology NAS kann diese Registry hosten – über den offiziellen `registry:2`-Container:
+
+1. Auf der NAS **Container Manager** (DSM 7.2+; früher „Docker"-Paket) installieren.
+2. Image `registry:2` herunterladen und als Container starten:
+   - Port `5000` mappen
+   - ein Volume für `/var/lib/registry` setzen (persistente Ablage der Images)
+3. Images taggen und auf die NAS pushen (statt Schritt 2):
+   ```bash
+   docker tag zev-backend-service:arm64 nas.local:5000/zev-backend-service:arm64
+   docker push nas.local:5000/zev-backend-service:arm64
+   # analog für admin-service und frontend-service
+   ```
+4. Auf dem Pi ziehen (statt Schritt 4) – in der `docker-compose.yml` die `image:`-Einträge
+   auf `nas.local:5000/zev-<service>:arm64` setzen, dann:
+   ```bash
+   docker compose pull
+   docker compose up -d
+   ```
+
+Hinweise zur Registry:
+
+- **Architektur egal:** Eine Registry speichert beliebige Architekturen. Auch eine x86-NAS
+  kann die `arm64`-Images für den Pi vorhalten (inkl. Multi-Arch-Manifest).
+- **TLS/HTTP:** Ohne gültiges Zertifikat gilt die Registry als „insecure". Dann auf
+  Bau-Rechner **und** Pi in `/etc/docker/daemon.json` ergänzen und Docker neu starten:
+  ```json
+  { "insecure-registries": ["nas.local:5000"] }
+  ```
+  Sauberer: die Registry hinter den **Reverse Proxy** der NAS (DSM → Anmeldeportal →
+  Reverse Proxy) mit Let's-Encrypt-Zertifikat stellen – dann entfällt der insecure-Eintrag.
+- **Auth:** `registry:2` ist standardmässig offen. Bei Bedarf htpasswd-Basic-Auth aktivieren
+  oder hinter den NAS-Reverse-Proxy mit Authentisierung stellen.
+
 ## Hinweise
 
 - **`.env` wird nicht übertragen** – Secrets auf dem Pi separat anlegen, niemals ins
