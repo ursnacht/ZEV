@@ -63,11 +63,12 @@ public class OrganizationInterceptor implements HandlerInterceptor {
      * Extrahiert die Organisationen aus dem JWT-Token und mappt sie auf interne IDs.
      * JWT-Struktur (Keycloak Organizations):
      * {
-     *   "organizations": {
-     *     "org-alias-1": { "id": "uuid-1" },
+     *   "organization": {
+     *     "org-alias-1": { "id": "uuid-1", "displayName": ["Anzeigename 1"] },
      *     "org-alias-2": { "id": "uuid-2" }
      *   }
      * }
+     * Der Anzeigename (Attribut "displayName") ist optional. Fehlt er, wird der Alias als Name verwendet.
      */
     @SuppressWarnings("unchecked")
     private void extractOrganizations(JwtAuthenticationToken jwtAuth) {
@@ -81,10 +82,10 @@ public class OrganizationInterceptor implements HandlerInterceptor {
             }
 
             List<Long> orgIds = new ArrayList<>();
-            String firstOrgAlias = null;
+            String firstOrgName = null;
             Long firstOrgId = null;
 
-            // JWT-Struktur: {"alias": {"id": "uuid"}}
+            // JWT-Struktur: {"alias": {"id": "uuid", "displayName": ["Name"]}}
             for (Map.Entry<String, Object> entry : organizations.entrySet()) {
                 String alias = entry.getKey();
 
@@ -98,14 +99,17 @@ public class OrganizationInterceptor implements HandlerInterceptor {
                             Organisation org = organisationService.findOrCreate(keycloakOrgId, alias);
                             orgIds.add(org.getId());
 
+                            // Optionalen Anzeigenamen aus den Attributen lesen, sonst Alias verwenden
+                            String orgName = extractDisplayName(orgDetails, alias);
+
                             // Erste Organisation als aktuelle setzen
                             if (firstOrgId == null) {
                                 firstOrgId = org.getId();
-                                firstOrgAlias = alias;
+                                firstOrgName = orgName;
                             }
 
-                            log.debug("Organisation gemappt: keycloak_id={}, intern={} (Alias: {})",
-                                    keycloakOrgId, org.getId(), alias);
+                            log.debug("Organisation gemappt: keycloak_id={}, intern={} (Alias: {}, Name: {})",
+                                    keycloakOrgId, org.getId(), alias, orgName);
                         } catch (IllegalArgumentException e) {
                             log.warn("Ungültige Organisations-UUID im Token: {}", idString);
                         }
@@ -116,17 +120,36 @@ public class OrganizationInterceptor implements HandlerInterceptor {
             if (!orgIds.isEmpty()) {
                 organizationContextService.setAvailableOrgIds(orgIds);
                 organizationContextService.setCurrentOrgId(firstOrgId);
-                organizationContextService.setCurrentOrgName(firstOrgAlias);
+                organizationContextService.setCurrentOrgName(firstOrgName);
 
                 log.info("Organisationskontext gesetzt - Benutzer: {}, aktuelle Org-ID: {} ({}), verfügbare Orgs: {}",
                         jwtAuth.getToken().getSubject(),
                         firstOrgId,
-                        firstOrgAlias,
+                        firstOrgName,
                         orgIds.size());
             }
 
         } catch (Exception e) {
             log.error("Fehler beim Extrahieren der Organisationen aus JWT: {}", e.getMessage(), e);
         }
+    }
+
+    /**
+     * Liest den optionalen Anzeigenamen aus dem Attribut "displayName" der Organisation.
+     * Die Attribute werden vom Keycloak-Mapper "Organization Membership" nur geliefert, wenn
+     * die Option "Add organization attributes" aktiviert ist. Fehlt das Attribut, wird der
+     * Alias als Fallback-Name verwendet.
+     *
+     * JWT-Struktur: "&lt;alias&gt;": { "id": "uuid", "displayName": ["Anzeigename"] }
+     */
+    private String extractDisplayName(Map<String, Object> orgDetails, String alias) {
+        Object displayNameObj = orgDetails.get("displayName");
+        if (displayNameObj instanceof List<?> displayNameList && !displayNameList.isEmpty()) {
+            Object firstValue = displayNameList.get(0);
+            if (firstValue instanceof String name && !name.isBlank()) {
+                return name;
+            }
+        }
+        return alias;
     }
 }

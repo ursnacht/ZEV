@@ -15,10 +15,43 @@
    - Menü: "Client scopes" → "organization" (sollte bereits existieren)
    - Falls nicht: Neuen Scope "organization" erstellen
    - Mapper hinzufügen: "Organization Membership"
+   - Im Mapper "Organization Membership" folgende Optionen aktivieren:
+     - **Add organization id**: On (liefert die UUID der Organisation – wird vom Backend benötigt)
+     - **Add organization attributes**: On (liefert zusätzlich die Organisations-Attribute, siehe unten)
 5. Client Scope dem Client zuweisen:
    - Menü: "Clients" → Euren Client auswählen (z.B. "zev-frontend")
    - Tab "Client scopes" → "Add client scope"
    - "organization" hinzufügen (als "Default")
+
+### Optionaler Anzeigename der Organisation (displayName)
+
+Standardmässig liefert der Mapper nur den **Alias** der Organisation (als Key im `organization`-Claim).
+Das Backend verwendet diesen Alias als Organisationsnamen. Soll ein abweichender **Anzeigename**
+im Token mitgeliefert werden, kann dieser als Organisations-Attribut hinterlegt werden:
+
+1. Menü: "Organizations" → Organisation öffnen → Tab "Attributes"
+2. Attribut anlegen:
+   - **Key**: `displayName`
+   - **Value**: gewünschter Anzeigename (z.B. "ZEV Musterstrasse")
+3. Sicherstellen, dass im Mapper "Organization Membership" die Option
+   **"Add organization attributes"** aktiviert ist (siehe Schritt 4 oben).
+
+Der `organization`-Claim sieht dann so aus:
+
+```json
+"organization": {
+  "zev-musterstrasse": {
+    "id": "c2c9ba74-de18-4491-9489-8185629edd93",
+    "displayName": ["ZEV Musterstrasse"]
+  }
+}
+```
+
+(Das Attribut `displayName` erscheint direkt unter dem Alias – neben `id` –, nicht verschachtelt unter `attributes`.)
+
+**Hinweis:** Das Attribut `displayName` ist **optional**. Fehlt es (oder ist die Mapper-Option
+nicht aktiviert), verwendet das Backend automatisch den Alias als Organisationsnamen –
+es ist keine weitere Konfiguration nötig.
 
 #### JWT-Debugger
 * https://www.jwt.io/

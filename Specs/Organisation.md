@@ -51,6 +51,21 @@ Wenn ein Benutzer sich einloggt und dessen Keycloak-Organisations-UUID noch nich
 
 Falls sich die UUID einer Organisation in Keycloak ändert, muss es möglich sein, den Wert `keycloak_org_id` in der `organisation`-Tabelle zu aktualisieren, ohne dass Daten verloren gehen. Dies geschieht über einen Backend-Endpunkt, der nur für System-Administratoren zugänglich ist (z.B. via Datenbank oder geschützter API).
 
+### FR-7: Optionaler Anzeigename der Organisation (`displayName`)
+
+Der Keycloak-Claim heisst `organization` (Singular). Sein Key ist der **Alias** der Organisation. Optional kann ein abweichender **Anzeigename** mitgeliefert werden:
+
+- In Keycloak wird auf der Organisation ein Attribut `displayName` hinterlegt; der Mapper „Organization Membership" liefert es mit aktivierter Option **„Add organization attributes"**.
+- JWT-Struktur — `displayName` liegt **direkt unter dem Alias** (neben `id`) und ist ein **Array**:
+  ```json
+  "organization": {
+    "Mut13": { "displayName": ["Mutachstrasse 13"], "id": "b2e07c58-..." }
+  }
+  ```
+- **Optional:** Fehlt das Attribut (oder ist die Mapper-Option deaktiviert), wird der **Alias** als Name verwendet.
+- **Backend** (`OrganizationInterceptor`): liest `displayName[0]` aus dem Org-Eintrag; bei fehlendem/leerem/blankem Wert Fallback auf den Alias. Ergebnis wird via `OrganizationContextService.setCurrentOrgName(...)` gesetzt.
+- **Frontend** (`NavigationComponent`): liest denselben Claim `organization` (Singular) aus dem geparsten Token, ermittelt `displayName[0]` mit Alias-Fallback und zeigt den Namen **im Titel der Navbar** an — Format `ZEV Management - <Name>` (Trennsequenz `" - "`). Der Benutzername daneben enthält **keinen** Organisationsbezug mehr.
+
 ---
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
@@ -62,7 +77,10 @@ Falls sich die UUID einer Organisation in Keycloak ändert, muss es möglich sei
 * [ ] Ein erster Login mit einer neuen Keycloak-Organisation (noch nicht in DB) legt automatisch einen Eintrag in `zev.organisation` an (Auto-Provisioning).
 * [ ] Nach dem Update von `keycloak_org_id` für eine Organisation (UUID geändert) hat der Benutzer wieder vollen Zugriff auf alle bisherigen Daten — ohne Datenmigration in den Datentabellen.
 * [ ] Der `orgFilter` von Hibernate funktioniert weiterhin korrekt (BIGINT-Filterparameter statt UUID).
-* [ ] Das Keycloak-`organizations`-Claim bleibt die alleinige Quelle für die Keycloak-UUID; die interne `id` wird ausschliesslich intern verwendet.
+* [ ] Das Keycloak-`organization`-Claim bleibt die alleinige Quelle für die Keycloak-UUID; die interne `id` wird ausschliesslich intern verwendet.
+* [ ] Ist in Keycloak das Attribut `displayName` gesetzt und die Mapper-Option „Add organization attributes" aktiv, wird der Anzeigename im Navbar-Titel als `ZEV Management - <displayName>` dargestellt.
+* [ ] Ist kein `displayName` vorhanden, wird stattdessen der Alias im Titel angezeigt (`ZEV Management - <Alias>`).
+* [ ] Der Benutzername-Bereich der Navbar enthält keinen Organisationsbezug mehr (nur Vor-/Nachname bzw. Username).
 
 ---
 
@@ -107,7 +125,9 @@ Falls sich die UUID einer Organisation in Keycloak ändert, muss es möglich sei
   * `repository/MetrikRepository.java` — `findByNameAndOrgId(String, UUID)` → `findByNameAndOrgId(String, Long)`
   * `service/EinheitService.java`, `MesswerteService.java`, `TarifService.java`, `MieterService.java`, `MetricsService.java`, `EinstellungenService.java` — alle `getCurrentOrgId()` Aufrufe liefern neu `Long`
   * Neu: `entity/Organisation.java`, `repository/OrganisationRepository.java`, `service/OrganisationService.java`
-* **Betroffener Code (Frontend):** Keiner — `org_id` wird vom Frontend nicht verwendet.
+  * `config/OrganizationInterceptor.java` — Methode `extractDisplayName(...)` liest optionalen `displayName` mit Alias-Fallback (FR-7)
+* **Betroffener Code (Frontend):** `components/navigation/navigation.component.ts` + `.html` — liest Claim `organization` (Singular) inkl. `displayName`, zeigt den Org-Namen im Navbar-Titel statt beim Benutzernamen (FR-7). Sonst keiner — `org_id` wird vom Frontend nicht verwendet.
+* **Konfiguration (Keycloak):** Mapper „Organization Membership" mit Optionen „Add organization id" und „Add organization attributes"; Org-Attribut `displayName` (siehe `docs/Anleitung-keycloak.md`).
 * **Datenmigration:** Ja, mehrere Flyway-Migrationen erforderlich (Details in Umsetzungsplan).
 
 ---
@@ -126,5 +146,6 @@ Falls sich die UUID einer Organisation in Keycloak ändert, muss es möglich sei
 
 * **Auto-Provisioning: opt-in oder opt-out?** Soll eine neue Keycloak-Organisation automatisch in die DB aufgenommen werden (opt-in), oder soll eine manuelle Freischaltung erforderlich sein? Empfehlung: Auto-Provisioning, da dies dem bisherigen Verhalten am nächsten kommt.
 * **Organisations-Name aktualisieren:** Soll der `name` in `zev.organisation` bei jedem Login aktualisiert werden (falls der Alias in Keycloak geändert wurde)? Empfehlung: Ja, mit `UPDATE organisation SET name = ? WHERE keycloak_org_id = ?` bei jedem Login.
+* **Anzeigename (`displayName`) persistieren?** Aktuell wird der `displayName` nur zur Laufzeit aus dem JWT gelesen und angezeigt; in `zev.organisation` wird weiterhin der Alias als `name` gespeichert. Offen: Soll der `displayName` zusätzlich in der DB abgelegt werden? Empfehlung: vorerst nein — das JWT bleibt die Quelle, kein zusätzlicher Sync nötig.
 * **`INSERT ... ON CONFLICT`-Strategie:** PostgreSQL-spezifisches `ON CONFLICT DO UPDATE` oder `ON CONFLICT DO NOTHING` + anschliessendes `SELECT`? Empfehlung: `INSERT ... ON CONFLICT (keycloak_org_id) DO UPDATE SET name = EXCLUDED.name` (Upsert).
 * **Soll `organisation` dem `orgFilter` unterliegen?** Nein — die `organisation`-Tabelle ist technisch, nicht mandantenspezifisch, und wird ohne Filter abgefragt.

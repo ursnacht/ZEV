@@ -21,7 +21,7 @@ import { IconComponent } from '../icon/icon.component';
 export class NavigationComponent implements OnInit, OnDestroy {
   userProfile: KeycloakProfile | null = null;
   currentLang = 'de';
-  organizationAlias: string | null = null;
+  organizationName: string | null = null;
   private readonly keycloak = inject(Keycloak);
   private readonly router = inject(Router);
   private routerSubscription: Subscription | null = null;
@@ -76,11 +76,18 @@ export class NavigationComponent implements OnInit, OnDestroy {
   private extractOrganization(): void {
     try {
       const token = this.keycloak.tokenParsed;
-      if (token && token['organizations']) {
-        const organizations = token['organizations'] as Record<string, { id: string }>;
+      // Keycloak Organizations liefert den Claim "organization" (Singular):
+      // { "<alias>": { "id": "uuid", "displayName": ["Name"] } }
+      const organizations = token?.['organization'] as
+        | Record<string, { id?: string; displayName?: string[] }>
+        | undefined;
+      if (organizations) {
         const aliases = Object.keys(organizations);
         if (aliases.length > 0) {
-          this.organizationAlias = aliases[0];
+          const alias = aliases[0];
+          // Optionalen Anzeigenamen (displayName) verwenden, sonst Alias als Fallback
+          const displayName = organizations[alias]?.displayName?.[0];
+          this.organizationName = displayName?.trim() || alias;
         }
       }
     } catch (e) {
@@ -98,13 +105,6 @@ export class NavigationComponent implements OnInit, OnDestroy {
     return fullName || this.userProfile.username || '';
   }
 
-  get userDisplayName(): string {
-    const name = this.userName;
-    if (this.organizationAlias) {
-      return `${name}, ${this.organizationAlias}`;
-    }
-    return name;
-  }
 
   logout() {
     this.closeMenu();
