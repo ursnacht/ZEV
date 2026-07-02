@@ -41,5 +41,8 @@
          CVE-2026-42584, CVE-2026-42585, CVE-2026-42586, CVE-2026-42587,
          CVE-2026-44248 -->
     <netty.version>4.2.15.Final</netty.version>
+    <!-- postgresql 42.7.10 -> 42.7.12 behebt (HIGH):
+         CVE-2026-42198 (client-seitiger DoS im pgjdbc-Treiber); .12 = aktueller Patch -->
+    <postgresql.version>42.7.12</postgresql.version>
   </properties>
 </project>

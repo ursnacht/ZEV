@@ -24,7 +24,7 @@ ZEV (Zusammenschluss zum Eigenverbrauch) is a solar power distribution applicati
 ### Key Backend Dependencies
 - JasperReports 7.0.7 (Jakarta EE, PDF generation)
 - Swiss QR Bill Generator 3.4.0 (payment slips)
-- Spring AI Anthropic 2.0.0-M8 (model: `claude-haiku-4-5-20251001`)
+- Spring AI Anthropic 2.0.0 (model: `claude-haiku-4-5-20251001`)
 - Caffeine (in-memory cache)
 - Spring Boot Admin 4.0.4
 - Flyway (schema migrations)
@@ -462,4 +462,4 @@ Direct database access options:
 
 ## AI Integration
 
-The backend uses Spring AI Anthropic (2.0.0-M8) with model `claude-haiku-4-5-20251001` for AI-powered unit matching during CSV measurement upload (`EinheitMatchingService`). Configuration: max_tokens=100, temperature=0.0. Requires `ANTHROPIC_API_KEY` environment variable (see `.env.example`).
+The backend uses Spring AI Anthropic (2.0.0) with model `claude-haiku-4-5-20251001` for AI-powered unit matching during CSV measurement upload (`EinheitMatchingService`). Configuration: max_tokens=100, temperature=0.0. Requires `ANTHROPIC_API_KEY` environment variable (see `.env.example`).

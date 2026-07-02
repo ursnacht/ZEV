@@ -75,6 +75,12 @@ try {
     }
     $mvnArgs += @("-DnvdApiKey=$env:NVD_API_KEY", '-Dformat=ALL')
 
+    # Dokumentierte False-Positives ausblenden (Begruendung je Eintrag in der Datei)
+    $suppression = Join-Path $root 'dependency-check-suppressions.xml'
+    if (Test-Path $suppression) {
+        $mvnArgs += "-DsuppressionFiles=$suppression"
+    }
+
     # Key fuer die Konsolenausgabe maskieren
     $display = ($mvnArgs -replace '(-DnvdApiKey=).*', '$1***') -join ' '
     Write-Host "> mvn $display" -ForegroundColor Cyan

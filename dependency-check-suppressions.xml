@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OWASP Dependency-Check Suppression-Datei.
+
+  Enthaelt dokumentierte False-Positives, die per CPE-Range-Matching faelschlich
+  gemeldet werden, obwohl die eingesetzte Version bereits gepatcht ist.
+  Jede Suppression MUSS eine Begruendung (notes) mit Quelle tragen.
+
+  Aktivierung: ueber scripts/owasp-dependency-check.ps1 (-DsuppressionFiles=...).
+-->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+
+  <suppress>
+    <notes><![CDATA[
+      CVE-2025-10492 (JasperReports Java-Deserialisierung, CWE-502, RCE).
+      Laut NVD betrifft der CVE die JasperReports Library *Community Edition*
+      (net.sf.jasperreports:jasperreports) nur bis einschliesslich 7.0.3.
+      Der Fix (Deserialization-Class-Filter, automatisch aktiv, keine Konfiguration noetig)
+      wurde in 7.0.4 eingefuehrt. Wir nutzen 7.0.7 -> bereits gepatcht.
+      OWASP Dependency-Check flaggt hier faelschlich, weil das CE-Artefakt per
+      CPE-Range dem breiteren Professional-Bereich (bis 9.0.2) zugeordnet wird.
+      Quelle: https://nvd.nist.gov/vuln/detail/CVE-2025-10492
+      Release Notes: JasperReports 7.0.4 "add deserialization class filter to fix
+      the CVE-2025-10492 security vulnerability".
+    ]]></notes>
+    <packageUrl regex="true">^pkg:maven/net\.sf\.jasperreports/jasperreports(-pdf)?@.*$</packageUrl>
+    <cve>CVE-2025-10492</cve>
+  </suppress>
+
+</suppressions>
