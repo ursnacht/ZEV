@@ -93,8 +93,10 @@ test.describe('Einstellungen - Navigation and Display', () => {
         await expect(page.locator('#stellerPlz')).toBeVisible();
         await expect(page.locator('#stellerOrt')).toBeVisible();
 
-        // Check for Rechnungssteller section title
-        const sectionTitle = page.locator('.zev-form-section__title');
+        // Check for Rechnungssteller section title (scoped to the section containing the
+        // Rechnungssteller fields, since the page now has multiple .zev-form-section blocks
+        // — e.g. the Feature-Flags section).
+        const sectionTitle = page.locator('.zev-form-section:has(#stellerName) .zev-form-section__title');
         await expect(sectionTitle).toBeVisible();
 
         // Check for save button

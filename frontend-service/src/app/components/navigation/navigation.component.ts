@@ -10,11 +10,12 @@ import { ThemeService } from '../../services/theme.service';
 import { TranslationService } from '../../services/translation.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
+import { FeatureFlagDirective } from '../../directives/feature-flag.directive';
 
 @Component({
   selector: 'app-navigation',
   standalone: true,
-  imports: [RouterModule, TranslatePipe, IconComponent],
+  imports: [RouterModule, TranslatePipe, IconComponent, FeatureFlagDirective],
   templateUrl: './navigation.component.html',
   styleUrls: ['./navigation.component.css']
 })

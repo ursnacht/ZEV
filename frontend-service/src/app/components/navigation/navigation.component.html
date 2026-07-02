@@ -58,7 +58,7 @@
           {{ 'DEBITORKONTROLLE' | translate }}
         </a>
       </li>
-      <li>
+      <li *appFeature="'MESSWERTE_UPLOAD'">
         <a routerLink="/upload" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
          (click)="closeMenu()">
          <app-icon name="upload"></app-icon>

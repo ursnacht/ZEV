@@ -15,7 +15,7 @@ public class CacheConfig {
 
     @Bean
     public CacheManager cacheManager() {
-        CaffeineCacheManager cacheManager = new CaffeineCacheManager("statistik", "lizenzen");
+        CaffeineCacheManager cacheManager = new CaffeineCacheManager("statistik", "lizenzen", "featureFlags");
         cacheManager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(15, TimeUnit.MINUTES)
                 .maximumSize(100));

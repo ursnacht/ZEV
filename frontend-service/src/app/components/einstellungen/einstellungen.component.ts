@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { WithMessage } from '../../utils/with-message';
 import { EinstellungenService } from '../../services/einstellungen.service';
 import { Einstellungen, RechnungKonfiguration, Steller } from '../../models/einstellungen.model';
+import { FeatureFlagService } from '../../services/feature-flag.service';
+import { FeatureFlagAdmin, FeatureFlagQuelle } from '../../models/feature-flag.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { IconComponent } from '../icon/icon.component';
@@ -31,13 +33,52 @@ export class EinstellungenComponent extends WithMessage implements OnInit {
 
   loading = true;
 
+  featureFlags: FeatureFlagAdmin[] = [];
+  readonly Quelle = FeatureFlagQuelle;
+
   constructor(
     private einstellungenService: EinstellungenService,
+    private featureFlagService: FeatureFlagService,
     private translationService: TranslationService
   ) { super(); }
 
   ngOnInit(): void {
     this.loadEinstellungen();
+    this.loadFeatureFlags();
+  }
+
+  loadFeatureFlags(): void {
+    this.featureFlagService.getAdminFlags().subscribe({
+      next: (flags) => this.featureFlags = flags,
+      error: () => this.showMessage('FEATURE_FLAG_FEHLER', 'error')
+    });
+  }
+
+  onToggleFlag(flag: FeatureFlagAdmin, event: Event): void {
+    const enabled = (event.target as HTMLInputElement).checked;
+    this.featureFlagService.setFlag(flag.key, enabled).subscribe({
+      next: () => {
+        this.showMessage('FEATURE_FLAG_GESPEICHERT', 'success');
+        this.loadFeatureFlags();
+      },
+      error: (error) => {
+        this.showMessage(error.error || 'FEATURE_FLAG_FEHLER', 'error');
+        this.loadFeatureFlags();
+      }
+    });
+  }
+
+  onResetFlag(flag: FeatureFlagAdmin): void {
+    this.featureFlagService.resetFlag(flag.key).subscribe({
+      next: () => {
+        this.showMessage('FEATURE_FLAG_ZURUECKGESETZT', 'success');
+        this.loadFeatureFlags();
+      },
+      error: (error) => {
+        this.showMessage(error.error || 'FEATURE_FLAG_FEHLER', 'error');
+        this.loadFeatureFlags();
+      }
+    });
   }
 
   loadEinstellungen(): void {
