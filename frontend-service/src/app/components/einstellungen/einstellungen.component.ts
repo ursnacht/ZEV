@@ -1,6 +1,7 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import Keycloak from 'keycloak-js';
 import { WithMessage } from '../../utils/with-message';
 import { EinstellungenService } from '../../services/einstellungen.service';
 import { Einstellungen, RechnungKonfiguration, Steller } from '../../models/einstellungen.model';
@@ -36,6 +37,12 @@ export class EinstellungenComponent extends WithMessage implements OnInit {
   featureFlags: FeatureFlagAdmin[] = [];
   readonly Quelle = FeatureFlagQuelle;
 
+  /**
+   * Nur die Rolle {@code zev_admin} darf Feature-Flags verwalten. {@code org_admin} darf die
+   * Einstellungen bearbeiten, sieht die Feature-Flag-Sektion aber nicht.
+   */
+  readonly canManageFeatureFlags = inject(Keycloak).hasRealmRole('zev_admin');
+
   constructor(
     private einstellungenService: EinstellungenService,
     private featureFlagService: FeatureFlagService,
@@ -44,7 +51,9 @@ export class EinstellungenComponent extends WithMessage implements OnInit {
 
   ngOnInit(): void {
     this.loadEinstellungen();
-    this.loadFeatureFlags();
+    if (this.canManageFeatureFlags) {
+      this.loadFeatureFlags();
+    }
   }
 
   loadFeatureFlags(): void {

@@ -30,7 +30,7 @@ export const routes: Routes = [
   { path: 'tarife', component: TarifListComponent, canActivate: [AuthGuard], data: { roles: ['zev_admin'] } },
   { path: 'mieter', component: MieterListComponent, canActivate: [AuthGuard], data: { roles: ['zev_admin'] } },
   { path: 'design-system', component: DesignSystemShowcaseComponent, canActivate: [AuthGuard], data: { roles: ['zev'] } },
-  { path: 'einstellungen', component: EinstellungenComponent, canActivate: [AuthGuard], data: { roles: ['zev_admin'] } },
+  { path: 'einstellungen', component: EinstellungenComponent, canActivate: [AuthGuard], data: { roles: ['zev_admin', 'org_admin'] } },
   { path: 'translations', component: TranslationEditorComponent, canActivate: [AuthGuard], data: { roles: ['zev_admin'] } },
   { path: 'lizenzen', component: LizenzenComponent, canActivate: [AuthGuard], data: { roles: ['zev', 'zev_admin'] } }
 ];

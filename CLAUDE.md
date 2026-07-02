@@ -148,7 +148,7 @@ mvn test
 | TarifController         | `/api/tarife`        | zev_admin                     |
 | MieterController        | `/api/mieter`        | zev_admin                     |
 | DebitorController       | `/api/debitoren`     | zev_admin                     |
-| EinstellungenController | `/api/einstellungen` | zev_admin                     |
+| EinstellungenController | `/api/einstellungen` | zev_admin / org_admin         |
 | RechnungController      | `/api/rechnungen`    | zev_admin                     |
 | StatistikController     | `/api/statistik`     | zev                           |
 | LizenzenController      | `/api/lizenzen`      | zev                           |
@@ -219,7 +219,7 @@ mvn test
 | `/rechnungen`        | RechnungenComponent           | zev_admin      |
 | `/tarife`            | TarifListComponent            | zev_admin      |
 | `/mieter`            | MieterListComponent           | zev_admin      |
-| `/einstellungen`     | EinstellungenComponent        | zev_admin      |
+| `/einstellungen`     | EinstellungenComponent        | zev_admin, org_admin |
 | `/translations`      | TranslationEditorComponent    | zev_admin      |
 | `/design-system`     | DesignSystemShowcaseComponent | zev            |
 
@@ -330,7 +330,7 @@ erDiagram
 - Use `TranslatePipe` in Angular templates
 
 ### Authentication
-- Keycloak roles: `zev` (member), `zev_admin` (admin), `user` (basic)
+- Keycloak roles: `zev` (member), `zev_admin` (admin), `org_admin` (Einstellungen ohne Feature-Flags), `user` (basic)
 - Backend: `@PreAuthorize` annotations for authorization
 - Frontend: `AuthGuard` for route protection
 
@@ -453,6 +453,7 @@ Network: `zev-network` (bridge)
 
 - `testuser` / `testpassword` (zev_admin role)
 - `user` / `password` (zev role)
+- `orgadmin` / `orgadminpassword` (org_admin role: Einstellungen bearbeiten, keine Feature-Flags)
 
 ## Database Access
 

@@ -1,6 +1,7 @@
 import { createSpyObj, SpyObj } from '../../../testing/spy';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { fakeAsync, tick } from '../../../testing/fake-async';
+import Keycloak from 'keycloak-js';
 import { EinstellungenComponent } from './einstellungen.component';
 import { EinstellungenService } from '../../services/einstellungen.service';
 import { TranslationService } from '../../services/translation.service';
@@ -14,6 +15,7 @@ describe('EinstellungenComponent', () => {
   let fixture: ComponentFixture<EinstellungenComponent>;
   let einstellungenServiceSpy: SpyObj<EinstellungenService>;
   let featureFlagServiceSpy: SpyObj<FeatureFlagService>;
+  let keycloakSpy: SpyObj<Keycloak>;
 
   const mockFeatureFlags: FeatureFlagAdmin[] = [
     {
@@ -54,12 +56,17 @@ describe('EinstellungenComponent', () => {
     featureFlagServiceSpy.setFlag.mockReturnValue(of(void 0));
     featureFlagServiceSpy.resetFlag.mockReturnValue(of(void 0));
 
+    // Standard: Rolle zev_admin -> darf Feature-Flags verwalten
+    keycloakSpy = createSpyObj<Keycloak>('Keycloak', ['hasRealmRole']);
+    keycloakSpy.hasRealmRole.mockReturnValue(true);
+
     await TestBed.configureTestingModule({
       imports: [EinstellungenComponent],
       providers: [
         { provide: EinstellungenService, useValue: einstellungenServiceSpy },
         { provide: FeatureFlagService, useValue: featureFlagServiceSpy },
-        { provide: TranslationService, useValue: mockTranslationService }
+        { provide: TranslationService, useValue: mockTranslationService },
+        { provide: Keycloak, useValue: keycloakSpy }
       ]
     }).compileComponents();
 
@@ -356,6 +363,34 @@ describe('EinstellungenComponent', () => {
       component.dismissMessage();
 
       expect(component.message).toBe('');
+    });
+  });
+
+  describe('Feature-Flag-Berechtigung (org_admin vs. zev_admin)', () => {
+    it('should allow managing feature flags for zev_admin', () => {
+      expect(keycloakSpy.hasRealmRole).toHaveBeenCalledWith('zev_admin');
+      expect(component.canManageFeatureFlags).toBe(true);
+    });
+
+    it('should NOT load feature flags for org_admin (only zev_admin)', () => {
+      keycloakSpy.hasRealmRole.mockReturnValue(false);
+      featureFlagServiceSpy.getAdminFlags.mockClear();
+
+      const orgAdminFixture = TestBed.createComponent(EinstellungenComponent);
+      orgAdminFixture.detectChanges();
+
+      expect(orgAdminFixture.componentInstance.canManageFeatureFlags).toBe(false);
+      expect(featureFlagServiceSpy.getAdminFlags).not.toHaveBeenCalled();
+    });
+
+    it('should not render the feature flags section for org_admin', () => {
+      keycloakSpy.hasRealmRole.mockReturnValue(false);
+
+      const orgAdminFixture = TestBed.createComponent(EinstellungenComponent);
+      orgAdminFixture.detectChanges();
+
+      const html = orgAdminFixture.nativeElement.textContent as string;
+      expect(html).not.toContain('FEATURE_FLAGS');
     });
   });
 

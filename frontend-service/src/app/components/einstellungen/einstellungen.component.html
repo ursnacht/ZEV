@@ -110,6 +110,7 @@
       </form>
     </div>
 
+    @if (canManageFeatureFlags) {
     <div class="zev-form-section">
       <h3 class="zev-form-section__title">{{ 'FEATURE_FLAGS' | translate }}</h3>
 
@@ -159,5 +160,6 @@
         <p class="zev-text--muted">{{ 'FEATURE_FLAG_KEINE' | translate }}</p>
       }
     </div>
+    }
   }
 </div>

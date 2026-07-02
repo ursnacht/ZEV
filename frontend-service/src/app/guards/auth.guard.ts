@@ -34,9 +34,11 @@ const isAccessAllowed = async (
         return Object.values(grantedRoles.resourceRoles).some((roles) => roles.includes(role));
     };
 
-    const hasAllRequiredRoles = requiredRoles.every((role: string) => hasRequiredRole(role));
+    // Zugriff wird gewährt, sobald der User EINE der angegebenen Rollen besitzt
+    // (z.B. `['zev', 'zev_admin']` = Mitglied ODER Admin, `['zev_admin', 'org_admin']` = beide Admin-Typen).
+    const hasAnyRequiredRole = requiredRoles.some((role: string) => hasRequiredRole(role));
 
-    if (hasAllRequiredRoles) {
+    if (hasAnyRequiredRole) {
         return true;
     }
 
