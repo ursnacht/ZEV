@@ -11,6 +11,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -39,6 +40,14 @@ public class Organisation {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "konfiguration", columnDefinition = "jsonb")
     private String konfiguration;
+
+    /**
+     * Mandantenspezifische Feature-Flag-Überschreibungen als flaches Objekt
+     * { "FLAG_KEY": true|false }. NULL bedeutet: keine Überschreibungen (globale Defaults gelten).
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "feature_flags", columnDefinition = "jsonb")
+    private Map<String, Boolean> featureFlags;
 
     public Organisation() {}
 
@@ -80,6 +89,14 @@ public class Organisation {
 
     public void setKonfiguration(String konfiguration) {
         this.konfiguration = konfiguration;
+    }
+
+    public Map<String, Boolean> getFeatureFlags() {
+        return featureFlags;
+    }
+
+    public void setFeatureFlags(Map<String, Boolean> featureFlags) {
+        this.featureFlags = featureFlags;
     }
 
     @Override

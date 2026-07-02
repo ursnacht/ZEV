@@ -109,5 +109,55 @@
         </div>
       </form>
     </div>
+
+    <div class="zev-form-section">
+      <h3 class="zev-form-section__title">{{ 'FEATURE_FLAGS' | translate }}</h3>
+
+      @if (featureFlags.length > 0) {
+        <table class="zev-table">
+          <thead>
+            <tr>
+              <th>{{ 'FEATURE_FLAG' | translate }}</th>
+              <th>{{ 'FEATURE_FLAG_DEFAULT' | translate }}</th>
+              <th>{{ 'FEATURE_FLAG_STATUS' | translate }}</th>
+              <th>{{ 'FEATURE_FLAG_QUELLE' | translate }}</th>
+              <th>{{ 'FEATURE_FLAG_AKTION' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (flag of featureFlags; track flag.key) {
+              <tr>
+                <td>{{ flag.beschreibungKey | translate }}</td>
+                <td>{{ (flag.defaultWert ? 'FEATURE_FLAG_AKTIV' : 'FEATURE_FLAG_INAKTIV') | translate }}</td>
+                <td>
+                  <div class="zev-checkbox-item">
+                    <input type="checkbox" class="zev-checkbox" [id]="'flag-' + flag.key"
+                      [checked]="flag.effektiv" (change)="onToggleFlag(flag, $event)" />
+                    <label [for]="'flag-' + flag.key">
+                      <span class="zev-status" [class.zev-status--success]="flag.effektiv"
+                        [class.zev-status--warning]="!flag.effektiv">
+                        {{ (flag.effektiv ? 'FEATURE_FLAG_AKTIV' : 'FEATURE_FLAG_INAKTIV') | translate }}
+                      </span>
+                    </label>
+                  </div>
+                </td>
+                <td>{{ (flag.quelle === Quelle.OVERRIDE ? 'FEATURE_FLAG_QUELLE_OVERRIDE' : 'FEATURE_FLAG_QUELLE_DEFAULT') | translate }}</td>
+                <td>
+                  @if (flag.quelle === Quelle.OVERRIDE) {
+                    <button type="button" class="zev-button zev-button--secondary zev-button--compact"
+                      (click)="onResetFlag(flag)">
+                      <app-icon name="refresh-cw"></app-icon>
+                      {{ 'FEATURE_FLAG_ZURUECKSETZEN' | translate }}
+                    </button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      } @else {
+        <p class="zev-text--muted">{{ 'FEATURE_FLAG_KEINE' | translate }}</p>
+      }
+    </div>
   }
 </div>

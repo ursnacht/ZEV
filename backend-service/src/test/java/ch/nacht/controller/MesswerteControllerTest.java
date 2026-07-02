@@ -2,8 +2,10 @@ package ch.nacht.controller;
 
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
+import ch.nacht.entity.FeatureFlag;
 import ch.nacht.service.CalculationProgressService;
 import ch.nacht.service.EinheitService;
+import ch.nacht.service.FeatureFlagService;
 import ch.nacht.service.MesswerteService;
 import ch.nacht.service.MetricsService;
 import ch.nacht.service.OrganisationService;
@@ -61,12 +63,17 @@ public class MesswerteControllerTest {
     @MockitoBean
     private OrganisationService organisationService;
 
+    @MockitoBean
+    private FeatureFlagService featureFlagService;
+
     private Einheit testEinheit;
 
     @BeforeEach
     void setUp() {
         testEinheit = new Einheit("Wohnung A", EinheitTyp.CONSUMER);
         testEinheit.setId(1L);
+        // Feature-Flag standardmässig aktiv, damit der Upload-Endpunkt nicht gesperrt wird.
+        when(featureFlagService.isEnabled(any(), eq(FeatureFlag.MESSWERTE_UPLOAD))).thenReturn(true);
     }
 
     // ==================== Upload Endpoint Tests ====================
@@ -139,6 +146,23 @@ public class MesswerteControllerTest {
             .andExpect(status().isOk());
 
         verify(metricsService).recordMessdatenUpload("unbekannt");
+    }
+
+    @Test
+    void uploadCsv_FeatureDisabled_ReturnsForbidden() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "test.csv", "text/csv", "Time,Total,ZEV\n00:00,1.5,0.8\n".getBytes());
+
+        // Feature-Flag deaktiviert -> Upload wird unabhängig von der Rolle gesperrt.
+        when(featureFlagService.isEnabled(any(), eq(FeatureFlag.MESSWERTE_UPLOAD))).thenReturn(false);
+
+        mockMvc.perform(multipart("/api/messwerte/upload")
+                .file(file)
+                .param("date", "2024-01-15")
+                .param("einheitId", "1"))
+            .andExpect(status().isForbidden());
+
+        verify(messwerteService, never()).processCsvUpload(any(), anyLong(), anyString());
     }
 
     // ==================== Calculate Distribution Endpoint Tests ====================

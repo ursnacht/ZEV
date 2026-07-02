@@ -53,6 +53,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
     }
 
+    /**
+     * Handles features disabled via a tenant feature flag. Returns HTTP 403 with a
+     * translation key so the frontend can render a translated message.
+     */
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    @ExceptionHandler(FeatureDisabledException.class)
+    public ResponseEntity<Map<String, Object>> handleFeatureDisabledException(
+            FeatureDisabledException ex) {
+        Map<String, Object> error = new HashMap<>();
+        error.put("error", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+
     @ResponseStatus(HttpStatus.FORBIDDEN)
     @ExceptionHandler(NoOrganizationException.class)
     public ResponseEntity<Map<String, Object>> handleNoOrganizationException(

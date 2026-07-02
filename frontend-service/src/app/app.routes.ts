@@ -15,11 +15,12 @@ import { TranslationEditorComponent } from './components/translation-editor/tran
 import { DebitorkontrolleListComponent } from './components/debitorkontrolle-list/debitorkontrolle-list.component';
 
 import { AuthGuard } from './guards/auth.guard';
+import { FeatureFlagGuard } from './guards/feature-flag.guard';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/startseite', pathMatch: 'full' },
   { path: 'startseite', component: StartseiteComponent, canActivate: [AuthGuard], data: { roles: ['zev', 'zev_admin'] } },
-  { path: 'upload', component: MesswerteUploadComponent, canActivate: [AuthGuard], data: { roles: ['zev', 'zev_admin'] } },
+  { path: 'upload', component: MesswerteUploadComponent, canActivate: [AuthGuard, FeatureFlagGuard], data: { roles: ['zev', 'zev_admin'], featureFlag: 'MESSWERTE_UPLOAD' } },
   { path: 'einheiten', component: EinheitListComponent, canActivate: [AuthGuard], data: { roles: ['zev', 'zev_admin'] } },
   { path: 'solar-calculation', component: SolarCalculationComponent, canActivate: [AuthGuard], data: { roles: ['zev', 'zev_admin'] } },
   { path: 'chart', component: MesswerteChartComponent, canActivate: [AuthGuard], data: { roles: ['zev'] } },

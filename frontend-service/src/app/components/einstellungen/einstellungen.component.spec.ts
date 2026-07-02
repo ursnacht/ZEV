@@ -4,6 +4,8 @@ import { fakeAsync, tick } from '../../../testing/fake-async';
 import { EinstellungenComponent } from './einstellungen.component';
 import { EinstellungenService } from '../../services/einstellungen.service';
 import { TranslationService } from '../../services/translation.service';
+import { FeatureFlagService } from '../../services/feature-flag.service';
+import { FeatureFlagAdmin, FeatureFlagQuelle } from '../../models/feature-flag.model';
 import { Einstellungen } from '../../models/einstellungen.model';
 import { of, throwError } from 'rxjs';
 
@@ -11,6 +13,17 @@ describe('EinstellungenComponent', () => {
   let component: EinstellungenComponent;
   let fixture: ComponentFixture<EinstellungenComponent>;
   let einstellungenServiceSpy: SpyObj<EinstellungenService>;
+  let featureFlagServiceSpy: SpyObj<FeatureFlagService>;
+
+  const mockFeatureFlags: FeatureFlagAdmin[] = [
+    {
+      key: 'MESSWERTE_UPLOAD',
+      beschreibungKey: 'FEATURE_FLAG_MESSWERTE_UPLOAD',
+      defaultWert: true,
+      effektiv: true,
+      quelle: FeatureFlagQuelle.DEFAULT
+    }
+  ];
 
   const mockEinstellungen: Einstellungen = {
     id: 1,
@@ -34,10 +47,18 @@ describe('EinstellungenComponent', () => {
     einstellungenServiceSpy = createSpyObj<EinstellungenService>('EinstellungenService', ['getEinstellungen', 'saveEinstellungen']);
     einstellungenServiceSpy.getEinstellungen.mockReturnValue(of(mockEinstellungen));
 
+    featureFlagServiceSpy = createSpyObj<FeatureFlagService>('FeatureFlagService', [
+      'getAdminFlags', 'setFlag', 'resetFlag', 'isEnabled', 'load'
+    ]);
+    featureFlagServiceSpy.getAdminFlags.mockReturnValue(of(mockFeatureFlags));
+    featureFlagServiceSpy.setFlag.mockReturnValue(of(void 0));
+    featureFlagServiceSpy.resetFlag.mockReturnValue(of(void 0));
+
     await TestBed.configureTestingModule({
       imports: [EinstellungenComponent],
       providers: [
         { provide: EinstellungenService, useValue: einstellungenServiceSpy },
+        { provide: FeatureFlagService, useValue: featureFlagServiceSpy },
         { provide: TranslationService, useValue: mockTranslationService }
       ]
     }).compileComponents();
@@ -335,6 +356,96 @@ describe('EinstellungenComponent', () => {
       component.dismissMessage();
 
       expect(component.message).toBe('');
+    });
+  });
+
+  describe('loadFeatureFlags', () => {
+    it('should load the feature flags on init', () => {
+      expect(featureFlagServiceSpy.getAdminFlags).toHaveBeenCalled();
+      expect(component.featureFlags).toEqual(mockFeatureFlags);
+    });
+
+    it('should show an error message when loading fails', () => {
+      featureFlagServiceSpy.getAdminFlags.mockReturnValue(throwError(() => ({ status: 500 })));
+
+      component.loadFeatureFlags();
+
+      expect(component.message).toBe('FEATURE_FLAG_FEHLER');
+      expect(component.messageType).toBe('error');
+    });
+  });
+
+  describe('onToggleFlag', () => {
+    const toggleEvent = (checked: boolean): Event =>
+      ({ target: { checked } } as unknown as Event);
+
+    it('should set the override with the checkbox value', () => {
+      component.onToggleFlag(mockFeatureFlags[0], toggleEvent(false));
+
+      expect(featureFlagServiceSpy.setFlag).toHaveBeenCalledWith('MESSWERTE_UPLOAD', false);
+    });
+
+    it('should show a success message and reload after saving', () => {
+      featureFlagServiceSpy.getAdminFlags.mockClear();
+
+      component.onToggleFlag(mockFeatureFlags[0], toggleEvent(true));
+
+      expect(component.message).toBe('FEATURE_FLAG_GESPEICHERT');
+      expect(component.messageType).toBe('success');
+      expect(featureFlagServiceSpy.getAdminFlags).toHaveBeenCalledTimes(1);
+    });
+
+    it('should show the backend error message and reload on failure', () => {
+      featureFlagServiceSpy.setFlag.mockReturnValue(throwError(() => ({ error: 'Backend Fehler' })));
+      featureFlagServiceSpy.getAdminFlags.mockClear();
+
+      component.onToggleFlag(mockFeatureFlags[0], toggleEvent(true));
+
+      expect(component.message).toBe('Backend Fehler');
+      expect(component.messageType).toBe('error');
+      expect(featureFlagServiceSpy.getAdminFlags).toHaveBeenCalledTimes(1);
+    });
+
+    it('should fall back to the default error message when the error has no body', () => {
+      featureFlagServiceSpy.setFlag.mockReturnValue(throwError(() => ({ error: null })));
+
+      component.onToggleFlag(mockFeatureFlags[0], toggleEvent(true));
+
+      expect(component.message).toBe('FEATURE_FLAG_FEHLER');
+      expect(component.messageType).toBe('error');
+    });
+  });
+
+  describe('onResetFlag', () => {
+    it('should reset the override and show a success message and reload', () => {
+      featureFlagServiceSpy.getAdminFlags.mockClear();
+
+      component.onResetFlag(mockFeatureFlags[0]);
+
+      expect(featureFlagServiceSpy.resetFlag).toHaveBeenCalledWith('MESSWERTE_UPLOAD');
+      expect(component.message).toBe('FEATURE_FLAG_ZURUECKGESETZT');
+      expect(component.messageType).toBe('success');
+      expect(featureFlagServiceSpy.getAdminFlags).toHaveBeenCalledTimes(1);
+    });
+
+    it('should show the backend error message and reload on failure', () => {
+      featureFlagServiceSpy.resetFlag.mockReturnValue(throwError(() => ({ error: 'Reset Fehler' })));
+      featureFlagServiceSpy.getAdminFlags.mockClear();
+
+      component.onResetFlag(mockFeatureFlags[0]);
+
+      expect(component.message).toBe('Reset Fehler');
+      expect(component.messageType).toBe('error');
+      expect(featureFlagServiceSpy.getAdminFlags).toHaveBeenCalledTimes(1);
+    });
+
+    it('should fall back to the default error message when the error has no body', () => {
+      featureFlagServiceSpy.resetFlag.mockReturnValue(throwError(() => ({ error: null })));
+
+      component.onResetFlag(mockFeatureFlags[0]);
+
+      expect(component.message).toBe('FEATURE_FLAG_FEHLER');
+      expect(component.messageType).toBe('error');
     });
   });
 });

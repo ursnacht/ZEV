@@ -10,7 +10,7 @@
 ### FR-1: Ablauf / Flow
 1. Beim Start der Angular-App (nach erfolgreichem Keycloak-Login) lädt das Frontend die für den aktuellen Mandanten **effektiven** Feature-Flags via `GET /api/feature-flags` und hält sie im `FeatureFlagService`.
 2. Komponenten/Templates fragen Flags über `featureFlagService.isEnabled('KEY')`, eine Struktur-Direktive `*appFeature="'KEY'"` oder einen Route-Guard ab und blenden Features entsprechend ein/aus.
-3. Ein Administrator (`zev_admin`) öffnet die Seite „Feature-Flags" aus dem Menü.
+3. Ein Administrator (`zev_admin`) öffnet die Seite „Einstellungen" (`/einstellungen`); dort gibt es einen Abschnitt „Feature-Flags".
 4. Das System zeigt alle **im Code deklarierten** Flags mit ihrem aktuellen effektiven Zustand für den eigenen Mandanten (inkl. Hinweis, ob der Wert vom globalen Default stammt oder mandantenspezifisch überschrieben ist).
 5. Der Administrator schaltet ein Flag ein/aus. Das System speichert die mandantenspezifische Überschreibung und invalidiert den Cache; der neue Zustand ist sofort wirksam (nach Neuladen der Flags im Frontend).
 6. Der Administrator kann eine mandantenspezifische Überschreibung wieder entfernen, womit das Flag auf den globalen Default zurückfällt.
@@ -29,14 +29,14 @@
 * **Statische Backend-Schalter:** Wo ein Feature komplett deploy-fest (nicht pro Mandant) sein soll, werden Beans/Endpunkte zusätzlich mit `@ConditionalOnProperty(prefix = "features", name = "...")` geschaltet. Dies ist unabhängig vom mandantenspezifischen Mechanismus.
 
 ### FR-3: Layout
-* Neue Route `/feature-flags` mit Komponente `FeatureFlagListComponent` (nur `zev_admin`).
-* Neuer Menüeintrag „Feature-Flags" in der Navigation (im Admin-Bereich, z.B. nach „Einstellungen"), mit Feather-Icon (z.B. `toggle-right` oder Fallback `flag`).
-* **Seite:** Tabelle aller deklarierten Flags mit Spalten:
+* **Keine eigene Route/Komponente** für die Flag-Verwaltung. Die Verwaltung ist in die bestehende Seite „Einstellungen" (`/einstellungen`, `EinstellungenComponent`, nur `zev_admin`) integriert.
+* Neuer Abschnitt „Feature-Flags" auf der Einstellungen-Seite (z.B. unterhalb der Rechnungs-Einstellungen), umgesetzt als Tabelle/Liste aller deklarierten Flags mit Spalten:
   * Flag (technischer Key + übersetzte Beschreibung des Flags)
   * Default (globaler Wert aus dem `FeatureFlag`-Enum)
   * Status (effektiver Wert, als Toggle/Checkbox bedienbar) – „Aktiv" → `zev-status--success`, „Inaktiv" → `zev-status--warning`
   * Quelle (`Default` / `Überschrieben`)
   * Aktion: Überschreibung zurücksetzen (nur sichtbar, wenn `OVERRIDE`)
+* **Kein zusätzlicher Menüeintrag** in der Navigation – der Zugang erfolgt über den bestehenden Menüpunkt „Einstellungen".
 * Verwende das Design System (`zev-table`, `zev-status`, `zev-checkbox`, `zev-message`, `app-icon`).
 * Leerstate, falls keine Flags deklariert sind: Hinweis „Keine Feature-Flags definiert".
 
@@ -49,14 +49,14 @@
 * [ ] `DELETE /api/feature-flags/{key}` entfernt die Überschreibung; das Flag liefert anschliessend wieder den globalen Default
 * [ ] Eine Überschreibung eines Mandanten ist für andere Mandanten nicht sichtbar (Mandantentrennung)
 * [ ] `org_id` wird serverseitig aus dem JWT (`OrganizationContextService`) bestimmt, nie vom Client übergeben
-* [ ] Die Admin-Seite `/feature-flags` ist nur mit Rolle `zev_admin` erreichbar; Lese-Endpunkt `GET /api/feature-flags` mit Rolle `zev`
+* [ ] Die Flag-Verwaltung ist Teil der Einstellungen-Seite (`/einstellungen`) und nur mit Rolle `zev_admin` erreichbar; Lese-Endpunkt `GET /api/feature-flags` mit Rolle `zev`
 * [ ] Das Frontend lädt die Flags beim App-Start (nach Login) und stellt `isEnabled('KEY')` bereit
 * [ ] Ein per `*appFeature="'KEY'"` umschlossenes Element wird nur gerendert, wenn das Flag aktiv ist
 * [ ] Ein per `FeatureFlagGuard` geschützter Route-Zugriff wird bei inaktivem Flag abgewiesen (Redirect auf Startseite)
 * [ ] Die zweite Lese-Anfrage desselben Mandanten wird aus dem Caffeine-Cache bedient (kein erneuter DB-Zugriff bis Eviction/TTL)
 * [ ] Statische Backend-Beans/Endpunkte lassen sich via `@ConditionalOnProperty` (`features.*`) deploy-fest schalten
-* [ ] Die Admin-Seite zeigt zu jedem Flag eine übersetzte Beschreibung (DE/EN)
-* [ ] Alle UI-Texte der Admin-Seite kommen via `TranslationService` (DE/EN)
+* [ ] Die Flag-Verwaltung zeigt zu jedem Flag eine übersetzte Beschreibung (DE/EN)
+* [ ] Alle UI-Texte der Flag-Verwaltung kommen via `TranslationService` (DE/EN)
 * [ ] Die Darstellung verwendet das Design System
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
@@ -94,14 +94,14 @@
 * **Betroffener Code:**
   * `CacheConfig` – Cache `featureFlags` ergänzen
   * `application.yml` – nur falls optionale statische `@ConditionalOnProperty`-Schalter (`features.*`) genutzt werden; keine Default-Konfiguration der dynamischen Flags
-  * `NavigationComponent` – neuer Menüeintrag
-  * Angular-Routing (`app.routes.ts`) – Route `/feature-flags`
+  * `EinstellungenComponent` (`/einstellungen`) – neuer Abschnitt „Feature-Flags" zur Verwaltung der mandantenspezifischen Überschreibungen
   * `app.config.ts` – `APP_INITIALIZER` zum Laden der Flags nach Login
-* **Neue Dateien (Backend):** Flag-Registry (`FeatureFlag`-Enum mit Key, Default, Beschreibungs-Übersetzungs-Key), `FeatureFlagService`, `FeatureFlagController`, `FeatureFlagDTO` (Admin-Sicht: key, beschreibung, default, effektiv, Quelle), Flyway-Migration 1 (Spalte `feature_flags` auf `organisation`), Flyway-Migration 2 (Übersetzungen: Menü-/Seitentexte + Beschreibungs-Keys je Flag, `ON CONFLICT (key) DO NOTHING`).
-* **Neue Dateien (Frontend):** `feature-flag.service.ts`, `feature-flag.model.ts`, `feature-flag.directive.ts` (`*appFeature`), `feature-flag.guard.ts`, `feature-flag-list/`-Komponente.
+* **Neue Dateien (Backend):** Flag-Registry (`FeatureFlag`-Enum mit Key, Default, Beschreibungs-Übersetzungs-Key), `FeatureFlagService`, `FeatureFlagController`, `FeatureFlagDTO` (Admin-Sicht: key, beschreibung, default, effektiv, Quelle), Flyway-Migration 1 (Spalte `feature_flags` auf `organisation`), Flyway-Migration 2 (Übersetzungen: Abschnitts-/Überschriftstexte + Beschreibungs-Keys je Flag, `ON CONFLICT (key) DO NOTHING`).
+* **Neue Dateien (Frontend):** `feature-flag.service.ts`, `feature-flag.model.ts`, `feature-flag.directive.ts` (`*appFeature`), `feature-flag.guard.ts`. Keine eigene `feature-flag-list/`-Komponente – die Verwaltung erfolgt integriert in `EinstellungenComponent`.
 * **Datenmigration:** Keine Transformation bestehender Daten nötig; nur additive Spalte (`feature_flags`), Default NULL.
 
 ## 7. Abgrenzung / Out of Scope
+* Keine eigene Verwaltungsseite/Route `/feature-flags` und kein eigener Menüeintrag – die Flag-Verwaltung ist in die Einstellungen (`/einstellungen`) integriert.
 * Keine prozentualen/graduellen Rollouts (z.B. „20 % der Nutzer").
 * Kein A/B-Testing, keine Experiment-Auswertung.
 * Keine Flags pro **einzelnem Benutzer** – nur pro Mandant (`org_id`) bzw. global statisch.
@@ -112,6 +112,7 @@
 
 ## 8. Offene Fragen
 Keine offenen Fragen – folgende Punkte wurden entschieden und sind oben eingearbeitet:
+* **Verwaltungs-UI:** Die Flag-Verwaltung ist in die bestehende Einstellungen-Seite (`/einstellungen`, nur `zev_admin`) integriert; es gibt bewusst keine dedizierte Seite/Route `/feature-flags` und keinen eigenen Menüeintrag.
 * **Speicherort der Überschreibungen:** Eigene, additive JSONB-Spalte `feature_flags` auf `organisation` (die bestehende `konfiguration`-Spalte und der `EinstellungenService` bleiben unangetastet).
 * **Default-Quelle:** Globale Defaults ausschliesslich als Konstanten im `FeatureFlag`-Enum – **keine** Default-Konfiguration in `application.yml`. (Optionale statische `@ConditionalOnProperty`-Schalter bleiben davon unberührt.)
 * **Cache-Invalidierung über Instanzen:** Einzelinstanz angenommen; lokales `@CacheEvict` plus 15-Min-TTL als Backstop genügt vorerst (keine cluster-weite Invalidierung).
