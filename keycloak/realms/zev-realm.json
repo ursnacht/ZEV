@@ -43,8 +43,7 @@
                 }
             ],
             "realmRoles": [
-                "user",
-                "zev"
+                "zev_user"
             ]
         },
         {
@@ -58,8 +57,6 @@
                 }
             ],
             "realmRoles": [
-                "user",
-                "zev",
                 "zev_admin"
             ]
         },
@@ -74,8 +71,6 @@
                 }
             ],
             "realmRoles": [
-                "user",
-                "zev",
                 "org_admin"
             ]
         }
@@ -83,20 +78,113 @@
     "roles": {
         "realm": [
             {
-                "name": "user",
-                "description": "User role"
+                "name": "einheit:read",
+                "description": "Einheiten lesen (Liste)"
             },
             {
-                "name": "zev",
-                "description": "ZEV Member role"
+                "name": "einheit:write",
+                "description": "Einheiten anlegen/bearbeiten/loeschen, KI-Matching"
             },
             {
-                "name": "zev_admin",
-                "description": "ZEV Admin role"
+                "name": "messwerte:read",
+                "description": "Messwerte lesen (Grafik)"
+            },
+            {
+                "name": "messwerte:write",
+                "description": "Messwerte-Upload und Solarverteilung berechnen"
+            },
+            {
+                "name": "statistik:read",
+                "description": "Statistik ansehen und PDF-Export"
+            },
+            {
+                "name": "translations:read",
+                "description": "Uebersetzungen lesen (i18n-Laufzeit)"
+            },
+            {
+                "name": "translations:manage",
+                "description": "Uebersetzungen verwalten (Editor)"
+            },
+            {
+                "name": "tarife:manage",
+                "description": "Tarife verwalten"
+            },
+            {
+                "name": "mieter:read",
+                "description": "Mieter lesen (z.B. fuer Debitor-Formular)"
+            },
+            {
+                "name": "mieter:manage",
+                "description": "Mieter verwalten"
+            },
+            {
+                "name": "debitoren:manage",
+                "description": "Debitorenkontrolle verwalten"
+            },
+            {
+                "name": "rechnungen:manage",
+                "description": "Rechnungen generieren und herunterladen"
+            },
+            {
+                "name": "einstellungen:write",
+                "description": "Einstellungen (Rechnungsangaben) bearbeiten"
+            },
+            {
+                "name": "featureflags:read",
+                "description": "Effektive Feature-Flags lesen (UI-Steuerung)"
+            },
+            {
+                "name": "featureflags:manage",
+                "description": "Feature-Flags verwalten"
+            },
+            {
+                "name": "lizenzen:read",
+                "description": "Lizenzen ansehen"
+            },
+            {
+                "name": "zev_user",
+                "description": "ZEV Member role: Lesezugriff + Rechnungen/Debitoren verwalten (Composite)",
+                "composite": true,
+                "composites": {
+                    "realm": [
+                        "einheit:read",
+                        "messwerte:read",
+                        "statistik:read",
+                        "translations:read",
+                        "featureflags:read",
+                        "lizenzen:read",
+                        "mieter:read",
+                        "rechnungen:manage",
+                        "debitoren:manage"
+                    ]
+                }
             },
             {
                 "name": "org_admin",
-                "description": "Organisation Admin role: darf Einstellungen bearbeiten, aber keine Feature-Flags"
+                "description": "Organisation Admin role: zev_user + Einstellungen, Einheiten, Messwerte, Tarife, Mieter (keine Uebersetzungen/Feature-Flags)",
+                "composite": true,
+                "composites": {
+                    "realm": [
+                        "zev_user",
+                        "einstellungen:write",
+                        "einheit:write",
+                        "messwerte:write",
+                        "tarife:manage",
+                        "mieter:manage"
+                    ]
+                }
+            },
+            {
+                "name": "zev_admin",
+                "description": "ZEV Admin role: org_admin + Uebersetzungen + Feature-Flags (alle Permissions)",
+                "composite": true,
+                "composites": {
+                    "realm": [
+                        "org_admin",
+                        "translations:manage",
+                        "featureflags:manage"
+                    ]
+                }
             }
         ]
     }

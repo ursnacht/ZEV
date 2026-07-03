@@ -27,7 +27,7 @@ public class TranslationController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('zev')")
+    @PreAuthorize("hasAuthority('translations:read')")
     public ResponseEntity<Map<String, Map<String, String>>> getAllTranslations() {
         log.info("Fetching all translations");
         List<Translation> translations = translationService.getAllTranslations();
@@ -41,7 +41,7 @@ public class TranslationController {
     }
 
     @GetMapping("/list")
-    @PreAuthorize("hasRole('zev_admin')")
+    @PreAuthorize("hasAuthority('translations:manage')")
     public ResponseEntity<List<Translation>> getTranslationsList() {
         log.info("Admin fetching translations list");
         List<Translation> translations = translationService.getAllTranslations();
@@ -50,7 +50,7 @@ public class TranslationController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('zev_admin')")
+    @PreAuthorize("hasAuthority('translations:manage')")
     public ResponseEntity<Translation> createTranslation(@Valid @RequestBody Translation translation) {
         log.info("Creating new translation with key: {}", translation.getKey());
         Translation saved = translationService.saveTranslation(translation);
@@ -59,7 +59,7 @@ public class TranslationController {
     }
 
     @PutMapping("/{key:.+}")
-    @PreAuthorize("hasRole('zev_admin')")
+    @PreAuthorize("hasAuthority('translations:manage')")
     public ResponseEntity<Translation> updateTranslation(@PathVariable String key,
             @Valid @RequestBody Translation translation) {
         log.info("Updating translation with key: {}", key);
@@ -73,7 +73,7 @@ public class TranslationController {
     }
 
     @DeleteMapping("/{key:.+}")
-    @PreAuthorize("hasRole('zev_admin')")
+    @PreAuthorize("hasAuthority('translations:manage')")
     public ResponseEntity<Void> deleteTranslation(@PathVariable String key) {
         log.info("Delete request for translation with key: {}", key);
         boolean deleted = translationService.deleteTranslation(key);

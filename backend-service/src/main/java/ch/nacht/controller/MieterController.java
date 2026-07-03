@@ -17,7 +17,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/mieter")
-@PreAuthorize("hasRole('zev_admin')")
+@PreAuthorize("hasAuthority('mieter:manage')")
 public class MieterController {
 
     private static final Logger log = LoggerFactory.getLogger(MieterController.class);
@@ -29,6 +29,7 @@ public class MieterController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('mieter:read')")
     public List<Mieter> getAllMieter() {
         log.info("Fetching all mieter");
         List<Mieter> mieter = mieterService.getAllMieter();
@@ -37,6 +38,7 @@ public class MieterController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('mieter:read')")
     public ResponseEntity<Mieter> getMieterById(@PathVariable Long id) {
         log.info("Fetching mieter with id: {}", id);
         return mieterService.getMieterById(id)

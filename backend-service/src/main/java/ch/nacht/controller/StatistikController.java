@@ -16,7 +16,7 @@ import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/statistik")
-@PreAuthorize("hasRole('zev')")
+@PreAuthorize("hasAuthority('statistik:read')")
 public class StatistikController {
 
     private static final Logger log = LoggerFactory.getLogger(StatistikController.class);

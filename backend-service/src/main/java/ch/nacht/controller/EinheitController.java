@@ -16,7 +16,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/einheit")
-@PreAuthorize("hasRole('zev_admin')")
+@PreAuthorize("hasAuthority('einheit:write')")
 public class EinheitController {
 
     private static final Logger log = LoggerFactory.getLogger(EinheitController.class);
@@ -31,7 +31,7 @@ public class EinheitController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('zev')")
+    @PreAuthorize("hasAuthority('einheit:read')")
     public List<Einheit> getAllEinheiten() {
         log.info("Fetching all einheiten");
         List<Einheit> einheiten = einheitService.getAllEinheiten();

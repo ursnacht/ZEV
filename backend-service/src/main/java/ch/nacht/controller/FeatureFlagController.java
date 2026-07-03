@@ -36,7 +36,7 @@ public class FeatureFlagController {
      * Effektive Flags des aktuellen Mandanten als Key→Boolean-Map.
      */
     @GetMapping
-    @PreAuthorize("hasRole('zev')")
+    @PreAuthorize("hasAuthority('featureflags:read')")
     public Map<String, Boolean> getEffectiveFlags() {
         Long orgId = featureFlagService.getCurrentOrgId();
         log.info("Fetching effective feature flags for org: {}", orgId);
@@ -47,7 +47,7 @@ public class FeatureFlagController {
      * Admin-Sicht: alle deklarierten Flags inkl. Default, effektivem Wert und Quelle.
      */
     @GetMapping("/admin")
-    @PreAuthorize("hasRole('zev_admin')")
+    @PreAuthorize("hasAuthority('featureflags:manage')")
     public List<FeatureFlagDTO> getAdminFlags() {
         Long orgId = featureFlagService.getCurrentOrgId();
         log.info("Fetching admin feature flags for org: {}", orgId);
@@ -58,7 +58,7 @@ public class FeatureFlagController {
      * Setzt eine mandantenspezifische Überschreibung. Unbekannter Key → HTTP 400.
      */
     @PutMapping("/{key}")
-    @PreAuthorize("hasRole('zev_admin')")
+    @PreAuthorize("hasAuthority('featureflags:manage')")
     public ResponseEntity<?> setOverride(@PathVariable String key, @Valid @RequestBody FeatureFlagUpdateDTO body) {
         Long orgId = featureFlagService.getCurrentOrgId();
         log.info("Setting feature flag override: org={}, flag={}, enabled={}", orgId, key, body.getEnabled());
@@ -76,7 +76,7 @@ public class FeatureFlagController {
      * Unbekannter Key → HTTP 400.
      */
     @DeleteMapping("/{key}")
-    @PreAuthorize("hasRole('zev_admin')")
+    @PreAuthorize("hasAuthority('featureflags:manage')")
     public ResponseEntity<?> removeOverride(@PathVariable String key) {
         Long orgId = featureFlagService.getCurrentOrgId();
         log.info("Removing feature flag override: org={}, flag={}", orgId, key);

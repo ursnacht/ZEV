@@ -56,7 +56,7 @@ describe('EinstellungenComponent', () => {
     featureFlagServiceSpy.setFlag.mockReturnValue(of(void 0));
     featureFlagServiceSpy.resetFlag.mockReturnValue(of(void 0));
 
-    // Standard: Rolle zev_admin -> darf Feature-Flags verwalten
+    // Standard: Permission featureflags:manage vorhanden -> darf Feature-Flags verwalten
     keycloakSpy = createSpyObj<Keycloak>('Keycloak', ['hasRealmRole']);
     keycloakSpy.hasRealmRole.mockReturnValue(true);
 
@@ -366,13 +366,13 @@ describe('EinstellungenComponent', () => {
     });
   });
 
-  describe('Feature-Flag-Berechtigung (org_admin vs. zev_admin)', () => {
-    it('should allow managing feature flags for zev_admin', () => {
-      expect(keycloakSpy.hasRealmRole).toHaveBeenCalledWith('zev_admin');
+  describe('Feature-Flag-Berechtigung (Permission featureflags:manage)', () => {
+    it('should allow managing feature flags with featureflags:manage permission', () => {
+      expect(keycloakSpy.hasRealmRole).toHaveBeenCalledWith('featureflags:manage');
       expect(component.canManageFeatureFlags).toBe(true);
     });
 
-    it('should NOT load feature flags for org_admin (only zev_admin)', () => {
+    it('should NOT load feature flags without featureflags:manage (e.g. org_admin)', () => {
       keycloakSpy.hasRealmRole.mockReturnValue(false);
       featureFlagServiceSpy.getAdminFlags.mockClear();
 

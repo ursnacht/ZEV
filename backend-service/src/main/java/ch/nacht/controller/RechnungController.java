@@ -32,7 +32,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/rechnungen")
-@PreAuthorize("hasRole('zev_admin')")
+@PreAuthorize("hasAuthority('rechnungen:manage')")
 public class RechnungController {
 
     private static final Logger log = LoggerFactory.getLogger(RechnungController.class);

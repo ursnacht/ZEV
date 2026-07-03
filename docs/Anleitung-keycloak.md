@@ -23,6 +23,31 @@
    - Tab "Client scopes" → "Add client scope"
    - "organization" hinzufügen (als "Default")
 
+## Rollen & Permissions (Composite Roles)
+
+Die Autorisierung ist **permission-basiert**: Die Anwendung prüft feingranulare Permissions (Realm-Rollen wie `einstellungen:write`), die von den Fachrollen über **Composite Roles** gebündelt werden. Der Realm-Import `keycloak/realms/zev-realm.json` enthält diese bereits; die manuelle Einrichtung:
+
+1. **Permission-Rollen anlegen** (Menü "Realm roles" → "Create role"), je eine pro Eintrag:
+   - `einheit:read`, `einheit:write`
+   - `messwerte:read`, `messwerte:write`
+   - `statistik:read`
+   - `translations:read`, `translations:manage`
+   - `tarife:manage`, `mieter:read`, `mieter:manage`, `debitoren:manage`, `rechnungen:manage`
+   - `einstellungen:write`
+   - `featureflags:read`, `featureflags:manage`
+   - `lizenzen:read`
+
+2. **Fachrollen als Composite Roles anlegen** (Rolle erstellen → "Associated roles" → "Assign role"):
+   - `zev_user` → alle `*:read`-Permissions (`einheit:read`, `messwerte:read`, `statistik:read`, `translations:read`, `featureflags:read`, `lizenzen:read`, `mieter:read`) + `rechnungen:manage`, `debitoren:manage`
+   - `org_admin` → `zev_user` + `einstellungen:write`, `einheit:write`, `messwerte:write`, `tarife:manage`, `mieter:manage`
+   - `zev_admin` → `org_admin` + `translations:manage`, `featureflags:manage`
+
+   Keycloak löst verschachtelte Composites auf; im Token (`realm_access.roles`) erscheinen alle effektiven Permissions.
+
+3. **Usern nur die Fachrolle zuweisen** (`zev_user`, `org_admin` oder `zev_admin`) – Permissions kommen automatisch über die Composite-Auflösung.
+
+> Die vollständige Feature × Permission-Matrix steht in `Specs/Berechtigungen.md`.
+
 ### Optionaler Anzeigename der Organisation (displayName)
 
 Standardmässig liefert der Mapper nur den **Alias** der Organisation (als Key im `organization`-Claim).

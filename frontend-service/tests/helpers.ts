@@ -6,9 +6,15 @@ import { Page } from '@playwright/test';
  */
 
 /**
- * Handle Keycloak login if redirected to login page
+ * Handle Keycloak login if redirected to login page.
+ * @param username Keycloak-Benutzername (Default: testuser / zev_admin)
+ * @param password Passwort (Default: testpassword)
  */
-export async function handleKeycloakLogin(page: Page): Promise<void> {
+export async function handleKeycloakLogin(
+    page: Page,
+    username: string = 'testuser',
+    password: string = 'testpassword'
+): Promise<void> {
     // Wait for either the app to load or the login page to appear
     const loginFormLocator = page.locator('input[name="username"]');
     const navbarLocator = page.locator('.zev-navbar');
@@ -29,7 +35,7 @@ export async function handleKeycloakLogin(page: Page): Promise<void> {
         if (isLoginFormVisible) {
             // Keycloak 26+ uses a multi-step login: first username, then password
             // Step 1: Enter username and submit
-            await loginFormLocator.fill('testuser');
+            await loginFormLocator.fill(username);
             await page.click('button[type="submit"], input[type="submit"]');
 
             // Step 2: Wait for password field (multi-step) or check if already redirected
@@ -37,7 +43,7 @@ export async function handleKeycloakLogin(page: Page): Promise<void> {
             try {
                 await passwordLocator.waitFor({ state: 'visible', timeout: 5000 });
                 // Password field appeared - enter password and submit
-                await passwordLocator.fill('testpassword');
+                await passwordLocator.fill(password);
                 await page.click('button[type="submit"], input[type="submit"]');
             } catch {
                 // Password field didn't appear - might be single-step login or error
@@ -95,6 +101,19 @@ export async function navigateToHome(page: Page): Promise<void> {
 }
 
 /**
+ * Navigate to home page and log in as a specific user (für Rollen-/Permission-Tests).
+ * Jeder Playwright-Test läuft in einem frischen Context (keine geteilte SSO-Session),
+ * daher kann pro Test ein anderer Benutzer angemeldet werden.
+ */
+export async function loginAs(page: Page, username: string, password: string): Promise<void> {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await handleKeycloakLogin(page, username, password);
+    const navbar = page.locator('.zev-navbar');
+    await navbar.waitFor({ state: 'visible', timeout: 15000 });
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+}
+
+/**
  * Open hamburger menu
  */
 export async function openHamburgerMenu(page: Page): Promise<void> {
@@ -113,7 +132,19 @@ export async function navigateViaMenu(page: Page, href: string): Promise<void> {
     await openHamburgerMenu(page);
     const menuLink = page.locator(`a[href="${href}"]`);
     await menuLink.waitFor({ state: 'visible', timeout: 5000 });
-    await menuLink.click();
+    // Das Hamburger-Menü kann bei vielen Einträgen scrollen -> Eintrag zuerst in den
+    // Sichtbereich bringen. Falls das Overlay in headless zeitweise nicht klickbar ist
+    // (z.B. Cold-Start-Layout), sauber auf direkte Navigation zurückfallen.
+    await menuLink.scrollIntoViewIfNeeded().catch(() => {});
+    try {
+        await menuLink.click({ timeout: 5000 });
+    } catch {
+        try {
+            await menuLink.click({ force: true, timeout: 5000 });
+        } catch {
+            await page.goto(href, { waitUntil: 'domcontentloaded' });
+        }
+    }
     // Wait for navigation to complete
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 }

@@ -114,6 +114,11 @@
   padding: var(--spacing-md) 0;
   box-shadow: -4px 4px 6px rgba(0, 0, 0, 0.1);
   /* Shadow to left and bottom */
+
+  /* Bei vielen Eintraegen / kleinen Viewports scrollbar halten, statt unter den
+     sichtbaren Bereich zu ragen (Menu haengt an der sticky Navbar, top: 100%). */
+  max-height: calc(100vh - 4rem);
+  overflow-y: auto;
 }
 
 .zev-navbar__menu li {

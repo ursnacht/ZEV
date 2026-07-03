@@ -337,6 +337,47 @@ class ArchitectureTest {
         }
 
         /**
+         * Autorisierung ist permission-basiert: @PreAuthorize auf Controllern verwendet
+         * ausschliesslich hasAuthority('<permission>'), keine Fachrollen-Checks
+         * (hasRole/hasAnyRole). Siehe Specs/Composite-Roles.md.
+         */
+        @Test
+        @DisplayName("Controller-@PreAuthorize verwenden Permissions (hasAuthority), nicht Fachrollen")
+        void preAuthorizeShouldUsePermissionsNotRoles() {
+            ArchCondition<JavaClass> useHasAuthorityOnly =
+                new ArchCondition<>("nur hasAuthority(...) statt hasRole/hasAnyRole in @PreAuthorize verwenden") {
+                    @Override
+                    public void check(JavaClass controller, ConditionEvents events) {
+                        if (controller.isAnnotatedWith(PreAuthorize.class)) {
+                            reportIfRoleBased(controller.getAnnotationOfType(PreAuthorize.class).value(),
+                                controller, controller.getSimpleName(), events);
+                        }
+                        for (JavaMethod method : controller.getMethods()) {
+                            if (method.isAnnotatedWith(PreAuthorize.class)) {
+                                reportIfRoleBased(method.getAnnotationOfType(PreAuthorize.class).value(),
+                                    controller, method.getFullName(), events);
+                            }
+                        }
+                    }
+
+                    private void reportIfRoleBased(String expression, JavaClass owner, String location,
+                                                   ConditionEvents events) {
+                        if (expression.contains("hasRole(") || expression.contains("hasAnyRole(")) {
+                            events.add(SimpleConditionEvent.violated(owner,
+                                location + " verwendet Fachrollen-Check statt Permission: " + expression));
+                        }
+                    }
+                };
+
+            ArchRule rule = classes()
+                .that().resideInAPackage("..controller..")
+                .and().areAnnotatedWith(RestController.class)
+                .should(useHasAuthorityOnly);
+
+            rule.check(importedClasses);
+        }
+
+        /**
          * Jede mandantenfaehige Entity muss ein org_id-Feld tragen (Mandanten-Trennung).
          * Translation = global (keine Mandanten-Daten), Organisation = der Mandant selbst.
          */

@@ -17,7 +17,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/tarife")
-@PreAuthorize("hasRole('zev_admin')")
+@PreAuthorize("hasAuthority('tarife:manage')")
 public class TarifController {
 
     private static final Logger log = LoggerFactory.getLogger(TarifController.class);

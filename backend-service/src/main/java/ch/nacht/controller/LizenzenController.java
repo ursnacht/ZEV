@@ -14,7 +14,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/lizenzen")
-@PreAuthorize("hasRole('zev')")
+@PreAuthorize("hasAuthority('lizenzen:read')")
 public class LizenzenController {
 
     private static final Logger log = LoggerFactory.getLogger(LizenzenController.class);

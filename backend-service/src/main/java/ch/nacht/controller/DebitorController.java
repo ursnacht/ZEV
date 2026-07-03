@@ -19,7 +19,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/debitoren")
-@PreAuthorize("hasRole('zev_admin')")
+@PreAuthorize("hasAuthority('debitoren:manage')")
 public class DebitorController {
 
     private static final Logger log = LoggerFactory.getLogger(DebitorController.class);

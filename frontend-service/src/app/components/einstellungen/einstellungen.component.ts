@@ -38,10 +38,11 @@ export class EinstellungenComponent extends WithMessage implements OnInit {
   readonly Quelle = FeatureFlagQuelle;
 
   /**
-   * Nur die Rolle {@code zev_admin} darf Feature-Flags verwalten. {@code org_admin} darf die
-   * Einstellungen bearbeiten, sieht die Feature-Flag-Sektion aber nicht.
+   * Nur mit der Permission {@code featureflags:manage} dürfen Feature-Flags verwaltet werden
+   * (Fachrolle {@code zev_admin}). {@code org_admin} darf die Einstellungen bearbeiten
+   * ({@code einstellungen:write}), sieht die Feature-Flag-Sektion aber nicht.
    */
-  readonly canManageFeatureFlags = inject(Keycloak).hasRealmRole('zev_admin');
+  readonly canManageFeatureFlags = inject(Keycloak).hasRealmRole('featureflags:manage');
 
   constructor(
     private einstellungenService: EinstellungenService,

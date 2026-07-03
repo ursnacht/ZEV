@@ -19,18 +19,18 @@ import { FeatureFlagGuard } from './guards/feature-flag.guard';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/startseite', pathMatch: 'full' },
-  { path: 'startseite', component: StartseiteComponent, canActivate: [AuthGuard], data: { roles: ['zev', 'zev_admin'] } },
-  { path: 'upload', component: MesswerteUploadComponent, canActivate: [AuthGuard, FeatureFlagGuard], data: { roles: ['zev', 'zev_admin'], featureFlag: 'MESSWERTE_UPLOAD' } },
-  { path: 'einheiten', component: EinheitListComponent, canActivate: [AuthGuard], data: { roles: ['zev', 'zev_admin'] } },
-  { path: 'solar-calculation', component: SolarCalculationComponent, canActivate: [AuthGuard], data: { roles: ['zev', 'zev_admin'] } },
-  { path: 'chart', component: MesswerteChartComponent, canActivate: [AuthGuard], data: { roles: ['zev'] } },
-  { path: 'statistik', component: StatistikComponent, canActivate: [AuthGuard], data: { roles: ['zev'] } },
-  { path: 'rechnungen', component: RechnungenComponent, canActivate: [AuthGuard], data: { roles: ['zev_admin'] } },
-  { path: 'debitoren', component: DebitorkontrolleListComponent, canActivate: [AuthGuard], data: { roles: ['zev_admin'] } },
-  { path: 'tarife', component: TarifListComponent, canActivate: [AuthGuard], data: { roles: ['zev_admin'] } },
-  { path: 'mieter', component: MieterListComponent, canActivate: [AuthGuard], data: { roles: ['zev_admin'] } },
-  { path: 'design-system', component: DesignSystemShowcaseComponent, canActivate: [AuthGuard], data: { roles: ['zev'] } },
-  { path: 'einstellungen', component: EinstellungenComponent, canActivate: [AuthGuard], data: { roles: ['zev_admin', 'org_admin'] } },
-  { path: 'translations', component: TranslationEditorComponent, canActivate: [AuthGuard], data: { roles: ['zev_admin'] } },
-  { path: 'lizenzen', component: LizenzenComponent, canActivate: [AuthGuard], data: { roles: ['zev', 'zev_admin'] } }
+  { path: 'startseite', component: StartseiteComponent, canActivate: [AuthGuard] },
+  { path: 'upload', component: MesswerteUploadComponent, canActivate: [AuthGuard, FeatureFlagGuard], data: { permissions: ['messwerte:write'], featureFlag: 'MESSWERTE_UPLOAD' } },
+  { path: 'einheiten', component: EinheitListComponent, canActivate: [AuthGuard], data: { permissions: ['einheit:read'] } },
+  { path: 'solar-calculation', component: SolarCalculationComponent, canActivate: [AuthGuard], data: { permissions: ['messwerte:write'] } },
+  { path: 'chart', component: MesswerteChartComponent, canActivate: [AuthGuard], data: { permissions: ['messwerte:read'] } },
+  { path: 'statistik', component: StatistikComponent, canActivate: [AuthGuard], data: { permissions: ['statistik:read'] } },
+  { path: 'rechnungen', component: RechnungenComponent, canActivate: [AuthGuard], data: { permissions: ['rechnungen:manage'] } },
+  { path: 'debitoren', component: DebitorkontrolleListComponent, canActivate: [AuthGuard], data: { permissions: ['debitoren:manage'] } },
+  { path: 'tarife', component: TarifListComponent, canActivate: [AuthGuard], data: { permissions: ['tarife:manage'] } },
+  { path: 'mieter', component: MieterListComponent, canActivate: [AuthGuard], data: { permissions: ['mieter:manage'] } },
+  { path: 'design-system', component: DesignSystemShowcaseComponent, canActivate: [AuthGuard] },
+  { path: 'einstellungen', component: EinstellungenComponent, canActivate: [AuthGuard], data: { permissions: ['einstellungen:write'] } },
+  { path: 'translations', component: TranslationEditorComponent, canActivate: [AuthGuard], data: { permissions: ['translations:manage'] } },
+  { path: 'lizenzen', component: LizenzenComponent, canActivate: [AuthGuard], data: { permissions: ['lizenzen:read'] } }
 ];

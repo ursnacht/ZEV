@@ -48,8 +48,14 @@ public class SecurityConfig {
             }
             @SuppressWarnings("unchecked")
             List<String> roles = (List<String>) realmAccess.get("roles");
+            if (roles == null) {
+                return List.of();
+            }
+            // Rollen 1:1 als Authorities uebernehmen (ohne ROLE_-Praefix). Fachrollen sind in
+            // Keycloak Composite Roles, die feingranulare Permissions (z.B. "einstellungen:write")
+            // buendeln; die Anwendung prueft ausschliesslich diese Permissions via hasAuthority(...).
             return roles.stream()
-                    .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                    .map(SimpleGrantedAuthority::new)
                     .collect(Collectors.toList());
         });
         return converter;

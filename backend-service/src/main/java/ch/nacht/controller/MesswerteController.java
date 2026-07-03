@@ -48,7 +48,7 @@ public class MesswerteController {
     }
 
     @PostMapping("/upload")
-    @PreAuthorize("hasRole('zev_admin')")
+    @PreAuthorize("hasAuthority('messwerte:write')")
     public ResponseEntity<Map<String, Object>> uploadCsv(
             @RequestParam("date") String dateStr,
             @RequestParam("einheitId") Long einheitId,
@@ -86,7 +86,7 @@ public class MesswerteController {
     }
 
     @PostMapping("/calculate-distribution")
-    @PreAuthorize("hasRole('zev_admin')")
+    @PreAuthorize("hasAuthority('messwerte:write')")
     public ResponseEntity<Map<String, Object>> calculateDistribution(
             @RequestParam("dateFrom") String dateFromStr,
             @RequestParam("dateTo") String dateToStr,
@@ -135,7 +135,7 @@ public class MesswerteController {
     }
 
     @GetMapping("/by-einheit")
-    @PreAuthorize("hasRole('zev')")
+    @PreAuthorize("hasAuthority('messwerte:read')")
     public ResponseEntity<List<Map<String, Object>>> getMesswerteByEinheit(
             @RequestParam("einheitId") Long einheitId,
             @RequestParam("dateFrom") String dateFromStr,
@@ -161,7 +161,7 @@ public class MesswerteController {
     }
 
     @GetMapping("/calculation-progress")
-    @PreAuthorize("hasRole('zev_admin')")
+    @PreAuthorize("hasAuthority('messwerte:write')")
     public ResponseEntity<Map<String, Object>> getCalculationProgress() {
         CalculationProgressService.CalculationProgress progress =
                 calculationProgressService.getProgress(organizationContextService.getCurrentOrgId());

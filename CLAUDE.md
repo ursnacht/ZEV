@@ -140,19 +140,22 @@ mvn test
 
 ### REST API Endpoints
 
-| Controller              | Base Path            | Auth                          |
-|-------------------------|----------------------|-------------------------------|
-| EinheitController       | `/api/einheit`       | zev (read) / zev_admin (write) |
-| MesswerteController     | `/api/messwerte`     | zev (read) / zev_admin (write) |
-| TranslationController   | `/api/translations`  | zev (read) / zev_admin (write) |
-| TarifController         | `/api/tarife`        | zev_admin                     |
-| MieterController        | `/api/mieter`        | zev_admin                     |
-| DebitorController       | `/api/debitoren`     | zev_admin                     |
-| EinstellungenController | `/api/einstellungen` | zev_admin / org_admin         |
-| RechnungController      | `/api/rechnungen`    | zev_admin                     |
-| StatistikController     | `/api/statistik`     | zev                           |
-| LizenzenController      | `/api/lizenzen`      | zev                           |
-| PingController          | `/ping`              | public                        |
+Autorisierung permission-basiert via `@PreAuthorize("hasAuthority('<permission>')")` (siehe `Specs/Berechtigungen.md`). Permissions werden über Keycloak Composite Roles gebündelt (`zev_user ⊂ org_admin ⊂ zev_admin`).
+
+| Controller              | Base Path            | Auth (Permission)                        |
+|-------------------------|----------------------|------------------------------------------|
+| EinheitController       | `/api/einheit`       | `einheit:read` (Liste) / `einheit:write` |
+| MesswerteController     | `/api/messwerte`     | `messwerte:read` / `messwerte:write`     |
+| TranslationController   | `/api/translations`  | `translations:read` / `translations:manage` |
+| TarifController         | `/api/tarife`        | `tarife:manage`                          |
+| MieterController        | `/api/mieter`        | `mieter:read` (GET) / `mieter:manage`    |
+| DebitorController       | `/api/debitoren`     | `debitoren:manage`                       |
+| EinstellungenController | `/api/einstellungen` | `einstellungen:write`                    |
+| RechnungController      | `/api/rechnungen`    | `rechnungen:manage`                      |
+| StatistikController     | `/api/statistik`     | `statistik:read`                         |
+| FeatureFlagController   | `/api/feature-flags` | `featureflags:read` / `featureflags:manage` |
+| LizenzenController      | `/api/lizenzen`      | `lizenzen:read`                          |
+| PingController          | `/ping`              | public                                   |
 
 **Key Backend Components:**
 - `EinheitController` - CRUD for units (consumers/producers)
@@ -208,20 +211,24 @@ mvn test
 
 ### Frontend Routes & Roles
 
-| Route                | Component                     | Roles          |
-|----------------------|-------------------------------|----------------|
-| `/startseite`        | StartseiteComponent           | zev, zev_admin |
-| `/upload`            | MesswerteUploadComponent      | zev, zev_admin |
-| `/einheiten`         | EinheitListComponent          | zev, zev_admin |
-| `/solar-calculation` | SolarCalculationComponent     | zev, zev_admin |
-| `/chart`             | MesswerteChartComponent       | zev            |
-| `/statistik`         | StatistikComponent            | zev            |
-| `/rechnungen`        | RechnungenComponent           | zev_admin      |
-| `/tarife`            | TarifListComponent            | zev_admin      |
-| `/mieter`            | MieterListComponent           | zev_admin      |
-| `/einstellungen`     | EinstellungenComponent        | zev_admin, org_admin |
-| `/translations`      | TranslationEditorComponent    | zev_admin      |
-| `/design-system`     | DesignSystemShowcaseComponent | zev            |
+Routen sind über `data.permissions` (im `AuthGuard`) geschützt; Zugriff bei **einer** passenden Permission.
+
+| Route                | Component                     | Permission (`data.permissions`) |
+|----------------------|-------------------------------|---------------------------------|
+| `/startseite`        | StartseiteComponent           | – (authentifiziert)             |
+| `/upload`            | MesswerteUploadComponent      | `messwerte:write` (+ Feature-Flag `MESSWERTE_UPLOAD`) |
+| `/einheiten`         | EinheitListComponent          | `einheit:read`                  |
+| `/solar-calculation` | SolarCalculationComponent     | `messwerte:write`               |
+| `/chart`             | MesswerteChartComponent       | `messwerte:read`                |
+| `/statistik`         | StatistikComponent            | `statistik:read`                |
+| `/rechnungen`        | RechnungenComponent           | `rechnungen:manage`             |
+| `/debitoren`         | DebitorkontrolleListComponent | `debitoren:manage`              |
+| `/tarife`            | TarifListComponent            | `tarife:manage`                 |
+| `/mieter`            | MieterListComponent           | `mieter:manage`                 |
+| `/einstellungen`     | EinstellungenComponent        | `einstellungen:write`           |
+| `/translations`      | TranslationEditorComponent    | `translations:manage`           |
+| `/design-system`     | DesignSystemShowcaseComponent | – (authentifiziert)             |
+| `/lizenzen`          | LizenzenComponent             | `lizenzen:read`                 |
 
 ## Key Conventions
 
@@ -329,10 +336,14 @@ erDiagram
 - Translations stored in database
 - Use `TranslatePipe` in Angular templates
 
-### Authentication
-- Keycloak roles: `zev` (member), `zev_admin` (admin), `org_admin` (Einstellungen ohne Feature-Flags), `user` (basic)
-- Backend: `@PreAuthorize` annotations for authorization
-- Frontend: `AuthGuard` for route protection
+### Authentication & Authorization
+- **Permission-basiert:** Die Anwendung prüft feingranulare Permissions (z.B. `einstellungen:write`), nicht Fachrollen. Vollständige Matrix + Fachrolle→Permission-Zuordnung: `Specs/Berechtigungen.md`.
+- **Fachrollen** (Keycloak Composite Roles, hierarchisch `zev_user ⊂ org_admin ⊂ zev_admin`):
+  - `zev_user` (member) – alle `*:read`-Permissions (inkl. `mieter:read`) + `rechnungen:manage`, `debitoren:manage`
+  - `org_admin` – `zev_user` + `einstellungen:write`, `einheit:write`, `messwerte:write`, `tarife:manage`, `mieter:manage` (kein `translations:manage`/`featureflags:manage`)
+  - `zev_admin` (admin) – alle Permissions
+- Backend: `@PreAuthorize("hasAuthority('<permission>')")`; `JwtAuthenticationConverter` mappt `realm_access.roles` 1:1 auf Authorities (ohne `ROLE_`-Präfix)
+- Frontend: `AuthGuard` prüft `data.permissions` je Route
 
 ### Design System
 - Use `@zev/design-system` for UI components (local workspace dependency)
@@ -431,7 +442,7 @@ Additional documentation in `/docs/`:
 | keycloak         | quay.io/keycloak/keycloak:latest | 9000      | Admin: admin/admin, uses postgres (schema: keycloak) |
 | backend-service  | ./backend-service                | 8090      | Depends on postgres, admin-service                   |
 | admin-service    | ./admin-service                  | 8081      | Spring Boot Admin dashboard                          |
-| frontend-service | ./frontend-service               | 4200→8080 | Nginx, depends on backend + admin                    |
+| frontend-service | ./frontend-service               | 4200→8080 | Spring Boot (JRE) serviert den Angular-Build als statische Ressourcen; depends on backend + admin |
 | prometheus       | prom/prometheus:latest           | 9090      | Scrapes backend, admin, frontend actuator            |
 | grafana          | grafana/grafana:latest           | 3000      | Admin: admin/admin, provisioned dashboards           |
 
@@ -451,9 +462,9 @@ Network: `zev-network` (bridge)
 
 ## Test Users (Keycloak)
 
-- `testuser` / `testpassword` (zev_admin role)
-- `user` / `password` (zev role)
-- `orgadmin` / `orgadminpassword` (org_admin role: Einstellungen bearbeiten, keine Feature-Flags)
+- `testuser` / `testpassword` (`zev_admin` – alle Permissions)
+- `user` / `password` (`zev_user` – Lese-Permissions + Rechnungen/Debitoren verwalten)
+- `orgadmin` / `orgadminpassword` (`org_admin` – Einstellungen bearbeiten, keine Feature-Flags)
 
 ## Database Access
 

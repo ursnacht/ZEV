@@ -2,7 +2,8 @@ import { ActivatedRouteSnapshot, CanActivateFn, Router, RouterStateSnapshot, Url
 import { inject } from '@angular/core';
 import { AuthGuardData, createAuthGuard } from 'keycloak-angular';
 
-const isAccessAllowed = async (
+// Exportiert für Unit-Tests (die Guard-Logik unabhängig vom keycloak-angular-Wrapper prüfbar).
+export const isAccessAllowed = async (
     route: ActivatedRouteSnapshot,
     state: RouterStateSnapshot,
     authData: AuthGuardData
@@ -16,33 +17,33 @@ const isAccessAllowed = async (
         return false;
     }
 
-    // Get the required roles from the route data
-    const requiredRoles = route.data['roles'];
+    // Erforderliche Permissions aus den Route-Daten lesen.
+    const requiredPermissions = route.data['permissions'];
 
-    // Allow the user to proceed if no additional roles are required to access the route.
-    if (!requiredRoles || requiredRoles.length === 0) {
+    // Keine Permission gefordert -> Zugriff für jeden authentifizierten User erlaubt.
+    if (!requiredPermissions || requiredPermissions.length === 0) {
         return true;
     }
 
-    // Check if user has all required roles
-    const hasRequiredRole = (role: string): boolean => {
-        // Check in realm roles
-        if (grantedRoles.realmRoles.includes(role)) {
+    // Prüft, ob der User eine Permission besitzt. Permissions sind Keycloak-Rollen, die von den
+    // Fachrollen (Composite Roles) gebündelt werden und daher in den effektiven Realm-/Resource-Rollen erscheinen.
+    const hasPermission = (permission: string): boolean => {
+        // Realm-Rollen prüfen
+        if (grantedRoles.realmRoles.includes(permission)) {
             return true;
         }
-        // Check in resource roles
-        return Object.values(grantedRoles.resourceRoles).some((roles) => roles.includes(role));
+        // Resource-Rollen prüfen
+        return Object.values(grantedRoles.resourceRoles).some((roles) => roles.includes(permission));
     };
 
-    // Zugriff wird gewährt, sobald der User EINE der angegebenen Rollen besitzt
-    // (z.B. `['zev', 'zev_admin']` = Mitglied ODER Admin, `['zev_admin', 'org_admin']` = beide Admin-Typen).
-    const hasAnyRequiredRole = requiredRoles.some((role: string) => hasRequiredRole(role));
+    // Zugriff wird gewährt, sobald der User EINE der geforderten Permissions besitzt.
+    const hasAnyRequiredPermission = requiredPermissions.some((permission: string) => hasPermission(permission));
 
-    if (hasAnyRequiredRole) {
+    if (hasAnyRequiredPermission) {
         return true;
     }
 
-    // User doesn't have required roles, redirect to forbidden or home
+    // Fehlende Permission -> zurück auf die Startseite.
     return router.parseUrl('/');
 };
 

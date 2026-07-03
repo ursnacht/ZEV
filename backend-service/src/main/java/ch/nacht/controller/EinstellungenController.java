@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/api/einstellungen")
-@PreAuthorize("hasAnyRole('zev_admin', 'org_admin')")
+@PreAuthorize("hasAuthority('einstellungen:write')")
 public class EinstellungenController {
 
     private static final Logger log = LoggerFactory.getLogger(EinstellungenController.class);
