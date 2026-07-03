@@ -2,7 +2,7 @@
 
 ## Zusammenfassung
 
-Das Angular 21 SPA-Frontend (`frontend-service`) wird vollständig durch Vaadin Server-Side-Rendering ersetzt. Vaadin wird direkt in den `backend-service` integriert, sodass die Views die bestehenden `@Service`-Klassen direkt aufrufen – ohne HTTP-Roundtrip. Der `frontend-service` (Docker/Nginx) wird stillgelegt und aus `docker-compose.yml` entfernt.
+Das Angular 21 SPA-Frontend (`frontend-service`) wird vollständig durch Vaadin Server-Side-Rendering ersetzt. Vaadin wird direkt in den `backend-service` integriert, sodass die Views die bestehenden `@Service`-Klassen direkt aufrufen – ohne HTTP-Roundtrip. Der `frontend-service` (Docker/Spring Boot) wird stillgelegt und aus `docker-compose.yml` entfernt.
 
 ---
 

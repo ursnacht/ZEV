@@ -8,7 +8,7 @@
   * Entwickler mit Java-Kenntnissen können UI-Features ohne TypeScript/Angular-Wissen umsetzen
   * Vaadin bietet serverseitige Session-Verwaltung, Keycloak-Integration via Spring Security ist einfacher
   * Kein eigenständiges `frontend-service` Docker-Image mehr notwendig
-* **Aktueller Stand:** Das Angular-Frontend läuft als separater `frontend-service` (Docker, Nginx, Port 4200/8080). Es kommuniziert via REST-API mit dem `backend-service`. Authentication via `keycloak-angular`.
+* **Aktueller Stand:** Das Angular-Frontend läuft als separater `frontend-service` (Docker, Spring-Boot-Static-Server, Port 4200/8080). Es kommuniziert via REST-API mit dem `backend-service`. Authentication via `keycloak-angular`.
 
 ---
 
@@ -22,7 +22,7 @@ Alle bestehenden Module des Angular-Frontends werden als Vaadin-Views re-impleme
 2. Vaadin läuft als Spring Boot Starter (`vaadin-spring-boot-starter`).
 3. Keycloak-Authentifizierung via Spring Security / Vaadin Security Integration.
 4. Die bestehenden `@Service`-Klassen im `backend-service` werden direkt von den Vaadin-Views verwendet.
-5. Der `frontend-service` (Angular + Nginx) wird stillgelegt.
+5. Der `frontend-service` (Angular, via Spring Boot ausgeliefert) wird stillgelegt.
 6. Multi-Tenancy bleibt vollständig erhalten: `HibernateFilterService.enableOrgFilter()` wird in jedem View aktiviert (z.B. via `BeforeEnterObserver` oder Spring Security Context).
 
 ### FR-2: Navigation (Hamburger-/Seitenmenü)
@@ -255,7 +255,7 @@ Alle bestehenden Module des Angular-Frontends werden als Vaadin-Views re-impleme
 
 ### NFR-4: Deployment
 * Vaadin wird Teil des `backend-service` (neuer Maven-Modul oder direkte Integration)
-* `frontend-service` (Docker, Nginx) wird entfernt
+* `frontend-service` (Docker, Spring Boot) wird entfernt
 * `docker-compose.yml` wird angepasst: kein separater `frontend-service` mehr
 * Produktions-Build: `mvn clean package -Pproduction` (Vaadin Production Build bündelt und optimiert Assets)
 

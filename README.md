@@ -79,8 +79,8 @@ frontend-service/           # Angular web application
 │   │   ├── services/
 │   │   └── app.routes.ts
 │   └── index.html
-├── Dockerfile
-└── nginx.conf
+├── Dockerfile          # baut Angular + verpackt es als Spring-Boot-JAR
+└── pom.xml             # Spring Boot serviert den Angular-Build (SpaRedirectController)
 ```
 
 ## Algorithm
