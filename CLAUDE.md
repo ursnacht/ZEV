@@ -419,6 +419,9 @@ Feature specs are in `/Specs/`:
 - `SpringBoot4Upgrade.md` - Spring Boot 4 upgrade
 - `Statistik-PDF_Summen-pro-Einheit_Umsetzungsplan.md` - Statistics PDF unit summaries
 - `DarkMode.md` - Dark/Light mode toggle
+- `Composite-Roles.md` - Permission-based authorization (Keycloak Composite Roles)
+- `Berechtigungen.md` - Rollen-/Permission-Matrix (Feature × Permission)
+- `NAS-Deployment.md` - Synology NAS deployment
 
 Specs with `_Umsetzungsplan` suffix contain implementation plans. Pure implementation plans (no separate spec):
 - `PDF-Bibliothek-Wechsel_Umsetzungsplan.md` - PDF library switch
