@@ -413,7 +413,7 @@ Feature specs are in `/Specs/`:
 - `Icons.md` - Icon system
 - `DeleteTranslations.md` - Translation deletion
 - `Messwerte-mit-KI.md` - AI-assisted measurement upload
-- `MQTT-SmartMeter.md` - MQTT smart meter integration
+- `MQTT-Integration.md` - MQTT smart meter integration
 - `RefactoringProducer.md` - Producer refactoring
 - `SpringBoot4Upgrade.md` - Spring Boot 4 upgrade
 - `Statistik-PDF_Summen-pro-Einheit_Umsetzungsplan.md` - Statistics PDF unit summaries

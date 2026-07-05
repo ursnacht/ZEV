@@ -133,7 +133,7 @@ ZEV hat bereits **Prometheus/Grafana** im Stack: Pi einen Heartbeat bzw.
 
 Statt File-Batch + SFTP könnte der **Pi als MQTT-Gateway** die Messwerte an
 einen Broker beim NAS publizieren, ZEV abonniert sie (siehe Spec
-`MQTT-SmartMeter.md`) → näher an Echtzeit, kein Datei-Handling. Alternativ
+`MQTT-Integration.md`) → näher an Echtzeit, kein Datei-Handling. Alternativ
 direkter Push des Pi an die bestehende `/api/messwerte`-REST-Schnittstelle.
 
 > **Rollentrennung – der Broker liest keine Zähler:** Ein MQTT-Broker (Mosquitto)
@@ -234,7 +234,7 @@ Pi (MQTT-Publisher) ──VPN──> NAS:1883/8883 (Mosquitto) ──> ZEV-Backe
 
 Das ZEV-Backend (Spring Boot) abonniert die Werte per MQTT-Client
 (`spring-integration-mqtt` / Eclipse Paho) — das ist der Implementierungsteil aus
-der Spec `MQTT-SmartMeter.md`.
+der Spec `MQTT-Integration.md`.
 
 **Verfügbarkeit beachten**: Anders als File/SFTP puffert MQTT nur begrenzt.
 Fällt der Broker (NAS) aus, müssen Pi *und* Backend mit QoS 1/2 +
