@@ -136,6 +136,20 @@ einen Broker beim NAS publizieren, ZEV abonniert sie (siehe Spec
 `MQTT-SmartMeter.md`) → näher an Echtzeit, kein Datei-Handling. Alternativ
 direkter Push des Pi an die bestehende `/api/messwerte`-REST-Schnittstelle.
 
+> **Rollentrennung – der Broker liest keine Zähler:** Ein MQTT-Broker (Mosquitto)
+> **verteilt nur Nachrichten** und spricht kein Modbus. Das Auslesen der Zähler
+> (Modbus TCP / gPlug) übernimmt ein **separater Reader-/Publisher-Prozess** auf
+> dem Pi, der die Werte an den Broker *publiziert*. „Pi als MQTT-Gateway" meint
+> also zwei Komponenten:
+> 1. **Reader/Publisher** – liest die Zähler aus und publiziert (immer nötig, in
+>    jeder Variante; **nicht** Teil der Broker-Installation, separat zu
+>    implementieren/betreiben).
+> 2. **Broker** – nur bei Variante A/C lokal auf dem Pi; bei Variante B nur auf dem NAS.
+>
+> Der Reader publiziert an den Broker auf `localhost` (diese Verbindung fällt
+> praktisch nie aus); das Verlustrisiko bei Ausfällen liegt allein auf der Strecke
+> **Broker → NAS** (siehe Pufferung/QoS in den Broker-Setup-Notizen unten).
+
 **Empfehlung**: Das jetzige File/SFTP-Modell vorerst behalten (entkoppelt,
 fehlertolerant, einfach zu debuggen) und Punkte 1–4 umsetzen. MQTT erst, wenn
 Echtzeit oder deutlich mehr Zähler tatsächlich gefordert sind — sonst
@@ -279,4 +293,121 @@ dockt lokal und stabil an, NAS hat die höhere Uptime, Pi bleibt reiner
 Publisher. Bei realem Datenverlustrisiko durch VPN-/NAS-Ausfälle auf
 **Variante C** (Bridge auf dem Pi) nachrüsten. Variante A nur wählen, wenn der
 Broker zusätzlich lokale Verbraucher *am Zählerstandort* bedienen soll.
+
+## Setup-Notiz: MQTT-Broker auf dem Raspberry Pi betreiben (Variante A / C)
+
+Wird nur für **Variante A** (Broker läuft am Zählerstandort) oder als lokale
+Hälfte von **Variante C** (Pi-Broker mit Bridge zum NAS) benötigt. Bei der
+Standard-Empfehlung (Variante B, Broker nur auf dem NAS) ist dies **nicht** nötig.
+
+Auf dem Pi ist die **native Installation via apt** am schlanksten (systemd,
+kein Docker-Overhead). Falls auf dem Pi ohnehin Docker läuft (vgl.
+`docs/images.md`), geht auch `eclipse-mosquitto:2` analog zur NAS-Anleitung.
+
+### 1. Installation (nativ, empfohlen)
+
+```bash
+sudo apt update
+sudo apt install -y mosquitto mosquitto-clients
+sudo systemctl enable --now mosquitto     # Autostart nach Reboot/Stromausfall
+```
+
+Pfade auf dem Pi (Raspberry Pi OS / Debian):
+- Konfig: `/etc/mosquitto/mosquitto.conf` + `/etc/mosquitto/conf.d/*.conf`
+- Daten (Persistence): `/var/lib/mosquitto/`
+- Logs: `/var/log/mosquitto/`
+
+### 2. Konfiguration
+
+```conf
+# /etc/mosquitto/conf.d/zev.conf
+listener 1883
+persistence true
+persistence_location /var/lib/mosquitto/
+autosave_interval 300            # seltener auf Disk schreiben (SD-Karten schonen)
+log_dest file /var/log/mosquitto/mosquitto.log
+
+# Keine anonymen Verbindungen!
+allow_anonymous false
+password_file /etc/mosquitto/passwd
+```
+
+> **SD-Karten-Wear:** `persistence` schreibt nach `/var/lib/mosquitto/` — auf der
+> SD-Karte führt das zu Verschleiss. `persistence_location` besser auf eine
+> USB-SSD legen (vgl. Abschnitt „Datenpipeline härten → Pi-Speicher").
+
+### 3. Benutzer/Passwort anlegen
+
+```bash
+sudo mosquitto_passwd -c /etc/mosquitto/passwd zevpi   # -c nur beim ersten User
+sudo systemctl restart mosquitto                       # Passwortdatei laden
+```
+
+Getrennte User: einen für den **Zähler-Reader (Publisher, lokal)** und — bei
+Variante A — einen für die **NAS/ZEV-Verwaltung (Subscriber über VPN)**.
+
+### 4. Test (lokal auf dem Pi)
+
+```bash
+mosquitto_sub -h localhost -u zevpi -P '***' -t 'zev/messwerte/#' &
+mosquitto_pub -h localhost -u zevpi -P '***' -t 'zev/messwerte/test' -m 'hello'
+```
+
+### 5. Variante A — NAS abonniert über VPN
+
+Der Broker muss für das NAS **nur über den VPN-Pfad** erreichbar sein, nicht im
+offenen LAN/Internet:
+
+```bash
+sudo ufw allow in on wg0 to any port 1883 proto tcp   # nur VPN-Interface (z.B. wg0)
+sudo ufw allow in on wg0 to any port 8883 proto tcp   # TLS
+sudo ufw deny 1883/tcp                                # sonst dicht
+```
+
+Für Pufferung an der Quelle: `persistence true` + QoS 1/2 + ggf. `retained`
+(spiegelt die Resilienz des SFTP-Pull-Modells).
+
+### 6. Variante C — Bridge zum NAS-Broker (store-and-forward)
+
+Der lokale Pi-Broker nimmt die Messwerte entgegen und leitet sie an den
+NAS-Broker weiter, sobald der Tunnel steht. Bei Ausfall wird lokal gepuffert und
+nachgesendet.
+
+```conf
+# /etc/mosquitto/conf.d/bridge.conf
+connection zev-nas-bridge
+address <nas-vpn-ip>:8883
+remote_username zevpi
+remote_password ***
+# 'out' = vom Pi zum NAS; QoS 1
+topic zev/messwerte/# out 1
+bridge_protocol_version mqttv311
+cleansession false               # + persistence -> puffert bei VPN-/NAS-Ausfall
+try_private true
+notifications false
+restart_timeout 30
+# TLS zum NAS-Broker (Defense-in-Depth über den VPN-Tunnel)
+bridge_cafile /etc/mosquitto/certs/ca.crt
+```
+
+`cleansession false` zusammen mit `persistence true` (Abschnitt 2) sorgt dafür,
+dass keine Messwerte verloren gehen, während NAS oder VPN weg sind.
+
+### Sicherheit / Pi-spezifisch
+
+- **`allow_anonymous false`** + Passwort ist Pflicht.
+- **Firewall**: Ports 1883/8883 nur über das VPN-Interface (siehe Schritt 5).
+- **TLS (8883)**: Zertifikate nach `/etc/mosquitto/certs/`, im `listener 8883`
+  mit `cafile`/`certfile`/`keyfile` bzw. für die Bridge mit `bridge_cafile`.
+- **ACLs**: `acl_file` einsetzen, damit der Reader nur in `zev/messwerte/#`
+  publizieren darf.
+- **Persistence** nicht auf die SD-Karte (USB-SSD), `autosave_interval` erhöhen.
+- **Autostart**: `systemctl enable --now mosquitto` bringt den Broker nach einem
+  Stromausfall selbstständig hoch.
+
+### Docker-Alternative (falls Docker auf dem Pi läuft)
+
+Analog zur NAS-Anleitung mit `eclipse-mosquitto:2`; Volumes dann z. B. unter
+`/home/pi/mosquitto/{config,data,log}`. Sonst ist die native apt-Installation
+für den schlanken Pi vorzuziehen.
 
