@@ -21,6 +21,23 @@
 3. Jede physische Quelle ist einer **Einheit** über deren **`messpunkt`** zugeordnet (Konfiguration, kein Rückgriff auf interne DB-IDs).
 4. Lese-Intervall konfigurierbar (Default z.B. 1–5 min).
 
+> **Manuelles Auslesen / Diagnose (CLI):** Zum Prüfen von Verkabelung/Registern
+> eignet sich `mbpoll` (`sudo apt install mbpoll`). „Adresse 1" = Modbus
+> **Unit-/Slave-ID** (die Geräte-**IP** ist bei Modbus TCP zusätzlich nötig).
+> ```bash
+> # Modbus TCP, Unit-ID 1, 10 Holding-Register ab Register 1, einmalig:
+> mbpoll -a 1 -t 4 -r 1 -c 10 -1 <zaehler-ip> -p 502
+> # 32-bit-Float-Werte (ggf. -B fuer Big-Endian-Words):
+> mbpoll -a 1 -t 4:float -r 1 -c 4 -1 <zaehler-ip>
+> # Modbus RTU (serielle Leitung) statt TCP:
+> mbpoll -m rtu -a 1 -b 9600 -P none -t 4 -r 1 -c 10 -1 /dev/ttyUSB0
+> ```
+> `-a` Unit-ID, `-t 4`/`3` Holding/Input Register, `-r` Start, `-c` Anzahl,
+> `-1` One-Shot. Konkrete Register/Skalierung stammen aus der Zähler-Doku
+> (siehe Offene Frage „Register-Mapping Wago"). BKW/gPlug: falls HTTP-API,
+> Diagnose per `curl` statt `mbpoll`. Alternativen: `mbtget`, kurzes
+> `pymodbus`-Skript.
+
 ### FR-2: Delta-Berechnung
 1. Zähler liefern **absolute Zählerstände**; die Software berechnet die **Intervall-Deltas** `verbrauch`/`einspeisung` = aktueller Stand − letzter Stand.
 2. Der **letzte Zählerstand** wird persistiert (überlebt Neustart), damit Deltas lückenlos bleiben.
