@@ -13,15 +13,17 @@
   - Ziel-Topologie: Der Pi ist MQTT-**Publisher**, der **Broker (Mosquitto) läuft auf dem NAS** (Variante B der Topologie-Doku), das ZEV-Backend ist **Subscriber**.
   - Es gibt **noch keinen** MQTT-Code / keine MQTT-Dependency im Backend.
 
-> **Rollentrennung (siehe Topologie-Doku):** Ein MQTT-Broker verteilt nur Nachrichten und liest selbst keine Zähler. Das Auslesen (Modbus/gPlug) + Delta-Berechnung + Publish macht ein **separater Reader-/Publisher-Prozess auf dem Pi** — nicht Teil dieses Backend-Features (Out of Scope).
+> **Designentscheidung – absolute Zählerstände statt Deltas:** Der Pi überträgt die **absoluten (kumulativen) Zählerstände**, nicht berechnete Deltas. Die **Delta-/Intervall-Berechnung erfolgt im Backend**. Vorteil: **verlusttolerant** — geht eine MQTT-Nachricht verloren, bleibt die Gesamtsumme korrekt (die Differenz zweier empfangener Stände erfasst den Verbrauch dazwischen weiterhin vollständig); es sinkt nur kurz die zeitliche Auflösung. Dadurch entfallen strenge QoS-/Pufferungs-Anforderungen (kein zwingender Store-and-Forward-Bridge, Variante C).
+
+> **Rollentrennung (siehe Topologie-Doku):** Ein MQTT-Broker verteilt nur Nachrichten und liest selbst keine Zähler. Das Auslesen (Modbus/gPlug) + Publish der Zählerstände macht ein **separater Reader-/Publisher-Prozess auf dem Pi** (`Specs/Pi-Gateway-Software.md`) — nicht Teil dieses Backend-Features (Out of Scope).
 
 ## 2. Funktionale Anforderungen (FR)
 
 ### FR-1: MQTT-Broker-Anbindung (Subscriber)
 1. Das ZEV-Backend verbindet sich beim Start automatisch zum konfigurierten Broker (Mosquitto auf dem NAS).
 2. Verbindungsparameter (URL, Username, Passwort, Client-ID, QoS) über `application.yml` / Environment — **keine Secrets im Code**.
-3. Subscribe mit Wildcard auf alle Messwert-Topics (FR-2), QoS 1.
-4. Bei Verbindungsabbruch automatischer Reconnect mit Exponential Backoff; persistente Session.
+3. Subscribe mit Wildcard auf alle Messwert-Topics (FR-2).
+4. Bei Verbindungsabbruch automatischer Reconnect mit Exponential Backoff.
 
 ### FR-2: Topic-Struktur
 ```
@@ -38,62 +40,65 @@ zev/{orgId}/{messpunkt}/messwert
 * Der Pi adressiert die Einheit über den **Messpunkt** (physisch bekannt), nicht über die interne `einheit.id`. Das Backend löst die Einheit über **(`org_id`, `messpunkt`)** auf.
 * `{orgId}` folgt vorerst dem bestehenden `Messwerte`-Modell (internes `org_id` als `BIGINT`); Alternative (Keycloak-Alias/UUID) siehe Offene Fragen.
 
-### FR-3: Payload-Format (JSON, Deltas)
-Der Pi publiziert pro Messung bereits berechnete **Deltas** seit der letzten Messung:
+### FR-3: Payload-Format (JSON, absolute Zählerstände)
+Der Pi publiziert die **absoluten kumulativen Zählerstände** zum Messzeitpunkt:
 ```json
 {
   "timestamp": "2026-06-19T14:30:00Z",
-  "verbrauch": 1.25,
-  "einspeisung": 0.0
+  "zaehlerstandBezug": 12345.678,
+  "zaehlerstandEinspeisung": 4321.000
 }
 ```
 | Feld | Typ | Pflicht | Beschreibung |
 |------|-----|---------|--------------|
 | `timestamp` | ISO 8601 (UTC) | Ja | Zeitpunkt der Messung |
-| `verbrauch` | Decimal (kWh ≥ 0) | Ja | Verbrauch seit letzter Messung |
-| `einspeisung` | Decimal (kWh ≥ 0) | Ja | Einspeisung seit letzter Messung |
+| `zaehlerstandBezug` | Decimal (kWh, kumulativ) | Ja | Absoluter Zählerstand Bezug/Verbrauch (monoton steigend) |
+| `zaehlerstandEinspeisung` | Decimal (kWh, kumulativ) | Ja | Absoluter Zählerstand Einspeisung (monoton steigend) |
 
-> Die Payload trägt **physische Zählerwerte**. Die Abbildung auf die `messwerte`-Felder (`total`/`zev`) erfolgt bei der Aggregation (FR-6); `zev_calculated` bleibt Ergebnis der Solarverteilung. Die genaue Zuordnung ist eine **Offene Frage** (Abschnitt 8).
+> Die Stände sind **kumulativ und monoton** (Ausnahme: Zähler-Reset/-tausch, siehe Aggregation/Edge Cases). Welche Register genau übertragen werden und wie sie auf die `messwerte`-Felder (`total`/`zev`) abgebildet werden, ist eine **Offene Frage** (Abschnitt 8); `zev_calculated` bleibt Ergebnis der Solarverteilung.
 
 ### FR-4: Backend MQTT-Subscriber-Verarbeitung
 Pro eingehender Nachricht:
 1. Topic parsen → `orgId` + `messpunkt`.
-2. JSON validieren (Pflichtfelder, Typen, keine negativen Werte).
+2. JSON validieren (Pflichtfelder, Typen, Zählerstände nicht negativ).
 3. Einheit über **`messpunkt` + `orgId`** auflösen (Multi-Tenancy-Prüfung).
-4. Bei Erfolg: Rohdatensatz in `zaehler_rohdaten` (FR-5).
+4. Bei Erfolg: Rohdatensatz (absolute Stände) in `zaehler_rohdaten` (FR-5).
 5. Bei Validierungs-/Zuordnungsfehlern: Warnung loggen, Nachricht verwerfen (keine Exception nach aussen).
 6. Verarbeitung asynchron / non-blocking.
 
 > **Kein JWT im Ingest-Pfad:** MQTT-Nachrichten laufen ohne User-Request/JWT. Der Mandantenkontext (`org_id`) darf **nicht** aus `OrganizationContextService` (JWT) stammen, sondern wird aus dem Topic abgeleitet, gegen die Einheit geprüft und beim Persistieren explizit gesetzt (Hibernate-`orgFilter` entsprechend versorgen).
 
-### FR-5: Rohdaten-Persistierung
+### FR-5: Rohdaten-Persistierung (absolute Zählerstände)
 Neue Flyway-Migration (`V[n]__create_zaehler_rohdaten.sql`):
 ```sql
 CREATE TABLE zev.zaehler_rohdaten (
-    id              BIGSERIAL PRIMARY KEY,
-    org_id          BIGINT NOT NULL,
-    einheit_id      BIGINT NOT NULL REFERENCES zev.einheit(id),
-    zeit            TIMESTAMP NOT NULL,
-    verbrauch       DECIMAL(12,4) NOT NULL,
-    einspeisung     DECIMAL(12,4) NOT NULL,
-    empfangen_am    TIMESTAMP DEFAULT NOW(),
-    verarbeitet     BOOLEAN DEFAULT FALSE,
-    verarbeitet_am  TIMESTAMP,
+    id                        BIGSERIAL PRIMARY KEY,
+    org_id                    BIGINT NOT NULL,
+    einheit_id                BIGINT NOT NULL REFERENCES zev.einheit(id),
+    zeit                      TIMESTAMP NOT NULL,
+    zaehlerstand_bezug        DECIMAL(14,4) NOT NULL,
+    zaehlerstand_einspeisung  DECIMAL(14,4) NOT NULL,
+    empfangen_am              TIMESTAMP DEFAULT NOW(),
+    verarbeitet               BOOLEAN DEFAULT FALSE,
+    verarbeitet_am            TIMESTAMP,
     CONSTRAINT uk_zaehler_rohdaten UNIQUE (einheit_id, zeit)
 );
 CREATE INDEX idx_zaehler_rohdaten_unverarbeitet
     ON zev.zaehler_rohdaten(verarbeitet, zeit) WHERE verarbeitet = FALSE;
 ```
+* Speichert **absolute Stände** (nicht Deltas); `DECIMAL(14,4)` für grosse kumulative Werte.
 * `org_id` als `BIGINT` analog zur `messwerte`-Tabelle (`Messwerte.orgId` = `Long`); Hibernate-`@Filter` `orgFilter` wie bei allen Entities.
-* Entkoppelt Empfang von Verarbeitung und dient als Puffer.
 * Duplikat (gleiche `einheit_id` + `zeit`): Upsert.
 
-### FR-6: Scheduled Aggregation (15-Minuten-Job)
+### FR-6: Scheduled Aggregation (15-Minuten-Job) — Delta-Bildung im Backend
 1. Scheduled Job (`0 0,15,30,45 * * * *`) ermittelt das abgeschlossene 15-Minuten-Intervall.
-2. Pro Einheit mit unverarbeiteten Rohdaten im Intervall aggregieren (Summe `verbrauch`, Summe `einspeisung`; bei einer einzelnen Zeile 1:1).
-3. Mapping auf `messwerte` (`zeit`, `total`, `zev`, `einheit`, `org_id`); `zev_calculated` wird **nicht** aus MQTT befüllt (Solarverteilung, unverändert). Genaues Feld-Mapping siehe Offene Fragen.
-4. Speichern mit `quelle = 'MQTT'` (FR-7); Insert/Upsert.
-5. Verarbeitete Rohdaten markieren: `verarbeitet = TRUE`, `verarbeitet_am = NOW()`.
+2. Pro Einheit den **Intervall-Verbrauch als Differenz** bilden: `(letzter Stand ≤ Intervallende) − (Referenzstand = letzter Stand ≤ vorheriges Intervallende)`. Analog für Einspeisung.
+3. **Reset/Überlauf/Zählertausch:** ist die Differenz < 0, wird der Wert **nicht negativ** übernommen; Referenz neu setzen, WARN loggen (siehe Offene Fragen für die genaue Policy).
+4. Mapping auf `messwerte` (`zeit`, `total`, `zev`, `einheit`, `org_id`); `zev_calculated` wird **nicht** aus MQTT befüllt (Solarverteilung, unverändert). Genaues Feld-Mapping siehe Offene Fragen.
+5. Speichern mit `quelle = 'MQTT'` (FR-7); Insert/Upsert.
+6. Verarbeitete Rohdaten markieren: `verarbeitet = TRUE`, `verarbeitet_am = NOW()`; Referenzstand fortschreiben.
+
+> **Verlusttoleranz:** Fehlt in einem Intervall eine Meldung, fällt der Verbrauch ins nächste Intervall mit Meldung — die **Gesamtsumme bleibt korrekt**, nur die zeitliche Auflösung sinkt kurzzeitig. Das ist der zentrale Vorteil absoluter Stände gegenüber Deltas.
 
 ### FR-7: Erweiterung der `messwerte`-Tabelle (Quelle)
 ```sql
@@ -113,19 +118,21 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel).
 
 **MQTT-Empfang:**
 * [ ] Backend verbindet sich beim Start automatisch zum Broker und abonniert `zev/+/+/messwert`.
-* [ ] Gültige Nachricht → Zeile in `zaehler_rohdaten` mit korrektem `org_id` + `einheit_id` (aufgelöst über `messpunkt`).
+* [ ] Gültige Nachricht → Zeile in `zaehler_rohdaten` mit korrektem `org_id` + `einheit_id` (aufgelöst über `messpunkt`) und den absoluten Ständen.
 * [ ] Ungültiges JSON / fehlende Pflichtfelder → WARN, kein Insert.
 * [ ] Unbekannter Messpunkt → abgelehnt (WARN, kein Insert).
 * [ ] `orgId` passt nicht zur Einheit → verworfen (Security-Log) — Mandanten-Isolation gewährleistet.
-* [ ] Negative `verbrauch`/`einspeisung` → verworfen.
+* [ ] Negativer Zählerstand → verworfen.
 * [ ] Duplikat (Einheit + `zeit`) → Upsert.
 * [ ] Nach Broker-Abbruch automatischer Reconnect.
 
 **15-Minuten-Aggregation:**
-* [ ] Job läuft um :00, :15, :30, :45; Rohdaten korrekt summiert.
+* [ ] Job läuft um :00, :15, :30, :45; Intervall-Verbrauch korrekt als **Differenz** gebildet.
 * [ ] Aggregierte Werte in `messwerte` mit `quelle = 'MQTT'`.
 * [ ] Verarbeitete Rohdaten `verarbeitet = TRUE`; bereits verarbeitete werden nicht erneut aggregiert.
-* [ ] Leeres Intervall → kein `messwerte`-Eintrag (kein Nullwert).
+* [ ] Leeres Intervall (keine neue Meldung) → kein `messwerte`-Eintrag (kein Nullwert).
+* [ ] Verlorene Zwischen-Nachricht → Gesamtsumme über die betroffenen Intervalle bleibt korrekt (verlusttolerant).
+* [ ] Zähler-Reset/Rücksprung (Differenz < 0) → kein negativer Wert; Referenz neu gesetzt, WARN.
 * [ ] `zev_calculated` wird durch den Ingest nicht verändert; Solarverteilung funktioniert unverändert.
 
 **Monitoring & Kompatibilität:**
@@ -144,10 +151,9 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel).
 * **Mandanten-Isolation:** `org_id` aus dem Topic wird gegen die Einheit geprüft; Rohdaten/Messwerte tragen `org_id` und unterliegen dem Hibernate-`orgFilter`. Da kein JWT vorliegt, wird der Filter explizit mit dem topic-abgeleiteten `org_id` versorgt.
 
 ### NFR-3: Zuverlässigkeit
-* QoS 1 (at least once); Duplikate idempotent über Unique-Constraint (`einheit_id`, `zeit`).
-* Persistente Session für Reconnect ohne Nachrichtenverlust.
+* **Verlusttoleranz durch absolute Zählerstände:** Eine verlorene Nachricht führt **nicht** zu Datenverlust (die Differenzbildung ist selbstheilend). Daher genügt **QoS 0/1**; ein aufwändiger Store-and-Forward-Puffer/Bridge (Variante C) ist **nicht erforderlich** (Broker auf dem NAS = Variante B genügt).
+* Duplikate idempotent über Unique-Constraint (`einheit_id`, `zeit`).
 * Bei DB-Fehler: Rohdaten nicht als verarbeitet markieren, erneuter Versuch.
-* Puffer-Grenzen bewusst wählen (`persistence`, `max_queued_messages`) — MQTT puffert nur begrenzt, anders als das File/SFTP-Modell (siehe Topologie-Doku).
 
 ### NFR-4: Kompatibilität
 * Bestehender CSV-Upload bleibt funktionsfähig; CSV- und MQTT-Werte werden fachlich gleich behandelt (gleiche `messwerte`-Tabelle), unterscheidbar über `quelle`.
@@ -160,13 +166,14 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel).
 | Ungültiges/leeres JSON, fehlende Pflichtfelder | WARN, verwerfen |
 | Unbekannter Messpunkt | WARN, verwerfen |
 | `orgId` passt nicht zur Einheit | Security-WARN, verwerfen (kein Cross-Tenant-Write) |
-| Negative Werte | WARN, verwerfen |
+| Negativer Zählerstand | WARN, verwerfen |
 | Timestamp in der Zukunft | WARN, trotzdem speichern |
 | Duplikat (Einheit + `zeit`) | Upsert |
+| Verlorene Nachricht(en) | kein Datenverlust — Differenz zum nächsten Stand deckt die Lücke; nur Auflösungsverlust |
+| Zählerstand < Referenz (Reset/Überlauf/Zählertausch) | Aggregation: nicht negativ übernehmen, Referenz neu setzen, WARN |
 | Broker nicht erreichbar | Reconnect mit Exponential Backoff |
 | DB nicht erreichbar | Nachricht nicht markieren, Retry |
-| Keine Rohdaten im Intervall | kein `messwerte`-Eintrag |
-| Nur eine Rohdaten-Zeile im Intervall | Wert 1:1 übernehmen |
+| Keine neue Meldung im Intervall | kein `messwerte`-Eintrag |
 | Job-Ausfall/Neustart | nächster Lauf verarbeitet alle unverarbeiteten Rohdaten |
 | Bereits aggregierter `messwerte`-Eintrag | Upsert statt Doppel-Insert |
 | Leere Zähler-/Einheitenliste | kein Fehler; nichts zu verarbeiten |
@@ -175,18 +182,18 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel).
 * **Voraussetzungen:**
   - Einheiten (`einheit`) inkl. `messpunkt` müssen existieren (keine automatische Geräteregistrierung).
   - Mosquitto-Broker auf dem NAS betriebsbereit (siehe `docs/Netzwerk-Topologie-Hene.md`, Abschnitt „MQTT-Broker auf dem NAS betreiben").
-  - VPN-Verbindung zwischen Pi und NAS; **separater Reader-/Publisher-Prozess** auf dem Pi (Out of Scope).
+  - VPN-Verbindung zwischen Pi und NAS; **separater Reader-/Publisher-Prozess** auf dem Pi (Out of Scope, `Specs/Pi-Gateway-Software.md`).
 * **Neue Dependencies (Backend):** `spring-integration-mqtt` + Eclipse Paho (`org.eclipse.paho.client.mqttv3`).
-* **Backend-Konfiguration (`application.yml`):** `mqtt.broker.url/username/password`, `mqtt.topics.messwerte=zev/+/+/messwert`, `mqtt.qos=1` (Secrets via Env).
-* **Neuer Code:** MQTT-Subscriber/Handler, Topic-/Payload-Parser, `ZaehlerRohdaten`-Entity + Repository, Aggregations-Service (Scheduled), Health-Indicator, Prometheus-Metriken.
+* **Backend-Konfiguration (`application.yml`):** `mqtt.broker.url/username/password`, `mqtt.topics.messwerte=zev/+/+/messwert`, `mqtt.qos` (Secrets via Env).
+* **Neuer Code:** MQTT-Subscriber/Handler, Topic-/Payload-Parser, `ZaehlerRohdaten`-Entity + Repository, Aggregations-/Delta-Service (Scheduled), Health-Indicator, Prometheus-Metriken.
 * **Erweiterung:** `messwerte` um `quelle`.
 * **Wiederverwendet:** `Einheit`/`Messwerte`, `SolarDistribution` (unverändert), `MetricsService`, Grafana/Prometheus-Stack.
 * **Datenmigration:** Keine Bestandsmigration; nur neue Tabelle + `quelle`-Spalte.
 * **i18n:** Kein UI-Text in diesem Feature (reiner Backend-Ingest). Falls später Status-UI: Texte via `TranslationService`.
-* **Abhängige Dokumente:** `docs/Netzwerk-Topologie-Hene.md` (Topologie/Broker-Setup/Varianten A/B/C), `Specs/Metriken.md` (Prometheus-Infrastruktur).
+* **Abhängige Dokumente:** `docs/Netzwerk-Topologie-Hene.md` (Topologie/Broker-Setup/Varianten A/B/C), `Specs/Pi-Gateway-Software.md` (Publisher), `Specs/Metriken.md` (Prometheus-Infrastruktur).
 
 ## 7. Abgrenzung / Out of Scope
-* **Pi-Gateway-Software** (Auslesen Wago/Modbus TCP + BKW/gPlug, Delta-Berechnung, MQTT-Publish) — separat auf dem Pi implementiert/konfiguriert.
+* **Pi-Gateway-Software** (Auslesen Wago/Modbus TCP + BKW/gPlug, Publish der Zählerstände) — separat auf dem Pi implementiert/konfiguriert (`Specs/Pi-Gateway-Software.md`). Die **Delta-Bildung** liegt hingegen im Backend (FR-6).
 * Frontend-Live-Anzeige / WebSocket-Bridge.
 * Admin-UI für MQTT-Konfiguration / Broker-/ACL-Verwaltung.
 * Automatische Einheiten-/Geräteregistrierung; bidirektionale Befehle an Zähler.
@@ -196,10 +203,10 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel).
 * Änderung der Solarverteilungs-Logik (`zev_calculated`) — bleibt wie bisher.
 
 ## 8. Offene Fragen
-* [ ] **Mapping `verbrauch`/`einspeisung` → `messwerte`:** Wie werden die physischen Deltas auf `total`/`zev` abgebildet (z.B. `total = verbrauch`, Producer-Einspeisung → eigenes Feld/Vorzeichen)? Liefert der Zähler `zev` überhaupt, oder wird es abgeleitet? `zev_calculated` bleibt Ergebnis der Solarverteilung — korrekt?
+* [ ] **Register → `messwerte`-Mapping:** Welche absoluten Register (Bezug/Einspeisung, ggf. ein separater ZEV-Register) werden übertragen und wie auf `total`/`zev` abgebildet? Liefert der Zähler `zev` als eigenen Stand oder wird es abgeleitet? `zev_calculated` bleibt Ergebnis der Solarverteilung — korrekt?
 * [ ] **`org_id`-Typ & Topic-Kennung:** `Messwerte.orgId` ist `BIGINT`/`Long`, ERD/`generell.md` nennen `UUID`. Welcher Typ gilt für `zaehler_rohdaten`/Topic — internes `org_id` (BIGINT, aktuell angenommen) oder Keycloak-Alias/UUID (mapping via `OrganisationService`)?
 * [ ] **Messpunkt-Eindeutigkeit:** Ist `messpunkt` pro `org_id` eindeutig (nötig für die Auflösung)?
-* [ ] **QoS/Persistenz Pi-Seite:** Welche QoS-Stufe und Pufferung liefert das Pi-Gateway (Store-and-Forward bei VPN-Ausfall — evtl. Bridge nach Variante C der Topologie-Doku)?
-* [ ] **Rohdaten-Retention:** Cleanup-Job nötig, ab welchem Alter?
+* [ ] **Reset/Überlauf-Policy:** Genaue Erkennung (Schwellwert für „Rücksprung") und Umgang (Referenz neu setzen, Intervall auslassen)?
+* [ ] **Rohdaten-Retention:** Cleanup-Job nötig, ab welchem Alter (absolute Stände wachsen unbegrenzt)?
 * [ ] **Mehrfach-Quelle pro Einheit:** Verhalten, wenn für dieselbe Einheit + Zeitpunkt sowohl CSV- als auch MQTT-Daten vorliegen?
-* [ ] **Producer vs. Consumer** (`einheit.typ`): getrennte Payload-Felder/Topics für Einspeisung nötig?
+* [ ] **Producer vs. Consumer** (`einheit.typ`): getrennte Register/Topics für Einspeisung nötig?

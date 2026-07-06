@@ -236,10 +236,13 @@ Das ZEV-Backend (Spring Boot) abonniert die Werte per MQTT-Client
 (`spring-integration-mqtt` / Eclipse Paho) — das ist der Implementierungsteil aus
 der Spec `MQTT-Integration.md`.
 
-**Verfügbarkeit beachten**: Anders als File/SFTP puffert MQTT nur begrenzt.
-Fällt der Broker (NAS) aus, müssen Pi *und* Backend mit QoS 1/2 +
-`persistence` + `clean_session false` arbeiten, damit keine Messwerte verloren
-gehen — dies ist der zusätzliche Betriebsaufwand der MQTT-Variante.
+**Verfügbarkeit / Verlusttoleranz**: Gemäss `MQTT-Integration.md` überträgt der Pi
+**absolute Zählerstände** (nicht Deltas), die Delta-Bildung macht das Backend.
+Dadurch ist ein Nachrichtenverlust **unkritisch**: Fällt Broker/VPN kurz aus,
+schliesst der nächste übertragene Stand die Lücke, die Gesamtsumme bleibt korrekt
+(nur die zeitliche Auflösung sinkt kurz). Der frühere MQTT-Nachteil („puffert nur
+begrenzt" → QoS 1/2 + `persistence` + `clean_session false` nötig) entfällt damit
+weitgehend — **QoS 0/1 genügt**, ein Store-and-Forward-Puffer ist optional.
 
 ### Wo läuft der Broker? — Varianten A/B/C
 
@@ -290,8 +293,10 @@ Pi: Reader → lokaler Broker ──(Bridge/VPN)──> NAS-Broker → ZEV
 
 Für einen Standort mit einem Pi und einem NAS: **Variante B** — ZEV (Konsument)
 dockt lokal und stabil an, NAS hat die höhere Uptime, Pi bleibt reiner
-Publisher. Bei realem Datenverlustrisiko durch VPN-/NAS-Ausfälle auf
-**Variante C** (Bridge auf dem Pi) nachrüsten. Variante A nur wählen, wenn der
+Publisher. Da absolute Zählerstände verlusttolerant sind (s. o.), genügt
+Variante B; **Variante C** (Bridge auf dem Pi) ist **kein Muss** und nur sinnvoll,
+wenn auch die *zeitliche Auflösung* während Ausfällen lückenlos bleiben soll —
+nicht zur Vermeidung von Datenverlust. Variante A nur wählen, wenn der
 Broker zusätzlich lokale Verbraucher *am Zählerstandort* bedienen soll.
 
 ## Setup-Notiz: MQTT-Broker auf dem Raspberry Pi betreiben (Variante A / C)
