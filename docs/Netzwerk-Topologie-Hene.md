@@ -8,10 +8,10 @@ flowchart TB
         W3["Stromzähler Wago 3"]
         BKW["Stromzähler BKW<br/>(gPlug)"]
         ROUTER{{"Router"}}
-        RPI["Raspberry Pi<br/>VPN-Client<br/>MQTT-Gateway"]
+        RPI["Raspberry Pi<br/>VPN-Client<br/>Reader + MQTT-Publisher"]
     end
 
-    NAS["NAS<br/>ZEV-Verwaltung<br/>VPN-Server<br/>MQTT-Broker"]
+    NAS["NAS<br/>ZEV-Verwaltung<br/>VPN-Server<br/>MQTT-Broker + Delta-Bildung"]
 
     W1 -- "Modbus TCP" --> ROUTER
     W2 -- "Modbus TCP" --> ROUTER
@@ -25,8 +25,16 @@ flowchart TB
     RPI -. "liest aus" .-> BKW
 
     NAS -. "VPN über Internet" .-> ROUTER
-    NAS == "SFTP: holt Zählerdaten" ==> RPI
+    RPI == "MQTT: publiziert absolute Zählerstände (über VPN)" ==> NAS
+    NAS -. "SFTP: holt Zählerdaten (heute / Fallback)" .-> RPI
 ```
+
+> **Datenfluss (Ziel, MQTT):** Der Pi liest die Zähler (Modbus TCP / gPlug) und
+> **publiziert die absoluten Zählerstände** über den VPN-Tunnel an den
+> Mosquitto-**Broker auf dem NAS** (Variante B). Das ZEV-Backend abonniert sie und
+> **bildet die Deltas/15-Min-Werte** selbst — verlusttolerant (siehe
+> `Specs/MQTT-Integration.md`). Der **SFTP-Pull** (NAS holt Dateien beim Pi) ist
+> der heutige Weg bzw. Fallback.
 
 ## Setup-Notiz: Dateiübertragung via SFTP
 
