@@ -170,6 +170,8 @@ Für die MQTT-Variante (s. o.) wird ein Broker auf dem NAS benötigt. Empfohlen:
 Mosquitto ist der De-facto-Standard — schlank, stabil, NAS-tauglich. Docker gibt
 gegenüber einem NAS-Paket volle Versions- und Konfigurationskontrolle.
 
+https://github.com/sukesh-ak/setup-mosquitto-with-docker
+
 ### 1. Verzeichnisstruktur auf dem NAS
 
 ```

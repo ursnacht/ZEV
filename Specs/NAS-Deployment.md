@@ -24,6 +24,33 @@ Alle vom Browser bzw. von der Token-Validierung genutzten URLs müssen ohne Quel
 2. **Backend** `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI` muss der extern erreichbaren Keycloak-URL entsprechen (Token-`iss`), per Env setzbar (ist es bereits).
 3. **Backend** CORS `app.cors.allowed-origins` (`application.yml`) muss die NAS-Frontend-Origin zulassen, per Env `APP_CORS_ALLOWED_ORIGINS`.
 4. **Keycloak-Client** `zev-frontend`: `redirectUris`/`webOrigins` dürfen nicht auf `http://localhost:4200` festgenagelt sein, sondern müssen die NAS-URL erlauben (Realm-Konfiguration bzw. nachträglich anpassbar).
+5. **Spring-Profil `nas`** (`application-nas.yml`) bündelt die NAS-spezifische Backend-Konfiguration strukturiert; aktiviert via `SPRING_PROFILES_ACTIVE=nas`. Host-/Secret-Werte bleiben **Env-Platzhalter** (`${VAR:default}`) → ohne JAR-Rebuild setzbar. Gerüst:
+
+```yaml
+# backend-service/src/main/resources/application-nas.yml
+# Aktivierung: SPRING_PROFILES_ACTIVE=nas (im docker-compose.nas.yml gesetzt)
+app:
+  cors:
+    # NAS-Frontend-Origin (LAN) bzw. HTTPS-Domain
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://nas.local:4200}
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/zev}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # MUSS dem Token-`iss` = extern erreichbare Keycloak-URL entsprechen (sonst 401)
+          issuer-uri: ${JWT_ISSUER_URI:http://nas.local:9000/realms/zev}
+          # Zertifikatsabruf im Container-Netz bleibt intern
+          jwk-set-uri: ${JWT_JWK_SET_URI:http://keycloak:9000/realms/zev/protocol/openid-connect/certs}
+# Optional: MQTT nur bei Bedarf zuschalten -> SPRING_PROFILES_ACTIVE=nas,mqtt
+```
+
+> **Hinweise:** Secrets (DB-/Keycloak-Passwörter) bleiben in `.env`/Env, **nicht** im Profil-File. Alternativ/zusätzlich überschreiben die direkten Relaxed-Binding-Env-Vars (`APP_CORS_ALLOWED_ORIGINS`, `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI`, …) jeden Profilwert — höchste Priorität. Für die **HTTPS-Variante** die `nas.local`-Defaults durch die Domain ersetzen (`https://auth.example.com/realms/zev`, `https://zev.example.com`; siehe Umsetzungsplan-Abschnitt „HTTPS / Reverse-Proxy").
 
 ### FR-3: `.env`-Vorlage & Secrets
 1. Eine `.env`-Vorlage für die NAS mit allen nötigen Werten inkl. Host-URLs und **geänderten** Standard-Passwörtern.
