@@ -18,7 +18,7 @@
 ## 2. Funktionale Anforderungen (FR)
 
 ### FR-1: Zähler auslesen
-1. **Wago (3×) via Modbus TCP:** periodisches Lesen der relevanten Register (absolute Zählerstände Bezug/Einspeisung) pro Gerät; Host/Port/Register/Unit-ID konfigurierbar.
+1. **Wago (3×) via Modbus TCP:** periodisches Lesen der relevanten Register — die **Wirkenergie**-Zählerstände in **kWh** (Bezug/Einspeisung), **nicht** Leistung (kW) oder Blind-/Scheinenergie; pro Gerät Host/Port/Register/Unit-ID konfigurierbar.
 2. **BKW via gPlug:** Auslesen über die gPlug-Schnittstelle (Protokoll siehe Offene Fragen).
 3. Jede physische Quelle ist einer **Einheit** über deren **`messpunkt`** zugeordnet (Konfiguration, kein Rückgriff auf interne DB-IDs).
 4. Lese-/Publish-Intervall konfigurierbar (Default z.B. 1–5 min).
@@ -134,10 +134,10 @@
 * **Keine UI**; Konfiguration per Datei/Env.
 
 ## 8. Offene Fragen
-* [ ] **Technologie/Sprache:** Empfehlung **Python** (`pymodbus`, `paho-mqtt`, HTTP-Client) für schnelle Umsetzung; **Go** als Alternative (ein statisches arm64-Binary, minimaler Footprint, einfachstes Deployment). Java auf dem Pi eher nicht (JVM-Overhead). → Entscheiden.
-* [ ] **gPlug-Schnittstelle (BKW):** Modbus, HTTP/REST oder proprietär? Bestimmt Libs und Aufwand.
-* [ ] **Optionale Pufferung:** überhaupt nötig (nur für Auflösungserhalt bei Ausfällen)? Falls ja: Variante C (lokaler Broker + Bridge) oder in-process Queue?
-* [ ] **Welche Register/Stände** werden publiziert (Bezug/Einspeisung, ggf. ZEV-Register) und wie im Backend auf `total`/`zev` gemappt? (Spiegelt Offene Frage in `MQTT-Integration.md`.)
-* [ ] **`org_id` im Topic:** internes `org_id` (BIGINT) vs. Keycloak-Alias/UUID — konsistent zu `MQTT-Integration.md` festlegen.
-* [ ] **Register-Mapping Wago:** konkrete Modbus-Register/Skalierung je Zählertyp; `messpunkt`↔Gerät-Zuordnung.
-* [ ] **Publish-Intervall:** wie oft absolute Stände senden (bestimmt die erreichbare zeitliche Auflösung)?
+* [ ] **Technologie/Sprache:** Empfehlung **Python** (`pymodbus`, `paho-mqtt`, HTTP-Client) für schnelle Umsetzung; **Go** als Alternative (ein statisches arm64-Binary, minimaler Footprint, einfachstes Deployment). Java auf dem Pi eher nicht (JVM-Overhead). → Python
+* [ ] **gPlug-Schnittstelle (BKW):** Modbus, HTTP/REST oder proprietär? Bestimmt Libs und Aufwand. → damit noch warten. Kommt später als Erweiterung.
+* [ ] **Optionale Pufferung:** überhaupt nötig (nur für Auflösungserhalt bei Ausfällen)? Falls ja: Variante C (lokaler Broker + Bridge) oder in-process Queue? → keine Pufferung
+* [ ] **Welche Register/Stände** werden publiziert (Bezug/Einspeisung, ggf. ZEV-Register) und wie im Backend auf `total`/`zev` gemappt? (Spiegelt Offene Frage in `MQTT-Integration.md`.) → **Wirkenergie** (Active Energy, kumulativ in kWh): **Bezug = OBIS 1.8.0** → `zaehlerstandBezug`, **Einspeisung = OBIS 2.8.0** → `zaehlerstandEinspeisung`. **Keine** Wirk-/Blind-/Scheinleistung (kW/kvar/kVA) und keine Blind-/Scheinenergie. Das Mapping der Stände auf `total`/`zev` ist weiterhin mit `MQTT-Integration.md` abzustimmen.
+* [ ] **`org_id` im Topic:** internes `org_id` (BIGINT) vs. Keycloak-Alias/UUID — konsistent zu `MQTT-Integration.md` festlegen. → interne org_id
+* [ ] **Register-Mapping Wago:** konkrete Modbus-Register/Skalierung je Zählertyp; `messpunkt`↔Gerät-Zuordnung. → Semantik geklärt: **Wirkenergie kWh** (OBIS 1.8.0 Bezug / 2.8.0 Einspeisung, s. o.). Die **konkreten Modbus-Registeradressen + Skalierung** je Wago-Typ stammen aus dem Gerätedatenblatt (Diagnose per `mbpoll`); `messpunkt`↔Gerät-Zuordnung per Config.
+* [ ] **Publish-Intervall:** wie oft absolute Stände senden (bestimmt die erreichbare zeitliche Auflösung)? → konfigurierbar. Wir beginnen mit 5 Minuten.

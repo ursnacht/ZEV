@@ -29,20 +29,20 @@ Neues Repo/Verzeichnis, z. B. `pi-gateway/` (getrennt vom ZEV-Monorepo oder eige
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
 | [ ] | 1. Projekt-Setup | Repo/Struktur, Dependencies (`pymodbus`, `paho-mqtt`, HTTP-Client), Lint/Format, venv/Packaging |
-| [ ] | 2. Konfiguration | Config-Modell + Laden/Validierung: Zähler-Endpunkte, Register-Mapping, `messpunkt`↔Quelle, `org_id`, Broker-URL/Creds (Env, **keine Secrets im Code**), Lese-/Publish-Intervall, Puffer-Optionen |
-| [ ] | 3. gPlug-Schnittstelle klären (Spike) | Protokoll des BKW-Zählers ermitteln (Modbus / HTTP-REST / proprietär) → Reader-Design für Phase 5 festlegen |
-| [ ] | 4. Modbus-Reader (Wago) | `pymodbus`-Client, Register/Unit-ID/Skalierung aus Config, robustes Lesen (Timeouts, Teil-Reads verwerfen) |
-| [ ] | 5. gPlug-Reader (BKW) | Reader gemäss Ergebnis Phase 3 |
+| [ ] | 2. Konfiguration | Config-Modell + Laden/Validierung: Zähler-Endpunkte, Register-Mapping, `messpunkt`↔Quelle, `org_id`, Broker-URL/Creds (Env, **keine Secrets im Code**), Lese-/Publish-Intervall (**Default 5 min**, konfigurierbar) |
+| [ ] | 3. gPlug-Schnittstelle klären (Spike) — **später / Erweiterung** | BKW/gPlug **nicht** im ersten Wurf; Protokoll (Modbus / HTTP-REST / proprietär) später ermitteln |
+| [ ] | 4. Modbus-Reader (Wago) | `pymodbus`-Client, **Wirkenergie-Register (kWh, OBIS 1.8.0/2.8.0)**/Unit-ID/Skalierung aus Config, robustes Lesen (Timeouts, Teil-Reads verwerfen) |
+| [ ] | 5. gPlug-Reader (BKW) — **später / Erweiterung** | Reader gemäss Ergebnis Phase 3, nach dem Wago-Erstwurf |
 | [ ] | 6. Zählerstand-Handling (ohne Delta) | Gelesene **absolute Stände** unverändert übernehmen (keine Delta-Bildung, keine „letzter Stand"-Persistenz); nur fehlgeschlagene/Teil-Reads verwerfen. Delta-/Reset-Erkennung liegt im Backend |
 | [ ] | 7. MQTT-Publisher | Topic `zev/{orgId}/{messpunkt}/messwert`, Payload `{timestamp,zaehlerstandBezug,zaehlerstandEinspeisung}` (UTC), **QoS 0/1**, stabile Client-ID — byte-genau gemäss `MQTT-Integration.md` |
-| [ ] | 8. (Optional) Pufferung | Nur falls Auflösungserhalt bei Ausfällen gewünscht: Variante C (lokaler Mosquitto + Bridge) oder in-process Queue. **Kein Muss** — absolute Stände sind verlusttolerant |
+| [ ] | 8. Pufferung — **entfällt** | Entscheidung: **keine** Pufferung (Variante B genügt; absolute Stände sind verlusttolerant). Bei späterem Bedarf nachrüstbar (Variante C / Queue) |
 | [ ] | 9. Orchestrierung / Read-Loop | Intervall-Scheduler: Reader → Publish; Fehler isolieren (ein defekter Zähler stoppt nicht alle) |
 | [ ] | 10. Betrieb & Resilienz | `systemd`-Unit (Autostart), Reconnect (Broker/Modbus/gPlug) mit Backoff, NTP-Voraussetzung, Logging + Rotation, Persistenz auf **USB-SSD** (nicht SD) |
 | [ ] | 11. Monitoring / Heartbeat | „Letzter erfolgreicher Read/Publish" exponieren (Log / Status-Topic), damit stiller Ausfall erkennbar ist |
 | [ ] | 12. Tests | Unit: Topic-/Payload-Format (absolute Stände), Config-Parsing, Zeitstempel-UTC, Verwerfen fehlerhafter Reads. Integration: Publish gegen Test-Broker (Mosquitto), optional Modbus-Simulator |
 | [ ] | 13. Doku & Deployment | `README` (Installation, Config, systemd), Deployment auf den Pi (arm64; bei Python venv/pipx, bei Go Single-Binary) |
 
-> **Reihenfolge-Hinweis:** Phase 3 (gPlug-Spike) vor Phase 5; Phase 7 setzt den Vertrag aus `MQTT-Integration.md` voraus (bei Vertragsänderung dort abstimmen). Phase 8 (Pufferung) ist **optional**.
+> **Reihenfolge-Hinweis / Erstwurf:** Erster Wurf = **nur Wago (Modbus)**; **gPlug (Phasen 3+5) und Pufferung (Phase 8) entfallen zunächst**. Phase 7 setzt den Vertrag aus `MQTT-Integration.md` voraus (bei Vertragsänderung dort abstimmen).
 
 ## Validierungen
 
@@ -58,15 +58,22 @@ Neues Repo/Verzeichnis, z. B. `pi-gateway/` (getrennt vom ZEV-Monorepo oder eige
 - **Puffer (falls aktiv):** definierte Obergrenze + Policy bei Überlauf; **ohne** Puffer ist Verlust dank absoluter Stände unkritisch.
 - **Idempotenz:** QoS 0/1; Duplikate sind backend-seitig unschädlich (Unique `einheit_id`+`zeit`).
 
-## Offene Punkte / Annahmen
+## Entscheidungen / Offene Punkte
 
-Aus `Specs/Pi-Gateway-Software.md` Abschnitt 8 (dokumentierte Annahmen bis zur Klärung):
+**Getroffene Entscheidungen** (aus `Specs/Pi-Gateway-Software.md` Abschnitt 8):
 
-- **Sprache:** angenommen **Python** (Empfehlung: `pymodbus`/`paho-mqtt`, schnelle Umsetzung). Alternative **Go** (Single-Binary) würde Phasen 1/10/13 umformen, die fachlichen Phasen bleiben.
-- **Pufferung:** angenommen **keine** (absolute Stände sind verlusttolerant, Broker auf NAS = Variante B genügt). Optionale Pufferung nur für Auflösungserhalt (Variante C / Queue).
-- **gPlug-Schnittstelle:** offen → eigene **Spike-Phase 3** klärt das Protokoll, bevor Phase 5 umgesetzt wird.
-- **Publish-Modell:** angenommen, der Pi publiziert **je Lesezyklus die absoluten Zählerstände**; die Delta-Bildung/15-Min-Aggregation macht das Backend (`MQTT-Integration.md`, FR-6).
-- **`org_id` im Topic:** internes `org_id` (BIGINT) vs. Keycloak-Alias/UUID — konsistent zu `MQTT-Integration.md` festzulegen.
-- **Wago-Register-Mapping:** konkrete Register/Skalierung je Zählertyp aus der Gerätedoku (Diagnose vorab mit `mbpoll`, siehe FR-1 der Spec).
+- **Sprache: Python** (`pymodbus`/`paho-mqtt`). Go bleibt eine mögliche Alternative, ist aber nicht vorgesehen.
+- **Erstwurf nur Wago (Modbus TCP); gPlug/BKW später** als Erweiterung (Phasen 3+5 verschoben).
+- **Keine Pufferung** — Broker auf dem NAS (Variante B) genügt, da absolute Stände verlusttolerant sind (Phase 8 entfällt).
+- **Publish-Modell:** Pi publiziert **je Lesezyklus die absoluten Zählerstände**; Delta-/15-Min-Bildung im Backend (`MQTT-Integration.md`, FR-6).
+- **Publish-Intervall:** konfigurierbar, **Start mit 5 Minuten**.
+- **`org_id` im Topic: internes `org_id` (BIGINT)**.
+- **Register: Wirkenergie (kWh)** — **Bezug = OBIS 1.8.0** → `zaehlerstandBezug`, **Einspeisung = OBIS 2.8.0** → `zaehlerstandEinspeisung`; keine Leistung/Blind-/Scheingrössen.
 - **Reset-/Rücksprung-Policy:** liegt im Backend (`MQTT-Integration.md`); der Pi publiziert Rohstände unverändert.
-- **Repo-Ort:** eigenes Repo für die Pi-Software angenommen (nicht Teil des ZEV-Monorepos); dieser Plan liegt dennoch in `Specs/` zur Nachvollziehbarkeit.
+- **Repo-Ort:** eigenes Repo für die Pi-Software (nicht Teil des ZEV-Monorepos); dieser Plan liegt dennoch in `Specs/`.
+
+**Verbleibend offen:**
+
+- **Konkrete Modbus-Registeradressen + Skalierung** je Wago-Typ (aus Datenblatt; Diagnose per `mbpoll`).
+- **gPlug-Protokoll** (Modbus / HTTP-REST / proprietär) — erst bei der Erweiterung relevant.
+- **Mapping der Stände auf `total`/`zev`** — mit `MQTT-Integration.md` abzustimmen.

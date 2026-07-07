@@ -203,10 +203,10 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel).
 * Änderung der Solarverteilungs-Logik (`zev_calculated`) — bleibt wie bisher.
 
 ## 8. Offene Fragen
-* [ ] **Register → `messwerte`-Mapping:** Welche absoluten Register (Bezug/Einspeisung, ggf. ein separater ZEV-Register) werden übertragen und wie auf `total`/`zev` abgebildet? Liefert der Zähler `zev` als eigenen Stand oder wird es abgeleitet? `zev_calculated` bleibt Ergebnis der Solarverteilung — korrekt?
+* [ ] **Register → `messwerte`-Mapping:** Welche absoluten Register (Bezug/Einspeisung, ggf. ein separater ZEV-Register) werden übertragen und wie auf `total`/`zev` abgebildet? Liefert der Zähler `zev` als eigenen Stand oder wird es abgeleitet? `zev_calculated` bleibt Ergebnis der Solarverteilung — korrekt? → **Register geklärt:** übertragen wird die **Wirkenergie (kWh)** — Bezug **OBIS 1.8.0** (`zaehlerstandBezug`), Einspeisung **OBIS 2.8.0** (`zaehlerstandEinspeisung`); **keine** Leistung/Blind-/Scheingrössen (siehe `Pi-Gateway-Software.md`). **Offen bleibt** die Abbildung dieser Stände auf `total`/`zev`.
 * [ ] **`org_id`-Typ & Topic-Kennung:** `Messwerte.orgId` ist `BIGINT`/`Long`, ERD/`generell.md` nennen `UUID`. Welcher Typ gilt für `zaehler_rohdaten`/Topic — internes `org_id` (BIGINT, aktuell angenommen) oder Keycloak-Alias/UUID (mapping via `OrganisationService`)?
 * [ ] **Messpunkt-Eindeutigkeit:** Ist `messpunkt` pro `org_id` eindeutig (nötig für die Auflösung)?
 * [ ] **Reset/Überlauf-Policy:** Genaue Erkennung (Schwellwert für „Rücksprung") und Umgang (Referenz neu setzen, Intervall auslassen)?
-* [ ] **Rohdaten-Retention:** Cleanup-Job nötig, ab welchem Alter (absolute Stände wachsen unbegrenzt)?
-* [ ] **Mehrfach-Quelle pro Einheit:** Verhalten, wenn für dieselbe Einheit + Zeitpunkt sowohl CSV- als auch MQTT-Daten vorliegen?
-* [ ] **Producer vs. Consumer** (`einheit.typ`): getrennte Register/Topics für Einspeisung nötig?
+* [ ] **Rohdaten-Retention:** Cleanup-Job nötig, ab welchem Alter (absolute Stände wachsen unbegrenzt)? --> folgt später
+* [ ] **Mehrfach-Quelle pro Einheit:** Verhalten, wenn für dieselbe Einheit + Zeitpunkt sowohl CSV- als auch MQTT-Daten vorliegen? --> Warnung loggen, MQTT hat Vorrang
+* [ ] **Producer vs. Consumer** (`einheit.typ`): getrennte Register/Topics für Einspeisung nötig? --> weiss ich noch nicht
