@@ -57,7 +57,7 @@ Der Pi publiziert die **absoluten kumulativen Zählerstände** zum Messzeitpunkt
 | `zaehlerstandBezug` | Decimal (kWh, kumulativ) | Ja | Absoluter Zählerstand Bezug/Verbrauch (monoton steigend) |
 | `zaehlerstandEinspeisung` | Decimal (kWh, kumulativ) | Ja | Absoluter Zählerstand Einspeisung (monoton steigend) |
 
-> Die Stände sind **kumulativ und monoton** (Ausnahme: Zähler-Reset/-tausch, siehe Aggregation/Edge Cases). Welche Register genau übertragen werden und wie sie auf die `messwerte`-Felder (`total`/`zev`) abgebildet werden, ist eine **Offene Frage** (Abschnitt 8); `zev_calculated` bleibt Ergebnis der Solarverteilung.
+> Die Stände sind **kumulativ und monoton** (Ausnahme: Zähler-Reset/-tausch, siehe Aggregation/Edge Cases). Die Abbildung auf `messwerte` ist entschieden (FR-6.4): `total = ΔBezug − ΔEinspeisung` (vorzeichenbehaftet), `zev = 0` (Sentinel), `zev_calculated` bleibt Ergebnis der Solarverteilung (die `zev = 0` durch `zev_calculated` ersetzt, FR-9).
 
 ### FR-4: Backend MQTT-Subscriber-Verarbeitung
 Pro eingehender Nachricht:
@@ -94,9 +94,12 @@ CREATE INDEX idx_zaehler_rohdaten_unverarbeitet
 
 ### FR-6: Scheduled Aggregation (15-Minuten-Job) — Delta-Bildung im Backend
 1. Scheduled Job (`0 0,15,30,45 * * * *`) ermittelt das abgeschlossene 15-Minuten-Intervall.
-2. Pro Einheit den **Intervall-Verbrauch als Differenz** bilden: `(letzter Stand ≤ Intervallende) − (Referenzstand = letzter Stand ≤ vorheriges Intervallende)`. Analog für Einspeisung.
-3. **Reset/Überlauf/Zählertausch:** ist die Differenz < 0, wird der Wert **nicht negativ** übernommen; Referenz neu setzen, WARN loggen (siehe Offene Fragen für die genaue Policy).
-4. Mapping auf `messwerte` (`zeit`, `total`, `zev`, `einheit`, `org_id`); `zev_calculated` wird **nicht** aus MQTT befüllt (Solarverteilung, unverändert). Genaues Feld-Mapping siehe Offene Fragen.
+2. Pro Einheit **je Register die Differenz** über die Intervallgrenze bilden: `ΔBezug` und `ΔEinspeisung` = `(letzter Stand ≤ Intervallende) − (Referenzstand = letzter Stand ≤ vorheriges Intervallende)`.
+3. **Reset/Überlauf/Zählertausch:** Die Guard-Prüfung gilt **pro Register** — ist `ΔBezug` **oder** `ΔEinspeisung` < 0, wird das jeweilige Register-Delta **nicht negativ** übernommen (auf 0 gesetzt), die Referenz neu gesetzt und WARN geloggt. (Wichtig: nicht am Vorzeichen von `total` prüfen, da negatives `total` bei Einspeisung legitim ist – siehe Mapping unten.)
+4. **Mapping auf `messwerte`** (`zeit`, `total`, `einheit`, `org_id`) gemäss Entscheidung (§8):
+   * `total` = **vorzeichenbehafteter Netto-Wert**: `total = ΔBezug − ΔEinspeisung`. Bezug überwiegt → **positiv** (Verbrauch/Consumer); Einspeisung überwiegt → **negativ** (Produktion/Producer). Producer vs. Consumer wird also **über das Vorzeichen** unterschieden, ohne `einheit.typ`-Verzweigung.
+   * `zev` = **0** (Sentinel „nicht gemessen"; wird nicht aus MQTT befüllt). **Keine** Tabellen-/Constraint-Änderung nötig – `messwerte.zev` bleibt `NOT NULL`.
+   * `zev_calculated` = **NULL** beim Ingest; wird erst durch die **Solarverteilung** (`SolarDistribution`) berechnet. Diese setzt anschliessend `zev = zev_calculated`, sofern `zev = 0` (FR-9).
 5. Speichern mit `quelle = 'MQTT'` (FR-7); Insert/Upsert.
 6. Verarbeitete Rohdaten markieren: `verarbeitet = TRUE`, `verarbeitet_am = NOW()`; Referenzstand fortschreiben.
 
@@ -109,7 +112,7 @@ CREATE INDEX idx_zaehler_rohdaten_unverarbeitet
 ALTER TABLE zev.messwerte ADD COLUMN IF NOT EXISTS quelle VARCHAR(20) DEFAULT 'CSV';
 -- Mögliche Werte: 'CSV', 'MQTT', 'API'
 ```
-Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel).
+Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine** Änderung an `messwerte.zev` nötig: Der MQTT-Ingest setzt `zev = 0` (Sentinel), die Spalte bleibt `NOT NULL`. Die Solarverteilung ersetzt `zev = 0` später durch `zev_calculated` (FR-9). Damit bleiben alle bestehenden Konsumenten von `messwerte.zev` (Statistik/Rechnung) unverändert kompatibel.
 
 ### FR-8: Monitoring & Status
 1. Prometheus-Metriken (bestehende Infrastruktur, siehe `Specs/Metriken.md` / `MetricsService`):
@@ -117,6 +120,13 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel).
    - `zev_mqtt_last_message_timestamp` (Gauge)
    - `zev_aggregation_runs_total` (Counter), `zev_aggregation_last_run_timestamp` (Gauge)
 2. Health-Indicator `/actuator/health/mqtt` zeigt den Broker-Verbindungsstatus.
+
+### FR-9: Anpassung Solarverteilung (`zev`-Fallback)
+1. Die Solarverteilung (`SolarDistribution`) berechnet wie bisher `zev_calculated` pro Consumer/Intervall.
+2. **Neu:** Nach der Berechnung wird `zev = zev_calculated` gesetzt, **sofern `zev = 0`** (Sentinel für „nicht gemessen", von MQTT-importierten Werten). Bereits gemessene `zev`-Werte (z. B. aus CSV, `zev ≠ 0`) bleiben unverändert.
+3. Dadurch tragen MQTT-Werte nach der Verteilung denselben `zev`-Wert wie `zev_calculated`; CSV-Werte behalten ihren gemessenen Anteil.
+
+> **Kante:** Ein *gemessener* Wert von genau `zev = 0` (z. B. Nachtstunde ohne ZEV-Bezug aus CSV) würde ebenfalls durch `zev_calculated` ersetzt. Da `zev_calculated` in solchen Fällen ohnehin ~0 ist, ist der Effekt vernachlässigbar; falls doch relevant, kann die Unterscheidung über `quelle = 'MQTT'` statt über `zev = 0` erfolgen (Umsetzungsdetail).
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
@@ -131,13 +141,16 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel).
 * [ ] Nach Broker-Abbruch automatischer Reconnect.
 
 **15-Minuten-Aggregation:**
-* [ ] Job läuft um :00, :15, :30, :45; Intervall-Verbrauch korrekt als **Differenz** gebildet.
+* [ ] Job läuft um :00, :15, :30, :45; `ΔBezug`/`ΔEinspeisung` je Register korrekt als **Differenz** gebildet.
+* [ ] `total = ΔBezug − ΔEinspeisung` korrekt vorzeichenbehaftet (Bezug → positiv, Einspeisung → negativ).
+* [ ] `zev` wird beim MQTT-Ingest auf `0` gesetzt (Sentinel); `messwerte.zev` bleibt `NOT NULL`.
 * [ ] Aggregierte Werte in `messwerte` mit `quelle = 'MQTT'`.
 * [ ] Verarbeitete Rohdaten `verarbeitet = TRUE`; bereits verarbeitete werden nicht erneut aggregiert.
 * [ ] Leeres Intervall (keine neue Meldung) → kein `messwerte`-Eintrag (kein Nullwert).
 * [ ] Verlorene Zwischen-Nachricht → Gesamtsumme über die betroffenen Intervalle bleibt korrekt (verlusttolerant).
-* [ ] Zähler-Reset/Rücksprung (Differenz < 0) → kein negativer Wert; Referenz neu gesetzt, WARN.
+* [ ] Zähler-Reset/Rücksprung **pro Register** (`ΔBezug` bzw. `ΔEinspeisung` < 0) → betroffenes Delta auf 0, Referenz neu gesetzt, WARN. (Ein negatives `total` aus Einspeisung ist dagegen legitim und wird übernommen.)
 * [ ] `zev_calculated` wird durch den Ingest nicht verändert; Solarverteilung funktioniert unverändert.
+* [ ] Nach der Solarverteilung gilt `zev = zev_calculated`, wo `zev = 0` war (MQTT-Werte); gemessene CSV-Werte (`zev ≠ 0`) bleiben unverändert (FR-9).
 
 **Monitoring & Kompatibilität:**
 * [ ] MQTT-Metriken unter `/actuator/prometheus`; `/actuator/health/mqtt` zeigt Status.
@@ -174,7 +187,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel).
 | Timestamp in der Zukunft | WARN, trotzdem speichern |
 | Duplikat (Einheit + `zeit`) | Upsert |
 | Verlorene Nachricht(en) | kein Datenverlust — Differenz zum nächsten Stand deckt die Lücke; nur Auflösungsverlust |
-| Zählerstand < Referenz (Reset/Überlauf/Zählertausch) | Aggregation: nicht negativ übernehmen, Referenz neu setzen, WARN |
+| Register-Stand < Referenz (Reset/Überlauf/Zählertausch) | Aggregation **je Register**: betroffenes Delta (`ΔBezug`/`ΔEinspeisung`) auf 0, Referenz neu setzen, WARN (negatives `total` aus Einspeisung bleibt gültig) |
 | Broker nicht erreichbar | Reconnect mit Exponential Backoff |
 | DB nicht erreichbar | Nachricht nicht markieren, Retry |
 | Keine neue Meldung im Intervall | kein `messwerte`-Eintrag |
@@ -204,13 +217,15 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel).
 * TLS-Zertifikatsverwaltung (manuell, siehe Topologie-Doku).
 * Aufbewahrungs-/Cleanup-Strategie für Rohdaten (eigene Spec).
 * Beibehaltung des SFTP-Pfads als Fallback — nicht Gegenstand dieser Spec.
-* Änderung der Solarverteilungs-Logik (`zev_calculated`) — bleibt wie bisher.
+* Änderung der `zev_calculated`-**Berechnungslogik** (Verteilalgorithmus) — bleibt wie bisher. **Ausnahme (FR-9):** ein kleiner Zusatz setzt `zev = zev_calculated`, wo `zev = 0` (MQTT-Sentinel) — die eigentliche Verteilung ändert sich nicht.
 
 ## 8. Offene Fragen
-* [ ] **Register → `messwerte`-Mapping:** Welche absoluten Register (Bezug/Einspeisung, ggf. ein separater ZEV-Register) werden übertragen und wie auf `total`/`zev` abgebildet? Liefert der Zähler `zev` als eigenen Stand oder wird es abgeleitet? `zev_calculated` bleibt Ergebnis der Solarverteilung — korrekt? → **Register geklärt:** übertragen wird die **Wirkenergie (kWh)** — Bezug **OBIS 1.8.0** (`zaehlerstandBezug`), Einspeisung **OBIS 2.8.0** (`zaehlerstandEinspeisung`); **keine** Leistung/Blind-/Scheingrössen (siehe `Pi-Gateway-Software.md`). **Offen bleibt** die Abbildung dieser Stände auf `total`/`zev`.
-* [ ] **`org_id`-Typ & Topic-Kennung:** `Messwerte.orgId` ist `BIGINT`/`Long`, ERD/`generell.md` nennen `UUID`. Welcher Typ gilt für `zaehler_rohdaten`/Topic — internes `org_id` (BIGINT, aktuell angenommen) oder Keycloak-Alias/UUID (mapping via `OrganisationService`)?
-* [ ] **Messpunkt-Eindeutigkeit:** Ist `messpunkt` pro `org_id` eindeutig (nötig für die Auflösung)?
-* [ ] **Reset/Überlauf-Policy:** Genaue Erkennung (Schwellwert für „Rücksprung") und Umgang (Referenz neu setzen, Intervall auslassen)?
+* [x] **Register → `messwerte`-Mapping:** übertragen wird die **Wirkenergie (kWh)** — Bezug **OBIS 1.8.0** (`zaehlerstandBezug`), Einspeisung **OBIS 2.8.0** (`zaehlerstandEinspeisung`); **keine** Leistung/Blind-/Scheingrössen (siehe `Pi-Gateway-Software.md`). → **Mapping entschieden (siehe FR-6):** `total = ΔBezug − ΔEinspeisung` (**vorzeichenbehaftet**: positiv = Verbrauch, negativ = Einspeisung); `zev = 0` (Sentinel, keine Tabellen-Änderung); `zev_calculated = NULL` beim Ingest, erst durch die Solarverteilung, die dann `zev = zev_calculated` setzt, wo `zev = 0` (FR-9).
+* [x] **`org_id`-Typ & Topic-Kennung:** → **internes `org_id` (BIGINT)**, konsistent mit `messwerte`/`zaehler_rohdaten` und der Pi-Config. Kein UUID-Mapping.
+* [x] **Messpunkt-Eindeutigkeit:** → **`messpunkt` ist pro `org_id` eindeutig**; Auflösung über `(org_id, messpunkt)` (Unique-Constraint auf `einheit`).
+* [x] **Producer vs. Consumer** (`einheit.typ`): → **über das Vorzeichen von `total`** unterschieden (Bezug positiv, Einspeisung negativ); **keine** getrennten Register/Topics und **keine** `einheit.typ`-Verzweigung im Ingest.
+* [ ] **Reset/Überlauf-Policy:** Genaue Erkennung (Schwellwert für „Rücksprung") **pro Register** (Bezug/Einspeisung) und Umgang (Referenz neu setzen, Delta = 0)? (Grundsatz in FR-6.3 festgelegt; Schwellwert-Details offen.)
+* [ ] **Prosumer im selben Intervall:** Verhalten, wenn `ΔBezug` **und** `ΔEinspeisung` > 0 (Netmetering)? Aktuelle Festlegung: Netto `total = ΔBezug − ΔEinspeisung` (FR-6.4) — genügt das fachlich?
+* [x] **`zev`-Behandlung / Verträglichkeit:** → **`zev = 0` beim Ingest** (kein NULL, kein Schema-Eingriff); die Solarverteilung ersetzt `0` durch `zev_calculated` (FR-9). Bestehende `zev`-Konsumenten bleiben kompatibel. Rest-Kante (gemessenes echtes `0`) siehe FR-9-Hinweis.
 * [ ] **Rohdaten-Retention:** Cleanup-Job nötig, ab welchem Alter (absolute Stände wachsen unbegrenzt)? --> folgt später
-* [ ] **Mehrfach-Quelle pro Einheit:** Verhalten, wenn für dieselbe Einheit + Zeitpunkt sowohl CSV- als auch MQTT-Daten vorliegen? --> Warnung loggen, MQTT hat Vorrang
-* [ ] **Producer vs. Consumer** (`einheit.typ`): getrennte Register/Topics für Einspeisung nötig? --> weiss ich noch nicht
+* [x] **Mehrfach-Quelle pro Einheit:** Verhalten, wenn für dieselbe Einheit + Zeitpunkt sowohl CSV- als auch MQTT-Daten vorliegen? → **Warnung loggen, MQTT hat Vorrang.**
