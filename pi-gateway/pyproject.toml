@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zev-pi-gateway"
+version = "0.1.0"
+description = "ZEV Pi-Gateway: liest Stromzähler (Wago/Modbus TCP) und publiziert absolute Zählerstände per MQTT"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Urs Nacht" }]
+dependencies = [
+    "pymodbus>=3.6,<4.0",
+    "paho-mqtt>=2.1,<3.0",
+    "PyYAML>=6.0,<7.0",
+]
+
+[project.scripts]
+# Ermöglicht Start via `pi-gateway --config /opt/pi-gateway/config.yaml`
+pi-gateway = "gateway.main:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[tool.setuptools.packages.find]
+include = ["gateway*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

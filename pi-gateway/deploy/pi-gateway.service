@@ -1,0 +1,32 @@
+[Unit]
+Description=ZEV Pi-Gateway (Zähler auslesen und per MQTT publizieren)
+Documentation=https://github.com/ursnacht/ZEV/blob/main/Specs/Pi-Gateway-Software.md
+# Netzwerk (und ggf. VPN) muss vor dem Start verfügbar sein:
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pigw
+Group=pigw
+WorkingDirectory=/opt/pi-gateway
+# Secrets aus root-only Env-Datei laden (MQTT_USERNAME/MQTT_PASSWORD):
+EnvironmentFile=/etc/pi-gateway.env
+ExecStart=/opt/pi-gateway/.venv/bin/python -m gateway.main --config /opt/pi-gateway/config.yaml
+# Automatischer Neustart nach Absturz/Reboot:
+Restart=always
+RestartSec=10
+# Logs an journald:
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pi-gateway
+
+# Härtung (optional, empfohlen):
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/pi-gateway
+
+[Install]
+WantedBy=multi-user.target

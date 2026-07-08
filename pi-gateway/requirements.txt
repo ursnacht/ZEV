@@ -1,0 +1,15 @@
+# ZEV Pi-Gateway – Laufzeit-Abhängigkeiten
+# Installation (auf dem Raspberry Pi, im venv):
+#   pip install -r requirements.txt
+#
+# Versionen bewusst als untere Schranke (>=) mit Obergrenze, damit auf dem
+# Pi reproduzierbar, aber sicherheitsrelevante Patches noch möglich sind.
+
+# Modbus-TCP-Client (Wago-Zähler)
+pymodbus>=3.6,<4.0
+
+# MQTT-Client (Publish der Zählerstände)
+paho-mqtt>=2.1,<3.0
+
+# YAML-Konfiguration
+PyYAML>=6.0,<7.0

@@ -1,0 +1,49 @@
+# ZEV Pi-Gateway – Beispiel-Konfiguration
+#
+# Kopieren nach config.yaml und anpassen. Secrets NICHT hier eintragen, sondern
+# über ${ENV_VAR} referenzieren (siehe .env.example / systemd EnvironmentFile).
+#
+# Die Zähler-Liste ('zaehler') hat beliebige Länge (typisch 10–20 oder mehr).
+# Ein zusätzlicher Zähler = nur ein weiterer Listeneintrag, kein Code-Change.
+
+org_id: 42                       # internes org_id (BIGINT) des Mandanten
+publish_interval: 5m             # z. B. "30s", "5m", "1h" oder reine Sekunden-Zahl
+
+broker:
+  url: tcp://nas.local:1883      # bzw. tls://nas.local:8883
+  username: ${MQTT_USERNAME}     # aus der Umgebung (EnvironmentFile)
+  password: ${MQTT_PASSWORD}
+  qos: 1                         # 0 oder 1 genügt (absolute Stände sind verlusttolerant)
+  client_id: zev-pi-gateway-org42
+
+# Register-Adressen als String = HEXADEZIMAL (wie Wago-Datenblatt), daher gequotet.
+# Werte 'addr'/'typ'/'skalierung' sind BEISPIELHAFT – gemäss Datenblatt/mbpoll setzen.
+zaehler:
+  - messpunkt: "ID742-Wohnung-1"
+    protokoll: modbus-tcp
+    host: 192.168.10.11
+    port: 502
+    unit_id: 1
+    register:                    # Wirkenergie in kWh
+      bezug:       { addr: "600C", typ: float32, wortfolge: big, skalierung: 1.0 }  # OBIS 1.8.0
+      einspeisung: { addr: "6018", typ: float32, wortfolge: big, skalierung: 1.0 }  # OBIS 2.8.0
+
+  - messpunkt: "ID742-Wohnung-2"
+    protokoll: modbus-tcp
+    host: 192.168.10.12
+    port: 502
+    unit_id: 1
+    register:
+      bezug:       { addr: "600C", typ: float32, wortfolge: big, skalierung: 1.0 }
+      einspeisung: { addr: "6018", typ: float32, wortfolge: big, skalierung: 1.0 }
+
+  - messpunkt: "ID742-Allgemein"
+    protokoll: modbus-tcp
+    host: 192.168.10.13
+    port: 502
+    unit_id: 1
+    register:
+      bezug:       { addr: "600C", typ: float32, wortfolge: big, skalierung: 1.0 }
+      einspeisung: { addr: "6018", typ: float32, wortfolge: big, skalierung: 1.0 }
+
+# Später (Erweiterung): BKW als weiterer Eintrag mit  protokoll: gplug  (siehe Spec, Offene Fragen).

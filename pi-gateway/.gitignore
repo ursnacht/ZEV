@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+
+# Secrets / lokale Konfiguration (nur config.example.yaml wird versioniert)
+.env
+config.yaml
+*.local.yaml
