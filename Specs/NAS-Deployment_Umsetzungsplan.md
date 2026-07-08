@@ -11,6 +11,7 @@ Grundlage: [`Specs/NAS-Deployment.md`](./NAS-Deployment.md). Baut auf `docs/imag
 ### Neu
 - `docker-compose.nas.yml` – image-basiert (statt `build:`), Compose-Profiles `slim`/`full`
 - `.env.nas.example` – NAS-Vorlage inkl. Host-URLs + geänderte Secrets
+- `backend-service/src/main/resources/application-nas.yml` – Spring-Profil `nas` (CORS/Issuer/Datasource via Env-Platzhalter, Gerüst in `NAS-Deployment.md` FR-2.5)
 - `docs/NAS-Deployment.md` – End-to-End-Installationsanleitung (Build → Transfer → Start → Keycloak-Setup)
 
 ### Geändert
@@ -27,10 +28,10 @@ Grundlage: [`Specs/NAS-Deployment.md`](./NAS-Deployment.md). Baut auf `docs/imag
 | Status | Phase                                | Beschreibung                                                                                                                              |
 |--------|--------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
 |  [ ]   | 1. Frontend-Config externalisieren   | `config.json` beim Containerstart aus Env (`API_BASE_URL`, `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`) erzeugen; Spring serviert externe Static-Location mit Vorrang → Override **ohne** Rebuild |
-|  [ ]   | 2. Backend-URL-Konfig via Env        | `issuer-uri` (bereits Env) + `APP_CORS_ALLOWED_ORIGINS` verifizieren/ergänzen; Doku der nötigen Env-Keys                                   |
+|  [ ]   | 2. Backend-URL-Konfig (Profil `nas`) | `application-nas.yml` (Profil `nas`) mit `issuer-uri`/`jwk-set-uri`/`APP_CORS_ALLOWED_ORIGINS`/Datasource als **Env-Platzhalter** (`${VAR:default}`); Aktivierung `SPRING_PROFILES_ACTIVE=nas`. Direkte Relaxed-Binding-Env-Vars behalten Vorrang. Siehe `NAS-Deployment.md` FR-2.5 |
 |  [ ]   | 3. Keycloak-Client parametrieren     | `redirectUris`/`webOrigins` in `zev-realm.json` per Platzhalter (Realm-Import-Env-Substitution) oder dokumentierter Post-Install-Anpassung |
 |  [ ]   | 4. Image-Build für Ziel-Arch         | `scripts/build-images.ps1` mit Plattform-Param (`linux/amd64` / `linux/arm64`); Ergebnis tar.gz **oder** Registry (vgl. `docs/images.md`) |
-|  [ ]   | 5. NAS-Compose                       | `docker-compose.nas.yml`: `image:` statt `build:`, Fremd-Image-Tags gepinnt, Compose-Profiles `slim` (Postgres/Keycloak/Backend/Frontend) und `full` (+admin/prometheus/grafana), JVM-/Memory-Limits |
+|  [ ]   | 5. NAS-Compose                       | `docker-compose.nas.yml`: `image:` statt `build:`, Fremd-Image-Tags gepinnt, Compose-Profiles `slim` (Postgres/Keycloak/Backend/Frontend) und `full` (+admin/prometheus/grafana), JVM-/Memory-Limits; `backend-service` mit `SPRING_PROFILES_ACTIVE=nas` |
 |  [ ]   | 6. `.env.nas.example`                | Vorlage mit Host-URLs (`<nas>`), geänderten Passwörtern, optionalem `ANTHROPIC_API_KEY`                                                    |
 |  [ ]   | 7. Keycloak-Betriebsmodus            | LAN/HTTP (`start-dev`) dokumentiert; HTTPS-Variante (`start` + `KC_HOSTNAME`/`KC_PROXY` hinter Synology-Reverse-Proxy) als Option — Details siehe Abschnitt „HTTPS / Reverse-Proxy (Synology)" |
 |  [ ]   | 8. Post-Install Keycloak-Setup       | Anleitung: Organization anlegen, Client-Scope „organization" + Mapper, Nutzer zuordnen, Fachrollen/Composites prüfen                       |
@@ -49,6 +50,7 @@ Grundlage: [`Specs/NAS-Deployment.md`](./NAS-Deployment.md). Baut auf `docs/imag
 | Backend Token-Issuer     | `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI`                    | `http://<nas>:9000/realms/zev`                   |
 | Backend CORS             | `APP_CORS_ALLOWED_ORIGINS`                                                | `http://<nas>:4200`                              |
 | Keycloak-Client          | `zev-frontend` `redirectUris`/`webOrigins`                                | `http://<nas>:4200/*` / `http://<nas>:4200`      |
+| Backend-Profil           | `SPRING_PROFILES_ACTIVE`                                                   | `nas` (bzw. `nas,mqtt`)                          |
 | JWK-Set (intern)         | `..._JWK_SET_URI`                                                          | `http://keycloak:9000/...` (Container-Netz, bleibt) |
 
 > **Invariante:** Frontend `keycloak.url` == Backend `issuer-uri`-Host == vom Browser genutzte Keycloak-URL. Bei HTTPS/Reverse-Proxy überall die Domain statt `<nas>:9000`.
@@ -132,6 +134,7 @@ Aus `Specs/NAS-Deployment.md` Abschnitt 8 (dokumentierte Annahmen, bis geklärt)
 - **Architektur:** angenommen **x86-64** (`linux/amd64`). Bei ARM-NAS überall `linux/arm64` (Skript-Param).
 - **Zugriffsweg:** angenommen **LAN/HTTP** über `<nas>`-Host als Basis; HTTPS über Synology-Reverse-Proxy als empfohlene Option (Phase 7).
 - **Monitoring:** angenommen **Slim-Profil** als Default (ohne admin/prometheus/grafana); `full`-Profil optional.
-- **`config.json`-Override-Mechanismus:** gewählt **externe Spring-Static-Location + Entrypoint-Generierung aus Env** (Phase 1); Alternative Bind-Mount der Datei wird in der Doku erwähnt.
+- **`config.json`-Override-Mechanismus:** gewählt **externe Spring-Static-Location + Entrypoint-Generierung aus Env** (Phase 1); Alternative Bind-Mount der Datei wird in der Doku erwähnt. Betrifft **nur das Frontend**.
+- **Backend-Konfig-Ansatz:** Spring-Profil **`nas`** (`application-nas.yml`, Env-Platzhalter), aktiviert via `SPRING_PROFILES_ACTIVE=nas`; MQTT optional via `nas,mqtt`. Secrets bleiben in `.env`/Env, nicht im Profil-File.
 - **Realm-Parametrierung:** Keycloak-Realm-Import-Env-Substitution vs. Post-Install-Anpassung (Phase 3) – im Zweifel dokumentierte manuelle Anpassung, da robust.
 - Keine DB-/Schema-Änderung, keine neuen Entities/Endpunkte, kein neuer App-Code (reines Deployment/Config).

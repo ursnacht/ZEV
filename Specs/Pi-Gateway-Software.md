@@ -18,7 +18,7 @@
 ## 2. Funktionale Anforderungen (FR)
 
 ### FR-1: Zähler auslesen
-1. **Wago (3×) via Modbus TCP:** periodisches Lesen der relevanten Register — die **Wirkenergie**-Zählerstände in **kWh** (Bezug/Einspeisung), **nicht** Leistung (kW) oder Blind-/Scheinenergie; pro Gerät Host/Port/Register/Unit-ID konfigurierbar.
+1. **Wago via Modbus TCP (aktuell 3 Geräte, Liste beliebig erweiterbar — siehe FR-5):** periodisches Lesen der relevanten Register — die **Wirkenergie**-Zählerstände in **kWh** (Bezug/Einspeisung), **nicht** Leistung (kW) oder Blind-/Scheinenergie; pro Gerät Host/Port/Register/Unit-ID konfigurierbar.
 2. **BKW via gPlug:** Auslesen über die gPlug-Schnittstelle (Protokoll siehe Offene Fragen).
 3. Jede physische Quelle ist einer **Einheit** über deren **`messpunkt`** zugeordnet (Konfiguration, kein Rückgriff auf interne DB-IDs).
 4. Lese-/Publish-Intervall konfigurierbar (Default z.B. 1–5 min).
@@ -61,8 +61,52 @@
 3. Ohne Pufferung reicht ein direkter Publish an den NAS-Broker (Variante B).
 
 ### FR-5: Konfiguration
-1. Alle Parameter über Konfigurationsdatei/Env: Zähler-Endpunkte + Register-Mapping, `messpunkt`↔Quelle, `org_id`, Broker-URL/Credentials, Lese-/Publish-Intervall, optionale Puffer-Optionen.
-2. **Keine Secrets im Code/Repo** (Broker-Passwort etc. via Env/gesicherte Datei).
+1. **Flexible Zähler-Liste:** Die Zähler werden als **Liste beliebiger Länge** konfiguriert — typisch **10–20 oder mehr**, keine feste Anzahl im Code. Jeder Eintrag beschreibt einen Zähler vollständig (Protokoll, Host/IP, Port, Unit-ID, Register-Mapping, `messpunkt`).
+2. **Neuer Zähler = nur ein Konfigurations-Eintrag** (kein Code-Change, kein Rebuild).
+3. Weitere Parameter über Konfigurationsdatei/Env: `org_id`, Broker-URL/Credentials, Lese-/Publish-Intervall, optionale Puffer-Optionen.
+4. **Keine Secrets im Code/Repo** (Broker-Passwort etc. via Env/gesicherte Datei).
+
+> **Beispiel-Konfiguration (3 Wago-Zähler; ohne gPlug — folgt später):**
+> ```yaml
+> # config.yaml auf dem Pi (Secrets via Env)
+> org_id: 42
+> publish_interval: 5m
+> broker:
+>   url: tcp://nas.local:1883        # bzw. tls://nas.local:8883
+>   username: ${MQTT_USERNAME}
+>   password: ${MQTT_PASSWORD}
+>   qos: 1
+>
+> # Beliebig viele Zähler — hier 3 (Wago, Modbus TCP). Weitere einfach anhängen.
+> zaehler:
+>   - messpunkt: "ID742-Wohnung-1"
+>     protokoll: modbus-tcp
+>     host: 192.168.10.11
+>     port: 502
+>     unit_id: 1
+>     register:                       # Wirkenergie in kWh (Beispielwerte!)
+>       bezug:       { addr: 600C, typ: float32, wortfolge: big, skalierung: 1.0 }   # OBIS 1.8.0
+>       einspeisung: { addr: 6018, typ: float32, wortfolge: big, skalierung: 1.0 }   # OBIS 2.8.0
+>   - messpunkt: "ID742-Wohnung-2"
+>     protokoll: modbus-tcp
+>     host: 192.168.10.12
+>     port: 502
+>     unit_id: 1
+>     register:
+>       bezug:       { addr: 600C, typ: float32, wortfolge: big, skalierung: 1.0 }
+>       einspeisung: { addr: 6018, typ: float32, wortfolge: big, skalierung: 1.0 }
+>   - messpunkt: "ID742-Allgemein"
+>     protokoll: modbus-tcp
+>     host: 192.168.10.13
+>     port: 502
+>     unit_id: 1
+>     register:
+>       bezug:       { addr: 600C, typ: float32, wortfolge: big, skalierung: 1.0 }
+>       einspeisung: { addr: 6018, typ: float32, wortfolge: big, skalierung: 1.0 }
+>
+> # Später (Erweiterung): BKW als weiterer Eintrag mit  protokoll: gplug  (siehe Offene Fragen).
+> ```
+> Die Register-`addr`/`typ`/`skalierung` sind **beispielhaft** und müssen dem Wago-Datenblatt entsprechen (Diagnose per `mbpoll`, siehe FR-1). Der Skalierungs-/OBIS-Bezug ist unter „Register-Mapping Wago" (Offene Fragen) beschrieben.
 
 ### FR-6: Betrieb & Resilienz
 1. Läuft als **`systemd`-Service** mit Autostart nach Reboot/Stromausfall.
@@ -75,7 +119,8 @@
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
-* [ ] Der Dienst liest alle konfigurierten Zähler (3× Wago Modbus TCP, 1× BKW gPlug) im konfigurierten Intervall aus.
+* [ ] Der Dienst liest **alle konfigurierten Zähler** (beliebige Anzahl; aktuell 3× Wago Modbus TCP, gPlug folgt später) im konfigurierten Intervall aus.
+* [ ] Ein zusätzlicher Zähler lässt sich **allein per Konfigurations-Eintrag** ergänzen (kein Code-Change/Rebuild).
 * [ ] Der Dienst publiziert die **absoluten Zählerstände** unverändert (keine Delta-Berechnung, keine „letzter Stand"-Persistenz).
 * [ ] Publizierte Topic-/Payload-Struktur entspricht exakt `MQTT-Integration.md` (`zev/{orgId}/{messpunkt}/messwert`, `{timestamp,zaehlerstandBezug,zaehlerstandEinspeisung}`).
 * [ ] Bei Broker-/VPN-Ausfall entsteht **kein Datenverlust** in der Gesamtsumme (nächster übertragener Stand schliesst die Lücke); optionale Pufferung erhält zusätzlich die Auflösung.
@@ -104,7 +149,6 @@
 ### NFR-4: Kompatibilität
 * Payload/Topic-Vertrag mit `MQTT-Integration.md` bleibt stabil; Änderungen nur koordiniert.
 * Läuft auf Raspberry Pi OS (arm64); Deployment ohne Build auf dem Pi bevorzugt (siehe Sprachwahl, Offene Fragen).
-* Der bestehende SFTP-Weg kann parallel bestehen bleiben (Umstellung/Abschaltung separat).
 
 ## 5. Edge Cases & Fehlerbehandlung
 | Szenario | Verhalten |
@@ -141,3 +185,124 @@
 * [ ] **`org_id` im Topic:** internes `org_id` (BIGINT) vs. Keycloak-Alias/UUID — konsistent zu `MQTT-Integration.md` festlegen. → interne org_id
 * [ ] **Register-Mapping Wago:** konkrete Modbus-Register/Skalierung je Zählertyp; `messpunkt`↔Gerät-Zuordnung. → Semantik geklärt: **Wirkenergie kWh** (OBIS 1.8.0 Bezug / 2.8.0 Einspeisung, s. o.). Die **konkreten Modbus-Registeradressen + Skalierung** je Wago-Typ stammen aus dem Gerätedatenblatt (Diagnose per `mbpoll`); `messpunkt`↔Gerät-Zuordnung per Config.
 * [ ] **Publish-Intervall:** wie oft absolute Stände senden (bestimmt die erreichbare zeitliche Auflösung)? → konfigurierbar. Wir beginnen mit 5 Minuten.
+
+## Anhang A: systemd-Registrierung (Raspberry Pi OS)
+
+Anleitung, um das Python-Skript als `systemd`-Dienst mit Autostart zu betreiben
+(erfüllt FR-6.1/6.2). Annahmen: Raspberry Pi OS (arm64, systemd), Code liegt in
+`/opt/pi-gateway`, Ausführung als dedizierter, unprivilegierter Nutzer in einem
+virtuellen Environment (venv). Secrets kommen **nicht** ins Unit-File, sondern in
+eine root-only Env-Datei (FR-5.4).
+
+### A.1 Dienst-Nutzer und Verzeichnisse anlegen
+
+```bash
+# Dedizierter Systemnutzer ohne Login und ohne Home
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin pigw
+
+# Code- und Konfig-Verzeichnis
+sudo mkdir -p /opt/pi-gateway
+sudo chown -R pigw:pigw /opt/pi-gateway
+# ... Code nach /opt/pi-gateway kopieren (git clone / rsync / Release-Tarball) ...
+```
+
+### A.2 Virtuelles Environment und Abhängigkeiten
+
+```bash
+sudo -u pigw python3 -m venv /opt/pi-gateway/.venv
+sudo -u pigw /opt/pi-gateway/.venv/bin/pip install --upgrade pip
+sudo -u pigw /opt/pi-gateway/.venv/bin/pip install -r /opt/pi-gateway/requirements.txt
+```
+
+### A.3 Konfiguration und Secrets
+
+```bash
+# Anwendungs-Konfiguration (ohne Secrets, siehe FR-5)
+sudo install -o pigw -g pigw -m 640 config.yaml /opt/pi-gateway/config.yaml
+
+# Broker-Zugangsdaten als root-only Env-Datei (NICHT ins Unit-File!)
+sudo tee /etc/pi-gateway.env >/dev/null <<'EOF'
+MQTT_USERNAME=pi-org42
+MQTT_PASSWORD=<broker-passwort>
+EOF
+sudo chmod 600 /etc/pi-gateway.env
+sudo chown root:root /etc/pi-gateway.env
+```
+
+### A.4 systemd-Unit anlegen
+
+Datei `/etc/systemd/system/pi-gateway.service` (im Repo als
+`deploy/pi-gateway.service` versioniert):
+
+```ini
+[Unit]
+Description=ZEV Pi-Gateway (Zähler auslesen und per MQTT publizieren)
+Documentation=https://github.com/ursnacht/ZEV/blob/main/Specs/Pi-Gateway-Software.md
+# Netzwerk (und ggf. VPN) muss vor dem Start verfügbar sein:
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pigw
+Group=pigw
+WorkingDirectory=/opt/pi-gateway
+# Secrets aus root-only Env-Datei laden:
+EnvironmentFile=/etc/pi-gateway.env
+ExecStart=/opt/pi-gateway/.venv/bin/python -m gateway.main --config /opt/pi-gateway/config.yaml
+# Automatischer Neustart nach Absturz/Reboot (FR-6.1/6.2):
+Restart=always
+RestartSec=10
+# Logs an journald (kein eigenes Logfile-Management nötig):
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pi-gateway
+
+# Härtung (optional, empfohlen):
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/pi-gateway
+
+[Install]
+WantedBy=multi-user.target
+```
+
+> **Hinweis Pufferung/USB-SSD:** Wird später doch eine lokale Puffer-/Statusdatei
+> genutzt, deren Pfad (auf USB-SSD, **nicht** SD-Karte — FR-6.4) unter
+> `ReadWritePaths=` ergänzen.
+
+### A.5 Aktivieren, starten, prüfen
+
+```bash
+# Unit-Datei aus dem Repo installieren (oder direkt anlegen)
+sudo install -m 644 deploy/pi-gateway.service /etc/systemd/system/pi-gateway.service
+
+sudo systemctl daemon-reload
+sudo systemctl enable pi-gateway.service     # Autostart nach Reboot
+sudo systemctl start  pi-gateway.service     # sofort starten
+
+# Status und Logs
+systemctl status pi-gateway.service
+journalctl -u pi-gateway.service -f          # Live-Log (Ctrl+C beendet)
+journalctl -u pi-gateway.service --since "1 hour ago"
+```
+
+### A.6 Update / Neustart / Deaktivieren
+
+```bash
+# Nach Code-Update:
+sudo systemctl restart pi-gateway.service
+
+# Nach Änderung der Unit-Datei zusätzlich:
+sudo systemctl daemon-reload && sudo systemctl restart pi-gateway.service
+
+# Dienst dauerhaft abschalten:
+sudo systemctl disable --now pi-gateway.service
+```
+
+> **Zeitsynchronisation (FR-6.3):** Korrekte UTC-Zeitstempel sind
+> abrechnungskritisch. Sicherstellen, dass NTP läuft
+> (`timedatectl status` → „System clock synchronized: yes“; ggf.
+> `sudo timedatectl set-ntp true`).

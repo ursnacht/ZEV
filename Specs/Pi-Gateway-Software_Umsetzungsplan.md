@@ -13,10 +13,11 @@ Grundlage: [`Specs/Pi-Gateway-Software.md`](./Pi-Gateway-Software.md); Vertrag: 
 Neues Repo/Verzeichnis, z. B. `pi-gateway/` (getrennt vom ZEV-Monorepo oder eigenes Repo):
 
 - `pyproject.toml` / `requirements.txt` – Abhängigkeiten (`pymodbus`, `paho-mqtt`, `requests`/HTTP-Client, ggf. `pydantic` für Config)
-- `config.example.yaml` / `.env.example` – Zähler-Endpunkte, `messpunkt`↔Quelle, `org_id`, Broker, Intervalle, Puffer
-- `gateway/config.py` – Konfigurations-Laden/-Validierung
+- `config.example.yaml` / `.env.example` – **Liste beliebig vieler Zähler** (je Eintrag: Protokoll, Host/Port, Unit-ID, Register-Mapping, `messpunkt`) plus `org_id`, Broker, Intervall (Beispiel mit 3 Wago in `Pi-Gateway-Software.md` FR-5)
+- `gateway/config.py` – Konfigurations-Laden/-Validierung (Zähler-Liste)
+- `gateway/readers/factory.py` – Reader je `protokoll` erzeugen (erweiterbar: `modbus-tcp`, später `gplug`)
 - `gateway/readers/modbus_reader.py` – Wago (Modbus TCP)
-- `gateway/readers/gplug_reader.py` – BKW (gPlug)
+- `gateway/readers/gplug_reader.py` – BKW (gPlug, später)
 - `gateway/publisher.py` – MQTT-Publish der **absoluten Zählerstände** (Topic/Payload gemäss Vertrag; keine Delta-Bildung auf dem Pi)
 - `gateway/main.py` – Orchestrierung/Read-Loop, Reconnect, Heartbeat
 - `deploy/pi-gateway.service` – systemd-Unit
@@ -29,14 +30,14 @@ Neues Repo/Verzeichnis, z. B. `pi-gateway/` (getrennt vom ZEV-Monorepo oder eige
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
 | [ ] | 1. Projekt-Setup | Repo/Struktur, Dependencies (`pymodbus`, `paho-mqtt`, HTTP-Client), Lint/Format, venv/Packaging |
-| [ ] | 2. Konfiguration | Config-Modell + Laden/Validierung: Zähler-Endpunkte, Register-Mapping, `messpunkt`↔Quelle, `org_id`, Broker-URL/Creds (Env, **keine Secrets im Code**), Lese-/Publish-Intervall (**Default 5 min**, konfigurierbar) |
+| [ ] | 2. Konfiguration | Config-Schema: **Zähler als Liste beliebiger Länge (10–20+)**, je Eintrag vollständig (Protokoll, Host/Port, Unit-ID, Register-Mapping, `messpunkt`); dazu `org_id`, Broker-URL/Creds (Env, **keine Secrets im Code**), Intervall (**Default 5 min**). Laden/Validierung; **neuer Zähler = nur Config-Eintrag** (Beispiel: `Pi-Gateway-Software.md` FR-5) |
 | [ ] | 3. gPlug-Schnittstelle klären (Spike) — **später / Erweiterung** | BKW/gPlug **nicht** im ersten Wurf; Protokoll (Modbus / HTTP-REST / proprietär) später ermitteln |
-| [ ] | 4. Modbus-Reader (Wago) | `pymodbus`-Client, **Wirkenergie-Register (kWh, OBIS 1.8.0/2.8.0)**/Unit-ID/Skalierung aus Config, robustes Lesen (Timeouts, Teil-Reads verwerfen) |
+| [ ] | 4. Modbus-Reader (Wago) | `pymodbus`-Client für **alle Modbus-Zähler der Liste**, **Wirkenergie-Register (kWh, OBIS 1.8.0/2.8.0)**/Unit-ID/Skalierung aus Config, robustes Lesen (Timeouts, Teil-Reads verwerfen) |
 | [ ] | 5. gPlug-Reader (BKW) — **später / Erweiterung** | Reader gemäss Ergebnis Phase 3, nach dem Wago-Erstwurf |
 | [ ] | 6. Zählerstand-Handling (ohne Delta) | Gelesene **absolute Stände** unverändert übernehmen (keine Delta-Bildung, keine „letzter Stand"-Persistenz); nur fehlgeschlagene/Teil-Reads verwerfen. Delta-/Reset-Erkennung liegt im Backend |
 | [ ] | 7. MQTT-Publisher | Topic `zev/{orgId}/{messpunkt}/messwert`, Payload `{timestamp,zaehlerstandBezug,zaehlerstandEinspeisung}` (UTC), **QoS 0/1**, stabile Client-ID — byte-genau gemäss `MQTT-Integration.md` |
 | [ ] | 8. Pufferung — **entfällt** | Entscheidung: **keine** Pufferung (Variante B genügt; absolute Stände sind verlusttolerant). Bei späterem Bedarf nachrüstbar (Variante C / Queue) |
-| [ ] | 9. Orchestrierung / Read-Loop | Intervall-Scheduler: Reader → Publish; Fehler isolieren (ein defekter Zähler stoppt nicht alle) |
+| [ ] | 9. Orchestrierung / Read-Loop | Intervall-Scheduler iteriert über die **konfigurierte Zähler-Liste (N, skaliert auf 10–20+)**: pro Zähler Reader → Publish; Fehler **je Zähler isolieren** (ein defekter stoppt nicht alle) |
 | [ ] | 10. Betrieb & Resilienz | `systemd`-Unit (Autostart), Reconnect (Broker/Modbus/gPlug) mit Backoff, NTP-Voraussetzung, Logging + Rotation, Persistenz auf **USB-SSD** (nicht SD) |
 | [ ] | 11. Monitoring / Heartbeat | „Letzter erfolgreicher Read/Publish" exponieren (Log / Status-Topic), damit stiller Ausfall erkennbar ist |
 | [ ] | 12. Tests | Unit: Topic-/Payload-Format (absolute Stände), Config-Parsing, Zeitstempel-UTC, Verwerfen fehlerhafter Reads. Integration: Publish gegen Test-Broker (Mosquitto), optional Modbus-Simulator |
@@ -47,8 +48,9 @@ Neues Repo/Verzeichnis, z. B. `pi-gateway/` (getrennt vom ZEV-Monorepo oder eige
 ## Validierungen
 
 ### Konfiguration
-- Pflichtfelder vorhanden (Broker-URL/Creds, mind. ein Zähler mit `messpunkt` + `org_id`); Intervalle > 0; keine Secrets im Repo.
-- `messpunkt`↔Quelle eindeutig; Register-Mapping je Wago-Gerät vorhanden.
+- Pflichtfelder vorhanden (Broker-URL/Creds, `org_id`, **Zähler-Liste nicht leer**); Intervall > 0; keine Secrets im Repo.
+- **`messpunkt` über die gesamte Liste eindeutig**; je Zähler-Eintrag Protokoll/Host/Port/Unit-ID + Register-Mapping (Bezug/Einspeisung) vorhanden.
+- Funktioniert für **beliebige Zähleranzahl** (10–20+) rein per Konfiguration, ohne Code-Änderung.
 
 ### Laufzeit / Datenkorrektheit
 - **Payload-Vertrag:** `timestamp` (ISO 8601 UTC), `zaehlerstandBezug`/`zaehlerstandEinspeisung` numerisch **≥ 0** (kumulativ); Topic exakt `zev/{orgId}/{messpunkt}/messwert`.
