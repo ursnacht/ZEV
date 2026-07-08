@@ -100,6 +100,8 @@ CREATE INDEX idx_zaehler_rohdaten_unverarbeitet
 5. Speichern mit `quelle = 'MQTT'` (FR-7); Insert/Upsert.
 6. Verarbeitete Rohdaten markieren: `verarbeitet = TRUE`, `verarbeitet_am = NOW()`; Referenzstand fortschreiben.
 
+> **Profil-Aktivierung (`@Profile("mqtt")`):** Das Bean, das die Rohdaten periodisch aus `zaehler_rohdaten` liest und aggregiert (der `@Scheduled`-Aggregations-Job samt zugehörigem Service), ist **nur aktiv, wenn das Spring-Boot-Profil `mqtt` gesetzt ist** (`@Profile("mqtt")`; aktiviert via `SPRING_PROFILES_ACTIVE=mqtt` bzw. `spring.profiles.active`) — analog zum MQTT-Subscriber (FR-1). Ohne dieses Profil (Default, Tests, lokale Entwicklung) läuft **kein** Aggregations-Job; die `messwerte`-Tabelle wird ausschliesslich über den CSV-Upload befüllt.
+
 > **Verlusttoleranz:** Fehlt in einem Intervall eine Meldung, fällt der Verbrauch ins nächste Intervall mit Meldung — die **Gesamtsumme bleibt korrekt**, nur die zeitliche Auflösung sinkt kurzzeitig. Das ist der zentrale Vorteil absoluter Stände gegenüber Deltas.
 
 ### FR-7: Erweiterung der `messwerte`-Tabelle (Quelle)
