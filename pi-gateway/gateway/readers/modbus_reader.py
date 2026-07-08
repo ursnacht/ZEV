@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import struct
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from pymodbus.client import ModbusTcpClient
 
@@ -53,7 +53,7 @@ class ModbusReader(Reader):
 
         return MeterReading(
             messpunkt=self.messpunkt,
-            timestamp=datetime.now(UTC),
+            timestamp=datetime.now(timezone.utc),
             zaehlerstand_bezug=bezug,
             zaehlerstand_einspeisung=einspeisung,
         )

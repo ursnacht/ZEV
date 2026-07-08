@@ -8,7 +8,7 @@ Die Zeitstempel werden pro Zyklus geloggt; ein externer Watchdog kann darauf
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 log = logging.getLogger("gateway.heartbeat")
 
@@ -21,10 +21,10 @@ class Heartbeat:
         self.last_successful_publish: datetime | None = None
 
     def record_read(self) -> None:
-        self.last_successful_read = datetime.now(UTC)
+        self.last_successful_read = datetime.now(timezone.utc)
 
     def record_publish(self) -> None:
-        self.last_successful_publish = datetime.now(UTC)
+        self.last_successful_publish = datetime.now(timezone.utc)
 
     def log_cycle(self, success: int, total: int, connected: bool) -> None:
         """Loggt eine Zusammenfassung des Lesezyklus."""

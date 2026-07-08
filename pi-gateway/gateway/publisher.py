@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import UTC
+from datetime import timezone
 from urllib.parse import urlparse
 
 import paho.mqtt.client as mqtt
@@ -103,7 +103,7 @@ class MqttPublisher:
 
 def _to_payload(reading: MeterReading) -> dict:
     """Baut das Vertrags-JSON (UTC-Zeitstempel mit 'Z', Stände in kWh)."""
-    timestamp = reading.timestamp.astimezone(UTC).replace(microsecond=0)
+    timestamp = reading.timestamp.astimezone(timezone.utc).replace(microsecond=0)
     return {
         "timestamp": timestamp.isoformat().replace("+00:00", "Z"),
         "zaehlerstandBezug": round(reading.zaehlerstand_bezug, _KWH_DECIMALS),

@@ -25,5 +25,5 @@ class Reader(abc.ABC):
     def read(self) -> MeterReading:
         """Liest die absoluten Stände. Wirft ``ReadError`` bei Teil-/Fehl-Reads."""
 
-    def close(self) -> None:  # pragma: no cover - optionales Aufräumen
+    def close(self) -> None:  # noqa: B027 - optionaler Hook, Default absichtlich leer
         """Verbindung/Ressourcen freigeben (Default: nichts)."""

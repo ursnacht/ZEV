@@ -7,7 +7,7 @@ name = "zev-pi-gateway"
 version = "0.1.0"
 description = "ZEV Pi-Gateway: liest Stromzähler (Wago/Modbus TCP) und publiziert absolute Zählerstände per MQTT"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [{ name = "Urs Nacht" }]
 dependencies = [
@@ -31,7 +31,7 @@ include = ["gateway*"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py39"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
