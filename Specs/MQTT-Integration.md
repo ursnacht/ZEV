@@ -25,6 +25,8 @@
 3. Subscribe mit Wildcard auf alle Messwert-Topics (FR-2).
 4. Bei Verbindungsabbruch automatischer Reconnect mit Exponential Backoff.
 
+> **Profil-Aktivierung (`@Profile("mqtt")`):** Das Bean, das sich mit dem Broker verbindet und die Messwerte einliest (MQTT-Subscriber/Inbound-Adapter samt Message-Handler), ist **nur aktiv, wenn das Spring-Boot-Profil `mqtt` gesetzt ist** (`@Profile("mqtt")`; aktiviert via `SPRING_PROFILES_ACTIVE=mqtt` bzw. `spring.profiles.active`). Ohne dieses Profil (Default, Tests, lokale Entwicklung) startet **kein** MQTT-Client — es wird keine Broker-Verbindung aufgebaut, das Backend läuft unverändert nur mit CSV-Upload. So bleibt die MQTT-Anbindung optional und Umgebungen ohne erreichbaren Broker starten fehlerfrei.
+
 ### FR-2: Topic-Struktur
 ```
 zev/{orgId}/{messpunkt}/messwert
@@ -184,7 +186,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel).
   - Mosquitto-Broker auf dem NAS betriebsbereit (siehe `docs/Netzwerk-Topologie-Hene.md`, Abschnitt „MQTT-Broker auf dem NAS betreiben").
   - VPN-Verbindung zwischen Pi und NAS; **separater Reader-/Publisher-Prozess** auf dem Pi (Out of Scope, `Specs/Pi-Gateway-Software.md`).
 * **Neue Dependencies (Backend):** `spring-integration-mqtt` + Eclipse Paho (`org.eclipse.paho.client.mqttv3`).
-* **Backend-Konfiguration (`application.yml`):** `mqtt.broker.url/username/password`, `mqtt.topics.messwerte=zev/+/+/messwert`, `mqtt.qos` (Secrets via Env).
+* **Backend-Konfiguration (`application.yml`):** `mqtt.broker.url/username/password`, `mqtt.topics.messwerte=zev/+/+/messwert`, `mqtt.qos` (Secrets via Env). Der MQTT-Subscriber ist über das Spring-Profil **`mqtt`** zugeschaltet (`@Profile("mqtt")`, siehe FR-1); ohne aktives Profil wird keine Broker-Verbindung aufgebaut.
 * **Neuer Code:** MQTT-Subscriber/Handler, Topic-/Payload-Parser, `ZaehlerRohdaten`-Entity + Repository, Aggregations-/Delta-Service (Scheduled), Health-Indicator, Prometheus-Metriken.
 * **Erweiterung:** `messwerte` um `quelle`.
 * **Wiederverwendet:** `Einheit`/`Messwerte`, `SolarDistribution` (unverändert), `MetricsService`, Grafana/Prometheus-Stack.
