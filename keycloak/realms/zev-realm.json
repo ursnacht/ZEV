@@ -142,6 +142,10 @@
                 "description": "Lizenzen ansehen"
             },
             {
+                "name": "datenbank:read",
+                "description": "Datenbank-Ansicht (generische, read-only Tabellenansicht) - nur zev_admin"
+            },
+            {
                 "name": "zev_user",
                 "description": "ZEV Member role: Lesezugriff + Rechnungen/Debitoren verwalten (Composite)",
                 "composite": true,
@@ -182,7 +186,8 @@
                     "realm": [
                         "org_admin",
                         "translations:manage",
-                        "featureflags:manage"
+                        "featureflags:manage",
+                        "datenbank:read"
                     ]
                 }
             }

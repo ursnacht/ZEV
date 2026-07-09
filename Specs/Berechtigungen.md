@@ -10,7 +10,7 @@ Quelle der Wahrheit:
 
 > **Status:** Umgesetzt. Backend prüft `hasAuthority('<permission>')`, Keycloak bündelt die Permissions in den Composite-Rollen (`zev-realm.json`). Dieses Dokument ist die **massgebliche Zuordnung** – Realm, Backend und Frontend folgen ihr.
 
-Stand: 2026-07-03
+Stand: 2026-07-09
 
 ## Rollenmodell
 
@@ -39,6 +39,7 @@ Stand: 2026-07-03
 | `debitoren:manage`      | ✅  | ✅        | ✅        |
 | `translations:manage`   | ❌  | ✅        | ❌        |
 | `featureflags:manage`   | ❌  | ✅        | ❌        |
+| `datenbank:read`        | ❌  | ✅        | ❌        |
 
 ## Legende
 
@@ -67,6 +68,7 @@ Die Rollen-Spalten sind aus der obigen Fachrolle→Permission-Zuordnung abgeleit
 | Übersetzungs-Editor (verwalten)                      | `translations:manage`    | ❌  | ✅        | ❌        |
 | **Einstellungen (Rechnungsangaben) bearbeiten**      | `einstellungen:write`    | ❌  | ✅        | ✅        |
 | **Feature-Flags verwalten** ³                        | `featureflags:manage`    | ❌  | ✅        | ❌        |
+| **Datenbank-Ansicht** (Einstellungen) ⁵              | `datenbank:read`         | ❌  | ✅        | ❌        |
 | Lizenzen ansehen                                     | `lizenzen:read`          | ✅  | ✅        | ✅        |
 | Design-System-Showcase ⁰                             | – (authentifiziert)      | ✅  | ✅        | ✅        |
 
@@ -81,6 +83,8 @@ Die Rollen-Spalten sind aus der obigen Fachrolle→Permission-Zuordnung abgeleit
 ³ Das **Lesen** der effektiven Feature-Flags (`GET /api/feature-flags`, Permission `featureflags:read`) ist für alle Fachrollen erlaubt (interne UI-Steuerung). Das **Verwalten** erfordert `featureflags:manage`. In der `EinstellungenComponent` wird die Feature-Flag-Sektion nur bei `featureflags:manage` angezeigt.
 
 ⁴ Die Debitorkontrolle lädt für das Anlegen/Bearbeiten (Mieter-Dropdown) zusätzlich die Mieter-Liste (`GET /api/mieter`, Permission `mieter:read`). Daher hat jede Fachrolle mit `debitoren:manage` auch `mieter:read` (die Debitoren-Tabelle selbst nutzt `mieterName`/`einheitName` aus dem JOIN und benötigt sie nicht).
+
+⁵ Generische, **read-only** Tabellenansicht innerhalb der Seite `/einstellungen` (nur `zev_admin`). Die Seite selbst erfordert `einstellungen:write` (auch `org_admin`), der Datenbank-Bereich wird jedoch nur bei `datenbank:read` angezeigt und ist backend-seitig separat geschützt. Mandantenübergreifende Rohansicht (orgFilter nicht angewendet).
 
 ## Öffentlich (ohne Authentifizierung)
 
@@ -106,6 +110,7 @@ Die Spalten `zev_user` / `zev_admin` / `org_admin` sind gleich dargestellt wie i
 | DebitorController        | alle                                                                        | `hasAuthority('debitoren:manage')`       | ✅  | ✅        | ✅        |
 | RechnungController       | alle                                                                        | `hasAuthority('rechnungen:manage')`      | ✅  | ✅        | ✅        |
 | EinstellungenController  | alle                                                                        | `hasAuthority('einstellungen:write')`    | ❌  | ✅        | ✅        |
+| DatenbankController      | `GET /api/datenbank/tabellen`, `POST /api/datenbank/abfrage`                | `hasAuthority('datenbank:read')`         | ❌  | ✅        | ❌        |
 | FeatureFlagController    | `GET /api/feature-flags`                                                    | `hasAuthority('featureflags:read')`      | ✅  | ✅        | ✅        |
 | FeatureFlagController    | `GET /admin`, `PUT /{key}`, `DELETE /{key}`                                 | `hasAuthority('featureflags:manage')`    | ❌  | ✅        | ❌        |
 | LizenzenController       | `GET /api/lizenzen`                                                         | `hasAuthority('lizenzen:read')`          | ✅  | ✅        | ✅        |

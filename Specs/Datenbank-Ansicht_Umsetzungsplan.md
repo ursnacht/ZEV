@@ -18,8 +18,8 @@ Grundlage: [`Specs/Datenbank-Ansicht.md`](./Datenbank-Ansicht.md); Permission-Mo
 ## Betroffene Komponenten
 
 **Backend (neu):**
-- `dto/DatenbankAbfrageRequest.java` – `{ tabelle, where, page, size }`
-- `dto/DatenbankAbfrageResponse.java` – `{ spalten[], zeilen[[]], seite, groesse, hatMehr }`
+- `dto/DatenbankAbfrageRequestDTO.java` – `{ tabelle, where, page, size }` (DTO-Suffix wg. ArchUnit-Namenskonvention)
+- `dto/DatenbankAbfrageResponseDTO.java` – `{ spalten[], zeilen[[]], seite, groesse, hatMehr }`
 - `service/DatenbankService.java` – `JdbcTemplate`: Tabellenliste, Spalten (ohne `bytea`), read-only-Abfrage, Audit-Log
 - `service/WhereClauseValidator.java` (oder `util/`) – Guard-Prüfung der WHERE-Eingabe
 - `controller/DatenbankController.java` – `/api/datenbank`, `@PreAuthorize("hasAuthority('datenbank:read')")`
@@ -39,16 +39,16 @@ Grundlage: [`Specs/Datenbank-Ansicht.md`](./Datenbank-Ansicht.md); Permission-Mo
 
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
-| [ ] | 1. Keycloak-Permission | `zev-realm.json`: Realm-Rolle `datenbank:read` anlegen + in `zev_admin`-Composite aufnehmen. **Anwendung/Reimport durch den Benutzer** (Umgebungs-Konvention); Command nennen. |
-| [ ] | 2. Backend-DTOs | `DatenbankAbfrageRequest` (Bean-Validation: `tabelle` nicht leer, `size` 1..500, `page` ≥ 0), `DatenbankAbfrageResponse`. |
-| [ ] | 3. WHERE-Validator | `WhereClauseValidator`: lehnt `;`, Kommentare (`--`, `/*`, `*/`), Mehrfach-Statements, DML/DDL-Keywords (`INSERT/UPDATE/DELETE/DROP/ALTER/TRUNCATE/CREATE/GRANT/REVOKE/MERGE/COPY/CALL/DO`) und Sub-`SELECT` ab (Wortgrenzen-Regex, case-insensitive); Längenlimit (z.B. 500 Zeichen). Wirft `IllegalArgumentException`. |
-| [ ] | 4. Backend-Service | `DatenbankService` (`JdbcTemplate`): (a) `getTabellen()` aus `information_schema.tables` (`table_schema='zev'`, `BASE TABLE`); (b) `getSpalten(tabelle)` aus `information_schema.columns`, **`bytea` ausgeschlossen**; (c) `abfrage(req)`: Tabelle gegen Whitelist prüfen, WHERE validieren, `@Transactional(readOnly=true)` + `SET LOCAL statement_timeout='5s'`, `SELECT <spalten> FROM zev.<tabelle> [WHERE ...] LIMIT size+1 OFFSET page*size` (kein ORDER BY), `hatMehr` via size+1-Fetch, Werte als String; **Audit-Log** (Benutzer, Tabelle, WHERE, Zeit). |
-| [ ] | 5. Backend-Controller | `DatenbankController` (`/api/datenbank`, klassenweit `@PreAuthorize("hasAuthority('datenbank:read')")`): `GET /tabellen`, `POST /abfrage`; `IllegalArgumentException` → `400` (ohne DB-Interna). |
-| [ ] | 6. Frontend Model + Service | `datenbank.model.ts`, `datenbank.service.ts` (`getTabellen()`, `abfrage(req)`), `subscribe({next,error})`. |
-| [ ] | 7. Frontend-Komponente | `DatenbankAnsichtComponent`: Tabellen-Dropdown (lädt `/tabellen`), WHERE-Textfeld (Platzhalter-Beispiel), „Anzeigen"-Button (disabled ohne Tabelle), **generische** Ergebnis-Tabelle (Spalten/Zeilen aus Response, Design-System-`table`), Pagination (`page`/`size`, „hatMehr"), Message-Bereich; alle Texte via `TranslatePipe`. Neue Control-Flow-Syntax (`@if`/`@for`). |
-| [ ] | 8. Integration in Einstellungen | Bereich in `einstellungen.component.html` unter `@if (canViewDatenbank)` einbinden; `canViewDatenbank` in `einstellungen.component.ts` (Muster wie `canManageFeatureFlags`). |
-| [ ] | 9. Übersetzungen | `V71__Add_DatenbankAnsicht_Translations.sql` (DE/EN, `ON CONFLICT DO NOTHING`): Titel, Labels (Tabelle, Filter, Anzeigen, Seite, keine Daten, Fehlermeldungen). |
-| [ ] | 10. Berechtigungen-Doku | `Berechtigungen.md`: `datenbank:read` in Matrix + Endpunkt-Referenz (`/api/datenbank`), nur `zev_admin`. |
+| [x] | 1. Keycloak-Permission | `zev-realm.json`: Realm-Rolle `datenbank:read` angelegt + in `zev_admin`-Composite aufgenommen. **Anwendung/Reimport durch den Benutzer** (Umgebungs-Konvention). |
+| [x] | 2. Backend-DTOs | `DatenbankAbfrageRequest` (`tabelle` `@NotBlank`; `page`/`size` als `Integer`, im Service geklemmt), `DatenbankAbfrageResponse` (`spalten`, `zeilen`, `seite`, `groesse`, `hatMehr`). |
+| [x] | 3. WHERE-Validator | `WhereClauseValidator` (`@Component`): lehnt `;`, Kommentare (`--`, `/*`, `*/`), DML/DDL-Keywords (`INSERT/UPDATE/DELETE/DROP/ALTER/TRUNCATE/CREATE/GRANT/REVOKE/MERGE/COPY/CALL/DO`) und Sub-`SELECT` ab (Wortgrenzen-Regex, case-insensitive); Längenlimit 500. Wirft `IllegalArgumentException` mit Übersetzungs-Key. |
+| [x] | 4. Backend-Service | `DatenbankService` (`JdbcTemplate`): `getTabellen()` (`information_schema.tables`, `zev`/`BASE TABLE`); `getSpalten()` (`information_schema.columns`, **`bytea` ausgeschlossen**); `abfrage()`: Whitelist-Prüfung, WHERE-Validierung, `@Transactional(readOnly=true)` + `SET LOCAL statement_timeout=5000`, `SELECT <spalten> FROM zev.<tabelle> [WHERE ...] LIMIT ? OFFSET ?` (kein ORDER BY), `hatMehr` via size+1, Werte als String, DB-Fehler ohne Interna, **Audit-Log**. |
+| [x] | 5. Backend-Controller | `DatenbankController` (`/api/datenbank`, `@PreAuthorize("hasAuthority('datenbank:read')")`): `GET /tabellen`, `POST /abfrage`; `IllegalArgumentException` → `400`. |
+| [x] | 6. Frontend Model + Service | `datenbank.model.ts`, `datenbank.service.ts` (`getTabellen()`, `abfrage(req)`), `subscribe({next,error})`. |
+| [x] | 7. Frontend-Komponente | `DatenbankAnsichtComponent` (standalone, `WithMessage`): Tabellen-Dropdown (`/tabellen`), WHERE-Textfeld (Platzhalter), „Anzeigen"-Button (disabled ohne Tabelle), **generische** Ergebnis-Tabelle (Spalten/Zeilen aus Response), Pagination (`hatMehr`), Message-Bereich; `@if`/`@for`, `TranslatePipe`. |
+| [x] | 8. Integration in Einstellungen | `<app-datenbank-ansicht>` in `einstellungen.component.html` unter `@if (canViewDatenbank)`; `canViewDatenbank = inject(Keycloak).hasRealmRole('datenbank:read')`. |
+| [x] | 9. Übersetzungen | `V71__Add_DatenbankAnsicht_Translations.sql` (DE/EN, `ON CONFLICT DO NOTHING`): Titel, Labels, Pagination, Fehlermeldungen/Validierungs-Keys. |
+| [x] | 10. Berechtigungen-Doku | `Berechtigungen.md`: `datenbank:read` in Fachrolle→Permission, Matrix (Fussnote ⁵) + Endpunkt-Referenz (`/api/datenbank`), nur `zev_admin`. |
 
 > **Tests** (`/3_backend-tests`, `/4_frontend-unit-tests`, `/5_e2e-tests`) werden separat erstellt und sind **nicht** Teil dieser Umsetzung. Schwerpunkte: WHERE-Validator (Guards), Whitelist-/`403`-Fälle, `bytea`-Ausschluss, Pagination, generische Anzeige, Sichtbarkeit nur für `zev_admin`.
 
@@ -76,5 +76,5 @@ Grundlage: [`Specs/Datenbank-Ansicht.md`](./Datenbank-Ansicht.md); Permission-Mo
 - **`JdbcTemplate`** ist über `spring-boot-starter-data-jpa` (JDBC-Autoconfig) verfügbar; kein zusätzliches Starter-Dependency nötig.
 - **Pagination ohne `ORDER BY`:** Reihenfolge über Seiten hinweg nicht garantiert stabil (bewusst, Spec).
 - **Restrisiko WHERE-Guard:** Keyword-Blacklist per Wortgrenzen-Regex; Rest-Absicherung durch read-only-Transaktion + `statement_timeout` + `LIMIT` (defense-in-depth). Sub-`SELECT` explizit verboten.
-- **ArchUnit:** Service greift direkt auf `JdbcTemplate`/`DataSource` zu (kein Repository-Layer). Bei Layering-Regeln in `ArchitectureTest` ggf. eine begründete Ausnahme ergänzen — bei der Umsetzung prüfen.
+- **ArchUnit:** `ArchitectureTest` ist grün. Der direkte `JdbcTemplate`-Zugriff im Service verletzt **keine** Schichtenregel (keine Ausnahme nötig). Einzige Anpassung: DTOs müssen auf `DTO` enden (`dtosShouldEndWithDTO`) → `DatenbankAbfrageRequestDTO`/`DatenbankAbfrageResponseDTO`.
 - **Whitelist-Ermittlung:** pro Anfrage aus dem Katalog (leichtgewichtig); optionales Caching später.

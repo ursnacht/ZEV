@@ -1,0 +1,85 @@
+<div class="zev-form-section">
+  <h3 class="zev-form-section__title">
+    <app-icon name="database"></app-icon> {{ 'DATENBANK_ANSICHT' | translate }}
+  </h3>
+
+  @if (message) {
+    <div class="zev-message" [ngClass]="'zev-message--' + messageType"
+      [class.zev-message--dismissible]="messageType === 'error'"
+      (click)="messageType === 'error' && dismissMessage()">
+      <span>{{ message | translate }}</span>
+      @if (messageType === 'error') {
+        <span class="zev-message__dismiss">&times;</span>
+      }
+    </div>
+  }
+
+  <div class="zev-form-group">
+    <label for="dbTabelle">{{ 'DATENBANK_TABELLE' | translate }}:</label>
+    <select id="dbTabelle" class="zev-input" [(ngModel)]="selectedTabelle" name="dbTabelle">
+      <option value="">{{ 'DATENBANK_TABELLE_WAEHLEN' | translate }}</option>
+      @for (t of tabellen; track t) {
+        <option [value]="t">{{ t }}</option>
+      }
+    </select>
+  </div>
+
+  <div class="zev-form-group">
+    <label for="dbWhere">{{ 'DATENBANK_FILTER' | translate }}:</label>
+    <input type="text" id="dbWhere" class="zev-input" [(ngModel)]="whereClause" name="dbWhere"
+      placeholder="org_id = 42 AND zeit > '2026-01-01'" />
+  </div>
+
+  <div class="zev-form-actions">
+    <button type="button" class="zev-button zev-button--primary"
+      [disabled]="!selectedTabelle || loading" (click)="onAnzeigen()">
+      <app-icon name="search"></app-icon>
+      {{ 'DATENBANK_ANZEIGEN' | translate }}
+    </button>
+  </div>
+
+  @if (loading) {
+    <p>{{ 'LADEN' | translate }}...</p>
+  }
+
+  @if (result && !loading) {
+    @if (result.zeilen.length > 0) {
+      <div class="zev-datenbank-scroll">
+        <table class="zev-table">
+          <thead>
+            <tr>
+              @for (spalte of result.spalten; track $index) {
+                <th>{{ spalte }}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (zeile of result.zeilen; track $index) {
+              <tr>
+                @for (wert of zeile; track $index) {
+                  <td>{{ wert === null ? '' : wert }}</td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="zev-datenbank-pagination">
+        <button type="button" class="zev-button zev-button--secondary zev-button--compact"
+          [disabled]="page === 0" (click)="onVorherigeSeite()">
+          <app-icon name="chevron-left"></app-icon>
+          {{ 'DATENBANK_VORHERIGE' | translate }}
+        </button>
+        <span class="zev-text--muted">{{ 'DATENBANK_SEITE' | translate }} {{ page + 1 }}</span>
+        <button type="button" class="zev-button zev-button--secondary zev-button--compact"
+          [disabled]="!result.hatMehr" (click)="onNaechsteSeite()">
+          {{ 'DATENBANK_NAECHSTE' | translate }}
+          <app-icon name="chevron-right"></app-icon>
+        </button>
+      </div>
+    } @else {
+      <p class="zev-text--muted">{{ 'DATENBANK_KEINE_DATEN' | translate }}</p>
+    }
+  }
+</div>

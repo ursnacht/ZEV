@@ -1,0 +1,11 @@
+/* Breite/generische Ergebnistabelle horizontal scrollbar halten */
+.zev-datenbank-scroll {
+  overflow-x: auto;
+}
+
+.zev-datenbank-pagination {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}

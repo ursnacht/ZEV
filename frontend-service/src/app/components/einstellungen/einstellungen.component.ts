@@ -10,11 +10,12 @@ import { FeatureFlagAdmin, FeatureFlagQuelle } from '../../models/feature-flag.m
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { IconComponent } from '../icon/icon.component';
+import { DatenbankAnsichtComponent } from '../datenbank-ansicht/datenbank-ansicht.component';
 
 @Component({
   selector: 'app-einstellungen',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe, IconComponent],
+  imports: [CommonModule, FormsModule, TranslatePipe, IconComponent, DatenbankAnsichtComponent],
   templateUrl: './einstellungen.component.html',
   styleUrls: ['./einstellungen.component.css']
 })
@@ -43,6 +44,12 @@ export class EinstellungenComponent extends WithMessage implements OnInit {
    * ({@code einstellungen:write}), sieht die Feature-Flag-Sektion aber nicht.
    */
   readonly canManageFeatureFlags = inject(Keycloak).hasRealmRole('featureflags:manage');
+
+  /**
+   * Die Datenbank-Ansicht ist ausschliesslich für {@code zev_admin} bestimmt
+   * (Permission {@code datenbank:read}). {@code org_admin} sieht sie nicht.
+   */
+  readonly canViewDatenbank = inject(Keycloak).hasRealmRole('datenbank:read');
 
   constructor(
     private einstellungenService: EinstellungenService,
