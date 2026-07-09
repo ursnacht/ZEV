@@ -33,45 +33,88 @@ Grundlage: [`Specs/MQTT-Integration.md`](./MQTT-Integration.md); Publisher-Gegen
 - **`@Profile("mqtt")`** auf allen MQTT-Beans (Subscriber, Ingest-Handler, Aggregations-Job,
   Health-Indicator); FR-9 (Solarverteilung) ist profil-**unabhängig** (nur `zev=0`-Fallback).
 
+## Ablauf: zwei getrennte Auslöser
+
+Das Feature hat **zwei unabhängige Auslöser** — der Ingest ist **ereignisgesteuert (Push)**,
+die Aggregation **zeitgesteuert (`@Scheduled`)**. Für den Ingest gibt es bewusst **keinen**
+Scheduled-/Polling-Task: der Broker stellt Nachrichten über den message-driven Inbound-Adapter zu.
+
+**1) Ingest (Push, ereignisgesteuert):**
+
+```
+Broker (Mosquitto)
+  │  liefert Nachricht auf  zev/+/+/messwert
+  ▼
+MqttPahoMessageDrivenChannelAdapter  (Bean "mqttInbound", MessageProducerSupport)
+  │  dauerhafte Subscription, beim Start geöffnet; kein Polling
+  ▼
+mqttInputChannel  (DirectChannel)
+  ▼
+@ServiceActivator  mqttMessageHandler  (MessageHandler in MqttConfig)
+  │  liest RECEIVED_TOPIC-Header + Payload
+  ▼
+MqttIngestService.handle(topic, payload)   ← hier wird handle() aufgerufen
+  │  Topic/Payload parsen, validieren, Einheit (org_id, messpunkt) auflösen
+  ▼
+zev.zaehler_rohdaten  (Upsert, org_id explizit)
+```
+
+**2) Aggregation (Pull, zeitgesteuert):**
+
+```
+@Scheduled(cron "0 0,15,30,45 * * * *")
+  ▼
+ZaehlerAggregationService.aggregiere()
+  │  je Einheit: ΔBezug/ΔEinspeisung über Intervallgrenze (Reset-Guard pro Register)
+  ▼
+zev.messwerte  (total = ΔBezug − ΔEinspeisung, zev = 0, quelle = MQTT)  +  Rohdaten verarbeitet=true
+```
+
+> `MqttIngestService.handle(...)` wird **ausschliesslich** vom `@ServiceActivator`-Handler in
+> `MqttConfig` aufgerufen (kein direkter/geplanter Aufruf). Beide Auslöser sind nur mit aktivem
+> `@Profile("mqtt")` scharf. Der Empfang lässt sich erst gegen einen echten Broker verifizieren.
+
 ## Betroffene Komponenten
 
 **Neu:**
 - `backend-service/src/main/resources/db/migration/V69__create_zaehler_rohdaten.sql` – Rohdaten-Tabelle
-- `backend-service/src/main/resources/db/migration/V70__Add_messwerte_quelle.sql` – `quelle`-Spalte
+- `backend-service/src/main/resources/db/migration/V72__create_zaehler_rohdaten.sql` – Rohdaten-Tabelle
+- `backend-service/src/main/resources/db/migration/V73__Add_messwerte_quelle.sql` – `quelle`-Spalte
 - `backend-service/src/main/resources/application-mqtt.yml` – MQTT-Profil-Konfiguration (Broker via Env)
 - `entity/ZaehlerRohdaten.java` – Entity (org_id, `@Filter orgFilter`)
-- `entity/Quelle.java` – Enum `CSV`/`MQTT`/`API` (oder `String`-Konstante; siehe Annahmen)
-- `repository/ZaehlerRohdatenRepository.java` – Repository (unverarbeitete Rohdaten, Upsert-Auflösung)
+- `entity/Quelle.java` – Enum `CSV`/`MQTT`/`API`
+- `repository/ZaehlerRohdatenRepository.java` – Upsert-/Referenz-/Catch-up-Queries, `markVerarbeitet`
 - `config/MqttConfig.java` – Spring-Integration-MQTT Inbound-Adapter + Connection (`@Profile("mqtt")`)
-- `dto/ZaehlerMesswertPayload.java` – JSON-Payload (`timestamp`, `zaehlerstandBezug`, `zaehlerstandEinspeisung`)
+- `dto/ZaehlerMesswertPayloadDTO.java` – JSON-Payload (`timestamp`, `zaehlerstandBezug`, `zaehlerstandEinspeisung`)
 - `service/MqttIngestService.java` – Topic-/Payload-Parsing, Validierung, Einheit-Auflösung, Persistenz (`@Profile("mqtt")`)
 - `service/ZaehlerAggregationService.java` – `@Scheduled`-Delta-/Aggregations-Job (`@Profile("mqtt")`)
+- `service/MqttMetrics.java` – Prometheus-Metriken via `MeterRegistry` (`@Profile("mqtt")`)
 - `health/MqttHealthIndicator.java` – `/actuator/health/mqtt` (`@Profile("mqtt")`)
 
 **Geändert:**
-- `backend-service/pom.xml` – Dependencies `spring-integration-mqtt` (+ Paho mqttv3)
-- `entity/Messwerte.java` – Feld `quelle`
+- `backend-service/pom.xml` – `spring-boot-starter-integration`, `spring-integration-mqtt`, Paho `1.2.5`
+- `entity/Messwerte.java` – Feld `quelle` (Default `CSV`)
 - `repository/EinheitRepository.java` – `findByOrgIdAndMesspunkt(Long, String)`
-- `service/SolarDistribution.java` – FR-9: `zev = zev_calculated`, wo `zev == 0`
-- `service/MetricsService.java` – MQTT-/Aggregations-Metriken (FR-8)
-- `service/MesswerteService.java` – `quelle = 'CSV'` beim CSV-Upload setzen (Konsistenz)
+- `repository/MesswerteRepository.java` – `findByEinheitAndZeit` (Upsert)
+- `service/MesswerteService.java` – FR-9: `zev = zev_calculated`, wo `zev == 0` (in der Verteil-Schleife)
+- `.env.example` – MQTT-Broker-Variablen
 
 ## Umsetzungsreihenfolge (Phasen)
 
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
-| [ ] | 1. Dependencies & Profil-Gerüst | `spring-integration-mqtt` + Paho in `pom.xml` (Version aus Spring-Boot-BOM, keine Modul-Override). `application-mqtt.yml` mit `mqtt.broker.url/username/password`, `mqtt.topic`, `mqtt.qos`, `mqtt.client-id` (Secrets via Env). Kompiliert ohne aktives Profil unverändert. |
-| [ ] | 2. DB-Migration Rohdaten | `V69__create_zaehler_rohdaten.sql`: Tabelle gemäss FR-5 (`org_id BIGINT`, `einheit_id FK`, `zeit`, `zaehlerstand_bezug/einspeisung DECIMAL(14,4)`, `empfangen_am`, `verarbeitet`, `verarbeitet_am`, Unique `(einheit_id, zeit)`, Teilindex unverarbeitet). Spalten-Kommentare. |
-| [ ] | 3. DB-Migration `quelle` | `V70__Add_messwerte_quelle.sql`: `ALTER TABLE zev.messwerte ADD COLUMN IF NOT EXISTS quelle VARCHAR(20) DEFAULT 'CSV'` + Kommentar. **Kein** Eingriff an `zev` (bleibt `NOT NULL`). |
-| [ ] | 4. Entity + Repository Rohdaten | `ZaehlerRohdaten` (Vorlage `Tarif.java`; `orgId` + `@Filter orgFilter`), `Quelle`-Enum, `ZaehlerRohdatenRepository` (`findFirstByEinheitIdAndZeit` für Upsert, `findByVerarbeitetFalseOrderByZeitAsc`). `Messwerte.quelle`-Feld ergänzen. |
-| [ ] | 5. Einheit-Auflösung | `EinheitRepository.findByOrgIdAndMesspunkt(Long orgId, String messpunkt)` (explizite Mandantenprüfung, unabhängig vom orgFilter). |
-| [ ] | 6. MQTT-Subscriber (Connection) | `MqttConfig` (`@Profile("mqtt")`): Paho-`MqttPahoClientFactory` (URL/Creds/TLS aus Config), Inbound-Channel-Adapter auf `mqtt.topic` (`zev/+/+/messwert`), QoS, automatischer Reconnect. Verbindung beim Start (FR-1). |
-| [ ] | 7. Ingest-Handler (FR-4) | `MqttIngestService`: Topic→`orgId`+`messpunkt`, JSON→`ZaehlerMesswertPayload`, Validierung (Pflichtfelder/≥0), Einheit-Auflösung `(orgId, messpunkt)`, Cross-Tenant-Check, Rohdaten-Upsert (org_id **explizit**), Fehler → WARN + verwerfen (keine Exception nach aussen), non-blocking. |
-| [ ] | 8. Aggregations-Job (FR-6) | `ZaehlerAggregationService` (`@Scheduled(cron "0 0,15,30,45 * * * *")`, `@Profile("mqtt")`): je `(org_id, einheit)` `ΔBezug`/`ΔEinspeisung` über Intervallgrenze; **Reset-Guard pro Register** (Δ<0 → 0, Referenz neu, WARN); `total = ΔBezug − ΔEinspeisung` (signed), `zev = 0`, `messwerte` Insert/Upsert mit `quelle='MQTT'` + org_id explizit; Rohdaten `verarbeitet=TRUE`. Leeres Intervall → kein Eintrag. |
-| [ ] | 9. Solarverteilung FR-9 | `SolarDistribution`: nach Berechnung `zev = zev_calculated` setzen, sofern `zev == 0`; gemessene Werte (`zev ≠ 0`) unverändert. Verteilalgorithmus selbst unverändert. |
-| [ ] | 10. Metriken (FR-8) | `MetricsService` erweitern: `zev_mqtt_messages_received/processed/failed_total` (Counter), `zev_mqtt_last_message_timestamp` (Gauge), `zev_aggregation_runs_total` (Counter), `zev_aggregation_last_run_timestamp` (Gauge). Unter `/actuator/prometheus`. |
-| [ ] | 11. Health-Indicator (FR-8) | `MqttHealthIndicator implements HealthIndicator` (`@Profile("mqtt")`): Broker-Verbindungsstatus → `/actuator/health/mqtt`. Actuator-Exposure ggf. ergänzen. |
-| [ ] | 12. CSV-Quelle & Doku | `MesswerteService`: `quelle='CSV'` beim Upload setzen. `.env.example` (Broker-Vars), kurzer CLAUDE.md-/README-Hinweis zum `mqtt`-Profil. |
+| [x] | 1. Dependencies & Profil-Gerüst | `spring-boot-starter-integration` + `spring-integration-mqtt` (via BOM) + **Paho `1.2.5` explizit** (in `spring-integration-mqtt` optional, nicht BOM-verwaltet) in `pom.xml`. `application-mqtt.yml` mit `mqtt.broker.url/username/password`, `mqtt.topic`, `mqtt.qos`, `mqtt.client-id` (Secrets via Env). |
+| [x] | 2. DB-Migration Rohdaten | **`V72__create_zaehler_rohdaten.sql`** (V69/V70 waren im Plan reserviert, inzwischen aber V71 vergeben → V72/V73). Tabelle gemäss FR-5 (Sequence-Pattern, `org_id BIGINT`, `einheit_id FK`, `zeit`, `zaehlerstand_bezug/einspeisung DECIMAL(14,4)`, `empfangen_am`, `verarbeitet`, `verarbeitet_am`, Unique `(einheit_id, zeit)`, Teilindex). Spalten-Kommentare. |
+| [x] | 3. DB-Migration `quelle` | **`V73__Add_messwerte_quelle.sql`**: `ADD COLUMN IF NOT EXISTS quelle VARCHAR(20) NOT NULL DEFAULT 'CSV'` + Kommentar. **Kein** Eingriff an `zev`. |
+| [x] | 4. Entity + Repository Rohdaten | `ZaehlerRohdaten` (`orgId` + `@Filter orgFilter`, Sequence), `Quelle`-Enum, `ZaehlerRohdatenRepository` (Upsert, Referenz-/Catch-up-Queries, `markVerarbeitet`). `Messwerte.quelle` (Default `CSV`). |
+| [x] | 5. Einheit-Auflösung | `EinheitRepository.findByOrgIdAndMesspunkt(Long, String)`. |
+| [x] | 6. MQTT-Subscriber (Connection) | `MqttConfig` (`@Profile("mqtt")`): `DefaultMqttPahoClientFactory` (URL/Creds/TLS, `automaticReconnect`), `MqttPahoMessageDrivenChannelAdapter` auf `mqtt.topic`, QoS, `@ServiceActivator`-Handler. |
+| [x] | 7. Ingest-Handler (FR-4) | `MqttIngestService` (`@Profile("mqtt")`, `@Transactional`): Topic→`orgId`+`messpunkt`, JSON→`ZaehlerMesswertPayloadDTO`, Validierung (Pflichtfelder/≥0), Auflösung `(orgId, messpunkt)`, Rohdaten-Upsert (org_id **explizit**), Fehler → WARN + verwerfen; Metriken. |
+| [x] | 8. Aggregations-Job (FR-6) | `ZaehlerAggregationService` (`@Scheduled "0 0,15,30,45 * * * *"`, `@Profile("mqtt")`): Catch-up je Einheit über Quartals-Intervalle; **Reset-Guard pro Register**; `total = ΔBezug − ΔEinspeisung` (signed), `zev = 0`, Upsert `quelle='MQTT'` (org_id explizit); Rohdaten `verarbeitet=TRUE`. Leeres Intervall → kein Eintrag. |
+| [x] | 9. Solarverteilung FR-9 | `MesswerteService` (enthält die Verteil-Logik): nach `setZevCalculated` zusätzlich `zev = zev_calculated`, sofern `zev == 0`. Verteilalgorithmus unverändert. |
+| [x] | 10. Metriken (FR-8) | **Eigene `MqttMetrics`-Komponente** (`@Profile("mqtt")`, direkt via `MeterRegistry`) statt `MetricsService` — Letzterer nutzt den request-scoped Org-Kontext (im Ingest/Job nicht verfügbar). Counter/Gauges wie geplant. |
+| [x] | 11. Health-Indicator (FR-8) | `MqttHealthIndicator` (`@Profile("mqtt")`, Boot-4-API `org.springframework.boot.health.contributor`): `/actuator/health/mqtt`, UP solange Inbound-Adapter läuft. |
+| [x] | 12. CSV-Quelle & Doku | `Messwerte.quelle` Default `CSV` (CSV-Upload bleibt automatisch `CSV`). `.env.example` um MQTT-Broker-Vars ergänzt. |
 
 > **Reihenfolge-Hinweis:** Phasen 2–5 (DB/Entity) sind Voraussetzung für 7/8. Phase 6 (Connection) und 7 (Handler) bilden den Empfang; 8 die Verarbeitung; 9 die Verrechnung. 10/11 sind Monitoring, unabhängig testbar. FR-9 (Phase 9) ist die einzige profil-unabhängige Änderung.
 

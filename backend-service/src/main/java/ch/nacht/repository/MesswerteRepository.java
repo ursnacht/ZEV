@@ -25,6 +25,9 @@ public interface MesswerteRepository extends JpaRepository<Messwerte, Long> {
     @Query("SELECT m FROM Messwerte m WHERE m.einheit = :einheit AND m.zeit BETWEEN :dateFrom AND :dateTo ORDER BY m.zeit")
     List<Messwerte> findByEinheitAndZeitBetween(@Param("einheit") Einheit einheit, @Param("dateFrom") LocalDateTime dateFrom, @Param("dateTo") LocalDateTime dateTo);
 
+    /** Für Upsert aus der MQTT-Aggregation (ein Messwert je Einheit + Zeitpunkt). */
+    Optional<Messwerte> findByEinheitAndZeit(Einheit einheit, LocalDateTime zeit);
+
     // Statistik-Abfragen
     @Query("SELECT MAX(m.zeit) FROM Messwerte m")
     Optional<LocalDateTime> findMaxZeit();

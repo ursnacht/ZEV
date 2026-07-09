@@ -30,6 +30,10 @@ public class Messwerte {
     @Column(name = "zev_calculated")
     private Double zevCalculated;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "quelle", length = 20, nullable = false)
+    private Quelle quelle = Quelle.CSV;
+
     @ManyToOne
     @JoinColumn(name = "einheit_id")
     private Einheit einheit;
@@ -98,6 +102,14 @@ public class Messwerte {
 
     public void setOrgId(Long orgId) {
         this.orgId = orgId;
+    }
+
+    public Quelle getQuelle() {
+        return quelle;
+    }
+
+    public void setQuelle(Quelle quelle) {
+        this.quelle = quelle;
     }
 
     @Override

@@ -60,6 +60,13 @@ Der Pi publiziert die **absoluten kumulativen Zählerstände** zum Messzeitpunkt
 > Die Stände sind **kumulativ und monoton** (Ausnahme: Zähler-Reset/-tausch, siehe Aggregation/Edge Cases). Die Abbildung auf `messwerte` ist entschieden (FR-6.4): `total = ΔBezug − ΔEinspeisung` (vorzeichenbehaftet), `zev = 0` (Sentinel), `zev_calculated` bleibt Ergebnis der Solarverteilung (die `zev = 0` durch `zev_calculated` ersetzt, FR-9).
 
 ### FR-4: Backend MQTT-Subscriber-Verarbeitung
+
+> **Ereignisgesteuert (Push), kein Polling:** Der Empfang läuft über einen **message-driven
+> Inbound-Adapter** (`MqttPahoMessageDrivenChannelAdapter`), der beim Start eine dauerhafte
+> Broker-Subscription öffnet. Eintreffende Nachrichten werden über einen Channel an einen
+> `@ServiceActivator`-Handler gepusht, der die Verarbeitung (unten) anstösst — es gibt dafür
+> **keinen** Scheduled-/Polling-Task. Der `@Scheduled`-Task existiert nur für die Aggregation (FR-6).
+
 Pro eingehender Nachricht:
 1. Topic parsen → `orgId` + `messpunkt`.
 2. JSON validieren (Pflichtfelder, Typen, Zählerstände nicht negativ).

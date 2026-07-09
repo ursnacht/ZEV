@@ -223,6 +223,11 @@ public class MesswerteService {
                 Messwerte consumer = consumers.get(i);
                 BigDecimal distributedAmount = distributions.get(i);
                 consumer.setZevCalculated(distributedAmount.doubleValue());
+                // FR-9 (MQTT-Integration): MQTT-Messwerte tragen den Sentinel zev == 0 und
+                // erhalten hier den berechneten Anteil; gemessene Werte (zev != 0, z.B. CSV) bleiben.
+                if (consumer.getZev() != null && consumer.getZev() == 0.0) {
+                    consumer.setZev(distributedAmount.doubleValue());
+                }
                 messwerteRepository.save(consumer);
                 totalDistributed = totalDistributed.add(distributedAmount);
                 processedRecords++;

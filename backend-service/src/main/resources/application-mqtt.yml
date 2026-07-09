@@ -1,0 +1,10 @@
+# MQTT-Integration – nur aktiv mit Spring-Profil 'mqtt' (SPRING_PROFILES_ACTIVE=mqtt).
+# Secrets ausschliesslich über Umgebungsvariablen (keine Passwörter im Repo).
+mqtt:
+  broker:
+    url: ${MQTT_BROKER_URL:tcp://localhost:1883}       # z. B. tcp://nas.local:1883 oder tls://nas.local:8883
+    username: ${MQTT_BROKER_USERNAME:}
+    password: ${MQTT_BROKER_PASSWORD:}
+  client-id: ${MQTT_CLIENT_ID:zev-backend-subscriber}
+  topic: ${MQTT_TOPIC:zev/+/+/messwert}
+  qos: ${MQTT_QOS:1}
