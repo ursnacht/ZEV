@@ -1,0 +1,140 @@
+# ZEV-Stack MIT MQTT-Broker, OHNE Prometheus/Grafana.
+# Env-Datei: .env.mqtt  (Vorlage: .env.mqtt.example -> kopieren nach .env.mqtt)
+#
+# Start (WICHTIG: --env-file, damit .env.mqtt auch die ${...}-Interpolation speist
+# statt der allgemeinen .env):
+#   cp .env.mqtt.example .env.mqtt
+#   docker compose --env-file .env.mqtt -f docker-compose-mqtt.yml up --build
+#
+# Das Backend läuft mit Spring-Profil 'mqtt' und abonniert den Broker (mosquitto).
+# Publisher-Simulator separat starten (Host): siehe pi-gateway/README.md.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env.mqtt
+    environment:
+      - POSTGRES_DB=zev
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - zev-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  mosquitto:
+    build: ./pi-gateway/deploy/mosquitto   # Config + passwd sind ins Image gebacken (Auth aktiv)
+    container_name: mosquitto
+    ports:
+      - "1883:1883"
+    env_file:
+      - .env.mqtt
+    networks:
+      - zev-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "mosquitto_pub -h localhost -t healthcheck -m ping -q 1 -u $${MQTT_BROKER_USERNAME} -P $${MQTT_BROKER_PASSWORD} || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: keycloak
+    env_file:
+      - .env.mqtt
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_HTTP_PORT: 9000
+      KC_HEALTH_ENABLED: true
+      # Datenbank-Verbindung
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/zev
+      KC_DB_SCHEMA: keycloak
+      KC_DB_USERNAME: ${POSTGRES_USER}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+    command:
+      - start-dev
+      - --import-realm
+      - --features=organization
+    ports:
+      - "9000:9000"
+    depends_on:
+      - postgres
+    volumes:
+      - ./keycloak/realms:/opt/keycloak/data/import
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/health/ready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks:
+      - zev-network
+
+  backend-service:
+    build: ./backend-service
+    container_name: backend-service
+    ports:
+      - "8090:8090"
+    env_file:
+      - .env.mqtt
+    environment:
+      - SPRING_PROFILES_ACTIVE=mqtt
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/zev
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:9000/realms/zev
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:9000/realms/zev/protocol/openid-connect/certs
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # MQTT-Broker (im selben Netz erreichbar unter 'mosquitto')
+      - MQTT_BROKER_URL=tcp://mosquitto:1883
+      - MQTT_BROKER_USERNAME=${MQTT_BROKER_USERNAME}
+      - MQTT_BROKER_PASSWORD=${MQTT_BROKER_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+      admin-service:
+        condition: service_started
+    networks:
+      - zev-network
+    restart: unless-stopped
+
+  admin-service:
+    build: ./admin-service
+    container_name: admin-service
+    ports:
+      - "8081:8081"
+    networks:
+      - zev-network
+    restart: unless-stopped
+
+  frontend-service:
+    build: ./frontend-service
+    container_name: frontend-service
+    ports:
+      - "4200:8080"
+    depends_on:
+      - backend-service
+      - admin-service
+    networks:
+      - zev-network
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+networks:
+  zev-network:
+    driver: bridge

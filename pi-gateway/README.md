@@ -77,6 +77,53 @@ mbpoll -a 1 -t 4:float -r <register> -c 2 -1 <zaehler-ip> -p 502
 
 Konkrete Register/Skalierung stammen aus dem Wago-Datenblatt.
 
+## Publisher-Simulator (lokaler End-to-End-Test)
+
+Statt echter Zähler kann ein **synthetischer Reader** (`protokoll: sim`) monoton steigende
+Zählerstände erzeugen und über den **echten** Publish-Pfad (Topic/Payload, `MqttPublisher`)
+senden. Damit lässt sich der komplette MQTT-Workflow ohne Pi/Hardware testen:
+`Simulator → Broker → Backend-Ingest → zaehler_rohdaten → Aggregations-Job → messwerte`.
+
+Vorlage: [`config.sim.example.yaml`](./config.sim.example.yaml) (Zähler mit `protokoll: sim`;
+`"producer"` im `messpunkt` → Einspeisung überwiegt = negatives `total`, sonst Consumer).
+
+Der Dev-Broker erzwingt Auth (Username/Passwort). Dev-Credentials: `zev-backend` / `zev-mqtt-dev`
+(passend zu [`deploy/mosquitto/passwd`](./deploy/mosquitto/passwd)).
+
+**1) Broker + Backend starten** – am einfachsten über den MQTT-Stack (enthält Broker `mosquitto`
+und Backend mit Profil `mqtt`), aus dem Repo-Root:
+
+```bash
+cp .env.mqtt.example .env.mqtt
+docker compose --env-file .env.mqtt -f docker-compose-mqtt.yml up --build
+```
+
+<details><summary>Alternative: nur ein Wegwerf-Broker (Backend separat)</summary>
+
+```bash
+# aus dem Repo-Root; Config + passwd sind ins Image gebacken (Auth aktiv)
+docker build -t zev-mosquitto pi-gateway/deploy/mosquitto
+docker run --rm -it -p 1883:1883 zev-mosquitto
+```
+</details>
+
+**2) Einheiten anlegen** – je `messpunkt` aus der Sim-Config muss eine Einheit mit
+passendem `org_id` (hier `42`) existieren, sonst verwirft der Ingest „unbekannter Messpunkt".
+
+**3) Simulator starten** (mit Broker-Credentials):
+
+```bash
+cd pi-gateway
+cp config.sim.example.yaml config.sim.yaml     # ggf. messpunkte/org_id anpassen
+export MQTT_USERNAME=zev-backend MQTT_PASSWORD=zev-mqtt-dev   # PowerShell: $env:MQTT_USERNAME=...
+python -m gateway.main --config config.sim.yaml
+```
+
+**4) Prüfen:** `zev.zaehler_rohdaten` füllt sich laufend; nach der jeweils nächsten
+Viertelstunde (`:00/:15/:30/:45`) schreibt der Job `zev.messwerte`
+(`total` vorzeichenbehaftet, `zev = 0`, `quelle = 'MQTT'`). Mitlesen der Nachrichten optional:
+`mosquitto_sub -h localhost -t 'zev/#' -v -u zev-backend -P zev-mqtt-dev`.
+
 ## Deployment auf dem Pi (systemd)
 
 Vollständige Schritt-für-Schritt-Anleitung: **Anhang A** in

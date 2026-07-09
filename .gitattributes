@@ -1,0 +1,4 @@
+# Mosquitto-Dev-Broker-Dateien werden ins Image gebacken und von Mosquitto strikt geparst.
+# Sie müssen LF behalten – CRLF (autocrlf auf Windows) bricht das Einlesen von Config/passwd.
+pi-gateway/deploy/mosquitto/passwd text eol=lf
+pi-gateway/deploy/mosquitto/mosquitto.conf text eol=lf

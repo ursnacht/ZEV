@@ -26,9 +26,12 @@ _ENV_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 # Umrechnung von Intervall-Kurzschreibweisen (z. B. "5m", "30s", "1h") in Sekunden.
 _INTERVAL_UNITS = {"s": 1, "m": 60, "h": 3600}
 
-_SUPPORTED_PROTOCOLS = {"modbus-tcp"}  # "gplug" folgt später
+_SUPPORTED_PROTOCOLS = {"modbus-tcp", "sim"}  # "gplug" folgt später; "sim" = Publisher-Simulator
 _SUPPORTED_REGISTER_TYPES = {"float32"}
 _SUPPORTED_WORD_ORDERS = {"big", "little"}
+
+# Platzhalter-Register für den Simulator (liest keine echten Register).
+_DUMMY_REGISTER = RegisterSpec(addr=0)
 
 
 class ConfigError(Exception):
@@ -122,17 +125,23 @@ def _parse_meters(data) -> list[MeterConfig]:
                 f"nicht unterstützt (verfügbar: {sorted(_SUPPORTED_PROTOCOLS)})."
             )
 
-        register = _require(entry, "register", dict, ctx=f"zaehler[{index}] '{messpunkt}'")
-        register_bezug = _parse_register(register.get("bezug"), messpunkt, "bezug")
-        register_einspeisung = _parse_register(
-            register.get("einspeisung"), messpunkt, "einspeisung"
-        )
+        if protokoll == "sim":
+            # Der Simulator liest weder Host noch echte Register – Felder optional.
+            host = entry.get("host")
+            register_bezug = _DUMMY_REGISTER
+            register_einspeisung = _DUMMY_REGISTER
+        else:
+            host = _require(entry, "host", str, ctx=f"zaehler[{index}] '{messpunkt}'")
+            register = _require(entry, "register", dict, ctx=f"zaehler[{index}] '{messpunkt}'")
+            register_bezug = _parse_register(register.get("bezug"), messpunkt, "bezug")
+            register_einspeisung = _parse_register(
+                register.get("einspeisung"), messpunkt, "einspeisung")
 
         meters.append(
             MeterConfig(
                 messpunkt=messpunkt,
                 protokoll=protokoll,
-                host=_require(entry, "host", str, ctx=f"zaehler[{index}] '{messpunkt}'"),
+                host=host,
                 port=int(entry.get("port", 502)),
                 unit_id=int(entry.get("unit_id", 1)),
                 register_bezug=register_bezug,
