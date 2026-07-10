@@ -34,12 +34,17 @@ public class DatenbankService {
     private static final int MAX_SIZE = 500;
     private static final int STATEMENT_TIMEOUT_MS = 5000;
 
+    private static final String ORG_ID_SPALTE = "org_id";
+
     private final JdbcTemplate jdbcTemplate;
     private final WhereClauseValidator whereClauseValidator;
+    private final OrganizationContextService organizationContextService;
 
-    public DatenbankService(JdbcTemplate jdbcTemplate, WhereClauseValidator whereClauseValidator) {
+    public DatenbankService(JdbcTemplate jdbcTemplate, WhereClauseValidator whereClauseValidator,
+                            OrganizationContextService organizationContextService) {
         this.jdbcTemplate = jdbcTemplate;
         this.whereClauseValidator = whereClauseValidator;
+        this.organizationContextService = organizationContextService;
     }
 
     /**
@@ -52,6 +57,26 @@ public class DatenbankService {
                         + "WHERE table_schema = ? AND table_type = 'BASE TABLE' "
                         + "ORDER BY table_name",
                 String.class, SCHEMA);
+    }
+
+    /**
+     * Liefert den Standard-Filter (WHERE-Klausel) für eine Tabelle: Hat die Tabelle eine
+     * {@code org_id}-Spalte, wird als Default die Organisation des eingeloggten Benutzers
+     * vorgeschlagen ({@code org_id = <orgId>}); andernfalls ein leerer String.
+     *
+     * <p>Der Tabellenname wird gegen die Katalog-Whitelist geprüft (injektionssicher);
+     * die {@code org_id} des Benutzers stammt aus dem Request-Kontext (keine Benutzereingabe).
+     */
+    @Transactional(readOnly = true)
+    public String getStandardFilter(String tabelle) {
+        if (tabelle == null || !getTabellen().contains(tabelle)) {
+            throw new IllegalArgumentException("DATENBANK_TABELLE_UNGUELTIG");
+        }
+        Long orgId = organizationContextService.getCurrentOrgId();
+        if (orgId != null && getSpalten(tabelle).contains(ORG_ID_SPALTE)) {
+            return ORG_ID_SPALTE + " = " + orgId;
+        }
+        return "";
     }
 
     /**

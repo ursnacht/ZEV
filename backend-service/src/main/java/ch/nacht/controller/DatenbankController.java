@@ -12,9 +12,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * REST-Controller für die generische Datenbank-Ansicht. Ausschliesslich für zev_admin
@@ -38,6 +40,17 @@ public class DatenbankController {
         List<String> tabellen = datenbankService.getTabellen();
         log.info("Datenbank-Ansicht: {} Tabellen gelistet", tabellen.size());
         return tabellen;
+    }
+
+    @GetMapping("/standard-filter")
+    public ResponseEntity<?> getStandardFilter(@RequestParam String tabelle) {
+        try {
+            String filter = datenbankService.getStandardFilter(tabelle);
+            return ResponseEntity.ok(Map.of("where", filter));
+        } catch (IllegalArgumentException e) {
+            log.warn("Datenbank-Ansicht: Standard-Filter abgelehnt: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @PostMapping("/abfrage")

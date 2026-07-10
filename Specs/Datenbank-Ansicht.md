@@ -19,6 +19,13 @@
 7. Der Admin kann per **Klick auf eine Spaltenüberschrift** nach dieser Spalte **sortieren** (erneuter Klick kehrt die Richtung um). Die Sortierung erfolgt **serverseitig über den gesamten Datensatz** (nicht nur die aktuelle Seite) und setzt die Anzeige auf Seite 1 zurück.
 8. Bei ungültiger Eingabe / Fehler zeigt das System eine verständliche Fehlermeldung; es werden **keine** Daten geändert.
 
+### FR-1a: Standard-Filter auf die eigene Organisation (Nachtrag)
+* Bei der **Auswahl einer Tabelle** prüft das System, ob diese eine `org_id`-Spalte besitzt. Ist das der Fall, wird das **Filter-Feld** als **Default** mit der `org_id` des **eingeloggten Benutzers** vorbefüllt (`org_id = <orgId>`).
+* Besitzt die Tabelle **keine** `org_id`-Spalte (z.B. `translation`), bleibt das Filter-Feld **leer**.
+* Der Default ist nur ein **Vorschlag**: Der Admin kann die WHERE-Klausel jederzeit ändern oder löschen, um weiterhin **mandantenübergreifend** (Rohansicht) abzufragen.
+* Ein **erneuter** Tabellenwechsel setzt den Standard-Filter neu (überschreibt eine vorherige, ggf. angepasste Eingabe) und verwirft das bisherige Ergebnis.
+* Die interne `org_id` (BIGINT) ist **nicht** im JWT enthalten, sondern wird serverseitig aus dem Organisations-Kontext des Requests ermittelt; das Frontend ruft sie über einen Endpunkt ab (FR-3). Der Tabellenname wird dabei gegen die Whitelist geprüft (injektionssicher).
+
 ### FR-2: Generische Abfrage (kein tabellenspezifischer Code)
 * Die Anzeige ist **datengetrieben**: Spalten stammen aus `ResultSetMetaData` bzw. dem Ergebnis-Mapping (`JdbcTemplate`), **nicht** aus fest codierten DTOs/Entities je Tabelle.
 * Erzeugte Abfrage (konzeptionell): `SELECT * FROM zev.<tabelle> [WHERE <where>] [ORDER BY <sortSpalte> <ASC|DESC>] LIMIT <size> OFFSET <offset>`.
@@ -33,6 +40,7 @@ Neuer Controller unter `/api/datenbank`, klassenweit `@PreAuthorize("hasAuthorit
 | Methode | Pfad | Zweck |
 |---------|------|-------|
 | `GET` | `/api/datenbank/tabellen` | Liste der auswählbaren Tabellennamen (Schema `zev`) |
+| `GET` | `/api/datenbank/standard-filter?tabelle=<name>` | Standard-Filter für eine Tabelle → `{ where: "org_id = <orgId>" }` (bzw. `{ where: "" }`, falls keine `org_id`-Spalte). Tabellenname gegen Whitelist geprüft. |
 | `POST` | `/api/datenbank/abfrage` | Body `{ tabelle, where, page, size, sortSpalte?, sortRichtung? }` → `{ spalten[], zeilen[[]], seite, groesse, hatMehr }` |
 
 * `POST` statt `GET`, damit die WHERE-Klausel nicht in der URL/den Logs landet.
@@ -40,7 +48,8 @@ Neuer Controller unter `/api/datenbank`, klassenweit `@PreAuthorize("hasAuthorit
 
 ### FR-4: Layout / Anzeige
 * Der Bereich wird in `/einstellungen` als eigener Abschnitt/Panel eingefügt (Design-System-`panel`/`card`), sichtbar nur bei `datenbank:read`.
-* Elemente: **Tabellen-Dropdown**, **WHERE-Textfeld** (Platzhalter mit Beispiel; **Enter** löst „Anzeigen" aus), **„Anzeigen"-Button**, **Ergebnis-Tabelle** (Design-System-`table`) mit **klickbaren, sortierbaren Spaltenüberschriften** inkl. Richtungs-Indikator (▲/▼), **Pagination**, **Message-Bereich** (Design-System-`message`) für Fehler/Hinweise.
+* Elemente: **Tabellen-Dropdown**, **WHERE-Textfeld** (Platzhalter mit Beispiel; **Enter** löst „Anzeigen" aus; **Löschen-Button ×** am rechten Feldrand leert das Feld, sichtbar nur bei nicht-leerem Inhalt), **„Anzeigen"-Button**, **Ergebnis-Tabelle** (Design-System-`table`) mit **klickbaren, sortierbaren Spaltenüberschriften** inkl. Richtungs-Indikator (▲/▼), **Pagination**, **Message-Bereich** (Design-System-`message`) für Fehler/Hinweise.
+* Der Löschen-Button nutzt das wiederverwendbare Design-System-Muster **`zev-input-wrapper` + `zev-input-clear`** (kein komponenteneigenes CSS).
 * Alle Texte via `TranslationService`/`TranslatePipe` (keine Hardcodings).
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
@@ -60,6 +69,11 @@ Neuer Controller unter `/api/datenbank`, klassenweit `@PreAuthorize("hasAuthorit
 * [ ] Klick auf eine Spaltenüberschrift sortiert **serverseitig** nach dieser Spalte (über alle Seiten); erneuter Klick kehrt die Richtung um; ein Indikator (▲/▼) zeigt die aktive Sortierung.
 * [ ] Enter im Filter-Eingabefeld löst „Anzeigen" aus (wenn eine Tabelle gewählt ist und keine Abfrage läuft).
 * [ ] Eine ungültige/nicht existierende `sortSpalte` wird **abgewiesen** (`400`, kein SQL); `sortRichtung` nur `ASC`/`DESC`.
+* [ ] Wird eine Tabelle **mit** `org_id`-Spalte gewählt, ist das Filter-Feld mit `org_id = <orgId des eingeloggten Benutzers>` vorbefüllt.
+* [ ] Wird eine Tabelle **ohne** `org_id`-Spalte gewählt (z.B. `translation`), bleibt das Filter-Feld leer.
+* [ ] Der vorbefüllte Filter kann geändert/gelöscht werden; ohne `org_id`-Filter werden weiterhin Zeilen aller Mandanten angezeigt.
+* [ ] `GET /api/datenbank/standard-filter` mit einem nicht in der Whitelist enthaltenen Tabellennamen → `400`, kein SQL; Zugriff ohne `datenbank:read` → `403`.
+* [ ] Bei nicht-leerem Filter-Feld ist ein Löschen-Button (×) sichtbar; Klick leert das Feld; bei leerem Feld ist der Button ausgeblendet.
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 

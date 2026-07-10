@@ -32,6 +32,33 @@ input[type="date"].zev-input {
   cursor: not-allowed;
 }
 
+/* Clearable Input – Textfeld mit Löschen-Button (×) am rechten Rand */
+.zev-input-wrapper {
+  position: relative;
+}
+
+.zev-input-wrapper .zev-input {
+  padding-right: var(--spacing-xl);
+}
+
+.zev-input-clear {
+  position: absolute;
+  right: var(--spacing-xs);
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  color: var(--color-gray-500);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.zev-input-clear:hover {
+  color: var(--color-gray-800);
+}
+
 /* Form Container */
 .zev-form-container {
   background-color: var(--color-gray-50);

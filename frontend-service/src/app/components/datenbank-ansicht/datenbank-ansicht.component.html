@@ -16,7 +16,8 @@
 
   <div class="zev-form-group">
     <label for="dbTabelle">{{ 'DATENBANK_TABELLE' | translate }}:</label>
-    <select id="dbTabelle" class="zev-input" [(ngModel)]="selectedTabelle" name="dbTabelle">
+    <select id="dbTabelle" class="zev-input" [(ngModel)]="selectedTabelle" name="dbTabelle"
+      (ngModelChange)="onTabelleChange()">
       <option value="">{{ 'DATENBANK_TABELLE_WAEHLEN' | translate }}</option>
       @for (t of tabellen; track t) {
         <option [value]="t">{{ t }}</option>
@@ -26,9 +27,16 @@
 
   <div class="zev-form-group">
     <label for="dbWhere">{{ 'DATENBANK_FILTER' | translate }}:</label>
-    <input type="text" id="dbWhere" class="zev-input" [(ngModel)]="whereClause" name="dbWhere"
-      placeholder="org_id = 42 AND zeit > '2026-01-01'"
-      (keyup.enter)="!(!selectedTabelle || loading) && onAnzeigen()" />
+    <div class="zev-input-wrapper">
+      <input type="text" id="dbWhere" class="zev-input" [(ngModel)]="whereClause" name="dbWhere"
+        placeholder="org_id = 42 AND zeit > '2026-01-01'"
+        (keyup.enter)="!(!selectedTabelle || loading) && onAnzeigen()" />
+      @if (whereClause) {
+        <button type="button" class="zev-input-clear" (click)="onFilterLeeren()"
+          [attr.aria-label]="'DATENBANK_FILTER_LEEREN' | translate"
+          [title]="'DATENBANK_FILTER_LEEREN' | translate">&times;</button>
+      }
+    </div>
   </div>
 
   <div class="zev-form-actions">

@@ -43,6 +43,29 @@ export class DatenbankAnsichtComponent extends WithMessage implements OnInit {
     });
   }
 
+  /**
+   * Bei Tabellenwechsel: bisheriges Ergebnis verwerfen und den Standard-Filter setzen.
+   * Hat die Tabelle eine {@code org_id}-Spalte, wird als Default die Organisation des
+   * eingeloggten Benutzers vorgeschlagen; andernfalls bleibt der Filter leer.
+   */
+  onTabelleChange(): void {
+    this.result = null;
+    this.dismissMessage();
+    this.whereClause = '';
+    if (!this.selectedTabelle) {
+      return;
+    }
+    this.datenbankService.getStandardFilter(this.selectedTabelle).subscribe({
+      next: (where) => this.whereClause = where,
+      error: () => { /* Standard-Filter ist optional: bei Fehler bleibt das Feld leer */ }
+    });
+  }
+
+  /** Leert das Filter-Feld (Löschen-Button ×). Die Anzeige/Sortierung bleibt unverändert. */
+  onFilterLeeren(): void {
+    this.whereClause = '';
+  }
+
   onAnzeigen(): void {
     // Neue Abfrage (ggf. andere Tabelle/Filter) -> Sortierung zurücksetzen
     this.page = 0;
