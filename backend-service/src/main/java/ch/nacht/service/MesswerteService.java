@@ -148,6 +148,31 @@ public class MesswerteService {
     public CalculationResult calculateSolarDistribution(LocalDateTime dateFrom, LocalDateTime dateTo,
             String algorithm) {
         hibernateFilterService.enableOrgFilter();
+        // Fortschritt über den Request-Org-Kontext (UI-Polling)
+        return distribute(dateFrom, dateTo, algorithm, organizationContextService.getCurrentOrgId(), true);
+    }
+
+    /**
+     * Führt die Solarverteilung für eine explizit angegebene {@code org_id} und einen Zeitraum aus.
+     * Für Hintergrund-Aufrufe ohne JWT/Request-Kontext (z.B. unmittelbar nach der MQTT-Aggregation).
+     * Setzt den orgFilter explizit für den Mandanten. {@code showProgress = false} deaktiviert das
+     * Fortschritts-Tracking (im Hintergrund-Job gibt es kein UI-Polling).
+     */
+    @Transactional
+    @CacheEvict(value = "statistik", allEntries = true)
+    public CalculationResult calculateSolarDistributionForOrg(Long orgId, LocalDateTime dateFrom,
+            LocalDateTime dateTo, String algorithm, boolean showProgress) {
+        hibernateFilterService.enableOrgFilter(orgId);
+        return distribute(dateFrom, dateTo, algorithm, orgId, showProgress);
+    }
+
+    /**
+     * Kern der Solarverteilung über alle Zeitpunkte im Bereich. Der orgFilter muss bereits aktiviert
+     * sein. Bei {@code showProgress = true} wird der Fortschritt für {@code progressOrgId} gemeldet
+     * (UI-Polling); bei {@code false} läuft die Berechnung ohne Fortschrittsmeldung (Hintergrund-Job).
+     */
+    private CalculationResult distribute(LocalDateTime dateFrom, LocalDateTime dateTo,
+            String algorithm, Long progressOrgId, boolean showProgress) {
         log.info("Starting solar distribution calculation - dateFrom: {}, dateTo: {}, algorithm: {}",
                 dateFrom, dateTo, algorithm);
 
@@ -157,8 +182,9 @@ public class MesswerteService {
         List<LocalDateTime> distinctZeiten = messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo);
         log.info("Found {} distinct timestamps to process", distinctZeiten.size());
 
-        Long orgId = organizationContextService.getCurrentOrgId();
-        calculationProgressService.startCalculation(orgId, distinctZeiten.size());
+        if (showProgress) {
+            calculationProgressService.startCalculation(progressOrgId, distinctZeiten.size());
+        }
 
         int processedTimestamps = 0;
         int processedRecords = 0;
@@ -234,7 +260,9 @@ public class MesswerteService {
             }
 
             processedTimestamps++;
-            calculationProgressService.updateProgress(orgId, processedTimestamps);
+            if (showProgress) {
+                calculationProgressService.updateProgress(progressOrgId, processedTimestamps);
+            }
 
             if (processedTimestamps % 100 == 0) {
                 log.debug("Progress: {} timestamps processed", processedTimestamps);

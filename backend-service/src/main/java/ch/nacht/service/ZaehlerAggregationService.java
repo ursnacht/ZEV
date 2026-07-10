@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -25,7 +27,8 @@ import java.util.Optional;
  * 15-Minuten-Intervall die Differenz der absoluten Zählerstände (pro Register), schreibt
  * vorzeichenbehaftete {@code total = ΔBezug − ΔEinspeisung} in {@code messwerte}
  * (Consumer: {@code zev = 0}; Producer: {@code zev = total}; {@code quelle = MQTT}) und
- * markiert die Rohdaten als verarbeitet.
+ * markiert die Rohdaten als verarbeitet. Unmittelbar danach wird je Mandant die
+ * Solarverteilung für den behandelten Zeitraum ausgeführt (FR-6.7).
  *
  * <p>NUR aktiv mit Spring-Profil {@code mqtt}. Kein Request-Scope: {@code org_id} wird
  * explizit aus den Rohdaten/der Einheit übernommen (kein {@code orgFilter}).
@@ -37,19 +40,24 @@ public class ZaehlerAggregationService {
     private static final Logger log = LoggerFactory.getLogger(ZaehlerAggregationService.class);
     private static final int INTERVALL_MINUTEN = 15;
     private static final int MAX_INTERVALLE = 10_000; // Schutz gegen Runaway-Catch-up
+    // Algorithmus für die automatische Verteilung nach der Aggregation
+    private static final String DEFAULT_ALGORITHM = "PROPORTIONAL";
 
     private final ZaehlerRohdatenRepository rohdatenRepository;
     private final MesswerteRepository messwerteRepository;
     private final EinheitRepository einheitRepository;
+    private final MesswerteService messwerteService;
     private final MqttMetrics metrics;
 
     public ZaehlerAggregationService(ZaehlerRohdatenRepository rohdatenRepository,
                                      MesswerteRepository messwerteRepository,
                                      EinheitRepository einheitRepository,
+                                     MesswerteService messwerteService,
                                      MqttMetrics metrics) {
         this.rohdatenRepository = rohdatenRepository;
         this.messwerteRepository = messwerteRepository;
         this.einheitRepository = einheitRepository;
+        this.messwerteService = messwerteService;
         this.metrics = metrics;
     }
 
@@ -67,6 +75,9 @@ public class ZaehlerAggregationService {
         log.info("Aggregation start}");
         LocalDateTime letzteGrenze = floorAufQuartal(jetzt); // letztes abgeschlossenes Intervallende
         int erzeugt = 0;
+        // Behandelter Zeitraum je Mandant (min/max Intervallende), für die anschliessende Verteilung.
+        Map<Long, LocalDateTime> orgVon = new HashMap<>();
+        Map<Long, LocalDateTime> orgBis = new HashMap<>();
 
         for (Long einheitId : rohdatenRepository.findEinheitIdsWithUnverarbeitet()) {
             Einheit einheit = einheitRepository.findById(einheitId).orElse(null);
@@ -90,6 +101,9 @@ public class ZaehlerAggregationService {
                         einheitId, intervallStart, intervallEnde)) {
                     if (verarbeiteIntervall(einheit, intervallStart, intervallEnde)) {
                         erzeugt++;
+                        Long org = einheit.getOrgId();
+                        orgVon.merge(org, intervallEnde, (a, b) -> a.isBefore(b) ? a : b);
+                        orgBis.merge(org, intervallEnde, (a, b) -> a.isAfter(b) ? a : b);
                     }
                     rohdatenRepository.markVerarbeitet(einheitId, intervallEnde, jetzt);
                 }
@@ -99,6 +113,22 @@ public class ZaehlerAggregationService {
 
         if (erzeugt > 0) {
             log.info("Aggregation: {} Messwerte erzeugt (bis {})", erzeugt, letzteGrenze);
+        }
+
+        // FR-6.7: Unmittelbar nach der Aggregation die Solarverteilung je Mandant für den
+        // behandelten Zeitraum ausführen (setzt zev_calculated und – wo zev == 0 – zev). Fehler
+        // pro Mandant werden geloggt, brechen die übrigen Mandanten aber nicht ab.
+        for (Map.Entry<Long, LocalDateTime> e : orgVon.entrySet()) {
+            Long org = e.getKey();
+            LocalDateTime von = e.getValue();
+            LocalDateTime bis = orgBis.get(org);
+            try {
+                messwerteService.calculateSolarDistributionForOrg(org, von, bis, DEFAULT_ALGORITHM, false);
+                log.info("Solarverteilung nach Aggregation ausgeführt (org={}, {} – {})", org, von, bis);
+            } catch (Exception ex) {
+                log.warn("Solarverteilung nach Aggregation fehlgeschlagen (org={}, {} – {}): {}",
+                        org, von, bis, ex.getMessage());
+            }
         }
     }
 

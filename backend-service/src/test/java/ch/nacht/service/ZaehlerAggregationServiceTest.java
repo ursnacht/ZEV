@@ -55,6 +55,9 @@ public class ZaehlerAggregationServiceTest {
     private EinheitRepository einheitRepository;
 
     @Mock
+    private MesswerteService messwerteService;
+
+    @Mock
     private MqttMetrics metrics;
 
     private ZaehlerAggregationService service;
@@ -66,7 +69,8 @@ public class ZaehlerAggregationServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ZaehlerAggregationService(rohdatenRepository, messwerteRepository, einheitRepository, metrics);
+        service = new ZaehlerAggregationService(rohdatenRepository, messwerteRepository, einheitRepository,
+                messwerteService, metrics);
 
         einheit = new Einheit("Wohnung 1", EinheitTyp.CONSUMER);
         einheit.setId(EINHEIT_ID);
@@ -257,6 +261,33 @@ public class ZaehlerAggregationServiceTest {
         service.aggregiere();
 
         verify(rohdatenRepository, atLeastOnce()).markVerarbeitet(eq(EINHEIT_ID), any(), any());
+    }
+
+    // --- Solarverteilung nach Aggregation (FR-6.7) -------------------------
+
+    @Test
+    void aggregiere_RuftSolarverteilungFuerBehandeltenZeitraum() {
+        stubCatchUpEinInterval();
+        stubStaende(rohdaten("100.0", "50.0"), rohdaten("110.0", "52.0"));
+        when(messwerteRepository.findByEinheitAndZeit(eq(einheit), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.aggregiere();
+
+        // Ein Intervall verarbeitet → Verteilung für ORG_ID über [ende, ende] mit PROPORTIONAL,
+        // ohne Fortschritts-Tracking (showProgress = false)
+        verify(messwerteService).calculateSolarDistributionForOrg(
+                eq(ORG_ID), eq(intervall[1]), eq(intervall[1]), eq("PROPORTIONAL"), eq(false));
+    }
+
+    @Test
+    void aggregiere_KeinMesswert_KeineSolarverteilung() {
+        stubCatchUpEinInterval();
+        stubStaende(null, rohdaten("110.0", "52.0")); // keine Referenz → kein Messwert
+
+        service.aggregiere();
+
+        verify(messwerteService, never()).calculateSolarDistributionForOrg(any(), any(), any(), any(), anyBoolean());
     }
 
     @Test

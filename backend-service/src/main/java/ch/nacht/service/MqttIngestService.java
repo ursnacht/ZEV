@@ -50,6 +50,7 @@ public class MqttIngestService {
 
     @Transactional
     public void handle(String topic, String payload) {
+        log.info("MQTT data received. Topic: {}, payload: {}", topic, payload);
         metrics.recordReceived();
         try {
             // 1) Topic parsen: zev/{orgId}/{messpunkt}/messwert

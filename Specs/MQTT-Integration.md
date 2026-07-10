@@ -123,6 +123,10 @@ CREATE INDEX idx_zaehler_rohdaten_unverarbeitet
    * `zev_calculated` = **NULL** beim Ingest; wird erst durch die **Solarverteilung** (`SolarDistribution`) berechnet. Diese setzt anschliessend `zev = zev_calculated`, sofern `zev = 0` (FR-9).
 5. Speichern mit `quelle = 'MQTT'` (FR-7); Insert/Upsert.
 6. Verarbeitete Rohdaten markieren: `verarbeitet = TRUE`, `verarbeitet_am = NOW()`; Referenzstand fortschreiben.
+7. **Unmittelbar nach der Aggregation** wird **je Mandant (`org_id`)** die **Solarverteilung** (FR-9) für den **behandelten Zeitraum** ausgeführt — d.h. für das Intervall `[frühestes … spätestes verarbeitetes Intervallende]` des jeweiligen Mandanten. Dadurch tragen die frisch aggregierten Messwerte sofort ihr `zev_calculated` (und – wo `zev = 0` – `zev`), ohne manuellen Anstoss über die UI.
+   * Aufruf im `ZaehlerAggregationService` über `MesswerteService.calculateSolarDistributionForOrg(orgId, von, bis, algorithmus)`. Da **kein JWT/Request-Kontext** vorliegt, wird der Hibernate-`orgFilter` **explizit** mit der `org_id` versorgt (nicht aus `OrganizationContextService`); **kein** Fortschritts-Tracking.
+   * **Algorithmus:** **`PROPORTIONAL`** (Verbraucher erhalten proportional zu ihrem Verbrauch); keine mandantenspezifische Wahl.
+   * Fehler der Verteilung werden **pro Mandant** geloggt und brechen die Aggregation der übrigen Mandanten nicht ab.
 
 > **Profil-Aktivierung (`@Profile("mqtt")`):** Das Bean, das die Rohdaten periodisch aus `zaehler_rohdaten` liest und aggregiert (der `@Scheduled`-Aggregations-Job samt zugehörigem Service), ist **nur aktiv, wenn das Spring-Boot-Profil `mqtt` gesetzt ist** (`@Profile("mqtt")`; aktiviert via `SPRING_PROFILES_ACTIVE=mqtt` bzw. `spring.profiles.active`) — analog zum MQTT-Subscriber (FR-1). Ohne dieses Profil (Default, Tests, lokale Entwicklung) läuft **kein** Aggregations-Job; die `messwerte`-Tabelle wird ausschliesslich über den CSV-Upload befüllt.
 
@@ -173,6 +177,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 * [ ] Zähler-Reset/Rücksprung **pro Register** (`ΔBezug` bzw. `ΔEinspeisung` < 0) → betroffenes Delta auf 0, Referenz neu gesetzt, WARN. (Ein negatives `total` aus Einspeisung ist dagegen legitim und wird übernommen.)
 * [ ] `zev_calculated` wird durch den Ingest nicht verändert; Solarverteilung funktioniert unverändert.
 * [ ] Nach der Solarverteilung gilt `zev = zev_calculated`, wo `zev = 0` war (MQTT-Werte); gemessene CSV-Werte (`zev ≠ 0`) bleiben unverändert (FR-9).
+* [ ] Nach jedem Aggregationslauf wird je betroffenem Mandant die Solarverteilung für den behandelten Zeitraum automatisch ausgeführt (`calculateSolarDistributionForOrg`, `orgFilter` explizit gesetzt); ohne verarbeitetes Intervall erfolgt kein Verteilungsaufruf. Ein Fehler bei einem Mandanten bricht die übrigen nicht ab.
 
 **Monitoring & Kompatibilität:**
 * [ ] MQTT-Metriken unter `/actuator/prometheus`; `/actuator/health/mqtt` zeigt Status.
