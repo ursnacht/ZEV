@@ -173,13 +173,21 @@ docker compose --env-file .env.mqtt -f docker-compose-mqtt.yml up --build -d mos
 Vollständige Schritt-für-Schritt-Anleitung: **Anhang A** in
 [`Specs/Pi-Gateway-Software.md`](../Specs/Pi-Gateway-Software.md).
 
-Kurzfassung:
+**Paketierung (auf dem Bau-Rechner):** [`scripts/package-pi-gateway.ps1`](../scripts/package-pi-gateway.ps1)
+packt diesen Ordner (ohne venv/Cache/Secrets/Dev-Broker) in `zev-pi-gateway.zip` zur Übertragung:
+
+```powershell
+./scripts/package-pi-gateway.ps1        # -> /data/ZEV/zev-pi-gateway.zip
+# dann: scp zev-pi-gateway.zip <user>@<pi-host>:/home/pi/
+```
+
+Kurzfassung (auf dem Pi):
 
 ```bash
 # 1) Dienst-Nutzer + Verzeichnis
 sudo useradd --system --no-create-home --shell /usr/sbin/nologin pigw
 sudo mkdir -p /opt/pi-gateway && sudo chown -R pigw:pigw /opt/pi-gateway
-# ... Code nach /opt/pi-gateway kopieren ...
+# Code aus dem ZIP entpacken:  unzip zev-pi-gateway.zip -d /tmp && sudo cp -r /tmp/pi-gateway/* /opt/pi-gateway/
 
 # 2) venv + Abhängigkeiten
 sudo -u pigw python3 -m venv /opt/pi-gateway/.venv

@@ -18,7 +18,7 @@
 ## 2. Funktionale Anforderungen (FR)
 
 ### FR-1: Zähler auslesen
-1. **Wago via Modbus TCP (aktuell 3 Geräte, Liste beliebig erweiterbar — siehe FR-5):** periodisches Lesen der relevanten Register — die **Wirkenergie**-Zählerstände in **kWh** (Bezug/Einspeisung), **nicht** Leistung (kW) oder Blind-/Scheinenergie; pro Gerät Host/Port/Register/Unit-ID konfigurierbar.
+1. **Wago via Modbus TCP (aktuell 3 Geräte, Liste beliebig erweiterbar — siehe FR-5):** periodisches Lesen der relevanten Register — die **Wirkenergie**-Zählerstände in **kWh** (Bezug/Einspeisung), **nicht** Leistung (kW) oder Blind-/Scheinenergie; pro Gerät Host/Port/Register/Unit-ID konfigurierbar. Die Wago hängen per seriellem Modbus (RTU) an einem **Modbus-TCP-Hub** (RTU→TCP-Gateway, siehe `docs/Netzwerk-Topologie-Hene.md`): gemeinsame Hub-IP (`host`/`port`), Unterscheidung über die **Unit-ID**.
 2. **BKW via gPlug:** Auslesen über die gPlug-Schnittstelle (Protokoll siehe Offene Fragen).
 3. Jede physische Quelle ist einer **Einheit** über deren **`messpunkt`** zugeordnet (Konfiguration, kein Rückgriff auf interne DB-IDs).
 4. Lese-/Publish-Intervall konfigurierbar (Default z.B. 1–5 min).
@@ -77,36 +77,37 @@
 >   password: ${MQTT_PASSWORD}
 >   qos: 1
 >
-> # Beliebig viele Zähler — hier 3 (Wago, Modbus TCP). Weitere einfach anhängen.
+> # Beliebig viele Zähler — hier 3 Wago hinter EINEM Modbus-TCP-Hub (RTU→TCP-Gateway):
+> # gleiche host/port (Hub-IP), unterschiedliche unit_id (Modbus-Slave-Adresse). Weitere anhängen.
 > zaehler:
 >   - messpunkt: "ID742-Wohnung-1"
 >     protokoll: modbus-tcp
->     host: 192.168.10.11
+>     host: 192.168.10.10             # IP des Modbus-TCP-Hubs (für alle Wago gleich)
 >     port: 502
->     unit_id: 1
+>     unit_id: 1                      # Slave-Adresse dieses Zählers am Hub
 >     register:                       # Wirkenergie in kWh (Beispielwerte!)
 >       bezug:       { addr: 600C, typ: float32, wortfolge: big, skalierung: 1.0 }   # OBIS 1.8.0
 >       einspeisung: { addr: 6018, typ: float32, wortfolge: big, skalierung: 1.0 }   # OBIS 2.8.0
 >   - messpunkt: "ID742-Wohnung-2"
 >     protokoll: modbus-tcp
->     host: 192.168.10.12
+>     host: 192.168.10.10
 >     port: 502
->     unit_id: 1
+>     unit_id: 2
 >     register:
 >       bezug:       { addr: 600C, typ: float32, wortfolge: big, skalierung: 1.0 }
 >       einspeisung: { addr: 6018, typ: float32, wortfolge: big, skalierung: 1.0 }
 >   - messpunkt: "ID742-Allgemein"
 >     protokoll: modbus-tcp
->     host: 192.168.10.13
+>     host: 192.168.10.10
 >     port: 502
->     unit_id: 1
+>     unit_id: 3
 >     register:
 >       bezug:       { addr: 600C, typ: float32, wortfolge: big, skalierung: 1.0 }
 >       einspeisung: { addr: 6018, typ: float32, wortfolge: big, skalierung: 1.0 }
 >
 > # Später (Erweiterung): BKW als weiterer Eintrag mit  protokoll: gplug  (siehe Offene Fragen).
 > ```
-> Die Register-`addr`/`typ`/`skalierung` sind **beispielhaft** und müssen dem Wago-Datenblatt entsprechen (Diagnose per `mbpoll`, siehe FR-1). Der Skalierungs-/OBIS-Bezug ist unter „Register-Mapping Wago" (Offene Fragen) beschrieben.
+> Die drei Wago hängen per seriellem Modbus (RTU) an einem **Modbus-TCP-Hub** (siehe `docs/Netzwerk-Topologie-Hene.md`); daher **gleiche `host`/`port` (Hub-IP), verschiedene `unit_id`**. Die Register-`addr`/`typ`/`skalierung` sind **beispielhaft** und müssen dem Wago-Datenblatt entsprechen (Diagnose per `mbpoll`, siehe FR-1). Der Skalierungs-/OBIS-Bezug ist unter „Register-Mapping Wago" (Offene Fragen) beschrieben.
 
 ### FR-6: Betrieb & Resilienz
 1. Läuft als **`systemd`-Service** mit Autostart nach Reboot/Stromausfall.

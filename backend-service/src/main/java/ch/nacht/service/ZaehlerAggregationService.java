@@ -83,7 +83,7 @@ public class ZaehlerAggregationService {
             int schutz = 0;
             while (!intervallEnde.isAfter(letzteGrenze) && schutz++ < MAX_INTERVALLE) {
                 LocalDateTime intervallStart = intervallEnde.minusMinutes(INTERVALL_MINUTEN);
-                log.info("Aggregation. Intervall: {} - {}", intervallStart, intervallEnde);
+                log.info("Aggregation. Einheit: {}. Intervall: {} - {}", einheitId, intervallStart, intervallEnde);
                 if (rohdatenRepository.existsByEinheitIdAndZeitGreaterThanAndZeitLessThanEqual(
                         einheitId, intervallStart, intervallEnde)) {
                     if (verarbeiteIntervall(einheit, intervallStart, intervallEnde)) {

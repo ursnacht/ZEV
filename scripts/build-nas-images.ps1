@@ -1,28 +1,20 @@
 #!/usr/bin/env pwsh
-# Baut die drei lokal gebauten ZEV-Images (backend-, admin-, frontend-service)
-# fuer eine Ziel-Plattform (Standard: Raspberry Pi / linux/arm64) und exportiert
-# sie als eine gzip-komprimierte tar-Datei zum Uebertragen auf den Pi.
-#
-# Siehe docs/images.md fuer den vollstaendigen Ablauf (Uebertragen, Laden, Starten).
-#
-# ---------------------------------------------------------------------------
-# Voraussetzungen:
-#   * Docker mit Buildx (in Docker Desktop enthalten)
-#   * Einmalig QEMU fuer Cross-Plattform-Builds aktivieren:
-#       docker run --privileged --rm tonistiigi/binfmt --install all
-# ---------------------------------------------------------------------------
+# Baut die drei ZEV-App-Images (backend-, admin-, frontend-service) fuer das NAS
+# (Default linux/amd64) und exportiert sie als eine gzip-komprimierte tar-Datei.
 #
 # Aufruf:
-#   ./scripts/build-pi-images.ps1                          # linux/arm64, Tag "arm64"
-#   ./scripts/build-pi-images.ps1 -Platform linux/arm/v7 -Tag armv7   # 32-Bit-OS
-#   ./scripts/build-pi-images.ps1 -OutFile C:\tmp\zev.tar.gz
+#   ./scripts/build-nas-images.ps1                                  # linux/amd64, Tag "amd64"
+#   ./scripts/build-nas-images.ps1 -Platform linux/arm64 -Tag arm64 # ARM-NAS
+#   ./scripts/build-nas-images.ps1 -OutFile C:\tmp\zev.tar.gz
 #
-# Ergebnis: zev-images-<Tag>.tar.gz in /data/ZEV (sofern -OutFile nicht gesetzt).
+# Voraussetzungen, Uebertragung aufs NAS, Laden/Starten und die Registry-Alternative:
+# siehe docs/NAS-Images.md (massgebliche Anleitung). Der Raspberry Pi faehrt nur den
+# pi-gateway (separat: scripts/package-pi-gateway.ps1), nicht den App-Stack.
 
 [CmdletBinding()]
 param(
-    [string]$Platform = 'linux/arm64',
-    [string]$Tag = 'arm64',
+    [string]$Platform = 'linux/amd64',
+    [string]$Tag = 'amd64',
     [string]$OutFile
 )
 
@@ -84,8 +76,8 @@ try {
     $sizeMb = [math]::Round((Get-Item $OutFile).Length / 1MB, 1)
     Write-Host ""
     Write-Host "Fertig: $OutFile ($sizeMb MB)" -ForegroundColor Green
-    Write-Host "Naechster Schritt (siehe docs/images.md):" -ForegroundColor Green
-    Write-Host "  scp `"$OutFile`" pi@<pi-host>:/home/pi/"
+    Write-Host "Naechster Schritt (siehe docs/NAS-Images.md):" -ForegroundColor Green
+    Write-Host "  scp `"$OutFile`" <user>@<nas-host>:/volume1/docker/zev/"
 }
 finally {
     Pop-Location

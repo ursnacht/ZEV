@@ -18,30 +18,32 @@ broker:
 
 # Register-Adressen als String = HEXADEZIMAL (wie Wago-Datenblatt), daher gequotet.
 # Werte 'addr'/'typ'/'skalierung' sind BEISPIELHAFT – gemäss Datenblatt/mbpoll setzen.
+# Die 3 Wago hängen an EINEM Modbus-TCP-Hub (RTU→TCP): gleiche host/port (Hub-IP),
+# verschiedene unit_id (Slave-Adresse). Siehe docs/Netzwerk-Topologie-Hene.md.
 zaehler:
   - messpunkt: "ID742-Wohnung-1"
     protokoll: modbus-tcp
-    host: 192.168.10.11
+    host: 192.168.10.10          # IP des Modbus-TCP-Hubs (für alle Wago gleich)
     port: 502
-    unit_id: 1
+    unit_id: 1                   # Slave-Adresse dieses Zählers am Hub
     register:                    # Wirkenergie in kWh
       bezug:       { addr: "600C", typ: float32, wortfolge: big, skalierung: 1.0 }  # OBIS 1.8.0
       einspeisung: { addr: "6018", typ: float32, wortfolge: big, skalierung: 1.0 }  # OBIS 2.8.0
 
   - messpunkt: "ID742-Wohnung-2"
     protokoll: modbus-tcp
-    host: 192.168.10.12
+    host: 192.168.10.10
     port: 502
-    unit_id: 1
+    unit_id: 2
     register:
       bezug:       { addr: "600C", typ: float32, wortfolge: big, skalierung: 1.0 }
       einspeisung: { addr: "6018", typ: float32, wortfolge: big, skalierung: 1.0 }
 
   - messpunkt: "ID742-Allgemein"
     protokoll: modbus-tcp
-    host: 192.168.10.13
+    host: 192.168.10.10
     port: 502
-    unit_id: 1
+    unit_id: 3
     register:
       bezug:       { addr: "600C", typ: float32, wortfolge: big, skalierung: 1.0 }
       einspeisung: { addr: "6018", typ: float32, wortfolge: big, skalierung: 1.0 }

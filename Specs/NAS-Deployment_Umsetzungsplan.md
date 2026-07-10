@@ -4,7 +4,7 @@
 
 Die ZEV-Anwendung wird für den Betrieb auf einer **Synology NAS** (Container Manager, DSM 7.2+) lauffähig gemacht: bereitgestellte Images (kein Build auf der NAS), eine NAS-Compose-Datei, sowie die **Entkopplung aller `localhost`-URLs** (Frontend-Config, Backend-Issuer/CORS, Keycloak-Redirect) — konfigurierbar ohne Quellcode-/JAR-Rebuild. Business-Logik und Rollenmodell bleiben unverändert.
 
-Grundlage: [`Specs/NAS-Deployment.md`](./NAS-Deployment.md). Baut auf `docs/images.md` (Image-Transfer/Registry) und `docs/Anleitung-keycloak.md` (Keycloak-Setup) auf.
+Grundlage: [`Specs/NAS-Deployment.md`](./NAS-Deployment.md). Baut auf `docs/NAS-Images.md` (Image-Transfer/Registry) und `docs/Anleitung-keycloak.md` (Keycloak-Setup) auf.
 
 ## Betroffene Komponenten
 
@@ -19,7 +19,7 @@ Grundlage: [`Specs/NAS-Deployment.md`](./NAS-Deployment.md). Baut auf `docs/imag
 - `frontend-service/src/main/resources/application.properties` (bzw. Spring-Config des Frontend-JARs) – zusätzliche externe Static-Location für `config.json`
 - `backend-service/src/main/resources/application.yml` – sicherstellen, dass `app.cors.allowed-origins` per Env (`APP_CORS_ALLOWED_ORIGINS`) überschreibbar ist
 - `keycloak/realms/zev-realm.json` – `redirectUris`/`webOrigins` per Platzhalter/Env parametrierbar
-- `scripts/build-pi-images.ps1` → generalisieren auf `scripts/build-images.ps1` (Plattform-Parameter `linux/amd64` **und** `linux/arm64`)
+- `scripts/build-nas-images.ps1` – baut die ZEV-App-Images für das NAS (Default `linux/amd64`, Plattform via `-Platform` überschreibbar). (Der Pi fährt nur den `pi-gateway`; dieser wird separat per `scripts/package-pi-gateway.ps1` als ZIP paketiert.)
 - `docker-compose.yml` – Fremd-Image-Tags pinnen; Keycloak-Env `KC_BOOTSTRAP_ADMIN_*` prüfen
 - `CLAUDE.md` – Verweis auf NAS-Deployment-Doku
 
@@ -30,14 +30,14 @@ Grundlage: [`Specs/NAS-Deployment.md`](./NAS-Deployment.md). Baut auf `docs/imag
 |  [ ]   | 1. Frontend-Config externalisieren   | `config.json` beim Containerstart aus Env (`API_BASE_URL`, `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`) erzeugen; Spring serviert externe Static-Location mit Vorrang → Override **ohne** Rebuild |
 |  [ ]   | 2. Backend-URL-Konfig (Profil `nas`) | `application-nas.yml` (Profil `nas`) mit `issuer-uri`/`jwk-set-uri`/`APP_CORS_ALLOWED_ORIGINS`/Datasource als **Env-Platzhalter** (`${VAR:default}`); Aktivierung `SPRING_PROFILES_ACTIVE=nas`. Direkte Relaxed-Binding-Env-Vars behalten Vorrang. Siehe `NAS-Deployment.md` FR-2.5 |
 |  [ ]   | 3. Keycloak-Client parametrieren     | `redirectUris`/`webOrigins` in `zev-realm.json` per Platzhalter (Realm-Import-Env-Substitution) oder dokumentierter Post-Install-Anpassung |
-|  [ ]   | 4. Image-Build für Ziel-Arch         | `scripts/build-images.ps1` mit Plattform-Param (`linux/amd64` / `linux/arm64`); Ergebnis tar.gz **oder** Registry (vgl. `docs/images.md`) |
+|  [ ]   | 4. Image-Build für das NAS           | `scripts/build-nas-images.ps1` (Default `linux/amd64`, Plattform via `-Platform`); Ergebnis tar.gz **oder** Registry (vgl. `docs/NAS-Images.md`) |
 |  [ ]   | 5. NAS-Compose                       | `docker-compose.nas.yml`: `image:` statt `build:`, Fremd-Image-Tags gepinnt, Compose-Profiles `slim` (Postgres/Keycloak/Backend/Frontend) und `full` (+admin/prometheus/grafana), JVM-/Memory-Limits; `backend-service` mit `SPRING_PROFILES_ACTIVE=nas` |
 |  [ ]   | 6. `.env.nas.example`                | Vorlage mit Host-URLs (`<nas>`), geänderten Passwörtern, optionalem `ANTHROPIC_API_KEY`                                                    |
 |  [ ]   | 7. Keycloak-Betriebsmodus            | LAN/HTTP (`start-dev`) dokumentiert; HTTPS-Variante (`start` + `KC_HOSTNAME`/`KC_PROXY` hinter Synology-Reverse-Proxy) als Option — Details siehe Abschnitt „HTTPS / Reverse-Proxy (Synology)" |
 |  [ ]   | 8. Post-Install Keycloak-Setup       | Anleitung: Organization anlegen, Client-Scope „organization" + Mapper, Nutzer zuordnen, Fachrollen/Composites prüfen                       |
 |  [ ]   | 9. Installationsanleitung            | `docs/NAS-Deployment.md` (Container Manager, Ports/DSM-Konflikte, Volumes/Backup, Reboot-Verhalten, Troubleshooting `exec format error`/401/CORS) |
 |  [ ]   | 10. Smoke-Test auf NAS               | Manueller End-to-End-Test (Login je Rolle, API-Call ohne 401/CORS, Reboot-Persistenz) gemäss Akzeptanzkriterien                           |
-|  [ ]   | 11. Doku-Querverweise                | `CLAUDE.md` + `docs/images.md` auf NAS-Anleitung verlinken                                                                                 |
+|  [ ]   | 11. Doku-Querverweise                | `CLAUDE.md` + `docs/NAS-Images.md` auf NAS-Anleitung verlinken                                                                                 |
 
 > **Deploy-Reihenfolge:** Phasen 1–3 (Konfigurierbarkeit) müssen vor dem NAS-Rollout fertig sein; sonst greifen die `localhost`-Defaults (→ 401/CORS/Redirect-Fehler).
 

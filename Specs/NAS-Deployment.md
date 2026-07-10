@@ -6,7 +6,7 @@
 * **Warum machen wir das:** Die NAS ist eine kostengünstige, dauerhaft laufende Plattform beim Betreiber. Aktuell ist der Stack zwar containerisiert, aber auf die **lokale Entwicklungsumgebung** zugeschnitten.
 * **Aktueller Stand:**
   * `docker-compose.yml` mit `.env`, benannten Volumes, Healthchecks, `restart: unless-stopped`.
-  * `docs/images.md` + `scripts/build-pi-images.ps1`: Cross-Arch-Build (Buildx), Übertragung per tar.gz **oder** private `registry:2`-Registry auf der NAS. Der Image-Transfer ist damit bereits gelöst.
+  * `docs/NAS-Images.md` + `scripts/build-nas-images.ps1`: Image-Build (Buildx, Default `linux/amd64`), Übertragung per tar.gz **oder** private `registry:2`-Registry auf der NAS. Der Image-Transfer ist damit bereits gelöst. (Der Pi fährt nur den `pi-gateway`, separat paketiert via `scripts/package-pi-gateway.ps1`.)
   * **Hindernis:** Die drei App-Images werden per `build:` erzeugt (die Dockerfiles kopieren `target/*.jar`, Build erfolgt ausserhalb) – auf der NAS kann/soll nicht gebaut werden.
   * **Hindernis:** Host-URLs sind an mehreren Stellen fest auf `localhost` verdrahtet (siehe FR-2).
   * **Hindernis:** Keycloak läuft im `start-dev`-Modus; der Realm-Import enthält **keine** Organization, der `OrganizationInterceptor` verlangt aber einen `organization`-Claim.
@@ -15,7 +15,7 @@
 
 ### FR-1: NAS-taugliche Images & Bereitstellung
 1. Die drei App-Images (`backend-service`, `admin-service`, `frontend-service`) werden für die **Ziel-Architektur der NAS** gebaut (x86-64 → `linux/amd64`, ARM → `linux/arm64`).
-2. Bereitstellung auf der NAS wahlweise per tar.gz-Transfer **oder** private Registry (bestehende `docs/images.md`).
+2. Bereitstellung auf der NAS wahlweise per tar.gz-Transfer **oder** private Registry (bestehende `docs/NAS-Images.md`).
 3. Eine **NAS-spezifische Compose-Datei** (`docker-compose.nas.yml`) verwendet `image:` statt `build:` und referenziert die bereitgestellten Images.
 
 ### FR-2: Konfigurierbare Host-URLs (Entkopplung von `localhost`)
@@ -89,7 +89,7 @@ spring:
 * **Secrets** nicht ins Image backen; `.env` separat auf der NAS, Standard-Passwörter ändern.
 * **HTTPS** für Zugriff ausserhalb des vertrauenswürdigen LAN bzw. für sichere Cookies/Token: über den Synology-Reverse-Proxy (Let's Encrypt); Keycloak dann `KC_HOSTNAME`/`KC_PROXY`.
 * Exponierte Ports minimieren; idealerweise nur das Frontend (und Keycloak) nach aussen, DB/Monitoring intern.
-* Registry (falls genutzt) nicht offen betreiben (Auth/Reverse-Proxy) – vgl. `docs/images.md`.
+* Registry (falls genutzt) nicht offen betreiben (Auth/Reverse-Proxy) – vgl. `docs/NAS-Images.md`.
 
 ### NFR-3: Kompatibilität
 * Ziel: **Synology DSM 7.2+** mit Container Manager (Compose v2). Ältere DSM „Docker"-Pakete nicht unterstützt.
@@ -115,12 +115,12 @@ spring:
   * `backend-service/src/main/resources/application.yml`: `app.cors.allowed-origins`, `issuer-uri` (per Env überschreibbar halten).
   * `keycloak/realms/zev-realm.json`: `redirectUris`/`webOrigins` konfigurierbar (bzw. Post-Install-Anpassung).
   * Neu: `docker-compose.nas.yml`, `.env`-Vorlage (NAS), ggf. Slim-Profil (Compose-Profiles).
-  * Neu/erweitert: `docs/` NAS-Installationsanleitung (baut auf `docs/images.md` + `docs/Anleitung-keycloak.md` auf).
+  * Neu/erweitert: `docs/` NAS-Installationsanleitung (baut auf `docs/NAS-Images.md` + `docs/Anleitung-keycloak.md` auf).
 * **Datenmigration:** Keine (Neuinstallation). Bei Übernahme bestehender Daten: `pg_dump`/Volume-Backup.
 
 ## 7. Abgrenzung / Out of Scope
 * **Keine** Änderung der Anwendungs-/Business-Logik oder des Rollenmodells.
-* **Kein** Aufbau der privaten Registry selbst (in `docs/images.md` beschrieben) – hier nur referenziert.
+* **Kein** Aufbau der privaten Registry selbst (in `docs/NAS-Images.md` beschrieben) – hier nur referenziert.
 * **Keine** automatische Keycloak-Organization-/Nutzer-Provisionierung (bleibt manueller, dokumentierter Schritt).
 * **Kein** Kubernetes/Swarm; Ziel ist Docker Compose auf der NAS.
 * **Keine** produktive Härtung über das Genannte hinaus (kein IdP-Federation, kein HA/Cluster).

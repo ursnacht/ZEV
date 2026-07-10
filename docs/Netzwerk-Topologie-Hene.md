@@ -2,10 +2,11 @@
 
 ```mermaid
 flowchart TB
-    subgraph Lokales_Netzwerk["Lokales Netzwerk"]
+    subgraph Lokales_Netzwerk["Hausinfrastruktur (Zähler, Raspberry Pi)"]
         W1["Stromzähler Wago 1"]
         W2["Stromzähler Wago 2"]
         W3["Stromzähler Wago 3"]
+        HUB["Modbus-TCP-Hub<br/>(RTU → TCP Gateway)"]
         BKW["Stromzähler BKW<br/>(gPlug)"]
         ROUTER{{"Router"}}
         RPI["Raspberry Pi<br/>VPN-Client<br/>Reader + MQTT-Publisher"]
@@ -13,9 +14,10 @@ flowchart TB
 
     NAS["NAS<br/>ZEV-Verwaltung<br/>VPN-Server<br/>MQTT-Broker + Delta-Bildung"]
 
-    W1 -- "Modbus TCP" --> ROUTER
-    W2 -- "Modbus TCP" --> ROUTER
-    W3 -- "Modbus TCP" --> ROUTER
+    W1 -- "Modbus (RTU)" --> HUB
+    W2 -- "Modbus (RTU)" --> HUB
+    W3 -- "Modbus (RTU)" --> HUB
+    HUB -- "Modbus TCP" --> ROUTER
     BKW -- "gPlug" --> ROUTER
     ROUTER --- RPI
 
@@ -26,15 +28,23 @@ flowchart TB
 
     NAS -. "VPN über Internet" .-> ROUTER
     RPI == "MQTT: publiziert absolute Zählerstände (über VPN)" ==> NAS
-    NAS -. "SFTP: holt Zählerdaten (heute / Fallback)" .-> RPI
 ```
 
-> **Datenfluss (Ziel, MQTT):** Der Pi liest die Zähler (Modbus TCP / gPlug) und
+> **Zähler-Anbindung:** Die drei **Wago**-Zähler sind per **seriellem Modbus (RTU)** an einen
+> **Modbus-TCP-Hub** (RTU→TCP-Gateway) angeschlossen, der am Router hängt; der Pi liest sie per
+> **Modbus TCP** über den Hub (gemeinsame Hub-IP, je Zähler eine Unit-/Slave-ID). Der **BKW**-Zähler
+> ist separat über **gPlug** am Router.
+>
+> **Datenfluss (Ziel, MQTT):** Der Pi liest die Zähler (Modbus TCP über den Hub / gPlug) und
 > **publiziert die absoluten Zählerstände** über den VPN-Tunnel an den
 > Mosquitto-**Broker auf dem NAS** (Variante B). Das ZEV-Backend abonniert sie und
 > **bildet die Deltas/15-Min-Werte** selbst — verlusttolerant (siehe
 > `Specs/MQTT-Integration.md`). Der **SFTP-Pull** (NAS holt Dateien beim Pi) ist
 > der heutige Weg bzw. Fallback.
+>
+> *Hinweis:* Das Diagramm zeigt den **Ziel-Pfad (MQTT)**. Der **SFTP-Pull** ist bewusst
+> **nicht eingezeichnet** (der Übersichtlichkeit halber), bleibt aber als heutiger Weg/Fallback
+> gültig — Details im Abschnitt „Setup-Notiz: Dateiübertragung via SFTP" unten.
 
 ## Setup-Notiz: Dateiübertragung via SFTP
 
@@ -317,7 +327,7 @@ Standard-Empfehlung (Variante B, Broker nur auf dem NAS) ist dies **nicht** nöt
 
 Auf dem Pi ist die **native Installation via apt** am schlanksten (systemd,
 kein Docker-Overhead). Falls auf dem Pi ohnehin Docker läuft (vgl.
-`docs/images.md`), geht auch `eclipse-mosquitto:2` analog zur NAS-Anleitung.
+`docs/NAS-Images.md`), geht auch `eclipse-mosquitto:2` analog zur NAS-Anleitung.
 
 ### 1. Installation (nativ, empfohlen)
 
