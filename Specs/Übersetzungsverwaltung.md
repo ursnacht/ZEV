@@ -60,6 +60,28 @@
 * Tabellenbreite anpassbar via `ColumnResizeDirective` (Drag-to-resize)
 * Aktionen pro Zeile über `KebabMenuComponent`
 
+### FR-8: Export / Import (Nachtrag)
+* **Format:** **CSV** (Komma als Trenner), UTF-8 mit BOM, Zeilenenden CRLF. **Kopfzeile** `key,deutsch,englisch`, danach eine Zeile je Übersetzung. Felder mit Komma, Anführungszeichen oder Zeilenumbruch werden nach RFC 4180 in `"…"` gesetzt, eingebettete Anführungszeichen verdoppelt (`""`) — dadurch ist der Round-Trip Export→Import verlustfrei (Übersetzungstexte enthalten Kommas, Apostrophe, Gedankenstriche, ggf. Zeilenumbrüche). Serialisierung/Parsing erfolgen clientseitig (`utils/csv-utils.ts`); die Wire-Übertragung zum Backend bleibt JSON (`Translation[]`).
+* **Export:**
+  1. Über der Tabelle (Toolbar-Zeile) befindet sich ein Button **«Exportieren»** (Icon `download`).
+  2. Klick lädt **alle** aktuell geladenen Übersetzungen als Datei `uebersetzungen.csv` herunter (clientseitig via Blob; kein Backend-Call nötig).
+  3. Der Button ist deaktiviert, wenn keine Übersetzungen vorhanden sind.
+* **Import:**
+  1. Button **«Importieren»** (Icon `upload`) öffnet einen Datei-Dialog (nur `.csv`/`text/csv`).
+  2. **Rechts** neben dem Import-Button steht die Option **«Bestehende Keys überschreiben»** mit **zwei Radio-Buttons nebeneinander**: **Ja** / **Nein** (Default: **Ja**). Die Auswahl bestimmt, wie mit bereits vorhandenen Keys verfahren wird.
+  3. Die gewählte Datei wird im Frontend gelesen und als CSV geparst; eine vorhandene Kopfzeile (`key,deutsch,englisch`) wird übersprungen. Ergibt das Parsen keine Datenzeile, erscheint eine Fehlermeldung (kein Backend-Call).
+  4. Andernfalls sendet das Frontend `POST /api/translations/import?ueberschreiben=<true|false>` mit der Liste.
+  5. Der Server legt **neue** Keys immer an; nicht in der Datei enthaltene Keys bleiben **unverändert** (kein Löschen). Für **bereits bestehende** Keys gilt:
+     * **Überschreiben = Ja** (`ueberschreiben=true`): bestehende Keys werden **überschrieben** (Upsert).
+     * **Überschreiben = Nein** (`ueberschreiben=false`): bestehende Keys werden **übersprungen** (nur neue Keys werden angelegt).
+     Der Import ist **atomar** (bei einem ungültigen Eintrag wird nichts gespeichert).
+  6. Bei Erfolg: Erfolgsmeldung mit Anzahl **tatsächlich gespeicherter** Einträge (bei «Nein» ohne die übersprungenen); Admin-Liste **und** Übersetzungscache (`TranslationService`) werden neu geladen.
+  7. Nach dem Import wird das Datei-Input zurückgesetzt, sodass dieselbe Datei erneut gewählt werden kann.
+* **Rückmeldung:** Erfolg (auto-dismiss nach 5 s) bzw. Fehler (bleibt bis manuell geschlossen) über den Design-System-`message`-Bereich (`zev-message`).
+* **Backend-Endpunkt:** `POST /api/translations/import` (Body: `Translation[]`, Query `ueberschreiben` – Default `true`) → `{ "importiert": <n> }`; Autorisierung `translations:manage`. Validierung: jeder Eintrag braucht einen nicht-leeren Key (max. 200 Zeichen), sonst `400` mit Übersetzungs-Key.
+* **Design System:** Die Radio-Auswahl nutzt die wiederverwendbaren Klassen **`zev-radio-group`** + **`zev-radio-label`** (im Design-System-`form`-Bereich; kein komponenteneigenes CSS).
+* **CSV-Hilfsfunktionen:** `utils/csv-utils.ts` (`toCsv`, `parseCsv`) — RFC-4180-orientiert, mit Unit-Tests (`csv-utils.spec.ts`).
+
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
 ### Anzeige & Suche
@@ -88,6 +110,21 @@
 * [ ] Nach Bestätigung wird der Eintrag aus der Tabelle entfernt.
 * [ ] Nach dem Löschen wird der Übersetzungscache (TranslationService) neu geladen.
 * [ ] Bei Abbruch der Bestätigung bleibt der Eintrag unverändert bestehen.
+
+### Export / Import
+* [ ] Klick auf «Exportieren» lädt eine Datei `uebersetzungen.csv` (Komma-getrennt, Kopfzeile `key,deutsch,englisch`) mit allen Übersetzungen herunter.
+* [ ] Der Export-Button ist deaktiviert, wenn keine Übersetzungen vorhanden sind.
+* [ ] Klick auf «Importieren» öffnet einen Datei-Dialog (nur `.csv`).
+* [ ] Der Import einer zuvor exportierten CSV-Datei stellt exakt dieselben Übersetzungen wieder her (verlustfreier Round-Trip, auch bei Werten mit Kommas, Anführungszeichen und Zeilenumbrüchen).
+* [ ] Rechts neben dem Import-Button stehen zwei Radio-Buttons «Ja»/«Nein» für «Bestehende Keys überschreiben» (Default: Ja).
+* [ ] Bei **«Ja»** überschreibt der Import bestehende Keys mit den Werten aus der Datei; neue Keys werden angelegt.
+* [ ] Bei **«Nein»** bleiben bestehende Keys unverändert; nur neue Keys werden angelegt; die Erfolgsmeldung zählt nur die tatsächlich angelegten Einträge.
+* [ ] In beiden Fällen bleiben nicht in der Datei enthaltene Keys unverändert (kein Löschen).
+* [ ] Nach erfolgreichem Import erscheint eine Erfolgsmeldung mit der Anzahl importierter Einträge; Tabelle und Übersetzungscache werden aktualisiert.
+* [ ] Eine Datei ohne verwertbare Datenzeile (leer / nur Kopfzeile) führt zu einer Fehlermeldung, ohne einen Backend-Call auszulösen.
+* [ ] Ein Eintrag ohne Key (bzw. Key > 200 Zeichen) führt zu `400`; es wird **nichts** gespeichert (atomar).
+* [ ] `POST /api/translations/import` ist nur für `translations:manage` zugänglich (sonst `403`).
+* [ ] Dieselbe Datei kann nach einem Import direkt erneut gewählt werden (Datei-Input wird zurückgesetzt).
 
 ### Backend API
 * [ ] `GET /api/translations` ist für Rollen `user` und `admin` zugänglich und gibt `{de: {...}, en: {...}}` zurück.
@@ -136,7 +173,8 @@
 ## 7. Abgrenzung / Out of Scope
 
 * Mehr als zwei Sprachen (Deutsch, Englisch) werden nicht unterstützt.
-* Kein Import/Export von Übersetzungen (z.B. CSV).
+* Import/Export erfolgt ausschliesslich als **CSV** (Komma-getrennt, kein JSON/XLSX) — siehe FR-8.
+* Der Import **löscht keine** vorhandenen Keys (nur Anlegen bzw. optionales Überschreiben, siehe FR-8); ein Voll-Sync mit Löschen ist nicht vorgesehen.
 * Keine Versionierung oder History von Änderungen.
 * Keine Übersetzungen auf Mandantenebene (kein `org_id`); alle Mandanten teilen denselben Übersetzungsstamm.
 * Kein Inline-Editing direkt in der Tabelle; Bearbeitung erfolgt ausschliesslich über das Formular.

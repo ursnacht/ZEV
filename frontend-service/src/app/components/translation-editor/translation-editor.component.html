@@ -1,6 +1,19 @@
 <div class="zev-container">
   <h1><app-icon name="globe" size="lg"></app-icon> {{ 'TRANSLATION_EDITOR' | translate }}</h1>
 
+  @if (message) {
+    <div class="zev-message"
+      [class.zev-message--success]="messageType === 'success'"
+      [class.zev-message--error]="messageType === 'error'"
+      [class.zev-message--dismissible]="messageType === 'error'"
+      (click)="messageType === 'error' && dismissMessage()">
+      <span>{{ message }}</span>
+      @if (messageType === 'error') {
+        <span class="zev-message__dismiss">&times;</span>
+      }
+    </div>
+  }
+
   <div class="zev-form-container">
     <h3 class="zev-form-section__title">
       {{ (editMode ? 'BEARBEITEN' : 'ADD_NEW_TRANSLATION') | translate }}
@@ -47,6 +60,30 @@
       }
     </div>
     <span class="search-count">{{ filteredTranslations.length }} / {{ translations.length }}</span>
+    <div class="zev-table-actions">
+      <button type="button" (click)="exportTranslations()" class="zev-button zev-button--secondary"
+        [disabled]="translations.length === 0">
+        <app-icon name="download"></app-icon>
+        {{ 'TRANSLATION_EXPORT' | translate }}
+      </button>
+      <button type="button" (click)="fileInput.click()" class="zev-button zev-button--secondary">
+        <app-icon name="upload"></app-icon>
+        {{ 'TRANSLATION_IMPORT' | translate }}
+      </button>
+      <input #fileInput type="file" accept="text/csv,.csv" hidden
+        (change)="onImportFileSelected($event)">
+      <span class="zev-radio-group">
+        <span>{{ 'TRANSLATION_IMPORT_UEBERSCHREIBEN' | translate }}:</span>
+        <label class="zev-radio-label">
+          <input type="radio" name="importUeberschreiben" [value]="true" [(ngModel)]="importUeberschreiben">
+          {{ 'JA' | translate }}
+        </label>
+        <label class="zev-radio-label">
+          <input type="radio" name="importUeberschreiben" [value]="false" [(ngModel)]="importUeberschreiben">
+          {{ 'NEIN' | translate }}
+        </label>
+      </span>
+    </div>
   </div>
 
   @if (filteredTranslations.length > 0) {

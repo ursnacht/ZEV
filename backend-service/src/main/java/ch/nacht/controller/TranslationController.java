@@ -72,6 +72,25 @@ public class TranslationController {
         return ResponseEntity.ok(updated);
     }
 
+    @PostMapping("/import")
+    @PreAuthorize("hasAuthority('translations:manage')")
+    public ResponseEntity<?> importTranslations(@RequestBody List<Translation> translations,
+            @RequestParam(name = "ueberschreiben", defaultValue = "true") boolean ueberschreiben) {
+        if (translations == null || translations.isEmpty()) {
+            log.warn("Translation import rejected: empty payload");
+            return ResponseEntity.badRequest().body("TRANSLATION_IMPORT_LEER");
+        }
+        log.info("Importing {} translations (ueberschreiben={})", translations.size(), ueberschreiben);
+        try {
+            int count = translationService.importTranslations(translations, ueberschreiben);
+            log.info("Imported {} translations", count);
+            return ResponseEntity.ok(Map.of("importiert", count));
+        } catch (IllegalArgumentException e) {
+            log.warn("Translation import rejected: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @DeleteMapping("/{key:.+}")
     @PreAuthorize("hasAuthority('translations:manage')")
     public ResponseEntity<Void> deleteTranslation(@PathVariable String key) {

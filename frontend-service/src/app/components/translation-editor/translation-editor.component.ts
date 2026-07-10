@@ -5,6 +5,10 @@ import { TranslatePipe } from '../../pipes/translate.pipe';
 import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.component';
 import { ColumnResizeDirective } from '../../directives/column-resize.directive';
 import { IconComponent } from '../icon/icon.component';
+import { toCsv, parseCsv } from '../../utils/csv-utils';
+
+/** Kopfzeile der Export-/Import-CSV. */
+const CSV_HEADER = ['key', 'deutsch', 'englisch'];
 
 @Component({
   selector: 'app-translation-editor',
@@ -23,6 +27,13 @@ export class TranslationEditorComponent implements OnInit {
   loading = false;
   sortColumn: 'key' | 'deutsch' | 'englisch' | null = 'key';
   sortDirection: 'asc' | 'desc' = 'asc';
+
+  /** Rückmeldung für Import/Export (bereits übersetzter Text). */
+  message = '';
+  messageType: 'success' | 'error' = 'success';
+
+  /** Import-Option: bestehende Keys überschreiben (true) oder überspringen (false). Default: Ja. */
+  importUeberschreiben = true;
 
   menuItems: KebabMenuItem[] = [
     { label: 'BEARBEITEN', action: 'edit', icon: 'edit-2' },
@@ -136,6 +147,96 @@ export class TranslationEditorComponent implements OnInit {
       },
       error: (err) => console.error('Failed to delete translation', err)
     });
+  }
+
+  /** Exportiert alle Übersetzungen als CSV-Datei (Komma-getrennt, clientseitig, verlustfrei). */
+  exportTranslations(): void {
+    const rows = [
+      CSV_HEADER,
+      ...this.translations.map(t => [t.key ?? '', t.deutsch ?? '', t.englisch ?? ''])
+    ];
+    // UTF-8-BOM voranstellen, damit Excel Umlaute korrekt erkennt
+    const csv = '﻿' + toCsv(rows);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'uebersetzungen.csv';
+    link.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  /** Liest die gewählte CSV-Datei ein und importiert die enthaltenen Übersetzungen. */
+  onImportFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) {
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const list = this.csvRowsToTranslations(parseCsv(reader.result as string));
+        if (list.length === 0) {
+          this.showMessage(this.translationService.translate('TRANSLATION_IMPORT_FORMAT_FEHLER'), 'error');
+          return;
+        }
+        this.doImport(list);
+      } catch {
+        this.showMessage(this.translationService.translate('TRANSLATION_IMPORT_FORMAT_FEHLER'), 'error');
+      } finally {
+        // Zurücksetzen, damit dieselbe Datei erneut gewählt werden kann
+        input.value = '';
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  /** Wandelt geparste CSV-Zeilen in Übersetzungen um; eine optionale Kopfzeile wird übersprungen. */
+  private csvRowsToTranslations(rows: string[][]): Translation[] {
+    let dataRows = rows;
+    if (dataRows.length > 0) {
+      const head = dataRows[0].map(c => (c ?? '').trim().toLowerCase());
+      if (head[0] === 'key' && head[1] === 'deutsch' && head[2] === 'englisch') {
+        dataRows = dataRows.slice(1);
+      }
+    }
+    return dataRows.map(r => ({
+      key: (r[0] ?? '').trim(),
+      deutsch: r[1] ?? '',
+      englisch: r[2] ?? ''
+    }));
+  }
+
+  private doImport(list: Translation[]): void {
+    this.translationService.importTranslations(list, this.importUeberschreiben).subscribe({
+      next: (res) => {
+        this.showMessage(
+          this.translationService.translate('TRANSLATION_IMPORT_ERFOLG').replace('{count}', String(res.importiert)),
+          'success'
+        );
+        this.loadTranslations();
+      },
+      error: (err) => {
+        const key = typeof err.error === 'string' ? err.error : 'TRANSLATION_IMPORT_FEHLER';
+        this.showMessage(this.translationService.translate(key), 'error');
+      }
+    });
+  }
+
+  dismissMessage(): void {
+    this.message = '';
+    this.cdr.markForCheck();
+  }
+
+  private showMessage(text: string, type: 'success' | 'error'): void {
+    this.message = text;
+    this.messageType = type;
+    this.cdr.markForCheck();
+    if (type === 'success') {
+      // Erfolg automatisch ausblenden (Projektkonvention: Erfolg 5s, Fehler bleibt)
+      setTimeout(() => this.dismissMessage(), 5000);
+    }
   }
 
   onMenuAction(action: string, translation: Translation): void {

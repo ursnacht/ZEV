@@ -59,6 +59,22 @@ input[type="date"].zev-input {
   color: var(--color-gray-800);
 }
 
+/* Radio-Gruppe – horizontale Auswahl mit Beschriftung (nebeneinander) */
+.zev-radio-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+}
+
+.zev-radio-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xxs);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 /* Form Container */
 .zev-form-container {
   background-color: var(--color-gray-50);

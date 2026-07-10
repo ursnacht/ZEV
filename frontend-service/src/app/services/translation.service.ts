@@ -62,6 +62,14 @@ export class TranslationService {
         return this.http.post<Translation>(this.apiUrl, translation);
     }
 
+    importTranslations(translations: Translation[], ueberschreiben: boolean): Observable<{ importiert: number }> {
+        return this.http.post<{ importiert: number }>(`${this.apiUrl}/import`, translations, {
+            params: { ueberschreiben: String(ueberschreiben) }
+        }).pipe(
+            tap(() => this.loadTranslations())
+        );
+    }
+
     deleteTranslation(key: string): Observable<void> {
         return this.http.delete<void>(`${this.apiUrl}/${key}`).pipe(
             tap(() => this.loadTranslations())

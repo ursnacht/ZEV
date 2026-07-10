@@ -177,6 +177,38 @@ describe('TranslationService', () => {
     });
   });
 
+  describe('importTranslations', () => {
+    it('should POST the translations to /import with ueberschreiben=true and then reload', () => {
+      service.importTranslations(mockTranslationList, true).subscribe(result => {
+        expect(result).toEqual({ importiert: 2 });
+      });
+
+      const importReq = httpMock.expectOne(r => r.url === `${apiUrl}/import`);
+      expect(importReq.request.method).toBe('POST');
+      expect(importReq.request.body).toEqual(mockTranslationList);
+      expect(importReq.request.params.get('ueberschreiben')).toBe('true');
+      importReq.flush({ importiert: 2 });
+
+      // After import, loadTranslations() is called via tap()
+      const reloadReq = httpMock.expectOne(apiUrl);
+      expect(reloadReq.request.method).toBe('GET');
+      reloadReq.flush(mockTranslations);
+    });
+
+    it('should pass ueberschreiben=false when overwrite is disabled', () => {
+      service.importTranslations(mockTranslationList, false).subscribe(result => {
+        expect(result).toEqual({ importiert: 1 });
+      });
+
+      const importReq = httpMock.expectOne(r => r.url === `${apiUrl}/import`);
+      expect(importReq.request.params.get('ueberschreiben')).toBe('false');
+      importReq.flush({ importiert: 1 });
+
+      const reloadReq = httpMock.expectOne(apiUrl);
+      reloadReq.flush(mockTranslations);
+    });
+  });
+
   describe('deleteTranslation', () => {
     it('should make DELETE request and then reload translations', () => {
       const key = 'hello';
