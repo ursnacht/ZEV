@@ -115,7 +115,11 @@ CREATE INDEX idx_zaehler_rohdaten_unverarbeitet
 3. **Reset/Überlauf/Zählertausch:** Die Guard-Prüfung gilt **pro Register** — ist `ΔBezug` **oder** `ΔEinspeisung` < 0, wird das jeweilige Register-Delta **nicht negativ** übernommen (auf 0 gesetzt), die Referenz neu gesetzt und WARN geloggt. (Wichtig: nicht am Vorzeichen von `total` prüfen, da negatives `total` bei Einspeisung legitim ist – siehe Mapping unten.)
 4. **Mapping auf `messwerte`** (`zeit`, `total`, `einheit`, `org_id`) gemäss Entscheidung (§8):
    * `total` = **vorzeichenbehafteter Netto-Wert**: `total = ΔBezug − ΔEinspeisung`. Bezug überwiegt → **positiv** (Verbrauch/Consumer); Einspeisung überwiegt → **negativ** (Produktion/Producer). Producer vs. Consumer wird also **über das Vorzeichen** unterschieden, ohne `einheit.typ`-Verzweigung.
-   * `zev` = **0** (Sentinel „nicht gemessen"; wird nicht aus MQTT befüllt). **Keine** Tabellen-/Constraint-Änderung nötig – `messwerte.zev` bleibt `NOT NULL`.
+   * `zev`:
+     * **Consumer** (`einheit.typ = CONSUMER`): **0** (Sentinel „nicht gemessen"; wird nicht aus MQTT befüllt). Die Solarverteilung ersetzt `0` später durch `zev_calculated` (FR-9).
+     * **Producer** (`einheit.typ = PRODUCER`): **`zev = total`** — die gesamte Produktion des Intervalls wird als ZEV-relevanter Wert übernommen, damit die **Statistik die Produktion korrekt ausweist**. Dieser Wert ist ≠ 0 (ausser bei `total = 0`) und wird daher von der Solarverteilung **nicht** überschrieben (FR-9 greift nur bei `zev = 0`).
+     * **Keine** Tabellen-/Constraint-Änderung nötig – `messwerte.zev` bleibt `NOT NULL`.
+     * Dies ist die **einzige** typ-abhängige Verzweigung im Ingest; die `total`-Bildung bleibt vorzeichenbasiert ohne `einheit.typ`-Verzweigung.
    * `zev_calculated` = **NULL** beim Ingest; wird erst durch die **Solarverteilung** (`SolarDistribution`) berechnet. Diese setzt anschliessend `zev = zev_calculated`, sofern `zev = 0` (FR-9).
 5. Speichern mit `quelle = 'MQTT'` (FR-7); Insert/Upsert.
 6. Verarbeitete Rohdaten markieren: `verarbeitet = TRUE`, `verarbeitet_am = NOW()`; Referenzstand fortschreiben.
@@ -129,7 +133,7 @@ CREATE INDEX idx_zaehler_rohdaten_unverarbeitet
 ALTER TABLE zev.messwerte ADD COLUMN IF NOT EXISTS quelle VARCHAR(20) DEFAULT 'CSV';
 -- Mögliche Werte: 'CSV', 'MQTT', 'API'
 ```
-Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine** Änderung an `messwerte.zev` nötig: Der MQTT-Ingest setzt `zev = 0` (Sentinel), die Spalte bleibt `NOT NULL`. Die Solarverteilung ersetzt `zev = 0` später durch `zev_calculated` (FR-9). Damit bleiben alle bestehenden Konsumenten von `messwerte.zev` (Statistik/Rechnung) unverändert kompatibel.
+Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine** Änderung an `messwerte.zev` nötig: Der MQTT-Ingest setzt `zev = 0` (Sentinel) für Consumer bzw. `zev = total` für Producer (FR-6.4); die Spalte bleibt `NOT NULL`. Die Solarverteilung ersetzt `zev = 0` später durch `zev_calculated` (FR-9). Damit bleiben alle bestehenden Konsumenten von `messwerte.zev` (Statistik/Rechnung) unverändert kompatibel.
 
 ### FR-8: Monitoring & Status
 1. Prometheus-Metriken (bestehende Infrastruktur, siehe `Specs/Metriken.md` / `MetricsService`):
@@ -140,7 +144,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 
 ### FR-9: Anpassung Solarverteilung (`zev`-Fallback)
 1. Die Solarverteilung (`SolarDistribution`) berechnet wie bisher `zev_calculated` pro Consumer/Intervall.
-2. **Neu:** Nach der Berechnung wird `zev = zev_calculated` gesetzt, **sofern `zev = 0`** (Sentinel für „nicht gemessen", von MQTT-importierten Werten). Bereits gemessene `zev`-Werte (z. B. aus CSV, `zev ≠ 0`) bleiben unverändert.
+2. **Neu:** Nach der Berechnung wird `zev = zev_calculated` gesetzt, **sofern `zev = 0`** (Sentinel für „nicht gemessen", von MQTT-importierten Consumer-Werten). Bereits gesetzte `zev`-Werte (z. B. aus CSV oder MQTT-**Producer**-Werte mit `zev = total`, `zev ≠ 0`) bleiben unverändert.
 3. Dadurch tragen MQTT-Werte nach der Verteilung denselben `zev`-Wert wie `zev_calculated`; CSV-Werte behalten ihren gemessenen Anteil.
 
 > **Kante:** Ein *gemessener* Wert von genau `zev = 0` (z. B. Nachtstunde ohne ZEV-Bezug aus CSV) würde ebenfalls durch `zev_calculated` ersetzt. Da `zev_calculated` in solchen Fällen ohnehin ~0 ist, ist der Effekt vernachlässigbar; falls doch relevant, kann die Unterscheidung über `quelle = 'MQTT'` statt über `zev = 0` erfolgen (Umsetzungsdetail).
@@ -160,7 +164,8 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 **15-Minuten-Aggregation:**
 * [ ] Job läuft um :05, :20, :35, :50; verarbeitet werden die quartalsgenauen Intervalle (:00–:15, :15–:30, …); `ΔBezug`/`ΔEinspeisung` je Register korrekt als **Differenz** gebildet.
 * [ ] `total = ΔBezug − ΔEinspeisung` korrekt vorzeichenbehaftet (Bezug → positiv, Einspeisung → negativ).
-* [ ] `zev` wird beim MQTT-Ingest auf `0` gesetzt (Sentinel); `messwerte.zev` bleibt `NOT NULL`.
+* [ ] `zev` wird beim MQTT-Ingest für **Consumer** auf `0` gesetzt (Sentinel), für **Producer** auf `total`; `messwerte.zev` bleibt `NOT NULL`.
+* [ ] Für eine **Producer**-Einheit gilt nach der Aggregation `zev = total` (und wird von der Solarverteilung nicht überschrieben, da `zev ≠ 0`).
 * [ ] Aggregierte Werte in `messwerte` mit `quelle = 'MQTT'`.
 * [ ] Verarbeitete Rohdaten `verarbeitet = TRUE`; bereits verarbeitete werden nicht erneut aggregiert.
 * [ ] Leeres Intervall (keine neue Meldung) → kein `messwerte`-Eintrag (kein Nullwert).
@@ -240,7 +245,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 * [x] **Register → `messwerte`-Mapping:** übertragen wird die **Wirkenergie (kWh)** — Bezug **OBIS 1.8.0** (`zaehlerstandBezug`), Einspeisung **OBIS 2.8.0** (`zaehlerstandEinspeisung`); **keine** Leistung/Blind-/Scheingrössen (siehe `Pi-Gateway-Software.md`). → **Mapping entschieden (siehe FR-6):** `total = ΔBezug − ΔEinspeisung` (**vorzeichenbehaftet**: positiv = Verbrauch, negativ = Einspeisung); `zev = 0` (Sentinel, keine Tabellen-Änderung); `zev_calculated = NULL` beim Ingest, erst durch die Solarverteilung, die dann `zev = zev_calculated` setzt, wo `zev = 0` (FR-9).
 * [x] **`org_id`-Typ & Topic-Kennung:** → **internes `org_id` (BIGINT)**, konsistent mit `messwerte`/`zaehler_rohdaten` und der Pi-Config. Kein UUID-Mapping.
 * [x] **Messpunkt-Eindeutigkeit:** → **`messpunkt` ist pro `org_id` eindeutig**; Auflösung über `(org_id, messpunkt)` (Unique-Constraint auf `einheit`).
-* [x] **Producer vs. Consumer** (`einheit.typ`): → **über das Vorzeichen von `total`** unterschieden (Bezug positiv, Einspeisung negativ); **keine** getrennten Register/Topics und **keine** `einheit.typ`-Verzweigung im Ingest.
+* [x] **Producer vs. Consumer** (`einheit.typ`): → Der **`total`** wird **über das Vorzeichen** gebildet (Bezug positiv, Einspeisung negativ), **ohne** `einheit.typ`-Verzweigung und **ohne** getrennte Register/Topics. **Nachtrag:** Für den **`zev`**-Wert gibt es eine typ-abhängige Verzweigung — Producer: `zev = total`, Consumer: `zev = 0` (Sentinel) — damit die Statistik die Produktion korrekt ausweist (FR-6.4).
 * [ ] **Reset/Überlauf-Policy:** Genaue Erkennung (Schwellwert für „Rücksprung") **pro Register** (Bezug/Einspeisung) und Umgang (Referenz neu setzen, Delta = 0)? (Grundsatz in FR-6.3 festgelegt; Schwellwert-Details offen.)
 * [ ] **Prosumer im selben Intervall:** Verhalten, wenn `ΔBezug` **und** `ΔEinspeisung` > 0 (Netmetering)? Aktuelle Festlegung: Netto `total = ΔBezug − ΔEinspeisung` (FR-6.4) — genügt das fachlich?
 * [x] **`zev`-Behandlung / Verträglichkeit:** → **`zev = 0` beim Ingest** (kein NULL, kein Schema-Eingriff); die Solarverteilung ersetzt `0` durch `zev_calculated` (FR-9). Bestehende `zev`-Konsumenten bleiben kompatibel. Rest-Kante (gemessenes echtes `0`) siehe FR-9-Hinweis.

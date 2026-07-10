@@ -154,6 +154,27 @@ public class ZaehlerAggregationServiceTest {
         assertEquals(Quelle.MQTT, m.getQuelle());
     }
 
+    // --- Producer: zev = total ---------------------------------------------
+
+    @Test
+    void aggregiere_Producer_ZevGleichTotal() {
+        einheit = new Einheit("PV-Anlage", EinheitTyp.PRODUCER);
+        einheit.setId(EINHEIT_ID);
+        einheit.setOrgId(ORG_ID);
+        stubCatchUpEinInterval();
+        stubStaende(rohdaten("100.0", "50.0"), rohdaten("101.0", "70.0")); // ΔBezug=1, ΔEinsp=20 → total=-19
+        when(messwerteRepository.findByEinheitAndZeit(eq(einheit), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.aggregiere();
+
+        Messwerte m = captureSavedMesswert();
+        assertEquals(-19.0, m.getTotal(), 1e-9);
+        assertEquals(-19.0, m.getZev(), 1e-9); // Producer: zev = total (nicht Sentinel 0)
+        assertNull(m.getZevCalculated());
+        assertEquals(Quelle.MQTT, m.getQuelle());
+    }
+
     // --- Reset-Guard pro Register ------------------------------------------
 
     @Test

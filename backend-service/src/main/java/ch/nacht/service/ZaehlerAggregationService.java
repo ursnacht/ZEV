@@ -1,6 +1,7 @@
 package ch.nacht.service;
 
 import ch.nacht.entity.Einheit;
+import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Messwerte;
 import ch.nacht.entity.Quelle;
 import ch.nacht.entity.ZaehlerRohdaten;
@@ -23,7 +24,8 @@ import java.util.Optional;
  * Scheduled-Aggregations-Job der MQTT-Integration (FR-6). Bildet je Einheit und
  * 15-Minuten-Intervall die Differenz der absoluten Zählerstände (pro Register), schreibt
  * vorzeichenbehaftete {@code total = ΔBezug − ΔEinspeisung} in {@code messwerte}
- * (mit {@code zev = 0}, {@code quelle = MQTT}) und markiert die Rohdaten als verarbeitet.
+ * (Consumer: {@code zev = 0}; Producer: {@code zev = total}; {@code quelle = MQTT}) und
+ * markiert die Rohdaten als verarbeitet.
  *
  * <p>NUR aktiv mit Spring-Profil {@code mqtt}. Kein Request-Scope: {@code org_id} wird
  * explizit aus den Rohdaten/der Einheit übernommen (kein {@code orgFilter}).
@@ -142,7 +144,10 @@ public class ZaehlerAggregationService {
                     einheit.getId(), zeit);
         }
         messwert.setTotal(total);
-        messwert.setZev(0.0);            // Sentinel; Solarverteilung setzt später zev = zev_calculated
+        // Produzenten: zev = total, damit die Statistik die Produktion korrekt ausweist
+        // (der gesamte Produktions-total zählt als ZEV-relevant). Consumer: zev = 0 (Sentinel);
+        // die Solarverteilung setzt dort später zev = zev_calculated (FR-9).
+        messwert.setZev(einheit.getTyp() == EinheitTyp.PRODUCER ? total : 0.0);
         messwert.setQuelle(Quelle.MQTT); // zev_calculated bleibt null bis zur Solarverteilung
         messwerteRepository.save(messwert);
     }

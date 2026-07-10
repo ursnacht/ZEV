@@ -120,6 +120,7 @@ zev.messwerte  (total = ΔBezug − ΔEinspeisung, zev = 0, quelle = MQTT)  +  R
 | [x] | 10. Metriken (FR-8) | **Eigene `MqttMetrics`-Komponente** (`@Profile("mqtt")`, direkt via `MeterRegistry`) statt `MetricsService` — Letzterer nutzt den request-scoped Org-Kontext (im Ingest/Job nicht verfügbar). Counter/Gauges wie geplant. |
 | [x] | 11. Health-Indicator (FR-8) | `MqttHealthIndicator` (`@Profile("mqtt")`, Boot-4-API `org.springframework.boot.health.contributor`): `/actuator/health/mqtt`, UP solange Inbound-Adapter läuft. |
 | [x] | 12. CSV-Quelle & Doku | `Messwerte.quelle` Default `CSV` (CSV-Upload bleibt automatisch `CSV`). `.env.example` um MQTT-Broker-Vars ergänzt. |
+| [x] | 13. Nachtrag (Vibe): Producer-`zev` | `ZaehlerAggregationService.upsertMesswert`: `zev = (einheit.typ == PRODUCER) ? total : 0.0` (statt immer `0`), damit die Statistik die Produktion korrekt ausweist. Producer-Werte (`zev = total ≠ 0`) werden von FR-9 nicht überschrieben. Einzige typ-abhängige Verzweigung; `total`-Bildung unverändert. Test `aggregiere_Producer_ZevGleichTotal` ergänzt. |
 
 > **Reihenfolge-Hinweis:** Phasen 2–5 (DB/Entity) sind Voraussetzung für 7/8. Phase 6 (Connection) und 7 (Handler) bilden den Empfang; 8 die Verarbeitung; 9 die Verrechnung. 10/11 sind Monitoring, unabhängig testbar. FR-9 (Phase 9) ist die einzige profil-unabhängige Änderung.
 
