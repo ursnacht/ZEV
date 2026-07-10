@@ -36,12 +36,12 @@
 
     <div class="zev-form-group">
       <label>{{ 'ALGORITHMUS' | translate }}:</label>
-      <div class="algorithm-selection">
-        <label class="radio-label">
+      <div class="zev-radio-group">
+        <label class="zev-radio-label">
           <input type="radio" name="algorithm" value="EQUAL_SHARE" [(ngModel)]="algorithm">
           {{ 'ALGORITHMUS_EQUAL_SHARE' | translate }}
         </label>
-        <label class="radio-label">
+        <label class="zev-radio-label">
           <input type="radio" name="algorithm" value="PROPORTIONAL" [(ngModel)]="algorithm">
           {{ 'ALGORITHMUS_PROPORTIONAL' | translate }}
         </label>
