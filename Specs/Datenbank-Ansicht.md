@@ -13,15 +13,17 @@
 1. `zev_admin` öffnet `/einstellungen`; ein zusätzlicher Bereich **„Datenbank-Ansicht"** ist sichtbar (nur mit Permission `datenbank:read`; siehe NFR-2).
 2. Das System lädt die Liste der **auswählbaren Tabellen** (alle Basistabellen des Schemas `zev`, dynamisch aus dem Katalog) in ein Auswahlfeld (Dropdown).
 3. Der Admin wählt eine Tabelle und gibt **optional** eine WHERE-Klausel in ein Textfeld ein (ohne das Schlüsselwort `WHERE`, z.B. `org_id = 42 AND zeit > '2026-01-01'`).
-4. Der Admin klickt **„Anzeigen"**.
+4. Der Admin klickt **„Anzeigen"** — alternativ genügt die **Enter-Taste**, während der Fokus im Filter-Eingabefeld liegt (löst dieselbe Aktion aus, sofern eine Tabelle gewählt ist und keine Abfrage läuft).
 5. Das System validiert Tabelle + WHERE (NFR-2), führt eine **read-only**-Abfrage aus und liefert die Zeilen **paginiert** zurück.
 6. Das System zeigt die Ergebnisse **generisch** als Tabelle an: Spaltenüberschriften aus den DB-Metadaten, darunter die Zeilen; plus Zeilenanzahl und Pagination.
-7. Bei ungültiger Eingabe / Fehler zeigt das System eine verständliche Fehlermeldung; es werden **keine** Daten geändert.
+7. Der Admin kann per **Klick auf eine Spaltenüberschrift** nach dieser Spalte **sortieren** (erneuter Klick kehrt die Richtung um). Die Sortierung erfolgt **serverseitig über den gesamten Datensatz** (nicht nur die aktuelle Seite) und setzt die Anzeige auf Seite 1 zurück.
+8. Bei ungültiger Eingabe / Fehler zeigt das System eine verständliche Fehlermeldung; es werden **keine** Daten geändert.
 
 ### FR-2: Generische Abfrage (kein tabellenspezifischer Code)
 * Die Anzeige ist **datengetrieben**: Spalten stammen aus `ResultSetMetaData` bzw. dem Ergebnis-Mapping (`JdbcTemplate`), **nicht** aus fest codierten DTOs/Entities je Tabelle.
-* Erzeugte Abfrage (konzeptionell): `SELECT * FROM zev.<tabelle> [WHERE <where>] LIMIT <size> OFFSET <offset>` — **ohne `ORDER BY`** (Entscheidung).
-  > *Hinweis:* Ohne Sortierung ist die Zeilenreihenfolge über Pagination-Seiten hinweg von PostgreSQL **nicht garantiert stabil**; für ein Inspektionswerkzeug akzeptiert.
+* Erzeugte Abfrage (konzeptionell): `SELECT * FROM zev.<tabelle> [WHERE <where>] [ORDER BY <sortSpalte> <ASC|DESC>] LIMIT <size> OFFSET <offset>`.
+* **Sortierung (optional, serverseitig):** `sortSpalte` muss **exakt** einer Spalte der dynamischen Katalog-Spaltenliste entsprechen (gleiche Whitelist-Prüfung wie der Tabellenname → injektionssicher); `sortRichtung` ist strikt `ASC`/`DESC`. Ohne `sortSpalte` wird **kein `ORDER BY`** gesetzt.
+  > *Hinweis:* Ohne aktive Sortierung ist die Zeilenreihenfolge über Pagination-Seiten hinweg von PostgreSQL **nicht garantiert stabil**; eine gewählte Sortierung stabilisiert sie.
 * **Binärspalten (`bytea`) werden ausgeblendet** (nicht in Spalten/Zeilen zurückgegeben); übrige Typen (inkl. `jsonb`) werden als Text dargestellt (ggf. gekürzt).
 * Der Tabellenname wird **nicht** interpoliert übernommen, sondern gegen die dynamisch ermittelte **Whitelist** der `zev`-Tabellen geprüft (exakte Übereinstimmung) — dadurch ist der Tabellenname injektionssicher.
 * **Rohansicht über alle Mandanten:** Der Hibernate-`orgFilter` wird **nicht** angewendet (native Abfrage via `JdbcTemplate`); Zeilen aller Mandanten werden angezeigt, `org_id` erscheint als normale Spalte. (Bewusste Ausnahme von der sonstigen Mandanten-Isolation, gerechtfertigt durch die globale Rolle `zev_admin` — siehe NFR-2.)
@@ -31,14 +33,14 @@ Neuer Controller unter `/api/datenbank`, klassenweit `@PreAuthorize("hasAuthorit
 | Methode | Pfad | Zweck |
 |---------|------|-------|
 | `GET` | `/api/datenbank/tabellen` | Liste der auswählbaren Tabellennamen (Schema `zev`) |
-| `POST` | `/api/datenbank/abfrage` | Body `{ tabelle, where, page, size }` → `{ spalten[], zeilen[[]], seite, groesse, hatMehr }` |
+| `POST` | `/api/datenbank/abfrage` | Body `{ tabelle, where, page, size, sortSpalte?, sortRichtung? }` → `{ spalten[], zeilen[[]], seite, groesse, hatMehr }` |
 
 * `POST` statt `GET`, damit die WHERE-Klausel nicht in der URL/den Logs landet.
 * Rückgabe: Spaltennamen als String-Liste, Zeilen als Liste von Wert-Listen (oder Liste von Maps); Werte als String-repräsentiert/JSON-serialisierbar.
 
 ### FR-4: Layout / Anzeige
 * Der Bereich wird in `/einstellungen` als eigener Abschnitt/Panel eingefügt (Design-System-`panel`/`card`), sichtbar nur bei `datenbank:read`.
-* Elemente: **Tabellen-Dropdown**, **WHERE-Textfeld** (Platzhalter mit Beispiel), **„Anzeigen"-Button**, **Ergebnis-Tabelle** (Design-System-`table`), **Pagination**, **Message-Bereich** (Design-System-`message`) für Fehler/Hinweise.
+* Elemente: **Tabellen-Dropdown**, **WHERE-Textfeld** (Platzhalter mit Beispiel; **Enter** löst „Anzeigen" aus), **„Anzeigen"-Button**, **Ergebnis-Tabelle** (Design-System-`table`) mit **klickbaren, sortierbaren Spaltenüberschriften** inkl. Richtungs-Indikator (▲/▼), **Pagination**, **Message-Bereich** (Design-System-`message`) für Fehler/Hinweise.
 * Alle Texte via `TranslationService`/`TranslatePipe` (keine Hardcodings).
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
@@ -55,6 +57,9 @@ Neuer Controller unter `/api/datenbank`, klassenweit `@PreAuthorize("hasAuthorit
 * [ ] Ungültige WHERE-Syntax → verständliche Fehlermeldung (`400`), keine Stacktraces/DB-Interna nach aussen.
 * [ ] Leeres Ergebnis → Hinweis „keine Daten" statt leerer/fehlerhafter Tabelle.
 * [ ] Ausgeführte Abfragen werden serverseitig protokolliert (wer, Tabelle, WHERE, Zeitpunkt) — Audit.
+* [ ] Klick auf eine Spaltenüberschrift sortiert **serverseitig** nach dieser Spalte (über alle Seiten); erneuter Klick kehrt die Richtung um; ein Indikator (▲/▼) zeigt die aktive Sortierung.
+* [ ] Enter im Filter-Eingabefeld löst „Anzeigen" aus (wenn eine Tabelle gewählt ist und keine Abfrage läuft).
+* [ ] Eine ungültige/nicht existierende `sortSpalte` wird **abgewiesen** (`400`, kein SQL); `sortRichtung` nur `ASC`/`DESC`.
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
@@ -110,14 +115,13 @@ Neuer Controller unter `/api/datenbank`, klassenweit `@PreAuthorize("hasAuthorit
 * **Keine** gespeicherten Abfragen/Favoriten.
 * **Kein** allgemeiner SQL-Editor.
 * **Kein** CSV-/Daten-Export (Entscheidung).
-* **Keine** Sortierung (`ORDER BY`) — weder per Klick noch per Eingabe (Entscheidung).
 * **Keine** dedizierte read-only DB-Rolle; **keine** Audit-Tabelle (nur Application-Log).
 * Mandantenspezifische Filterung ist bewusst **nicht** aktiv (Rohansicht).
 
 ## 8. Offene Fragen
 Alle geklärt (in FR/NFR/Out-of-Scope eingearbeitet):
 * [x] **CSV-/Daten-Export:** → **nein** (Out of Scope).
-* [x] **Sortierung/`ORDER BY`:** → **ohne Sortierung** (FR-2; Pagination-Reihenfolge nicht garantiert stabil).
+* [x] **Sortierung/`ORDER BY`:** → **serverseitig per Spalten-Klick** (Nachtrag): `sortSpalte` gegen Katalog-Whitelist geprüft, `sortRichtung` `ASC`/`DESC`, über den gesamten Datensatz (FR-1/FR-2/FR-4).
 * [x] **Dedizierte read-only DB-Rolle:** → **nein**; read-only-Transaktion genügt (NFR-2).
 * [x] **Audit-Persistenz:** → **Application-Log** genügt (keine Audit-Tabelle, NFR-2).
 * [x] **Statement-Timeout / Pagegrösse:** → **5 s**, Default **50** / Max **500** (NFR-1).

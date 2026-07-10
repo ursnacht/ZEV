@@ -27,7 +27,8 @@
   <div class="zev-form-group">
     <label for="dbWhere">{{ 'DATENBANK_FILTER' | translate }}:</label>
     <input type="text" id="dbWhere" class="zev-input" [(ngModel)]="whereClause" name="dbWhere"
-      placeholder="org_id = 42 AND zeit > '2026-01-01'" />
+      placeholder="org_id = 42 AND zeit > '2026-01-01'"
+      (keyup.enter)="!(!selectedTabelle || loading) && onAnzeigen()" />
   </div>
 
   <div class="zev-form-actions">
@@ -49,7 +50,13 @@
           <thead>
             <tr>
               @for (spalte of result.spalten; track $index) {
-                <th>{{ spalte }}</th>
+                <th class="zev-table__header--sortable" (click)="onSort(spalte)"
+                  [attr.aria-sort]="sortSpalte === spalte ? (sortRichtung === 'ASC' ? 'ascending' : 'descending') : 'none'">
+                  {{ spalte }}
+                  @if (sortSpalte === spalte) {
+                    <span class="zev-table__sort-indicator">{{ sortRichtung === 'ASC' ? '▲' : '▼' }}</span>
+                  }
+                </th>
               }
             </tr>
           </thead>

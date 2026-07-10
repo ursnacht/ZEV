@@ -49,6 +49,7 @@ Grundlage: [`Specs/Datenbank-Ansicht.md`](./Datenbank-Ansicht.md); Permission-Mo
 | [x] | 8. Integration in Einstellungen | `<app-datenbank-ansicht>` in `einstellungen.component.html` unter `@if (canViewDatenbank)`; `canViewDatenbank = inject(Keycloak).hasRealmRole('datenbank:read')`. |
 | [x] | 9. Übersetzungen | `V71__Add_DatenbankAnsicht_Translations.sql` (DE/EN, `ON CONFLICT DO NOTHING`): Titel, Labels, Pagination, Fehlermeldungen/Validierungs-Keys. |
 | [x] | 10. Berechtigungen-Doku | `Berechtigungen.md`: `datenbank:read` in Fachrolle→Permission, Matrix (Fussnote ⁵) + Endpunkt-Referenz (`/api/datenbank`), nur `zev_admin`. |
+| [x] | 11. Nachtrag (Vibe): Sortierung + Enter | **Serverseitige Sortierung**: DTO um `sortSpalte`/`sortRichtung` erweitert; `DatenbankService` prüft `sortSpalte` gegen die Katalog-Spaltenliste (Whitelist, injektionssicher), `sortRichtung` strikt `ASC`/`DESC`, hängt `ORDER BY "<spalte>" ASC|DESC` an. Frontend: klickbare `<th>` mit **Design-System-Klassen** `zev-table__header--sortable` + `zev-table__sort-indicator` (▲/▼, wie `tarif-list` – kein eigenes CSS), `onSort()` (Richtung togglen, Seite→0). **Enter im Filterfeld** (`(keyup.enter)`) löst „Anzeigen" aus. |
 
 > **Tests** (`/3_backend-tests`, `/4_frontend-unit-tests`, `/5_e2e-tests`) werden separat erstellt und sind **nicht** Teil dieser Umsetzung. Schwerpunkte: WHERE-Validator (Guards), Whitelist-/`403`-Fälle, `bytea`-Ausschluss, Pagination, generische Anzeige, Sichtbarkeit nur für `zev_admin`.
 
@@ -58,23 +59,25 @@ Grundlage: [`Specs/Datenbank-Ansicht.md`](./Datenbank-Ansicht.md); Permission-Mo
 - **`tabelle`:** nicht leer; muss exakt einer `zev`-Basistabelle entsprechen (dynamische Whitelist) — sonst `400`, **kein** SQL.
 - **`where`:** optional; falls gesetzt Guard-Prüfung (siehe Phase 3); Längenlimit. Verstoss → `400`, keine Ausführung.
 - **`size`:** 1..500 (Default 50); **`page`:** ≥ 0.
-- **Ausführung:** read-only-Transaktion + `statement_timeout=5s`; `bytea`-Spalten ausgeschlossen; kein `ORDER BY`.
+- **`sortSpalte`:** optional; falls gesetzt muss sie exakt einer Katalog-Spalte entsprechen (Whitelist) — sonst `400`, **kein** SQL. **`sortRichtung`:** nur `ASC`/`DESC` (Default `ASC`).
+- **Ausführung:** read-only-Transaktion + `statement_timeout=5s`; `bytea`-Spalten ausgeschlossen; `ORDER BY` nur bei gültiger `sortSpalte`.
 - **Autorisierung:** `datenbank:read` (nur `zev_admin`) — sonst `403`.
 - **Fehler-Hygiene:** Fehlermeldung ohne Stacktrace/DB-Interna.
 
 ### Frontend
-- „Anzeigen" deaktiviert, solange keine Tabelle gewählt.
+- „Anzeigen" deaktiviert, solange keine Tabelle gewählt; **Enter** im Filterfeld löst „Anzeigen" aus (nur wenn Tabelle gewählt und keine Abfrage läuft).
 - `size`/`page` über Pagination-Steuerung; WHERE optional.
+- **Sortierung:** Klick auf Spaltenkopf → `onSort()` (bei gleicher Spalte Richtung umkehren, sonst `ASC`), Seite auf 0; „Anzeigen" setzt die Sortierung zurück.
 - Backend-Fehler (`400`/`403`/Timeout) als Message anzeigen; leeres Ergebnis → „keine Daten".
 - Bereich nur bei `hasRealmRole('datenbank:read')` gerendert.
 
 ## Offene Punkte / Annahmen
 
-- **Alle Spec-Fragen sind beantwortet** (Datenbank-Ansicht.md §8): ohne Sortierung, `bytea` ausblenden, keine dedizierte DB-Rolle, Audit = Application-Log, Timeout 5 s / Paging 50/500, Permission `datenbank:read`, kein CSV-Export.
+- **Alle Spec-Fragen sind beantwortet** (Datenbank-Ansicht.md §8): serverseitige Sortierung per Spalten-Klick (Nachtrag), `bytea` ausblenden, keine dedizierte DB-Rolle, Audit = Application-Log, Timeout 5 s / Paging 50/500, Permission `datenbank:read`, kein CSV-Export.
 - **Migrationsnummer `V71`:** V69/V70 sind im MQTT-Integration-Plan reserviert; bei der Umsetzung die **nächste freie Nummer verifizieren** (zev-db MCP / `flyway:info`).
 - **Keycloak:** Realm-Änderung (`datenbank:read` + Composite) wird **vom Benutzer** angewandt (kein Reimport durch Claude). `hasRealmRole('datenbank:read')` funktioniert, da Composite-Rollen im Token expandiert werden (wie `featureflags:manage`).
 - **`JdbcTemplate`** ist über `spring-boot-starter-data-jpa` (JDBC-Autoconfig) verfügbar; kein zusätzliches Starter-Dependency nötig.
-- **Pagination ohne `ORDER BY`:** Reihenfolge über Seiten hinweg nicht garantiert stabil (bewusst, Spec).
+- **Pagination ohne aktive Sortierung:** Reihenfolge über Seiten hinweg nicht garantiert stabil; eine per Spalten-Klick gewählte Sortierung (`ORDER BY`) stabilisiert sie.
 - **Restrisiko WHERE-Guard:** Keyword-Blacklist per Wortgrenzen-Regex; Rest-Absicherung durch read-only-Transaktion + `statement_timeout` + `LIMIT` (defense-in-depth). Sub-`SELECT` explizit verboten.
 - **ArchUnit:** `ArchitectureTest` ist grün. Der direkte `JdbcTemplate`-Zugriff im Service verletzt **keine** Schichtenregel (keine Ausnahme nötig). Einzige Anpassung: DTOs müssen auf `DTO` enden (`dtosShouldEndWithDTO`) → `DatenbankAbfrageRequestDTO`/`DatenbankAbfrageResponseDTO`.
 - **Whitelist-Ermittlung:** pro Anfrage aus dem Katalog (leichtgewichtig); optionales Caching später.

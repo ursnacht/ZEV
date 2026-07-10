@@ -25,13 +25,15 @@ Das Design System (`/design-system`) enthält alle wiederverwendbaren UI-Kompone
 
 **Wichtig:** Vor dem Erstellen neuer Styles immer prüfen, ob bereits eine passende Klasse existiert!
 
+Die folgende Tabelle ist ein **Überblick, nicht vollständig**. Massgeblich (Quelle der Wahrheit) sind die CSS-Dateien in `design-system/src/components/*.css` sowie der **Design-System-Showcase** (`DesignSystemShowcaseComponent`, Route `/design-system`) zum Ansehen aller Bausteine. Neue wiederverwendbare Bausteine dort ergänzen.
+
 | Kategorie | Verfügbare Klassen |
 |-----------|-------------------|
 | Container | `.zev-container`, `.zev-card`, `.zev-panel` |
 | Formulare | `.zev-form-container`, `.zev-form-group`, `.zev-form-row`, `.zev-form-actions`, `.zev-form-section`, `.zev-date-range-row` |
 | Inputs | `.zev-input`, `.zev-select`, `.zev-form-error`, `.zev-form-hint` |
 | Buttons | `.zev-button`, `.zev-button--primary`, `.zev-button--secondary`, `.zev-button--danger`, `.zev-button--compact` |
-| Tabellen | `.zev-table`, `.zev-table__header--sortable`, `.zev-table--compact` |
+| Tabellen | `.zev-table`, `.zev-table__header--sortable`, `.zev-table__sort-indicator`, `.zev-table--compact` |
 | Messages | `.zev-message`, `.zev-message--success`, `.zev-message--error`, `.zev-message--dismissible` |
 | Navigation | `.zev-navbar`, `.zev-navbar__link`, `.zev-navbar__link--active`, `.zev-hamburger` |
 | Kebab-Menü | `.zev-kebab-container`, `.zev-kebab-button`, `.zev-kebab-menu`, `.zev-kebab-menu__item`, `.zev-kebab-menu__item--danger` |
@@ -49,12 +51,15 @@ Das Design System (`/design-system`) enthält alle wiederverwendbaren UI-Kompone
 * Komponenten-CSS-Dateien minimal halten (nur komponentenspezifische Styles)
 * Neue wiederverwendbare Styles in `design-system/src/components/` hinzufügen
 * Nach Änderungen am Design System: `cd design-system && npm run build`
-* Ändere NIEMALS ein BESTEHENDES DB-Migrationsskript bevor du nicht mit dem MCP-Server 'zev-db' geprüft hast, ob es nicht bereits ausgeführt worden ist.
 
 ### Navigation
 * In der Navigationsbar (rechts, links vom Darkmode-Toggle) wird Vorname und Nachname des eingeloggten Benutzers angezeigt
 * Fallback: Benutzername (username), falls kein Vor-/Nachname in Keycloak hinterlegt
 * Kein Org-Alias in diesem Bereich
+
+### Datenbank / Migrationen (Flyway)
+* Ändere **NIEMALS** ein bereits ausgeführtes Migrationsskript. Vor jeder Änderung an einer Migration via MCP-Server `zev-db` prüfen, ob sie schon ausgeführt wurde (`SELECT version, success FROM zev.flyway_schema_history WHERE version = '<NR>';`); wurde sie ausgeführt, **neue** Migration mit nächsthöherer Versionsnummer anlegen (gilt auch für kleine Ergänzungen wie Übersetzungs-Keys).
+* Neue Übersetzungen immer mit `ON CONFLICT (key) DO NOTHING`.
 
 ### Multi-Tenancy
 * Jede Entity muss eine `org_id` (UUID) Spalte haben

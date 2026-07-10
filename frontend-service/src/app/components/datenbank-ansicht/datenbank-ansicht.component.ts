@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WithMessage } from '../../utils/with-message';
 import { DatenbankService } from '../../services/datenbank.service';
-import { DatenbankAbfrageResponse } from '../../models/datenbank.model';
+import { DatenbankAbfrageResponse, SortRichtung } from '../../models/datenbank.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
 
@@ -27,6 +27,8 @@ export class DatenbankAnsichtComponent extends WithMessage implements OnInit {
   page = 0;
   size = 50;
   loading = false;
+  sortSpalte: string | null = null;
+  sortRichtung: SortRichtung = 'ASC';
 
   constructor(private datenbankService: DatenbankService) { super(); }
 
@@ -42,6 +44,21 @@ export class DatenbankAnsichtComponent extends WithMessage implements OnInit {
   }
 
   onAnzeigen(): void {
+    // Neue Abfrage (ggf. andere Tabelle/Filter) -> Sortierung zurücksetzen
+    this.page = 0;
+    this.sortSpalte = null;
+    this.sortRichtung = 'ASC';
+    this.abfrage();
+  }
+
+  onSort(spalte: string): void {
+    if (this.sortSpalte === spalte) {
+      // gleiche Spalte -> Richtung umkehren
+      this.sortRichtung = this.sortRichtung === 'ASC' ? 'DESC' : 'ASC';
+    } else {
+      this.sortSpalte = spalte;
+      this.sortRichtung = 'ASC';
+    }
     this.page = 0;
     this.abfrage();
   }
@@ -70,7 +87,9 @@ export class DatenbankAnsichtComponent extends WithMessage implements OnInit {
       tabelle: this.selectedTabelle,
       where: this.whereClause?.trim() || undefined,
       page: this.page,
-      size: this.size
+      size: this.size,
+      sortSpalte: this.sortSpalte || undefined,
+      sortRichtung: this.sortSpalte ? this.sortRichtung : undefined
     }).subscribe({
       next: (result) => {
         this.result = result;

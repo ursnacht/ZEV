@@ -84,11 +84,23 @@ public class DatenbankService {
         // 5) Read-only absichern + Langläufer verhindern
         jdbcTemplate.execute("SET LOCAL statement_timeout = " + STATEMENT_TIMEOUT_MS);
 
+        // 6) Optionale Sortierung: Spalte MUSS aus der Katalog-Whitelist stammen (injektionssicher),
+        //    Richtung strikt ASC/DESC.
+        String orderBySql = "";
+        String sortSpalte = request.getSortSpalte();
+        if (sortSpalte != null && !sortSpalte.isBlank()) {
+            if (!spalten.contains(sortSpalte)) {
+                throw new IllegalArgumentException("DATENBANK_SORT_UNGUELTIG");
+            }
+            boolean desc = "DESC".equalsIgnoreCase(request.getSortRichtung());
+            orderBySql = " ORDER BY \"" + sortSpalte + "\" " + (desc ? "DESC" : "ASC");
+        }
+
         String cols = String.join(", ", spalten.stream().map(c -> "\"" + c + "\"").toList());
         String whereSql = (where == null || where.isBlank()) ? "" : " WHERE " + where;
-        // Tabellenname stammt aus der Whitelist; Spalten aus dem Katalog -> injektionssicher.
+        // Tabellenname/Spalten/Sortierspalte stammen aus dem Katalog -> injektionssicher.
         String sql = "SELECT " + cols + " FROM " + SCHEMA + ".\"" + tabelle + "\"" + whereSql
-                + " LIMIT ? OFFSET ?";
+                + orderBySql + " LIMIT ? OFFSET ?";
 
         // size+1 lesen, um hatMehr ohne separaten COUNT zu bestimmen
         List<List<Object>> zeilen;
@@ -113,8 +125,9 @@ public class DatenbankService {
         }
 
         // Audit-Log (Application-Log): wer hat welche Abfrage ausgeführt
-        log.info("Datenbank-Ansicht: user={}, tabelle={}, where='{}', page={}, size={} -> {} Zeilen",
-                aktuellerBenutzer(), tabelle, where == null ? "" : where, page, size, zeilen.size());
+        log.info("Datenbank-Ansicht: user={}, tabelle={}, where='{}', sort='{}', page={}, size={} -> {} Zeilen",
+                aktuellerBenutzer(), tabelle, where == null ? "" : where, orderBySql.trim(), page, size,
+                zeilen.size());
 
         return new DatenbankAbfrageResponseDTO(spalten, zeilen, page, size, hatMehr);
     }

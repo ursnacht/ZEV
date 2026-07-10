@@ -16,6 +16,10 @@ $ARGUMENTS
 4. **Ergänze das Anforderungsdokument** mit den zusätzlichen Anforderungen.
     - Ergänze die Funktionalen Anforderungen, die Akzeptanzkriterien und die Nichtfunktionalen Anforderungen wo nötig.
 5. **Setze die neuen Anforderungen um** gemäss den Vorgaben in `Specs/generell.md`.
+    - **Design System zuerst prüfen** (siehe Block unten) – kein UI-CSS ohne diese Prüfung.
+
+## 🎨 Design System – zwingend beachten (bei UI-Änderungen)
+* **Kein neues UI-CSS ohne vorherige Prüfung des Design Systems.** Bestehende Klassen wiederverwenden, wiederverwendbare Styles gehören ins Design System – Details, Klassenliste und Regeln stehen in `Specs/generell.md` (Abschnitt „Design System"). Dort nachschlagen, nicht hier duplizieren.
 
 ## ⚠️ Datenbank-Migrationen (Flyway) – zwingend beachten
 * **Ändere NIEMALS ein bestehendes Migrationsskript** (auch keines, das du in derselben Session erstellt hast), bevor du nicht via MCP-Server `zev-db` geprüft hast, ob es bereits ausgeführt wurde:
