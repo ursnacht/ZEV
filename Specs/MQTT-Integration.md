@@ -110,7 +110,7 @@ CREATE INDEX idx_zaehler_rohdaten_unverarbeitet
 * Duplikat (gleiche `einheit_id` + `zeit`): Upsert.
 
 ### FR-6: Scheduled Aggregation (15-Minuten-Job) — Delta-Bildung im Backend
-1. Scheduled Job (`0 0,15,30,45 * * * *`) ermittelt das abgeschlossene 15-Minuten-Intervall.
+1. Scheduled Job (`0 5,20,35,50 * * * *`, d.h. jeweils **5 Minuten nach** der Viertelstunde) ermittelt das abgeschlossene 15-Minuten-Intervall. Der 5-Minuten-Versatz gibt spät eintreffenden MQTT-Nachrichten Zeit; die **verarbeiteten Intervallgrenzen bleiben quartalsgenau** (`:00/:15/:30/:45`).
 2. Pro Einheit **je Register die Differenz** über die Intervallgrenze bilden: `ΔBezug` und `ΔEinspeisung` = `(letzter Stand ≤ Intervallende) − (Referenzstand = letzter Stand ≤ vorheriges Intervallende)`.
 3. **Reset/Überlauf/Zählertausch:** Die Guard-Prüfung gilt **pro Register** — ist `ΔBezug` **oder** `ΔEinspeisung` < 0, wird das jeweilige Register-Delta **nicht negativ** übernommen (auf 0 gesetzt), die Referenz neu gesetzt und WARN geloggt. (Wichtig: nicht am Vorzeichen von `total` prüfen, da negatives `total` bei Einspeisung legitim ist – siehe Mapping unten.)
 4. **Mapping auf `messwerte`** (`zeit`, `total`, `einheit`, `org_id`) gemäss Entscheidung (§8):
@@ -158,7 +158,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 * [ ] Nach Broker-Abbruch automatischer Reconnect.
 
 **15-Minuten-Aggregation:**
-* [ ] Job läuft um :00, :15, :30, :45; `ΔBezug`/`ΔEinspeisung` je Register korrekt als **Differenz** gebildet.
+* [ ] Job läuft um :05, :20, :35, :50; verarbeitet werden die quartalsgenauen Intervalle (:00–:15, :15–:30, …); `ΔBezug`/`ΔEinspeisung` je Register korrekt als **Differenz** gebildet.
 * [ ] `total = ΔBezug − ΔEinspeisung` korrekt vorzeichenbehaftet (Bezug → positiv, Einspeisung → negativ).
 * [ ] `zev` wird beim MQTT-Ingest auf `0` gesetzt (Sentinel); `messwerte.zev` bleibt `NOT NULL`.
 * [ ] Aggregierte Werte in `messwerte` mit `quelle = 'MQTT'`.

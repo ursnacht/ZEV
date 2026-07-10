@@ -51,7 +51,10 @@ public class ZaehlerAggregationService {
         this.metrics = metrics;
     }
 
-    @Scheduled(cron = "0 0,15,30,45 * * * *")
+    // Läuft 5 Minuten nach jeder Viertelstunde (:05/:20/:35/:50), damit spät eintreffende
+    // MQTT-Nachrichten des gerade abgeschlossenen Quartals noch enthalten sind. Die verarbeiteten
+    // Intervallgrenzen bleiben quartalsgenau (:00/:15/:30/:45) – dafür sorgt floorAufQuartal().
+    @Scheduled(cron = "0 5,20,35,50 * * * *")
     @Transactional
     public void aggregiere() {
         metrics.recordAggregationRun();

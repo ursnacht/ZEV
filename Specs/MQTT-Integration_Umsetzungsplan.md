@@ -67,7 +67,7 @@ zev.zaehler_rohdaten  (Upsert, org_id explizit)
 **2) Aggregation (Pull, zeitgesteuert):**
 
 ```
-@Scheduled(cron "0 0,15,30,45 * * * *")
+@Scheduled(cron "0 5,20,35,50 * * * *")   # 5 Min nach der Viertelstunde; Intervalle bleiben :00/:15/:30/:45
   ▼
 ZaehlerAggregationService.aggregiere()
   │  je Einheit: ΔBezug/ΔEinspeisung über Intervallgrenze (Reset-Guard pro Register)
@@ -115,7 +115,7 @@ zev.messwerte  (total = ΔBezug − ΔEinspeisung, zev = 0, quelle = MQTT)  +  R
 | [x] | 5. Einheit-Auflösung | `EinheitRepository.findByOrgIdAndMesspunkt(Long, String)`. |
 | [x] | 6. MQTT-Subscriber (Connection) | `MqttConfig` (`@Profile("mqtt")`): `DefaultMqttPahoClientFactory` (URL/Creds/TLS, `automaticReconnect`), `MqttPahoMessageDrivenChannelAdapter` auf `mqtt.topic`, QoS, `@ServiceActivator`-Handler. |
 | [x] | 7. Ingest-Handler (FR-4) | `MqttIngestService` (`@Profile("mqtt")`, `@Transactional`): Topic→`orgId`+`messpunkt`, JSON→`ZaehlerMesswertPayloadDTO`, Validierung (Pflichtfelder/≥0), Auflösung `(orgId, messpunkt)`, Rohdaten-Upsert (org_id **explizit**), Fehler → WARN + verwerfen; Metriken. |
-| [x] | 8. Aggregations-Job (FR-6) | `ZaehlerAggregationService` (`@Scheduled "0 0,15,30,45 * * * *"`, `@Profile("mqtt")`): Catch-up je Einheit über Quartals-Intervalle; **Reset-Guard pro Register**; `total = ΔBezug − ΔEinspeisung` (signed), `zev = 0`, Upsert `quelle='MQTT'` (org_id explizit); Rohdaten `verarbeitet=TRUE`. Leeres Intervall → kein Eintrag. |
+| [x] | 8. Aggregations-Job (FR-6) | `ZaehlerAggregationService` (`@Scheduled "0 5,20,35,50 * * * *"` – 5 Min nach der Viertelstunde, Intervallgrenzen bleiben quartalsgenau via `floorAufQuartal`; `@Profile("mqtt")`): Catch-up je Einheit über Quartals-Intervalle; **Reset-Guard pro Register**; `total = ΔBezug − ΔEinspeisung` (signed), `zev = 0`, Upsert `quelle='MQTT'` (org_id explizit); Rohdaten `verarbeitet=TRUE`. Leeres Intervall → kein Eintrag. |
 | [x] | 9. Solarverteilung FR-9 | `MesswerteService` (enthält die Verteil-Logik): nach `setZevCalculated` zusätzlich `zev = zev_calculated`, sofern `zev == 0`. Verteilalgorithmus unverändert. |
 | [x] | 10. Metriken (FR-8) | **Eigene `MqttMetrics`-Komponente** (`@Profile("mqtt")`, direkt via `MeterRegistry`) statt `MetricsService` — Letzterer nutzt den request-scoped Org-Kontext (im Ingest/Job nicht verfügbar). Counter/Gauges wie geplant. |
 | [x] | 11. Health-Indicator (FR-8) | `MqttHealthIndicator` (`@Profile("mqtt")`, Boot-4-API `org.springframework.boot.health.contributor`): `/actuator/health/mqtt`, UP solange Inbound-Adapter läuft. |
