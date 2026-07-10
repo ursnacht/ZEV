@@ -64,6 +64,6 @@ class MeterReading:
     """Ein gelesener, absoluter Zählerstand zum Messzeitpunkt."""
 
     messpunkt: str
-    timestamp: datetime            # UTC
+    timestamp: datetime            # aware; wird als lokale Zeit mit Offset publiziert
     zaehlerstand_bezug: float      # kWh, kumulativ, >= 0
     zaehlerstand_einspeisung: float  # kWh, kumulativ, >= 0

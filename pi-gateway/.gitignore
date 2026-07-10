@@ -7,7 +7,8 @@ venv/
 build/
 dist/
 
-# Secrets / lokale Konfiguration (nur config.example.yaml wird versioniert)
+# Secrets / lokale Konfiguration (nur *.example.yaml wird versioniert)
 .env
 config.yaml
+config.sim.yaml
 *.local.yaml

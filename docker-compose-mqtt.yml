@@ -44,9 +44,10 @@ services:
     restart: unless-stopped
     healthcheck:
       test: [ "CMD-SHELL", "mosquitto_pub -h localhost -t healthcheck -m ping -q 1 -u $${MQTT_BROKER_USERNAME} -P $${MQTT_BROKER_PASSWORD} || exit 1" ]
-      interval: 10s
+      interval: 60s
       timeout: 5s
       retries: 5
+      start_period: 10s   # frühe Probes beim Hochfahren, damit backend nicht ~60s auf 'healthy' wartet
 
   keycloak:
     image: quay.io/keycloak/keycloak:latest
@@ -90,6 +91,7 @@ services:
     env_file:
       - .env.mqtt
     environment:
+      - TZ=Europe/Zurich
       - SPRING_PROFILES_ACTIVE=mqtt
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/zev
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}

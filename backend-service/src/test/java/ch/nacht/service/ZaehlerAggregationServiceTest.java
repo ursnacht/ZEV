@@ -18,7 +18,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
@@ -81,7 +80,7 @@ public class ZaehlerAggregationServiceTest {
 
     /** Verdrahtet Catch-up für genau ein abgeschlossenes Intervall (frühester Stand = letztes Quartalsende). */
     private void stubCatchUpEinInterval() {
-        LocalDateTime letztesQuartalsende = floorAufQuartal(LocalDateTime.now(ZoneOffset.UTC));
+        LocalDateTime letztesQuartalsende = floorAufQuartal(LocalDateTime.now());
         ZaehlerRohdaten earliest = new ZaehlerRohdaten(ORG_ID, EINHEIT_ID, letztesQuartalsende,
                 BigDecimal.ZERO, BigDecimal.ZERO);
 
@@ -186,7 +185,7 @@ public class ZaehlerAggregationServiceTest {
 
     @Test
     void aggregiere_LeeresIntervall_KeinEintrag() {
-        LocalDateTime letztesQuartalsende = floorAufQuartal(LocalDateTime.now(ZoneOffset.UTC));
+        LocalDateTime letztesQuartalsende = floorAufQuartal(LocalDateTime.now());
         ZaehlerRohdaten earliest = new ZaehlerRohdaten(ORG_ID, EINHEIT_ID, letztesQuartalsende,
                 BigDecimal.ZERO, BigDecimal.ZERO);
         when(rohdatenRepository.findEinheitIdsWithUnverarbeitet()).thenReturn(List.of(EINHEIT_ID));

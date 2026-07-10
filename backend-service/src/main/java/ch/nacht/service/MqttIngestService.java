@@ -5,6 +5,7 @@ import ch.nacht.entity.Einheit;
 import ch.nacht.entity.ZaehlerRohdaten;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.ZaehlerRohdatenRepository;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.Optional;
 
 /**
@@ -41,7 +41,10 @@ public class MqttIngestService {
                              MqttMetrics metrics) {
         this.einheitRepository = einheitRepository;
         this.rohdatenRepository = rohdatenRepository;
-        this.objectMapper = objectMapper;
+        // Offset-behaftete Zeit NICHT auf die Kontext-Zeitzone normalisieren, damit die vom Pi
+        // gesendete lokale Wanduhrzeit verbatim erhalten bleibt (OffsetDateTime.toLocalDateTime()).
+        this.objectMapper = objectMapper.copy()
+                .disable(DeserializationFeature.ADJUST_DATES_TO_CONTEXT_TIME_ZONE);
         this.metrics = metrics;
     }
 
@@ -95,7 +98,10 @@ public class MqttIngestService {
             Einheit einheit = einheitOpt.get();
 
             // 4) Rohdaten upsert (org_id explizit)
-            LocalDateTime zeit = LocalDateTime.ofInstant(p.getTimestamp(), ZoneOffset.UTC);
+            // Der Pi sendet die lokale Zeit mit Offset (ISO 8601); die lokale Wanduhrzeit
+            // wird verbatim übernommen – konsistent mit dem CSV-Upload und der messwerte-Tabelle
+            // (naive lokale Zeit). Unabhängig von der Backend-Zeitzone.
+            LocalDateTime zeit = p.getTimestamp().toLocalDateTime();
             ZaehlerRohdaten row = rohdatenRepository.findByEinheitIdAndZeit(einheit.getId(), zeit).orElse(null);
             if (row == null) {
                 row = new ZaehlerRohdaten(orgId, einheit.getId(), zeit,

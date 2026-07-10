@@ -63,22 +63,89 @@ Einheit mit **`org_id = 42`** anlegen. Standard-Messpunkte der Vorlage:
 `MP-Wohnung-1`, `MP-Wohnung-2`, `MP-Producer`. Fehlt eine Einheit, verwirft der Ingest die
 Nachricht mit „unbekannter Messpunkt".
 
-**2) Simulator starten** (eigenes Terminal, auf dem Host):
+**2) Simulator starten** (eigenes Terminal, auf dem Host).
+
+**Windows (PowerShell)** – Schritt für Schritt aus dem Repo-Root `C:\data\git\ZEV`:
+
+```powershell
+cd pi-gateway
+
+# venv anlegen (py-Launcher; alternativ 'python')
+py -3 -m venv .venv
+
+# venv aktivieren:
+.\.venv\Scripts\Activate.ps1
+# Falls PowerShell die Aktivierung blockiert ("... kann nicht geladen werden ..."),
+# einmalig für DIESE Sitzung erlauben und erneut aktivieren:
+#   Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+# (oder ohne Aktivierung direkt die venv-Python nutzen: .\.venv\Scripts\python.exe -m gateway.main --config config.sim.yaml)
+
+# Abhängigkeiten installieren
+pip install -r requirements.txt
+
+# Konfiguration aus Vorlage kopieren (ggf. messpunkte/org_id anpassen)
+Copy-Item config.sim.example.yaml config.sim.yaml
+
+# Broker-Credentials für DIESE Sitzung setzen (Dev-Werte):
+$env:MQTT_USERNAME = "zev-backend"
+$env:MQTT_PASSWORD = "zev-mqtt-dev"
+
+# Simulator starten (läuft dauerhaft; mit Strg+C beenden)
+python -m gateway.main --config config.sim.yaml
+```
+
+> Hinweise (PowerShell):
+> - `py -3` wählt die neueste installierte Python-3-Version; alternativ `py -3.9` oder `python`.
+> - `$env:VAR = "wert"` gilt nur in der **aktuellen** PowerShell-Sitzung. Neues Fenster → erneut setzen.
+> - Die venv-Aktivierung ändert den Prompt zu `(.venv)`. Danach genügt `python`.
+
+**Linux/macOS (bash):**
 
 ```bash
 cd pi-gateway
-python3 -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
+python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-cp config.sim.example.yaml config.sim.yaml         # ggf. messpunkte/org_id anpassen
-
-# Broker-Credentials setzen (Dev):
-export MQTT_USERNAME=zev-backend MQTT_PASSWORD=zev-mqtt-dev   # PowerShell: $env:MQTT_USERNAME="zev-backend"; $env:MQTT_PASSWORD="zev-mqtt-dev"
-
+cp config.sim.example.yaml config.sim.yaml
+export MQTT_USERNAME=zev-backend MQTT_PASSWORD=zev-mqtt-dev
 python -m gateway.main --config config.sim.yaml
 ```
 
 Der Simulator publiziert alle 5 s absolute, monoton steigende Zählerstände
-(`"producer"` im Messpunkt → Einspeisung überwiegt = negatives `total`).
+(`"producer"` im Messpunkt → Einspeisung überwiegt = negatives `total`). Der Zeitstempel
+wird in **lokaler Zeit mit UTC-Offset** gesendet (z. B. `2026-07-10T14:30:00+02:00`).
+
+### Aktualisierten Simulator neu starten (nach Code-Änderung)
+
+Der Simulator läuft direkt aus dem Quellcode (`python -m gateway.main`), daher werden geänderte
+`.py`-Dateien beim nächsten Start automatisch übernommen – **kein erneutes `pip install` nötig**
+(solange sich `requirements.txt` nicht geändert hat). venv und `config.sim.yaml` bleiben bestehen.
+
+**Windows (PowerShell)** – im vorhandenen Simulator-Fenster **Strg+C** (alten Lauf beenden), dann:
+
+```powershell
+cd C:\data\git\ZEV\pi-gateway
+.\.venv\Scripts\Activate.ps1                # falls die Sitzung neu ist
+$env:MQTT_USERNAME = "zev-backend"          # nur nötig, wenn in dieser Sitzung noch nicht gesetzt
+$env:MQTT_PASSWORD = "zev-mqtt-dev"
+python -m gateway.main --config config.sim.yaml
+```
+
+**Linux/macOS (bash):**
+
+```bash
+cd pi-gateway && . .venv/bin/activate
+export MQTT_USERNAME=zev-backend MQTT_PASSWORD=zev-mqtt-dev
+python -m gateway.main --config config.sim.yaml
+```
+
+> **Wichtig:** Die Zeitzonen-Korrektur steckt zum grössten Teil im **Backend** (Payload-Format,
+> verbatim-Speicherung, `TZ=Europe/Zurich`). Nach Code-Änderungen daher auch das Backend neu bauen:
+> ```powershell
+> docker compose --env-file .env.mqtt -f docker-compose-mqtt.yml up --build -d backend-service
+> ```
+> Für einen sauberen Test vorher die alten (ggf. UTC-Raster-)Testdaten entfernen –
+> `... down -v` (inkl. DB-Volume) oder gezielt `TRUNCATE zev.zaehler_rohdaten;`
+> und `DELETE FROM zev.messwerte WHERE quelle='MQTT';`.
 
 **3) Prüfen**
 - `zev.zaehler_rohdaten` füllt sich laufend (Ingest).

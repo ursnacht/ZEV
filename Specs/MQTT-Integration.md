@@ -46,16 +46,26 @@ zev/{orgId}/{messpunkt}/messwert
 Der Pi publiziert die **absoluten kumulativen Zählerstände** zum Messzeitpunkt:
 ```json
 {
-  "timestamp": "2026-06-19T14:30:00Z",
+  "timestamp": "2026-06-19T14:30:00+02:00",
   "zaehlerstandBezug": 12345.678,
   "zaehlerstandEinspeisung": 4321.000
 }
 ```
 | Feld | Typ | Pflicht | Beschreibung |
 |------|-----|---------|--------------|
-| `timestamp` | ISO 8601 (UTC) | Ja | Zeitpunkt der Messung |
+| `timestamp` | ISO 8601 (lokale Zeit mit Offset) | Ja | Zeitpunkt der Messung, z. B. `2026-06-19T14:30:00+02:00` |
 | `zaehlerstandBezug` | Decimal (kWh, kumulativ) | Ja | Absoluter Zählerstand Bezug/Verbrauch (monoton steigend) |
 | `zaehlerstandEinspeisung` | Decimal (kWh, kumulativ) | Ja | Absoluter Zählerstand Einspeisung (monoton steigend) |
+
+> **Zeitzone (Wire = lokale Zeit mit Offset, Speicherung verbatim):** Der Pi sendet `timestamp`
+> als **lokale Zeit mit UTC-Offset** (ISO 8601, z. B. `2026-06-19T14:30:00+02:00`) – eindeutig
+> (kein DST-Doppelstunden-Problem). Das Backend übernimmt die lokale Wanduhrzeit **verbatim**
+> (`OffsetDateTime.toLocalDateTime()`, ohne Zeitzonen-Umrechnung) und speichert sie in
+> `zaehler_rohdaten.zeit` – konsistent mit der `messwerte`-Tabelle/dem CSV-Upload (naive lokale
+> Zeit). Der Ingest ist damit **unabhängig** von der Backend-Zeitzone. Der Aggregations-Job nutzt
+> `LocalDateTime.now()`; dafür muss der Container/JVM in der lokalen Zone laufen
+> (`TZ=Europe/Zurich`, in den `docker-compose*.yml` gesetzt), damit `now()` auf demselben
+> Raster liegt wie die gespeicherten Zeitstempel.
 
 > Die Stände sind **kumulativ und monoton** (Ausnahme: Zähler-Reset/-tausch, siehe Aggregation/Edge Cases). Die Abbildung auf `messwerte` ist entschieden (FR-6.4): `total = ΔBezug − ΔEinspeisung` (vorzeichenbehaftet), `zev = 0` (Sentinel), `zev_calculated` bleibt Ergebnis der Solarverteilung (die `zev = 0` durch `zev_calculated` ersetzt, FR-9).
 

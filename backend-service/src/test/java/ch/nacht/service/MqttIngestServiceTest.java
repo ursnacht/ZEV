@@ -92,8 +92,8 @@ public class MqttIngestServiceTest {
         when(rohdatenRepository.findByEinheitIdAndZeit(eq(EINHEIT_ID), any())).thenReturn(Optional.empty());
         when(rohdatenRepository.save(any(ZaehlerRohdaten.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        // Act
-        service.handle(TOPIC, payload("2026-01-01T10:07:00Z", "123.4500", "10.0000"));
+        // Act – lokale Zeit mit Offset (Wire-Contract); Wanduhrzeit wird verbatim gespeichert
+        service.handle(TOPIC, payload("2026-01-01T10:07:00+01:00", "123.4500", "10.0000"));
 
         // Assert
         ArgumentCaptor<ZaehlerRohdaten> captor = ArgumentCaptor.forClass(ZaehlerRohdaten.class);
@@ -101,6 +101,7 @@ public class MqttIngestServiceTest {
         ZaehlerRohdaten saved = captor.getValue();
         assertEquals(ORG_ID, saved.getOrgId());
         assertEquals(EINHEIT_ID, saved.getEinheitId());
+        // Verbatim: 10:07 lokal (unabhängig von der Test-JVM-Zeitzone)
         assertEquals(LocalDateTime.of(2026, 1, 1, 10, 7), saved.getZeit());
         assertEquals(0, new BigDecimal("123.4500").compareTo(saved.getZaehlerstandBezug()));
         assertEquals(0, new BigDecimal("10.0000").compareTo(saved.getZaehlerstandEinspeisung()));

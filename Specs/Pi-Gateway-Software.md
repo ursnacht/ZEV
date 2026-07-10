@@ -49,9 +49,9 @@
 1. **Topic:** `zev/{orgId}/{messpunkt}/messwert` (exakt wie Backend-Subscription `zev/+/+/messwert`).
 2. **Payload (JSON, absolute Stände):**
    ```json
-   { "timestamp": "2026-06-19T14:30:00Z", "zaehlerstandBezug": 12345.678, "zaehlerstandEinspeisung": 4321.000 }
+   { "timestamp": "2026-06-19T14:30:00+02:00", "zaehlerstandBezug": 12345.678, "zaehlerstandEinspeisung": 4321.000 }
    ```
-   `timestamp` in **UTC (ISO 8601)**, Stände in kWh (kumulativ, ≥ 0).
+   `timestamp` in **lokaler Zeit mit UTC-Offset (ISO 8601)** (z. B. `+02:00`; eindeutig, kein DST-Problem), Stände in kWh (kumulativ, ≥ 0). Voraussetzung: korrekte lokale Zeitzone + NTP auf dem Pi (FR-6.3).
 3. QoS **0 oder 1** genügt (Verlusttoleranz durch absolute Stände); stabile Client-ID.
 4. Topic/Payload müssen **byte-genau** zum Backend-Vertrag passen (Änderungen nur abgestimmt mit `MQTT-Integration.md`).
 
@@ -126,7 +126,7 @@
 * [ ] Bei Broker-/VPN-Ausfall entsteht **kein Datenverlust** in der Gesamtsumme (nächster übertragener Stand schliesst die Lücke); optionale Pufferung erhält zusätzlich die Auflösung.
 * [ ] Unvollständige/fehlgeschlagene Reads werden verworfen (nicht publiziert).
 * [ ] Dienst startet nach Reboot automatisch (`systemd`) und verbindet sich selbstständig neu.
-* [ ] Zeitstempel sind UTC und korrekt (NTP); driftende Uhr wird als Problem erkennbar.
+* [ ] Zeitstempel sind lokale Zeit mit korrektem UTC-Offset (NTP + Zeitzone); driftende Uhr wird als Problem erkennbar.
 * [ ] Keine Secrets im Code/Repo; Broker-Zugangsdaten via Env/Config.
 * [ ] „Letzter erfolgreicher Read/Publish" ist auslesbar (Heartbeat).
 
@@ -158,7 +158,7 @@
 | Zählerüberlauf / Rücksprung / Zählerwechsel | Rohstand wird publiziert; Erkennung/Behandlung im **Backend** (Differenz < 0) |
 | Broker/VPN nicht erreichbar | Verlust unkritisch; optional puffern (Variante C / Queue) für Auflösung |
 | Puffer voll (falls Pufferung aktiv) | Definiertes Verhalten (z.B. älteste verwerfen + WARN) |
-| Uhr driftet / kein NTP | WARN; Zeitstempel bleiben UTC; Betreiber-Alarm |
+| Uhr driftet / kein NTP | WARN; Zeitstempel bleiben lokale Zeit mit Offset; Betreiber-Alarm |
 | Doppelter Publish (nach Reconnect) | Backend behandelt idempotent (Unique-Constraint) |
 | Prozessabsturz/Neustart | `systemd` startet neu; kein „letzter Stand" nötig (zustandslos) |
 
@@ -302,7 +302,8 @@ sudo systemctl daemon-reload && sudo systemctl restart pi-gateway.service
 sudo systemctl disable --now pi-gateway.service
 ```
 
-> **Zeitsynchronisation (FR-6.3):** Korrekte UTC-Zeitstempel sind
-> abrechnungskritisch. Sicherstellen, dass NTP läuft
-> (`timedatectl status` → „System clock synchronized: yes“; ggf.
-> `sudo timedatectl set-ntp true`).
+> **Zeitsynchronisation & Zeitzone (FR-6.3):** Korrekte Zeitstempel sind
+> abrechnungskritisch. Sicherstellen, dass NTP läuft **und die lokale Zeitzone gesetzt ist**
+> (`timedatectl status` → „System clock synchronized: yes“ und korrekte „Time zone“;
+> ggf. `sudo timedatectl set-ntp true` bzw. `sudo timedatectl set-timezone Europe/Zurich`).
+> Der publizierte Zeitstempel trägt den lokalen UTC-Offset.

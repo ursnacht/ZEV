@@ -16,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
@@ -56,7 +55,11 @@ public class ZaehlerAggregationService {
     @Transactional
     public void aggregiere() {
         metrics.recordAggregationRun();
-        LocalDateTime jetzt = LocalDateTime.now(ZoneOffset.UTC);
+        // Lokale Zeit – konsistent mit den lokal gespeicherten Rohdaten-Zeitstempeln
+        // (Pi sendet lokale Zeit mit Offset, verbatim übernommen) und dem messwerte-Raster.
+        // Voraussetzung: Backend/Container läuft in der lokalen Zone (TZ=Europe/Zurich).
+        LocalDateTime jetzt = LocalDateTime.now();
+        log.info("Aggregation start: {}", jetzt);
         LocalDateTime letzteGrenze = floorAufQuartal(jetzt); // letztes abgeschlossenes Intervallende
         int erzeugt = 0;
 
@@ -77,6 +80,7 @@ public class ZaehlerAggregationService {
             int schutz = 0;
             while (!intervallEnde.isAfter(letzteGrenze) && schutz++ < MAX_INTERVALLE) {
                 LocalDateTime intervallStart = intervallEnde.minusMinutes(INTERVALL_MINUTEN);
+                log.info("Aggregation. Intervall: {} - {}", intervallStart, intervallEnde);
                 if (rohdatenRepository.existsByEinheitIdAndZeitGreaterThanAndZeitLessThanEqual(
                         einheitId, intervallStart, intervallEnde)) {
                     if (verarbeiteIntervall(einheit, intervallStart, intervallEnde)) {

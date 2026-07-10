@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import timezone
 from urllib.parse import urlparse
 
 import paho.mqtt.client as mqtt
@@ -102,10 +101,16 @@ class MqttPublisher:
 
 
 def _to_payload(reading: MeterReading) -> dict:
-    """Baut das Vertrags-JSON (UTC-Zeitstempel mit 'Z', Stände in kWh)."""
-    timestamp = reading.timestamp.astimezone(timezone.utc).replace(microsecond=0)
+    """Baut das Vertrags-JSON (Zeitstempel in LOKALER Zeit mit Offset, Stände in kWh).
+
+    Der Zeitstempel wird als ISO-8601 in der lokalen Zeitzone des Pi mit UTC-Offset
+    gesendet (z. B. ``2026-07-10T14:30:00+02:00``). Das ist eindeutig (kein
+    DST-Doppelstunden-Problem) und das Backend speichert die lokale Wanduhrzeit verbatim.
+    Voraussetzung: die lokale Zeitzone des Pi ist korrekt gesetzt (NTP + Zeitzone, FR-6.3).
+    """
+    timestamp = reading.timestamp.astimezone().replace(microsecond=0)
     return {
-        "timestamp": timestamp.isoformat().replace("+00:00", "Z"),
+        "timestamp": timestamp.isoformat(),
         "zaehlerstandBezug": round(reading.zaehlerstand_bezug, _KWH_DECIMALS),
         "zaehlerstandEinspeisung": round(reading.zaehlerstand_einspeisung, _KWH_DECIMALS),
     }

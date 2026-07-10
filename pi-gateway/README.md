@@ -36,11 +36,11 @@ config.yaml ─► config.py ─► main.py (Read-Loop)
 Topic: `zev/{orgId}/{messpunkt}/messwert`
 
 ```json
-{ "timestamp": "2026-06-19T14:30:00Z", "zaehlerstandBezug": 12345.678, "zaehlerstandEinspeisung": 4321.0 }
+{ "timestamp": "2026-06-19T14:30:00+02:00", "zaehlerstandBezug": 12345.678, "zaehlerstandEinspeisung": 4321.0 }
 ```
 
-`timestamp` in UTC (ISO 8601), Stände in kWh (kumulativ, ≥ 0). Muss byte-genau zu
-`Specs/MQTT-Integration.md` passen.
+`timestamp` in lokaler Zeit mit UTC-Offset (ISO 8601), Stände in kWh (kumulativ, ≥ 0).
+Muss byte-genau zu `Specs/MQTT-Integration.md` passen.
 
 ## Konfiguration
 
@@ -124,6 +124,50 @@ Viertelstunde (`:00/:15/:30/:45`) schreibt der Job `zev.messwerte`
 (`total` vorzeichenbehaftet, `zev = 0`, `quelle = 'MQTT'`). Mitlesen der Nachrichten optional:
 `mosquitto_sub -h localhost -t 'zev/#' -v -u zev-backend -P zev-mqtt-dev`.
 
+## Broker-Zugangsdaten (`deploy/mosquitto/passwd`)
+
+Der Dev-Broker erzwingt Auth über die Datei [`deploy/mosquitto/passwd`](./deploy/mosquitto/passwd)
+(Username/Passwort, PBKDF2-SHA512-Hash – kein Klartext). Sie wird per `Dockerfile`
+(`COPY passwd …`) ins Broker-Image gebacken, damit die Auth unabhängig von Bind-Mount-Rechten greift.
+
+Erzeugt wurde die Datei mit `mosquitto_passwd` aus dem Mosquitto-Image (kein lokaler
+Mosquitto-Install nötig). Ausgeführt in `pi-gateway/deploy/mosquitto`:
+
+```bash
+# Dev-User zev-backend / zev-mqtt-dev  (-c = Datei neu anlegen/überschreiben, -b = Batch)
+MSYS_NO_PATHCONV=1 docker run --rm -v "$PWD":/data eclipse-mosquitto:2 \
+  mosquitto_passwd -c -b /data/passwd zev-backend zev-mqtt-dev
+```
+
+> `MSYS_NO_PATHCONV=1` verhindert unter Git-Bash/Windows das Verhunzen des `/data`-Pfads.
+> PowerShell: `docker run --rm -v "${PWD}:/data" eclipse-mosquitto:2 mosquitto_passwd -c -b /data/passwd zev-backend zev-mqtt-dev`
+
+**Passwort ändern** (Datei neu erzeugen, `-c`):
+
+```bash
+MSYS_NO_PATHCONV=1 docker run --rm -v "$PWD":/data eclipse-mosquitto:2 \
+  mosquitto_passwd -c -b /data/passwd zev-backend <neues-passwort>
+```
+
+**Weiteren User hinzufügen** – **ohne** `-c` (Datei nicht überschreiben), z.B. getrennte User für
+Pi-Publisher und Backend-Subscriber (für Produktion empfohlen, siehe Topologie-Doku):
+
+```bash
+MSYS_NO_PATHCONV=1 docker run --rm -v "$PWD":/data eclipse-mosquitto:2 \
+  mosquitto_passwd -b /data/passwd pi-publisher <passwort>
+```
+
+Nach jeder Änderung: Broker neu bauen (Datei ist ins Image gebacken) und Passwörter synchron halten
+(`.env.mqtt` → `MQTT_BROKER_PASSWORD`; Simulator → `$env:MQTT_PASSWORD` bzw. `export MQTT_PASSWORD`),
+sonst lehnt der Broker mit „not authorised" ab.
+
+```bash
+docker compose --env-file .env.mqtt -f docker-compose-mqtt.yml up --build -d mosquitto
+```
+
+> **Zeilenenden:** `passwd` muss **LF** behalten (via `.gitattributes` erzwungen) – CRLF bricht
+> das Einlesen durch Mosquitto.
+
 ## Deployment auf dem Pi (systemd)
 
 Vollständige Schritt-für-Schritt-Anleitung: **Anhang A** in
@@ -155,8 +199,9 @@ systemctl status pi-gateway.service
 journalctl -u pi-gateway.service -f
 ```
 
-> **NTP:** Korrekte UTC-Zeitstempel sind abrechnungskritisch – sicherstellen, dass
-> die Uhr synchron ist (`timedatectl status`).
+> **NTP & Zeitzone:** Korrekte Zeitstempel sind abrechnungskritisch – sicherstellen, dass
+> Uhr **und lokale Zeitzone** stimmen (`timedatectl status`; ggf.
+> `sudo timedatectl set-timezone Europe/Zurich`). Der publizierte Zeitstempel trägt den lokalen Offset.
 
 ## Stand / Abgrenzung
 

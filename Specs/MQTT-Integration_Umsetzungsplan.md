@@ -30,6 +30,11 @@ Grundlage: [`Specs/MQTT-Integration.md`](./MQTT-Integration.md); Publisher-Gegen
   Aggregation gruppiert explizit nach `(org_id, einheit)`.
 - **`org_id` = internes `BIGINT`/`Long`** (Entscheidung Spec §8), konsistent mit
   `Messwerte.orgId` und `Einheit.orgId`.
+- **Zeitzone:** Der Pi sendet UTC; der Ingest konvertiert auf die **lokale Zone**
+  (`ZoneId.systemDefault()`) und speichert `zaehler_rohdaten.zeit` als lokale Wanduhrzeit.
+  Der Aggregations-Job nutzt `LocalDateTime.now()` (lokal). Voraussetzung: Container-TZ =
+  lokale Zone (`TZ=Europe/Zurich` in `docker-compose*.yml`). So liegen MQTT- und CSV-Werte
+  auf demselben lokalen 15-Minuten-Raster.
 - **`@Profile("mqtt")`** auf allen MQTT-Beans (Subscriber, Ingest-Handler, Aggregations-Job,
   Health-Indicator); FR-9 (Solarverteilung) ist profil-**unabhängig** (nur `zev=0`-Fallback).
 
@@ -122,7 +127,7 @@ zev.messwerte  (total = ΔBezug − ΔEinspeisung, zev = 0, quelle = MQTT)  +  R
 
 ### Ingest (MqttIngestService, FR-4)
 - **Topic:** genau 4 Segmente `zev/{orgId}/{messpunkt}/messwert`; `orgId` numerisch parsebar — sonst WARN + verwerfen.
-- **Payload:** `timestamp` (ISO 8601 UTC) vorhanden/parsebar; `zaehlerstandBezug` und `zaehlerstandEinspeisung` vorhanden, numerisch, **≥ 0** — sonst WARN + verwerfen.
+- **Payload:** `timestamp` (ISO 8601, lokale Zeit mit UTC-Offset) vorhanden/parsebar, verbatim als lokale Wanduhrzeit übernommen; `zaehlerstandBezug` und `zaehlerstandEinspeisung` vorhanden, numerisch, **≥ 0** — sonst WARN + verwerfen.
 - **Einheit-Auflösung:** `(orgId, messpunkt)` muss existieren — unbekannt → WARN + verwerfen (kein Insert).
 - **Mandanten-Isolation:** Auflösung ausschliesslich über `(orgId, messpunkt)`; kein Cross-Tenant-Write möglich (org_id explizit gesetzt).
 - **Duplikat** `(einheit_id, zeit)`: Upsert (idempotent), kein Doppel-Insert.

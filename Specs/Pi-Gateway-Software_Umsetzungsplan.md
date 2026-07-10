@@ -35,7 +35,7 @@ Neues Repo/Verzeichnis, z. B. `pi-gateway/` (getrennt vom ZEV-Monorepo oder eige
 | [x] | 4. Modbus-Reader (Wago) | `pymodbus`-Client (`gateway/readers/modbus_reader.py`) für **alle Modbus-Zähler der Liste**, **Wirkenergie-Register (kWh, OBIS 1.8.0/2.8.0)** als float32 (Wortfolge/Skalierung aus Config, `struct`-Decode), robustes Lesen (Timeout, Teil-Reads verwerfen); Reader-`base.py` + `factory.py` |
 | [ ] | 5. gPlug-Reader (BKW) — **später / Erweiterung** | Platzhalter `gplug_reader.py` (wirft `NotImplementedError`); vollwertig nach Ergebnis Phase 3 |
 | [x] | 6. Zählerstand-Handling (ohne Delta) | Gelesene **absolute Stände** unverändert übernommen (keine Delta-Bildung, keine „letzter Stand"-Persistenz); nur fehlgeschlagene/Teil-Reads + negative Stände verworfen. Delta-/Reset-Erkennung liegt im Backend |
-| [x] | 7. MQTT-Publisher | `gateway/publisher.py`: Topic `zev/{orgId}/{messpunkt}/messwert`, Payload `{timestamp,zaehlerstandBezug,zaehlerstandEinspeisung}` (UTC-`Z`, kWh gerundet auf 4 NKS), **QoS 0/1**, stabile Client-ID, paho-2.x — byte-genau gemäss `MQTT-Integration.md` |
+| [x] | 7. MQTT-Publisher | `gateway/publisher.py`: Topic `zev/{orgId}/{messpunkt}/messwert`, Payload `{timestamp,zaehlerstandBezug,zaehlerstandEinspeisung}` (lokale Zeit mit UTC-Offset, kWh gerundet auf 4 NKS), **QoS 0/1**, stabile Client-ID, paho-2.x — byte-genau gemäss `MQTT-Integration.md` |
 | [x] | 8. Pufferung — **entfällt** | Entscheidung: **keine** Pufferung (Variante B genügt; absolute Stände sind verlusttolerant). Bei späterem Bedarf nachrüstbar (Variante C / Queue) |
 | [x] | 9. Orchestrierung / Read-Loop | `gateway/main.py`: Intervall-Loop iteriert über die **konfigurierte Zähler-Liste (N, skaliert auf 10–20+)**: pro Zähler Reader → Publish; Fehler **je Zähler isoliert** (ein defekter stoppt nicht alle); unterbrechbares Warten via `threading.Event` |
 | [x] | 10. Betrieb & Resilienz | `systemd`-Unit (`deploy/pi-gateway.service`, Autostart/`Restart=always`), MQTT-Reconnect mit Backoff (`reconnect_delay_set`), Modbus-Reconnect je Zyklus, NTP-Voraussetzung dokumentiert, Logging (journald/stdout), Signal-Handling (SIGINT/SIGTERM) |
@@ -53,9 +53,9 @@ Neues Repo/Verzeichnis, z. B. `pi-gateway/` (getrennt vom ZEV-Monorepo oder eige
 - Funktioniert für **beliebige Zähleranzahl** (10–20+) rein per Konfiguration, ohne Code-Änderung.
 
 ### Laufzeit / Datenkorrektheit
-- **Payload-Vertrag:** `timestamp` (ISO 8601 UTC), `zaehlerstandBezug`/`zaehlerstandEinspeisung` numerisch **≥ 0** (kumulativ); Topic exakt `zev/{orgId}/{messpunkt}/messwert`.
+- **Payload-Vertrag:** `timestamp` (ISO 8601, lokale Zeit mit UTC-Offset), `zaehlerstandBezug`/`zaehlerstandEinspeisung` numerisch **≥ 0** (kumulativ); Topic exakt `zev/{orgId}/{messpunkt}/messwert`.
 - **Reads:** nur vollständige, plausible Stände publizieren; Reset-/Rücksprung-Erkennung erfolgt im **Backend** (nicht auf dem Pi).
-- **Zeit:** Zeitstempel in UTC; bei fehlendem NTP/Drift WARN.
+- **Zeit:** Zeitstempel in lokaler Zeit mit UTC-Offset; bei fehlendem NTP/Drift WARN.
 - **Teil-/Fehl-Reads:** unvollständige Messungen werden verworfen, nicht publiziert.
 - **Puffer (falls aktiv):** definierte Obergrenze + Policy bei Überlauf; **ohne** Puffer ist Verlust dank absoluter Stände unkritisch.
 - **Idempotenz:** QoS 0/1; Duplikate sind backend-seitig unschädlich (Unique `einheit_id`+`zeit`).
