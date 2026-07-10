@@ -62,7 +62,7 @@ public class ZaehlerAggregationService {
         // (Pi sendet lokale Zeit mit Offset, verbatim übernommen) und dem messwerte-Raster.
         // Voraussetzung: Backend/Container läuft in der lokalen Zone (TZ=Europe/Zurich).
         LocalDateTime jetzt = LocalDateTime.now();
-        log.info("Aggregation start: {}", jetzt);
+        log.info("Aggregation start}");
         LocalDateTime letzteGrenze = floorAufQuartal(jetzt); // letztes abgeschlossenes Intervallende
         int erzeugt = 0;
 
@@ -83,7 +83,7 @@ public class ZaehlerAggregationService {
             int schutz = 0;
             while (!intervallEnde.isAfter(letzteGrenze) && schutz++ < MAX_INTERVALLE) {
                 LocalDateTime intervallStart = intervallEnde.minusMinutes(INTERVALL_MINUTEN);
-                log.info("Aggregation. Einheit: {}. Intervall: {} - {}", einheitId, intervallStart, intervallEnde);
+                log.info("Aggregation. Einheit: {}, Intervall: {} - {}", einheitId, intervallStart, intervallEnde);
                 if (rohdatenRepository.existsByEinheitIdAndZeitGreaterThanAndZeitLessThanEqual(
                         einheitId, intervallStart, intervallEnde)) {
                     if (verarbeiteIntervall(einheit, intervallStart, intervallEnde)) {
