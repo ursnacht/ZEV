@@ -24,6 +24,11 @@
     * Summe C: Summe zev aller Producer (Verbrauch Anteil ZEV)
     * Summe D: Summe zev aller Consumer (Verbrauch Anteil ZEV)
     * Summe E: Summe zev_calculated aller Consumer (Verbrauch Anteil ZEV)
+  * Zeige **vor dem Summen-Vergleich** zusätzlich folgende zwei berechnete Werte (kWh) an:
+    * **Bezug von VNB** = Verbrauch (Consumer Total) − zev_berechnet der Consumer (`summeConsumerTotal − summeConsumerZevCalculated`)
+    * **Rücklieferung** = Produktion (Producer Total) − zev der Producer (`summeProducerTotal − summeProducerZev`, jeweils Absolutwerte)
+    * Fachlich: *Bezug von VNB* = aus dem Netz bezogener Rest des Verbrauchs; *Rücklieferung* = ins Netz eingespeister Überschuss der Produktion.
+    * Beide Werte werden – wie die übrigen Summen – mit einem **Balken** visualisiert (gleiche Skala/`getBarWidth`, eigene Farben).
   * Vergleiche, ob Summe C = Summe D
   * Vergleiche, ob Summe C = Summe E
   * Vergleiche, ob Summe D = Summe E

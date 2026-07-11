@@ -26,6 +26,8 @@ describe('StatistikComponent', () => {
     summeProducerZev: 800,
     summeConsumerZev: 750,
     summeConsumerZevCalculated: 760,
+    bezugVonVnb: 140,
+    ruecklieferung: 1000,
     summenCDGleich: true,
     differenzCD: 0,
     summenCEGleich: false,

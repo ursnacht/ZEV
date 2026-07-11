@@ -119,6 +119,41 @@ public class StatistikServiceTest {
     }
 
     @Test
+    void getStatistik_BerechneteWerte_BezugUndRuecklieferung() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 1, 31);
+
+        when(messwerteRepository.findMaxZeit()).thenReturn(Optional.of(LocalDateTime.of(2024, 1, 31, 23, 45)));
+        when(einheitRepository.findAll()).thenReturn(Arrays.asList(producer, consumer1));
+        when(messwerteRepository.findDistinctEinheitenInRange(any(), any()))
+                .thenReturn(Arrays.asList(producer, consumer1));
+        when(messwerteRepository.findDistinctDatesInRange(any(), any()))
+                .thenReturn(von.datesUntil(bis.plusDays(1)).toList());
+
+        when(messwerteRepository.sumTotalByEinheitTypAndZeitBetween(eq(EinheitTyp.PRODUCER), any(), any()))
+                .thenReturn(-1000.0); // Produktion (negativ gespeichert → abs = 1000)
+        when(messwerteRepository.sumTotalByEinheitTypAndZeitBetween(eq(EinheitTyp.CONSUMER), any(), any()))
+                .thenReturn(800.0);   // Verbrauch
+        when(messwerteRepository.sumZevByEinheitTypAndZeitBetween(eq(EinheitTyp.PRODUCER), any(), any()))
+                .thenReturn(-700.0);  // zev Producer (negativ gespeichert → abs = 700)
+        when(messwerteRepository.sumZevByEinheitTypAndZeitBetween(eq(EinheitTyp.CONSUMER), any(), any()))
+                .thenReturn(600.0);
+        when(messwerteRepository.sumZevCalculatedByEinheitTypAndZeitBetween(eq(EinheitTyp.CONSUMER), any(), any()))
+                .thenReturn(600.0);   // zev_berechnet Consumer
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(any(), any(), any())).thenReturn(0.0);
+        when(messwerteRepository.sumZevByEinheitAndZeitBetween(any(), any(), any())).thenReturn(0.0);
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(any(), any(), any())).thenReturn(0.0);
+
+        StatistikDTO result = statistikService.getStatistik(von, bis);
+
+        MonatsStatistikDTO monat = result.getMonate().get(0);
+        // Bezug von VNB = Verbrauch (800) − zev_berechnet Consumer (600) = 200
+        assertEquals(200.0, monat.getBezugVonVnb(), 0.001);
+        // Rücklieferung = Produktion (abs 1000) − zev Producer (abs 700) = 300
+        assertEquals(300.0, monat.getRuecklieferung(), 0.001);
+    }
+
+    @Test
     void getStatistik_MultipleMonths_ReturnsAllMonths() {
         LocalDate von = LocalDate.of(2024, 1, 1);
         LocalDate bis = LocalDate.of(2024, 3, 31);

@@ -175,6 +175,15 @@ public class StatistikService {
                 yearMonth.getYear(), yearMonth.getMonthValue(),
                 summeProducerTotal, summeConsumerTotal, summeProducerZev, summeConsumerZev, summeConsumerZevCalculated);
 
+        // Berechnete Werte (vor dem Summen-Vergleich):
+        // Bezug von VNB  = Verbrauch (Consumer Total) − zev_berechnet der Consumer
+        // Rücklieferung  = Produktion (Producer Total) − zev der Producer
+        dto.setBezugVonVnb(dto.getSummeConsumerTotal() - dto.getSummeConsumerZevCalculated());
+        dto.setRuecklieferung(dto.getSummeProducerTotal() - dto.getSummeProducerZev());
+
+        logger.debug("Monat {}/{}: BezugVonVnb={}, Ruecklieferung={}",
+                yearMonth.getYear(), yearMonth.getMonthValue(), dto.getBezugVonVnb(), dto.getRuecklieferung());
+
         // Vergleiche durchführen
         vergleicheSummen(dto);
 

@@ -182,6 +182,31 @@
                 </td>
                 <td class="zev-table__number">{{ formatNumber(monat.summeConsumerZevCalculated) }}</td>
               </tr>
+              <!-- Berechnete Werte (vor dem Summen-Vergleich) -->
+              <tr>
+                <td>{{ 'BEZUG_VON_VNB' | translate }}</td>
+                <td class="zev-table__bar-cell">
+                  <div class="zev-bar-container">
+                    <div class="zev-bar"
+                      [style.width.%]="getBarWidth(monat.bezugVonVnb, monat)"
+                      [style.background-color]="getBarColor('F')">
+                    </div>
+                  </div>
+                </td>
+                <td class="zev-table__number">{{ formatNumber(monat.bezugVonVnb) }}</td>
+              </tr>
+              <tr>
+                <td>{{ 'RUECKLIEFERUNG' | translate }}</td>
+                <td class="zev-table__bar-cell">
+                  <div class="zev-bar-container">
+                    <div class="zev-bar"
+                      [style.width.%]="getBarWidth(monat.ruecklieferung, monat)"
+                      [style.background-color]="getBarColor('G')">
+                    </div>
+                  </div>
+                </td>
+                <td class="zev-table__number">{{ formatNumber(monat.ruecklieferung) }}</td>
+              </tr>
             </tbody>
           </table>
           <!-- Vergleiche -->

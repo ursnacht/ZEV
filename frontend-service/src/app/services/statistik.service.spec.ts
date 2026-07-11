@@ -27,6 +27,8 @@ describe('StatistikService', () => {
         summeProducerZev: 800,
         summeConsumerZev: 800,
         summeConsumerZevCalculated: 798,
+        bezugVonVnb: 152,
+        ruecklieferung: 1200,
         summenCDGleich: true,
         differenzCD: 0,
         summenCEGleich: true,

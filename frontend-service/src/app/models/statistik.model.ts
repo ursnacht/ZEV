@@ -29,6 +29,10 @@ export interface MonatsStatistik {
   summeConsumerZev: number;
   summeConsumerZevCalculated: number;
 
+  // Berechnete Werte (vor dem Summen-Vergleich)
+  bezugVonVnb: number;
+  ruecklieferung: number;
+
   // Vergleiche
   summenCDGleich: boolean;
   differenzCD: number;

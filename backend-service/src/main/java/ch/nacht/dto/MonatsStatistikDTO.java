@@ -22,6 +22,10 @@ public class MonatsStatistikDTO {
     private Double summeConsumerZev;
     private Double summeConsumerZevCalculated;
 
+    // Berechnete Werte (vor dem Summen-Vergleich)
+    private Double bezugVonVnb;       // Verbrauch(Consumer Total) − zev_berechnet(Consumer)
+    private Double ruecklieferung;    // Produktion(Producer Total) − zev(Producer)
+
     // Vergleiche
     private boolean summenCDGleich;
     private Double differenzCD;
@@ -130,6 +134,22 @@ public class MonatsStatistikDTO {
 
     public void setSummeConsumerZevCalculated(Double summeConsumerZevCalculated) {
         this.summeConsumerZevCalculated = summeConsumerZevCalculated;
+    }
+
+    public Double getBezugVonVnb() {
+        return bezugVonVnb;
+    }
+
+    public void setBezugVonVnb(Double bezugVonVnb) {
+        this.bezugVonVnb = bezugVonVnb;
+    }
+
+    public Double getRuecklieferung() {
+        return ruecklieferung;
+    }
+
+    public void setRuecklieferung(Double ruecklieferung) {
+        this.ruecklieferung = ruecklieferung;
     }
 
     public boolean isSummenCDGleich() {

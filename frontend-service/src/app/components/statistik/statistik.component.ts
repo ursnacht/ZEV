@@ -195,13 +195,15 @@ export class StatistikComponent extends WithMessage implements OnInit {
     return (value / maxValue) * 100;
   }
 
-  getBarColor(type: 'A' | 'B' | 'C' | 'D' | 'E'): string {
+  getBarColor(type: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G'): string {
     const colors: Record<string, string> = {
       'A': '#4CAF50',  // Producer Total - Grün
       'B': '#2196F3',  // Consumer Total - Blau
       'C': '#FF9800',  // Producer ZEV - Orange
       'D': '#9C27B0',  // Consumer ZEV - Lila
-      'E': '#00BCD4'   // Consumer ZEV Calculated - Cyan
+      'E': '#00BCD4',  // Consumer ZEV Calculated - Cyan
+      'F': '#F44336',  // Bezug von VNB - Rot
+      'G': '#8BC34A'   // Rücklieferung - Hellgrün
     };
     return colors[type] || '#999';
   }
