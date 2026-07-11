@@ -274,10 +274,10 @@ public class ZaehlerAggregationServiceTest {
 
         service.aggregiere();
 
-        // Ein Intervall verarbeitet → Verteilung für ORG_ID über [ende, ende] mit PROPORTIONAL,
+        // Ein Intervall verarbeitet → Verteilung für ORG_ID über [start, ende] mit PROPORTIONAL,
         // ohne Fortschritts-Tracking (showProgress = false)
         verify(messwerteService).calculateSolarDistributionForOrg(
-                eq(ORG_ID), eq(intervall[1]), eq(intervall[1]), eq("PROPORTIONAL"), eq(false));
+                eq(ORG_ID), eq(intervall[0]), eq(intervall[1]), eq("PROPORTIONAL"), eq(false));
     }
 
     @Test

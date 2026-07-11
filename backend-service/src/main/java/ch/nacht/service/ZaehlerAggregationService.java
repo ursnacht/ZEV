@@ -75,7 +75,9 @@ public class ZaehlerAggregationService {
         log.info("Aggregation start}");
         LocalDateTime letzteGrenze = floorAufQuartal(jetzt); // letztes abgeschlossenes Intervallende
         int erzeugt = 0;
-        // Behandelter Zeitraum je Mandant (min/max Intervallende), für die anschliessende Verteilung.
+        // Behandelter Zeitraum je Mandant für die anschliessende Verteilung:
+        // von = frühester Intervall-Start, bis = spätestes Intervall-Ende (echte Spanne, auch bei
+        // nur einem verarbeiteten Intervall).
         Map<Long, LocalDateTime> orgVon = new HashMap<>();
         Map<Long, LocalDateTime> orgBis = new HashMap<>();
 
@@ -102,7 +104,7 @@ public class ZaehlerAggregationService {
                     if (verarbeiteIntervall(einheit, intervallStart, intervallEnde)) {
                         erzeugt++;
                         Long org = einheit.getOrgId();
-                        orgVon.merge(org, intervallEnde, (a, b) -> a.isBefore(b) ? a : b);
+                        orgVon.merge(org, intervallStart, (a, b) -> a.isBefore(b) ? a : b);
                         orgBis.merge(org, intervallEnde, (a, b) -> a.isAfter(b) ? a : b);
                     }
                     rohdatenRepository.markVerarbeitet(einheitId, intervallEnde, jetzt);
