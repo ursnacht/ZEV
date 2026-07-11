@@ -21,6 +21,8 @@
     <field name="summeProducerZev" class="java.lang.Double"/>
     <field name="summeConsumerZev" class="java.lang.Double"/>
     <field name="summeConsumerZevCalculated" class="java.lang.Double"/>
+    <field name="bezugVonVnb" class="java.lang.Double"/>
+    <field name="ruecklieferung" class="java.lang.Double"/>
     <field name="summenCDGleich" class="java.lang.Boolean"/>
     <field name="differenzCD" class="java.lang.Double"/>
     <field name="summenCEGleich" class="java.lang.Boolean"/>
@@ -96,7 +98,7 @@
 
     <!-- Detail Band - One band per month -->
     <detail>
-        <band height="280">
+        <band height="312">
             <!-- Month header -->
             <element kind="textField" uuid="33333333-3333-3333-3333-33333333330c" x="0" y="10" width="555" height="25" forecolor="#333333" fontSize="14.0" bold="true" vTextAlign="Middle">
                 <expression><![CDATA[java.time.Month.of($F{monat}).getDisplayName(java.time.format.TextStyle.FULL, "de".equals($P{SPRACHE}) ? java.util.Locale.GERMAN : java.util.Locale.ENGLISH) + " " + $F{jahr} + " (" + $F{von}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + " - " + $F{bis}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + ")"]]></expression>
@@ -227,55 +229,91 @@
                 <expression><![CDATA[ch.nacht.util.BarImageHelper.createBar($F{summeConsumerZevCalculated}, $V{maxSumme}, 275, 14, new java.awt.Color(0, 188, 212))]]></expression>
             </element>
 
+            <!-- Row: Bezug von VNB (berechnet) -->
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333346" x="0" y="176" width="170" height="16" fontSize="9.0" vTextAlign="Middle">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("BEZUG_VON_VNB")]]></expression>
+                <box leftPadding="4" rightPadding="4">
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333347" x="170" y="176" width="100" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[$F{bezugVonVnb}]]></expression>
+                <box leftPadding="4" rightPadding="4">
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
+            <!-- Bar: Bezug von VNB (#F44336 Rot) -->
+            <element kind="image" uuid="33333333-3333-3333-3333-333333333348" x="280" y="177" width="275" height="14" scaleImage="FillFrame">
+                <expression><![CDATA[ch.nacht.util.BarImageHelper.createBar($F{bezugVonVnb}, $V{maxSumme}, 275, 14, new java.awt.Color(244, 67, 54))]]></expression>
+            </element>
+
+            <!-- Row: Rücklieferung (berechnet) -->
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333349" x="0" y="192" width="170" height="16" fontSize="9.0" vTextAlign="Middle">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("RUECKLIEFERUNG")]]></expression>
+                <box leftPadding="4" rightPadding="4">
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333334a" x="170" y="192" width="100" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[$F{ruecklieferung}]]></expression>
+                <box leftPadding="4" rightPadding="4">
+                    <pen lineWidth="0.5" lineColor="#DDDDDD"/>
+                </box>
+            </element>
+            <!-- Bar: Rücklieferung (#8BC34A Hellgrün) -->
+            <element kind="image" uuid="33333333-3333-3333-3333-33333333334b" x="280" y="193" width="275" height="14" scaleImage="FillFrame">
+                <expression><![CDATA[ch.nacht.util.BarImageHelper.createBar($F{ruecklieferung}, $V{maxSumme}, 275, 14, new java.awt.Color(139, 195, 74))]]></expression>
+            </element>
+
             <!-- Summen Vergleich section -->
-            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331d" x="0" y="185" width="200" height="18" forecolor="#666666" fontSize="12.0" bold="true">
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331d" x="0" y="217" width="200" height="18" forecolor="#666666" fontSize="12.0" bold="true">
                 <expression><![CDATA[$P{TRANSLATIONS}.get("SUMMEN_VERGLEICH")]]></expression>
             </element>
-            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331e" x="200" y="185" width="355" height="15" forecolor="#999999" fontSize="8.0">
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331e" x="200" y="217" width="355" height="15" forecolor="#999999" fontSize="8.0">
                 <expression><![CDATA[$P{TRANSLATIONS}.get("TOLERANZ") + ": " + String.format("%.3f", $P{STATISTIK}.getToleranz()) + " kWh"]]></expression>
             </element>
 
             <!-- Comparison: A = B -->
-            <element kind="staticText" uuid="33333333-3333-3333-3333-33333333331f" x="0" y="202" width="50" height="15" fontSize="9.0">
+            <element kind="staticText" uuid="33333333-3333-3333-3333-33333333331f" x="0" y="234" width="50" height="15" fontSize="9.0">
                 <text><![CDATA[A = B:]]></text>
             </element>
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333320" x="50" y="202" width="150" height="15" forecolor="#4CAF50" fontSize="9.0">
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333320" x="50" y="234" width="150" height="15" forecolor="#4CAF50" fontSize="9.0">
                 <expression><![CDATA["✓ " + $P{TRANSLATIONS}.get("GLEICH")]]></expression>
                 <printWhenExpression><![CDATA[$F{summenCDGleich}]]></printWhenExpression>
             </element>
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333321" x="50" y="202" width="150" height="15" forecolor="#F44336" fontSize="9.0">
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333321" x="50" y="234" width="150" height="15" forecolor="#F44336" fontSize="9.0">
                 <expression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + String.format("%+.3f", $F{differenzCD}) + " kWh)"]]></expression>
                 <printWhenExpression><![CDATA[!$F{summenCDGleich}]]></printWhenExpression>
             </element>
 
             <!-- Comparison: A = C -->
-            <element kind="staticText" uuid="33333333-3333-3333-3333-333333333322" x="200" y="202" width="50" height="15" fontSize="9.0">
+            <element kind="staticText" uuid="33333333-3333-3333-3333-333333333322" x="200" y="234" width="50" height="15" fontSize="9.0">
                 <text><![CDATA[A = C:]]></text>
             </element>
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333323" x="250" y="202" width="150" height="15" forecolor="#4CAF50" fontSize="9.0">
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333323" x="250" y="234" width="150" height="15" forecolor="#4CAF50" fontSize="9.0">
                 <expression><![CDATA["✓ " + $P{TRANSLATIONS}.get("GLEICH")]]></expression>
                 <printWhenExpression><![CDATA[$F{summenCEGleich}]]></printWhenExpression>
             </element>
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333324" x="250" y="202" width="150" height="15" forecolor="#F44336" fontSize="9.0">
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333324" x="250" y="234" width="150" height="15" forecolor="#F44336" fontSize="9.0">
                 <expression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + String.format("%+.3f", $F{differenzCE}) + " kWh)"]]></expression>
                 <printWhenExpression><![CDATA[!$F{summenCEGleich}]]></printWhenExpression>
             </element>
 
             <!-- Comparison: B = C -->
-            <element kind="staticText" uuid="33333333-3333-3333-3333-333333333325" x="400" y="202" width="50" height="15" fontSize="9.0">
+            <element kind="staticText" uuid="33333333-3333-3333-3333-333333333325" x="400" y="234" width="50" height="15" fontSize="9.0">
                 <text><![CDATA[B = C:]]></text>
             </element>
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333326" x="450" y="202" width="105" height="15" forecolor="#4CAF50" fontSize="9.0">
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333326" x="450" y="234" width="105" height="15" forecolor="#4CAF50" fontSize="9.0">
                 <expression><![CDATA["✓ " + $P{TRANSLATIONS}.get("GLEICH")]]></expression>
                 <printWhenExpression><![CDATA[$F{summenDEGleich}]]></printWhenExpression>
             </element>
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333327" x="450" y="202" width="105" height="15" forecolor="#F44336" fontSize="9.0">
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333327" x="450" y="234" width="105" height="15" forecolor="#F44336" fontSize="9.0">
                 <expression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + String.format("%+.3f", $F{differenzDE}) + " kWh)"]]></expression>
                 <printWhenExpression><![CDATA[!$F{summenDEGleich}]]></printWhenExpression>
             </element>
 
             <!-- Subreport: Summen pro Einheit -->
-            <element kind="subreport" uuid="33333333-3333-3333-3333-333333333330" x="0" y="225" width="555" height="50">
+            <element kind="subreport" uuid="33333333-3333-3333-3333-333333333330" x="0" y="257" width="555" height="50">
                 <printWhenExpression><![CDATA[$F{einheitSummen} != null && !$F{einheitSummen}.isEmpty()]]></printWhenExpression>
                 <parameter name="TRANSLATIONS">
                     <expression><![CDATA[$P{TRANSLATIONS}]]></expression>

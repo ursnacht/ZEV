@@ -29,6 +29,7 @@
     * **Rücklieferung** = Produktion (Producer Total) − zev der Producer (`summeProducerTotal − summeProducerZev`, jeweils Absolutwerte)
     * Fachlich: *Bezug von VNB* = aus dem Netz bezogener Rest des Verbrauchs; *Rücklieferung* = ins Netz eingespeister Überschuss der Produktion.
     * Beide Werte werden – wie die übrigen Summen – mit einem **Balken** visualisiert (gleiche Skala/`getBarWidth`, eigene Farben).
+    * Beide Werte erscheinen auch im **PDF-Export** (`statistik.jrxml`), inkl. Balken, an derselben Stelle (vor dem Summen-Vergleich).
   * Vergleiche, ob Summe C = Summe D
   * Vergleiche, ob Summe C = Summe E
   * Vergleiche, ob Summe D = Summe E
