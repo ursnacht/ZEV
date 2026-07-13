@@ -12,10 +12,12 @@
             "directAccessGrantsEnabled": false,
             "serviceAccountsEnabled": false,
             "redirectUris": [
-                "http://localhost:4200/*"
+                "http://localhost:4200/*",
+                "${ZEV_FRONTEND_URL:http://localhost:4200}/*"
             ],
             "webOrigins": [
-                "http://localhost:4200"
+                "http://localhost:4200",
+                "${ZEV_FRONTEND_URL:http://localhost:4200}"
             ],
             "attributes": {
                 "pkce.code.challenge.method": "S256"

@@ -4,6 +4,17 @@ server:
 spring:
   application:
     name: frontend-service
+
+# Laufzeit-Konfiguration des Angular-Frontends (wird als /assets/config.json ausgeliefert,
+# siehe FrontendConfigController). Über Environment-Variablen überschreibbar – so kann dasselbe
+# Image ohne Rebuild in jeder Umgebung (lokal, NAS, ...) betrieben werden.
+frontend:
+  config:
+    api-base-url: ${FRONTEND_API_BASE_URL:http://localhost:8090}
+    keycloak:
+      url: ${FRONTEND_KEYCLOAK_URL:http://localhost:9000}
+      realm: ${FRONTEND_KEYCLOAK_REALM:zev}
+      client-id: ${FRONTEND_KEYCLOAK_CLIENT_ID:zev-frontend}
   boot:
     admin:
       client:
