@@ -45,7 +45,7 @@ $excludeDirs = @('.venv', 'venv', '__pycache__', 'build', 'dist',
 $excludeFiles = @('.env', 'config.yaml', 'config.sim.yaml')
 $excludeFilePatterns = @('*.pyc', '*.local.yaml')
 # Ganze Pfade, die NICHT aufs Pi gehoeren (relativ zu pi-gateway/):
-#   deploy/mosquitto = Dev-Broker (laeuft auf dem NAS, enthaelt passwd) - nicht Teil des Pi-Pakets.
+#   deploy/mosquitto = Broker (laeuft auf dem NAS, Auth via MOSQUITTO_USERS) - nicht Teil des Pi-Pakets.
 $excludePaths = @('deploy/mosquitto')
 
 # In ein temporaeres Staging-Verzeichnis kopieren, dort bereinigen, dann zippen.

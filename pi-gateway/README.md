@@ -87,8 +87,8 @@ senden. Damit lässt sich der komplette MQTT-Workflow ohne Pi/Hardware testen:
 Vorlage: [`config.sim.example.yaml`](./config.sim.example.yaml) (Zähler mit `protokoll: sim`;
 `"producer"` im `messpunkt` → Einspeisung überwiegt = negatives `total`, sonst Consumer).
 
-Der Dev-Broker erzwingt Auth (Username/Passwort). Dev-Credentials: `zev-backend` / `zev-mqtt-dev`
-(passend zu [`deploy/mosquitto/passwd`](./deploy/mosquitto/passwd)).
+Der Broker erzwingt Auth (Username/Passwort). Dev-Credentials: `zev-backend` / `zev-mqtt-dev`
+(Default in `.env.mqtt.example` → `MOSQUITTO_USERS`).
 
 **1) Broker + Backend starten** – am einfachsten über den MQTT-Stack (enthält Broker `mosquitto`
 und Backend mit Profil `mqtt`), aus dem Repo-Root:
@@ -101,9 +101,9 @@ docker compose --env-file .env.mqtt -f docker-compose-mqtt.yml up --build
 <details><summary>Alternative: nur ein Wegwerf-Broker (Backend separat)</summary>
 
 ```bash
-# aus dem Repo-Root; Config + passwd sind ins Image gebacken (Auth aktiv)
+# aus dem Repo-Root; Config ins Image gebacken, passwd zur Laufzeit aus MOSQUITTO_USERS (Auth aktiv)
 docker build -t zev-mosquitto pi-gateway/deploy/mosquitto
-docker run --rm -it -p 1883:1883 zev-mosquitto
+docker run --rm -it -p 1883:1883 -e MOSQUITTO_USERS='zev-backend:zev-mqtt-dev' zev-mosquitto
 ```
 </details>
 
@@ -124,49 +124,37 @@ Viertelstunde (`:00/:15/:30/:45`) schreibt der Job `zev.messwerte`
 (`total` vorzeichenbehaftet, `zev = 0`, `quelle = 'MQTT'`). Mitlesen der Nachrichten optional:
 `mosquitto_sub -h localhost -t 'zev/#' -v -u zev-backend -P zev-mqtt-dev`.
 
-## Broker-Zugangsdaten (`deploy/mosquitto/passwd`)
+## Broker-Zugangsdaten (`MOSQUITTO_USERS`)
 
-Der Dev-Broker erzwingt Auth über die Datei [`deploy/mosquitto/passwd`](./deploy/mosquitto/passwd)
-(Username/Passwort, PBKDF2-SHA512-Hash – kein Klartext). Sie wird per `Dockerfile`
-(`COPY passwd …`) ins Broker-Image gebacken, damit die Auth unabhängig von Bind-Mount-Rechten greift.
+Der Broker erzwingt Auth (`allow_anonymous false`). Die Zugangsdaten liegen **nicht** mehr als
+Datei im Repo/Image, sondern werden beim Container-Start aus der Umgebungsvariablen
+`MOSQUITTO_USERS` erzeugt: Das [Entrypoint-Skript](./deploy/mosquitto/docker-entrypoint.sh)
+schreibt die `user:passwort`-Paare in `/mosquitto/config/passwd` und hasht sie in-place mit
+`mosquitto_passwd -U` (PBKDF2 – kein Klartext im laufenden Container). So bleiben Secrets aus
+Image und Repo; derselbe Broker taugt für Dev **und** NAS.
 
-Erzeugt wurde die Datei mit `mosquitto_passwd` aus dem Mosquitto-Image (kein lokaler
-Mosquitto-Install nötig). Ausgeführt in `pi-gateway/deploy/mosquitto`:
+Format (whitespace-getrennte Paare; Passwörter ohne Whitespace, Doppelpunkt im Passwort erlaubt):
 
-```bash
-# Dev-User zev-backend / zev-mqtt-dev  (-c = Datei neu anlegen/überschreiben, -b = Batch)
-MSYS_NO_PATHCONV=1 docker run --rm -v "$PWD":/data eclipse-mosquitto:2 \
-  mosquitto_passwd -c -b /data/passwd zev-backend zev-mqtt-dev
+```dotenv
+# in .env.mqtt (bzw. der NAS-.env)
+MOSQUITTO_USERS=zev-backend:zev-mqtt-dev pi-org42:change-me
 ```
 
-> `MSYS_NO_PATHCONV=1` verhindert unter Git-Bash/Windows das Verhunzen des `/data`-Pfads.
-> PowerShell: `docker run --rm -v "${PWD}:/data" eclipse-mosquitto:2 mosquitto_passwd -c -b /data/passwd zev-backend zev-mqtt-dev`
+- **Backend-Subscriber:** einer der Einträge muss zu `MQTT_BROKER_USERNAME` /
+  `MQTT_BROKER_PASSWORD` passen.
+- **Pi-Publisher:** für den Pi einen eigenen User ergänzen (Produktion: getrennte User
+  je Publisher/Subscriber, siehe Topologie-Doku); derselbe User/dasselbe Passwort dann in
+  `/etc/pi-gateway.env` auf dem Pi (`MQTT_USERNAME`/`MQTT_PASSWORD`).
 
-**Passwort ändern** (Datei neu erzeugen, `-c`):
-
-```bash
-MSYS_NO_PATHCONV=1 docker run --rm -v "$PWD":/data eclipse-mosquitto:2 \
-  mosquitto_passwd -c -b /data/passwd zev-backend <neues-passwort>
-```
-
-**Weiteren User hinzufügen** – **ohne** `-c` (Datei nicht überschreiben), z.B. getrennte User für
-Pi-Publisher und Backend-Subscriber (für Produktion empfohlen, siehe Topologie-Doku):
+**Passwort ändern / User hinzufügen:** `MOSQUITTO_USERS` anpassen und den Broker neu starten
+(kein Image-Rebuild nötig, da die passwd zur Laufzeit erzeugt wird):
 
 ```bash
-MSYS_NO_PATHCONV=1 docker run --rm -v "$PWD":/data eclipse-mosquitto:2 \
-  mosquitto_passwd -b /data/passwd pi-publisher <passwort>
+docker compose --env-file .env.mqtt -f docker-compose-mqtt.yml up -d mosquitto
 ```
 
-Nach jeder Änderung: Broker neu bauen (Datei ist ins Image gebacken) und Passwörter synchron halten
-(`.env.mqtt` → `MQTT_BROKER_PASSWORD`; Simulator → `$env:MQTT_PASSWORD` bzw. `export MQTT_PASSWORD`),
-sonst lehnt der Broker mit „not authorised" ab.
-
-```bash
-docker compose --env-file .env.mqtt -f docker-compose-mqtt.yml up --build -d mosquitto
-```
-
-> **Zeilenenden:** `passwd` muss **LF** behalten (via `.gitattributes` erzwungen) – CRLF bricht
-> das Einlesen durch Mosquitto.
+> **Zeilenenden:** `docker-entrypoint.sh` und `mosquitto.conf` müssen **LF** behalten (via
+> `.gitattributes` erzwungen) – CRLF bricht den `#!/bin/sh`-Shebang bzw. das Config-Parsing.
 
 ## Deployment auf dem Pi (systemd)
 
@@ -210,6 +198,23 @@ journalctl -u pi-gateway.service -f
 > **NTP & Zeitzone:** Korrekte Zeitstempel sind abrechnungskritisch – sicherstellen, dass
 > Uhr **und lokale Zeitzone** stimmen (`timedatectl status`; ggf.
 > `sudo timedatectl set-timezone Europe/Zurich`). Der publizierte Zeitstempel trägt den lokalen Offset.
+
+### Update (neuer Code auf bestehender Installation)
+
+Neu paketieren + übertragen (Bau-Rechner, s.o.), dann auf dem Pi. `config.yaml`/`.env`/`.venv`
+sind **nicht** im ZIP und bleiben erhalten. Vollständige Fassung: **Anhang A** in
+[`Specs/Pi-Gateway-Software.md`](../Specs/Pi-Gateway-Software.md).
+
+```bash
+sudo systemctl stop pi-gateway.service
+unzip -o zev-pi-gateway.zip -d /tmp/pi-gw-update
+sudo cp -r /tmp/pi-gw-update/pi-gateway/. /opt/pi-gateway/   # überschreibt Code, nicht config/venv
+sudo chown -R pigw:pigw /opt/pi-gateway
+# Nur nötig, wenn sich requirements.txt geändert hat (z.B. pymodbus-Pin):
+sudo -u pigw /opt/pi-gateway/.venv/bin/pip install -r /opt/pi-gateway/requirements.txt
+sudo systemctl start pi-gateway.service
+journalctl -u pi-gateway.service -f
+```
 
 ## Stand / Abgrenzung
 

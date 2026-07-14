@@ -36,14 +36,22 @@ class ModbusReader(Reader):
         )
 
     def read(self) -> MeterReading:
-        if not self._client.connect():
-            raise ReadError(
-                f"Modbus-Verbindung zu {self.config.host}:{self.config.port} "
-                f"('{self.messpunkt}') fehlgeschlagen."
-            )
+        try:
+            if not self._client.connect():
+                raise ReadError(
+                    f"Modbus-Verbindung zu {self.config.host}:{self.config.port} "
+                    f"('{self.messpunkt}') fehlgeschlagen."
+                )
 
-        bezug = self._read_float(self.config.register_bezug, rolle="bezug")
-        einspeisung = self._read_float(self.config.register_einspeisung, rolle="einspeisung")
+            bezug = self._read_float(self.config.register_bezug, rolle="bezug")
+            einspeisung = self._read_float(self.config.register_einspeisung, rolle="einspeisung")
+        finally:
+            # An einem RTU->TCP-Hub mit wenigen erlaubten Sockets darf immer nur EINE
+            # Verbindung offen sein. Da die Zähler sequenziell gelesen werden, hält das
+            # Schliessen nach jedem Read die Zahl gleichzeitig offener Sockets auf 1 und
+            # vermeidet tote ("stale") Sockets. Intervall ist Minuten -> Reconnect-Overhead
+            # vernachlässigbar; absolute Stände sind verlusttolerant.
+            self._client.close()
 
         if bezug < 0 or einspeisung < 0:
             raise ReadError(

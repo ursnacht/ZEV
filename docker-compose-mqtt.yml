@@ -33,12 +33,17 @@ services:
       start_period: 10s
 
   mosquitto:
-    build: ./pi-gateway/deploy/mosquitto   # Config + passwd sind ins Image gebacken (Auth aktiv)
+    build: ./pi-gateway/deploy/mosquitto   # passwd wird beim Start aus MOSQUITTO_USERS erzeugt (Auth aktiv)
     container_name: mosquitto
     ports:
       - "1883:1883"
     env_file:
       - .env.mqtt
+    environment:
+      # Broker-User (user:passwort, whitespace-getrennt); daraus generiert der
+      # Entrypoint die gehashte passwd. Muss MQTT_BROKER_USERNAME (Backend) und –
+      # fuer den Pi – den Publisher-User enthalten.
+      - MOSQUITTO_USERS=${MOSQUITTO_USERS}
     networks:
       - zev-network
     restart: unless-stopped

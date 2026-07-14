@@ -303,6 +303,32 @@ sudo systemctl daemon-reload && sudo systemctl restart pi-gateway.service
 sudo systemctl disable --now pi-gateway.service
 ```
 
+### Updaten
+```bash
+# 0) Dienst stoppen (Datei nicht "unter den Füssen" austauschen)
+sudo systemctl stop pi-gateway.service
+
+# 1) ZIP nach /tmp entpacken (ergibt /tmp/pi-gw-update/pi-gateway/...)
+cd /home/pi
+unzip -o zev-pi-gateway.zip -d /tmp/pi-gw-update
+
+# 2) Code nach /opt/pi-gateway kopieren.
+#    Plain cp -> vorhandene config.yaml/.venv bleiben erhalten (nicht im ZIP, werden nicht überschrieben).
+sudo cp -r /tmp/pi-gw-update/pi-gateway/. /opt/pi-gateway/
+
+# 3) Eigentümer korrigieren (cp hat als root kopiert)
+sudo chown -R pigw:pigw /opt/pi-gateway
+
+# 4) Abhängigkeiten im venv aktualisieren  <-- WICHTIG für den pymodbus-Fix!
+#    requirements.txt ist jetzt <3.10 -> pip stellt die kompatible Version sicher.
+sudo -u pigw /opt/pi-gateway/.venv/bin/pip install -r /opt/pi-gateway/requirements.txt
+
+# 5) Starten + Logs prüfen
+sudo systemctl start pi-gateway.service
+journalctl -u pi-gateway.service -f
+```
+
+
 > **Zeitsynchronisation & Zeitzone (FR-6.3):** Korrekte Zeitstempel sind
 > abrechnungskritisch. Sicherstellen, dass NTP läuft **und die lokale Zeitzone gesetzt ist**
 > (`timedatectl status` → „System clock synchronized: yes“ und korrekte „Time zone“;

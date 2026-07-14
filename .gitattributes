@@ -1,4 +1,5 @@
-# Mosquitto-Dev-Broker-Dateien werden ins Image gebacken und von Mosquitto strikt geparst.
-# Sie müssen LF behalten – CRLF (autocrlf auf Windows) bricht das Einlesen von Config/passwd.
-pi-gateway/deploy/mosquitto/passwd text eol=lf
+# Mosquitto-Broker-Dateien werden ins Image gebacken und strikt geparst/ausgeführt.
+# Sie müssen LF behalten – CRLF (autocrlf auf Windows) bricht Config-Parsing bzw.
+# den #!/bin/sh-Shebang des Entrypoints.
 pi-gateway/deploy/mosquitto/mosquitto.conf text eol=lf
+pi-gateway/deploy/mosquitto/docker-entrypoint.sh text eol=lf
