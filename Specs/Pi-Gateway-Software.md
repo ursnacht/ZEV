@@ -232,8 +232,7 @@ sudo chown root:root /etc/pi-gateway.env
 
 ### A.4 systemd-Unit anlegen
 
-Datei `/etc/systemd/system/pi-gateway.service` (im Repo als
-`deploy/pi-gateway.service` versioniert):
+Datei `/etc/systemd/system/pi-gateway.service` (im Repo als `deploy/pi-gateway.service` versioniert):
 
 ```ini
 [Unit]
@@ -319,7 +318,7 @@ sudo cp -r /tmp/pi-gw-update/pi-gateway/. /opt/pi-gateway/
 # 3) Eigentümer korrigieren (cp hat als root kopiert)
 sudo chown -R pigw:pigw /opt/pi-gateway
 
-# 4) Abhängigkeiten im venv aktualisieren  <-- WICHTIG für den pymodbus-Fix!
+# 4) Abhängigkeiten im venv aktualisieren  <-- WICHTIG bei pymodbus-Fix!
 #    requirements.txt ist jetzt <3.10 -> pip stellt die kompatible Version sicher.
 sudo -u pigw /opt/pi-gateway/.venv/bin/pip install -r /opt/pi-gateway/requirements.txt
 
