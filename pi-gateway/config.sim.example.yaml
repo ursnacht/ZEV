@@ -5,8 +5,8 @@
 # Nutzung:  python -m gateway.main --config config.sim.yaml
 # (siehe README, Abschnitt "Publisher-Simulator")
 
-org_id: 42                       # muss zum org_id der Einheiten im Backend passen
-publish_interval: 5s             # beschleunigt (statt 5m), damit man schnell Daten sieht
+org_id: 2                        # muss zum org_id der Einheiten im Backend passen
+publish_interval: 30s            # beschleunigt (statt 5m), damit man schnell Daten sieht
 
 broker:
   url: tcp://localhost:1883      # lokaler Mosquitto (docker compose / docker run, siehe README)
