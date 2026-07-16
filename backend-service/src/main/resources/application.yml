@@ -30,6 +30,11 @@ spring:
         instance:
           prefer-ip: true
           service-url: http://backend-service:8090
+          metadata:
+            # Basic-Auth-Zugangsdaten, mit denen der SBA-Server die geschuetzten
+            # Actuator-Endpoints dieses Service abruft (Details: Environment, Logger, ...).
+            user.name: ${ACTUATOR_USER:actuator}
+            user.password: ${ACTUATOR_PASSWORD:actuator}
   datasource:
     url: jdbc:postgresql://localhost:5432/zev
     username: postgres
@@ -58,20 +63,30 @@ spring:
           # audiences:
           #  - zev-frontend
 
+# Basic-Auth-Zugangsdaten fuer /actuator/** (SecurityConfig.actuatorFilterChain).
+# Defaults nur fuer lokale Entwicklung – in Produktion via Env ueberschreiben.
+actuator:
+  user: ${ACTUATOR_USER:actuator}
+  password: ${ACTUATOR_PASSWORD:actuator}
+
 management:
   endpoints:
     web:
-      # Security: nur unkritische Endpoints exponieren. /actuator/** ist (fuer
-      # Prometheus/SBA) unauthentifiziert erreichbar (siehe SecurityConfig), daher
-      # duerfen env/heapdump/configprops/loggers NICHT freigegeben werden.
+      # Security: alle Endpoints exponiert, aber /actuator/** ist per Basic Auth
+      # geschuetzt (SecurityConfig.actuatorFilterChain). Nur health/info/prometheus
+      # bleiben oeffentlich (Docker-Healthchecks, Prometheus-Scrape).
       exposure:
-        include: "health,info,prometheus"
+        include: "*"
       cors:
         allowed-origins: "http://localhost:8081,http://admin-service:8081"
         allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
   endpoint:
     health:
       show-details: when_authorized
+    env:
+      show-values: when_authorized
+    configprops:
+      show-values: when_authorized
   prometheus:
     metrics:
       export:

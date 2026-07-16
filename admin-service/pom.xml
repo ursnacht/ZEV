@@ -19,10 +19,11 @@
       <artifactId>spring-boot-admin-starter-server</artifactId>
       <version>${spring-boot-admin.version}</version>
     </dependency>
-    <!-- dependency>
+    <!-- Basic Auth fuer /actuator/** (siehe SecurityConfig) -->
+    <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-security</artifactId>
-    </dependency -->
+    </dependency>
     <!-- Client dependency for self-registration -->
     <dependency>
       <groupId>de.codecentric</groupId>

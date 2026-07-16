@@ -116,6 +116,9 @@ services:
       # JWK-Set wird serverseitig geladen -> interner Docker-Name bleibt korrekt.
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:9000/realms/zev/protocol/openid-connect/certs
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # Basic Auth fuer /actuator/** (SBA-Details); Default nur fuer lokale Entwicklung
+      - ACTUATOR_USER=${ACTUATOR_USER:-actuator}
+      - ACTUATOR_PASSWORD=${ACTUATOR_PASSWORD:-actuator}
       # MQTT-Broker (im selben Netz erreichbar unter 'mosquitto')
       - MQTT_BROKER_URL=tcp://mosquitto:1883
       - MQTT_BROKER_USERNAME=${MQTT_BROKER_USERNAME}
@@ -136,6 +139,11 @@ services:
     container_name: admin-service
     ports:
       - "8081:8081"
+    environment:
+      # Basic Auth fuer /actuator/**; muss in allen Services identisch sein,
+      # damit der SBA-Server die Client-Endpoints abrufen kann
+      - ACTUATOR_USER=${ACTUATOR_USER:-actuator}
+      - ACTUATOR_PASSWORD=${ACTUATOR_PASSWORD:-actuator}
     networks:
       - zev-network
     restart: unless-stopped
@@ -152,6 +160,9 @@ services:
       - FRONTEND_KEYCLOAK_URL=${FRONTEND_KEYCLOAK_URL:-http://localhost:9000}
       - FRONTEND_KEYCLOAK_REALM=${FRONTEND_KEYCLOAK_REALM:-zev}
       - FRONTEND_KEYCLOAK_CLIENT_ID=${FRONTEND_KEYCLOAK_CLIENT_ID:-zev-frontend}
+      # Basic Auth fuer /actuator/** (SBA-Details); Default nur fuer lokale Entwicklung
+      - ACTUATOR_USER=${ACTUATOR_USER:-actuator}
+      - ACTUATOR_PASSWORD=${ACTUATOR_PASSWORD:-actuator}
     depends_on:
       - backend-service
       - admin-service

@@ -4,6 +4,18 @@ server:
 spring:
   application:
     name: frontend-service
+  boot:
+    admin:
+      client:
+        url: http://admin-service:8081
+        instance:
+          prefer-ip: true
+          service-url: http://frontend-service:8080
+          metadata:
+            # Basic-Auth-Zugangsdaten, mit denen der SBA-Server die geschuetzten
+            # Actuator-Endpoints dieses Service abruft (Details: Environment, Logger, ...).
+            user.name: ${ACTUATOR_USER:actuator}
+            user.password: ${ACTUATOR_PASSWORD:actuator}
 
 # Laufzeit-Konfiguration des Angular-Frontends (wird als /assets/config.json ausgeliefert,
 # siehe FrontendConfigController). Über Environment-Variablen überschreibbar – so kann dasselbe
@@ -15,17 +27,18 @@ frontend:
       url: ${FRONTEND_KEYCLOAK_URL:http://localhost:9000}
       realm: ${FRONTEND_KEYCLOAK_REALM:zev}
       client-id: ${FRONTEND_KEYCLOAK_CLIENT_ID:zev-frontend}
-  boot:
-    admin:
-      client:
-        url: http://admin-service:8081
-        instance:
-          prefer-ip: true
-          service-url: http://frontend-service:8080
+
+# Basic-Auth-Zugangsdaten fuer /actuator/** (siehe SecurityConfig).
+# Defaults nur fuer lokale Entwicklung – in Produktion via Env ueberschreiben.
+actuator:
+  user: ${ACTUATOR_USER:actuator}
+  password: ${ACTUATOR_PASSWORD:actuator}
 
 management:
   endpoints:
     web:
+      # Security: alle Endpoints exponiert, aber /actuator/** ist per Basic Auth
+      # geschuetzt (SecurityConfig); nur health/info/prometheus bleiben oeffentlich.
       exposure:
         include: "*"
       cors:
@@ -33,10 +46,8 @@ management:
         allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
   endpoint:
     health:
-      show-details: ALWAYS
+      show-details: when_authorized
     env:
-      show-values: ALWAYS
+      show-values: when_authorized
     configprops:
-      show-values: ALWAYS
-    loggers:
-      enabled: true
+      show-values: when_authorized

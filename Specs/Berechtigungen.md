@@ -89,7 +89,12 @@ Die Rollen-Spalten sind aus der obigen Fachrolle→Permission-Zuordnung abgeleit
 ## Öffentlich (ohne Authentifizierung)
 
 - `GET /ping` – Health-Check
-- `/api/public/**`, `/actuator/**`
+- `/api/public/**`
+- `/actuator/health`, `/actuator/info`, `/actuator/prometheus` (Docker-Healthchecks, Prometheus-Scrape)
+
+Alle übrigen Actuator-Endpoints (`/actuator/env`, `/actuator/loggers`, ...) erfordern **Basic Auth**
+(`ACTUATOR_USER`/`ACTUATOR_PASSWORD`, siehe `SecurityConfig.actuatorFilterChain`); der Spring Boot
+Admin Server authentifiziert sich mit denselben Credentials (Client-Metadata `user.name`/`user.password`).
 
 ## Endpunkt-Referenz (Backend `@PreAuthorize`)
 
@@ -116,4 +121,4 @@ Die Spalten `zev_user` / `zev_admin` / `org_admin` sind gleich dargestellt wie i
 | LizenzenController       | `GET /api/lizenzen`                                                         | `hasAuthority('lizenzen:read')`          | ✅  | ✅        | ✅        |
 | AuthController           | `POST /api/auth/logout`                                                     | `isAuthenticated()`                      | ✅  | ✅        | ✅        |
 
-`PingController` (`GET /ping`) sowie `/api/public/**` und `/actuator/**` sind öffentlich (keine Authentifizierung, siehe Abschnitt oben).
+`PingController` (`GET /ping`), `/api/public/**` sowie `/actuator/health|info|prometheus` sind öffentlich; die übrigen Actuator-Endpoints erfordern Basic Auth (siehe Abschnitt oben).

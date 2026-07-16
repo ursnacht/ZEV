@@ -103,8 +103,9 @@ Das wichtigste ZEV-Risiko ist Cross-Tenant-Datenzugriff. Pro mandantenfähiger E
    nur via Env/`.env` (gitignored). Treffer → **High**.
 2. **`SecurityConfig`/JWT**: Issuer/Audience-Validierung aktiv, Keycloak-Org-Claim korrekt gemappt,
    kein `permitAll()` zu breit, CORS nicht `*` mit Credentials.
-3. **Actuator** (`backend`/`admin`/`frontend`): nur unkritische Endpoints exponiert; `/actuator/env`,
-   `/heapdump` etc. nicht öffentlich.
+3. **Actuator** (`backend`/`admin`/`frontend`): nur `health`/`info`/`prometheus` öffentlich; alle
+   übrigen (`/actuator/env`, `/heapdump`, `/loggers`, ...) nur mit Basic Auth
+   (`actuatorFilterChain`, Credentials via `ACTUATOR_USER`/`ACTUATOR_PASSWORD`) erreichbar.
 4. **Fehlerbehandlung**: `GlobalExceptionHandler` leakt keine Stacktraces/internen Details an den Client.
 5. **i18n**: keine sicherheitsrelevanten/internen Infos in hartcodierten Strings (Konvention: Texte
    über `TranslationService`).

@@ -10,19 +10,35 @@ spring:
         url: http://admin-service:8081
         instance:
           prefer-ip: true
+          metadata:
+            # Basic-Auth-Zugangsdaten, mit denen der SBA-Server die geschuetzten
+            # Actuator-Endpoints dieses Service abruft (Details: Environment, Logger, ...).
+            user.name: ${ACTUATOR_USER:actuator}
+            user.password: ${ACTUATOR_PASSWORD:actuator}
+
+# Basic-Auth-Zugangsdaten fuer /actuator/** (siehe SecurityConfig).
+# Defaults nur fuer lokale Entwicklung – in Produktion via Env ueberschreiben.
+actuator:
+  user: ${ACTUATOR_USER:actuator}
+  password: ${ACTUATOR_PASSWORD:actuator}
 
 management:
   endpoints:
     web:
-      # Security: nur unkritische Endpoints exponieren (siehe backend-service).
+      # Security: alle Endpoints exponiert, aber /actuator/** ist per Basic Auth
+      # geschuetzt (SecurityConfig); nur health/info/prometheus bleiben oeffentlich.
       exposure:
-        include: "health,info,prometheus"
+        include: "*"
       cors:
         allowed-origins: "http://localhost:8081,http://admin-service:8081"
         allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
   endpoint:
     health:
       show-details: when_authorized
+    env:
+      show-values: when_authorized
+    configprops:
+      show-values: when_authorized
 
 logging:
   level:
