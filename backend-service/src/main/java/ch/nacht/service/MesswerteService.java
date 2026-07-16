@@ -5,6 +5,7 @@ import ch.nacht.SolarDistribution;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Messwerte;
+import ch.nacht.entity.Quelle;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
 import org.slf4j.Logger;
@@ -17,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -225,6 +227,9 @@ public class MesswerteService {
             // Skip if no consumers
             if (consumers.isEmpty()) {
                 log.debug("No consumers found for timestamp: {}", zeit);
+                // Ohne Consumer wird nichts im ZEV konsumiert: MQTT-Produzenten auf zev = 0
+                // (alles Rücklieferung).
+                aktualisiereProducerZev(producers, BigDecimal.ZERO);
                 continue;
             }
 
@@ -259,6 +264,12 @@ public class MesswerteService {
                 processedRecords++;
             }
 
+            // Producer-zev = im ZEV konsumierte Produktion (= tatsächlich verteilte Menge);
+            // die Algorithmen kappen die Zuteilung am Verbrauch, der Rest ist Rücklieferung.
+            BigDecimal verteiltFuerZeit = distributions.stream()
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            aktualisiereProducerZev(producers, verteiltFuerZeit);
+
             processedTimestamps++;
             if (showProgress) {
                 calculationProgressService.updateProgress(progressOrgId, processedTimestamps);
@@ -281,6 +292,33 @@ public class MesswerteService {
                 dateTo,
                 totalSolarProduced.doubleValue(),
                 totalDistributed.doubleValue());
+    }
+
+    /**
+     * Setzt bei MQTT-Produzenten {@code zev} auf den im ZEV konsumierten Anteil der Produktion
+     * (= tatsächlich verteilte Menge), bei mehreren Produzenten proportional zu ihrer Produktion.
+     * Messwerte ohne Produktion ({@code total >= 0}, z.B. Steuergerät) erhalten 0. Gespeichert
+     * wird mit negativem Vorzeichen, konsistent zu {@code total}. CSV-Messwerte tragen den vom
+     * Messdienstleister gemessenen ZEV-Anteil und bleiben unangetastet.
+     */
+    private void aktualisiereProducerZev(List<Messwerte> producers, BigDecimal verteilt) {
+        BigDecimal produktion = producers.stream()
+                .map(m -> BigDecimal.valueOf(m.getTotal()))
+                .filter(t -> t.signum() < 0)
+                .map(BigDecimal::abs)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        for (Messwerte producer : producers) {
+            if (producer.getQuelle() != Quelle.MQTT) {
+                continue;
+            }
+            BigDecimal total = BigDecimal.valueOf(producer.getTotal());
+            BigDecimal anteil = (produktion.signum() > 0 && total.signum() < 0)
+                    ? verteilt.multiply(total.abs()).divide(produktion, 10, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+            producer.setZev(anteil.negate().doubleValue());
+            messwerteRepository.save(producer);
+        }
     }
 
     public static class CalculationResult {

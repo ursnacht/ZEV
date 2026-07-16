@@ -110,18 +110,43 @@ docker run --rm -it -p 1883:1883 -e MOSQUITTO_USERS='zev-backend:zev-mqtt-dev' z
 **2) Einheiten anlegen** – je `messpunkt` aus der Sim-Config muss eine Einheit mit
 passendem `org_id` (hier `42`) existieren, sonst verwirft der Ingest „unbekannter Messpunkt".
 
-**3) Simulator starten** (mit Broker-Credentials):
+**3) Simulator starten** (mit Broker-Credentials; venv/Abhängigkeiten siehe
+[Lokale Installation](#lokale-installation-entwicklung)):
 
 ```bash
 cd pi-gateway
 cp config.sim.example.yaml config.sim.yaml     # ggf. messpunkte/org_id anpassen
-export MQTT_USERNAME=zev-backend MQTT_PASSWORD=zev-mqtt-dev   # PowerShell: $env:MQTT_USERNAME=...
+export MQTT_USERNAME=zev-backend MQTT_PASSWORD=zev-mqtt-dev
 python -m gateway.main --config config.sim.yaml
 ```
 
+<details><summary>Windows/PowerShell (inkl. venv-Setup)</summary>
+
+```powershell
+cd pi-gateway
+
+# Einmalig: venv anlegen und Abhängigkeiten installieren
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1   # bei Execution-Policy-Fehler vorher: Set-ExecutionPolicy -Scope Process RemoteSigned
+pip install -r requirements.txt
+
+Copy-Item config.sim.example.yaml config.sim.yaml   # ggf. messpunkte/org_id anpassen
+
+# Broker-Credentials (Dev-Defaults)
+$env:MQTT_USERNAME = "zev-backend"
+$env:MQTT_PASSWORD = "zev-mqtt-dev"
+
+python -m gateway.main --config config.sim.yaml
+```
+
+Bei späteren Starts genügen `Activate.ps1`, die beiden `$env:`-Variablen und der Start-Befehl;
+beenden mit `Ctrl+C`.
+</details>
+
 **4) Prüfen:** `zev.zaehler_rohdaten` füllt sich laufend; nach der jeweils nächsten
-Viertelstunde (`:00/:15/:30/:45`) schreibt der Job `zev.messwerte`
-(`total` vorzeichenbehaftet, `zev = 0`, `quelle = 'MQTT'`). Mitlesen der Nachrichten optional:
+Viertelstunde (`:00/:15/:30/:45`, Job-Läufe `:05/:20/:35/:50`) schreibt der Job `zev.messwerte`
+(`total` vorzeichenbehaftet, `quelle = 'MQTT'`); die unmittelbar anschliessende Solarverteilung
+setzt `zev`/`zev_calculated` (Producer: im ZEV konsumierter Anteil). Mitlesen der Nachrichten optional:
 `mosquitto_sub -h localhost -t 'zev/#' -v -u zev-backend -P zev-mqtt-dev`.
 
 ## Broker-Zugangsdaten (`MOSQUITTO_USERS`)

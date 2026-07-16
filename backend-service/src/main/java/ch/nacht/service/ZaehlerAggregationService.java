@@ -26,9 +26,11 @@ import java.util.Optional;
  * Scheduled-Aggregations-Job der MQTT-Integration (FR-6). Bildet je Einheit und
  * 15-Minuten-Intervall die Differenz der absoluten Zählerstände (pro Register), schreibt
  * vorzeichenbehaftete {@code total = ΔBezug − ΔEinspeisung} in {@code messwerte}
- * (Consumer: {@code zev = 0}; Producer: {@code zev = total}; {@code quelle = MQTT}) und
- * markiert die Rohdaten als verarbeitet. Unmittelbar danach wird je Mandant die
- * Solarverteilung für den behandelten Zeitraum ausgeführt (FR-6.7).
+ * (Consumer: {@code zev = 0}; Producer: {@code zev = total}, jeweils vorläufig;
+ * {@code quelle = MQTT}) und markiert die Rohdaten als verarbeitet. Unmittelbar danach wird
+ * je Mandant die Solarverteilung für den behandelten Zeitraum ausgeführt (FR-6.7); sie setzt
+ * bei Consumern {@code zev = zev_calculated} und bei Producern {@code zev} auf den im ZEV
+ * konsumierten Anteil der Produktion.
  *
  * <p>NUR aktiv mit Spring-Profil {@code mqtt}. Kein Request-Scope: {@code org_id} wird
  * explizit aus den Rohdaten/der Einheit übernommen (kein {@code orgFilter}).
@@ -176,9 +178,10 @@ public class ZaehlerAggregationService {
                     einheit.getId(), zeit);
         }
         messwert.setTotal(total);
-        // Produzenten: zev = total, damit die Statistik die Produktion korrekt ausweist
-        // (der gesamte Produktions-total zählt als ZEV-relevant). Consumer: zev = 0 (Sentinel);
-        // die Solarverteilung setzt dort später zev = zev_calculated (FR-9).
+        // Vorläufige zev-Werte – die unmittelbar anschliessende Solarverteilung (FR-6.7)
+        // ersetzt sie: Producer erhalten den im ZEV konsumierten Anteil der Produktion
+        // (= verteilte Menge, Rest ist Rücklieferung), Consumer zev = zev_calculated (FR-9,
+        // Sentinel zev = 0).
         messwert.setZev(einheit.getTyp() == EinheitTyp.PRODUCER ? total : 0.0);
         messwert.setQuelle(Quelle.MQTT); // zev_calculated bleibt null bis zur Solarverteilung
         messwerteRepository.save(messwert);

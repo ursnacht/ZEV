@@ -37,7 +37,7 @@ export class TranslationEditorComponent implements OnInit {
 
   menuItems: KebabMenuItem[] = [
     { label: 'BEARBEITEN', action: 'edit', icon: 'edit-2' },
-    { label: 'DELETE', action: 'delete', danger: true, icon: 'trash-2' }
+    { label: 'LOESCHEN', action: 'delete', danger: true, icon: 'trash-2' }
   ];
 
   constructor(

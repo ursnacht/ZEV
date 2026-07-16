@@ -3,6 +3,7 @@ package ch.nacht.service;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Messwerte;
+import ch.nacht.entity.Quelle;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
 
@@ -416,6 +417,145 @@ public class MesswerteServiceTest {
 
         assertEquals(dateFrom, result.getDateFrom());
         assertEquals(dateTo, result.getDateTo());
+    }
+
+    // ==================== Producer-zev (im ZEV konsumierte Produktion) ====================
+
+    @Test
+    void calculateSolarDistribution_MqttProducer_ZevIstVerteilteMenge() {
+        LocalDateTime dateFrom = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime dateTo = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
+        LocalDateTime zeit = LocalDateTime.of(2024, 1, 15, 12, 0);
+
+        // Produktion (10) übersteigt den Verbrauch (5): verteilt wird nur 5,
+        // der Producer-zev muss auf −5 korrigiert werden (Rest = Rücklieferung).
+        Messwerte producer = new Messwerte(zeit, -10.0, -10.0, producerEinheit);
+        producer.setQuelle(Quelle.MQTT);
+        Messwerte consumer = new Messwerte(zeit, 5.0, 0.0, consumerEinheit);
+
+        when(messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo))
+            .thenReturn(List.of(zeit));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.PRODUCER))
+            .thenReturn(List.of(producer));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER))
+            .thenReturn(List.of(consumer));
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        messwerteService.calculateSolarDistribution(dateFrom, dateTo, "PROPORTIONAL");
+
+        assertEquals(-5.0, producer.getZev(), 1e-9);
+        verify(messwerteRepository).save(producer);
+    }
+
+    @Test
+    void calculateSolarDistribution_CsvProducer_ZevBleibtGemessenerWert() {
+        LocalDateTime dateFrom = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime dateTo = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
+        LocalDateTime zeit = LocalDateTime.of(2024, 1, 15, 12, 0);
+
+        // CSV: zev ist der vom Messdienstleister gemessene ZEV-Anteil – bleibt unangetastet.
+        Messwerte producer = new Messwerte(zeit, -10.0, -7.0, producerEinheit);
+        Messwerte consumer = new Messwerte(zeit, 5.0, 0.0, consumerEinheit);
+
+        when(messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo))
+            .thenReturn(List.of(zeit));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.PRODUCER))
+            .thenReturn(List.of(producer));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER))
+            .thenReturn(List.of(consumer));
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        messwerteService.calculateSolarDistribution(dateFrom, dateTo, "PROPORTIONAL");
+
+        assertEquals(-7.0, producer.getZev(), 1e-9);
+        verify(messwerteRepository, never()).save(producer);
+    }
+
+    @Test
+    void calculateSolarDistribution_MqttProducerOhneConsumer_ZevWirdNull() {
+        LocalDateTime dateFrom = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime dateTo = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
+        LocalDateTime zeit = LocalDateTime.of(2024, 1, 15, 12, 0);
+
+        Messwerte producer = new Messwerte(zeit, -10.0, -10.0, producerEinheit);
+        producer.setQuelle(Quelle.MQTT);
+
+        when(messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo))
+            .thenReturn(List.of(zeit));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.PRODUCER))
+            .thenReturn(List.of(producer));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER))
+            .thenReturn(Collections.emptyList());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        messwerteService.calculateSolarDistribution(dateFrom, dateTo, "PROPORTIONAL");
+
+        // Nichts im ZEV konsumiert: alles Rücklieferung
+        assertEquals(0.0, producer.getZev(), 1e-9);
+        verify(messwerteRepository).save(producer);
+    }
+
+    @Test
+    void calculateSolarDistribution_MehrereMqttProducer_ProportionaleAufteilung() {
+        LocalDateTime dateFrom = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime dateTo = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
+        LocalDateTime zeit = LocalDateTime.of(2024, 1, 15, 12, 0);
+
+        Einheit producerEinheit2 = new Einheit("Solaranlage 2", EinheitTyp.PRODUCER);
+        producerEinheit2.setId(3L);
+        producerEinheit2.setOrgId(testOrgId);
+
+        // Produktion 6 + 4 = 10, Verbrauch 5 → verteilt 5, aufgeteilt 60%/40% → −3 / −2
+        Messwerte producer1 = new Messwerte(zeit, -6.0, -6.0, producerEinheit);
+        producer1.setQuelle(Quelle.MQTT);
+        Messwerte producer2 = new Messwerte(zeit, -4.0, -4.0, producerEinheit2);
+        producer2.setQuelle(Quelle.MQTT);
+        Messwerte consumer = new Messwerte(zeit, 5.0, 0.0, consumerEinheit);
+
+        when(messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo))
+            .thenReturn(List.of(zeit));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.PRODUCER))
+            .thenReturn(List.of(producer1, producer2));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER))
+            .thenReturn(List.of(consumer));
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        messwerteService.calculateSolarDistribution(dateFrom, dateTo, "PROPORTIONAL");
+
+        assertEquals(-3.0, producer1.getZev(), 1e-9);
+        assertEquals(-2.0, producer2.getZev(), 1e-9);
+    }
+
+    @Test
+    void calculateSolarDistribution_MqttSteuergeraet_ZevNull() {
+        LocalDateTime dateFrom = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime dateTo = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
+        LocalDateTime zeit = LocalDateTime.of(2024, 1, 15, 12, 0);
+
+        Einheit steuergeraetEinheit = new Einheit("Steuergerät", EinheitTyp.PRODUCER);
+        steuergeraetEinheit.setId(3L);
+        steuergeraetEinheit.setOrgId(testOrgId);
+
+        // Positiver total (Verbrauch des Steuergeräts) produziert nichts → zev = 0
+        Messwerte producer = new Messwerte(zeit, -10.0, -10.0, producerEinheit);
+        producer.setQuelle(Quelle.MQTT);
+        Messwerte steuergeraet = new Messwerte(zeit, 2.0, 2.0, steuergeraetEinheit);
+        steuergeraet.setQuelle(Quelle.MQTT);
+        Messwerte consumer = new Messwerte(zeit, 5.0, 0.0, consumerEinheit);
+
+        when(messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo))
+            .thenReturn(List.of(zeit));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.PRODUCER))
+            .thenReturn(List.of(producer, steuergeraet));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER))
+            .thenReturn(List.of(consumer));
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        messwerteService.calculateSolarDistribution(dateFrom, dateTo, "PROPORTIONAL");
+
+        assertEquals(0.0, steuergeraet.getZev(), 1e-9);
+        // Netto-Produktion 10 − 2 = 8 ≥ Verbrauch 5 → verteilte Menge 5 komplett dem Produzenten
+        assertEquals(-5.0, producer.getZev(), 1e-9);
     }
 
     // ==================== CalculationResult Tests ====================
