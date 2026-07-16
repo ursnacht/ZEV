@@ -96,6 +96,10 @@ Alle übrigen Actuator-Endpoints (`/actuator/env`, `/actuator/loggers`, ...) erf
 (`ACTUATOR_USER`/`ACTUATOR_PASSWORD`, siehe `SecurityConfig.actuatorFilterChain`); der Spring Boot
 Admin Server authentifiziert sich mit denselben Credentials (Client-Metadata `user.name`/`user.password`).
 
+Die **Spring-Boot-Admin-UI** (admin-service, `:8081`) ist ebenfalls per Basic Auth geschützt
+(`SBA_USER`/`SBA_PASSWORD`, Rolle `SBA_ADMIN`); die Clients registrieren sich mit denselben
+Credentials (`spring.boot.admin.client.username/password`) an `POST /instances`.
+
 ## Endpunkt-Referenz (Backend `@PreAuthorize`)
 
 Die Spalten `zev_user` / `zev_admin` / `org_admin` sind gleich dargestellt wie in der Matrix (abgeleitet aus der Fachrolle→Permission-Zuordnung). Die Spalte `@PreAuthorize` zeigt die technische Regel im Ziel-Modell.

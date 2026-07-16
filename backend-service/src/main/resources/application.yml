@@ -27,6 +27,9 @@ spring:
     admin:
       client:
         url: ${ADMIN_URL:http://admin-service:8081}
+        # Basic-Auth-Zugangsdaten fuer die Registrierung am SBA-Server (POST /instances).
+        username: ${SBA_USER:sba}
+        password: ${SBA_PASSWORD:sba}
         instance:
           prefer-ip: true
           service-url: http://backend-service:8090

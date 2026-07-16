@@ -119,6 +119,9 @@ services:
       # Basic Auth fuer /actuator/** (SBA-Details); Default nur fuer lokale Entwicklung
       - ACTUATOR_USER=${ACTUATOR_USER:-actuator}
       - ACTUATOR_PASSWORD=${ACTUATOR_PASSWORD:-actuator}
+      # Basic Auth fuer die Registrierung am SBA-Server (SBA-UI-Credentials)
+      - SBA_USER=${SBA_USER:-sba}
+      - SBA_PASSWORD=${SBA_PASSWORD:-sba}
       # MQTT-Broker (im selben Netz erreichbar unter 'mosquitto')
       - MQTT_BROKER_URL=tcp://mosquitto:1883
       - MQTT_BROKER_USERNAME=${MQTT_BROKER_USERNAME}
@@ -144,6 +147,9 @@ services:
       # damit der SBA-Server die Client-Endpoints abrufen kann
       - ACTUATOR_USER=${ACTUATOR_USER:-actuator}
       - ACTUATOR_PASSWORD=${ACTUATOR_PASSWORD:-actuator}
+      # Basic Auth fuer die SBA-UI und die Client-Registrierung (POST /instances)
+      - SBA_USER=${SBA_USER:-sba}
+      - SBA_PASSWORD=${SBA_PASSWORD:-sba}
     networks:
       - zev-network
     restart: unless-stopped
@@ -163,6 +169,9 @@ services:
       # Basic Auth fuer /actuator/** (SBA-Details); Default nur fuer lokale Entwicklung
       - ACTUATOR_USER=${ACTUATOR_USER:-actuator}
       - ACTUATOR_PASSWORD=${ACTUATOR_PASSWORD:-actuator}
+      # Basic Auth fuer die Registrierung am SBA-Server (SBA-UI-Credentials)
+      - SBA_USER=${SBA_USER:-sba}
+      - SBA_PASSWORD=${SBA_PASSWORD:-sba}
     depends_on:
       - backend-service
       - admin-service

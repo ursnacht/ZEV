@@ -8,6 +8,10 @@ spring:
     admin:
       client:
         url: http://admin-service:8081
+        # Basic-Auth-Zugangsdaten fuer die Registrierung am SBA-Server (POST /instances,
+        # siehe SecurityConfig.sbaFilterChain).
+        username: ${SBA_USER:sba}
+        password: ${SBA_PASSWORD:sba}
         instance:
           prefer-ip: true
           metadata:
@@ -16,11 +20,15 @@ spring:
             user.name: ${ACTUATOR_USER:actuator}
             user.password: ${ACTUATOR_PASSWORD:actuator}
 
-# Basic-Auth-Zugangsdaten fuer /actuator/** (siehe SecurityConfig).
-# Defaults nur fuer lokale Entwicklung – in Produktion via Env ueberschreiben.
+# Basic-Auth-Zugangsdaten (siehe SecurityConfig); Defaults nur fuer lokale
+# Entwicklung – in Produktion via Env ueberschreiben.
+# actuator: Abruf der /actuator/**-Endpoints | sba: SBA-UI und Client-Registrierung
 actuator:
   user: ${ACTUATOR_USER:actuator}
   password: ${ACTUATOR_PASSWORD:actuator}
+sba:
+  user: ${SBA_USER:sba}
+  password: ${SBA_PASSWORD:sba}
 
 management:
   endpoints:

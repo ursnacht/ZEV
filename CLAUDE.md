@@ -458,7 +458,7 @@ Network: `zev-network` (bridge)
 
 - Frontend: http://localhost:4200
 - Backend API: http://localhost:8090
-- Admin Service: http://localhost:8081
+- Admin Service: http://localhost:8081 (Basic Auth: sba/sba, via `SBA_USER`/`SBA_PASSWORD`)
 - Keycloak: http://localhost:9000
 - Keycloak Admin: http://localhost:9000 (admin/admin)
 - Prometheus: http://localhost:9090
