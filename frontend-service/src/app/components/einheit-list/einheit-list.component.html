@@ -2,8 +2,12 @@
   <h1><app-icon name="home" size="lg"></app-icon> {{ 'EINHEITEN_VERWALTUNG' | translate }}</h1>
 
   @if (message) {
-    <div class="zev-message" [ngClass]="'zev-message--' + messageType">
-      {{ message }}
+    <div class="zev-message" [ngClass]="'zev-message--' + messageType"
+      [class.zev-message--clickable]="messageType === 'error'" (click)="messageType === 'error' && dismissMessage()">
+      <span>{{ message }}</span>
+      @if (messageType === 'error') {
+        <span class="zev-message__dismiss">&times;</span>
+      }
     </div>
   }
 

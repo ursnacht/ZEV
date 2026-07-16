@@ -28,12 +28,18 @@ describe('StatistikComponent', () => {
     summeConsumerZevCalculated: 760,
     bezugVonVnb: 140,
     ruecklieferung: 1000,
+    bilanzBezug: 140,
+    bilanzRuecklieferung: 1000,
     summenCDGleich: true,
     differenzCD: 0,
     summenCEGleich: false,
     differenzCE: -10,
     summenDEGleich: true,
     differenzDE: 0,
+    bezugBilanzGleich: true,
+    bezugBilanzDifferenz: 0,
+    ruecklieferungBilanzGleich: true,
+    ruecklieferungBilanzDifferenz: 0,
     tageAbweichungen: [],
     einheitSummen: []
   };

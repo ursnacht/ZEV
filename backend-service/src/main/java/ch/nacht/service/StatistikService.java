@@ -163,6 +163,10 @@ public class StatistikService {
                 EinheitTyp.CONSUMER, vonDateTime, bisDateTime);
         Double summeConsumerZevCalculated = messwerteRepository.sumZevCalculatedByEinheitTypAndZeitBetween(
                 EinheitTyp.CONSUMER, vonDateTime, bisDateTime);
+        Double summeBilanzBezug = messwerteRepository.sumTotalByEinheitTypAndZeitBetween(
+                EinheitTyp.BEZUG, vonDateTime, bisDateTime);
+        Double summeBilanzRuecklieferung = messwerteRepository.sumTotalByEinheitTypAndZeitBetween(
+                EinheitTyp.RUECKLIEFERUNG, vonDateTime, bisDateTime);
 
         // Producer values are negative, use absolute values for display
         dto.setSummeProducerTotal(summeProducerTotal != null ? Math.abs(summeProducerTotal) : 0.0);
@@ -170,6 +174,10 @@ public class StatistikService {
         dto.setSummeProducerZev(summeProducerZev != null ? Math.abs(summeProducerZev) : 0.0);
         dto.setSummeConsumerZev(summeConsumerZev != null ? summeConsumerZev : 0.0);
         dto.setSummeConsumerZevCalculated(summeConsumerZevCalculated != null ? summeConsumerZevCalculated : 0.0);
+        // Bilanzmesspunkte: Bezug positiv, Rücklieferung negativ → Vergleich über Beträge.
+        // Fehlende Bilanz-Einheit/-Daten → 0.0 (Vergleich wird trotzdem angezeigt).
+        dto.setBilanzBezug(summeBilanzBezug != null ? summeBilanzBezug : 0.0);
+        dto.setBilanzRuecklieferung(summeBilanzRuecklieferung != null ? Math.abs(summeBilanzRuecklieferung) : 0.0);
 
         logger.debug("Monat {}/{}: ProducerTotal={}, ConsumerTotal={}, ProducerZev={}, ConsumerZev={}, ConsumerZevCalc={}",
                 yearMonth.getYear(), yearMonth.getMonthValue(),
@@ -218,6 +226,16 @@ public class StatistikService {
         double differenzDE = summeD - summeE;
         dto.setSummenDEGleich(Math.abs(differenzDE) < TOLERANZ);
         dto.setDifferenzDE(differenzDE);
+
+        // Berechneter "Bezug von VNB" vs. Bilanzmesspunkt BEZUG
+        double bezugBilanzDifferenz = dto.getBezugVonVnb() - dto.getBilanzBezug();
+        dto.setBezugBilanzGleich(Math.abs(bezugBilanzDifferenz) < TOLERANZ);
+        dto.setBezugBilanzDifferenz(bezugBilanzDifferenz);
+
+        // Berechnete "Rücklieferung" vs. Bilanzmesspunkt RUECKLIEFERUNG (beide als Betrag)
+        double ruecklieferungBilanzDifferenz = dto.getRuecklieferung() - dto.getBilanzRuecklieferung();
+        dto.setRuecklieferungBilanzGleich(Math.abs(ruecklieferungBilanzDifferenz) < TOLERANZ);
+        dto.setRuecklieferungBilanzDifferenz(ruecklieferungBilanzDifferenz);
     }
 
     private void pruefeDatenVollstaendigkeitMonat(MonatsStatistikDTO dto, LocalDate von, LocalDate bis) {
@@ -314,8 +332,8 @@ public class StatistikService {
             Double summeZev = messwerteRepository.sumZevByEinheitAndZeitBetween(einheit, vonDateTime, bisDateTime);
             Double summeZevCalculated = messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(einheit, vonDateTime, bisDateTime);
 
-            // Producer values are stored as negative, use absolute values for display
-            if (einheit.getTyp() == EinheitTyp.PRODUCER) {
+            // Producer-/Bilanz-Werte können negativ gespeichert sein → Absolutwerte für die Anzeige
+            if (einheit.getTyp() != EinheitTyp.CONSUMER) {
                 summeTotal = summeTotal != null ? Math.abs(summeTotal) : 0.0;
                 summeZev = summeZev != null ? Math.abs(summeZev) : 0.0;
             } else {

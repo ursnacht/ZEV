@@ -29,6 +29,10 @@
     <field name="differenzCE" class="java.lang.Double"/>
     <field name="summenDEGleich" class="java.lang.Boolean"/>
     <field name="differenzDE" class="java.lang.Double"/>
+    <field name="bezugBilanzGleich" class="java.lang.Boolean"/>
+    <field name="bezugBilanzDifferenz" class="java.lang.Double"/>
+    <field name="ruecklieferungBilanzGleich" class="java.lang.Boolean"/>
+    <field name="ruecklieferungBilanzDifferenz" class="java.lang.Double"/>
     <field name="einheitSummen" class="java.util.List"/>
 
     <!-- Variable: Maximum of all sums for bar scaling -->
@@ -98,7 +102,7 @@
 
     <!-- Detail Band - One band per month -->
     <detail>
-        <band height="312">
+        <band height="330">
             <!-- Month header -->
             <element kind="textField" uuid="33333333-3333-3333-3333-33333333330c" x="0" y="10" width="555" height="25" forecolor="#333333" fontSize="14.0" bold="true" vTextAlign="Middle">
                 <expression><![CDATA[java.time.Month.of($F{monat}).getDisplayName(java.time.format.TextStyle.FULL, "de".equals($P{SPRACHE}) ? java.util.Locale.GERMAN : java.util.Locale.ENGLISH) + " " + $F{jahr} + " (" + $F{von}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + " - " + $F{bis}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + ")"]]></expression>
@@ -312,8 +316,34 @@
                 <printWhenExpression><![CDATA[!$F{summenDEGleich}]]></printWhenExpression>
             </element>
 
+            <!-- Comparison: Bezug von VNB (berechnet) vs. Bilanzmesspunkt BEZUG -->
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333331" x="0" y="252" width="130" height="15" fontSize="9.0">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("VERGLEICH_BEZUG") + ":"]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333332" x="130" y="252" width="145" height="15" forecolor="#4CAF50" fontSize="9.0">
+                <expression><![CDATA["✓ " + $P{TRANSLATIONS}.get("GLEICH")]]></expression>
+                <printWhenExpression><![CDATA[$F{bezugBilanzGleich}]]></printWhenExpression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333333" x="130" y="252" width="145" height="15" forecolor="#F44336" fontSize="9.0">
+                <expression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + String.format("%+.3f", $F{bezugBilanzDifferenz}) + " kWh)"]]></expression>
+                <printWhenExpression><![CDATA[!$F{bezugBilanzGleich}]]></printWhenExpression>
+            </element>
+
+            <!-- Comparison: Rücklieferung (berechnet) vs. Bilanzmesspunkt RUECKLIEFERUNG -->
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333334" x="280" y="252" width="150" height="15" fontSize="9.0">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("VERGLEICH_RUECKLIEFERUNG") + ":"]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333335" x="430" y="252" width="125" height="15" forecolor="#4CAF50" fontSize="9.0">
+                <expression><![CDATA["✓ " + $P{TRANSLATIONS}.get("GLEICH")]]></expression>
+                <printWhenExpression><![CDATA[$F{ruecklieferungBilanzGleich}]]></printWhenExpression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333336" x="430" y="252" width="125" height="15" forecolor="#F44336" fontSize="9.0">
+                <expression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + String.format("%+.3f", $F{ruecklieferungBilanzDifferenz}) + " kWh)"]]></expression>
+                <printWhenExpression><![CDATA[!$F{ruecklieferungBilanzGleich}]]></printWhenExpression>
+            </element>
+
             <!-- Subreport: Summen pro Einheit -->
-            <element kind="subreport" uuid="33333333-3333-3333-3333-333333333330" x="0" y="257" width="555" height="50">
+            <element kind="subreport" uuid="33333333-3333-3333-3333-333333333330" x="0" y="275" width="555" height="50">
                 <printWhenExpression><![CDATA[$F{einheitSummen} != null && !$F{einheitSummen}.isEmpty()]]></printWhenExpression>
                 <parameter name="TRANSLATIONS">
                     <expression><![CDATA[$P{TRANSLATIONS}]]></expression>

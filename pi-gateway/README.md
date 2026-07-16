@@ -84,8 +84,10 @@ Zählerstände erzeugen und über den **echten** Publish-Pfad (Topic/Payload, `M
 senden. Damit lässt sich der komplette MQTT-Workflow ohne Pi/Hardware testen:
 `Simulator → Broker → Backend-Ingest → zaehler_rohdaten → Aggregations-Job → messwerte`.
 
-Vorlage: [`config.sim.example.yaml`](./config.sim.example.yaml) (Zähler mit `protokoll: sim`;
-`"producer"` im `messpunkt` → Einspeisung überwiegt = negatives `total`, sonst Consumer).
+Vorlage: [`config.sim.example.yaml`](./config.sim.example.yaml) (Zähler mit `protokoll: sim`).
+Das Verhalten steuert der `messpunkt`-Name: `"producer"` → Einspeisung überwiegt (negatives
+`total`); `"bezug"` bzw. `"rücklieferung"` → Bilanzmesspunkt am Netzanschluss (nur Bezug- bzw.
+nur Einspeisungs-Register wächst); sonst Consumer (positives `total`).
 
 Der Broker erzwingt Auth (Username/Passwort). Dev-Credentials: `zev-backend` / `zev-mqtt-dev`
 (Default in `.env.mqtt.example` → `MOSQUITTO_USERS`).

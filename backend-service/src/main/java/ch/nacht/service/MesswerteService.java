@@ -193,7 +193,9 @@ public class MesswerteService {
         BigDecimal totalSolarProduced = BigDecimal.ZERO;
         BigDecimal totalDistributed = BigDecimal.ZERO;
 
-        // Process each timestamp
+        // Process each timestamp. Nur PRODUCER/CONSUMER nehmen an der Verteilung teil –
+        // Bilanz-Typen (BEZUG/RUECKLIEFERUNG) werden hier nie geladen (zev/zev_calculated
+        // bleiben unangetastet).
         for (LocalDateTime zeit : distinctZeiten) {
             // Get all producers for this timestamp
             List<Messwerte> producers = messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.PRODUCER);

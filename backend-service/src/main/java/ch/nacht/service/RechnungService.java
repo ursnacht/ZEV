@@ -115,6 +115,11 @@ public class RechnungService {
                     } else {
                         log.debug("Skipping producer unit {} - no GRUNDGEBUEHR tariffs found", einheit.getName());
                     }
+                } else {
+                    // Bilanz-Typen (BEZUG/RUECKLIEFERUNG) messen den Netzanschluss und
+                    // werden bewusst nicht verrechnet.
+                    log.debug("Skipping unit {} - Bilanz-Typ {} wird nicht verrechnet",
+                            einheit.getName(), einheit.getTyp());
                 }
             });
         }

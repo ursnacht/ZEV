@@ -5,6 +5,7 @@ import { WithMessage } from '../../utils/with-message';
 import { StatistikService } from '../../services/statistik.service';
 import { Statistik, MonatsStatistik, TagMitAbweichung } from '../../models/statistik.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { EinheitTypPipe } from '../../pipes/einheit-typ.pipe';
 import { SwissDatePipe } from '../../pipes/swiss-date.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
@@ -13,7 +14,7 @@ import { IconComponent } from '../icon/icon.component';
 @Component({
   selector: 'app-statistik',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe, SwissDatePipe, QuarterSelectorComponent, IconComponent],
+  imports: [CommonModule, FormsModule, TranslatePipe, EinheitTypPipe, SwissDatePipe, QuarterSelectorComponent, IconComponent],
   templateUrl: './statistik.component.html',
   styleUrls: ['./statistik.component.css']
 })
@@ -169,6 +170,11 @@ export class StatistikComponent extends WithMessage implements OnInit {
       return '-';
     }
     return value.toFixed(3);
+  }
+
+  /** Bilanz-Typen (Netzanschluss): nur `total` ist fachlich relevant, zev/zev_berechnet nicht. */
+  isBilanzTyp(einheitTyp: string): boolean {
+    return einheitTyp === 'BEZUG' || einheitTyp === 'RUECKLIEFERUNG';
   }
 
   formatDifferenz(value: number | null | undefined): string {

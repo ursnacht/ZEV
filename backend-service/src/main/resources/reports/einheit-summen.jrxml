@@ -66,7 +66,10 @@
 
             <!-- Typ (translated) -->
             <element kind="textField" uuid="44444444-4444-4444-4444-444444444411" x="170" y="0" width="85" height="16" fontSize="9.0" vTextAlign="Middle">
-                <expression><![CDATA[$F{einheitTyp}.name().equals("PRODUCER") ? $P{TRANSLATIONS}.get("PRODUZENT") : $P{TRANSLATIONS}.get("KONSUMENT")]]></expression>
+                <expression><![CDATA[$F{einheitTyp}.name().equals("PRODUCER") ? $P{TRANSLATIONS}.get("PRODUZENT")
+                    : $F{einheitTyp}.name().equals("BEZUG") ? $P{TRANSLATIONS}.get("TYP_BEZUG")
+                    : $F{einheitTyp}.name().equals("RUECKLIEFERUNG") ? $P{TRANSLATIONS}.get("TYP_RUECKLIEFERUNG")
+                    : $P{TRANSLATIONS}.get("KONSUMENT")]]></expression>
                 <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
@@ -80,9 +83,9 @@
                 </box>
             </element>
 
-            <!-- ZEV (kWh) -->
-            <element kind="textField" uuid="44444444-4444-4444-4444-444444444413" x="355" y="0" width="100" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
-                <expression><![CDATA[$F{summeZev}]]></expression>
+            <!-- ZEV (kWh) - "-" fuer Bilanz-Typen (zev ohne fachliche Bedeutung, immer 0) -->
+            <element kind="textField" uuid="44444444-4444-4444-4444-444444444413" x="355" y="0" width="100" height="16" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[($F{einheitTyp}.name().equals("BEZUG") || $F{einheitTyp}.name().equals("RUECKLIEFERUNG")) ? "-" : ($F{summeZev} != null ? String.format("%,.3f", $F{summeZev}) : null)]]></expression>
                 <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>

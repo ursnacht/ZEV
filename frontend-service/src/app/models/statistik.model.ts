@@ -7,7 +7,7 @@ export interface TagMitAbweichung {
 export interface EinheitSummen {
   einheitId: number;
   einheitName: string;
-  einheitTyp: 'PRODUCER' | 'CONSUMER';
+  einheitTyp: 'PRODUCER' | 'CONSUMER' | 'BEZUG' | 'RUECKLIEFERUNG';
   summeTotal: number;
   summeZev: number;
   summeZevCalculated: number;
@@ -33,6 +33,10 @@ export interface MonatsStatistik {
   bezugVonVnb: number;
   ruecklieferung: number;
 
+  // Bilanzmesspunkte (Netzanschluss)
+  bilanzBezug: number;
+  bilanzRuecklieferung: number;
+
   // Vergleiche
   summenCDGleich: boolean;
   differenzCD: number;
@@ -40,6 +44,12 @@ export interface MonatsStatistik {
   differenzCE: number;
   summenDEGleich: boolean;
   differenzDE: number;
+
+  // Vergleiche gegen die Bilanzmesspunkte
+  bezugBilanzGleich: boolean;
+  bezugBilanzDifferenz: number;
+  ruecklieferungBilanzGleich: boolean;
+  ruecklieferungBilanzDifferenz: number;
 
   // Tage mit Abweichungen
   tageAbweichungen: TagMitAbweichung[];

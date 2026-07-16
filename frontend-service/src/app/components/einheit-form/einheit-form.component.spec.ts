@@ -52,10 +52,12 @@ describe('EinheitFormComponent', () => {
       expect(component.formData.messpunkt).toBe('MP-001');
     });
 
-    it('should have two einheit type options', () => {
-      expect(component.einheitTypOptions.length).toBe(2);
+    it('should have four einheit type options', () => {
+      expect(component.einheitTypOptions.length).toBe(4);
       expect(component.einheitTypOptions[0].value).toBe(EinheitTyp.PRODUCER);
       expect(component.einheitTypOptions[1].value).toBe(EinheitTyp.CONSUMER);
+      expect(component.einheitTypOptions[2].value).toBe(EinheitTyp.BEZUG);
+      expect(component.einheitTypOptions[3].value).toBe(EinheitTyp.RUECKLIEFERUNG);
     });
   });
 

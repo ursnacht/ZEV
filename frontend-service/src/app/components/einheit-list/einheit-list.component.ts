@@ -97,7 +97,10 @@ export class EinheitListComponent extends WithMessage implements OnInit {
           this.loadEinheiten();
         },
         error: (error) => {
-          this.showMessage('Fehler beim Aktualisieren: ' + error.message, 'error');
+          const key = error.error?.error;
+          this.showMessage(key
+            ? this.translationService.translate(key)
+            : 'Fehler beim Aktualisieren: ' + error.message, 'error');
         }
       });
     } else {
@@ -108,7 +111,10 @@ export class EinheitListComponent extends WithMessage implements OnInit {
           this.loadEinheiten();
         },
         error: (error) => {
-          this.showMessage('Fehler beim Erstellen: ' + error.message, 'error');
+          const key = error.error?.error;
+          this.showMessage(key
+            ? this.translationService.translate(key)
+            : 'Fehler beim Erstellen: ' + error.message, 'error');
         }
       });
     }

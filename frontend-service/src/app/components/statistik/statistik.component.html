@@ -247,6 +247,28 @@
                   </span>
                 }
               </div>
+              <div class="zev-comparison-item">
+                <span class="zev-status-indicator">
+                  <span class="zev-status-dot" [ngClass]="getComparisonStatusClass(monat.bezugBilanzGleich)"></span>
+                  <span>{{ 'VERGLEICH_BEZUG' | translate }}</span>
+                </span>
+                @if (!monat.bezugBilanzGleich) {
+                  <span class="zev-differenz">
+                    {{ 'DIFFERENZ' | translate }}: {{ formatDifferenz(monat.bezugBilanzDifferenz) }} kWh
+                  </span>
+                }
+              </div>
+              <div class="zev-comparison-item">
+                <span class="zev-status-indicator">
+                  <span class="zev-status-dot" [ngClass]="getComparisonStatusClass(monat.ruecklieferungBilanzGleich)"></span>
+                  <span>{{ 'VERGLEICH_RUECKLIEFERUNG' | translate }}</span>
+                </span>
+                @if (!monat.ruecklieferungBilanzGleich) {
+                  <span class="zev-differenz">
+                    {{ 'DIFFERENZ' | translate }}: {{ formatDifferenz(monat.ruecklieferungBilanzDifferenz) }} kWh
+                  </span>
+                }
+              </div>
             </div>
           </div>
           <!-- Summen pro Einheit -->
@@ -268,9 +290,9 @@
                     <tr
                       [ngClass]="{'zev-table__row--producer': einheit.einheitTyp === 'PRODUCER', 'zev-table__row--consumer': einheit.einheitTyp === 'CONSUMER'}">
                       <td>{{ einheit.einheitName }}</td>
-                      <td>{{ (einheit.einheitTyp === 'PRODUCER' ? 'PRODUZENT' : 'KONSUMENT') | translate }}</td>
+                      <td>{{ einheit.einheitTyp | einheitTyp }}</td>
                       <td class="zev-table__number">{{ formatNumber(einheit.summeTotal) }}</td>
-                      <td class="zev-table__number">{{ formatNumber(einheit.summeZev) }}</td>
+                      <td class="zev-table__number">{{ isBilanzTyp(einheit.einheitTyp) ? '-' : formatNumber(einheit.summeZev) }}</td>
                       <td class="zev-table__number">{{ einheit.einheitTyp === 'CONSUMER' ? formatNumber(einheit.summeZevCalculated) : '-' }}</td>
                     </tr>
                   }

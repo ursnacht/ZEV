@@ -41,8 +41,8 @@ Pro Monat werden **zusätzlich** zu A=B, A=C, B=C zwei neue Vergleiche berechnet
 1. **Statistik-Seite** (`StatistikComponent`): zwei zusätzliche Vergleichs-Items im Bereich „Summen-Vergleich" (Design-System-`zev-comparison-item` mit Status-Dot ✓/✗ und Differenz-Anzeige, wie bestehend). Die Vergleiche tragen **eigene, kurze Kürzel/Labels** (analog „A = B"; **nicht** die bestehenden Value-Keys `BEZUG_VON_VNB`/`RUECKLIEFERUNG` wiederverwenden). Optional: die beiden Bilanz-Summen als zusätzliche Zeilen/Balken in der Werte-Tabelle.
 2. **Statistik-PDF** (`statistik.jrxml`): die zwei neuen Vergleiche werden — **konsistent zur Web-Ansicht** — ebenfalls ausgegeben (in Scope).
 3. **Einheiten-Formular** (`EinheitFormComponent`): Typ-Dropdown um „Bezug" und „Rücklieferung" ergänzt.
-4. **Typ-Anzeige** (`EinheitTypPipe`, Einheiten-Liste, „Summen pro Einheit"): muss alle **vier** Typen korrekt beschriften (bisher binär `CONSUMER` vs. sonst → `PRODUZENT`; muss auf 4 Typen erweitert werden).
-5. **„Summen pro Einheit":** Bilanz-Einheiten werden dort **mitgelistet**, mit **Absolutwerten** (analog zur Producer-Darstellung).
+4. **Typ-Anzeige** (`EinheitTypPipe`, Einheiten-Liste, „Summen pro Einheit"): muss alle **vier** Typen korrekt beschriften (bisher binär `CONSUMER` vs. sonst → `PRODUZENT`; muss auf 4 Typen erweitert werden). **Achtung:** Die binäre Logik existiert nicht nur in der Pipe, sondern auch inline in der Statistik-Tabelle „Summen pro Einheit" (`statistik.component.html`) und im PDF-Subreport (`reports/einheit-summen.jrxml`) — alle drei Stellen anpassen.
+5. **„Summen pro Einheit":** Bilanz-Einheiten werden dort **mitgelistet**, mit **Absolutwerten** (analog zur Producer-Darstellung). Nur `total` ist fachlich relevant: die Spalten **ZEV** und **ZEV berechnet** zeigen für Bilanz-Typen **`-`** (Web und PDF).
 6. Alle neuen Texte über `TranslationService`/`TranslatePipe` (keine Hardcodings).
 
 ### FR-6: Persistierung & i18n
@@ -119,9 +119,12 @@ Pro Monat werden **zusätzlich** zu A=B, A=C, B=C zwei neue Vergleiche berechnet
   - `service/EinheitService.java` — Eindeutigkeits-Validierung (max. eine `BEZUG`- und eine `RUECKLIEFERUNG`-Einheit pro Mandant).
   - `service/RechnungService.java` — prüfen, dass Bilanz-Typen nicht verrechnet werden.
   - `service/StatistikPdfService.java` + `reports/statistik.jrxml` — zwei neue Vergleiche (falls in Scope).
+  - `reports/einheit-summen.jrxml` — Typ-Label im Subreport „Summen pro Einheit" auf 4 Typen erweitern.
 * **Betroffener Code (Frontend):**
   - `models/einheit.model.ts` (`EinheitTyp`), `components/einheit-form` (Typ-Optionen), `pipes/einheit-typ.pipe.ts` (4 Typen).
-  - `models/statistik.model.ts`, `components/statistik/*` (zwei neue Vergleichs-Items), zugehörige Tests/Mocks.
+  - `models/statistik.model.ts`, `components/statistik/*` (zwei neue Vergleichs-Items; Typ-Spalte in „Summen pro Einheit" über `EinheitTypPipe` statt Inline-Ternary), zugehörige Tests/Mocks.
+  - `components/einheit-list` — Eindeutigkeits-Fehlermeldung übersetzt anzeigen (`error.error?.error`).
+* **Testunterstützung:** Der Publisher-Simulator (`pi-gateway`, `sim_reader.py`) unterstützt die Bilanzmesspunkte über die `messpunkt`-Namen `"bezug"` (nur Bezug-Register wächst) und `"rücklieferung"` (nur Einspeisungs-Register wächst); Beispiel-Einträge in `config.sim.example.yaml`.
 * **Datenmigration:** keine (nur neue Übersetzungs-Keys via Flyway).
 * **i18n:** neue Keys für Typ-Labels und ggf. Vergleichs-Beschriftungen (DE/EN).
 

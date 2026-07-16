@@ -18,7 +18,7 @@
       <select id="typ" class="zev-select" [(ngModel)]="formData.typ" name="typ" required>
         @for (option of einheitTypOptions; track option) {
           <option [value]="option.value">
-            {{ option.label }}
+            {{ option.label | translate }}
           </option>
         }
       </select>

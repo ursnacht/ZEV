@@ -29,12 +29,18 @@ describe('StatistikService', () => {
         summeConsumerZevCalculated: 798,
         bezugVonVnb: 152,
         ruecklieferung: 1200,
+        bilanzBezug: 152,
+        bilanzRuecklieferung: 1200,
         summenCDGleich: true,
         differenzCD: 0,
         summenCEGleich: true,
         differenzCE: 2,
         summenDEGleich: true,
         differenzDE: 0,
+        bezugBilanzGleich: true,
+        bezugBilanzDifferenz: 0,
+        ruecklieferungBilanzGleich: true,
+        ruecklieferungBilanzDifferenz: 0,
         tageAbweichungen: [],
         einheitSummen: []
       }

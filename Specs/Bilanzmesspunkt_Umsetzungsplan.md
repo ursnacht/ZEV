@@ -18,6 +18,7 @@ Grundlage: [`Specs/Bilanzmesspunkt.md`](./Bilanzmesspunkt.md).
 - `service/StatistikService.java` – Bilanz-Summen (`sumTotalByEinheitTypAndZeitBetween` mit den neuen Typen) + Vergleiche berechnen; `berechneEinheitSummen` um `abs` für Bilanz-Typen erweitern.
 - `service/RechnungService.java` – sicherstellen, dass Bilanz-Typen **nicht** verrechnet werden (weder Consumer- noch Producer-Zweig).
 - `service/StatistikPdfService.java` / `reports/statistik.jrxml` – zwei neue Vergleiche im PDF.
+- `reports/einheit-summen.jrxml` – Typ-Label im Subreport auf 4 Typen (war binär `PRODUCER`/sonst).
 - (Verifikation, kein Code) `service/MesswerteService.java`, `service/ZaehlerAggregationService.java` – Verteilung nur `PRODUCER`/`CONSUMER`; `zev=0` für Bilanz-Typen bereits gegeben.
 
 **Frontend (geändert):**
@@ -26,7 +27,7 @@ Grundlage: [`Specs/Bilanzmesspunkt.md`](./Bilanzmesspunkt.md).
 - `pipes/einheit-typ.pipe.ts` – Mapping für **vier** Typen.
 - `components/einheit-list/einheit-list.component.ts` – Erstell-/Update-Fehler übersetzt anzeigen (`error.error?.error`).
 - `models/statistik.model.ts` – neue Bilanz-/Vergleichsfelder.
-- `components/statistik/statistik.component.html` – zwei neue Vergleichs-Items (+ optional zwei Bilanz-Summenzeilen/Balken).
+- `components/statistik/statistik.component.html` – zwei neue Vergleichs-Items (+ optional zwei Bilanz-Summenzeilen/Balken); Typ-Spalte in „Summen pro Einheit" über `EinheitTypPipe` (war binäres Inline-Ternary).
 - Tests/Mocks: `statistik.component.spec.ts`, `statistik.service.spec.ts`, `einheit-form.component.spec.ts` (neue Enum-Werte/DTO-Felder).
 
 **DB / i18n:**
@@ -36,16 +37,16 @@ Grundlage: [`Specs/Bilanzmesspunkt.md`](./Bilanzmesspunkt.md).
 
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
-| [ ] | 1. EinheitTyp erweitern | `EinheitTyp` (Backend + `einheit.model.ts`) um `BEZUG`, `RUECKLIEFERUNG`. Keine Schema-Migration (VARCHAR). |
-| [ ] | 2. Eindeutigkeit Backend | `EinheitRepository.existsByTyp`/`existsByTypAndIdNot`; `EinheitService.createEinheit`/`updateEinheit`: bei Bilanz-Typ prüfen (orgFilter aktiv) → sonst `IllegalStateException("EINHEIT_BILANZ_TYP_EXISTIERT")` (Mapping auf HTTP 400 via `GlobalExceptionHandler`). |
-| [ ] | 3. Verteilung/Aggregation absichern | Verifizieren: `MesswerteService.distribute` verarbeitet nur `PRODUCER`/`CONSUMER` (Bilanz-Typen ausgeschlossen); `ZaehlerAggregationService` setzt `zev=0` für Bilanz-Typen. Ggf. Kommentar/Test ergänzen. Kein funktionaler Code nötig. |
-| [ ] | 4. RechnungService absichern | Sicherstellen, dass Einheiten der Bilanz-Typen weder als Consumer noch als Producer verrechnet werden (Filter/Guard); ggf. Regressionstest. |
-| [ ] | 5. Statistik-Berechnung | `MonatsStatistikDTO` um Bilanz-Summen + Vergleichsfelder; `StatistikService`: Bilanz-Summen ermitteln, Vergleiche (Bezug positiv; Rücklieferung über Beträge) mit `TOLERANZ`; `berechneEinheitSummen` → `abs` auch für Bilanz-Typen. |
-| [ ] | 6. Statistik-Anzeige (Web) | `statistik.model.ts` + `statistik.component.html`: zwei neue Vergleichs-Items im Bereich „Summen-Vergleich" (Design-System `zev-comparison-item`, Status-Dot + Differenz); optional zwei Bilanz-Summenzeilen mit Balken (Absolutwerte). |
-| [ ] | 7. Statistik-PDF | `statistik.jrxml`: zwei neue Vergleiche (Felder + Elemente) analog Web; Band-Höhe/Layout anpassen. `JasperTemplateCompileTest` grün. |
-| [ ] | 8. Einheiten-UI | `einheit-form`: zwei neue Typ-Optionen; `einheit-typ.pipe`: vier Typen; `einheit-list`: übersetzte Fehlermeldung bei Eindeutigkeits-Verletzung. |
-| [ ] | 9. Übersetzungen | `V80__Add_Bilanzmesspunkt_Translations.sql`: `TYP_BEZUG`, `TYP_RUECKLIEFERUNG`, `VERGLEICH_BEZUG`, `VERGLEICH_RUECKLIEFERUNG`, `EINHEIT_BILANZ_TYP_EXISTIERT` (DE/EN, `ON CONFLICT DO NOTHING`). |
-| [ ] | 10. Tests anpassen | Bestehende Spec-Mocks/Tests auf neue Enum-Werte und DTO-/Model-Felder anpassen (Backend `StatistikServiceTest`, Frontend `statistik.*.spec.ts`, `einheit-form.component.spec.ts`). Neue Tests gemäss separaten Test-Skills (`/3`–`/5`). |
+| [x] | 1. EinheitTyp erweitern | `EinheitTyp` (Backend + `einheit.model.ts`) um `BEZUG`, `RUECKLIEFERUNG`. Keine Schema-Migration (VARCHAR). |
+| [x] | 2. Eindeutigkeit Backend | `EinheitRepository.existsByTyp`/`existsByTypAndIdNot`; `EinheitService.createEinheit`/`updateEinheit`: bei Bilanz-Typ prüfen (orgFilter aktiv) → sonst `IllegalStateException("EINHEIT_BILANZ_TYP_EXISTIERT")` (Mapping auf HTTP 400 via `GlobalExceptionHandler`). |
+| [x] | 3. Verteilung/Aggregation absichern | Verifizieren: `MesswerteService.distribute` verarbeitet nur `PRODUCER`/`CONSUMER` (Bilanz-Typen ausgeschlossen); `ZaehlerAggregationService` setzt `zev=0` für Bilanz-Typen. Ggf. Kommentar/Test ergänzen. Kein funktionaler Code nötig. |
+| [x] | 4. RechnungService absichern | Sicherstellen, dass Einheiten der Bilanz-Typen weder als Consumer noch als Producer verrechnet werden (Filter/Guard); ggf. Regressionstest. |
+| [x] | 5. Statistik-Berechnung | `MonatsStatistikDTO` um Bilanz-Summen + Vergleichsfelder; `StatistikService`: Bilanz-Summen ermitteln, Vergleiche (Bezug positiv; Rücklieferung über Beträge) mit `TOLERANZ`; `berechneEinheitSummen` → `abs` auch für Bilanz-Typen. |
+| [x] | 6. Statistik-Anzeige (Web) | `statistik.model.ts` + `statistik.component.html`: zwei neue Vergleichs-Items im Bereich „Summen-Vergleich" (Design-System `zev-comparison-item`, Status-Dot + Differenz); optional zwei Bilanz-Summenzeilen mit Balken (Absolutwerte). |
+| [x] | 7. Statistik-PDF | `statistik.jrxml`: zwei neue Vergleiche (Felder + Elemente) analog Web; Band-Höhe/Layout anpassen. `JasperTemplateCompileTest` grün. |
+| [x] | 8. Einheiten-UI | `einheit-form`: zwei neue Typ-Optionen; `einheit-typ.pipe`: vier Typen; `einheit-list`: übersetzte Fehlermeldung bei Eindeutigkeits-Verletzung. |
+| [x] | 9. Übersetzungen | `V80__Add_Bilanzmesspunkt_Translations.sql`: `TYP_BEZUG`, `TYP_RUECKLIEFERUNG`, `VERGLEICH_BEZUG`, `VERGLEICH_RUECKLIEFERUNG`, `EINHEIT_BILANZ_TYP_EXISTIERT` (DE/EN, `ON CONFLICT DO NOTHING`). |
+| [x] | 10. Tests anpassen | Bestehende Spec-Mocks/Tests auf neue Enum-Werte und DTO-/Model-Felder anpassen (Backend `StatistikServiceTest`, Frontend `statistik.*.spec.ts`, `einheit-form.component.spec.ts`). Neue Tests gemäss separaten Test-Skills (`/3`–`/5`). |
 
 > **Tests** (Unit/Integration/E2E) werden gemäss Projekt-Workflow separat mit `/3_backend-tests`, `/4_frontend-unit-tests`, `/5_e2e-tests` erstellt; hier nur die Anpassung bestehender Tests, damit der Build grün bleibt.
 
@@ -73,3 +74,13 @@ Grundlage: [`Specs/Bilanzmesspunkt.md`](./Bilanzmesspunkt.md).
 - **PDF-Layout:** Einfügen der zwei Vergleiche erhöht die Detail-Band-Höhe (analog zur letzten Statistik-PDF-Erweiterung); Positionen der nachfolgenden Elemente entsprechend verschieben.
 - **Bilanz-Einheiten in „Summen pro Einheit":** werden mitgelistet (Absolutwerte); der Typ wird über `EinheitTypPipe` angezeigt.
 - **`total`-Vorzeichen der Bilanz-Einheiten** hängt von der (späteren) Datenquelle ab (Import folgt separat); die Vorzeichen-/`abs`-Logik ist unabhängig davon korrekt.
+
+## Umsetzungsnotizen (nach Abschluss)
+
+- **Alle 10 Phasen umgesetzt** (Backend 425 Unit-Tests, Frontend 779 Tests, `JasperTemplateCompileTest` grün). Die **optionalen** Bilanz-Summenzeilen/-Balken in der Werte-Tabelle (Phase 6) wurden bewusst **nicht** umgesetzt.
+- **Nachbesserung ZEV-Spalte (FR-5.5):** In „Summen pro Einheit" zeigt die Spalte **ZEV (kWh)** für Bilanz-Typen `-` statt `0.000` (Web: `isBilanzTyp()`-Helper, PDF: `einheit-summen.jrxml`) – nur `total` ist für Bilanzmesspunkte fachlich relevant.
+- **Nachbesserung Typ-Anzeige (FR-5.4):** Die binäre Typ-Logik existierte ausser in der `EinheitTypPipe` auch inline in `statistik.component.html` („Summen pro Einheit") und im PDF-Subreport `einheit-summen.jrxml` – beide zeigten Bilanz-Einheiten als „Konsument" und wurden nachträglich auf 4 Typen erweitert (Web über `EinheitTypPipe`, PDF über verschachteltes Ternary mit `TYP_BEZUG`/`TYP_RUECKLIEFERUNG`).
+- **`einheit-list`:** Fehlermeldungen sind jetzt wegklickbar (Message-Konvention: Error bleibt bis dismissed) – das Dismiss-Markup fehlte im Template.
+- **`EinheitControllerTest`:** Test ergänzt, der das Fehlerformat `400 {"error":"EINHEIT_BILANZ_TYP_EXISTIERT"}` absichert (`GlobalExceptionHandler`-Mapping).
+- **Publisher-Simulator** (`pi-gateway`): `sim_reader.py` um die Modi `bezug`/`rücklieferung` erweitert (nur Bezug- bzw. nur Einspeisungs-Register wächst); `config.sim(.example).yaml` mit den Messpunkten `Bezug`/`Rücklieferung` ergänzt.
+- **Übersetzungen:** Migration `V80` liefert die Defaults „Bezug"/„Rücklieferung"; im Zielsystem wurden die Typ-Labels via Übersetzungs-Editor auf „Bezug VNB"/„Rücklieferung VNB" angepasst (Migration bleibt unverändert, `ON CONFLICT DO NOTHING`).

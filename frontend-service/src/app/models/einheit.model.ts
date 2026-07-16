@@ -1,6 +1,8 @@
 export enum EinheitTyp {
   PRODUCER = 'PRODUCER',
-  CONSUMER = 'CONSUMER'
+  CONSUMER = 'CONSUMER',
+  BEZUG = 'BEZUG',
+  RUECKLIEFERUNG = 'RUECKLIEFERUNG'
 }
 
 export interface Einheit {

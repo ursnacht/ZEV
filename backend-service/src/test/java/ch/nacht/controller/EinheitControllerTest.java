@@ -58,6 +58,19 @@ public class EinheitControllerTest {
     }
 
     @Test
+    public void createEinheit_ZweiterBilanzTyp_Returns400MitFehlerKey() throws Exception {
+        Einheit einheit = new Einheit("Netzanschluss", EinheitTyp.BEZUG);
+        when(einheitService.createEinheit(any(Einheit.class)))
+                .thenThrow(new IllegalStateException("EINHEIT_BILANZ_TYP_EXISTIERT"));
+
+        mockMvc.perform(post("/api/einheit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(einheit)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error", is("EINHEIT_BILANZ_TYP_EXISTIERT")));
+    }
+
+    @Test
     public void createEinheit_InvalidName_ReturnsBadRequest() throws Exception {
         Einheit einheit = new Einheit("", EinheitTyp.CONSUMER); // Empty name
 

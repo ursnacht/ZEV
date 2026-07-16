@@ -23,8 +23,10 @@ export class EinheitFormComponent implements OnInit {
   };
 
   einheitTypOptions = [
-    { value: EinheitTyp.PRODUCER, label: 'Producer' },
-    { value: EinheitTyp.CONSUMER, label: 'Consumer' }
+    { value: EinheitTyp.PRODUCER, label: 'PRODUZENT' },
+    { value: EinheitTyp.CONSUMER, label: 'KONSUMENT' },
+    { value: EinheitTyp.BEZUG, label: 'TYP_BEZUG' },
+    { value: EinheitTyp.RUECKLIEFERUNG, label: 'TYP_RUECKLIEFERUNG' }
   ];
 
   ngOnInit(): void {

@@ -5,8 +5,10 @@ MQTT-Pfad (Read-Loop → MqttPublisher → Topic/Payload → Backend-Ingest → 
 ohne Hardware/Pi end-to-end getestet werden kann.
 
 Verhalten je Zähler wird über den `messpunkt` gesteuert:
-- enthält der Name "producer" → Einspeisung wächst schneller als Bezug (negatives `total`)
-- sonst (Consumer)           → Bezug wächst, kaum Einspeisung (positives `total`)
+- enthält der Name "producer"                        → Einspeisung wächst schneller als Bezug (negatives `total`)
+- enthält der Name "rücklieferung"/"ruecklieferung"  → Bilanzmesspunkt: nur Einspeisung wächst (negatives `total`)
+- enthält der Name "bezug"                           → Bilanzmesspunkt: nur Bezug wächst (positives `total`)
+- sonst (Consumer)                                   → Bezug wächst, kaum Einspeisung (positives `total`)
 """
 
 from __future__ import annotations
@@ -24,14 +26,28 @@ class SimReader(Reader):
     def __init__(self, config: MeterConfig, start_bezug: float = 1000.0,
                  start_einspeisung: float = 0.0) -> None:
         super().__init__(config)
-        self._is_producer = "producer" in config.messpunkt.lower()
+        name = config.messpunkt.lower()
+        if "producer" in name:
+            self._mode = "producer"
+        elif "rücklieferung" in name or "ruecklieferung" in name:
+            self._mode = "ruecklieferung"
+        elif "bezug" in name:
+            self._mode = "bezug"
+        else:
+            self._mode = "consumer"
         self._bezug = start_bezug
         self._einspeisung = start_einspeisung
 
     def read(self) -> MeterReading:
-        if self._is_producer:
+        if self._mode == "producer":
             self._bezug += random.uniform(0.0, 0.05)
             self._einspeisung += random.uniform(0.30, 0.80)
+        elif self._mode == "ruecklieferung":
+            # Bilanzmesspunkt Netzanschluss: Rücklieferung an den VNB (nur Einspeisung wächst)
+            self._einspeisung += random.uniform(0.10, 0.50)
+        elif self._mode == "bezug":
+            # Bilanzmesspunkt Netzanschluss: Bezug vom VNB (nur Bezug wächst)
+            self._bezug += random.uniform(0.30, 0.90)
         else:
             self._bezug += random.uniform(0.20, 0.60)
             self._einspeisung += random.uniform(0.0, 0.05)

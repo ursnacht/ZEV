@@ -26,6 +26,10 @@ public class MonatsStatistikDTO {
     private Double bezugVonVnb;       // Verbrauch(Consumer Total) − zev_berechnet(Consumer)
     private Double ruecklieferung;    // Produktion(Producer Total) − zev(Producer)
 
+    // Bilanzmesspunkte (Netzanschluss): Summen der Typen BEZUG (positiv) / RUECKLIEFERUNG (Betrag)
+    private Double bilanzBezug;
+    private Double bilanzRuecklieferung;
+
     // Vergleiche
     private boolean summenCDGleich;
     private Double differenzCD;
@@ -33,6 +37,12 @@ public class MonatsStatistikDTO {
     private Double differenzCE;
     private boolean summenDEGleich;
     private Double differenzDE;
+
+    // Vergleiche gegen die Bilanzmesspunkte
+    private boolean bezugBilanzGleich;
+    private Double bezugBilanzDifferenz;
+    private boolean ruecklieferungBilanzGleich;
+    private Double ruecklieferungBilanzDifferenz;
 
     // Tage mit Abweichungen
     private List<TagMitAbweichungDTO> tageAbweichungen = new ArrayList<>();
@@ -152,6 +162,22 @@ public class MonatsStatistikDTO {
         this.ruecklieferung = ruecklieferung;
     }
 
+    public Double getBilanzBezug() {
+        return bilanzBezug;
+    }
+
+    public void setBilanzBezug(Double bilanzBezug) {
+        this.bilanzBezug = bilanzBezug;
+    }
+
+    public Double getBilanzRuecklieferung() {
+        return bilanzRuecklieferung;
+    }
+
+    public void setBilanzRuecklieferung(Double bilanzRuecklieferung) {
+        this.bilanzRuecklieferung = bilanzRuecklieferung;
+    }
+
     public boolean isSummenCDGleich() {
         return summenCDGleich;
     }
@@ -198,6 +224,38 @@ public class MonatsStatistikDTO {
 
     public void setDifferenzDE(Double differenzDE) {
         this.differenzDE = differenzDE;
+    }
+
+    public boolean isBezugBilanzGleich() {
+        return bezugBilanzGleich;
+    }
+
+    public void setBezugBilanzGleich(boolean bezugBilanzGleich) {
+        this.bezugBilanzGleich = bezugBilanzGleich;
+    }
+
+    public Double getBezugBilanzDifferenz() {
+        return bezugBilanzDifferenz;
+    }
+
+    public void setBezugBilanzDifferenz(Double bezugBilanzDifferenz) {
+        this.bezugBilanzDifferenz = bezugBilanzDifferenz;
+    }
+
+    public boolean isRuecklieferungBilanzGleich() {
+        return ruecklieferungBilanzGleich;
+    }
+
+    public void setRuecklieferungBilanzGleich(boolean ruecklieferungBilanzGleich) {
+        this.ruecklieferungBilanzGleich = ruecklieferungBilanzGleich;
+    }
+
+    public Double getRuecklieferungBilanzDifferenz() {
+        return ruecklieferungBilanzDifferenz;
+    }
+
+    public void setRuecklieferungBilanzDifferenz(Double ruecklieferungBilanzDifferenz) {
+        this.ruecklieferungBilanzDifferenz = ruecklieferungBilanzDifferenz;
     }
 
     public List<TagMitAbweichungDTO> getTageAbweichungen() {

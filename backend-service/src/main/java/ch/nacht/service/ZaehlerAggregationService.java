@@ -181,7 +181,8 @@ public class ZaehlerAggregationService {
         // Vorläufige zev-Werte – die unmittelbar anschliessende Solarverteilung (FR-6.7)
         // ersetzt sie: Producer erhalten den im ZEV konsumierten Anteil der Produktion
         // (= verteilte Menge, Rest ist Rücklieferung), Consumer zev = zev_calculated (FR-9,
-        // Sentinel zev = 0).
+        // Sentinel zev = 0). Bilanz-Typen (BEZUG/RUECKLIEFERUNG) bleiben dauerhaft bei
+        // zev = 0 – sie nehmen nicht an der Verteilung teil.
         messwert.setZev(einheit.getTyp() == EinheitTyp.PRODUCER ? total : 0.0);
         messwert.setQuelle(Quelle.MQTT); // zev_calculated bleibt null bis zur Solarverteilung
         messwerteRepository.save(messwert);
