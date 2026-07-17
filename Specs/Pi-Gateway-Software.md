@@ -29,6 +29,7 @@
 > ```bash
 > # Modbus TCP, Unit-ID 1, 10 Holding-Register ab Register 1, einmalig:
 > mbpoll -a 1 -t 4 -r 1 -c 10 -1 <zaehler-ip> -p 502
+> mbpoll -t 4:float -r 0x6016 -c 1 -1 192.168.10.164 -p 502 -a 16
 > # 32-bit-Float-Werte (ggf. -B fuer Big-Endian-Words):
 > mbpoll -a 1 -t 4:float -r 1 -c 4 -1 <zaehler-ip>
 > # Modbus RTU (serielle Leitung) statt TCP:
