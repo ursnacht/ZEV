@@ -1,5 +1,6 @@
 package ch.nacht.service;
 
+import ch.nacht.exception.NoOrganizationException;
 import jakarta.persistence.EntityManager;
 import org.hibernate.Filter;
 import org.hibernate.Session;
@@ -9,6 +10,10 @@ import org.springframework.stereotype.Service;
 
 /**
  * Service zum Aktivieren des Hibernate orgFilter für Multi-Tenancy.
+ *
+ * <p><b>Fail-closed:</b> Kann der Filter nicht aktiviert werden (kein Organisationskontext,
+ * Session-Fehler), wird eine {@link IllegalStateException} geworfen und die nachfolgende Query
+ * verhindert – niemals still ohne Mandantenfilter weiterlaufen (Cross-Tenant-Leak, OWASP A01).
  */
 @Service
 public class HibernateFilterService {
@@ -36,10 +41,15 @@ public class HibernateFilterService {
      * Aktiviert bzw. aktualisiert den orgFilter für eine explizit angegebene {@code org_id}.
      * Für Hintergrund-Jobs ohne JWT/Request-Kontext (z.B. MQTT-Aggregation), die den Mandanten
      * aus den Daten ableiten. Muss innerhalb einer Transaktion aufgerufen werden.
+     *
+     * @throws NoOrganizationException wenn keine {@code org_id} vorliegt (fail-closed)
+     * @throws IllegalStateException wenn der Filter nicht aktiviert werden kann
+     *         (fail-closed – Query darf nicht ungefiltert laufen)
      */
     public void enableOrgFilter(Long orgId) {
         if (orgId == null) {
-            return;
+            throw new NoOrganizationException(
+                    "Keine Organisation im Kontext – orgFilter kann nicht aktiviert werden");
         }
         try {
             Session session = entityManager.unwrap(Session.class);
@@ -50,7 +60,8 @@ public class HibernateFilterService {
             filter.setParameter("orgId", orgId);
             log.debug("Hibernate orgFilter aktiviert für org_id: {}", orgId);
         } catch (Exception e) {
-            log.warn("Konnte orgFilter nicht aktivieren: {}", e.getMessage());
+            log.error("Konnte orgFilter nicht aktivieren (org_id: {}): {}", orgId, e.getMessage());
+            throw new IllegalStateException("orgFilter konnte nicht aktiviert werden", e);
         }
     }
 }
