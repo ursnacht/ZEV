@@ -6,17 +6,18 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface EinheitRepository extends JpaRepository<Einheit, Long> {
     List<Einheit> findAllByOrderByNameAsc();
 
     /**
-     * Auflösung einer Einheit über (org_id, messpunkt) – explizite Mandantenprüfung
-     * für den MQTT-Ingest (ohne Request-Scope / orgFilter).
+     * Auflösung der Einheiten über (org_id, messpunkt) – explizite Mandantenprüfung
+     * für den MQTT-Ingest (ohne Request-Scope / orgFilter). Mehrere Treffer sind zulässig:
+     * die Bilanz-Typen BEZUG/RUECKLIEFERUNG dürfen denselben Messpunkt teilen, die Meldung
+     * wird dann beim Ingest auf die Einheiten aufgeteilt (Register-Projektion).
      */
-    Optional<Einheit> findByOrgIdAndMesspunkt(Long orgId, String messpunkt);
+    List<Einheit> findAllByOrgIdAndMesspunkt(Long orgId, String messpunkt);
 
     /** Eindeutigkeit der Bilanz-Typen je Mandant (orgFilter muss aktiv sein). */
     boolean existsByTyp(EinheitTyp typ);

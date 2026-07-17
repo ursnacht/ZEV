@@ -17,10 +17,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -88,7 +90,7 @@ public class MqttIngestServiceTest {
     @Test
     void handle_ValidMessage_SavesRohdaten() {
         // Arrange
-        when(einheitRepository.findByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT)).thenReturn(Optional.of(einheit));
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT)).thenReturn(List.of(einheit));
         when(rohdatenRepository.findByEinheitIdAndZeit(eq(EINHEIT_ID), any())).thenReturn(Optional.empty());
         when(rohdatenRepository.save(any(ZaehlerRohdaten.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -119,7 +121,7 @@ public class MqttIngestServiceTest {
         ZaehlerRohdaten existing = new ZaehlerRohdaten(ORG_ID, EINHEIT_ID,
                 LocalDateTime.of(2026, 1, 1, 10, 7),
                 new BigDecimal("100.0000"), new BigDecimal("5.0000"));
-        when(einheitRepository.findByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT)).thenReturn(Optional.of(einheit));
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT)).thenReturn(List.of(einheit));
         when(rohdatenRepository.findByEinheitIdAndZeit(eq(EINHEIT_ID), any())).thenReturn(Optional.of(existing));
         when(rohdatenRepository.save(any(ZaehlerRohdaten.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -134,6 +136,64 @@ public class MqttIngestServiceTest {
         assertEquals(0, new BigDecimal("10.0000").compareTo(captor.getValue().getZaehlerstandEinspeisung()));
         verify(metrics).recordProcessed();
         verify(metrics, never()).recordFailed();
+    }
+
+    // --- Bilanzmesspunkt: Splitting & Register-Projektion (FR-2.3/2.4) --------
+
+    @Test
+    void handle_GeteilterBilanzMesspunkt_SplittetAufBeideEinheiten() {
+        Einheit bezugEinheit = new Einheit("Bezug", EinheitTyp.BEZUG);
+        bezugEinheit.setId(20L);
+        bezugEinheit.setOrgId(ORG_ID);
+        bezugEinheit.setMesspunkt(MESSPUNKT);
+        Einheit ruecklieferungEinheit = new Einheit("Rücklieferung", EinheitTyp.RUECKLIEFERUNG);
+        ruecklieferungEinheit.setId(21L);
+        ruecklieferungEinheit.setOrgId(ORG_ID);
+        ruecklieferungEinheit.setMesspunkt(MESSPUNKT);
+
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT))
+                .thenReturn(List.of(bezugEinheit, ruecklieferungEinheit));
+        when(rohdatenRepository.findByEinheitIdAndZeit(anyLong(), any())).thenReturn(Optional.empty());
+        when(rohdatenRepository.save(any(ZaehlerRohdaten.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.handle(TOPIC, payload("2026-01-01T10:07:00+01:00", "123.4500", "10.0000"));
+
+        ArgumentCaptor<ZaehlerRohdaten> captor = ArgumentCaptor.forClass(ZaehlerRohdaten.class);
+        verify(rohdatenRepository, times(2)).save(captor.capture());
+
+        ZaehlerRohdaten bezugRow = captor.getAllValues().get(0);
+        assertEquals(20L, bezugRow.getEinheitId());
+        assertEquals(0, new BigDecimal("123.4500").compareTo(bezugRow.getZaehlerstandBezug()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(bezugRow.getZaehlerstandEinspeisung()));
+
+        ZaehlerRohdaten ruecklieferungRow = captor.getAllValues().get(1);
+        assertEquals(21L, ruecklieferungRow.getEinheitId());
+        assertEquals(0, BigDecimal.ZERO.compareTo(ruecklieferungRow.getZaehlerstandBezug()));
+        assertEquals(0, new BigDecimal("10.0000").compareTo(ruecklieferungRow.getZaehlerstandEinspeisung()));
+
+        // Eine Meldung = einmal verarbeitet
+        verify(metrics).recordProcessed();
+        verify(metrics, never()).recordFailed();
+    }
+
+    @Test
+    void handle_EinzelneBezugEinheit_ProjiziertNurBezugRegister() {
+        Einheit bezugEinheit = new Einheit("Bezug", EinheitTyp.BEZUG);
+        bezugEinheit.setId(20L);
+        bezugEinheit.setOrgId(ORG_ID);
+        bezugEinheit.setMesspunkt(MESSPUNKT);
+
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT)).thenReturn(List.of(bezugEinheit));
+        when(rohdatenRepository.findByEinheitIdAndZeit(eq(20L), any())).thenReturn(Optional.empty());
+        when(rohdatenRepository.save(any(ZaehlerRohdaten.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.handle(TOPIC, payload("2026-01-01T10:07:00Z", "123.4500", "10.0000"));
+
+        ArgumentCaptor<ZaehlerRohdaten> captor = ArgumentCaptor.forClass(ZaehlerRohdaten.class);
+        verify(rohdatenRepository).save(captor.capture());
+        // Projektion gilt auch ohne geteilten Messpunkt: Einspeisung wird ignoriert
+        assertEquals(0, new BigDecimal("123.4500").compareTo(captor.getValue().getZaehlerstandBezug()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(captor.getValue().getZaehlerstandEinspeisung()));
     }
 
     // --- Ungültiges Topic ----------------------------------------------------
@@ -245,7 +305,7 @@ public class MqttIngestServiceTest {
 
     @Test
     void handle_UnknownMesspunkt_Discarded() {
-        when(einheitRepository.findByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT)).thenReturn(Optional.empty());
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT)).thenReturn(List.of());
 
         service.handle(TOPIC, payload("2026-01-01T10:07:00Z", "1.0", "0.0"));
 
@@ -255,7 +315,7 @@ public class MqttIngestServiceTest {
 
     @Test
     void handle_RepositoryThrows_DiscardedWithoutPropagation() {
-        when(einheitRepository.findByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT))
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT))
                 .thenThrow(new RuntimeException("DB down"));
 
         assertDoesNotThrow(() ->

@@ -6,8 +6,11 @@ ohne Hardware/Pi end-to-end getestet werden kann.
 
 Verhalten je Zähler wird über den `messpunkt` gesteuert:
 - enthält der Name "producer"                        → Einspeisung wächst schneller als Bezug (negatives `total`)
-- enthält der Name "rücklieferung"/"ruecklieferung"  → Bilanzmesspunkt: nur Einspeisung wächst (negatives `total`)
-- enthält der Name "bezug"                           → Bilanzmesspunkt: nur Bezug wächst (positives `total`)
+- enthält der Name "bilanz"                          → Bilanzzähler am Netzanschluss: BEIDE Register wachsen
+                                                       (eine Meldung mit Bezug UND Einspeisung; der Backend-Ingest
+                                                       splittet sie auf die Einheiten Bezug/Rücklieferung)
+- enthält der Name "rücklieferung"/"ruecklieferung"  → nur Einspeisung wächst (negatives `total`)
+- enthält der Name "bezug"                           → nur Bezug wächst (positives `total`)
 - sonst (Consumer)                                   → Bezug wächst, kaum Einspeisung (positives `total`)
 """
 
@@ -29,6 +32,8 @@ class SimReader(Reader):
         name = config.messpunkt.lower()
         if "producer" in name:
             self._mode = "producer"
+        elif "bilanz" in name:
+            self._mode = "bilanz"
         elif "rücklieferung" in name or "ruecklieferung" in name:
             self._mode = "ruecklieferung"
         elif "bezug" in name:
@@ -42,6 +47,10 @@ class SimReader(Reader):
         if self._mode == "producer":
             self._bezug += random.uniform(0.0, 0.05)
             self._einspeisung += random.uniform(0.30, 0.80)
+        elif self._mode == "bilanz":
+            # Bilanzzähler Netzanschluss: beide Register in einer Meldung
+            self._bezug += random.uniform(0.30, 0.90)
+            self._einspeisung += random.uniform(0.10, 0.50)
         elif self._mode == "ruecklieferung":
             # Bilanzmesspunkt Netzanschluss: Rücklieferung an den VNB (nur Einspeisung wächst)
             self._einspeisung += random.uniform(0.10, 0.50)

@@ -17,6 +17,7 @@ Grundlage: [`Specs/Bilanzmesspunkt.md`](./Bilanzmesspunkt.md).
 - `dto/MonatsStatistikDTO.java` – neue Felder: `bilanzBezug`, `bilanzRuecklieferung`, `bezugBilanzGleich`, `bezugBilanzDifferenz`, `ruecklieferungBilanzGleich`, `ruecklieferungBilanzDifferenz`.
 - `service/StatistikService.java` – Bilanz-Summen (`sumTotalByEinheitTypAndZeitBetween` mit den neuen Typen) + Vergleiche berechnen; `berechneEinheitSummen` um `abs` für Bilanz-Typen erweitern.
 - `service/RechnungService.java` – sicherstellen, dass Bilanz-Typen **nicht** verrechnet werden (weder Consumer- noch Producer-Zweig).
+- `service/MqttIngestService.java` / `repository/EinheitRepository.java` – gemeinsamer Bilanzmesspunkt: `findAllByOrgIdAndMesspunkt` (Liste statt Optional), Splitting der Meldung + Register-Projektion je Bilanz-Typ (FR-2.3/2.4).
 - `service/StatistikPdfService.java` / `reports/statistik.jrxml` – zwei neue Vergleiche im PDF.
 - `reports/einheit-summen.jrxml` – Typ-Label im Subreport auf 4 Typen (war binär `PRODUCER`/sonst).
 - (Verifikation, kein Code) `service/MesswerteService.java`, `service/ZaehlerAggregationService.java` – Verteilung nur `PRODUCER`/`CONSUMER`; `zev=0` für Bilanz-Typen bereits gegeben.
@@ -46,7 +47,8 @@ Grundlage: [`Specs/Bilanzmesspunkt.md`](./Bilanzmesspunkt.md).
 | [x] | 7. Statistik-PDF | `statistik.jrxml`: zwei neue Vergleiche (Felder + Elemente) analog Web; Band-Höhe/Layout anpassen. `JasperTemplateCompileTest` grün. |
 | [x] | 8. Einheiten-UI | `einheit-form`: zwei neue Typ-Optionen; `einheit-typ.pipe`: vier Typen; `einheit-list`: übersetzte Fehlermeldung bei Eindeutigkeits-Verletzung. |
 | [x] | 9. Übersetzungen | `V80__Add_Bilanzmesspunkt_Translations.sql`: `TYP_BEZUG`, `TYP_RUECKLIEFERUNG`, `VERGLEICH_BEZUG`, `VERGLEICH_RUECKLIEFERUNG`, `EINHEIT_BILANZ_TYP_EXISTIERT` (DE/EN, `ON CONFLICT DO NOTHING`). |
-| [x] | 10. Tests anpassen | Bestehende Spec-Mocks/Tests auf neue Enum-Werte und DTO-/Model-Felder anpassen (Backend `StatistikServiceTest`, Frontend `statistik.*.spec.ts`, `einheit-form.component.spec.ts`). Neue Tests gemäss separaten Test-Skills (`/3`–`/5`). |
+| [x] | 10. Tests anpassen |
+| [x] | 11. MQTT-Splitting (Nachtrag) | Gemeinsamer Bilanzmesspunkt: `EinheitRepository.findAllByOrgIdAndMesspunkt` (mehrere Treffer zulässig), `MqttIngestService` splittet die Meldung je Einheit mit Register-Projektion (BEZUG: nur Bezug, RUECKLIEFERUNG: nur Einspeisung, jeweils andere = 0; PRODUCER/CONSUMER verbatim). `ZaehlerAggregationService` unverändert korrekt (arbeitet je Einheit auf projizierten Rohdaten). Simulator: neuer Modus `bilanz` (beide Register in einer Meldung). | Bestehende Spec-Mocks/Tests auf neue Enum-Werte und DTO-/Model-Felder anpassen (Backend `StatistikServiceTest`, Frontend `statistik.*.spec.ts`, `einheit-form.component.spec.ts`). Neue Tests gemäss separaten Test-Skills (`/3`–`/5`). |
 
 > **Tests** (Unit/Integration/E2E) werden gemäss Projekt-Workflow separat mit `/3_backend-tests`, `/4_frontend-unit-tests`, `/5_e2e-tests` erstellt; hier nur die Anpassung bestehender Tests, damit der Build grün bleibt.
 
@@ -84,3 +86,4 @@ Grundlage: [`Specs/Bilanzmesspunkt.md`](./Bilanzmesspunkt.md).
 - **`EinheitControllerTest`:** Test ergänzt, der das Fehlerformat `400 {"error":"EINHEIT_BILANZ_TYP_EXISTIERT"}` absichert (`GlobalExceptionHandler`-Mapping).
 - **Publisher-Simulator** (`pi-gateway`): `sim_reader.py` um die Modi `bezug`/`rücklieferung` erweitert (nur Bezug- bzw. nur Einspeisungs-Register wächst); `config.sim(.example).yaml` mit den Messpunkten `Bezug`/`Rücklieferung` ergänzt.
 - **Übersetzungen:** Migration `V80` liefert die Defaults „Bezug"/„Rücklieferung"; im Zielsystem wurden die Typ-Labels via Übersetzungs-Editor auf „Bezug VNB"/„Rücklieferung VNB" angepasst (Migration bleibt unverändert, `ON CONFLICT DO NOTHING`).
+- **Nachtrag MQTT-Splitting (Phase 11, FR-2.3/2.4):** Der physische Bilanzzähler liefert beide Register in einer Meldung → beide Bilanz-Einheiten dürfen denselben `messpunkt` tragen; der Ingest splittet mit Register-Projektion (gilt für Bilanz-Typen immer, auch ohne geteilten Messpunkt). Tests: `MqttIngestServiceTest` (+2, Splitting/Projektion), `ZaehlerRohdatenRepositoryIT` auf `findAllByOrgIdAndMesspunkt` angepasst. Simulator-Config nutzt neu den gemeinsamen Messpunkt `Bilanz` (Modus `bilanz`) statt der zwei Einzel-Messpunkte.

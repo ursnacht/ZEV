@@ -20,6 +20,8 @@
 ### FR-2: Aggregation (wie andere Typen)
 1. Messwerte der Typen `BEZUG` und `RUECKLIEFERUNG` werden **identisch zu den übrigen Typen** aggregiert (`ZaehlerAggregationService`): `total = ΔBezug − ΔEinspeisung`, Reset-Guard pro Register, Upsert in `messwerte`, `quelle = MQTT`.
 2. `zev` dieser Einheiten wird beim Ingest auf **`0`** gesetzt (kein Producer → kein `zev = total`). Da diese Typen nicht an der Verteilung teilnehmen, bleibt `zev`/`zev_calculated` ohne fachliche Bedeutung.
+3. **Gemeinsamer Bilanzmesspunkt (MQTT-Splitting):** Der physische Bilanzzähler liefert **beide Register in einer MQTT-Meldung** (`zaehlerstandBezug` und `zaehlerstandEinspeisung`). Die Einheiten der Typen `BEZUG` und `RUECKLIEFERUNG` dürfen deshalb **denselben `messpunkt`** tragen. Der Ingest (`MqttIngestService`) löst **alle** Einheiten zu `(org_id, messpunkt)` auf und schreibt **je Einheit einen Rohdatensatz** (Splitting einer Meldung auf mehrere Einheiten).
+4. **Register-Projektion je Bilanz-Typ:** Beim Ingest erhält eine Einheit vom Typ `BEZUG` nur das Bezugs-Register (`zaehlerstand_bezug = Payload.zaehlerstandBezug`, `zaehlerstand_einspeisung = 0`), eine Einheit vom Typ `RUECKLIEFERUNG` nur das Einspeise-Register (`zaehlerstand_einspeisung = Payload.zaehlerstandEinspeisung`, `zaehlerstand_bezug = 0`). Die Projektion gilt für Bilanz-Typen **immer** (auch ohne geteilten Messpunkt) — eine `BEZUG`-Einheit zählt nie Einspeisung und umgekehrt. `PRODUCER`/`CONSUMER` erhalten die Payload unverändert. Damit ergibt die Aggregation für `BEZUG` ein positives, für `RUECKLIEFERUNG` ein negatives `total` (konsistent zu FR-4.5).
 
 ### FR-3: Ausschluss aus der Solarverteilung
 1. Einheiten der Typen `BEZUG` und `RUECKLIEFERUNG` **fliessen nicht in die Solarstromverteilung ein** (`MesswerteService`): Sie werden **weder** als Producer (Erzeugung) **noch** als Consumer (Verbrauch) berücksichtigt.
@@ -64,6 +66,9 @@ Pro Monat werden **zusätzlich** zu A=B, A=C, B=C zwei neue Vergleiche berechnet
 
 ### Aggregation & Verteilung
 * [ ] Messwerte von `BEZUG`/`RUECKLIEFERUNG`-Einheiten werden vom Aggregations-Job wie andere Typen zu `messwerte` aggregiert (`total` korrekt, `quelle = MQTT`).
+* [ ] Zwei Einheiten (`BEZUG` + `RUECKLIEFERUNG`) mit **demselben `messpunkt`**: eine MQTT-Meldung erzeugt **zwei** Rohdatensätze mit projizierten Registern (Splitting).
+* [ ] Register-Projektion: `BEZUG` → `bezug = Payload.zaehlerstandBezug`, `einspeisung = 0`; `RUECKLIEFERUNG` → `einspeisung = Payload.zaehlerstandEinspeisung`, `bezug = 0`; daraus `total` positiv bzw. negativ.
+* [ ] `PRODUCER`/`CONSUMER`-Ingest bleibt unverändert (Payload verbatim, ein Rohdatensatz je Einheit/Meldung).
 * [ ] Einheiten der Typen `BEZUG`/`RUECKLIEFERUNG` werden von der Solarverteilung **nicht** berücksichtigt: ihr `zev_calculated` bleibt unverändert (nicht gesetzt), und sie beeinflussen `zev_calculated` der Consumer **nicht**.
 * [ ] Die bestehenden Statistik-Summen A–E (Producer/Consumer) enthalten **keine** Werte der neuen Typen.
 
@@ -104,6 +109,8 @@ Pro Monat werden **zusätzlich** zu A=B, A=C, B=C zwei neue Vergleiche berechnet
 | Rücklieferung negativ aggregiert (Einspeisung) | Betrag (`abs`) für den Vergleich verwenden (wie Producer) |
 | Bilanz-Einheit ohne Messwerte, aber vorhanden | erscheint ggf. in „Summen pro Einheit" mit 0-Werten |
 | Bilanz-Einheit fälschlich in Rechnung/Verteilung | darf **nicht** vorkommen — Bilanz-Typen sind aus Verrechnung & Verteilung ausgeschlossen |
+| Nur **eine** Bilanz-Einheit nutzt den (gemeinsamen) Messpunkt | nur ihr Register-Anteil wird geschrieben (Projektion je Typ), der Rest der Meldung wird ignoriert |
+| Mehrere Einheiten zu `(org_id, messpunkt)` | Meldung wird auf **alle** aufgelösten Einheiten angewendet (je ein Rohdatensatz, Projektion je Typ) |
 | Alte Datensätze / Migration | keine (nur additiv) |
 | i18n-Key fehlt | Fallback: Key wird angezeigt (bestehendes `TranslatePipe`-Verhalten) |
 | Netzwerkfehler beim Laden der Statistik | bestehende Fehlerbehandlung der `StatistikComponent` greift unverändert |
@@ -116,6 +123,7 @@ Pro Monat werden **zusätzlich** zu A=B, A=C, B=C zwei neue Vergleiche berechnet
   - `repository/MesswerteRepository.java` — `sumTotalByEinheitTypAndZeitBetween` ist bereits generisch nutzbar (kein neuer Query zwingend).
   - `service/MesswerteService.java` — sicherstellen, dass Verteilung nur `PRODUCER`/`CONSUMER` verarbeitet (Ist-Zustand; ggf. explizit dokumentieren/absichern).
   - `service/ZaehlerAggregationService.java` — `zev`-Behandlung für neue Typen (Default `0`); ansonsten unverändert.
+  - `service/MqttIngestService.java` + `repository/EinheitRepository.java` — Auflösung `(org_id, messpunkt)` liefert eine **Liste** (`findAllByOrgIdAndMesspunkt`); Splitting/Register-Projektion je Bilanz-Typ (FR-2.3/2.4).
   - `service/EinheitService.java` — Eindeutigkeits-Validierung (max. eine `BEZUG`- und eine `RUECKLIEFERUNG`-Einheit pro Mandant).
   - `service/RechnungService.java` — prüfen, dass Bilanz-Typen nicht verrechnet werden.
   - `service/StatistikPdfService.java` + `reports/statistik.jrxml` — zwei neue Vergleiche (falls in Scope).
@@ -124,7 +132,7 @@ Pro Monat werden **zusätzlich** zu A=B, A=C, B=C zwei neue Vergleiche berechnet
   - `models/einheit.model.ts` (`EinheitTyp`), `components/einheit-form` (Typ-Optionen), `pipes/einheit-typ.pipe.ts` (4 Typen).
   - `models/statistik.model.ts`, `components/statistik/*` (zwei neue Vergleichs-Items; Typ-Spalte in „Summen pro Einheit" über `EinheitTypPipe` statt Inline-Ternary), zugehörige Tests/Mocks.
   - `components/einheit-list` — Eindeutigkeits-Fehlermeldung übersetzt anzeigen (`error.error?.error`).
-* **Testunterstützung:** Der Publisher-Simulator (`pi-gateway`, `sim_reader.py`) unterstützt die Bilanzmesspunkte über die `messpunkt`-Namen `"bezug"` (nur Bezug-Register wächst) und `"rücklieferung"` (nur Einspeisungs-Register wächst); Beispiel-Einträge in `config.sim.example.yaml`.
+* **Testunterstützung:** Der Publisher-Simulator (`pi-gateway`, `sim_reader.py`) unterstützt die Bilanzmesspunkte über die `messpunkt`-Namen `"bilanz"` (Bilanzzähler: **beide** Register wachsen in einer Meldung – zum Test des Ingest-Splittings beide Einheiten mit diesem Messpunkt anlegen), `"bezug"` (nur Bezug-Register) und `"rücklieferung"` (nur Einspeisungs-Register); Beispiel-Eintrag `Bilanz` in `config.sim.example.yaml`.
 * **Datenmigration:** keine (nur neue Übersetzungs-Keys via Flyway).
 * **i18n:** neue Keys für Typ-Labels und ggf. Vergleichs-Beschriftungen (DE/EN).
 

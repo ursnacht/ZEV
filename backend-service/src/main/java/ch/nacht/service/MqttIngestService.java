@@ -2,6 +2,7 @@ package ch.nacht.service;
 
 import ch.nacht.dto.ZaehlerMesswertPayloadDTO;
 import ch.nacht.entity.Einheit;
+import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.ZaehlerRohdaten;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.ZaehlerRohdatenRepository;
@@ -13,12 +14,18 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Optional;
+import java.util.List;
 
 /**
  * Verarbeitet eingehende MQTT-Messwert-Nachrichten (FR-4): Topic/Payload parsen, validieren,
- * Einheit über (org_id, messpunkt) auflösen und absolute Zählerstände als Rohdaten persistieren.
+ * Einheiten über (org_id, messpunkt) auflösen und absolute Zählerstände als Rohdaten persistieren.
+ *
+ * <p>Mehrere Einheiten je Messpunkt sind zulässig (Bilanzmesspunkt FR-2.3): die Bilanz-Typen
+ * BEZUG/RUECKLIEFERUNG dürfen denselben Messpunkt teilen; die Meldung wird dann aufgeteilt und
+ * je Einheit nur das relevante Register übernommen (BEZUG: nur Bezug, RUECKLIEFERUNG: nur
+ * Einspeisung; das jeweils andere = 0).
  *
  * <p>Kein Request-Scope/JWT: die Mandanten-ID stammt aus dem Topic und wird explizit gesetzt
  * (kein {@code OrganizationContextService}, kein {@code orgFilter}). Fehler werden geloggt und
@@ -89,37 +96,59 @@ public class MqttIngestService {
                 return;
             }
 
-            // 3) Einheit über (org_id, messpunkt) auflösen (Mandanten-Isolation)
-            Optional<Einheit> einheitOpt = einheitRepository.findByOrgIdAndMesspunkt(orgId, messpunkt);
-            if (einheitOpt.isEmpty()) {
+            // 3) Einheiten über (org_id, messpunkt) auflösen (Mandanten-Isolation). Mehrere
+            //    Treffer sind zulässig: BEZUG/RUECKLIEFERUNG dürfen denselben Bilanzmesspunkt
+            //    teilen – die Meldung wird dann je Einheit auf das relevante Register projiziert.
+            List<Einheit> einheiten = einheitRepository.findAllByOrgIdAndMesspunkt(orgId, messpunkt);
+            if (einheiten.isEmpty()) {
                 log.warn("MQTT: unbekannter Messpunkt (org={}, messpunkt={}) – verworfen", orgId, messpunkt);
                 metrics.recordFailed();
                 return;
             }
-            Einheit einheit = einheitOpt.get();
 
-            // 4) Rohdaten upsert (org_id explizit)
+            // 4) Rohdaten upsert je Einheit (org_id explizit)
             // Der Pi sendet die lokale Zeit mit Offset (ISO 8601); die lokale Wanduhrzeit
             // wird verbatim übernommen – konsistent mit dem CSV-Upload und der messwerte-Tabelle
             // (naive lokale Zeit). Unabhängig von der Backend-Zeitzone.
             LocalDateTime zeit = p.getTimestamp().toLocalDateTime();
-            ZaehlerRohdaten row = rohdatenRepository.findByEinheitIdAndZeit(einheit.getId(), zeit).orElse(null);
-            if (row == null) {
-                row = new ZaehlerRohdaten(orgId, einheit.getId(), zeit,
-                        p.getZaehlerstandBezug(), p.getZaehlerstandEinspeisung());
-            } else {
-                row.setZaehlerstandBezug(p.getZaehlerstandBezug());
-                row.setZaehlerstandEinspeisung(p.getZaehlerstandEinspeisung());
+            for (Einheit einheit : einheiten) {
+                upsertRohdaten(orgId, einheit, zeit, p);
             }
-            row.setEmpfangenAm(LocalDateTime.now());
-            row.setVerarbeitet(false);
-            rohdatenRepository.save(row);
 
             metrics.recordProcessed();
-            log.debug("MQTT: Rohdaten gespeichert (org={}, messpunkt={}, zeit={})", orgId, messpunkt, zeit);
+            log.debug("MQTT: Rohdaten gespeichert (org={}, messpunkt={}, zeit={}, einheiten={})",
+                    orgId, messpunkt, zeit, einheiten.size());
         } catch (Exception e) {
             metrics.recordFailed();
             log.warn("MQTT: Nachricht verworfen (Topic {}): {}", topic, e.getMessage());
         }
+    }
+
+    /**
+     * Schreibt (Upsert) den Rohdatensatz einer Einheit. Bilanz-Typen erhalten nur ihr
+     * relevantes Register (FR-2.4): BEZUG nur den Bezug, RUECKLIEFERUNG nur die Einspeisung,
+     * das jeweils andere Register wird auf 0 gesetzt – so zählt eine BEZUG-Einheit nie
+     * Einspeisung (und umgekehrt), auch wenn der physische Bilanzzähler beide Register in
+     * einer Meldung liefert. PRODUCER/CONSUMER übernehmen die Payload unverändert.
+     */
+    private void upsertRohdaten(long orgId, Einheit einheit, LocalDateTime zeit, ZaehlerMesswertPayloadDTO p) {
+        BigDecimal bezug = p.getZaehlerstandBezug();
+        BigDecimal einspeisung = p.getZaehlerstandEinspeisung();
+        if (einheit.getTyp() == EinheitTyp.BEZUG) {
+            einspeisung = BigDecimal.ZERO;
+        } else if (einheit.getTyp() == EinheitTyp.RUECKLIEFERUNG) {
+            bezug = BigDecimal.ZERO;
+        }
+
+        ZaehlerRohdaten row = rohdatenRepository.findByEinheitIdAndZeit(einheit.getId(), zeit).orElse(null);
+        if (row == null) {
+            row = new ZaehlerRohdaten(orgId, einheit.getId(), zeit, bezug, einspeisung);
+        } else {
+            row.setZaehlerstandBezug(bezug);
+            row.setZaehlerstandEinspeisung(einspeisung);
+        }
+        row.setEmpfangenAm(LocalDateTime.now());
+        row.setVerarbeitet(false);
+        rohdatenRepository.save(row);
     }
 }

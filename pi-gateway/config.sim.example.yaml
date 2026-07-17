@@ -17,12 +17,14 @@ broker:
 
 # messpunkt MUSS je Einheit im Backend existieren (sonst verwirft der Ingest "unbekannter Messpunkt").
 # "producer" im Namen        -> Einspeisung überwiegt (negatives total)
-# "bezug" im Namen           -> Bilanzmesspunkt Bezug vom VNB (nur Bezug wächst, positives total)
-# "rücklieferung" im Namen   -> Bilanzmesspunkt Rücklieferung an VNB (nur Einspeisung wächst, negatives total)
+# "bilanz" im Namen          -> Bilanzzähler Netzanschluss: BEIDE Register wachsen. Im Backend
+#                               BEIDE Einheiten (Typ Bezug + Typ Rücklieferung) mit diesem
+#                               messpunkt anlegen -> der Ingest splittet die Meldung je Typ.
+# "bezug" im Namen           -> nur Bezug wächst (positives total; Einzel-Zähler je Richtung)
+# "rücklieferung" im Namen   -> nur Einspeisung wächst (negatives total; Einzel-Zähler je Richtung)
 # sonst                      -> Consumer (positives total)
 zaehler:
   - { messpunkt: "MP-Wohnung-1",   protokoll: sim }
   - { messpunkt: "MP-Wohnung-2",   protokoll: sim }
   - { messpunkt: "MP-Producer",    protokoll: sim }
-  - { messpunkt: "Bezug",          protokoll: sim }
-  - { messpunkt: "Rücklieferung",  protokoll: sim }
+  - { messpunkt: "Bilanz",         protokoll: sim }

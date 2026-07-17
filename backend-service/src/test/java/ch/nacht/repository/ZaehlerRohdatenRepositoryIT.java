@@ -187,16 +187,16 @@ class ZaehlerRohdatenRepositoryIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void findByOrgIdAndMesspunkt_Found_ReturnsEinheit() {
-        Optional<Einheit> result = einheitRepository.findByOrgIdAndMesspunkt(orgId, MESSPUNKT);
+    void findAllByOrgIdAndMesspunkt_Found_ReturnsEinheit() {
+        List<Einheit> result = einheitRepository.findAllByOrgIdAndMesspunkt(orgId, MESSPUNKT);
 
-        assertThat(result).isPresent();
-        assertThat(result.get().getId()).isEqualTo(einheitId);
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo(einheitId);
     }
 
     @Test
-    void findByOrgIdAndMesspunkt_WrongOrg_ReturnsEmpty() {
-        Optional<Einheit> result = einheitRepository.findByOrgIdAndMesspunkt(orgId + 999, MESSPUNKT);
+    void findAllByOrgIdAndMesspunkt_WrongOrg_ReturnsEmpty() {
+        List<Einheit> result = einheitRepository.findAllByOrgIdAndMesspunkt(orgId + 999, MESSPUNKT);
 
         assertThat(result).isEmpty();
     }

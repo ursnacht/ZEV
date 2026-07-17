@@ -86,8 +86,10 @@ senden. Damit lässt sich der komplette MQTT-Workflow ohne Pi/Hardware testen:
 
 Vorlage: [`config.sim.example.yaml`](./config.sim.example.yaml) (Zähler mit `protokoll: sim`).
 Das Verhalten steuert der `messpunkt`-Name: `"producer"` → Einspeisung überwiegt (negatives
-`total`); `"bezug"` bzw. `"rücklieferung"` → Bilanzmesspunkt am Netzanschluss (nur Bezug- bzw.
-nur Einspeisungs-Register wächst); sonst Consumer (positives `total`).
+`total`); `"bilanz"` → Bilanzzähler am Netzanschluss, **beide** Register wachsen (im Backend die
+Einheiten Typ Bezug **und** Typ Rücklieferung mit demselben `messpunkt` anlegen – der Ingest
+splittet die Meldung je Typ); `"bezug"` bzw. `"rücklieferung"` → nur ein Register wächst;
+sonst Consumer (positives `total`).
 
 Der Broker erzwingt Auth (Username/Passwort). Dev-Credentials: `zev-backend` / `zev-mqtt-dev`
 (Default in `.env.mqtt.example` → `MOSQUITTO_USERS`).
