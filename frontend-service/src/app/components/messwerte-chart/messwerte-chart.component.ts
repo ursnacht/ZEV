@@ -158,9 +158,9 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
 
     const labels = data.map(d => new Date(d.zeit).toLocaleString('de-DE'));
     const totalValues = data.map(d => d.total ?? 0);
-    const zevValues = data.map(d => -(d.zevCalculated ?? 0));
+    const zevValues = data.map(d => -(d.zev ?? 0));
     const totalSum = data.reduce((sum, d) => sum + (d.total ?? 0), 0);
-    const zevSum = data.reduce((sum, d) => sum + (d.zevCalculated ?? 0), 0);
+    const zevSum = data.reduce((sum, d) => sum + (d.zev ?? 0), 0);
 
     const config: ChartConfiguration = {
       type: 'line',
@@ -176,7 +176,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
             fill: false
           },
           {
-            label: `ZEV Calculated (Σ ${zevSum.toFixed(3)} kWh)`,
+            label: `ZEV (Σ ${zevSum.toFixed(3)} kWh)`,
             data: zevValues,
             borderColor: '#2196F3',
             backgroundColor: 'rgba(33, 150, 243, 0.1)',

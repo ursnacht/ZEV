@@ -261,8 +261,8 @@ public class MesswerteControllerTest {
     @Test
     void getMesswerteByEinheit_ValidRequest_ReturnsList() throws Exception {
         List<Map<String, Object>> serviceResult = Arrays.asList(
-            Map.of("zeit", "2024-01-15T00:00", "total", 5.0, "zevCalculated", 1.8),
-            Map.of("zeit", "2024-01-15T00:15", "total", 3.0, "zevCalculated", 1.2)
+            Map.of("zeit", "2024-01-15T00:00", "total", 5.0, "zev", 1.8),
+            Map.of("zeit", "2024-01-15T00:15", "total", 3.0, "zev", 1.2)
         );
 
         when(messwerteService.getMesswerteByEinheit(
@@ -277,7 +277,7 @@ public class MesswerteControllerTest {
             .andExpect(jsonPath("$", hasSize(2)))
             .andExpect(jsonPath("$[0].zeit", is("2024-01-15T00:00")))
             .andExpect(jsonPath("$[0].total", is(5.0)))
-            .andExpect(jsonPath("$[0].zevCalculated", is(1.8)));
+            .andExpect(jsonPath("$[0].zev", is(1.8)));
     }
 
     @Test

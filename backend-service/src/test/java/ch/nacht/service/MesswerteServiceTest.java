@@ -208,7 +208,6 @@ public class MesswerteServiceTest {
         LocalDateTime zeit = LocalDateTime.of(2024, 1, 15, 12, 0);
 
         Messwerte messwert = new Messwerte(zeit, 5.0, 2.5, consumerEinheit);
-        messwert.setZevCalculated(1.8);
 
         when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumerEinheit));
         when(messwerteRepository.findByEinheitAndZeitBetween(eq(consumerEinheit), any(), any()))
@@ -220,7 +219,7 @@ public class MesswerteServiceTest {
         assertEquals(1, result.size());
         assertEquals(zeit.toString(), result.get(0).get("zeit"));
         assertEquals(5.0, result.get(0).get("total"));
-        assertEquals(1.8, result.get(0).get("zevCalculated"));
+        assertEquals(2.5, result.get(0).get("zev"));
         verify(hibernateFilterService).enableOrgFilter();
     }
 
@@ -240,7 +239,6 @@ public class MesswerteServiceTest {
         LocalDate dateTo = LocalDate.of(2024, 1, 31);
 
         Messwerte messwert = new Messwerte(LocalDateTime.of(2024, 1, 15, 12, 0), null, null, consumerEinheit);
-        messwert.setZevCalculated(null);
 
         when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumerEinheit));
         when(messwerteRepository.findByEinheitAndZeitBetween(eq(consumerEinheit), any(), any()))
@@ -249,7 +247,7 @@ public class MesswerteServiceTest {
         List<Map<String, Object>> result = messwerteService.getMesswerteByEinheit(1L, dateFrom, dateTo);
 
         assertEquals(0.0, result.get(0).get("total"));
-        assertEquals(0.0, result.get(0).get("zevCalculated"));
+        assertEquals(0.0, result.get(0).get("zev"));
     }
 
     @Test

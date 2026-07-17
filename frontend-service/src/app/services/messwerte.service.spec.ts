@@ -19,8 +19,8 @@ describe('MesswerteService', () => {
   };
 
   const mockMesswertData: MesswertData[] = [
-    { zeit: '2024-01-15T00:00', total: 5.0, zevCalculated: 1.8 },
-    { zeit: '2024-01-15T00:15', total: 3.0, zevCalculated: 1.2 }
+    { zeit: '2024-01-15T00:00', total: 5.0, zev: 1.8 },
+    { zeit: '2024-01-15T00:15', total: 3.0, zev: 1.2 }
   ];
 
   beforeEach(() => {

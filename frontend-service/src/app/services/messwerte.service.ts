@@ -23,7 +23,7 @@ export interface CalculationProgress {
 export interface MesswertData {
   zeit: string;
   total: number;
-  zevCalculated: number;
+  zev: number;
 }
 
 @Injectable({
