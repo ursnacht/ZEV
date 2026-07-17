@@ -119,6 +119,37 @@ public class RechnungControllerTest {
     }
 
     @Test
+    void generateRechnungen_NullRechnung_KeinDebitorAberPdf() throws Exception {
+        // 0-Rechnung (z.B. kein Verbrauch im Zeitraum): PDF wird erzeugt,
+        // aber kein Debitor-Eintrag (debitor.betrag hat CHECK > 0)
+        testRechnung.setEndBetrag(0.0);
+        when(rechnungService.berechneRechnungen(anyList(), any(), any()))
+            .thenReturn(List.of(testRechnung));
+        when(rechnungPdfService.generatePdf(any(RechnungDTO.class), anyString()))
+            .thenReturn(new byte[]{1, 2, 3});
+        when(rechnungStorageService.sanitizeKey(anyString())).thenReturn("Wohnung_1_10");
+        when(rechnungStorageService.getFilename("Wohnung_1_10")).thenReturn("Wohnung_1_10.pdf");
+
+        String request = """
+            {
+                "von": "2024-01-01",
+                "bis": "2024-03-31",
+                "einheitIds": [1],
+                "sprache": "de"
+            }
+            """;
+
+        mockMvc.perform(post("/api/rechnungen/generate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.count", is(1)));
+
+        verify(debitorService, never()).upsertFromRechnung(any(), any(), any(), any());
+        verify(rechnungStorageService).store(eq("Wohnung_1_10"), any());
+    }
+
+    @Test
     void generateRechnungen_NullVon_ReturnsBadRequest() throws Exception {
         String request = """
             {

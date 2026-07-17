@@ -8,6 +8,7 @@
     <parameter name="SPRACHE" class="java.lang.String"/>
     <parameter name="ZEITRAUM" class="java.lang.String"/>
     <parameter name="GENERIERT_AM" class="java.lang.String"/>
+    <parameter name="ORG_NAME" class="java.lang.String"/>
     <parameter name="EINHEIT_SUMMEN_SUBREPORT" class="net.sf.jasperreports.engine.JasperReport"/>
 
     <!-- Fields for MonatsStatistik detail band -->
@@ -53,9 +54,10 @@
 
     <!-- Title Band - Report Header -->
     <title height="130">
-        <!-- Title: Statistik Report -->
+        <!-- Title: Statistik Report + Anzeigename der Organisation -->
         <element kind="textField" uuid="33333333-3333-3333-3333-333333333301" x="0" y="0" width="555" height="30" forecolor="#4CAF50" fontSize="18.0" bold="true">
-            <expression><![CDATA[$P{TRANSLATIONS}.get("STATISTIK_REPORT")]]></expression>
+            <expression><![CDATA[$P{TRANSLATIONS}.get("STATISTIK_REPORT")
+                + ($P{ORG_NAME} != null && !$P{ORG_NAME}.isBlank() ? " – " + $P{ORG_NAME} : "")]]></expression>
         </element>
 
         <!-- Subtitle: Zeitraum -->

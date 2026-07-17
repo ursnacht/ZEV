@@ -1,8 +1,15 @@
 .startseite {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   min-height: calc(100vh - 200px);
+}
+
+.startseite__version {
+  margin-top: auto;
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-600);
 }
 
 .startseite__hero {

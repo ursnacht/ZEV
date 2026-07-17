@@ -36,6 +36,7 @@
     * Es wird kein HTTP 500 mehr zurückgegeben, wenn die Validierung fehlschlägt (der `@Transactional`-Endpunkt rollt sauber zurück; die `TarifLueckenException` wird zentral in `GlobalExceptionHandler` auf 400 abgebildet).
     * Die Meldung stammt aus derselben Quelle (`validateTarifAbdeckung`) wie die Validierung in der Tarifverwaltung – identischer Wortlaut.
     * **Mehrsprachigkeit:** Das Backend liefert die Lücken **strukturiert** (`{ error: "FEHLER_TARIF_LUECKEN", luecken: [{ tarifTyp, datum, weitere }] }`); das Frontend setzt die Meldung aus Translation-Keys zusammen (`FEHLER_TARIF_LUECKEN`, `TARIF_LUECKE_ZEV`/`TARIF_LUECKE_VNB`, `TARIF_LUECKE_WEITERE`). Datum (`dd.MM.yyyy`) und Tarif-Typ-Code sind sprachneutral. Keine hartcodierten deutschen Texte mehr.
+* **0-Rechnungen (Endbetrag 0.00 CHF, z.B. kein Verbrauch im Zeitraum):** Das PDF wird erzeugt (Beleg für den Mieter), aber es wird **kein Debitor-Eintrag** angelegt (keine Forderung; `debitor.betrag` hat den Constraint `> 0`, siehe `Specs/Debitorkontrolle.md`). Die übrigen Rechnungen des Laufs sind davon nicht betroffen.
 
 ## 3. Technische Spezifikationen (Technical Specs)
 * Erweiterung der Einheit

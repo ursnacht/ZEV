@@ -102,14 +102,20 @@ public class RechnungController {
                         : rechnung.getEinheitName();
                 String key = rechnungStorageService.sanitizeKey(keyBase);
 
-                // Persist debitor entry before storing PDF: if upsert fails, no PDF is stored
-                if (rechnung.getMieterId() != null) {
+                // Persist debitor entry before storing PDF: if upsert fails, no PDF is stored.
+                // 0-Rechnungen (z.B. kein Verbrauch im Zeitraum): PDF wird erzeugt, aber keine
+                // Forderung angelegt (debitor.betrag hat CHECK > 0).
+                BigDecimal betrag = BigDecimal.valueOf(rechnung.getEndBetrag()).setScale(2, RoundingMode.HALF_UP);
+                if (rechnung.getMieterId() != null && betrag.compareTo(BigDecimal.ZERO) > 0) {
                     debitorService.upsertFromRechnung(
                             rechnung.getMieterId(),
-                            BigDecimal.valueOf(rechnung.getEndBetrag()).setScale(2, RoundingMode.HALF_UP),
+                            betrag,
                             rechnung.getVon(),
                             rechnung.getBis()
                     );
+                } else if (rechnung.getMieterId() != null) {
+                    log.info("Kein Debitor-Eintrag für 0-Rechnung (mieterId={}, einheit={}, {}–{})",
+                            rechnung.getMieterId(), rechnung.getEinheitName(), rechnung.getVon(), rechnung.getBis());
                 }
 
                 rechnungStorageService.store(key, pdf);

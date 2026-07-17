@@ -7,4 +7,17 @@
     </h1>
     <p class="startseite__subtitle">{{ 'STARTSEITE_BESCHREIBUNG' | translate }}</p>
   </div>
+  @if (schemaVersion || buildTime) {
+    <p class="startseite__version">
+      @if (schemaVersion) {
+        <span>{{ 'DB_SCHEMA_VERSION' | translate }}: V{{ schemaVersion }}</span>
+      }
+      @if (schemaVersion && buildTime) {
+        <span> · </span>
+      }
+      @if (buildTime) {
+        <span>{{ 'BUILD_DATUM' | translate }}: {{ buildTime }}</span>
+      }
+    </p>
+  }
 </div>

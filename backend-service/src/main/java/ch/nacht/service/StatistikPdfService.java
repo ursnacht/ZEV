@@ -28,12 +28,15 @@ public class StatistikPdfService {
     private static final Logger log = LoggerFactory.getLogger(StatistikPdfService.class);
 
     private final TranslationRepository translationRepository;
+    private final OrganizationContextService organizationContextService;
 
     private JasperReport compiledReport;
     private JasperReport compiledEinheitSummenReport;
 
-    public StatistikPdfService(TranslationRepository translationRepository) {
+    public StatistikPdfService(TranslationRepository translationRepository,
+                               OrganizationContextService organizationContextService) {
         this.translationRepository = translationRepository;
+        this.organizationContextService = organizationContextService;
     }
 
     @PostConstruct
@@ -81,6 +84,8 @@ public class StatistikPdfService {
         parameters.put("ZEITRAUM", zeitraum);
         parameters.put("GENERIERT_AM", generiertAm);
         parameters.put("EINHEIT_SUMMEN_SUBREPORT", compiledEinheitSummenReport);
+        // Anzeigename der Organisation (JWT-Claim displayName, Fallback Alias) für den Titel
+        parameters.put("ORG_NAME", organizationContextService.getCurrentOrgName());
 
         // Monate als DataSource für das Detail-Band
         JRBeanCollectionDataSource monateDataSource =
