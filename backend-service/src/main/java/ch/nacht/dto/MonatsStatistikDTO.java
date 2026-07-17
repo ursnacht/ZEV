@@ -22,13 +22,18 @@ public class MonatsStatistikDTO {
     private Double summeConsumerZev;
     private Double summeConsumerZevCalculated;
 
-    // Berechnete Werte (vor dem Summen-Vergleich)
-    private Double bezugVonVnb;       // Verbrauch(Consumer Total) − zev_berechnet(Consumer)
+    // Berechnete Werte (nur für den Summen-Vergleich gegen die Bilanz-Einheiten)
+    private Double bezugVonVnb;       // Verbrauch(Consumer Total) − zev(Consumer, gemessen)
     private Double ruecklieferung;    // Produktion(Producer Total) − zev(Producer)
 
     // Bilanzmesspunkte (Netzanschluss): Summen der Typen BEZUG (positiv) / RUECKLIEFERUNG (Betrag)
     private Double bilanzBezug;
     private Double bilanzRuecklieferung;
+
+    // Namen der Bilanz-Einheiten (max. eine je Typ); null = keine Einheit vorhanden ->
+    // Bilanz-Zeile und zugehöriger Vergleich werden nicht angezeigt (FR-4.6/FR-5.7)
+    private String bilanzBezugName;
+    private String bilanzRuecklieferungName;
 
     // Vergleiche
     private boolean summenCDGleich;
@@ -224,6 +229,22 @@ public class MonatsStatistikDTO {
 
     public void setDifferenzDE(Double differenzDE) {
         this.differenzDE = differenzDE;
+    }
+
+    public String getBilanzBezugName() {
+        return bilanzBezugName;
+    }
+
+    public void setBilanzBezugName(String bilanzBezugName) {
+        this.bilanzBezugName = bilanzBezugName;
+    }
+
+    public String getBilanzRuecklieferungName() {
+        return bilanzRuecklieferungName;
+    }
+
+    public void setBilanzRuecklieferungName(String bilanzRuecklieferungName) {
+        this.bilanzRuecklieferungName = bilanzRuecklieferungName;
     }
 
     public boolean isBezugBilanzGleich() {

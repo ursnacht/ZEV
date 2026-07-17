@@ -33,9 +33,12 @@ export interface MonatsStatistik {
   bezugVonVnb: number;
   ruecklieferung: number;
 
-  // Bilanzmesspunkte (Netzanschluss)
+  // Bilanzmesspunkte (Netzanschluss); Name null = keine Einheit vorhanden ->
+  // Bilanz-Zeile und zugehöriger Vergleich werden nicht angezeigt
   bilanzBezug: number;
   bilanzRuecklieferung: number;
+  bilanzBezugName: string | null;
+  bilanzRuecklieferungName: string | null;
 
   // Vergleiche
   summenCDGleich: boolean;

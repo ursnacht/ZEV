@@ -27,6 +27,10 @@ public class StatistikService {
     private static final Logger logger = LoggerFactory.getLogger(StatistikService.class);
     private static final double TOLERANZ = 0.1;
 
+    /** Anzeige-Reihenfolge der Typen in "Summen pro Einheit" (Web und PDF-Subreport). */
+    private static final List<EinheitTyp> TYP_ANZEIGE_REIHENFOLGE = List.of(
+            EinheitTyp.PRODUCER, EinheitTyp.CONSUMER, EinheitTyp.RUECKLIEFERUNG, EinheitTyp.BEZUG);
+
     private final MesswerteRepository messwerteRepository;
     private final EinheitRepository einheitRepository;
     private final HibernateFilterService hibernateFilterService;
@@ -175,18 +179,25 @@ public class StatistikService {
         dto.setSummeConsumerZev(summeConsumerZev != null ? summeConsumerZev : 0.0);
         dto.setSummeConsumerZevCalculated(summeConsumerZevCalculated != null ? summeConsumerZevCalculated : 0.0);
         // Bilanzmesspunkte: Bezug positiv, Rücklieferung negativ → Vergleich über Beträge.
-        // Fehlende Bilanz-Einheit/-Daten → 0.0 (Vergleich wird trotzdem angezeigt).
+        // Fehlende Daten → 0.0.
         dto.setBilanzBezug(summeBilanzBezug != null ? summeBilanzBezug : 0.0);
         dto.setBilanzRuecklieferung(summeBilanzRuecklieferung != null ? Math.abs(summeBilanzRuecklieferung) : 0.0);
+        // Namen der Bilanz-Einheiten (max. eine je Typ und Mandant, orgFilter aktiv);
+        // null = keine Einheit → Bilanz-Zeile und -Vergleich werden nicht angezeigt (FR-4.6/FR-5.7).
+        dto.setBilanzBezugName(einheitRepository.findFirstByTyp(EinheitTyp.BEZUG)
+                .map(Einheit::getName).orElse(null));
+        dto.setBilanzRuecklieferungName(einheitRepository.findFirstByTyp(EinheitTyp.RUECKLIEFERUNG)
+                .map(Einheit::getName).orElse(null));
 
         logger.debug("Monat {}/{}: ProducerTotal={}, ConsumerTotal={}, ProducerZev={}, ConsumerZev={}, ConsumerZevCalc={}",
                 yearMonth.getYear(), yearMonth.getMonthValue(),
                 summeProducerTotal, summeConsumerTotal, summeProducerZev, summeConsumerZev, summeConsumerZevCalculated);
 
-        // Berechnete Werte (vor dem Summen-Vergleich):
-        // Bezug von VNB  = Verbrauch (Consumer Total) − zev_berechnet der Consumer
-        // Rücklieferung  = Produktion (Producer Total) − zev der Producer
-        dto.setBezugVonVnb(dto.getSummeConsumerTotal() - dto.getSummeConsumerZevCalculated());
+        // Berechnete Werte (nur fuer den Summen-Vergleich gegen die Bilanz-Einheiten):
+        // Bezug von VNB  = Verbrauch (Consumer Total) − zev der Consumer (B, gemessen –
+        //                  Messung gegen Messung; nicht zev_berechnet)
+        // Rücklieferung  = Produktion (Producer Total) − zev der Producer (A)
+        dto.setBezugVonVnb(dto.getSummeConsumerTotal() - dto.getSummeConsumerZev());
         dto.setRuecklieferung(dto.getSummeProducerTotal() - dto.getSummeProducerZev());
 
         logger.debug("Monat {}/{}: BezugVonVnb={}, Ruecklieferung={}",
@@ -353,9 +364,10 @@ public class StatistikService {
             einheitSummen.add(einheitSummenDTO);
         }
 
-        // Sort by type (PRODUCER first), then by name
+        // Anzeige-Reihenfolge nach Typ (Produzenten, Konsumenten, Rücklieferung, Bezug), dann Name
         einheitSummen.sort((a, b) -> {
-            int typeCompare = a.getEinheitTyp().compareTo(b.getEinheitTyp());
+            int typeCompare = Integer.compare(TYP_ANZEIGE_REIHENFOLGE.indexOf(a.getEinheitTyp()),
+                    TYP_ANZEIGE_REIHENFOLGE.indexOf(b.getEinheitTyp()));
             if (typeCompare != 0) return typeCompare;
             return a.getEinheitName().compareTo(b.getEinheitName());
         });

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface EinheitRepository extends JpaRepository<Einheit, Long> {
@@ -18,6 +19,9 @@ public interface EinheitRepository extends JpaRepository<Einheit, Long> {
      * wird dann beim Ingest auf die Einheiten aufgeteilt (Register-Projektion).
      */
     List<Einheit> findAllByOrgIdAndMesspunkt(Long orgId, String messpunkt);
+
+    /** Erste Einheit eines Typs, z.B. die Bilanz-Einheit (max. eine je Mandant; orgFilter muss aktiv sein). */
+    Optional<Einheit> findFirstByTyp(EinheitTyp typ);
 
     /** Eindeutigkeit der Bilanz-Typen je Mandant (orgFilter muss aktiv sein). */
     boolean existsByTyp(EinheitTyp typ);

@@ -24,12 +24,11 @@
     * Summe C: Summe zev aller Producer (Verbrauch Anteil ZEV)
     * Summe D: Summe zev aller Consumer (Verbrauch Anteil ZEV)
     * Summe E: Summe zev_calculated aller Consumer (Verbrauch Anteil ZEV)
-  * Zeige **vor dem Summen-Vergleich** zusätzlich folgende zwei berechnete Werte (kWh) an:
-    * **Bezug von VNB** = Verbrauch (Consumer Total) − zev_berechnet der Consumer (`summeConsumerTotal − summeConsumerZevCalculated`)
+  * Berechne folgende zwei Werte (kWh) – *(revidiert: sie werden **nicht mehr als Zeilen** in der Werte-Tabelle angezeigt, sondern nur noch im **Summen-Vergleich** gegen die Bilanz-Einheiten verwendet, siehe `Specs/Bilanzmesspunkt.md` FR-4/FR-5.7)*:
+    * **Bezug von VNB** = Verbrauch (Consumer Total) − **gemessener** zev der Consumer (`summeConsumerTotal − summeConsumerZev`; revidiert – vorher `zev_berechnet`, neu Messung gegen Messung)
     * **Rücklieferung** = Produktion (Producer Total) − zev der Producer (`summeProducerTotal − summeProducerZev`, jeweils Absolutwerte)
     * Fachlich: *Bezug von VNB* = aus dem Netz bezogener Rest des Verbrauchs; *Rücklieferung* = ins Netz eingespeister Überschuss der Produktion.
-    * Beide Werte werden – wie die übrigen Summen – mit einem **Balken** visualisiert (gleiche Skala/`getBarWidth`, eigene Farben).
-    * Beide Werte erscheinen auch im **PDF-Export** (`statistik.jrxml`), inkl. Balken, an derselben Stelle (vor dem Summen-Vergleich).
+  * Existieren **Bilanz-Einheiten** (Typen `BEZUG`/`RUECKLIEFERUNG`, siehe `Specs/Bilanzmesspunkt.md` FR-5.7), erscheinen **stattdessen** deren gemessene Bilanz-Summen als Zeilen in der Werte-Tabelle (Beschriftung = **Einheiten-Name**, mit Balken, Web + PDF); ohne Bilanz-Einheiten entfallen diese Zeilen und die zugehörigen Bilanz-Vergleiche.
   * Vergleiche, ob Summe C = Summe D
   * Vergleiche, ob Summe C = Summe E
   * Vergleiche, ob Summe D = Summe E

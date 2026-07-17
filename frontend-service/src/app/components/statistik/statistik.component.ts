@@ -195,13 +195,15 @@ export class StatistikComponent extends WithMessage implements OnInit {
       monat.summeConsumerTotal || 0,
       monat.summeProducerZev || 0,
       monat.summeConsumerZev || 0,
-      monat.summeConsumerZevCalculated || 0
+      monat.summeConsumerZevCalculated || 0,
+      monat.bilanzBezug || 0,
+      monat.bilanzRuecklieferung || 0
     );
     if (maxValue === 0) return 0;
     return (value / maxValue) * 100;
   }
 
-  getBarColor(type: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G'): string {
+  getBarColor(type: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I'): string {
     const colors: Record<string, string> = {
       'A': '#4CAF50',  // Producer Total - Grün
       'B': '#2196F3',  // Consumer Total - Blau
@@ -209,7 +211,9 @@ export class StatistikComponent extends WithMessage implements OnInit {
       'D': '#9C27B0',  // Consumer ZEV - Lila
       'E': '#00BCD4',  // Consumer ZEV Calculated - Cyan
       'F': '#F44336',  // Bezug von VNB - Rot
-      'G': '#8BC34A'   // Rücklieferung - Hellgrün
+      'G': '#8BC34A',  // Rücklieferung - Hellgrün
+      'H': '#E91E63',  // Bilanz-Einheit Bezug - Pink
+      'I': '#CDDC39'   // Bilanz-Einheit Rücklieferung - Lime
     };
     return colors[type] || '#999';
   }

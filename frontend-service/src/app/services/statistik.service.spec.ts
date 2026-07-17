@@ -31,6 +31,8 @@ describe('StatistikService', () => {
         ruecklieferung: 1200,
         bilanzBezug: 152,
         bilanzRuecklieferung: 1200,
+        bilanzBezugName: 'Bezug VNB',
+        bilanzRuecklieferungName: 'Rücklieferung VNB',
         summenCDGleich: true,
         differenzCD: 0,
         summenCEGleich: true,

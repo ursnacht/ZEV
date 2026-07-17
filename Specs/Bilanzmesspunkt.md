@@ -29,7 +29,7 @@
 
 ### FR-4: Zwei neue Summen-Vergleiche in der Statistik
 Pro Monat werden **zusätzlich** zu A=B, A=C, B=C zwei neue Vergleiche berechnet und angezeigt — **vor** oder unmittelbar im Bereich „Summen-Vergleich" (konsistent mit den bestehenden Vergleichen):
-1. **Bezug-Vergleich:** berechneter Wert **`Bezug von VNB`** (`ConsumerTotal − zev_berechnet Consumer`) gegen die **Bilanz-Summe Bezug** = Summe `total` der Einheit(en) vom Typ `BEZUG` im Zeitraum.
+1. **Bezug-Vergleich:** berechneter Wert **`Bezug von VNB`** (`ConsumerTotal − zev Consumer`, **gemessener** ZEV-Anteil B – Messung gegen Messung; revidiert, vorher `zev_berechnet`) gegen die **Bilanz-Summe Bezug** = Summe `total` der Einheit(en) vom Typ `BEZUG` im Zeitraum.
 2. **Rücklieferungs-Vergleich:** berechneter Wert **`Rücklieferung`** (`ProducerTotal − zev der Producer`) gegen die **Bilanz-Summe Rücklieferung** = Summe `total` der Einheit(en) vom Typ `RUECKLIEFERUNG` im Zeitraum.
 3. Es gilt **dieselbe Toleranz** wie bei den bestehenden Vergleichen (`TOLERANZ = 0.1 kWh`). Ein Vergleich gilt als „gleich", wenn `|Differenz| < TOLERANZ`.
 4. Bei Abweichung wird — wie bei den anderen Vergleichen — die **Differenz** angezeigt.
@@ -37,15 +37,16 @@ Pro Monat werden **zusätzlich** zu A=B, A=C, B=C zwei neue Vergleiche berechnet
    * **Bezug:** `differenzBezug = BezugVonVnb − BilanzSummeBezug` (beide positiv).
    * **Rücklieferung:** Vergleich über die Beträge — die berechnete `Rücklieferung` liegt positiv vor, die Bilanz-Summe negativ; `differenzRuecklieferung = Rücklieferung − |BilanzSummeRücklieferung|`.
    * In beiden Fällen: „gleich" ⇔ `|Differenz| < TOLERANZ`.
-6. Sind **keine** Einheiten des jeweiligen Typs vorhanden, ist die Bilanz-Summe `0`; der Vergleich wird **dennoch angezeigt** (Differenz = berechneter Wert).
+6. Sind **keine** Einheiten des jeweiligen Typs vorhanden, wird der jeweilige Vergleich **nicht angezeigt** (Web und PDF). *(Revidiert – ursprüngliche Festlegung war: anzeigen mit Bilanz-Summe 0.)*
 
 ### FR-5: Anzeige / Layout
-1. **Statistik-Seite** (`StatistikComponent`): zwei zusätzliche Vergleichs-Items im Bereich „Summen-Vergleich" (Design-System-`zev-comparison-item` mit Status-Dot ✓/✗ und Differenz-Anzeige, wie bestehend). Die Vergleiche tragen **eigene, kurze Kürzel/Labels** (analog „A = B"; **nicht** die bestehenden Value-Keys `BEZUG_VON_VNB`/`RUECKLIEFERUNG` wiederverwenden). Optional: die beiden Bilanz-Summen als zusätzliche Zeilen/Balken in der Werte-Tabelle.
+1. **Statistik-Seite** (`StatistikComponent`): zwei zusätzliche Vergleichs-Items im Bereich „Summen-Vergleich" (Design-System-`zev-comparison-item` mit Status-Dot ✓/✗ und Differenz-Anzeige, wie bestehend). Die Vergleiche tragen **eigene, kurze Kürzel/Labels** (analog „A = B"; **nicht** die bestehenden Value-Keys `BEZUG_VON_VNB`/`RUECKLIEFERUNG` wiederverwenden). Ein Vergleich wird nur angezeigt, wenn die zugehörige Bilanz-Einheit existiert (FR-4.6). Beide Vergleichs-Items tragen einen **Tooltip** (natives `title`-Attribut, übersetzte Keys `TOOLTIP_VERGLEICH_BEZUG`/`TOOLTIP_VERGLEICH_RUECKLIEFERUNG`), der die Berechnungsformel erläutert.
 2. **Statistik-PDF** (`statistik.jrxml`): die zwei neuen Vergleiche werden — **konsistent zur Web-Ansicht** — ebenfalls ausgegeben (in Scope).
 3. **Einheiten-Formular** (`EinheitFormComponent`): Typ-Dropdown um „Bezug" und „Rücklieferung" ergänzt.
 4. **Typ-Anzeige** (`EinheitTypPipe`, Einheiten-Liste, „Summen pro Einheit"): muss alle **vier** Typen korrekt beschriften (bisher binär `CONSUMER` vs. sonst → `PRODUZENT`; muss auf 4 Typen erweitert werden). **Achtung:** Die binäre Logik existiert nicht nur in der Pipe, sondern auch inline in der Statistik-Tabelle „Summen pro Einheit" (`statistik.component.html`) und im PDF-Subreport (`reports/einheit-summen.jrxml`) — alle drei Stellen anpassen.
-5. **„Summen pro Einheit":** Bilanz-Einheiten werden dort **mitgelistet**, mit **Absolutwerten** (analog zur Producer-Darstellung). Nur `total` ist fachlich relevant: die Spalten **ZEV** und **ZEV berechnet** zeigen für Bilanz-Typen **`-`** (Web und PDF).
+5. **„Summen pro Einheit":** Bilanz-Einheiten werden dort **mitgelistet**, mit **Absolutwerten** (analog zur Producer-Darstellung). Nur `total` ist fachlich relevant: die Spalten **ZEV** und **ZEV berechnet** zeigen für Bilanz-Typen **`-`** (Web und PDF). **Sortierung** nach Typ in der Reihenfolge **Produzenten, Konsumenten, Rücklieferung, Bezug**, innerhalb des Typs nach Name.
 6. Alle neuen Texte über `TranslationService`/`TranslatePipe` (keine Hardcodings).
+7. **Bilanz-Zeilen in der Werte-Tabelle (ersetzen die berechneten Zeilen):** Die berechneten Werte „Bezug von VNB" und „Rücklieferung" werden **nicht mehr als Zeilen** in der Werte-Tabelle angezeigt – ihre Berechnung bleibt bestehen und wird ausschliesslich im **Summen-Vergleich** gegen die Bilanz-Einheiten verwendet (FR-4). Existiert eine Einheit vom Typ `BEZUG` bzw. `RUECKLIEFERUNG`, wird **stattdessen** ihre gemessene Bilanz-Summe (Betrag) als Zeile angezeigt, mit **Balken** (gleiche Skala; die Bilanz-Summen fliessen in die Skalen-Maximum-Berechnung ein) und dem **Namen der Einheit** als Beschreibung (1. Spalte; kein Übersetzungs-Key nötig). Existiert die Einheit nicht, entfällt die Zeile – ebenso der zugehörige Vergleich (FR-4.6). **Reihenfolge: Rücklieferung vor Bezug** – sowohl bei den Bilanz-Zeilen als auch bei den zwei Bilanz-Vergleichen. Gilt für **Web und PDF**.
 
 ### FR-6: Persistierung & i18n
 * Keine neue Tabelle/Spalte; `einheit.typ` speichert die neuen Enum-Strings `BEZUG` / `RUECKLIEFERUNG`.
@@ -77,7 +78,9 @@ Pro Monat werden **zusätzlich** zu A=B, A=C, B=C zwei neue Vergleiche berechnet
 * [ ] Pro Monat wird ein Vergleich „Rücklieferung (berechnet) ↔ Summe Typ `RUECKLIEFERUNG`" mit Status und Differenz angezeigt.
 * [ ] Beide neuen Vergleiche verwenden dieselbe Toleranz (`0.1 kWh`); `|Differenz| < Toleranz` ⇒ „gleich".
 * [ ] Liegt die Differenz ausserhalb der Toleranz, wird die Differenz (kWh) angezeigt.
-* [ ] Sind keine Einheiten des jeweiligen Typs vorhanden, ist die Bilanz-Summe `0` und der Vergleich wird trotzdem angezeigt (Differenz = berechneter Wert).
+* [ ] Existiert die Bilanz-Einheit, erscheint in der Werte-Tabelle eine Zeile mit dem **Einheiten-Namen** als Beschreibung, der Bilanz-Summe (Betrag) und Balken (Web + PDF).
+* [ ] Die berechneten Werte „Bezug von VNB"/„Rücklieferung" erscheinen **nicht mehr als Zeilen** in der Werte-Tabelle (Web + PDF); sie werden nur noch im Summen-Vergleich verwendet.
+* [ ] Sind keine Einheiten des jeweiligen Typs vorhanden, werden **weder** die Bilanz-Zeile **noch** der zugehörige Vergleich angezeigt (Web + PDF).
 * [ ] Der Bezug-Vergleich rechnet mit positivem, der Rücklieferungs-Vergleich mit negativer Bilanz-Summe (Vergleich über Beträge); beide nutzen Toleranz `0.1 kWh`.
 * [ ] Die Bilanz-Einheiten erscheinen in „Summen pro Einheit" mit **Absolutwerten**.
 * [ ] Die neuen Vergleiche erscheinen auch im PDF-Export (konsistent zur Web-Ansicht).
@@ -103,7 +106,7 @@ Pro Monat werden **zusätzlich** zu A=B, A=C, B=C zwei neue Vergleiche berechnet
 ## 5. Edge Cases & Fehlerbehandlung
 | Szenario | Verhalten |
 |----------|-----------|
-| Keine `BEZUG`/`RUECKLIEFERUNG`-Einheit vorhanden | Bilanz-Summe = 0; Vergleich wird angezeigt, Differenz = berechneter Wert |
+| Keine `BEZUG`/`RUECKLIEFERUNG`-Einheit vorhanden | weder Bilanz-Zeile noch zugehöriger Vergleich werden angezeigt (Web + PDF) |
 | Zweite Einheit desselben Bilanz-Typs anlegen | abgewiesen mit Fehlermeldung (`EINHEIT_BILANZ_TYP_EXISTIERT`) |
 | `total` der Bilanz-Einheit ist `NULL` (keine Daten im Zeitraum) | als `0.0` behandeln (analog bestehende Summen) |
 | Rücklieferung negativ aggregiert (Einspeisung) | Betrag (`abs`) für den Vergleich verwenden (wie Producer) |
@@ -119,7 +122,7 @@ Pro Monat werden **zusätzlich** zu A=B, A=C, B=C zwei neue Vergleiche berechnet
 * **Voraussetzungen:** bestehende Statistik (`Specs/Statistik.md`), MQTT-Aggregation (`Specs/MQTT-Integration.md`), Einheiten-Verwaltung.
 * **Betroffener Code (Backend):**
   - `entity/EinheitTyp.java` — zwei neue Enum-Werte.
-  - `service/StatistikService.java` + `dto/MonatsStatistikDTO.java` — zwei neue Bilanz-Summen + zwei Vergleichsfelder (gleich/Differenz); Berechnung mit Toleranz.
+  - `service/StatistikService.java` + `dto/MonatsStatistikDTO.java` — zwei neue Bilanz-Summen + zwei Vergleichsfelder (gleich/Differenz); Berechnung mit Toleranz; Namen der Bilanz-Einheiten (`bilanzBezugName`/`bilanzRuecklieferungName`, `null` = keine Einheit → Zeile/Vergleich ausblenden).
   - `repository/MesswerteRepository.java` — `sumTotalByEinheitTypAndZeitBetween` ist bereits generisch nutzbar (kein neuer Query zwingend).
   - `service/MesswerteService.java` — sicherstellen, dass Verteilung nur `PRODUCER`/`CONSUMER` verarbeitet (Ist-Zustand; ggf. explizit dokumentieren/absichern).
   - `service/ZaehlerAggregationService.java` — `zev`-Behandlung für neue Typen (Default `0`); ansonsten unverändert.
@@ -148,7 +151,7 @@ Alle Fragen sind **geklärt** (in FR/AK eingearbeitet):
 * [x] **Enum-Benennung:** → `BEZUG` / `RUECKLIEFERUNG` (deutsch, domänennah). (FR-1)
 * [x] **Vorzeichenkonvention:** → **Bezug positiv, Rücklieferung negativ**; Gleichheitsprüfung über die Beträge, Toleranz `0.1 kWh`. (FR-4.5)
 * [x] **PDF-Export:** → **konsistent zur Web-Ansicht**, in Scope. (FR-5.2)
-* [x] **Leerer Vergleich:** → Bilanz-Summe `0`, Vergleich **anzeigen**. (FR-4.6)
+* [x] **Leerer Vergleich:** → **revidiert**: ohne Bilanz-Einheit werden Zeile und Vergleich **nicht angezeigt**. (FR-4.6/FR-5.7)
 * [x] **Anzahl Bilanz-Einheiten pro Typ:** → **höchstens eine** je Typ und Mandant (Validierung). (FR-1.3)
 * [x] **„Summen pro Einheit":** → Bilanz-Einheiten **mitlisten, Absolutwerte**. (FR-5.5)
 * [x] **Vergleichsbezeichnung im UI:** → **neue Kürzel/Label-Keys** (`VERGLEICH_BEZUG`/`VERGLEICH_RUECKLIEFERUNG`), nicht die Value-Keys wiederverwenden. (FR-5.1/FR-6)

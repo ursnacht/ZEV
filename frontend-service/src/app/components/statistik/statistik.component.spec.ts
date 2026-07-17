@@ -30,6 +30,8 @@ describe('StatistikComponent', () => {
     ruecklieferung: 1000,
     bilanzBezug: 140,
     bilanzRuecklieferung: 1000,
+    bilanzBezugName: 'Bezug VNB',
+    bilanzRuecklieferungName: 'Rücklieferung VNB',
     summenCDGleich: true,
     differenzCD: 0,
     summenCEGleich: false,

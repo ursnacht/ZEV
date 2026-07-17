@@ -137,9 +137,9 @@ public class StatistikServiceTest {
         when(messwerteRepository.sumZevByEinheitTypAndZeitBetween(eq(EinheitTyp.PRODUCER), any(), any()))
                 .thenReturn(-700.0);  // zev Producer (negativ gespeichert → abs = 700)
         when(messwerteRepository.sumZevByEinheitTypAndZeitBetween(eq(EinheitTyp.CONSUMER), any(), any()))
-                .thenReturn(600.0);
+                .thenReturn(590.0);   // zev Consumer (B, gemessen) – bewusst != zev_berechnet
         when(messwerteRepository.sumZevCalculatedByEinheitTypAndZeitBetween(eq(EinheitTyp.CONSUMER), any(), any()))
-                .thenReturn(600.0);   // zev_berechnet Consumer
+                .thenReturn(600.0);   // zev_berechnet Consumer (C)
         when(messwerteRepository.sumTotalByEinheitAndZeitBetween(any(), any(), any())).thenReturn(0.0);
         when(messwerteRepository.sumZevByEinheitAndZeitBetween(any(), any(), any())).thenReturn(0.0);
         when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(any(), any(), any())).thenReturn(0.0);
@@ -147,8 +147,8 @@ public class StatistikServiceTest {
         StatistikDTO result = statistikService.getStatistik(von, bis);
 
         MonatsStatistikDTO monat = result.getMonate().get(0);
-        // Bezug von VNB = Verbrauch (800) − zev_berechnet Consumer (600) = 200
-        assertEquals(200.0, monat.getBezugVonVnb(), 0.001);
+        // Bezug von VNB = Verbrauch (800) − zev Consumer (B, gemessen, 590) = 210 (nicht C!)
+        assertEquals(210.0, monat.getBezugVonVnb(), 0.001);
         // Rücklieferung = Produktion (abs 1000) − zev Producer (abs 700) = 300
         assertEquals(300.0, monat.getRuecklieferung(), 0.001);
     }
