@@ -24,3 +24,6 @@ node_modules/
 
 # Exportierte Docker-Image-Archive (siehe scripts/build-pi-images.ps1)
 zev-images-*.tar.gz
+
+# Aus Specs generierte PDFs (jederzeit aus der .md neu erzeugbar)
+/Specs/*.pdf
