@@ -129,9 +129,12 @@ test.describe('Statistik Page - Monthly Statistics', () => {
             const comparisonSection = firstMonthPanel.locator('.zev-comparison-section');
             await expect(comparisonSection).toBeVisible();
 
-            // Check for comparison grid items
-            const comparisonItems = firstMonthPanel.locator('.zev-comparison-item');
-            expect(await comparisonItems.count()).toBe(3); // A=B, A=C, B=C
+            // Check for comparison grid items: 3 base comparisons (A=B, A=C, B=C)
+            // plus, for tenants using the Bilanzmodell, up to 2 extra comparisons
+            // (Bezug ↔ Bilanz, Rücklieferung ↔ Bilanz).
+            const comparisonCount = await firstMonthPanel.locator('.zev-comparison-item').count();
+            expect(comparisonCount).toBeGreaterThanOrEqual(3);
+            expect(comparisonCount).toBeLessThanOrEqual(5);
 
             // Check for Einheit-Summen table (new feature)
             const einheitSummenTable = firstMonthPanel.locator('.zev-table--compact');

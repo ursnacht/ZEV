@@ -123,20 +123,22 @@ test.describe('Rechnungen - Einheiten Auswahl (FR-3: Produzenten)', () => {
         await selectAll.click();
         await page.waitForTimeout(300);
 
-        // Type label is localized: DE "Produzent"/"Konsument", EN "Producer"/"Consumer"
-        const isProducer = (label: string) => /produzent|producer/i.test(label);
+        // Type label is rendered as "[Typ]" and localized. "Select all" selects
+        // ONLY consumers (DE "Konsument"/EN "Consumer"); producers and the balance
+        // meter points Bezug/Rücklieferung (Grid supply/Feed-in) must NOT be selected.
+        const isConsumer = (label: string) => /konsument|consumer/i.test(label);
 
-        // Consumers must be checked, producers must NOT be checked
+        // Consumers must be checked, all other types must NOT be checked
         let sawConsumer = false;
         for (let i = 0; i < itemCount; i++) {
             const item = items.nth(i);
             const labelText = (await item.locator('label').textContent()) ?? '';
             const checkbox = item.locator('input[type="checkbox"]');
-            if (isProducer(labelText)) {
-                await expect(checkbox).not.toBeChecked();
-            } else {
+            if (isConsumer(labelText)) {
                 sawConsumer = true;
                 await expect(checkbox).toBeChecked();
+            } else {
+                await expect(checkbox).not.toBeChecked();
             }
         }
         // The test data is expected to contain at least one consumer
