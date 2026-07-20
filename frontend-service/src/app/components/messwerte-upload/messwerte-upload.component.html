@@ -56,33 +56,53 @@
             </td>
 
             <td class="upload-row__einheit">
-              <select
-                class="zev-select"
-                [(ngModel)]="entry.einheitId"
-                [disabled]="entry.status === 'matching' || entry.status === 'uploading' || entry.status === 'done'">
-                @for (einheit of einheiten; track einheit.id) {
-                  <option [value]="einheit.id">{{ einheit.name }} ({{ einheit.typ }})</option>
+              @if (entry.bilanz) {
+                <span class="zev-status zev-status--success">{{ 'UPLOAD_TYP_BILANZ' | translate }}</span>
+                @if (entry.status !== 'uploading' && entry.status !== 'done') {
+                  <button type="button" class="zev-button zev-button--secondary zev-button--compact"
+                    (click)="toggleBilanz(entry)" [title]="'BILANZ_MARKIERUNG_ZURUECKSETZEN' | translate">
+                    <app-icon name="x"></app-icon>
+                  </button>
                 }
-              </select>
-              @if (entry.status === 'matching') {
-                <span class="zev-spinner-container">
-                  <span class="zev-spinner zev-spinner--small"></span>
-                </span>
-              }
-              @if (entry.matchConfidence !== null && entry.matchConfidence > 0.8 && entry.status === 'ready') {
-                <span class="zev-status zev-status--success">{{ 'AUTOMATISCH_ERKANNT' | translate }}</span>
-              }
-              @if (entry.matchConfidence !== null && entry.matchConfidence <= 0.8 && entry.status === 'ready') {
-                <span class="zev-status zev-status--warning">{{ 'BITTE_PRUEFEN' | translate }}</span>
+              } @else {
+                <select
+                  class="zev-select"
+                  [(ngModel)]="entry.einheitId"
+                  [disabled]="entry.status === 'matching' || entry.status === 'uploading' || entry.status === 'done'">
+                  @for (einheit of einheiten; track einheit.id) {
+                    <option [value]="einheit.id">{{ einheit.name }} ({{ einheit.typ }})</option>
+                  }
+                </select>
+                @if (entry.status === 'matching') {
+                  <span class="zev-spinner-container">
+                    <span class="zev-spinner zev-spinner--small"></span>
+                  </span>
+                }
+                @if (entry.matchConfidence !== null && entry.matchConfidence > 0.8 && entry.status === 'ready') {
+                  <span class="zev-status zev-status--success">{{ 'AUTOMATISCH_ERKANNT' | translate }}</span>
+                }
+                @if (entry.matchConfidence !== null && entry.matchConfidence <= 0.8 && entry.status === 'ready') {
+                  <span class="zev-status zev-status--warning">{{ 'BITTE_PRUEFEN' | translate }}</span>
+                }
+                @if (entry.status === 'ready') {
+                  <button type="button" class="zev-button zev-button--secondary zev-button--compact"
+                    (click)="toggleBilanz(entry)" [title]="'ALS_BILANZ_MARKIEREN' | translate">
+                    {{ 'ALS_BILANZ_MARKIEREN' | translate }}
+                  </button>
+                }
               }
             </td>
 
             <td>
-              <input
-                type="date"
-                class="zev-input"
-                [(ngModel)]="entry.date"
-                [disabled]="entry.status === 'uploading' || entry.status === 'done'">
+              @if (!entry.bilanz) {
+                <input
+                  type="date"
+                  class="zev-input"
+                  [(ngModel)]="entry.date"
+                  [disabled]="entry.status === 'uploading' || entry.status === 'done'">
+              } @else {
+                <span class="zev-text--muted">—</span>
+              }
             </td>
 
             <td>

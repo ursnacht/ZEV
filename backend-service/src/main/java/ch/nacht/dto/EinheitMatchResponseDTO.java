@@ -11,6 +11,7 @@ public class EinheitMatchResponseDTO {
     private double confidence;  // 0.0 - 1.0
     private boolean matched;
     private String message;     // Error message if not matched
+    private boolean bilanz;     // true = Bilanz-Datei (Bezug + Rücklieferung), keine einzelne Einheit
 
     public EinheitMatchResponseDTO() {
     }
@@ -21,6 +22,7 @@ public class EinheitMatchResponseDTO {
         this.confidence = builder.confidence;
         this.matched = builder.matched;
         this.message = builder.message;
+        this.bilanz = builder.bilanz;
     }
 
     public static Builder builder() {
@@ -67,12 +69,21 @@ public class EinheitMatchResponseDTO {
         this.message = message;
     }
 
+    public boolean isBilanz() {
+        return bilanz;
+    }
+
+    public void setBilanz(boolean bilanz) {
+        this.bilanz = bilanz;
+    }
+
     public static class Builder {
         private Long einheitId;
         private String einheitName;
         private double confidence;
         private boolean matched;
         private String message;
+        private boolean bilanz;
 
         public Builder einheitId(Long einheitId) {
             this.einheitId = einheitId;
@@ -96,6 +107,11 @@ public class EinheitMatchResponseDTO {
 
         public Builder message(String message) {
             this.message = message;
+            return this;
+        }
+
+        public Builder bilanz(boolean bilanz) {
+            this.bilanz = bilanz;
             return this;
         }
 

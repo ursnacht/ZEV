@@ -85,6 +85,34 @@ public class MesswerteController {
         }
     }
 
+    @PostMapping("/upload-bilanz")
+    @PreAuthorize("hasAuthority('messwerte:write')")
+    public ResponseEntity<Map<String, Object>> uploadBilanzCsv(
+            @RequestParam("file") MultipartFile file) {
+
+        log.info("Bilanz CSV upload request received - filename: {}", file.getOriginalFilename());
+
+        // Feature-Gate wie beim Einheiten-Upload (unabhängig von der Rolle).
+        Long orgId = organizationContextService.getCurrentOrgId();
+        if (!featureFlagService.isEnabled(orgId, FeatureFlag.MESSWERTE_UPLOAD)) {
+            log.warn("Bilanz upload rejected - feature MESSWERTE_UPLOAD disabled for org: {}", orgId);
+            throw new FeatureDisabledException("FEATURE_FLAG_DEAKTIVIERT");
+        }
+
+        try {
+            Map<String, Object> result = messwerteService.processBilanzCsvUpload(file);
+            log.info("Bilanz CSV upload successful - result: {}", result);
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            log.error("Bilanz CSV upload failed - filename: {}, error: {}",
+                    file.getOriginalFilename(), e.getMessage(), e);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error",
+                    "message", e.getMessage()));
+        }
+    }
+
     @PostMapping("/calculate-distribution")
     @PreAuthorize("hasAuthority('messwerte:write')")
     public ResponseEntity<Map<String, Object>> calculateDistribution(

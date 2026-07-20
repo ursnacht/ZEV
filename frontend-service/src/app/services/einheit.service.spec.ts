@@ -34,7 +34,8 @@ describe('EinheitService', () => {
     einheitName: 'Allgemein',
     confidence: 0.9,
     matched: true,
-    message: null
+    message: null,
+    bilanz: false
   };
 
   beforeEach(() => {
@@ -171,7 +172,8 @@ describe('EinheitService', () => {
         einheitName: null,
         confidence: 0,
         matched: false,
-        message: 'Keine passende Einheit gefunden'
+        message: 'Keine passende Einheit gefunden',
+        bilanz: false
       };
 
       service.matchEinheitByFilename(filename).subscribe(response => {
@@ -193,7 +195,8 @@ describe('EinheitService', () => {
         einheitName: null,
         confidence: 0,
         matched: false,
-        message: 'KI-Service nicht verfügbar'
+        message: 'KI-Service nicht verfügbar',
+        bilanz: false
       };
 
       service.matchEinheitByFilename(filename).subscribe(response => {

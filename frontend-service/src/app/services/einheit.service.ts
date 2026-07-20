@@ -10,6 +10,7 @@ export interface EinheitMatchResponse {
   confidence: number;
   matched: boolean;
   message: string | null;
+  bilanz: boolean;
 }
 
 @Injectable({

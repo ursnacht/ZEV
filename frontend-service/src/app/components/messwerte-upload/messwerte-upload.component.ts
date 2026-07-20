@@ -20,6 +20,7 @@ export interface UploadEntry {
   status: UploadStatus;
   errorMessage: string | null;
   matchConfidence: number | null;
+  bilanz: boolean;   // true = Bilanz-Datei (Bezug + Rücklieferung), keine Einheit/Datum nötig
 }
 
 @Component({
@@ -105,8 +106,14 @@ export class MesswerteUploadComponent extends WithMessage implements OnInit {
       this.entries.length > 0 &&
       !this.importing &&
       !this.isAnyMatching &&
-      this.entries.every(e => e.einheitId !== null && e.date !== '' && e.status !== 'uploading')
+      this.entries.every(e =>
+        (e.bilanz || (e.einheitId !== null && e.date !== '')) && e.status !== 'uploading')
     );
+  }
+
+  /** Einen Eintrag manuell als Bilanz-Datei markieren bzw. zurücksetzen (Fallback, wenn die KI nicht greift). */
+  toggleBilanz(entry: UploadEntry): void {
+    entry.bilanz = !entry.bilanz;
   }
 
   importAll(): void {
@@ -134,24 +141,33 @@ export class MesswerteUploadComponent extends WithMessage implements OnInit {
       entry.status = 'uploading';
 
       const formData = new FormData();
-      formData.append('date', entry.date);
-      formData.append('einheitId', entry.einheitId!.toString());
       formData.append('file', entry.file);
+      let url = `${getRuntimeConfig().apiBaseUrl}/api/messwerte/upload`;
+      if (entry.bilanz) {
+        // Bilanz-Datei: nur die Datei, kein Datum/keine Einheit
+        url = `${getRuntimeConfig().apiBaseUrl}/api/messwerte/upload-bilanz`;
+      } else {
+        formData.append('date', entry.date);
+        formData.append('einheitId', entry.einheitId!.toString());
+      }
 
-      this.http.post<any>(`${getRuntimeConfig().apiBaseUrl}/api/messwerte/upload`, formData).subscribe({
+      this.http.post<any>(url, formData).subscribe({
         next: (response) => {
           if (response.status === 'success') {
             entry.status = 'done';
             successCount++;
           } else {
             entry.status = 'error';
-            entry.errorMessage = response.message;
+            entry.errorMessage = response.message
+              ? this.translationService.translate(response.message) : null;
           }
           processNext(index + 1);
         },
         error: (error) => {
           entry.status = 'error';
-          entry.errorMessage = error.message;
+          const backendMsg = error.error?.message;
+          entry.errorMessage = backendMsg
+            ? this.translationService.translate(backendMsg) : error.message;
           processNext(index + 1);
         }
       });
@@ -191,6 +207,7 @@ export class MesswerteUploadComponent extends WithMessage implements OnInit {
       status: 'matching' as UploadStatus,
       errorMessage: null,
       matchConfidence: null,
+      bilanz: false,
     }));
 
     this.entries = [...this.entries, ...newEntries];
@@ -205,7 +222,9 @@ export class MesswerteUploadComponent extends WithMessage implements OnInit {
     this.einheitService.matchEinheitByFilename(entry.file.name).subscribe({
       next: (result) => {
         entry.matchConfidence = result.confidence;
-        if (result.matched && result.einheitId) {
+        if (result.bilanz) {
+          entry.bilanz = true;
+        } else if (result.matched && result.einheitId) {
           entry.einheitId = result.einheitId;
         }
         entry.status = 'ready';

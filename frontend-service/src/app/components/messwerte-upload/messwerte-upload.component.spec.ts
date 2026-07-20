@@ -25,7 +25,8 @@ describe('MesswerteUploadComponent', () => {
     einheitName: 'Allgemein',
     confidence: 0.9,
     matched: true,
-    message: null
+    message: null,
+    bilanz: false
   };
 
   const mockTranslationService = {
@@ -103,15 +104,15 @@ describe('MesswerteUploadComponent', () => {
 
     it('should return true when at least one entry is matching', () => {
       component.entries = [
-        { file: makeCsvFile(), einheitId: 1, date: '', status: 'ready', errorMessage: null, matchConfidence: null },
-        { file: makeCsvFile('b.csv'), einheitId: 1, date: '', status: 'matching', errorMessage: null, matchConfidence: null }
+        { file: makeCsvFile(), einheitId: 1, date: '', status: 'ready', errorMessage: null, matchConfidence: null, bilanz: false },
+        { file: makeCsvFile('b.csv'), einheitId: 1, date: '', status: 'matching', errorMessage: null, matchConfidence: null, bilanz: false }
       ];
       expect(component.isAnyMatching).toBe(true);
     });
 
     it('should return false when all entries are ready', () => {
       component.entries = [
-        { file: makeCsvFile(), einheitId: 1, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null }
+        { file: makeCsvFile(), einheitId: 1, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null, bilanz: false }
       ];
       expect(component.isAnyMatching).toBe(false);
     });
@@ -124,28 +125,28 @@ describe('MesswerteUploadComponent', () => {
 
     it('should return false when any entry is matching', () => {
       component.entries = [
-        { file: makeCsvFile(), einheitId: 1, date: '2025-01-01', status: 'matching', errorMessage: null, matchConfidence: null }
+        { file: makeCsvFile(), einheitId: 1, date: '2025-01-01', status: 'matching', errorMessage: null, matchConfidence: null, bilanz: false }
       ];
       expect(component.canImport).toBe(false);
     });
 
     it('should return false when any entry has no einheitId', () => {
       component.entries = [
-        { file: makeCsvFile(), einheitId: null, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null }
+        { file: makeCsvFile(), einheitId: null, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null, bilanz: false }
       ];
       expect(component.canImport).toBe(false);
     });
 
     it('should return false when any entry has no date', () => {
       component.entries = [
-        { file: makeCsvFile(), einheitId: 1, date: '', status: 'ready', errorMessage: null, matchConfidence: null }
+        { file: makeCsvFile(), einheitId: 1, date: '', status: 'ready', errorMessage: null, matchConfidence: null, bilanz: false }
       ];
       expect(component.canImport).toBe(false);
     });
 
     it('should return true when all entries are valid and ready', () => {
       component.entries = [
-        { file: makeCsvFile(), einheitId: 1, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null }
+        { file: makeCsvFile(), einheitId: 1, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null, bilanz: false }
       ];
       expect(component.canImport).toBe(true);
     });
@@ -153,15 +154,15 @@ describe('MesswerteUploadComponent', () => {
 
   describe('removeEntry', () => {
     it('should remove the specified entry from the list', () => {
-      const entry: UploadEntry = { file: makeCsvFile(), einheitId: 1, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null };
+      const entry: UploadEntry = { file: makeCsvFile(), einheitId: 1, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null, bilanz: false };
       component.entries = [entry];
       component.removeEntry(entry);
       expect(component.entries.length).toBe(0);
     });
 
     it('should only remove the specified entry', () => {
-      const entry1: UploadEntry = { file: makeCsvFile('a.csv'), einheitId: 1, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null };
-      const entry2: UploadEntry = { file: makeCsvFile('b.csv'), einheitId: 2, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null };
+      const entry1: UploadEntry = { file: makeCsvFile('a.csv'), einheitId: 1, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null, bilanz: false };
+      const entry2: UploadEntry = { file: makeCsvFile('b.csv'), einheitId: 2, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null, bilanz: false };
       component.entries = [entry1, entry2];
       component.removeEntry(entry1);
       expect(component.entries).toEqual([entry2]);
@@ -239,7 +240,7 @@ describe('MesswerteUploadComponent', () => {
 
     it('should upload entries and show success message', fakeAsync(() => {
       component.entries = [
-        { file: makeCsvFile(), einheitId: 1, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null }
+        { file: makeCsvFile(), einheitId: 1, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null, bilanz: false }
       ];
       component.importAll();
 
@@ -253,7 +254,7 @@ describe('MesswerteUploadComponent', () => {
 
     it('should set entry status to error on upload failure', fakeAsync(() => {
       component.entries = [
-        { file: makeCsvFile(), einheitId: 1, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null }
+        { file: makeCsvFile(), einheitId: 1, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null, bilanz: false }
       ];
       component.importAll();
 
@@ -266,7 +267,7 @@ describe('MesswerteUploadComponent', () => {
 
     it('should reset importing flag after completion', fakeAsync(() => {
       component.entries = [
-        { file: makeCsvFile(), einheitId: 1, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null }
+        { file: makeCsvFile(), einheitId: 1, date: '2025-01-01', status: 'ready', errorMessage: null, matchConfidence: null, bilanz: false }
       ];
       component.importAll();
 

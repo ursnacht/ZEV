@@ -22,6 +22,7 @@ public class EinheitMatchingService {
 
     private static final Logger log = LoggerFactory.getLogger(EinheitMatchingService.class);
     private static final String NO_MATCH = "KEINE";
+    private static final String BILANZ = "BILANZ";
 
     private final ChatClient chatClient;
     private final EinheitService einheitService;
@@ -155,6 +156,9 @@ public class EinheitMatchingService {
     private String buildSystemPrompt(List<Einheit> einheiten) {
         StringBuilder sb = new StringBuilder();
         sb.append("Finde die passende Einheit anhand einer Abkürzung.\n\n");
+        sb.append("Sonderfall Bilanz-Datei: Enthält die Abkürzung 'bilanz', handelt es sich um eine\n");
+        sb.append("Bilanz-Datei (Netzbezug UND Rücklieferung in einer Datei), die NICHT einer einzelnen\n");
+        sb.append("Einheit entspricht. Antworte in diesem Fall ausschliesslich mit '").append(BILANZ).append("'.\n\n");
         sb.append("Typische Abkürzungen sind:\n");
         sb.append("- 'a' oder 'allg' oder 'allgemein' -> Allgemein\n");
         sb.append("- 'pv' oder 'pv-anlage' -> PV Produktion\n");
@@ -180,7 +184,7 @@ public class EinheitMatchingService {
         StringBuilder sb = new StringBuilder();
 
         sb.append("\nWelche Einheit passt am besten zur Abkürzung '").append(unitIdentifier).append("'?\n");
-        sb.append("Antworte NUR mit der ID-Nummer oder 'KEINE'.");
+        sb.append("Antworte NUR mit der ID-Nummer, '").append(BILANZ).append("' (Bilanz-Datei) oder 'KEINE'.");
 
         return sb.toString();
     }
@@ -190,6 +194,16 @@ public class EinheitMatchingService {
      */
     private EinheitMatchResponseDTO parseResponse(String response, List<Einheit> einheiten) {
         String trimmedResponse = response.trim().toUpperCase();
+
+        // Check for Bilanz file (Bezug + Rücklieferung, keine einzelne Einheit)
+        if (trimmedResponse.equals(BILANZ)) {
+            log.info("Bilanz file detected by Claude");
+            return EinheitMatchResponseDTO.builder()
+                    .matched(true)
+                    .bilanz(true)
+                    .confidence(0.9)
+                    .build();
+        }
 
         // Check for no match
         if (trimmedResponse.equals(NO_MATCH)) {

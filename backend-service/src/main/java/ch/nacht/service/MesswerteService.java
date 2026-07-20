@@ -22,8 +22,10 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -115,6 +117,131 @@ public class MesswerteService {
                 "count", messwerteList.size(),
                 "einheitId", einheitId,
                 "einheitName", einheit.getName());
+    }
+
+    /** Datumsformat der Bilanz-CSV (JS-Date-toString, z.B. "Mon Jun 01 2026"). */
+    private static final DateTimeFormatter BILANZ_DATE = DateTimeFormatter.ofPattern("EEE MMM dd yyyy", Locale.ENGLISH);
+
+    /**
+     * Verarbeitet eine Bilanz-CSV (Netzbezug + Rücklieferung in einer Datei, 15-Min-Raster).
+     * Die Werte werden den Einheiten vom Typ BEZUG bzw. RUECKLIEFERUNG zugeordnet (total signiert,
+     * zev = 0, quelle = CSV). Zeitstempel: Tag aus der Spalte "category", 15-Min-Slot fortlaufend
+     * ab 00:00 des jeweiligen Tages. Überschreibt – wie der Consumer-Upload – die Monatsdaten
+     * beider Einheiten.
+     */
+    @Transactional
+    @CacheEvict(value = "statistik", allEntries = true)
+    public Map<String, Object> processBilanzCsvUpload(MultipartFile file) throws Exception {
+        hibernateFilterService.enableOrgFilter();
+        log.info("Starting Bilanz CSV upload - filename: {}, size: {} bytes",
+                file.getOriginalFilename(), file.getSize());
+
+        // Bilanz-Einheiten im aktuellen Mandanten auflösen
+        Einheit bezugEinheit = einheitRepository.findFirstByTyp(EinheitTyp.BEZUG)
+                .orElseThrow(() -> new IllegalArgumentException("BILANZ_EINHEIT_FEHLT"));
+        Einheit ruecklieferungEinheit = einheitRepository.findFirstByTyp(EinheitTyp.RUECKLIEFERUNG)
+                .orElseThrow(() -> new IllegalArgumentException("BILANZ_EINHEIT_FEHLT"));
+
+        Long orgId = organizationContextService.getCurrentOrgId();
+        List<Messwerte> messwerteList = new ArrayList<>();
+        LocalDate ersterTag = null;
+        LocalDate aktuellerTag = null;
+        LocalDateTime slotZeit = null;
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
+            // Kopfzeile lesen und Spalten positions- + titelbasiert plausibilisieren.
+            // Trennzeichen wie beim Consumer-Upload sowohl Komma als auch Semikolon.
+            String header = reader.readLine();
+            String[] headerCols = header != null ? header.split("[,;]", -1) : new String[0];
+            if (headerCols.length < 3
+                    || !headerCols[1].toLowerCase().contains("bezug")
+                    || !headerCols[2].toLowerCase().contains("cklieferung")) {
+                throw new IllegalArgumentException("BILANZ_CSV_UNGUELTIG");
+            }
+
+            String line;
+            int lineNumber = 1;
+            while ((line = reader.readLine()) != null) {
+                lineNumber++;
+                if (line.isBlank()) {
+                    continue;
+                }
+                String[] parts = line.split("[,;]", -1);
+                if (parts.length < 3) {
+                    log.warn("Bilanz-CSV Zeile {} übersprungen: zu wenige Spalten", lineNumber);
+                    continue;
+                }
+
+                LocalDate tag;
+                try {
+                    tag = LocalDate.parse(parts[0].trim(), BILANZ_DATE);
+                } catch (Exception e) {
+                    log.warn("Bilanz-CSV Zeile {} übersprungen: unparsbares Datum '{}'", lineNumber, parts[0]);
+                    continue;
+                }
+
+                // Tageswechsel → Slot auf 00:00 zurücksetzen, sonst +15 min
+                if (!tag.equals(aktuellerTag)) {
+                    aktuellerTag = tag;
+                    slotZeit = tag.atStartOfDay();
+                    if (ersterTag == null) {
+                        ersterTag = tag;
+                    }
+                } else {
+                    slotZeit = slotZeit.plusMinutes(15);
+                }
+
+                String bezugStr = parts[1].trim();
+                String ruecklieferungStr = parts[2].trim();
+                boolean hatBezug = !bezugStr.isEmpty();
+                boolean hatRuecklieferung = !ruecklieferungStr.isEmpty();
+                if (hatBezug == hatRuecklieferung) {
+                    // beide gefüllt oder beide leer → überspringen
+                    log.warn("Bilanz-CSV Zeile {} übersprungen: nicht genau eine Spalte gefüllt", lineNumber);
+                    continue;
+                }
+
+                try {
+                    double total = Double.parseDouble(hatBezug ? bezugStr : ruecklieferungStr);
+                    Einheit einheit = hatBezug ? bezugEinheit : ruecklieferungEinheit;
+                    Messwerte messwert = new Messwerte(slotZeit, total, 0.0, einheit);
+                    messwert.setOrgId(orgId);
+                    messwert.setQuelle(Quelle.CSV);
+                    messwerteList.add(messwert);
+                } catch (NumberFormatException e) {
+                    log.warn("Bilanz-CSV Zeile {} übersprungen: nicht-numerischer Wert", lineNumber);
+                }
+            }
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error reading Bilanz CSV file: {}", e.getMessage(), e);
+            throw e;
+        }
+
+        if (messwerteList.isEmpty() || ersterTag == null) {
+            throw new IllegalArgumentException("BILANZ_CSV_UNGUELTIG");
+        }
+
+        // Monats-Overwrite beider Einheiten (Monat der ersten Datenzeile), analog processCsvUpload
+        LocalDateTime monatVon = ersterTag.withDayOfMonth(1).atStartOfDay();
+        LocalDateTime monatBis = ersterTag.withDayOfMonth(ersterTag.lengthOfMonth()).atTime(23, 59, 59);
+        for (Einheit einheit : List.of(bezugEinheit, ruecklieferungEinheit)) {
+            List<Messwerte> bestehende = messwerteRepository.findByEinheitAndZeitBetween(einheit, monatVon, monatBis);
+            if (!bestehende.isEmpty()) {
+                log.info("Deleting {} existing Bilanz records for einheit {}", bestehende.size(), einheit.getName());
+                messwerteRepository.deleteAll(bestehende);
+            }
+        }
+
+        messwerteRepository.saveAll(messwerteList);
+        log.info("Successfully saved {} Bilanz messwerte records", messwerteList.size());
+
+        return Map.of(
+                "status", "success",
+                "count", messwerteList.size(),
+                "bezugEinheit", bezugEinheit.getName(),
+                "ruecklieferungEinheit", ruecklieferungEinheit.getName());
     }
 
     @Transactional(readOnly = true)
