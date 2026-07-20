@@ -416,6 +416,7 @@ Feature specs are in `/Specs/`:
 - `MQTT-Integration.md` - MQTT smart meter integration (Backend-Subscriber)
 - `Batteriespeicher.md` - Battery storage integration (Typ SPEICHER, nachrangige Verteilung)
 - `Bilanzmodell.md` - Abrechnung aus Bilanzmessung (Alternative zur Producer-Verteilung, je Mandant wählbar)
+- `Bilanz-Messwerte-Upload.md` - CSV-Upload der Bilanz-Werte (Bezug/Rücklieferung) mit KI-Erkennung
 - `Pi-Gateway-Software.md` - Raspberry-Pi Reader/Publisher (Zähler auslesen → MQTT)
 - `RefactoringProducer.md` - Producer refactoring
 - `SpringBoot4Upgrade.md` - Spring Boot 4 upgrade
