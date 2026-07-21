@@ -20,7 +20,7 @@ export interface UploadEntry {
   status: UploadStatus;
   errorMessage: string | null;
   matchConfidence: number | null;
-  bilanz: boolean;   // true = Bilanz-Datei (Bezug + Rücklieferung), keine Einheit/Datum nötig
+  bilanz: boolean;   // true = Bilanz-Datei (Bezug + Rücklieferung); Datum wie Consumer/Producer, keine Einheit
 }
 
 @Component({
@@ -107,7 +107,7 @@ export class MesswerteUploadComponent extends WithMessage implements OnInit {
       !this.importing &&
       !this.isAnyMatching &&
       this.entries.every(e =>
-        (e.bilanz || (e.einheitId !== null && e.date !== '')) && e.status !== 'uploading')
+        e.date !== '' && (e.bilanz || e.einheitId !== null) && e.status !== 'uploading')
     );
   }
 
@@ -142,12 +142,12 @@ export class MesswerteUploadComponent extends WithMessage implements OnInit {
 
       const formData = new FormData();
       formData.append('file', entry.file);
+      formData.append('date', entry.date);
       let url = `${getRuntimeConfig().apiBaseUrl}/api/messwerte/upload`;
       if (entry.bilanz) {
-        // Bilanz-Datei: nur die Datei, kein Datum/keine Einheit
+        // Bilanz-Datei: file + date; die Bilanz-Einheiten werden serverseitig per Typ aufgelöst
         url = `${getRuntimeConfig().apiBaseUrl}/api/messwerte/upload-bilanz`;
       } else {
-        formData.append('date', entry.date);
         formData.append('einheitId', entry.einheitId!.toString());
       }
 
@@ -243,7 +243,7 @@ export class MesswerteUploadComponent extends WithMessage implements OnInit {
       if (content) {
         const lines = content.split('\n');
         if (lines.length >= 2) {
-          const parsedDate = this.parseEnglishDate(lines[1].split(',')[0]);
+          const parsedDate = this.parseEnglishDate(lines[1].split(/[,;]/)[0]);
           if (parsedDate) {
             entry.date = parsedDate;
           }

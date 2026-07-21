@@ -88,9 +88,10 @@ public class MesswerteController {
     @PostMapping("/upload-bilanz")
     @PreAuthorize("hasAuthority('messwerte:write')")
     public ResponseEntity<Map<String, Object>> uploadBilanzCsv(
-            @RequestParam("file") MultipartFile file) {
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("date") String date) {
 
-        log.info("Bilanz CSV upload request received - filename: {}", file.getOriginalFilename());
+        log.info("Bilanz CSV upload request received - filename: {}, date: {}", file.getOriginalFilename(), date);
 
         // Feature-Gate wie beim Einheiten-Upload (unabhängig von der Rolle).
         Long orgId = organizationContextService.getCurrentOrgId();
@@ -100,7 +101,7 @@ public class MesswerteController {
         }
 
         try {
-            Map<String, Object> result = messwerteService.processBilanzCsvUpload(file);
+            Map<String, Object> result = messwerteService.processBilanzCsvUpload(file, date);
             log.info("Bilanz CSV upload successful - result: {}", result);
             return ResponseEntity.ok(result);
 

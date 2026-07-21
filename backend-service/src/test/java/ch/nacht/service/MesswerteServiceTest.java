@@ -53,6 +53,8 @@ public class MesswerteServiceTest {
 
     private Einheit consumerEinheit;
     private Einheit producerEinheit;
+    private Einheit bezugEinheit;
+    private Einheit ruecklieferungEinheit;
     private Long testOrgId;
 
     @BeforeEach
@@ -66,6 +68,343 @@ public class MesswerteServiceTest {
         producerEinheit = new Einheit("Solaranlage", EinheitTyp.PRODUCER);
         producerEinheit.setId(2L);
         producerEinheit.setOrgId(testOrgId);
+
+        bezugEinheit = new Einheit("Bezug", EinheitTyp.BEZUG);
+        bezugEinheit.setId(10L);
+        bezugEinheit.setOrgId(testOrgId);
+
+        ruecklieferungEinheit = new Einheit("Rücklieferung", EinheitTyp.RUECKLIEFERUNG);
+        ruecklieferungEinheit.setId(11L);
+        ruecklieferungEinheit.setOrgId(testOrgId);
+    }
+
+    // ==================== processBilanzCsvUpload Tests ====================
+
+    /** Gültige Bilanz-Kopfzeile (Bezug-/Rücklieferung-Spaltentitel, positionsbasiert). */
+    private static final String BILANZ_HEADER =
+        "category;vZEV Bezug von VNB (Total 315.54 kWh);vZEV Rücklieferung an VNB (Total -454.06 kWh)";
+
+    /** date-Parameter des Bilanz-Uploads (Startzeitpunkt, wie beim Consumer-Upload). */
+    private static final String BILANZ_DATE = "2026-06-01";
+
+    private void stubBilanzEinheiten() {
+        when(einheitRepository.findFirstByTyp(EinheitTyp.BEZUG)).thenReturn(Optional.of(bezugEinheit));
+        when(einheitRepository.findFirstByTyp(EinheitTyp.RUECKLIEFERUNG))
+            .thenReturn(Optional.of(ruecklieferungEinheit));
+    }
+
+    private MockMultipartFile bilanzFile(String body) {
+        return new MockMultipartFile("file", "2026-06-Bilanz.csv", "text/csv",
+            (BILANZ_HEADER + "\n" + body).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void processBilanzCsvUpload_ValidCsv_SavesBezugAndRuecklieferung() throws Exception {
+        // Eine Bezug-Zeile (positiv), eine Rücklieferung-Zeile (negativ)
+        MockMultipartFile file = bilanzFile(
+            "Mon Jun 01 2026;1.5;\n" +
+            "Mon Jun 01 2026;;-2.0\n");
+
+        stubBilanzEinheiten();
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(messwerteRepository.findByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(Collections.emptyList());
+
+        Map<String, Object> result = messwerteService.processBilanzCsvUpload(file, BILANZ_DATE);
+
+        assertEquals("success", result.get("status"));
+        assertEquals(2, result.get("count"));
+        assertEquals("Bezug", result.get("bezugEinheit"));
+        assertEquals("Rücklieferung", result.get("ruecklieferungEinheit"));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Messwerte>> captor = ArgumentCaptor.forClass(List.class);
+        verify(messwerteRepository).saveAll(captor.capture());
+        List<Messwerte> saved = captor.getValue();
+        assertEquals(2, saved.size());
+
+        Messwerte bezug = saved.get(0);
+        assertEquals(bezugEinheit, bezug.getEinheit());
+        assertEquals(1.5, bezug.getTotal(), 1e-9);
+        assertEquals(0.0, bezug.getZev(), 1e-9);
+        assertEquals(Quelle.CSV, bezug.getQuelle());
+
+        Messwerte rueck = saved.get(1);
+        assertEquals(ruecklieferungEinheit, rueck.getEinheit());
+        assertEquals(-2.0, rueck.getTotal(), 1e-9);
+        assertEquals(0.0, rueck.getZev(), 1e-9);
+        assertEquals(Quelle.CSV, rueck.getQuelle());
+
+        verify(hibernateFilterService).enableOrgFilter();
+    }
+
+    @Test
+    void processBilanzCsvUpload_TimestampFromDateParamAndSlot() throws Exception {
+        // Zeitstempel = date-Parameter (00:00) + fortlaufend +15 min je Zeile (wie Consumer-Upload)
+        MockMultipartFile file = bilanzFile(
+            "Mon Jun 01 2026;1.0;\n" +
+            "Mon Jun 01 2026;2.0;\n" +
+            "Mon Jun 01 2026;;-3.0\n");
+
+        stubBilanzEinheiten();
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(messwerteRepository.findByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(Collections.emptyList());
+
+        messwerteService.processBilanzCsvUpload(file, BILANZ_DATE);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Messwerte>> captor = ArgumentCaptor.forClass(List.class);
+        verify(messwerteRepository).saveAll(captor.capture());
+        List<Messwerte> saved = captor.getValue();
+
+        assertEquals(3, saved.size());
+        assertEquals(LocalDateTime.of(2026, 6, 1, 0, 0), saved.get(0).getZeit());
+        assertEquals(LocalDateTime.of(2026, 6, 1, 0, 15), saved.get(1).getZeit());
+        assertEquals(LocalDateTime.of(2026, 6, 1, 0, 30), saved.get(2).getZeit());
+    }
+
+    @Test
+    void processBilanzCsvUpload_IgnoresCategoryDate_ContinuousSlots() throws Exception {
+        // Die category-Spalte (auch ein Tageswechsel) wird ignoriert; der Slot läuft
+        // fortlaufend ab dem date-Parameter weiter (identisch zum Consumer-Upload).
+        MockMultipartFile file = bilanzFile(
+            "Mon Jun 01 2026;1.0;\n" +
+            "Mon Jun 01 2026;2.0;\n" +
+            "Tue Jun 02 2026;3.0;\n");
+
+        stubBilanzEinheiten();
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(messwerteRepository.findByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(Collections.emptyList());
+
+        messwerteService.processBilanzCsvUpload(file, BILANZ_DATE);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Messwerte>> captor = ArgumentCaptor.forClass(List.class);
+        verify(messwerteRepository).saveAll(captor.capture());
+        List<Messwerte> saved = captor.getValue();
+
+        assertEquals(LocalDateTime.of(2026, 6, 1, 0, 0), saved.get(0).getZeit());
+        assertEquals(LocalDateTime.of(2026, 6, 1, 0, 15), saved.get(1).getZeit());
+        assertEquals(LocalDateTime.of(2026, 6, 1, 0, 30), saved.get(2).getZeit());
+    }
+
+    @Test
+    void processBilanzCsvUpload_ExistingData_DeletesBothEinheitenForMonth() throws Exception {
+        MockMultipartFile file = bilanzFile("Mon Jun 01 2026;1.5;\n");
+
+        Messwerte existingBezug = new Messwerte(
+            LocalDateTime.of(2026, 6, 5, 0, 0), 1.0, 0.0, bezugEinheit);
+        Messwerte existingRueck = new Messwerte(
+            LocalDateTime.of(2026, 6, 5, 0, 0), -1.0, 0.0, ruecklieferungEinheit);
+
+        stubBilanzEinheiten();
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(messwerteRepository.findByEinheitAndZeitBetween(eq(bezugEinheit), any(), any()))
+            .thenReturn(List.of(existingBezug));
+        when(messwerteRepository.findByEinheitAndZeitBetween(eq(ruecklieferungEinheit), any(), any()))
+            .thenReturn(List.of(existingRueck));
+
+        messwerteService.processBilanzCsvUpload(file, BILANZ_DATE);
+
+        verify(messwerteRepository).deleteAll(List.of(existingBezug));
+        verify(messwerteRepository).deleteAll(List.of(existingRueck));
+        verify(messwerteRepository).saveAll(anyList());
+
+        // Overwrite-Fenster ist der ganze Monat der ersten Datenzeile (Juni 2026)
+        ArgumentCaptor<LocalDateTime> vonCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> bisCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(messwerteRepository, times(2))
+            .findByEinheitAndZeitBetween(any(), vonCaptor.capture(), bisCaptor.capture());
+        assertEquals(LocalDateTime.of(2026, 6, 1, 0, 0), vonCaptor.getAllValues().get(0));
+        assertEquals(LocalDateTime.of(2026, 6, 30, 23, 59, 59), bisCaptor.getAllValues().get(0));
+    }
+
+    @Test
+    void processBilanzCsvUpload_MissingBezugEinheit_ThrowsBilanzEinheitFehlt() {
+        MockMultipartFile file = bilanzFile("Mon Jun 01 2026;1.5;\n");
+
+        when(einheitRepository.findFirstByTyp(EinheitTyp.BEZUG)).thenReturn(Optional.empty());
+
+        IllegalArgumentException ex = assertThrows(
+            IllegalArgumentException.class,
+            () -> messwerteService.processBilanzCsvUpload(file, BILANZ_DATE));
+        assertEquals("BILANZ_EINHEIT_FEHLT", ex.getMessage());
+        verify(messwerteRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void processBilanzCsvUpload_MissingRuecklieferungEinheit_ThrowsBilanzEinheitFehlt() {
+        MockMultipartFile file = bilanzFile("Mon Jun 01 2026;1.5;\n");
+
+        when(einheitRepository.findFirstByTyp(EinheitTyp.BEZUG)).thenReturn(Optional.of(bezugEinheit));
+        when(einheitRepository.findFirstByTyp(EinheitTyp.RUECKLIEFERUNG)).thenReturn(Optional.empty());
+
+        IllegalArgumentException ex = assertThrows(
+            IllegalArgumentException.class,
+            () -> messwerteService.processBilanzCsvUpload(file, BILANZ_DATE));
+        assertEquals("BILANZ_EINHEIT_FEHLT", ex.getMessage());
+        verify(messwerteRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void processBilanzCsvUpload_HeaderTitleMismatch_ThrowsBilanzCsvUngueltig() {
+        // Spaltentitel passen nicht zur Position (Bezug/Rücklieferung vertauscht/fehlend)
+        MockMultipartFile file = new MockMultipartFile("file", "2026-06-Bilanz.csv", "text/csv",
+            ("category;Spalte A;Spalte B\nMon Jun 01 2026;1.5;\n")
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+        stubBilanzEinheiten();
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+
+        IllegalArgumentException ex = assertThrows(
+            IllegalArgumentException.class,
+            () -> messwerteService.processBilanzCsvUpload(file, BILANZ_DATE));
+        assertEquals("BILANZ_CSV_UNGUELTIG", ex.getMessage());
+        verify(messwerteRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void processBilanzCsvUpload_EmptyFile_ThrowsBilanzCsvUngueltig() {
+        MockMultipartFile file = new MockMultipartFile("file", "2026-06-Bilanz.csv", "text/csv",
+            new byte[0]);
+
+        stubBilanzEinheiten();
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+
+        IllegalArgumentException ex = assertThrows(
+            IllegalArgumentException.class,
+            () -> messwerteService.processBilanzCsvUpload(file, BILANZ_DATE));
+        assertEquals("BILANZ_CSV_UNGUELTIG", ex.getMessage());
+    }
+
+    @Test
+    void processBilanzCsvUpload_OnlyHeader_ThrowsBilanzCsvUngueltig() {
+        MockMultipartFile file = bilanzFile("");
+
+        stubBilanzEinheiten();
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+
+        IllegalArgumentException ex = assertThrows(
+            IllegalArgumentException.class,
+            () -> messwerteService.processBilanzCsvUpload(file, BILANZ_DATE));
+        assertEquals("BILANZ_CSV_UNGUELTIG", ex.getMessage());
+        verify(messwerteRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void processBilanzCsvUpload_BothColumnsFilled_SkipsLine() throws Exception {
+        // Zeile mit beiden Spalten gefüllt wird übersprungen; nur die valide Zeile bleibt
+        MockMultipartFile file = bilanzFile(
+            "Mon Jun 01 2026;1.5;-2.0\n" +
+            "Mon Jun 01 2026;3.0;\n");
+
+        stubBilanzEinheiten();
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(messwerteRepository.findByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(Collections.emptyList());
+
+        Map<String, Object> result = messwerteService.processBilanzCsvUpload(file, BILANZ_DATE);
+
+        assertEquals(1, result.get("count"));
+    }
+
+    @Test
+    void processBilanzCsvUpload_NoColumnFilled_SkipsLine() throws Exception {
+        MockMultipartFile file = bilanzFile(
+            "Mon Jun 01 2026;;\n" +
+            "Mon Jun 01 2026;3.0;\n");
+
+        stubBilanzEinheiten();
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(messwerteRepository.findByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(Collections.emptyList());
+
+        Map<String, Object> result = messwerteService.processBilanzCsvUpload(file, BILANZ_DATE);
+
+        assertEquals(1, result.get("count"));
+    }
+
+    @Test
+    void processBilanzCsvUpload_NonNumericValue_SkipsLine() throws Exception {
+        MockMultipartFile file = bilanzFile(
+            "Mon Jun 01 2026;abc;\n" +
+            "Mon Jun 01 2026;3.0;\n");
+
+        stubBilanzEinheiten();
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(messwerteRepository.findByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(Collections.emptyList());
+
+        Map<String, Object> result = messwerteService.processBilanzCsvUpload(file, BILANZ_DATE);
+
+        assertEquals(1, result.get("count"));
+    }
+
+    @Test
+    void processBilanzCsvUpload_UnparsableCategory_StillSaved() throws Exception {
+        // Die category-Spalte wird backendseitig nicht ausgewertet -> auch eine Zeile mit
+        // unparsbarem "Datum" wird gespeichert (Zeitstempel kommt aus dem date-Parameter).
+        MockMultipartFile file = bilanzFile(
+            "not-a-date;1.5;\n" +
+            "Mon Jun 01 2026;3.0;\n");
+
+        stubBilanzEinheiten();
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(messwerteRepository.findByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(Collections.emptyList());
+
+        Map<String, Object> result = messwerteService.processBilanzCsvUpload(file, BILANZ_DATE);
+
+        assertEquals(2, result.get("count"));
+    }
+
+    @Test
+    void processBilanzCsvUpload_InvalidDateParam_Throws() {
+        // Ungültiger date-Parameter -> LocalDate.parse wirft (wie beim Consumer-Upload);
+        // der Controller mappt das auf HTTP 400.
+        MockMultipartFile file = bilanzFile("Mon Jun 01 2026;1.5;\n");
+
+        stubBilanzEinheiten();
+
+        assertThrows(Exception.class,
+            () -> messwerteService.processBilanzCsvUpload(file, "kein-datum"));
+        verify(messwerteRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void processBilanzCsvUpload_SetsOrgIdOnMesswerte() throws Exception {
+        MockMultipartFile file = bilanzFile("Mon Jun 01 2026;1.5;\n");
+
+        stubBilanzEinheiten();
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(messwerteRepository.findByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(Collections.emptyList());
+
+        messwerteService.processBilanzCsvUpload(file, BILANZ_DATE);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Messwerte>> captor = ArgumentCaptor.forClass(List.class);
+        verify(messwerteRepository).saveAll(captor.capture());
+        assertEquals(testOrgId, captor.getValue().get(0).getOrgId());
+    }
+
+    @Test
+    void processBilanzCsvUpload_CommaDelimiterAndHeader_ParsesCorrectly() throws Exception {
+        // Trennzeichen Komma statt Semikolon
+        MockMultipartFile file = new MockMultipartFile("file", "2026-06-Bilanz.csv", "text/csv",
+            ("category,Bezug von VNB,Rücklieferung an VNB\nMon Jun 01 2026,1.5,\n")
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+        stubBilanzEinheiten();
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(messwerteRepository.findByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(Collections.emptyList());
+
+        Map<String, Object> result = messwerteService.processBilanzCsvUpload(file, BILANZ_DATE);
+
+        assertEquals(1, result.get("count"));
     }
 
     // ==================== processCsvUpload Tests ====================

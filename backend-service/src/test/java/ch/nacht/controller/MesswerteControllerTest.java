@@ -165,6 +165,66 @@ public class MesswerteControllerTest {
         verify(messwerteService, never()).processCsvUpload(any(), anyLong(), anyString());
     }
 
+    // ==================== Upload Bilanz Endpoint Tests ====================
+
+    @Test
+    void uploadBilanzCsv_ValidFile_ReturnsSuccess() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "2026-06-Bilanz.csv", "text/csv",
+            "category;Bezug;Rücklieferung\nMon Jun 01 2026;1.5;\n".getBytes());
+
+        Map<String, Object> serviceResult = Map.of(
+            "status", "success",
+            "count", 2,
+            "bezugEinheit", "Bezug",
+            "ruecklieferungEinheit", "Rücklieferung"
+        );
+
+        when(messwerteService.processBilanzCsvUpload(any(), any())).thenReturn(serviceResult);
+
+        mockMvc.perform(multipart("/api/messwerte/upload-bilanz")
+                .file(file)
+                .param("date", "2026-06-01"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status", is("success")))
+            .andExpect(jsonPath("$.count", is(2)))
+            .andExpect(jsonPath("$.bezugEinheit", is("Bezug")))
+            .andExpect(jsonPath("$.ruecklieferungEinheit", is("Rücklieferung")));
+    }
+
+    @Test
+    void uploadBilanzCsv_ServiceThrowsException_ReturnsBadRequest() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "2026-06-Bilanz.csv", "text/csv", "invalid".getBytes());
+
+        when(messwerteService.processBilanzCsvUpload(any(), any()))
+            .thenThrow(new IllegalArgumentException("BILANZ_EINHEIT_FEHLT"));
+
+        mockMvc.perform(multipart("/api/messwerte/upload-bilanz")
+                .file(file)
+                .param("date", "2026-06-01"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.status", is("error")))
+            .andExpect(jsonPath("$.message", is("BILANZ_EINHEIT_FEHLT")));
+    }
+
+    @Test
+    void uploadBilanzCsv_FeatureDisabled_ReturnsForbidden() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "2026-06-Bilanz.csv", "text/csv",
+            "category;Bezug;Rücklieferung\nMon Jun 01 2026;1.5;\n".getBytes());
+
+        // Feature-Flag deaktiviert -> Upload wird unabhängig von der Rolle gesperrt.
+        when(featureFlagService.isEnabled(any(), eq(FeatureFlag.MESSWERTE_UPLOAD))).thenReturn(false);
+
+        mockMvc.perform(multipart("/api/messwerte/upload-bilanz")
+                .file(file)
+                .param("date", "2026-06-01"))
+            .andExpect(status().isForbidden());
+
+        verify(messwerteService, never()).processBilanzCsvUpload(any(), any());
+    }
+
     // ==================== Calculate Distribution Endpoint Tests ====================
 
     @Test

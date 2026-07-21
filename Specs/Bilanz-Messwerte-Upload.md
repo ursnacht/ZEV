@@ -23,18 +23,19 @@
 4. **Manueller Fallback:** Erkennt die KI die Bilanz-Datei nicht oder ist der KI-Service nicht erreichbar, kann der Benutzer einen Upload-Eintrag **manuell** als Bilanz markieren (analog zur bereits bestehenden manuellen Einheiten-Auswahl bei fehlgeschlagenem Matching). Ein manuell als Bilanz markierter Eintrag verhält sich identisch zum KI-erkannten (`bilanz = true`).
 
 ### FR-3: Upload & Persistierung
-1. Neuer Endpoint **`POST /api/messwerte/upload-bilanz`** (nur Datei; kein `einheitId`/`date`-Parameter), Permission `messwerte:write` **und** Feature-Flag `MESSWERTE_UPLOAD` (Prüfung `featureFlagService.isEnabled(orgId, FeatureFlag.MESSWERTE_UPLOAD)` wie beim bestehenden `/upload`; disabled → `FeatureDisabledException("FEATURE_FLAG_DEAKTIVIERT")`, zentral auf HTTP 403 gemappt).
+1. Neuer Endpoint **`POST /api/messwerte/upload-bilanz`** mit den Parametern **`file`** und **`date`** (kein `einheitId`) – **analog zum bestehenden `/upload`**, nur ohne Einheit (die beiden Bilanz-Einheiten werden serverseitig per Typ aufgelöst). Permission `messwerte:write` **und** Feature-Flag `MESSWERTE_UPLOAD` (Prüfung `featureFlagService.isEnabled(orgId, FeatureFlag.MESSWERTE_UPLOAD)` wie beim bestehenden `/upload`; disabled → `FeatureDisabledException("FEATURE_FLAG_DEAKTIVIERT")`, zentral auf HTTP 403 gemappt).
 2. Der Service löst im aktuellen Mandanten die Einheiten vom Typ `BEZUG` und `RUECKLIEFERUNG` per Typ auf (`findFirstByTyp`, `orgFilter` aktiv). Fehlt eine der beiden → HTTP 400 mit `BILANZ_EINHEIT_FEHLT` (übersetzt), es wird nichts gespeichert.
-3. **Zeitstempel:** Der Tag stammt aus `category` (Format `EEE MMM dd yyyy`); der 15-Min-Slot ergibt sich – **gleich wie beim bestehenden Consumer-Upload** – aus fortlaufendem `+15 min` je Zeile, beginnend bei `00:00` des jeweiligen Tages (Positions-Index innerhalb des Tages). **Keine** Validierung auf 96 Zeilen/Tag (der bestehende Upload validiert das ebenfalls nicht); best-effort. Verbatim als lokale Zeit.
+3. **Zeitstempel – identisch zum Consumer-Upload:** Der Zeitstempel ergibt sich aus dem **`date`-Parameter** (`00:00` des Tages) plus fortlaufendem **`+15 min` je gespeicherter Zeile** (Positions-Index über die gesamte Datei) – exakt wie `processCsvUpload`. Die `category`-Spalte der Datei wird dabei – wie `parts[0]` beim Consumer-Upload – **nicht** ausgewertet (das GUI liest daraus lediglich den Vorbefüll-Wert für `date`, FR-4.5). **Keine** Validierung auf 96 Zeilen/Tag; best-effort. Verbatim als lokale Zeit.
 4. Je Datenzeile wird **ein** Messwert erzeugt: gefüllte Bezug-Spalte → Einheit `BEZUG` (`total = Wert`), gefüllte Rücklieferung-Spalte → Einheit `RUECKLIEFERUNG` (`total = Wert`). In beiden Fällen `zev = 0`, `quelle = CSV`.
 5. **Überschreiben:** Bestehende Messwerte beider Einheiten werden **gleich wie beim Consumer-Upload** (`processCsvUpload`) für den Monat der Daten vor dem Speichern gelöscht (idempotenter Re-Upload). Tage über die Monatsgrenze hinaus (z.B. eine `Jul 01`-Zeile in einer Juni-Datei) werden wie beim Consumer-Upload behandelt — keine gesonderte Mehr-Monats-Logik.
 6. `org_id` wird serverseitig aus dem `OrganizationContextService` gesetzt (nicht aus der Datei/dem Request).
 
 ### FR-4: Frontend-Upload
-1. Erkennt die KI-Zuordnung eine Bilanz-Datei (`bilanz = true`), wird der Upload-Eintrag als **Bilanz** dargestellt (Badge/Label, Key `UPLOAD_TYP_BILANZ`); Einheiten-Auswahl und Datumsfeld entfallen für diesen Eintrag. Zusätzlich kann der Benutzer einen Eintrag **manuell** als Bilanz markieren/zurücksetzen (Fallback, FR-2.4).
-2. **Readiness:** Die bestehende „Bereit"-Prüfung (`entries.every(e => e.einheitId !== null && e.date !== '' …)`) wird angepasst: ein Bilanz-Eintrag (`bilanz = true`) gilt **ohne** `einheitId`/`date` als bereit; nur normale Einträge benötigen weiterhin Einheit + Datum.
-3. Der Bilanz-Eintrag wird beim Hochladen an `/api/messwerte/upload-bilanz` gesendet (nur Datei). Erfolg/Fehler werden wie bei den übrigen Einträgen angezeigt (`.zev-message--success`/`--error`).
+1. Erkennt die KI-Zuordnung eine Bilanz-Datei (`bilanz = true`), wird der Upload-Eintrag als **Bilanz** dargestellt (Badge/Label, Key `UPLOAD_TYP_BILANZ`); die **Einheiten-Auswahl** entfällt für diesen Eintrag (durch das Bilanz-Label ersetzt). Das **Datumsfeld bleibt sichtbar** und wird – **gleich wie bei Consumer-/Producer-Dateien** – aus dem Dateiinhalt vorbefüllt (s. FR-4.5). Zusätzlich kann der Benutzer einen Eintrag **manuell** als Bilanz markieren/zurücksetzen (Fallback, FR-2.4).
+2. **Readiness:** Die „Bereit"-Prüfung verlangt für **alle** Einträge ein `date`; nur **normale** Einträge benötigen zusätzlich eine `einheitId`. Ein Bilanz-Eintrag ist also bereit, sobald sein (aus der Datei vorbefülltes) `date` gesetzt ist – **ohne** `einheitId`.
+3. Der Bilanz-Eintrag wird beim Hochladen an `/api/messwerte/upload-bilanz` gesendet – mit **`file` und `date`** (ohne `einheitId`), analog zum normalen Upload. Erfolg/Fehler werden wie bei den übrigen Einträgen angezeigt (`.zev-message--success`/`--error`).
 4. Gemischte Uploads (Bilanz-Datei + normale Einheiten-Dateien) in einem Vorgang sind möglich; jeder Eintrag nutzt seinen passenden Endpoint.
+5. **Datum aus der Datei (alle Dateitypen einheitlich):** Beim Hinzufügen einer Datei liest das GUI das erste Datum aus dem Dateiinhalt (erste Datenzeile, Spalte `category`, Format `EEE MMM dd yyyy`) und zeigt es im **editierbaren Datumsfeld** an – **identisch für Consumer/Producer und Bilanz**. Dieses Datum wird beim Upload als `date`-Parameter gesendet und dient dem Backend als Startzeitpunkt (`date + Zeilenindex·15min`, FR-3.3) – **die Verwendung ist bei Bilanz dieselbe wie bei Consumer/Producer**. Das Datum darf nach der KI-Erkennung **nicht verschwinden**. Schlägt das Lesen fehl, bleibt das Feld leer und der Eintrag ist nicht „bereit" (der Benutzer setzt das Datum dann manuell – wie bei Consumer/Producer).
 
 ### FR-5: Statistik-Nutzung
 * Es ist **kein** neuer Statistik-Code nötig: Sobald die Messwerte der Einheiten `BEZUG`/`RUECKLIEFERUNG` in `messwerte` liegen, verwendet der bestehende Summen-Vergleich (`StatistikService`, `Specs/Bilanzmesspunkt.md`) sie automatisch.
@@ -54,14 +55,15 @@
 
 ### Upload & Persistierung
 * [ ] `POST /api/messwerte/upload-bilanz` speichert je Datenzeile einen Messwert für `BEZUG` (positiv) bzw. `RUECKLIEFERUNG` (negativ), `zev = 0`, `quelle = CSV`.
-* [ ] Der Zeitstempel wird aus `category` (Tag) + Zeilenposition (15-Min-Slot) gebildet; erster Wert eines Tages = `00:00`.
+* [ ] Der Zeitstempel wird – wie beim Consumer-Upload – aus dem `date`-Parameter (`00:00`) + fortlaufendem `+15 min` je Zeile gebildet; die `category`-Spalte wird backendseitig nicht ausgewertet.
 * [ ] Fehlt im Mandanten die `BEZUG`- oder `RUECKLIEFERUNG`-Einheit → HTTP 400 `BILANZ_EINHEIT_FEHLT`, nichts wird gespeichert.
 * [ ] Re-Upload derselben Bilanz-Datei ersetzt die Monatsdaten beider Einheiten (kein Duplikat).
 * [ ] `org_id` wird serverseitig gesetzt; ein anderer Mandant sieht die Werte nicht (Mandanten-Isolation).
 * [ ] Beispiel `docs/2026-06-Bilanz.csv`: 2880 Zeilen → Summe Bezug ≈ 315.54 kWh, Summe Rücklieferung ≈ −454.06 kWh (Kopf-Totale).
 
 ### Frontend & Statistik
-* [ ] Ein als Bilanz erkannter Eintrag zeigt ein Bilanz-Label und blendet Einheiten-/Datumsauswahl aus; Upload an den Bilanz-Endpoint.
+* [ ] Ein als Bilanz erkannter Eintrag zeigt ein Bilanz-Label und blendet die **Einheiten-Auswahl** aus; das **Datumsfeld bleibt sichtbar** und wird aus der Datei vorbefüllt (wie Consumer/Producer); Upload an den Bilanz-Endpoint.
+* [ ] Beim Hinzufügen einer Bilanz-Datei wird das Datum aus der Datei gelesen und bleibt sichtbar – es verschwindet **nicht** nach der KI-Erkennung.
 * [ ] Ein Bilanz-Eintrag gilt ohne `einheitId`/`date` als „bereit" (Batch wird nicht blockiert); normale Einträge brauchen weiterhin Einheit + Datum.
 * [ ] Nach dem Upload erscheinen die Bilanz-Summen im Statistik-Summen-Vergleich (Bezug/Rücklieferung ↔ Bilanz).
 
@@ -86,23 +88,24 @@
 | `BEZUG`- oder `RUECKLIEFERUNG`-Einheit fehlt im Mandanten | HTTP 400 `BILANZ_EINHEIT_FEHLT`, nichts gespeichert |
 | Spaltentitel passt nicht zur Position (kein `Bezug`/`Rücklieferung`) | HTTP 400 `BILANZ_CSV_UNGUELTIG` (Plausibilisierung, FR-1.1) |
 | Zeile mit beiden Spalten gefüllt oder beiden leer | Zeile überspringen + Warn-Log (kein Abbruch) |
-| Tag mit ≠ 96 Datenzeilen (Lücken/Zusatzzeilen) | **best-effort, gleich wie Consumer-Upload**: keine Validierung, fortlaufendes `+15 min` je Zeile ab `00:00` des Tages |
-| Tage über die Monatsgrenze (z.B. `Jul 01`-Zeile in Juni-Datei) | wie beim Consumer-Upload: kein gesonderter Umgang; Monats-Overwrite nach Daten-Monat |
-| Unparsbares `category`-Datum (nicht `EEE MMM dd yyyy`) | Zeile überspringen + Warn-Log; bei komplett unparsbarer Datei HTTP 400 `BILANZ_CSV_UNGUELTIG` |
+| ≠ 96 Datenzeilen/Tag bzw. Lücken (Zusatzzeilen) | **best-effort, gleich wie Consumer-Upload**: keine Validierung, fortlaufendes `+15 min` je Zeile ab dem `date`-Parameter (`00:00`) |
+| Tage über die Monatsgrenze | wie beim Consumer-Upload: kein gesonderter Umgang; Monats-Overwrite nach dem Monat des `date`-Parameters |
+| Unparsbares `category`-Datum in der Datei | backendseitig irrelevant (Spalte wird nicht ausgewertet); im GUI bleibt das Datumsfeld leer → Eintrag nicht „bereit" (FR-4.5) |
 | Leere Datei / nur Kopfzeile | HTTP 400 `BILANZ_CSV_UNGUELTIG` |
 | Nicht-numerischer Wert in einer Spalte | Zeile überspringen + Warn-Log |
 | KI-Service nicht erreichbar / erkennt Bilanz nicht | bestehende Fehlerbehandlung (`extractErrorMessage`); Benutzer markiert den Eintrag **manuell** als Bilanz (FR-2.4) |
 | Netzwerkfehler beim Upload | Eintrag auf `error`, Meldung im Frontend |
+| Datum kann nicht aus der (Bilanz-)Datei gelesen werden | Datumsfeld bleibt leer; Eintrag **nicht** „bereit" – Benutzer setzt das Datum manuell (wie Consumer/Producer, FR-4.5) |
 
 ## 6. Abhängigkeiten & betroffene Funktionalität
 * **Voraussetzungen:** Bilanzmesspunkt (`Specs/Bilanzmesspunkt.md`, Typen `BEZUG`/`RUECKLIEFERUNG`), Messwerte-Upload mit KI (`Specs/Messwerte-mit-KI.md`), Statistik.
 * **Betroffener Code (Backend):**
   - `service/EinheitMatchingService.java` — Prompt um Bilanz-Abkürzung erweitern; Sentinel `BILANZ` parsen → `bilanz = true`.
   - `dto/EinheitMatchResponseDTO.java` — Flag `bilanz` (Default `false`).
-  - `controller/MesswerteController.java` — neuer Endpoint `POST /upload-bilanz` (Datei, `messwerte:write` + `MESSWERTE_UPLOAD`-Flag-Prüfung wie bei `/upload`).
-  - `service/MesswerteService.java` — neue Methode `processBilanzCsvUpload(file)`: Einheiten per Typ auflösen (`findFirstByTyp`), Datei parsen (Tag aus `category`, Slot fortlaufend `+15 min` wie Consumer-Upload, Spaltentitel-Plausibilisierung), Messwerte je Einheit schreiben, Monats-Overwrite, `@CacheEvict("statistik")`.
+  - `controller/MesswerteController.java` — neuer Endpoint `POST /upload-bilanz` (`file` + `date`, `messwerte:write` + `MESSWERTE_UPLOAD`-Flag-Prüfung wie bei `/upload`).
+  - `service/MesswerteService.java` — neue Methode `processBilanzCsvUpload(file, date)`: Einheiten per Typ auflösen (`findFirstByTyp`), Spaltentitel-Plausibilisierung, Zeitstempel = `date`-Parameter (`00:00`) + fortlaufend `+15 min` je Zeile (**identisch zu `processCsvUpload`**, `category`-Spalte nicht ausgewertet), Messwerte je Einheit schreiben, Monats-Overwrite, `@CacheEvict("statistik")`.
   - `repository/EinheitRepository.java` — `findFirstByTyp(EinheitTyp)` (existiert bereits, `EinheitRepository.java:24`) zur Auflösung der Bilanz-Einheiten.
-* **Betroffener Code (Frontend):** `services/einheit.service.ts` (Response-Flag `bilanz`), `components/messwerte-upload/*` (Bilanz-Eintrag: Label, kein Einheit/Datum, manuelle Bilanz-Markierung, angepasste Readiness-Prüfung, Bilanz-Endpoint), `models/*`, Tests/Mocks.
+* **Betroffener Code (Frontend):** `services/einheit.service.ts` (Response-Flag `bilanz`), `components/messwerte-upload/*` (Bilanz-Eintrag: Label statt Einheiten-Auswahl, **Datumsfeld wie Consumer/Producer** aus Datei vorbefüllt und als `date` gesendet, manuelle Bilanz-Markierung, Readiness-Prüfung, Bilanz-Endpoint), `models/*`, Tests/Mocks.
 * **Datenmigration:** keine (nur Übersetzungs-Keys via Flyway).
 
 ## 7. Abgrenzung / Out of Scope

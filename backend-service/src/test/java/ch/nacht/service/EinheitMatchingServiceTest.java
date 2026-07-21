@@ -274,4 +274,51 @@ public class EinheitMatchingServiceTest {
         assertFalse(result.isMatched());
         assertEquals("Keine passende Einheit gefunden", result.getMessage());
     }
+
+    // ==================== Bilanz-Sentinel Tests ====================
+
+    @Test
+    void matchEinheitByFilename_ClaudeReturnsBILANZ_ReturnsBilanzMatch() {
+        List<Einheit> einheiten = Arrays.asList(einheit1, einheit2, einheit3);
+        when(einheitService.getAllEinheiten()).thenReturn(einheiten);
+
+        setupChatClientMock("BILANZ");
+
+        EinheitMatchResponseDTO result = einheitMatchingService.matchEinheitByFilename("2026-06-Bilanz.csv");
+
+        assertTrue(result.isMatched());
+        assertTrue(result.isBilanz());
+        assertNull(result.getEinheitId());
+        assertNull(result.getEinheitName());
+        assertEquals(0.9, result.getConfidence());
+    }
+
+    @Test
+    void matchEinheitByFilename_ClaudeReturnsBilanzLowercaseWithWhitespace_ReturnsBilanzMatch() {
+        List<Einheit> einheiten = Arrays.asList(einheit1, einheit2, einheit3);
+        when(einheitService.getAllEinheiten()).thenReturn(einheiten);
+
+        setupChatClientMock("  bilanz  ");
+
+        EinheitMatchResponseDTO result = einheitMatchingService.matchEinheitByFilename("2026-06-Bilanz.csv");
+
+        assertTrue(result.isMatched());
+        assertTrue(result.isBilanz());
+        assertNull(result.getEinheitId());
+    }
+
+    @Test
+    void matchEinheitByFilename_ClaudeReturnsValidId_BilanzFlagFalse() {
+        // Regression: normale ID-Zuordnung darf das Bilanz-Flag nicht setzen
+        List<Einheit> einheiten = Arrays.asList(einheit1, einheit2, einheit3);
+        when(einheitService.getAllEinheiten()).thenReturn(einheiten);
+
+        setupChatClientMock("2");
+
+        EinheitMatchResponseDTO result = einheitMatchingService.matchEinheitByFilename("2025-07-1-li.csv");
+
+        assertTrue(result.isMatched());
+        assertFalse(result.isBilanz());
+        assertEquals(2L, result.getEinheitId());
+    }
 }

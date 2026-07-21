@@ -150,6 +150,20 @@ describe('MesswerteUploadComponent', () => {
       ];
       expect(component.canImport).toBe(true);
     });
+
+    it('should return true for a bilanz entry with a date but no einheitId', () => {
+      component.entries = [
+        { file: makeCsvFile(), einheitId: null, date: '2026-06-01', status: 'ready', errorMessage: null, matchConfidence: null, bilanz: true }
+      ];
+      expect(component.canImport).toBe(true);
+    });
+
+    it('should return false for a bilanz entry without a date', () => {
+      component.entries = [
+        { file: makeCsvFile(), einheitId: null, date: '', status: 'ready', errorMessage: null, matchConfidence: null, bilanz: true }
+      ];
+      expect(component.canImport).toBe(false);
+    });
   });
 
   describe('removeEntry', () => {
@@ -249,6 +263,23 @@ describe('MesswerteUploadComponent', () => {
       tick();
 
       expect(component.entries.length).toBe(0);
+      expect(component.messageType).toBe('success');
+    }));
+
+    it('should upload a bilanz entry to the bilanz endpoint with the date', fakeAsync(() => {
+      component.entries = [
+        { file: makeCsvFile(), einheitId: null, date: '2026-06-01', status: 'ready', errorMessage: null, matchConfidence: null, bilanz: true }
+      ];
+      component.importAll();
+
+      const req = httpMock.expectOne('http://localhost:8090/api/messwerte/upload-bilanz');
+      const body = req.request.body as FormData;
+      expect(body.get('date')).toBe('2026-06-01');
+      expect(body.get('file')).toBeTruthy();
+      expect(body.get('einheitId')).toBeNull();
+      req.flush({ status: 'success' });
+      tick();
+
       expect(component.messageType).toBe('success');
     }));
 

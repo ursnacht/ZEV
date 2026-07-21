@@ -94,15 +94,11 @@
             </td>
 
             <td>
-              @if (!entry.bilanz) {
-                <input
-                  type="date"
-                  class="zev-input"
-                  [(ngModel)]="entry.date"
-                  [disabled]="entry.status === 'uploading' || entry.status === 'done'">
-              } @else {
-                <span class="zev-text--muted">—</span>
-              }
+              <input
+                type="date"
+                class="zev-input"
+                [(ngModel)]="entry.date"
+                [disabled]="entry.status === 'uploading' || entry.status === 'done'">
             </td>
 
             <td>
