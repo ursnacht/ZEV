@@ -11,18 +11,22 @@
 ## 2. Funktionale Anforderungen (FR) - Was soll das System tun?
 
 ### FR-1: Modus-Auswahl je Mandant
-1. Neue Einstellung **`verteilmodus`** in `einstellungen.konfiguration` (Feld in `RechnungKonfigurationDTO`) mit den Werten `PRODUCER_MESSUNG` (Default, heutiges Verhalten) und `BILANZ`. **Fehlt oder ist `null`** (Bestandsmandanten, altes JSON), gilt `PRODUCER_MESSUNG` (rückwärtskompatibel; Jackson: fehlendes Feld → `null` → im Code auf Default gemappt).
+1. Neue Einstellung **`verteilmodus`** in `einstellungen.konfiguration` (Feld in `RechnungKonfigurationDTO`, Typ: neues Enum `Verteilmodus` im `entity`-Package) mit den Werten `PRODUCER_MESSUNG` (Default, heutiges Verhalten) und `BILANZ`. Der Default wird **im Code** gesetzt (kein `@NotNull` auf dem Feld), Jackson muss ein fehlendes/unbekanntes Feld null-tolerant deserialisieren. **Fehlt oder ist `null`** (Bestandsmandanten, altes JSON) **oder fehlt die ganze `konfiguration`** (Mandant ohne Einstellungen), gilt `PRODUCER_MESSUNG` (rückwärtskompatibel).
 2. Der Modus ist in der **Einstellungen-Seite** wählbar (Dropdown, übersetzte Labels `VERTEILMODUS_PRODUCER_MESSUNG` / `VERTEILMODUS_BILANZ`), erfordert `einstellungen:write`.
 3. Der gewählte Modus steuert die Solarverteilung (`MesswerteService.distribute`) sowohl beim manuellen Lauf (`/solar-calculation`) als auch beim automatischen Lauf nach der MQTT-Aggregation (`ZaehlerAggregationService`).
-4. **Org-expliziter Konfig-Zugriff:** Der Modus muss über eine mandanten-explizite Methode gelesen werden (z.B. `EinstellungenService.getVerteilmodus(orgId)`), **nicht** über den request-scoped `getCurrentOrgId()`. Grund: Der MQTT-Auto-Lauf (`ZaehlerAggregationService`) läuft ohne Request-Kontext und übergibt die `org_id` explizit; ein Zugriff über `getCurrentOrgId()` wäre dort `null` und würde seit dem Fail-closed-Verhalten von `HibernateFilterService.enableOrgFilter()` eine `NoOrganizationException` auslösen.
+4. **Org-expliziter Konfig-Zugriff:** Der Modus muss über eine mandanten-explizite Methode gelesen werden (z.B. `EinstellungenService.getVerteilmodus(orgId)`), **nicht** über den request-scoped `getCurrentOrgId()`. Grund: Der MQTT-Auto-Lauf (`ZaehlerAggregationService`) läuft ohne Request-Kontext und übergibt die `org_id` explizit; ein Zugriff über `getCurrentOrgId()` wäre dort `null` und würde seit dem Fail-closed-Verhalten von `HibernateFilterService.enableOrgFilter()` eine `NoOrganizationException` auslösen. Liefert der Zugriff `null` (Mandant ohne Einstellungen/`konfiguration`), gilt `PRODUCER_MESSUNG` (Default, s. FR-1.1).
 
 ### FR-2: Verteilung im Bilanzmodell
 Pro Zeitintervall mit `ConsumerTotal` = Summe Consumer-`total`, `Bezug` = `total` der Einheit vom Typ `BEZUG` (positiv):
 1. **Verteilbarer ZEV-Eigenverbrauch:** `S = max(0, ConsumerTotal − Bezug)`. `S` ist der intern (aus PV und/oder Speicher) gedeckte Teil des Verbrauchs.
 2. **Verteilung:** `S` wird mit dem gewählten Algorithmus (EQUAL_SHARE/PROPORTIONAL, je Consumer am eigenen `total` gekappt) auf die Consumer verteilt — dieselben Algorithmen wie heute, nur mit `S` statt der Producer-Produktion als zu verteilende Menge.
+   - **Producer-unabhängige Iteration:** Im Bilanzmodus wird ein Intervall über **Consumer + BEZUG** verarbeitet, **nicht** producer-gesteuert. Der heutige Loop (`MesswerteService.distribute`) überspringt Intervalle ohne PRODUCER (`producers.isEmpty()` → `continue`); im BILANZ-Zweig darf dieser Skip **nicht** greifen, da `S` producer-unabhängig ist (bilanz-/batterie-only-ZEV ohne Producer-Messung ist ein gültiger Fall). Ein Intervall mit Consumern und Bezug, aber ohne Producer-Messwert, verteilt `S` regulär.
 3. **Consumer-`zev`:** je Consumer = zugeteilte Menge; `zev_calculated` = derselbe Wert. MQTT-Sentinel-Regel bleibt (`zev == 0` → berechneter Wert; gemessene CSV-Werte bleiben).
-4. **Producer-`zev` (nur Statistik):** = `|ProduktionTotal| − |Rücklieferung(Bilanz)|`, proportional zur Produktion auf die Producer verteilt (im ZEV verbrauchte Produktion lt. Bilanz). Beeinflusst die Verrechnung nicht. **Fehlt die `RUECKLIEFERUNG`-Einheit**, wird Producer-`zev` auf `0` gesetzt (Statistik unvollständig) — der Lauf **läuft weiter**, da dieser Wert nicht abrechnungsrelevant ist.
-5. **Nur `BEZUG` ist abrechnungskritisch:** Fehlt die **`BEZUG`-Einheit** oder fehlen deren Messwerte im Zeitraum, kann `S` (und damit die Consumer-Abrechnung) nicht bestimmt werden → der Verteillauf bricht mit einer verständlichen Meldung ab (Key `BILANZMODELL_KEINE_BILANZDATEN`, HTTP 400), es werden **keine** teilweisen `zev`-Werte geschrieben. Die fehlende `RUECKLIEFERUNG`-Einheit ist **kein** Abbruchgrund (siehe FR-2.4).
+4. **Producer-`zev` (nur Statistik):** = `|ProduktionTotal| − |Rücklieferung(Bilanz)|`, proportional zur Produktion auf die Producer verteilt (im ZEV verbrauchte Produktion lt. Bilanz). Beeinflusst die Verrechnung nicht. **Fehlt die `RUECKLIEFERUNG`-Einheit**, wird Producer-`zev` auf `0` gesetzt (Statistik unvollständig) — der Lauf **läuft weiter**, da dieser Wert nicht abrechnungsrelevant ist. Wie heute wird Producer-`zev` **nur bei `quelle == MQTT`** überschrieben; CSV-Producer behalten ihren gemessenen `zev`-Wert (bestehender Guard in `aktualisiereProducerZev` bleibt bestehen).
+5. **Nur `BEZUG` ist abrechnungskritisch:** Fehlt die **`BEZUG`-Einheit** oder fehlen deren Messwerte in einem Intervall, kann `S` (und damit die Consumer-Abrechnung) für dieses Intervall nicht bestimmt werden → **harter Abbruch** des Laufs, es werden **keine** teilweisen `zev`-Werte geschrieben (Rollback über `@Transactional`). Der Abbruch identifiziert das betroffene Intervall (Tag, Zeit) und verhält sich je nach Auslöser:
+   - **Manueller Lauf** (`/solar-calculation`): Abbruch mit `IllegalStateException`, deren Message den Key `BILANZMODELL_KEINE_BILANZDATEN` sowie das betroffene Intervall (Tag, Zeit) trägt → HTTP 400 (der Endpoint fängt `Exception` und liefert `message`; `IllegalStateException` ist zusätzlich im `GlobalExceptionHandler` auf 400 gemappt).
+   - **Automatischer Lauf** (`ZaehlerAggregationService`, MQTT): kein HTTP-Status — der Lauf des Mandanten bricht ab und loggt **ERROR** mit Intervall-Angabe (Tag, Zeit); übrige Mandanten laufen weiter.
+   Die fehlende `RUECKLIEFERUNG`-Einheit ist **kein** Abbruchgrund (siehe FR-2.4).
 
 ### FR-3: Verrechnung
 1. Die Consumer-Rechnung ist **strukturell unverändert**: ZEV-Anteil (`zev`) zum ZEV-Tarif, Netz-Anteil (`total − zev`) zum VNB-Tarif. Nur die Herkunft von `zev` ändert sich (Bilanz statt Producer-Verteilung).
@@ -33,24 +37,29 @@ Pro Zeitintervall mit `ConsumerTotal` = Summe Consumer-`total`, `Bezug` = `total
 1. Die bestehenden Summen A–E und die berechneten Vergleichswerte (`Bezug von VNB`, `Rücklieferung`) bleiben erhalten.
 2. **Hinweis zur Plausibilisierung:** Im Bilanzmodell wird der Vergleich „Bezug von VNB (berechnet) ↔ Bilanz Bezug" **tautologisch** (per Konstruktion ≈ 0), da die Verteilung aus der Bilanz abgeleitet ist. Die Vergleiche bleiben sichtbar, verlieren aber ihre Kontrollfunktion; das wird über einen **Hinweis/Tooltip** (Key `STATISTIK_MODUS_BILANZ_HINWEIS`) am Summen-Vergleich kenntlich gemacht.
 3. Der aktuell wirksame Modus wird in der Statistik angezeigt (Key `VERTEILMODUS`).
+4. **Tatsächliche Rücklieferung (Bilanzmodus):** Im Modus `BILANZ` wird zusätzlich die **gemessene** Rücklieferung aus der `RUECKLIEFERUNG`-Bilanz-Einheit angezeigt (Summe deren `total` im Zeitraum) statt nur des berechneten Werts (Key `STATISTIK_RUECKLIEFERUNG_GEMESSEN`). Fehlt die `RUECKLIEFERUNG`-Einheit, entfällt diese Anzeige (kein Abbruch, vgl. FR-2.4).
 
 ### FR-5: Persistierung & i18n
 * Keine neue Tabelle/Spalte: `verteilmodus` wird als Feld in `RechnungKonfigurationDTO` (JSONB `einstellungen.konfiguration`) ergänzt.
-* Neue Übersetzungs-Keys via Flyway-Migration (`ON CONFLICT (key) DO NOTHING`): `VERTEILMODUS`, `VERTEILMODUS_PRODUCER_MESSUNG`, `VERTEILMODUS_BILANZ`, `BILANZMODELL_KEINE_BILANZDATEN`, `STATISTIK_MODUS_BILANZ_HINWEIS` (DE/EN).
+* Neue Übersetzungs-Keys via Flyway-Migration (`ON CONFLICT (key) DO NOTHING`): `VERTEILMODUS`, `VERTEILMODUS_PRODUCER_MESSUNG`, `VERTEILMODUS_BILANZ`, `BILANZMODELL_KEINE_BILANZDATEN`, `STATISTIK_MODUS_BILANZ_HINWEIS`, `STATISTIK_RUECKLIEFERUNG_GEMESSEN` (DE/EN).
 * Multi-Tenancy unverändert: die Einstellung liegt je `org_id` in `einstellungen`; `orgId` stammt aus dem Kontext, nicht aus dem Request.
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
 ### Modus-Auswahl
-* [ ] `RechnungKonfigurationDTO` enthält `verteilmodus`; **altes JSON ohne das Feld** deserialisiert fehlerfrei (`null`) und wird im Code auf `PRODUCER_MESSUNG` gemappt (Bestandsmandanten unverändert).
+* [ ] `RechnungKonfigurationDTO` enthält `verteilmodus` (Enum `Verteilmodus`); **altes JSON ohne das Feld** deserialisiert fehlerfrei (`null`) und wird im Code auf `PRODUCER_MESSUNG` gemappt (Bestandsmandanten unverändert).
+* [ ] Mandant **ohne Einstellungen** (`konfiguration == null`): `getVerteilmodus(orgId)` liefert `PRODUCER_MESSUNG` (Default), keine Exception.
 * [ ] In der Einstellungen-Seite ist der Modus wählbar und wird persistiert (Roundtrip); erfordert `einstellungen:write`.
 
 ### Verteilung Bilanzmodell
 * [ ] Bei `verteilmodus = BILANZ` verteilt `MesswerteService.distribute` pro Intervall `S = max(0, ConsumerTotal − Bezug)` auf die Consumer (EQUAL_SHARE/PROPORTIONAL).
 * [ ] Beispiel `ConsumerTotal=10, Bezug=4` → `S=4` wird verteilt; Consumer-`zev`-Summe = 4, Netz-Anteil-Summe = 6 = Bezug.
 * [ ] `Bezug > ConsumerTotal` (z.B. Batterie lädt aus Netz) → `S=0`, kein ZEV-Anteil in diesem Intervall.
-* [ ] Fehlt die `BEZUG`-Einheit oder deren Messwerte im Zeitraum → Verteillauf bricht mit `BILANZMODELL_KEINE_BILANZDATEN` (HTTP 400) ab; keine `zev`-Werte werden geschrieben.
+* [ ] Intervall mit Consumern und Bezug, aber **ohne Producer-Messwert** → `S` wird trotzdem verteilt (kein producer-gesteuerter Skip im BILANZ-Zweig).
+* [ ] Fehlt die `BEZUG`-Einheit oder deren Messwerte in einem Intervall → **manueller** Lauf bricht mit `IllegalStateException` (Message = Key `BILANZMODELL_KEINE_BILANZDATEN` + Intervall Tag/Zeit) → HTTP 400 ab; keine `zev`-Werte werden geschrieben (Rollback).
+* [ ] Gleicher Fehlerfall im **MQTT-Auto-Lauf** → Lauf des Mandanten bricht ab, ERROR-Log mit Intervall-Angabe; übrige Mandanten laufen weiter; keine `zev`-Werte geschrieben.
 * [ ] Fehlt (nur) die `RUECKLIEFERUNG`-Einheit → Producer-`zev` = 0, der Lauf bricht **nicht** ab (Consumer-Abrechnung unberührt).
+* [ ] Producer-`zev` wird im Bilanzmodus nur bei `quelle == MQTT` gesetzt; CSV-Producer behalten den gemessenen `zev`.
 * [ ] Der Bilanzmodus greift auch beim **MQTT-Auto-Lauf** (`ZaehlerAggregationService`): der Modus wird org-explizit geladen (kein `getCurrentOrgId()`), keine `NoOrganizationException`.
 * [ ] Bei `verteilmodus = PRODUCER_MESSUNG` ist das Verteilergebnis **identisch** zu heute (Regression).
 
@@ -60,6 +69,7 @@ Pro Zeitintervall mit `ConsumerTotal` = Summe Consumer-`total`, `Bezug` = `total
 
 ### Statistik & Sicherheit
 * [ ] Der aktive Modus wird in der Statistik angezeigt; im Bilanzmodus weist ein Hinweis darauf hin, dass die Bilanz-Vergleiche tautologisch sind.
+* [ ] Im Bilanzmodus wird die **gemessene** Rücklieferung aus der `RUECKLIEFERUNG`-Einheit angezeigt; fehlt die Einheit, entfällt die Anzeige ohne Fehler.
 * [ ] Statistik bleibt mit `statistik:read`, Einstellungen mit `einstellungen:write` erreichbar; alle neuen UI-Texte via `TranslationService` (DE/EN).
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
@@ -77,10 +87,10 @@ Pro Zeitintervall mit `ConsumerTotal` = Summe Consumer-`total`, `Bezug` = `total
 | Szenario | Verhalten |
 |----------|-----------|
 | `verteilmodus` fehlt (Bestandsmandant) | wie `PRODUCER_MESSUNG` (Default) |
-| Modus `BILANZ`, aber keine `BEZUG`-Einheit / keine Bilanzdaten | Verteillauf bricht mit `BILANZMODELL_KEINE_BILANZDATEN` (HTTP 400) ab, nichts wird geschrieben |
+| Modus `BILANZ`, aber keine `BEZUG`-Einheit / keine Bilanzdaten | Harter Abbruch, nichts wird geschrieben. Manuell: HTTP 400 mit `BILANZMODELL_KEINE_BILANZDATEN` + Intervall (Tag/Zeit). Auto: ERROR-Log mit Intervall, Mandant übersprungen |
 | `Bezug > ConsumerTotal` (Netzladung Batterie / Messdifferenz) | `S = 0` in diesem Intervall (kein negativer Eigenverbrauch) |
 | Keine Consumer im Intervall | nichts zu verteilen (`S` irrelevant), keine `zev`-Werte |
-| Bilanzdaten-Lücke einzelner Intervalle | Intervall wird als unvollständig behandelt (analog `fehlendeTage`); Lauf bricht ab bzw. meldet die Lücke |
+| Bilanzdaten-Lücke einzelner Intervalle | **Harter Abbruch** (keine partielle Verteilung). Manuell: Fehlermeldung mit Intervall-Angabe (Tag, Zeit) → HTTP 400. Auto: Verteilung bricht ab und loggt **ERROR** mit Intervall-Angabe |
 | Umstellung des Modus rückwirkend | Neuberechnung überschreibt `zev`/`zev_calculated` für den gewählten Zeitraum; Nutzer wird auf Auswirkung auf bereits erstellte Rechnungen hingewiesen |
 | Netzwerkfehler beim Laden von Statistik/Einstellungen | bestehende Fehlerbehandlung greift unverändert |
 
@@ -89,12 +99,12 @@ Pro Zeitintervall mit `ConsumerTotal` = Summe Consumer-`total`, `Bezug` = `total
 * **Betroffener Code (Backend):**
   - `dto/RechnungKonfigurationDTO.java` — Feld `verteilmodus` (nullable, Default `PRODUCER_MESSUNG`).
   - `service/EinstellungenService.java` — **org-explizite** Lese-Methode `getVerteilmodus(orgId)` (bzw. `getEinstellungenForOrg(orgId)`), die **nicht** `getCurrentOrgId()` nutzt (für den Hintergrund-Lauf, s. FR-1.4).
-  - `service/MesswerteService.java` — **Kern**: neue Abhängigkeit auf `EinstellungenService` (bislang nicht injiziert, Konstruktor erweitern); `distribute` verzweigt nach Modus; im Bilanzmodus `S = max(0, ConsumerTotal − Bezug)` als Verteilmenge (statt Producer-Produktion), Consumer-`zev` daraus; Producer-`zev` aus `Produktion − Rücklieferung` (0, falls keine `RUECKLIEFERUNG`-Einheit).
+  - `service/MesswerteService.java` — **Kern**: neue Abhängigkeit auf `EinstellungenService` (bislang nicht injiziert, Konstruktor erweitern); `distribute` verzweigt nach Modus; im Bilanzmodus `S = max(0, ConsumerTotal − Bezug)` als Verteilmenge (statt Producer-Produktion), Consumer-`zev` daraus; Producer-`zev` aus `Produktion − Rücklieferung` (0, falls keine `RUECKLIEFERUNG`-Einheit). BILANZ-Zweig iteriert **producer-unabhängig** (kein `producers.isEmpty()`-Skip). Abbruch bei fehlenden Bilanzdaten via `IllegalStateException` (Message = Key + Intervall) — im `GlobalExceptionHandler` bereits auf HTTP 400 gemappt (kein neuer Handler nötig); der Rollback über `@Transactional` garantiert „keine Teilwerte".
   - `service/ZaehlerAggregationService.java` — Modus beim Auto-Lauf über `getVerteilmodus(orgId)` (explizite org) berücksichtigen.
   - `service/StatistikService.java` — Modus-Anzeige / Hinweis; Vergleichswerte unverändert.
   - `service/RechnungService.java` — unverändert (nutzt weiterhin `zev`); nur Regressionsabsicherung.
 * **Betroffener Code (Frontend):** `einstellungen.component.*` + Model (Modus-Dropdown), `statistik.component.*` (Modus-Anzeige/Hinweis), Tests/Mocks.
-* **Datenmigration:** keine (nur Übersetzungs-Keys via Flyway, nächste freie Version prüfen; aktuell höchste `V83`).
+* **Datenmigration:** keine (nur Übersetzungs-Keys via Flyway, nächste freie Version zum Zeitpunkt der Umsetzung eruieren).
 
 ## 7. Abgrenzung / Out of Scope
 * **Producer-kWh-Vergütung** — Producer bleiben bei Grundgebühr (geklärt).
@@ -109,7 +119,7 @@ Vorab geklärt:
 * [x] **Verhältnis zu Batteriespeicher:** Koexistenz; Bilanzmodell wird zuerst umgesetzt.
 * [x] **Producer:** unverändert (nur Grundgebühr).
 
-Noch offen (vor Umsetzungsstart klären):
-* [ ] Verhalten bei **Modus-Wechsel mit bereits erstellten Rechnungen**: nur Hinweis (aktuell angenommen) oder Sperre/Warnung mit Bestätigung?
-* [ ] Bei **Bilanzdaten-Lücken**: harter Abbruch des ganzen Laufs oder Verteilung der vollständigen Intervalle + Meldung der Lücken (analog `fehlendeTage`)?
-* [ ] Soll der **`RUECKLIEFERUNG`-Wert** über den Producer-`zev` (Statistik) hinaus im Bilanzmodell eine Rolle spielen (z.B. Anzeige „tatsächliche Rücklieferung" statt berechnet)?
+Geklärt (Review):
+* [x] Bei **Bilanzdaten-Lücken**: **harter Abbruch** (keine partielle Verteilung). Manuell → Fehlermeldung mit Intervall (Tag, Zeit)/HTTP 400; Auto → ERROR-Log mit Intervall. Siehe FR-2.5 / §5.
+* [x] **Modus-Wechsel mit bereits erstellten Rechnungen:** nur **Hinweis** (keine Sperre, keine automatische Neuberechnung). Siehe §5 / §7.
+* [x] **`RUECKLIEFERUNG`-Wert:** Im Bilanzmodus wird die **tatsächlich gemessene** Rücklieferung in der Statistik angezeigt (statt nur berechnet). Siehe FR-4.4.
