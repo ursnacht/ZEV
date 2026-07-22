@@ -36,6 +36,7 @@
 * Vielleicht hast du eine gute Idee, das graphisch darzustellen
 * Die Seite soll im Menu wählbar sein
 * Alle Texte mehrsprachig machen und in die Datenbank aufnehmen
+* **Darstellung numerischer Werte:** Alle kWh-Werte in den Tabellen (Summen-Tabelle, „Summen pro Einheit", Tage-mit-Abweichungen) werden **rechtsbündig** dargestellt – konsistent mit der PDF-Ausgabe. Umgesetzt über die Design-System-Klasse `.zev-table__number`.
 
 ### 3. Technische Spezifikationen (Technical Specs)
 * Verwende das Design System

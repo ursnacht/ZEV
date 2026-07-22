@@ -516,3 +516,11 @@ Beim Öffnen von `/statistik` ist neu das vorangehende Quartal (statt des Vormon
 - **Quartal-Button aktiv**: keine Änderung am `QuarterSelectorComponent` nötig – via bestehendem `[selectedVon]`/`[selectedBis]`-Binding.
 - **Tests**: `statistik.component.spec.ts` – Initialisierungs-Tests mit `jasmine.clock().mockDate()` (Vorquartal inkl. Jahreswechsel-Fall). E2E in `tests/quarter-selector.spec.ts` (Abschnitt "on Statistik page"): Default-Daten entsprechen dem Vorquartal, Vorquartal-Button hat `zev-quarter-button--active`.
 - **Keine neuen Texte/Backend**: rein clientseitig.
+
+### kWh-Werte rechtsbündig (Design System)
+
+Die kWh-Werte in den Statistik-Tabellen erschienen im Web linksbündig, obwohl `.zev-table__number` `text-align: right` setzt. Ursache: `.zev-table th, .zev-table td { text-align: left }` (`table/table.css`, Spezifität 0,1,1) überschrieb `.zev-table__number` (0,1,0).
+
+- **`design-system/src/components/statistik/statistik.css`**: Regel auf höhere Spezifität angehoben (`.zev-table th.zev-table__number, .zev-table td.zev-table__number { text-align: right }`); anschliessend `npm run build` im Design System.
+- **Keine Frontend-Code-Änderung**: die Tabellenzellen tragen bereits die Klasse `.zev-table__number`.
+- **Keine neuen Texte/Backend/Tests**: rein visuell, konsistent mit der PDF-Ausgabe.
