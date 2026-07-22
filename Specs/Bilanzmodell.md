@@ -105,6 +105,7 @@ Pro Zeitintervall mit `ConsumerTotal` = Summe Consumer-`total`, `Bezug` = `total
   - `service/RechnungService.java` — unverändert (nutzt weiterhin `zev`); nur Regressionsabsicherung.
 * **Betroffener Code (Frontend):** `einstellungen.component.*` + Model (Modus-Dropdown), `statistik.component.*` (Modus-Anzeige/Hinweis), Tests/Mocks.
 * **Datenmigration:** keine (nur Übersetzungs-Keys via Flyway, nächste freie Version zum Zeitpunkt der Umsetzung eruieren).
+* **End-to-End-Test via Pi-Gateway-Simulator:** Der Publisher-Simulator (`pi-gateway/gateway/readers/sim_reader.py`) übermittelt Bilanz-Daten **bereits** – kein Anpassungsbedarf für das Bilanzmodell. Der Modus `bilanz` (Messpunkt-Name enthält „bilanz") lässt beide Register wachsen (eine Meldung mit Bezug **und** Einspeisung; der Backend-Ingest splittet sie auf die Einheiten `BEZUG`/`RUECKLIEFERUNG`); alternativ existieren die Einzel-Modi `bezug` und `ruecklieferung`. Die Beispiel-Konfiguration `pi-gateway/config.sim.yaml` enthält bereits einen `Bilanz`-Zähler. Damit ist das Bilanzmodell ohne Hardware über den kompletten MQTT-Pfad (Reader → Publisher → Ingest → Aggregation → Verteilung mit `verteilmodus=BILANZ`) testbar. *(Verifiziert – kein Code-Change; siehe Umsetzungsplan „Nachträgliche Ergänzungen".)*
 
 ## 7. Abgrenzung / Out of Scope
 * **Producer-kWh-Vergütung** — Producer bleiben bei Grundgebühr (geklärt).

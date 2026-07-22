@@ -229,3 +229,25 @@ ON CONFLICT (key) DO NOTHING;
 4. **Annahme:** `verteilmodus` wird als String-Enum im bestehenden JSONB-Blob gespeichert; kein Schema-Change, kein Backfill bestehender `einstellungen`-Zeilen nötig.
 5. **Annahme:** Der `BEZUG`-Messwert pro Intervall ist der `total`-Wert der (max. einen) `BEZUG`-Einheit; positiv. Vorzeichen-/Betrags-Behandlung analog `StatistikService` (Bezug positiv, Rücklieferung als Betrag).
 6. **Tests:** Unit-/Integration-/E2E-Tests werden über die Folge-Kommandos (`3_backend-tests`, `4_frontend-unit-tests`, `5_e2e-tests`) erstellt; besonders wichtig: **Regressionstest** `PRODUCER_MESSUNG` = heutiges Ergebnis sowie die Beispielrechnung `ConsumerTotal=10, Bezug=4 → S=4`.
+
+---
+
+## Nachträgliche Ergänzungen
+
+### Pi-Gateway-Simulator übermittelt Bilanz/Rücklieferung (verifiziert, kein Code-Change)
+
+Frage: Muss `pi-gateway/gateway/readers/sim_reader.py` für das Bilanzmodell angepasst werden, damit Bilanz/Rücklieferung übermittelt werden?
+
+**Ergebnis: Nein – bereits vorhanden** (eingeführt mit der Bilanzmesspunkt-Umsetzung, Commit `85e0c81`). Verifiziert durch Ausführen des Readers:
+
+| Messpunkt-Name enthält | `_mode` | Δ Bezug | Δ Einspeisung |
+|---|---|---|---|
+| „bilanz" | `bilanz` | wächst | wächst (eine Meldung, beide Register → Ingest splittet auf `BEZUG`/`RUECKLIEFERUNG`) |
+| „bezug" | `bezug` | wächst | 0 |
+| „rücklieferung"/„ruecklieferung" | `ruecklieferung` | 0 | wächst |
+| „producer" | `producer` | ~0 | wächst (Einspeisung überwiegt) |
+| sonst | `consumer` | wächst | ~0 |
+
+- `pi-gateway/config.sim.yaml` enthält bereits einen `Bilanz`-Zähler; `publisher.py` sendet beide Register (`zaehlerstandBezug`/`zaehlerstandEinspeisung`) je Meldung.
+- Damit ist das Bilanzmodell ohne Hardware über den kompletten MQTT-Pfad testbar (Reader → Publisher → Ingest → Aggregation → Verteilung mit `verteilmodus=BILANZ`).
+- **Bewusst nicht geändert:** koherente/korrelierte Bilanzwerte (Bilanz-Bezug ist ein unabhängiger Zufalls-Random-Walk, physikalisch nicht an Consumer/Producer gekoppelt) – für einen synthetischen End-to-End-Test akzeptiert; keine Anforderung.
