@@ -51,6 +51,13 @@
       <div class="zev-panel">
         <h3 class="zev-panel__title">{{ 'STATISTIK_UEBERSICHT' | translate }}</h3>
         <div class="zev-panel__content">
+          <!-- Aktiver Verteilmodus -->
+          <div class="zev-info-row">
+            <span class="zev-info-label">{{ 'VERTEILMODUS' | translate }}:</span>
+            <span class="zev-info-value">
+              {{ (isBilanz ? 'VERTEILMODUS_BILANZ' : 'VERTEILMODUS_PRODUCER_MESSUNG') | translate }}
+            </span>
+          </div>
           <!-- Messwerte vorhanden bis -->
           <div class="zev-info-row">
             <span class="zev-info-label">{{ 'MESSWERTE_VORHANDEN_BIS' | translate }}:</span>
@@ -187,7 +194,7 @@
                    Zeilen angezeigt, sondern nur noch im Summen-Vergleich verwendet (FR-5.7). -->
               @if (monat.bilanzRuecklieferungName) {
                 <tr>
-                  <td>{{ monat.bilanzRuecklieferungName }}</td>
+                  <td>{{ isBilanz ? ('STATISTIK_RUECKLIEFERUNG_GEMESSEN' | translate) : monat.bilanzRuecklieferungName }}</td>
                   <td class="zev-table__bar-cell">
                     <div class="zev-bar-container">
                       <div class="zev-bar"
@@ -218,6 +225,12 @@
           <!-- Vergleiche -->
           <div class="zev-comparison-section">
             <h4>{{ 'SUMMEN_VERGLEICH' | translate }}</h4>
+            @if (isBilanz) {
+              <p class="zev-message zev-message--info">
+                <app-icon name="info"></app-icon>
+                {{ 'STATISTIK_MODUS_BILANZ_HINWEIS' | translate }}
+              </p>
+            }
             <p class="zev-toleranz-info">{{ 'TOLERANZ' | translate }}: {{ statistik?.toleranz }} kWh</p>
             <div class="zev-comparison-grid">
               <div class="zev-comparison-item">

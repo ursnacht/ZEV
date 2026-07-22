@@ -1,5 +1,7 @@
 package ch.nacht.dto;
 
+import ch.nacht.entity.Verteilmodus;
+
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -11,8 +13,17 @@ public class StatistikDTO {
     private List<LocalDate> fehlendeTage = new ArrayList<>();
     private List<MonatsStatistikDTO> monate = new ArrayList<>();
     private double toleranz;
+    private Verteilmodus verteilmodus;
 
     public StatistikDTO() {
+    }
+
+    public Verteilmodus getVerteilmodus() {
+        return verteilmodus;
+    }
+
+    public void setVerteilmodus(Verteilmodus verteilmodus) {
+        this.verteilmodus = verteilmodus;
     }
 
     public LocalDate getMesswerteBisDate() {

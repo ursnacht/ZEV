@@ -47,6 +47,15 @@
           }
         </div>
 
+        <div class="zev-form-group">
+          <label for="verteilmodus">{{ 'VERTEILMODUS' | translate }}:</label>
+          <select id="verteilmodus" class="zev-select"
+            [(ngModel)]="formData.verteilmodus" name="verteilmodus">
+            <option value="PRODUCER_MESSUNG">{{ 'VERTEILMODUS_PRODUCER_MESSUNG' | translate }}</option>
+            <option value="BILANZ">{{ 'VERTEILMODUS_BILANZ' | translate }}</option>
+          </select>
+        </div>
+
         <div class="zev-form-section">
           <h3 class="zev-form-section__title">{{ 'RECHNUNGSSTELLER' | translate }}</h3>
 

@@ -34,13 +34,19 @@ public class StatistikService {
     private final MesswerteRepository messwerteRepository;
     private final EinheitRepository einheitRepository;
     private final HibernateFilterService hibernateFilterService;
+    private final OrganizationContextService organizationContextService;
+    private final EinstellungenService einstellungenService;
 
     public StatistikService(MesswerteRepository messwerteRepository,
                             EinheitRepository einheitRepository,
-                            HibernateFilterService hibernateFilterService) {
+                            HibernateFilterService hibernateFilterService,
+                            OrganizationContextService organizationContextService,
+                            EinstellungenService einstellungenService) {
         this.messwerteRepository = messwerteRepository;
         this.einheitRepository = einheitRepository;
         this.hibernateFilterService = hibernateFilterService;
+        this.organizationContextService = organizationContextService;
+        this.einstellungenService = einstellungenService;
     }
 
     @Transactional(readOnly = true)
@@ -51,6 +57,7 @@ public class StatistikService {
 
         StatistikDTO statistik = new StatistikDTO();
         statistik.setToleranz(TOLERANZ);
+        statistik.setVerteilmodus(einstellungenService.getVerteilmodus(organizationContextService.getCurrentOrgId()));
 
         // Letztes Datum mit Messwerten ermitteln
         LocalDate letztesMessdatum = ermittleLetztesMessdatum();

@@ -6,6 +6,7 @@ import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Messwerte;
 import ch.nacht.entity.Quelle;
+import ch.nacht.entity.Verteilmodus;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
 import org.slf4j.Logger;
@@ -36,17 +37,20 @@ public class MesswerteService {
     private final OrganizationContextService organizationContextService;
     private final HibernateFilterService hibernateFilterService;
     private final CalculationProgressService calculationProgressService;
+    private final EinstellungenService einstellungenService;
 
     public MesswerteService(MesswerteRepository messwerteRepository,
                             EinheitRepository einheitRepository,
                             OrganizationContextService organizationContextService,
                             HibernateFilterService hibernateFilterService,
-                            CalculationProgressService calculationProgressService) {
+                            CalculationProgressService calculationProgressService,
+                            EinstellungenService einstellungenService) {
         this.messwerteRepository = messwerteRepository;
         this.einheitRepository = einheitRepository;
         this.organizationContextService = organizationContextService;
         this.hibernateFilterService = hibernateFilterService;
         this.calculationProgressService = calculationProgressService;
+        this.einstellungenService = einstellungenService;
         log.info("MesswerteService initialized");
     }
 
@@ -280,8 +284,9 @@ public class MesswerteService {
      */
     private CalculationResult distribute(LocalDateTime dateFrom, LocalDateTime dateTo,
             String algorithm, Long progressOrgId, boolean showProgress) {
-        log.info("Starting solar distribution calculation - dateFrom: {}, dateTo: {}, algorithm: {}",
-                dateFrom, dateTo, algorithm);
+        Verteilmodus modus = einstellungenService.getVerteilmodus(progressOrgId);
+        log.info("Solar distribution - dateFrom: {}, dateTo: {}, algorithm: {}, verteilmodus: {} (org={})",
+                dateFrom, dateTo, algorithm, modus, progressOrgId);
 
         long startTime = System.currentTimeMillis();
 
@@ -293,6 +298,19 @@ public class MesswerteService {
             calculationProgressService.startCalculation(progressOrgId, distinctZeiten.size());
         }
 
+        if (modus == Verteilmodus.BILANZ) {
+            return distributeBilanz(distinctZeiten, dateFrom, dateTo, algorithm, progressOrgId, showProgress, startTime);
+        }
+        return distributeProducerMessung(distinctZeiten, dateFrom, dateTo, algorithm, progressOrgId, showProgress, startTime);
+    }
+
+    /**
+     * Verteilmodus {@code PRODUCER_MESSUNG} (heutiges Verhalten, unverändert): verteilt die
+     * Producer-Produktion je Zeitpunkt auf die Consumer.
+     */
+    private CalculationResult distributeProducerMessung(List<LocalDateTime> distinctZeiten,
+            LocalDateTime dateFrom, LocalDateTime dateTo, String algorithm, Long progressOrgId,
+            boolean showProgress, long startTime) {
         int processedTimestamps = 0;
         int processedRecords = 0;
         BigDecimal totalSolarProduced = BigDecimal.ZERO;
@@ -390,6 +408,118 @@ public class MesswerteService {
         long duration = System.currentTimeMillis() - startTime;
         log.info(
                 "Solar distribution calculation completed - timestamps: {}, records: {}, totalProduced: {} kWh, totalDistributed: {} kWh, duration: {} ms",
+                processedTimestamps, processedRecords, totalSolarProduced, totalDistributed, duration);
+
+        return new CalculationResult(
+                processedTimestamps,
+                processedRecords,
+                dateFrom,
+                dateTo,
+                totalSolarProduced.doubleValue(),
+                totalDistributed.doubleValue());
+    }
+
+    /**
+     * Verteilmodus {@code BILANZ} (Spec FR-2): der ZEV-Eigenverbrauch wird aus der Netz-Bilanz
+     * abgeleitet – {@code S = max(0, ConsumerTotal − Bezug)} – und mit demselben Algorithmus wie
+     * heute auf die Consumer verteilt. Iteriert <b>producer-unabhängig</b> (kein Skip bei fehlenden
+     * Producern). Producer-{@code zev} ist nur statistisch: {@code |Produktion| − |Rücklieferung|},
+     * proportional (MQTT-Guard). Fehlt die {@code BEZUG}-Einheit oder deren Messwert in einem
+     * Intervall mit Consumern, bricht der Lauf mit {@code IllegalStateException} ab (Rollback über
+     * {@code @Transactional}); die fehlende {@code RUECKLIEFERUNG}-Einheit ist kein Abbruchgrund.
+     */
+    private CalculationResult distributeBilanz(List<LocalDateTime> distinctZeiten,
+            LocalDateTime dateFrom, LocalDateTime dateTo, String algorithm, Long progressOrgId,
+            boolean showProgress, long startTime) {
+        // BEZUG-Einheit ist abrechnungskritisch: fehlt sie komplett, sofort abbrechen.
+        if (!einheitRepository.existsByTyp(EinheitTyp.BEZUG)) {
+            throw new IllegalStateException("BILANZMODELL_KEINE_BILANZDATEN: keine BEZUG-Einheit vorhanden");
+        }
+
+        int processedTimestamps = 0;
+        int processedRecords = 0;
+        BigDecimal totalSolarProduced = BigDecimal.ZERO; // hier: Summe der verteilten Menge S
+        BigDecimal totalDistributed = BigDecimal.ZERO;
+
+        for (LocalDateTime zeit : distinctZeiten) {
+            List<Messwerte> producers = messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.PRODUCER);
+
+            // Producer-zev (nur Statistik): im ZEV verbrauchte Produktion lt. Bilanz =
+            // |Produktion| − |Rücklieferung|, proportional auf die Producer (MQTT-Guard).
+            if (!producers.isEmpty()) {
+                BigDecimal produktion = producers.stream()
+                        .map(m -> BigDecimal.valueOf(m.getTotal()))
+                        .filter(t -> t.signum() < 0)
+                        .map(BigDecimal::abs)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal ruecklieferung = messwerteRepository
+                        .findByZeitAndEinheitTyp(zeit, EinheitTyp.RUECKLIEFERUNG).stream()
+                        .map(m -> BigDecimal.valueOf(m.getTotal()).abs())
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal imZev = produktion.subtract(ruecklieferung).max(BigDecimal.ZERO);
+                aktualisiereProducerZev(producers, imZev);
+            }
+
+            List<Messwerte> consumers = messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER);
+            if (consumers.isEmpty()) {
+                // Keine Consumer → nichts im ZEV zu verteilen (S irrelevant).
+                continue;
+            }
+
+            // Bezug ist für dieses Intervall abrechnungskritisch.
+            List<Messwerte> bezugMesswerte = messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.BEZUG);
+            if (bezugMesswerte.isEmpty()) {
+                throw new IllegalStateException("BILANZMODELL_KEINE_BILANZDATEN: "
+                        + zeit.toLocalDate() + " " + zeit.toLocalTime());
+            }
+
+            BigDecimal bezug = bezugMesswerte.stream()
+                    .map(m -> BigDecimal.valueOf(m.getTotal()))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal consumerTotal = consumers.stream()
+                    .map(m -> BigDecimal.valueOf(m.getTotal()))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            // Verteilbarer ZEV-Eigenverbrauch: S = max(0, ConsumerTotal − Bezug)
+            BigDecimal s = consumerTotal.subtract(bezug).max(BigDecimal.ZERO);
+            totalSolarProduced = totalSolarProduced.add(s);
+
+            List<BigDecimal> consumptions = consumers.stream()
+                    .map(m -> BigDecimal.valueOf(m.getTotal()))
+                    .collect(Collectors.toList());
+
+            List<BigDecimal> distributions;
+            if ("PROPORTIONAL".equalsIgnoreCase(algorithm)) {
+                distributions = ProportionalConsumptionDistribution.distributeSolarPower(s, consumptions);
+            } else {
+                distributions = SolarDistribution.distributeSolarPower(s, consumptions);
+            }
+
+            for (int i = 0; i < consumers.size(); i++) {
+                Messwerte consumer = consumers.get(i);
+                BigDecimal distributedAmount = distributions.get(i);
+                consumer.setZevCalculated(distributedAmount.doubleValue());
+                // MQTT-Sentinel-Regel bleibt: zev == 0 → berechneter Wert; gemessene CSV-Werte bleiben.
+                if (consumer.getZev() != null && consumer.getZev() == 0.0) {
+                    consumer.setZev(distributedAmount.doubleValue());
+                }
+                messwerteRepository.save(consumer);
+                totalDistributed = totalDistributed.add(distributedAmount);
+                processedRecords++;
+            }
+
+            processedTimestamps++;
+            if (showProgress) {
+                calculationProgressService.updateProgress(progressOrgId, processedTimestamps);
+            }
+            if (processedTimestamps % 100 == 0) {
+                log.debug("Progress (Bilanz): {} timestamps processed", processedTimestamps);
+            }
+        }
+
+        long duration = System.currentTimeMillis() - startTime;
+        log.info(
+                "Solar distribution (Bilanz) completed - timestamps: {}, records: {}, totalS: {} kWh, totalDistributed: {} kWh, duration: {} ms",
                 processedTimestamps, processedRecords, totalSolarProduced, totalDistributed, duration);
 
         return new CalculationResult(

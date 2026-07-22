@@ -5,6 +5,7 @@ import ch.nacht.dto.MonatsStatistikDTO;
 import ch.nacht.dto.StatistikDTO;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
+import ch.nacht.entity.Verteilmodus;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +25,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +39,12 @@ public class StatistikServiceTest {
 
     @Mock
     private HibernateFilterService hibernateFilterService;
+
+    @Mock
+    private OrganizationContextService organizationContextService;
+
+    @Mock
+    private EinstellungenService einstellungenService;
 
     @InjectMocks
     private StatistikService statistikService;
@@ -55,6 +63,12 @@ public class StatistikServiceTest {
 
         consumer2 = new Einheit("Wohnung B", EinheitTyp.CONSUMER);
         consumer2.setId(3L);
+
+        // Verteilmodus-Anzeige in der Statistik (Default = heutiges Verhalten); lenient,
+        // da nicht jeder Test getStatistik() aufruft.
+        lenient().when(organizationContextService.getCurrentOrgId()).thenReturn(1L);
+        lenient().when(einstellungenService.getVerteilmodus(any()))
+            .thenReturn(Verteilmodus.PRODUCER_MESSUNG);
     }
 
     @Test

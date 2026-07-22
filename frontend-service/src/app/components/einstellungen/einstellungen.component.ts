@@ -28,7 +28,8 @@ export class EinstellungenComponent extends WithMessage implements OnInit {
       strasse: '',
       plz: '',
       ort: ''
-    }
+    },
+    verteilmodus: 'PRODUCER_MESSUNG'
   };
 
   einstellungenId: number | undefined;
@@ -108,6 +109,10 @@ export class EinstellungenComponent extends WithMessage implements OnInit {
           // Ensure steller object exists
           if (!this.formData.steller) {
             this.formData.steller = { name: '', strasse: '', plz: '', ort: '' };
+          }
+          // Bestandsmandanten ohne Feld → Default PRODUCER_MESSUNG
+          if (!this.formData.verteilmodus) {
+            this.formData.verteilmodus = 'PRODUCER_MESSUNG';
           }
         }
         this.loading = false;

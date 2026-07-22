@@ -31,16 +31,16 @@ Ein alternatives, pro Mandant wählbares Abrechnungs-/Verteilmodell: Statt aus d
 
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
-| [ ] | 1. Backend-Enum | `Verteilmodus` (`PRODUCER_MESSUNG`, `BILANZ`) im `entity`-Package |
-| [ ] | 2. Backend-DTO | Feld `verteilmodus` in `RechnungKonfigurationDTO` (nullable, null-tolerant, Default im Code) |
-| [ ] | 3. Backend-EinstellungenService | Org-explizite Lese-Methode `getVerteilmodus(orgId)` (ohne `getCurrentOrgId()`) |
-| [ ] | 4. Backend-MesswerteService (Kern) | `distribute` verzweigt nach Modus; BILANZ-Logik, Abbruch, Producer-`zev` |
-| [ ] | 5. Backend-ZaehlerAggregationService | Verifizieren, dass der Auto-Lauf den Modus zieht (Modus zentral in `distribute`) |
-| [ ] | 6. Backend-StatistikService/DTO | Modus in `StatistikDTO`; gemessene Rücklieferung im Bilanzmodus |
-| [ ] | 7. Frontend-Models | `verteilmodus` in `Einstellungen`/`RechnungKonfiguration` und `Statistik` |
-| [ ] | 8. Frontend-Einstellungen | Modus-Dropdown mit übersetzten Labels |
-| [ ] | 9. Frontend-Statistik | Modus-Anzeige, Tautologie-Hinweis, gemessene Rücklieferung |
-| [ ] | 10. Übersetzungen | Flyway-Migration mit neuen Translation-Keys (DE/EN) |
+| [x] | 1. Backend-Enum | `Verteilmodus` (`PRODUCER_MESSUNG`, `BILANZ`) im `entity`-Package |
+| [x] | 2. Backend-DTO | Feld `verteilmodus` in `RechnungKonfigurationDTO` (nullable, null-tolerant, Default im Code) |
+| [x] | 3. Backend-EinstellungenService | Org-explizite Lese-Methode `getVerteilmodus(orgId)` (ohne `getCurrentOrgId()`) |
+| [x] | 4. Backend-MesswerteService (Kern) | `distribute` verzweigt nach Modus; BILANZ-Logik, Abbruch, Producer-`zev` |
+| [x] | 5. Backend-ZaehlerAggregationService | Modus zentral in `distribute`; Abbruch im Auto-Lauf als ERROR geloggt |
+| [x] | 6. Backend-StatistikService/DTO | Modus in `StatistikDTO`; gemessene Rücklieferung (`bilanzRuecklieferung`) bereits vorhanden |
+| [x] | 7. Frontend-Models | `verteilmodus` in `Einstellungen`/`RechnungKonfiguration` und `Statistik` |
+| [x] | 8. Frontend-Einstellungen | Modus-Dropdown mit übersetzten Labels |
+| [x] | 9. Frontend-Statistik | Modus-Anzeige, Tautologie-Hinweis, gemessene Rücklieferung |
+| [x] | 10. Übersetzungen | Flyway-Migration `V85__Add_Bilanzmodell_Translations.sql` (DE/EN) |
 
 ---
 

@@ -28,6 +28,11 @@ export class StatistikComponent extends WithMessage implements OnInit {
   expandedMonths: Set<number> = new Set();
   expandedGlobalDetails = false;
 
+  /** Aktiver Verteilmodus ist BILANZ (Modus-abhängige Anzeige/Hinweise). */
+  get isBilanz(): boolean {
+    return this.statistik?.verteilmodus === 'BILANZ';
+  }
+
   constructor(
     private statistikService: StatistikService,
     private translationService: TranslationService

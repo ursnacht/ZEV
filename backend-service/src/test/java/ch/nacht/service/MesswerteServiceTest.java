@@ -4,6 +4,7 @@ import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Messwerte;
 import ch.nacht.entity.Quelle;
+import ch.nacht.entity.Verteilmodus;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
 
@@ -48,6 +49,9 @@ public class MesswerteServiceTest {
     @Mock
     private CalculationProgressService calculationProgressService;
 
+    @Mock
+    private EinstellungenService einstellungenService;
+
     @InjectMocks
     private MesswerteService messwerteService;
 
@@ -76,6 +80,11 @@ public class MesswerteServiceTest {
         ruecklieferungEinheit = new Einheit("Rücklieferung", EinheitTyp.RUECKLIEFERUNG);
         ruecklieferungEinheit.setId(11L);
         ruecklieferungEinheit.setOrgId(testOrgId);
+
+        // Default-Verteilmodus (heutiges Verhalten) für die bestehenden Verteilungs-Tests;
+        // lenient, da nicht jeder Test die Verteilung auslöst.
+        lenient().when(einstellungenService.getVerteilmodus(any()))
+            .thenReturn(Verteilmodus.PRODUCER_MESSUNG);
     }
 
     // ==================== processBilanzCsvUpload Tests ====================

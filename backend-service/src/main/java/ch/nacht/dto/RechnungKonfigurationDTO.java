@@ -1,5 +1,7 @@
 package ch.nacht.dto;
 
+import ch.nacht.entity.Verteilmodus;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -22,6 +24,12 @@ public class RechnungKonfigurationDTO {
     @Valid
     @NotNull(message = "Steller is required")
     private StellerDTO steller;
+
+    /**
+     * Verteilmodus des Mandanten. Nullable (ohne {@code @NotNull}): Bestandsmandanten / altes JSON
+     * haben das Feld nicht → {@code null}, im Code auf {@link Verteilmodus#PRODUCER_MESSUNG} gemappt.
+     */
+    private Verteilmodus verteilmodus;
 
     public RechnungKonfigurationDTO() {
     }
@@ -54,6 +62,14 @@ public class RechnungKonfigurationDTO {
 
     public void setSteller(StellerDTO steller) {
         this.steller = steller;
+    }
+
+    public Verteilmodus getVerteilmodus() {
+        return verteilmodus;
+    }
+
+    public void setVerteilmodus(Verteilmodus verteilmodus) {
+        this.verteilmodus = verteilmodus;
     }
 
     /**

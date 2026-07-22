@@ -68,4 +68,5 @@ export interface Statistik {
   fehlendeTage: string[];
   monate: MonatsStatistik[];
   toleranz: number;
+  verteilmodus?: 'PRODUCER_MESSUNG' | 'BILANZ';
 }
