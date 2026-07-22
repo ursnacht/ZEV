@@ -179,6 +179,27 @@ public class ZaehlerAggregationServiceTest {
         assertEquals(Quelle.MQTT, m.getQuelle());
     }
 
+    // --- Wiederaufnahme nach längerem Unterbruch (ggf. mehrtägig) ----------
+
+    @Test
+    void aggregiere_WiederaufnahmeNachUnterbruch_GesamterVerbrauchImErstenIntervall() {
+        // Referenz = letzter Vor-Unterbruch-Stand (Tage alt, i.d.R. bereits verarbeitet);
+        // letzter = erster Stand nach Wiederaufnahme. Die Differenz überbrückt den gesamten
+        // Unterbruch, weil die Referenz-Abfrage (findFirst...ZeitLessThanEqual) NICHT auf
+        // `verarbeitet` filtert. Kein Datenverlust: der komplette Verbrauch fällt gebündelt in
+        // das erste Intervall mit Meldung nach Wiederaufnahme.
+        stubCatchUpEinInterval();
+        stubStaende(rohdaten("1000.0", "200.0"), rohdaten("1250.0", "200.0")); // ΔBezug=250 über mehrere Tage
+        when(messwerteRepository.findByEinheitAndZeit(eq(einheit), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.aggregiere();
+
+        Messwerte m = captureSavedMesswert();
+        assertEquals(250.0, m.getTotal(), 1e-9); // gesamter Unterbruch-Verbrauch, nichts verloren
+        assertEquals(Quelle.MQTT, m.getQuelle());
+    }
+
     // --- Reset-Guard pro Register ------------------------------------------
 
     @Test

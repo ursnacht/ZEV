@@ -141,6 +141,7 @@ zev.messwerte  (total = ΔBezug − ΔEinspeisung, zev = 0, quelle = MQTT)  +  R
 - `total = ΔBezug − ΔEinspeisung` (vorzeichenbehaftet); `zev = 0`; `quelle = 'MQTT'`.
 - Leeres Intervall (keine neue Meldung) → **kein** `messwerte`-Eintrag.
 - Bereits verarbeitete Rohdaten (`verarbeitet = TRUE`) werden nicht erneut aggregiert; Job-Neustart verarbeitet offene Rohdaten.
+- **Wiederaufnahme nach längerem Unterbruch (verifiziert):** Kein Datenverlust — die Referenz-Abfrage `findFirstByEinheitIdAndZeitLessThanEqualOrderByZeitDesc` ignoriert das `verarbeitet`-Flag und liefert den letzten Vor-Unterbruch-Stand; die überbrückende Differenz erfasst den gesamten Unterbruch und fällt gebündelt als **ein** grosser `total` in das erste Intervall mit Meldung (Auflösungsverlust, bewusster Trade-off). Der Catch-up startet beim ersten unverarbeiteten Stand → die leeren Intervalle des Unterbruchs werden nicht durchlaufen. Regressionstest: `ZaehlerAggregationServiceTest#aggregiere_WiederaufnahmeNachUnterbruch_GesamterVerbrauchImErstenIntervall`.
 
 ### Solarverteilung (FR-9)
 - `zev = zev_calculated` **nur** wo `zev == 0`; `zev ≠ 0` (CSV) bleibt unverändert.
@@ -152,7 +153,7 @@ zev.messwerte  (total = ΔBezug − ΔEinspeisung, zev = 0, quelle = MQTT)  +  R
 - **`quelle`-Repräsentation:** Annahme = `Quelle`-Enum (`CSV`/`MQTT`/`API`) als `@Enumerated(STRING)`; DB-Spalte `VARCHAR(20)` DEFAULT `'CSV'`.
 - **`messpunkt` eindeutig pro `org_id`** (Spec §8 entschieden): Auflösung erwartet höchstens einen Treffer; Annahme = Eindeutigkeit fachlich sichergestellt (optionaler Unique-Index `(org_id, messpunkt)` auf `einheit` als spätere Härtung, nicht Teil dieses Plans).
 - **FR-9-Kante:** gemessenes echtes `zev = 0` würde ebenfalls durch `zev_calculated` ersetzt (Effekt vernachlässigbar; Alternative über `quelle='MQTT'` möglich — Umsetzungsdetail, Spec dokumentiert).
-- **Rohdaten-Retention/Cleanup:** Out of Scope (Spec: „folgt später").
+- **Rohdaten-Retention/Cleanup:** Out of Scope (Spec: „folgt später"). **Caveat:** ein späterer Cleanup darf den letzten Stand vor einer noch unverarbeiteten Lücke nicht löschen (Referenz für die überbrückende Delta-Bildung nach Wiederaufnahme) — sonst Datenverlust.
 - **Dependency-Versionen:** aus Spring-Boot-BOM (keine Modul-Property-Overrides, gemäss Projekt-Konvention); Paho = `mqttv3` (Default von `spring-integration-mqtt`).
 - **Broker/ACL-Einrichtung** auf dem NAS ist Betrieb (nicht Code) — `docs/Netzwerk-Topologie-Hene.md`.
 - **Tests** werden separat erstellt (`/3_backend-tests`): Ingest (Topic/Payload/Validierung/Auflösung/Mandant), Aggregation (Delta/Signed/Reset/Leerintervall), FR-9, Rohdaten-Repository.

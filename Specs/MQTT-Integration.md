@@ -174,6 +174,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 * [ ] Verarbeitete Rohdaten `verarbeitet = TRUE`; bereits verarbeitete werden nicht erneut aggregiert.
 * [ ] Leeres Intervall (keine neue Meldung) → kein `messwerte`-Eintrag (kein Nullwert).
 * [ ] Verlorene Zwischen-Nachricht → Gesamtsumme über die betroffenen Intervalle bleibt korrekt (verlusttolerant).
+* [ ] **Wiederaufnahme nach mehrtägigem Unterbruch** → die Differenz zum letzten Vor-Unterbruch-Stand deckt den gesamten Zeitraum; **keine kWh gehen verloren**, der Gesamtbetrag erscheint gebündelt im ersten Intervall mit Meldung nach Wiederaufnahme (Referenz wird unabhängig vom `verarbeitet`-Flag über den Zeitstempel aufgelöst).
 * [ ] Zähler-Reset/Rücksprung **pro Register** (`ΔBezug` bzw. `ΔEinspeisung` < 0) → betroffenes Delta auf 0, Referenz neu gesetzt, WARN. (Ein negatives `total` aus Einspeisung ist dagegen legitim und wird übernommen.)
 * [ ] `zev_calculated` wird durch den Ingest nicht verändert; Solarverteilung funktioniert unverändert.
 * [ ] Nach der Solarverteilung gilt `zev = zev_calculated`, wo `zev = 0` war (MQTT-Werte); gemessene CSV-Werte (`zev ≠ 0`) bleiben unverändert (FR-9).
@@ -214,6 +215,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 | Timestamp in der Zukunft | WARN, trotzdem speichern |
 | Duplikat (Einheit + `zeit`) | Upsert |
 | Verlorene Nachricht(en) | kein Datenverlust — Differenz zum nächsten Stand deckt die Lücke; nur Auflösungsverlust |
+| Wiederaufnahme nach **längerem Unterbruch** (Pi/Broker offline, ggf. mehrere Tage) | **kein Datenverlust** — die Differenz zum letzten Vor-Unterbruch-Stand deckt den gesamten Zeitraum; der kumulierte Verbrauch fällt gebündelt als **ein** grosser `total` in das erste Intervall mit Meldung nach Wiederaufnahme (Auflösungsverlust, bewusster Trade-off der absoluten Stände). Der Referenzstand wird über `findFirstByEinheitIdAndZeitLessThanEqualOrderByZeitDesc` **unabhängig vom `verarbeitet`-Flag** gefunden; der Catch-up-Loop startet erst beim ersten unverarbeiteten Stand (die leeren Intervalle des Unterbruchs werden nicht durchlaufen). **Voraussetzung:** der Vor-Unterbruch-Stand existiert noch (Retention darf ihn nicht löschen, s. §8). |
 | Register-Stand < Referenz (Reset/Überlauf/Zählertausch) | Aggregation **je Register**: betroffenes Delta (`ΔBezug`/`ΔEinspeisung`) auf 0, Referenz neu setzen, WARN (negatives `total` aus Einspeisung bleibt gültig) |
 | Broker nicht erreichbar | Reconnect mit Exponential Backoff |
 | DB nicht erreichbar | Nachricht nicht markieren, Retry |
@@ -254,5 +256,5 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 * [ ] **Reset/Überlauf-Policy:** Genaue Erkennung (Schwellwert für „Rücksprung") **pro Register** (Bezug/Einspeisung) und Umgang (Referenz neu setzen, Delta = 0)? (Grundsatz in FR-6.3 festgelegt; Schwellwert-Details offen.)
 * [ ] **Prosumer im selben Intervall:** Verhalten, wenn `ΔBezug` **und** `ΔEinspeisung` > 0 (Netmetering)? Aktuelle Festlegung: Netto `total = ΔBezug − ΔEinspeisung` (FR-6.4) — genügt das fachlich?
 * [x] **`zev`-Behandlung / Verträglichkeit:** → **`zev = 0` beim Ingest** (kein NULL, kein Schema-Eingriff); die Solarverteilung ersetzt `0` durch `zev_calculated` (FR-9). Bestehende `zev`-Konsumenten bleiben kompatibel. Rest-Kante (gemessenes echtes `0`) siehe FR-9-Hinweis.
-* [ ] **Rohdaten-Retention:** Cleanup-Job nötig, ab welchem Alter (absolute Stände wachsen unbegrenzt)? --> folgt später
+* [ ] **Rohdaten-Retention:** Cleanup-Job nötig, ab welchem Alter (absolute Stände wachsen unbegrenzt)? --> folgt später. **Wichtig (Wechselwirkung mit der Wiederaufnahme nach Unterbruch):** Ein Cleanup darf den **letzten Stand vor einer noch unverarbeiteten Lücke** nicht löschen — dieser ist die Referenz für die überbrückende Delta-Bildung nach Wiederaufnahme; wird er gelöscht, ginge der Verbrauch des Unterbruchs verloren (`referenz == null` → kein Messwert). Sichere Regel: nur **verarbeitete** Rohdaten löschen und pro Einheit mindestens den jüngsten Stand behalten.
 * [x] **Mehrfach-Quelle pro Einheit:** Verhalten, wenn für dieselbe Einheit + Zeitpunkt sowohl CSV- als auch MQTT-Daten vorliegen? → **Warnung loggen, MQTT hat Vorrang.**
