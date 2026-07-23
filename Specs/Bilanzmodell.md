@@ -53,7 +53,7 @@ Pro Zeitintervall mit `ConsumerTotal` = Summe Consumer-`total`, `Bezug` = `total
 
 ### Verteilung Bilanzmodell
 * [ ] Bei `verteilmodus = BILANZ` verteilt `MesswerteService.distribute` pro Intervall `S = max(0, ConsumerTotal − Bezug)` auf die Consumer (EQUAL_SHARE/PROPORTIONAL).
-* [ ] Beispiel `ConsumerTotal=10, Bezug=4` → `S=4` wird verteilt; Consumer-`zev`-Summe = 4, Netz-Anteil-Summe = 6 = Bezug.
+* [ ] Beispiel `ConsumerTotal=10, Bezug=4` → `S=6` wird verteilt; Consumer-`zev`-Summe = 6, Netz-Anteil-Summe = 10 − 6 = 4 = Bezug (verrechnungstreu, FR-3.3).
 * [ ] `Bezug > ConsumerTotal` (z.B. Batterie lädt aus Netz) → `S=0`, kein ZEV-Anteil in diesem Intervall.
 * [ ] Intervall mit Consumern und Bezug, aber **ohne Producer-Messwert** → `S` wird trotzdem verteilt (kein producer-gesteuerter Skip im BILANZ-Zweig).
 * [ ] Fehlt die `BEZUG`-Einheit oder deren Messwerte in einem Intervall → **manueller** Lauf bricht mit `IllegalStateException` (Message = Key `BILANZMODELL_KEINE_BILANZDATEN` + Intervall Tag/Zeit) → HTTP 400 ab; keine `zev`-Werte werden geschrieben (Rollback).

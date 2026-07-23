@@ -904,6 +904,267 @@ public class MesswerteServiceTest {
         assertEquals(-5.0, producer.getZev(), 1e-9);
     }
 
+    // ==================== Bilanzmodus (Verteilmodus.BILANZ) ====================
+
+    @Test
+    void calculateSolarDistribution_Bilanz_VerteiltSMaxConsumerMinusBezug() {
+        LocalDateTime dateFrom = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime dateTo = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
+        LocalDateTime zeit = LocalDateTime.of(2024, 1, 15, 12, 0);
+
+        when(einstellungenService.getVerteilmodus(any())).thenReturn(Verteilmodus.BILANZ);
+        when(einheitRepository.existsByTyp(EinheitTyp.BEZUG)).thenReturn(true);
+        when(messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo)).thenReturn(List.of(zeit));
+
+        // ConsumerTotal=10, Bezug=4 → S = max(0, 10 - 4) = 6 (Spec FR-2.1);
+        // die zentrale Invariante ist Netz-Anteil-Summe = Bezug (FR-3.3).
+        Messwerte consumer = new Messwerte(zeit, 10.0, 0.0, consumerEinheit);
+        Messwerte bezug = new Messwerte(zeit, 4.0, 0.0, bezugEinheit);
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.PRODUCER)).thenReturn(Collections.emptyList());
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER)).thenReturn(List.of(consumer));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.BEZUG)).thenReturn(List.of(bezug));
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        MesswerteService.CalculationResult result = messwerteService.calculateSolarDistribution(
+            dateFrom, dateTo, "EQUAL_SHARE");
+
+        // S = 6, dem einzigen Consumer zugeteilt
+        assertEquals(6.0, consumer.getZev(), 1e-9);
+        assertEquals(6.0, consumer.getZevCalculated(), 1e-9);
+        // Netz-Anteil = total - zev = 10 - 6 = 4 = Bezug
+        assertEquals(4.0, consumer.getTotal() - consumer.getZev(), 1e-9);
+        assertEquals(1, result.getProcessedTimestamps());
+        assertEquals(6.0, result.getTotalSolarProduced(), 1e-9);
+    }
+
+    @Test
+    void calculateSolarDistribution_Bilanz_ConsumerZevSummeUndNetzAnteilGleichBezug() {
+        LocalDateTime dateFrom = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime dateTo = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
+        LocalDateTime zeit = LocalDateTime.of(2024, 1, 15, 12, 0);
+
+        Einheit consumerEinheit2 = new Einheit("Wohnung B", EinheitTyp.CONSUMER);
+        consumerEinheit2.setId(3L);
+        consumerEinheit2.setOrgId(testOrgId);
+
+        when(einstellungenService.getVerteilmodus(any())).thenReturn(Verteilmodus.BILANZ);
+        when(einheitRepository.existsByTyp(EinheitTyp.BEZUG)).thenReturn(true);
+        when(messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo)).thenReturn(List.of(zeit));
+
+        // ConsumerTotal = 5 + 5 = 10, Bezug = 4 → S = 6, EQUAL_SHARE → je 3
+        Messwerte c1 = new Messwerte(zeit, 5.0, 0.0, consumerEinheit);
+        Messwerte c2 = new Messwerte(zeit, 5.0, 0.0, consumerEinheit2);
+        Messwerte bezug = new Messwerte(zeit, 4.0, 0.0, bezugEinheit);
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.PRODUCER)).thenReturn(Collections.emptyList());
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER)).thenReturn(List.of(c1, c2));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.BEZUG)).thenReturn(List.of(bezug));
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        MesswerteService.CalculationResult result = messwerteService.calculateSolarDistribution(
+            dateFrom, dateTo, "EQUAL_SHARE");
+
+        assertEquals(3.0, c1.getZev(), 1e-9);
+        assertEquals(3.0, c2.getZev(), 1e-9);
+        // Consumer-zev-Summe = 6 = S
+        assertEquals(6.0, c1.getZev() + c2.getZev(), 1e-9);
+        // Netz-Anteil-Summe = (5-3)+(5-3) = 4 = Bezug (FR-3.3 verrechnungstreu)
+        assertEquals(4.0, (c1.getTotal() - c1.getZev()) + (c2.getTotal() - c2.getZev()), 1e-9);
+        assertEquals(2, result.getProcessedRecords());
+    }
+
+    @Test
+    void calculateSolarDistribution_Bilanz_BezugGroesserConsumerTotal_SIstNull() {
+        LocalDateTime dateFrom = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime dateTo = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
+        LocalDateTime zeit = LocalDateTime.of(2024, 1, 15, 12, 0);
+
+        when(einstellungenService.getVerteilmodus(any())).thenReturn(Verteilmodus.BILANZ);
+        when(einheitRepository.existsByTyp(EinheitTyp.BEZUG)).thenReturn(true);
+        when(messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo)).thenReturn(List.of(zeit));
+
+        // Bezug (15) > ConsumerTotal (10), z.B. Batterie lädt aus dem Netz → S = 0
+        Messwerte consumer = new Messwerte(zeit, 10.0, 0.0, consumerEinheit);
+        Messwerte bezug = new Messwerte(zeit, 15.0, 0.0, bezugEinheit);
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.PRODUCER)).thenReturn(Collections.emptyList());
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER)).thenReturn(List.of(consumer));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.BEZUG)).thenReturn(List.of(bezug));
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        MesswerteService.CalculationResult result = messwerteService.calculateSolarDistribution(
+            dateFrom, dateTo, "EQUAL_SHARE");
+
+        assertEquals(0.0, consumer.getZev(), 1e-9);
+        assertEquals(0.0, consumer.getZevCalculated(), 1e-9);
+        assertEquals(0.0, result.getTotalSolarProduced(), 1e-9);
+        assertEquals(1, result.getProcessedTimestamps());
+    }
+
+    @Test
+    void calculateSolarDistribution_Bilanz_OhneProducer_VerteiltTrotzdem() {
+        LocalDateTime dateFrom = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime dateTo = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
+        LocalDateTime zeit = LocalDateTime.of(2024, 1, 15, 12, 0);
+
+        when(einstellungenService.getVerteilmodus(any())).thenReturn(Verteilmodus.BILANZ);
+        when(einheitRepository.existsByTyp(EinheitTyp.BEZUG)).thenReturn(true);
+        when(messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo)).thenReturn(List.of(zeit));
+
+        // Keine Producer-Messwerte in diesem Intervall (findByZeitAndEinheitTyp(PRODUCER) = leer);
+        // im BILANZ-Zweig darf der producer-gesteuerte Skip NICHT greifen.
+        Messwerte consumer = new Messwerte(zeit, 8.0, 0.0, consumerEinheit);
+        Messwerte bezug = new Messwerte(zeit, 3.0, 0.0, bezugEinheit);
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.PRODUCER)).thenReturn(Collections.emptyList());
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER)).thenReturn(List.of(consumer));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.BEZUG)).thenReturn(List.of(bezug));
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        MesswerteService.CalculationResult result = messwerteService.calculateSolarDistribution(
+            dateFrom, dateTo, "EQUAL_SHARE");
+
+        // S = max(0, 8 - 3) = 5 wird trotz fehlender Producer verteilt (kein Skip)
+        assertEquals(1, result.getProcessedTimestamps());
+        assertEquals(5.0, consumer.getZev(), 1e-9);
+    }
+
+    @Test
+    void calculateSolarDistribution_Bilanz_KeineBezugEinheit_ThrowsIllegalState() {
+        LocalDateTime dateFrom = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime dateTo = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
+
+        when(einstellungenService.getVerteilmodus(any())).thenReturn(Verteilmodus.BILANZ);
+        when(einheitRepository.existsByTyp(EinheitTyp.BEZUG)).thenReturn(false);
+
+        IllegalStateException ex = assertThrows(
+            IllegalStateException.class,
+            () -> messwerteService.calculateSolarDistribution(dateFrom, dateTo, "EQUAL_SHARE"));
+
+        assertTrue(ex.getMessage().contains("BILANZMODELL_KEINE_BILANZDATEN"));
+        // Rollback-Garantie: keine zev-Werte geschrieben
+        verify(messwerteRepository, never()).save(any());
+    }
+
+    @Test
+    void calculateSolarDistribution_Bilanz_FehlenderBezugMesswertImIntervall_ThrowsIllegalStateMitIntervall() {
+        LocalDateTime dateFrom = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime dateTo = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
+        LocalDateTime zeit = LocalDateTime.of(2024, 1, 15, 12, 0);
+
+        when(einstellungenService.getVerteilmodus(any())).thenReturn(Verteilmodus.BILANZ);
+        when(einheitRepository.existsByTyp(EinheitTyp.BEZUG)).thenReturn(true);
+        when(messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo)).thenReturn(List.of(zeit));
+
+        // Consumer vorhanden, aber KEIN BEZUG-Messwert im Intervall (findByZeitAndEinheitTyp(BEZUG) = leer)
+        Messwerte consumer = new Messwerte(zeit, 10.0, 0.0, consumerEinheit);
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.PRODUCER)).thenReturn(Collections.emptyList());
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER)).thenReturn(List.of(consumer));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.BEZUG)).thenReturn(Collections.emptyList());
+
+        IllegalStateException ex = assertThrows(
+            IllegalStateException.class,
+            () -> messwerteService.calculateSolarDistribution(dateFrom, dateTo, "EQUAL_SHARE"));
+
+        assertTrue(ex.getMessage().contains("BILANZMODELL_KEINE_BILANZDATEN"),
+            "Message soll den Key tragen: " + ex.getMessage());
+        // Intervall-Angabe (Tag + Zeit)
+        assertTrue(ex.getMessage().contains("2024-01-15"), "Message soll den Tag tragen: " + ex.getMessage());
+        assertTrue(ex.getMessage().contains("12:00"), "Message soll die Zeit tragen: " + ex.getMessage());
+        // keine Teilwerte geschrieben
+        verify(messwerteRepository, never()).save(any());
+    }
+
+    @Test
+    void calculateSolarDistribution_Bilanz_KeineRuecklieferung_KeinAbbruch_ConsumerVerteilt() {
+        LocalDateTime dateFrom = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime dateTo = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
+        LocalDateTime zeit = LocalDateTime.of(2024, 1, 15, 12, 0);
+
+        when(einstellungenService.getVerteilmodus(any())).thenReturn(Verteilmodus.BILANZ);
+        when(einheitRepository.existsByTyp(EinheitTyp.BEZUG)).thenReturn(true);
+        // Keine RUECKLIEFERUNG-Einheit vorhanden → Producer-zev = 0 (Statistik unvollständig, FR-2.4)
+        when(einheitRepository.existsByTyp(EinheitTyp.RUECKLIEFERUNG)).thenReturn(false);
+        when(messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo)).thenReturn(List.of(zeit));
+
+        Messwerte producer = new Messwerte(zeit, -10.0, -10.0, producerEinheit);
+        producer.setQuelle(Quelle.MQTT);
+        Messwerte consumer = new Messwerte(zeit, 10.0, 0.0, consumerEinheit);
+        Messwerte bezug = new Messwerte(zeit, 6.0, 0.0, bezugEinheit);
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.PRODUCER)).thenReturn(List.of(producer));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER)).thenReturn(List.of(consumer));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.BEZUG)).thenReturn(List.of(bezug));
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Kein Abbruch: fehlende Rücklieferung ist nicht abrechnungskritisch (FR-2.4)
+        MesswerteService.CalculationResult result = messwerteService.calculateSolarDistribution(
+            dateFrom, dateTo, "EQUAL_SHARE");
+
+        // Consumer-Abrechnung unberührt: S = max(0, 10 - 6) = 4
+        assertEquals(4.0, consumer.getZev(), 1e-9);
+        // Fehlende RUECKLIEFERUNG-Einheit → Producer-zev = 0 (MQTT-Producer, nur Statistik)
+        assertEquals(0.0, producer.getZev(), 1e-9);
+        assertEquals(1, result.getProcessedTimestamps());
+    }
+
+    @Test
+    void calculateSolarDistribution_Bilanz_CsvProducer_ZevBleibtGemessen() {
+        LocalDateTime dateFrom = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime dateTo = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
+        LocalDateTime zeit = LocalDateTime.of(2024, 1, 15, 12, 0);
+
+        when(einstellungenService.getVerteilmodus(any())).thenReturn(Verteilmodus.BILANZ);
+        when(einheitRepository.existsByTyp(EinheitTyp.BEZUG)).thenReturn(true);
+        when(messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo)).thenReturn(List.of(zeit));
+
+        when(einheitRepository.existsByTyp(EinheitTyp.RUECKLIEFERUNG)).thenReturn(true);
+
+        // CSV-Producer: gemessener zev (-7) bleibt unangetastet (Guard quelle == MQTT)
+        Messwerte producer = new Messwerte(zeit, -10.0, -7.0, producerEinheit); // default Quelle = CSV
+        Messwerte rueck = new Messwerte(zeit, -3.0, 0.0, ruecklieferungEinheit);
+        Messwerte consumer = new Messwerte(zeit, 10.0, 0.0, consumerEinheit);
+        Messwerte bezug = new Messwerte(zeit, 6.0, 0.0, bezugEinheit);
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.PRODUCER)).thenReturn(List.of(producer));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.RUECKLIEFERUNG)).thenReturn(List.of(rueck));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER)).thenReturn(List.of(consumer));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.BEZUG)).thenReturn(List.of(bezug));
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        messwerteService.calculateSolarDistribution(dateFrom, dateTo, "EQUAL_SHARE");
+
+        assertEquals(-7.0, producer.getZev(), 1e-9);
+        verify(messwerteRepository, never()).save(producer);
+        // Consumer regulär verteilt: S = 10 - 6 = 4
+        assertEquals(4.0, consumer.getZev(), 1e-9);
+    }
+
+    @Test
+    void calculateSolarDistribution_Bilanz_MqttProducer_ProducerZevAusProduktionMinusRuecklieferung() {
+        LocalDateTime dateFrom = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime dateTo = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
+        LocalDateTime zeit = LocalDateTime.of(2024, 1, 15, 12, 0);
+
+        when(einstellungenService.getVerteilmodus(any())).thenReturn(Verteilmodus.BILANZ);
+        when(einheitRepository.existsByTyp(EinheitTyp.BEZUG)).thenReturn(true);
+        when(einheitRepository.existsByTyp(EinheitTyp.RUECKLIEFERUNG)).thenReturn(true);
+        when(messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo)).thenReturn(List.of(zeit));
+
+        // MQTT-Producer: zev = |Produktion(10)| - |Rücklieferung(3)| = 7 (negativ gespeichert → -7)
+        Messwerte producer = new Messwerte(zeit, -10.0, -10.0, producerEinheit);
+        producer.setQuelle(Quelle.MQTT);
+        Messwerte rueck = new Messwerte(zeit, -3.0, 0.0, ruecklieferungEinheit);
+        Messwerte consumer = new Messwerte(zeit, 10.0, 0.0, consumerEinheit);
+        Messwerte bezug = new Messwerte(zeit, 6.0, 0.0, bezugEinheit);
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.PRODUCER)).thenReturn(List.of(producer));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.RUECKLIEFERUNG)).thenReturn(List.of(rueck));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER)).thenReturn(List.of(consumer));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.BEZUG)).thenReturn(List.of(bezug));
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        messwerteService.calculateSolarDistribution(dateFrom, dateTo, "EQUAL_SHARE");
+
+        assertEquals(-7.0, producer.getZev(), 1e-9);
+        verify(messwerteRepository).save(producer);
+        assertEquals(4.0, consumer.getZev(), 1e-9);
+    }
+
     // ==================== CalculationResult Tests ====================
 
     @Test

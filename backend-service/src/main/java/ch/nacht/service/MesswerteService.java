@@ -435,6 +435,10 @@ public class MesswerteService {
         if (!einheitRepository.existsByTyp(EinheitTyp.BEZUG)) {
             throw new IllegalStateException("BILANZMODELL_KEINE_BILANZDATEN: keine BEZUG-Einheit vorhanden");
         }
+        // Fehlt die RUECKLIEFERUNG-Einheit ganz, ist der im ZEV verbrauchte Anteil der Produktion
+        // nicht bestimmbar → Producer-zev = 0 (Statistik unvollständig, FR-2.4). Der Lauf läuft
+        // weiter, da dieser Wert nicht abrechnungsrelevant ist.
+        boolean hatRuecklieferung = einheitRepository.existsByTyp(EinheitTyp.RUECKLIEFERUNG);
 
         int processedTimestamps = 0;
         int processedRecords = 0;
@@ -447,17 +451,22 @@ public class MesswerteService {
             // Producer-zev (nur Statistik): im ZEV verbrauchte Produktion lt. Bilanz =
             // |Produktion| − |Rücklieferung|, proportional auf die Producer (MQTT-Guard).
             if (!producers.isEmpty()) {
-                BigDecimal produktion = producers.stream()
-                        .map(m -> BigDecimal.valueOf(m.getTotal()))
-                        .filter(t -> t.signum() < 0)
-                        .map(BigDecimal::abs)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-                BigDecimal ruecklieferung = messwerteRepository
-                        .findByZeitAndEinheitTyp(zeit, EinheitTyp.RUECKLIEFERUNG).stream()
-                        .map(m -> BigDecimal.valueOf(m.getTotal()).abs())
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-                BigDecimal imZev = produktion.subtract(ruecklieferung).max(BigDecimal.ZERO);
-                aktualisiereProducerZev(producers, imZev);
+                if (!hatRuecklieferung) {
+                    // Keine RUECKLIEFERUNG-Einheit → Anteil unbekannt → 0 (siehe FR-2.4).
+                    aktualisiereProducerZev(producers, BigDecimal.ZERO);
+                } else {
+                    BigDecimal produktion = producers.stream()
+                            .map(m -> BigDecimal.valueOf(m.getTotal()))
+                            .filter(t -> t.signum() < 0)
+                            .map(BigDecimal::abs)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    BigDecimal ruecklieferung = messwerteRepository
+                            .findByZeitAndEinheitTyp(zeit, EinheitTyp.RUECKLIEFERUNG).stream()
+                            .map(m -> BigDecimal.valueOf(m.getTotal()).abs())
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    BigDecimal imZev = produktion.subtract(ruecklieferung).max(BigDecimal.ZERO);
+                    aktualisiereProducerZev(producers, imZev);
+                }
             }
 
             List<Messwerte> consumers = messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER);

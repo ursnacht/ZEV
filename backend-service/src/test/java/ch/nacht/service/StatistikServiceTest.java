@@ -480,4 +480,41 @@ public class StatistikServiceTest {
         assertEquals(LocalDate.of(2024, 1, 15), monat.getVon());
         assertEquals(LocalDate.of(2024, 1, 31), monat.getBis());
     }
+
+    // ==================== Verteilmodus im StatistikDTO ====================
+
+    @Test
+    void getStatistik_VerteilmodusBilanz_WirdInsDtoGesetzt() {
+        when(einstellungenService.getVerteilmodus(any())).thenReturn(Verteilmodus.BILANZ);
+        stubMinimalStatistik();
+
+        StatistikDTO result = statistikService.getStatistik(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31));
+
+        assertEquals(Verteilmodus.BILANZ, result.getVerteilmodus());
+    }
+
+    @Test
+    void getStatistik_VerteilmodusProducerMessung_WirdInsDtoGesetzt() {
+        // Default aus setUp: PRODUCER_MESSUNG
+        stubMinimalStatistik();
+
+        StatistikDTO result = statistikService.getStatistik(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31));
+
+        assertEquals(Verteilmodus.PRODUCER_MESSUNG, result.getVerteilmodus());
+    }
+
+    /** Minimales, vollständiges Stub-Set für einen getStatistik-Lauf über einen Monat. */
+    private void stubMinimalStatistik() {
+        when(messwerteRepository.findMaxZeit()).thenReturn(Optional.of(LocalDateTime.of(2024, 1, 31, 23, 45)));
+        when(einheitRepository.findAll()).thenReturn(Arrays.asList(producer, consumer1));
+        when(messwerteRepository.findDistinctEinheitenInRange(any(), any()))
+                .thenReturn(Arrays.asList(producer, consumer1));
+        when(messwerteRepository.findDistinctDatesInRange(any(), any())).thenReturn(Collections.emptyList());
+        when(messwerteRepository.sumTotalByEinheitTypAndZeitBetween(any(), any(), any())).thenReturn(100.0);
+        when(messwerteRepository.sumZevByEinheitTypAndZeitBetween(any(), any(), any())).thenReturn(50.0);
+        when(messwerteRepository.sumZevCalculatedByEinheitTypAndZeitBetween(any(), any(), any())).thenReturn(50.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(any(), any(), any())).thenReturn(100.0);
+        when(messwerteRepository.sumZevByEinheitAndZeitBetween(any(), any(), any())).thenReturn(50.0);
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(any(), any(), any())).thenReturn(50.0);
+    }
 }
