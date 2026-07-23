@@ -62,7 +62,7 @@ Die folgende Tabelle ist ein **Überblick, nicht vollständig**. Massgeblich (Qu
 * Neue Übersetzungen immer mit `ON CONFLICT (key) DO NOTHING`.
 
 ### Multi-Tenancy
-* Jede Entity muss eine `org_id` (UUID) Spalte haben
+* Jede Entity muss eine `org_id` (BIGINT / `Long`) Spalte haben (interne Mandanten-ID, analog `messwerte`/`zaehler_rohdaten`; **nicht** UUID)
 * Hibernate-Filter (`@Filter`, `@FilterDef`) für automatische Mandantentrennung verwenden
 * `OrganizationContextService` liefert die aktuelle `org_id` aus dem Keycloak-Token
 * Flyway-Migrationen: Neue Tabellen immer mit `org_id` Spalte anlegen
