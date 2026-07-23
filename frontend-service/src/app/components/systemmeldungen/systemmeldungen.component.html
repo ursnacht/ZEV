@@ -1,0 +1,144 @@
+<div class="zev-container">
+  <h1><app-icon name="file-text" size="lg"></app-icon> {{ 'SYSTEMMELDUNGEN' | translate }}</h1>
+
+  @if (message) {
+    <div class="zev-message" [ngClass]="'zev-message--' + messageType"
+      [class.zev-message--dismissible]="messageType === 'error'" (click)="messageType === 'error' && dismissMessage()">
+      <span>{{ message | translate }}</span>
+      @if (messageType === 'error') {
+        <span class="zev-message__dismiss">&times;</span>
+      }
+    </div>
+  }
+
+  <!-- Filter -->
+  <div class="zev-filter-row">
+    <div class="zev-form-group">
+      <label for="erledigtFilter">{{ 'SYSTEMMELDUNGEN_FILTER_STATUS' | translate }}:</label>
+      <select id="erledigtFilter" class="zev-select" [(ngModel)]="erledigtFilter" (ngModelChange)="onFilterChange()">
+        <option value="OFFENE">{{ 'SYSTEMMELDUNGEN_FILTER_OFFENE' | translate }}</option>
+        <option value="ERLEDIGTE">{{ 'SYSTEMMELDUNGEN_FILTER_ERLEDIGTE' | translate }}</option>
+        <option value="ALLE">{{ 'SYSTEMMELDUNGEN_FILTER_ALLE' | translate }}</option>
+      </select>
+    </div>
+    <div class="zev-form-group">
+      <label for="kategorieFilter">{{ 'SYSTEMMELDUNGEN_KATEGORIE' | translate }}:</label>
+      <select id="kategorieFilter" class="zev-select" [(ngModel)]="kategorieFilter" (ngModelChange)="onFilterChange()">
+        <option value="">{{ 'SYSTEMMELDUNGEN_FILTER_ALLE_KATEGORIEN' | translate }}</option>
+        @for (kat of kategorien; track kat) {
+          <option [value]="kat">{{ kat | translate }}</option>
+        }
+      </select>
+    </div>
+    <div class="zev-form-group">
+      <label for="levelFilter">{{ 'SYSTEMMELDUNGEN_LEVEL' | translate }}:</label>
+      <select id="levelFilter" class="zev-select" [(ngModel)]="levelFilter" (ngModelChange)="onFilterChange()">
+        <option value="">{{ 'SYSTEMMELDUNGEN_FILTER_ALLE_LEVEL' | translate }}</option>
+        @for (lvl of levelOptionen; track lvl) {
+          <option [value]="lvl">{{ ('SYSTEMMELDUNG_LEVEL_' + lvl) | translate }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  @if (meldungen.length > 0) {
+    <table class="zev-table">
+      <thead>
+        <tr>
+          <th class="zev-table__header--sortable" (click)="onSort('level')">
+            {{ 'SYSTEMMELDUNGEN_LEVEL' | translate }}
+            @if (sortSpalte === 'level') {
+              <span class="zev-table__sort-indicator">{{ sortRichtung === 'ASC' ? '▲' : '▼' }}</span>
+            }
+          </th>
+          <th class="zev-table__header--sortable" (click)="onSort('kategorie')">
+            {{ 'SYSTEMMELDUNGEN_KATEGORIE' | translate }}
+            @if (sortSpalte === 'kategorie') {
+              <span class="zev-table__sort-indicator">{{ sortRichtung === 'ASC' ? '▲' : '▼' }}</span>
+            }
+          </th>
+          <th class="zev-table__header--sortable" (click)="onSort('erstmalsAufgetreten')">
+            {{ 'SYSTEMMELDUNGEN_ERSTMALS' | translate }}
+            @if (sortSpalte === 'erstmalsAufgetreten') {
+              <span class="zev-table__sort-indicator">{{ sortRichtung === 'ASC' ? '▲' : '▼' }}</span>
+            }
+          </th>
+          <th class="zev-table__header--sortable" (click)="onSort('zuletztAufgetreten')">
+            {{ 'SYSTEMMELDUNGEN_ZULETZT' | translate }}
+            @if (sortSpalte === 'zuletztAufgetreten') {
+              <span class="zev-table__sort-indicator">{{ sortRichtung === 'ASC' ? '▲' : '▼' }}</span>
+            }
+          </th>
+          <th class="zev-table__header--sortable" (click)="onSort('meldungKey')">
+            {{ 'SYSTEMMELDUNGEN_MELDUNG' | translate }}
+            @if (sortSpalte === 'meldungKey') {
+              <span class="zev-table__sort-indicator">{{ sortRichtung === 'ASC' ? '▲' : '▼' }}</span>
+            }
+          </th>
+          <th class="zev-table__number zev-table__header--sortable" (click)="onSort('zaehler')">
+            {{ 'SYSTEMMELDUNGEN_ZAEHLER' | translate }}
+            @if (sortSpalte === 'zaehler') {
+              <span class="zev-table__sort-indicator">{{ sortRichtung === 'ASC' ? '▲' : '▼' }}</span>
+            }
+          </th>
+          <th class="zev-table__header--sortable" (click)="onSort('erledigt')">
+            {{ 'SYSTEMMELDUNGEN_ERLEDIGT' | translate }}
+            @if (sortSpalte === 'erledigt') {
+              <span class="zev-table__sort-indicator">{{ sortRichtung === 'ASC' ? '▲' : '▼' }}</span>
+            }
+          </th>
+          @if (canManage) {
+            <th></th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (m of meldungen; track m.id) {
+          <tr [class.zev-text--muted]="m.erledigt">
+            <td>
+              <span class="zev-status" [ngClass]="levelClass(m.level)">
+                {{ ('SYSTEMMELDUNG_LEVEL_' + m.level) | translate }}
+              </span>
+            </td>
+            <td>{{ m.kategorie | translate }}</td>
+            <td>{{ m.erstmalsAufgetreten | date:'dd.MM.yyyy HH:mm' }}</td>
+            <td>{{ m.zuletztAufgetreten | date:'dd.MM.yyyy HH:mm' }}</td>
+            <td>{{ m.meldungKey | translate }}{{ m.parameter ? ' ' + m.parameter : '' }}</td>
+            <td class="zev-table__number">{{ m.zaehler }}</td>
+            <td>
+              <input type="checkbox" class="zev-checkbox" [checked]="m.erledigt"
+                [disabled]="!canManage" (change)="onToggleErledigt(m)"
+                [attr.aria-label]="'SYSTEMMELDUNGEN_ERLEDIGT' | translate" />
+            </td>
+            @if (canManage) {
+              <td>
+                <app-kebab-menu [items]="menuItems" (itemClick)="onMenuAction($event, m)"></app-kebab-menu>
+              </td>
+            }
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    <!-- Paginierung (serverseitig, analog Datenbank-Ansicht) -->
+    <div class="zev-pagination">
+      <button type="button" class="zev-button zev-button--secondary zev-button--compact"
+        [disabled]="page === 0 || loading" (click)="onVorherigeSeite()">
+        <app-icon name="chevron-left"></app-icon>
+        {{ 'PAGINATION_VORHERIGE' | translate }}
+      </button>
+      <span class="zev-text--muted">{{ 'PAGINATION_SEITE' | translate }} {{ page + 1 }}</span>
+      <button type="button" class="zev-button zev-button--secondary zev-button--compact"
+        [disabled]="!hatMehr || loading" (click)="onNaechsteSeite()">
+        {{ 'PAGINATION_NAECHSTE' | translate }}
+        <app-icon name="chevron-right"></app-icon>
+      </button>
+    </div>
+  }
+
+  @if (meldungen.length === 0 && !loading) {
+    <div class="zev-empty-state">
+      <p>{{ 'SYSTEMMELDUNGEN_KEINE' | translate }}</p>
+    </div>
+  }
+</div>

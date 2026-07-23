@@ -53,6 +53,11 @@
   color: #C62828;
 }
 
+.zev-status--info {
+  background-color: rgba(33, 150, 243, 0.15);
+  color: #1565C0;
+}
+
 /* Dark Mode */
 [data-theme="dark"] .zev-status--success {
   background-color: rgba(105, 219, 124, 0.2);
@@ -67,4 +72,9 @@
 [data-theme="dark"] .zev-status--error {
   background-color: rgba(255, 107, 107, 0.2);
   color: #ff6b6b;
+}
+
+[data-theme="dark"] .zev-status--info {
+  background-color: rgba(77, 171, 247, 0.2);
+  color: #4dabf7;
 }

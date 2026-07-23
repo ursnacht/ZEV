@@ -217,3 +217,15 @@ input[type="date"].zev-input {
     flex: 1;
   }
 }
+
+/* Filterleiste: mehrere Filter-Controls nebeneinander (oberhalb einer Liste/Tabelle) */
+.zev-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.zev-filter-row .zev-form-group {
+  margin-bottom: 0;
+}

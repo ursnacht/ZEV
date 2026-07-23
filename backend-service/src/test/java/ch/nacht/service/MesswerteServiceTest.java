@@ -52,6 +52,9 @@ public class MesswerteServiceTest {
     @Mock
     private EinstellungenService einstellungenService;
 
+    @Mock
+    private SystemmeldungService systemmeldungService;
+
     @InjectMocks
     private MesswerteService messwerteService;
 

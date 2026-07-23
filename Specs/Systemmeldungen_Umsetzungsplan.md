@@ -36,19 +36,19 @@ Eine mandantenfähige, benutzer­sichtbare **Systemmeldungen**-Seite, die Betrie
 
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
-| [ ] | 1. DB-Migration Tabelle | `V86` – `zev.systemmeldung` + Sequenz, UNIQUE-Teil-Index `(org_id, meldung_key) WHERE erledigt=false`, Index für Liste/Retention |
-| [ ] | 2. Backend-Enum + Entity | `MeldungLevel` (INFO/WARN/ERROR), `Systemmeldung` (mit `@Filter("orgFilter")`, `org_id` `Long`) |
-| [ ] | 3. Backend-Repository | Paginierte/gefilterte Liste (`Slice`), org-explizite Dedup-/Auto-Resolve-Queries, Retention-Delete |
-| [ ] | 4. Backend-Service | `SystemmeldungService`: `erfasse(...)` (Dedup, `REQUIRES_NEW`), `autoResolve(orgId, key)`, `getSeite(...)`, `setErledigt(...)`, `delete(...)` |
-| [ ] | 5. Backend-Controller + DTO | `/api/systemmeldungen` (GET paginiert/sortiert/gefiltert, PUT erledigt-Toggle, DELETE); `@PreAuthorize` read/manage |
-| [ ] | 6. Bilanzmodell-Integration | `MesswerteService`/`ZaehlerAggregationService`: Erfassen im Fehlerpfad (org-explizit, `REQUIRES_NEW`), Auto-Resolve im Erfolgsfall |
-| [ ] | 7. Retention Cleanup-Job | `@Scheduled` (ohne `@Profile("mqtt")`, analog `RechnungStorageService`) + `application.yml`-Config |
-| [ ] | 8. Berechtigungen | `systemmeldungen:read`/`:manage` in `zev-realm.json` (Composite Roles) + `Berechtigungen.md` |
-| [ ] | 9. Frontend-Model + Service | `systemmeldung.model.ts`, `systemmeldung.service.ts` (paginierte/gefilterte Calls) |
-| [ ] | 10. Frontend-Komponente | List-Component: Filter (Erledigt/Kategorie/Level), serverseitige Sortierung, Paginierung, Kebab (löschen), Checkbox (erledigt), Level-Badge |
-| [ ] | 11. Routing | Route `/systemmeldungen` mit `AuthGuard`, `data.permissions: ['systemmeldungen:read']` |
-| [ ] | 12. Navigation | Menü-Eintrag **nach „Statistik"**, Icon `file-text` |
-| [ ] | 13. Übersetzungen | `V87` – Menü/Titel, Spalten, Filter-Labels, Level-/Kategorie-Labels, Aktionen (DE/EN) |
+| [x] | 1. DB-Migration Tabelle | `V86` – `zev.systemmeldung` + Sequenz, UNIQUE-Teil-Index `(org_id, meldung_key) WHERE erledigt=false`, Index für Liste/Retention |
+| [x] | 2. Backend-Enum + Entity | `MeldungLevel` (INFO/WARN/ERROR), `Systemmeldung` (mit `@Filter("orgFilter")`, `org_id` `Long`) |
+| [x] | 3. Backend-Repository | Paginierte/gefilterte Liste (`Slice`), org-explizite Dedup-/Auto-Resolve-Queries, Retention-Delete |
+| [x] | 4. Backend-Service | `SystemmeldungService`: `erfasse(...)` (Dedup, `REQUIRES_NEW`), `autoResolve(orgId, key)`, `getSeite(...)`, `setErledigt(...)`, `delete(...)`; zentrale Kategorie-/Keys als Konstanten |
+| [x] | 5. Backend-Controller + DTO | `/api/systemmeldungen` (GET paginiert/sortiert/gefiltert, PUT erledigt-Toggle, DELETE); method-level `@PreAuthorize` read/manage |
+| [x] | 6. Bilanzmodell-Integration | zentral in `MesswerteService.distributeBilanz`: Erfassen (org-explizit, `REQUIRES_NEW`) vor Abbruch, Auto-Resolve bei Erfolg → deckt manuellen + MQTT-Lauf ab (keine Änderung an Controller/Aggregation nötig) |
+| [x] | 7. Retention Cleanup-Job | `SystemmeldungCleanupJob` `@Scheduled` (ohne `@Profile`) + `application.yml` (`systemmeldung.retention.tage/cron`) |
+| [x] | 8. Berechtigungen | `systemmeldungen:read`/`:manage` in `zev-realm.json` (Composite Roles: read→zev_user, manage→org_admin) + `Berechtigungen.md`. **Realm-Reimport durch User** |
+| [x] | 9. Frontend-Model + Service | `systemmeldung.model.ts`, `systemmeldung.service.ts` (paginierte/gefilterte Calls) |
+| [x] | 10. Frontend-Komponente | List-Component: Filter (Erledigt/Kategorie/Level), serverseitige Sortierung, Paginierung, Kebab (löschen), Checkbox (erledigt), Level-Badge; neue DS-Styles `.zev-status--info`, `.zev-pagination`, `.zev-filter-row` |
+| [x] | 11. Routing | Route `/systemmeldungen` mit `AuthGuard`, `data.permissions: ['systemmeldungen:read']` |
+| [x] | 12. Navigation | Menü-Eintrag **nach „Statistik"**, Icon `file-text` |
+| [x] | 13. Übersetzungen | `V87` – Menü/Titel, Spalten, Filter-Labels, Level-/Kategorie-Labels, Pagination, Aktionen (DE/EN) |
 
 > **Reihenfolge-Hinweis:** Backend (1–7) vor Frontend (9–12). Phase 8 (Keycloak) wird vom User ausgeführt (Realm-Reimport/Umgebung).
 

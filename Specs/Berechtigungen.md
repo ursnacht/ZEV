@@ -40,6 +40,8 @@ Stand: 2026-07-09
 | `translations:manage`   | ❌  | ✅        | ❌        |
 | `featureflags:manage`   | ❌  | ✅        | ❌        |
 | `datenbank:read`        | ❌  | ✅        | ❌        |
+| `systemmeldungen:read`  | ✅  | ✅        | ✅        |
+| `systemmeldungen:manage`| ❌  | ✅        | ✅        |
 
 ## Legende
 
@@ -70,6 +72,8 @@ Die Rollen-Spalten sind aus der obigen Fachrolle→Permission-Zuordnung abgeleit
 | **Feature-Flags verwalten** ³                        | `featureflags:manage`    | ❌  | ✅        | ❌        |
 | **Datenbank-Ansicht** (Einstellungen) ⁵              | `datenbank:read`         | ❌  | ✅        | ❌        |
 | Lizenzen ansehen                                     | `lizenzen:read`          | ✅  | ✅        | ✅        |
+| Systemmeldungen ansehen                              | `systemmeldungen:read`   | ✅  | ✅        | ✅        |
+| Systemmeldungen verwalten (erledigt/löschen)         | `systemmeldungen:manage` | ❌  | ✅        | ✅        |
 | Design-System-Showcase ⁰                             | – (authentifiziert)      | ✅  | ✅        | ✅        |
 
 ## Fussnoten
@@ -123,6 +127,8 @@ Die Spalten `zev_user` / `zev_admin` / `org_admin` sind gleich dargestellt wie i
 | FeatureFlagController    | `GET /api/feature-flags`                                                    | `hasAuthority('featureflags:read')`      | ✅  | ✅        | ✅        |
 | FeatureFlagController    | `GET /admin`, `PUT /{key}`, `DELETE /{key}`                                 | `hasAuthority('featureflags:manage')`    | ❌  | ✅        | ❌        |
 | LizenzenController       | `GET /api/lizenzen`                                                         | `hasAuthority('lizenzen:read')`          | ✅  | ✅        | ✅        |
+| SystemmeldungController  | `GET /api/systemmeldungen`, `GET /kategorien`                               | `hasAuthority('systemmeldungen:read')`   | ✅  | ✅        | ✅        |
+| SystemmeldungController  | `PUT /{id}/erledigt`, `DELETE /{id}`                                        | `hasAuthority('systemmeldungen:manage')` | ❌  | ✅        | ✅        |
 | AuthController           | `POST /api/auth/logout`                                                     | `isAuthenticated()`                      | ✅  | ✅        | ✅        |
 
 `PingController` (`GET /ping`), `/api/public/**` sowie `/actuator/health|info|prometheus` sind öffentlich; die übrigen Actuator-Endpoints erfordern Basic Auth (siehe Abschnitt oben).

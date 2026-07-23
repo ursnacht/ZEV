@@ -95,6 +95,12 @@ management:
       export:
         enabled: true
 
+# Systemmeldungen: Aufbewahrung (Retention) erledigter Einträge
+systemmeldung:
+  retention:
+    tage: 90                 # erledigte Meldungen älter als N Tage werden gelöscht
+    cron: "0 0 3 * * *"      # täglich 03:00 (Cleanup-Job, ohne mqtt-Profil)
+
 # Logging Configuration
 logging:
   level:

@@ -13,6 +13,7 @@ import { DesignSystemShowcaseComponent } from './components/design-system-showca
 import { LizenzenComponent } from './components/lizenzen/lizenzen.component';
 import { TranslationEditorComponent } from './components/translation-editor/translation-editor.component';
 import { DebitorkontrolleListComponent } from './components/debitorkontrolle-list/debitorkontrolle-list.component';
+import { SystemmeldungenComponent } from './components/systemmeldungen/systemmeldungen.component';
 
 import { AuthGuard } from './guards/auth.guard';
 import { FeatureFlagGuard } from './guards/feature-flag.guard';
@@ -25,6 +26,7 @@ export const routes: Routes = [
   { path: 'solar-calculation', component: SolarCalculationComponent, canActivate: [AuthGuard], data: { permissions: ['messwerte:write'] } },
   { path: 'chart', component: MesswerteChartComponent, canActivate: [AuthGuard], data: { permissions: ['messwerte:read'] } },
   { path: 'statistik', component: StatistikComponent, canActivate: [AuthGuard], data: { permissions: ['statistik:read'] } },
+  { path: 'systemmeldungen', component: SystemmeldungenComponent, canActivate: [AuthGuard], data: { permissions: ['systemmeldungen:read'] } },
   { path: 'rechnungen', component: RechnungenComponent, canActivate: [AuthGuard], data: { permissions: ['rechnungen:manage'] } },
   { path: 'debitoren', component: DebitorkontrolleListComponent, canActivate: [AuthGuard], data: { permissions: ['debitoren:manage'] } },
   { path: 'tarife', component: TarifListComponent, canActivate: [AuthGuard], data: { permissions: ['tarife:manage'] } },

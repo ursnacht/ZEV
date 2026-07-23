@@ -4,6 +4,7 @@ import ch.nacht.ProportionalConsumptionDistribution;
 import ch.nacht.SolarDistribution;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
+import ch.nacht.entity.MeldungLevel;
 import ch.nacht.entity.Messwerte;
 import ch.nacht.entity.Quelle;
 import ch.nacht.entity.Verteilmodus;
@@ -38,19 +39,22 @@ public class MesswerteService {
     private final HibernateFilterService hibernateFilterService;
     private final CalculationProgressService calculationProgressService;
     private final EinstellungenService einstellungenService;
+    private final SystemmeldungService systemmeldungService;
 
     public MesswerteService(MesswerteRepository messwerteRepository,
                             EinheitRepository einheitRepository,
                             OrganizationContextService organizationContextService,
                             HibernateFilterService hibernateFilterService,
                             CalculationProgressService calculationProgressService,
-                            EinstellungenService einstellungenService) {
+                            EinstellungenService einstellungenService,
+                            SystemmeldungService systemmeldungService) {
         this.messwerteRepository = messwerteRepository;
         this.einheitRepository = einheitRepository;
         this.organizationContextService = organizationContextService;
         this.hibernateFilterService = hibernateFilterService;
         this.calculationProgressService = calculationProgressService;
         this.einstellungenService = einstellungenService;
+        this.systemmeldungService = systemmeldungService;
         log.info("MesswerteService initialized");
     }
 
@@ -433,7 +437,10 @@ public class MesswerteService {
             boolean showProgress, long startTime) {
         // BEZUG-Einheit ist abrechnungskritisch: fehlt sie komplett, sofort abbrechen.
         if (!einheitRepository.existsByTyp(EinheitTyp.BEZUG)) {
-            throw new IllegalStateException("BILANZMODELL_KEINE_BILANZDATEN: keine BEZUG-Einheit vorhanden");
+            systemmeldungService.erfasse(progressOrgId, MeldungLevel.ERROR,
+                    SystemmeldungService.KATEGORIE_BILANZMODELL, SystemmeldungService.KEY_KEINE_BILANZDATEN, null);
+            throw new IllegalStateException(
+                    SystemmeldungService.KEY_KEINE_BILANZDATEN + ": keine BEZUG-Einheit vorhanden");
         }
         // Fehlt die RUECKLIEFERUNG-Einheit ganz, ist der im ZEV verbrauchte Anteil der Produktion
         // nicht bestimmbar → Producer-zev = 0 (Statistik unvollständig, FR-2.4). Der Lauf läuft
@@ -478,8 +485,11 @@ public class MesswerteService {
             // Bezug ist für dieses Intervall abrechnungskritisch.
             List<Messwerte> bezugMesswerte = messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.BEZUG);
             if (bezugMesswerte.isEmpty()) {
-                throw new IllegalStateException("BILANZMODELL_KEINE_BILANZDATEN: "
-                        + zeit.toLocalDate() + " " + zeit.toLocalTime());
+                String intervall = zeit.toLocalDate() + " " + zeit.toLocalTime();
+                systemmeldungService.erfasse(progressOrgId, MeldungLevel.ERROR,
+                        SystemmeldungService.KATEGORIE_BILANZMODELL, SystemmeldungService.KEY_KEINE_BILANZDATEN,
+                        intervall);
+                throw new IllegalStateException(SystemmeldungService.KEY_KEINE_BILANZDATEN + ": " + intervall);
             }
 
             BigDecimal bezug = bezugMesswerte.stream()
@@ -525,6 +535,9 @@ public class MesswerteService {
                 log.debug("Progress (Bilanz): {} timestamps processed", processedTimestamps);
             }
         }
+
+        // Erfolgreicher Bilanzlauf → offene Bilanzdaten-Meldungen des Mandanten auto-resolven (Selbstheilung).
+        systemmeldungService.autoResolve(progressOrgId, SystemmeldungService.KEY_KEINE_BILANZDATEN);
 
         long duration = System.currentTimeMillis() - startTime;
         log.info(

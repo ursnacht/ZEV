@@ -148,6 +148,14 @@
                 "description": "Datenbank-Ansicht (generische, read-only Tabellenansicht) - nur zev_admin"
             },
             {
+                "name": "systemmeldungen:read",
+                "description": "Systemmeldungen ansehen"
+            },
+            {
+                "name": "systemmeldungen:manage",
+                "description": "Systemmeldungen verwalten (erledigt markieren, loeschen)"
+            },
+            {
                 "name": "zev_user",
                 "description": "ZEV Member role: Lesezugriff + Rechnungen/Debitoren verwalten (Composite)",
                 "composite": true,
@@ -161,7 +169,8 @@
                         "lizenzen:read",
                         "mieter:read",
                         "rechnungen:manage",
-                        "debitoren:manage"
+                        "debitoren:manage",
+                        "systemmeldungen:read"
                     ]
                 }
             },
@@ -176,7 +185,8 @@
                         "einheit:write",
                         "messwerte:write",
                         "tarife:manage",
-                        "mieter:manage"
+                        "mieter:manage",
+                        "systemmeldungen:manage"
                     ]
                 }
             },
