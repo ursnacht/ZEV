@@ -15,9 +15,13 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -36,17 +40,20 @@ public class StatistikService {
     private final HibernateFilterService hibernateFilterService;
     private final OrganizationContextService organizationContextService;
     private final EinstellungenService einstellungenService;
+    private final TranslationService translationService;
 
     public StatistikService(MesswerteRepository messwerteRepository,
                             EinheitRepository einheitRepository,
                             HibernateFilterService hibernateFilterService,
                             OrganizationContextService organizationContextService,
-                            EinstellungenService einstellungenService) {
+                            EinstellungenService einstellungenService,
+                            TranslationService translationService) {
         this.messwerteRepository = messwerteRepository;
         this.einheitRepository = einheitRepository;
         this.hibernateFilterService = hibernateFilterService;
         this.organizationContextService = organizationContextService;
         this.einstellungenService = einstellungenService;
+        this.translationService = translationService;
     }
 
     @Transactional(readOnly = true)
@@ -380,5 +387,85 @@ public class StatistikService {
         });
 
         dto.setEinheitSummen(einheitSummen);
+    }
+
+    // ==================== CSV-Export der 15-Min-Werte je Consumer (Spec Export-Messdaten) ====================
+
+    /**
+     * Erzeugt eine CSV der 15-Minuten-Messwerte einer <b>Consumer</b>-Einheit für den Zeitraum
+     * (Spalten: Datum+Zeit, Energiebezug Total, Anteil Bezug aus ZEV). Die Spaltentitel werden je
+     * {@code sprache} übersetzt; das Monatstotal im Titel wird aus derselben Rundungsbasis (Summe der
+     * auf 3 NKS gerundeten Intervallwerte) gebildet, sodass Header == Summe der Zeilen.
+     *
+     * <p>Sicherheit: Da {@code findById} den {@code orgFilter} nicht anwendet, wird die {@code org_id}
+     * der Einheit <b>explizit</b> geprüft (keine Cross-Tenant-Exporte).
+     */
+    @Transactional(readOnly = true)
+    public byte[] exportMesswerteCsv(Long einheitId, LocalDate von, LocalDate bis, String sprache) {
+        hibernateFilterService.enableOrgFilter();
+
+        Einheit einheit = einheitRepository.findById(einheitId)
+                .orElseThrow(() -> new IllegalArgumentException("EINHEIT_NICHT_GEFUNDEN"));
+        // Org-Check (findById umgeht den orgFilter)
+        if (!Objects.equals(einheit.getOrgId(), organizationContextService.getCurrentOrgId())) {
+            throw new IllegalArgumentException("EINHEIT_NICHT_GEFUNDEN");
+        }
+        if (einheit.getTyp() != EinheitTyp.CONSUMER) {
+            throw new IllegalArgumentException("EXPORT_NUR_CONSUMER");
+        }
+
+        List<Messwerte> werte = messwerteRepository.findByEinheitAndZeitBetween(
+                einheit, von.atStartOfDay(), bis.atTime(23, 59, 59));
+        werte.sort(Comparator.comparing(Messwerte::getZeit));
+
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
+        BigDecimal totalSum = BigDecimal.ZERO;
+        BigDecimal zevSum = BigDecimal.ZERO;
+        List<String> zeilen = new ArrayList<>();
+        for (Messwerte m : werte) {
+            BigDecimal total = round3(m.getTotal());
+            BigDecimal zev = round3(m.getZev());
+            totalSum = totalSum.add(total);
+            zevSum = zevSum.add(zev);
+            zeilen.add(csv(m.getZeit().format(fmt)) + "," + total.toPlainString() + "," + zev.toPlainString());
+        }
+
+        String titelZeit = translate("EXPORT_SPALTE_DATUM_ZEIT", sprache);
+        String titelTotal = translate("EXPORT_SPALTE_ENERGIEBEZUG_TOTAL", sprache);
+        String titelZev = translate("EXPORT_SPALTE_ANTEIL_ZEV", sprache);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(csv(titelZeit)).append(',')
+                .append(csv(titelTotal + " (" + totalSum.toPlainString() + ")")).append(',')
+                .append(csv(titelZev + " (" + zevSum.toPlainString() + ")")).append('\n');
+        for (String zeile : zeilen) {
+            sb.append(zeile).append('\n');
+        }
+
+        logger.info("CSV-Export für Einheit {} ({} – {}): {} Zeilen", einheitId, von, bis, zeilen.size());
+        return sb.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** Übersetzt einen Key je Sprache (analog {@code StatistikPdfService}); Fallback = Key. */
+    private String translate(String key, String sprache) {
+        return translationService.getTranslationByKey(key)
+                .map(t -> "en".equalsIgnoreCase(sprache) ? t.getEnglisch() : t.getDeutsch())
+                .filter(v -> v != null && !v.isBlank())
+                .orElse(key);
+    }
+
+    private static BigDecimal round3(Double v) {
+        return BigDecimal.valueOf(v != null ? v : 0.0).setScale(3, RoundingMode.HALF_UP);
+    }
+
+    /** CSV-Feld escapen (nur nötig bei Komma/Quote/Zeilenumbruch, z.B. in übersetzten Titeln). */
+    private static String csv(String value) {
+        if (value == null) {
+            return "";
+        }
+        if (value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 }

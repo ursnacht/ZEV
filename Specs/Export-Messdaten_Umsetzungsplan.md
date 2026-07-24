@@ -25,11 +25,11 @@ In der Statistik-Seite bekommt jede **Consumer**-Zeile der Monatstabelle „Summ
 
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
-| [ ] | 1. Backend-Service (CSV) | `StatistikService.exportMesswerteCsv(einheitId, von, bis, sprache)`: org-expliziter Einheiten-Check, 15-Min-Werte laden, auf 3 NKS runden, Header (übersetzte Titel + Monatstotal aus gerundeten Werten), Datenzeilen, `byte[]`/String |
-| [ ] | 2. Backend-Controller | `GET /api/statistik/export/csv?einheitId&von&bis&sprache` → `text/csv`, `Content-Disposition: attachment`, Dateiname bereinigt; `von > bis` → 400 (Klasse hat bereits `@PreAuthorize('statistik:read')`) |
-| [ ] | 3. Frontend-Service | `statistik.service.ts`: `exportCsv(einheitId, von, bis, sprache): Observable<Blob>` |
-| [ ] | 4. Frontend-Component | Button „Download CSV" je **CONSUMER**-Zeile in „Summen pro Einheit"; deaktiviert bei `summeTotal === 0`; Download-Handler (Blob → Link), Sprache via `getCurrentLanguage()` |
-| [ ] | 5. Übersetzungen | `V88` – `DOWNLOAD_CSV` + Spaltentitel-Keys + Fehlermeldung (DE/EN) |
+| [x] | 1. Backend-Service (CSV) | `StatistikService.exportMesswerteCsv(einheitId, von, bis, sprache)`: org-expliziter Einheiten-Check, nur CONSUMER, 15-Min-Werte laden, auf 3 NKS runden, Header (übersetzte Titel + Monatstotal aus gerundeten Werten), Datenzeilen, `byte[]`; `TranslationService` injiziert |
+| [x] | 2. Backend-Controller | `GET /api/statistik/export/csv?einheitId&von&bis&sprache` → `text/csv`, `Content-Disposition: attachment` (ASCII-Fallback-Name); `von > bis` → 400; `IllegalArgumentException` → 400 (Klasse hat bereits `@PreAuthorize('statistik:read')`) |
+| [x] | 3. Frontend-Service | `statistik.service.ts`: `exportCsv(einheitId, von, bis, sprache): Observable<Blob>` |
+| [x] | 4. Frontend-Component | Button „Download CSV" je **CONSUMER**-Zeile in „Summen pro Einheit"; deaktiviert bei `summeTotal === 0`; Download-Handler (Blob → Link, benutzerfreundlicher Dateiname mit Einheiten-Name), Sprache via `getCurrentLanguage()` |
+| [x] | 5. Übersetzungen | `V88` – `DOWNLOAD_CSV`, `EXPORT_SPALTE_*`, `EXPORT_CSV_FEHLER` (DE/EN) |
 
 ---
 

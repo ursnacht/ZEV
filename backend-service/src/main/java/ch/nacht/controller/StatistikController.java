@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 
 @RestController
@@ -73,6 +74,43 @@ public class StatistikController {
 
         } catch (Exception e) {
             log.error("Failed to retrieve letztes Messdatum - error: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/export/csv")
+    public ResponseEntity<byte[]> exportCsv(
+            @RequestParam Long einheitId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate von,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate bis,
+            @RequestParam(defaultValue = "de") String sprache) {
+
+        log.info("CSV export request - einheitId: {}, von: {}, bis: {}, sprache: {}", einheitId, von, bis, sprache);
+
+        try {
+            if (von.isAfter(bis)) {
+                log.warn("Invalid date range - von ({}) is after bis ({})", von, bis);
+                return ResponseEntity.badRequest().build();
+            }
+
+            byte[] csv = statistikService.exportMesswerteCsv(einheitId, von, bis, sprache);
+            // Server-seitiger Fallback-Dateiname (ASCII-sicher); das Frontend setzt den
+            // benutzerfreundlichen Namen mit Einheiten-Name selbst.
+            String filename = String.format("verbrauch_%d_%04d-%02d.csv", einheitId, von.getYear(), von.getMonthValue());
+
+            log.info("CSV export successful - filename: {}, size: {} bytes", filename, csv.length);
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
+                    .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                    .body(csv);
+
+        } catch (IllegalArgumentException e) {
+            log.warn("CSV export abgelehnt - einheitId: {}, error: {}", einheitId, e.getMessage());
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("CSV export failed - einheitId: {}, von: {}, bis: {}, error: {}",
+                    einheitId, von, bis, e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }

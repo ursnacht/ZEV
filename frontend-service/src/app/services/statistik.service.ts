@@ -35,4 +35,17 @@ export class StatistikService {
       responseType: 'blob'
     });
   }
+
+  exportCsv(einheitId: number, von: string, bis: string, sprache: string = 'de'): Observable<Blob> {
+    const params = new HttpParams()
+      .set('einheitId', einheitId)
+      .set('von', von)
+      .set('bis', bis)
+      .set('sprache', sprache);
+
+    return this.http.get(`${this.apiUrl}/export/csv`, {
+      params,
+      responseType: 'blob'
+    });
+  }
 }

@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WithMessage } from '../../utils/with-message';
 import { StatistikService } from '../../services/statistik.service';
-import { Statistik, MonatsStatistik, TagMitAbweichung } from '../../models/statistik.model';
+import { Statistik, MonatsStatistik, TagMitAbweichung, EinheitSummen } from '../../models/statistik.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { EinheitTypPipe } from '../../pipes/einheit-typ.pipe';
 import { SwissDatePipe } from '../../pipes/swiss-date.pipe';
@@ -135,6 +135,26 @@ export class StatistikComponent extends WithMessage implements OnInit {
           'error'
         );
       }
+    });
+  }
+
+  /**
+   * CSV-Download der 15-Min-Werte einer Consumer-Einheit für den Monat. Der Dateiname wird
+   * benutzerfreundlich aus Einheiten-Name + Monat gebildet (bereinigt).
+   */
+  onDownloadCsv(monat: MonatsStatistik, einheit: EinheitSummen): void {
+    const sprache = this.translationService.getCurrentLanguage();
+    this.statistikService.exportCsv(einheit.einheitId, monat.von, monat.bis, sprache).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const name = einheit.einheitName.replace(/[^A-Za-z0-9._-]/g, '_');
+        link.download = `verbrauch_${name}_${monat.von.substring(0, 7)}.csv`;
+        link.click();
+        window.URL.revokeObjectURL(url);
+      },
+      error: () => this.showMessage(this.translationService.translate('EXPORT_CSV_FEHLER'), 'error')
     });
   }
 

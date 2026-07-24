@@ -46,6 +46,9 @@ public class StatistikServiceTest {
     @Mock
     private EinstellungenService einstellungenService;
 
+    @Mock
+    private TranslationService translationService;
+
     @InjectMocks
     private StatistikService statistikService;
 
