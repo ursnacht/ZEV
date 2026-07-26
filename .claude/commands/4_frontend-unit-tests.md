@@ -52,8 +52,9 @@ Fahre ab Abschnitt "Vorgehen" fort.
 
 ### Phase 3: Test-Erstellung
 1. Erstelle Tests für fehlende Cases (Vorlagen unten beachten)
-2. Führe Tests aus: `npm test -- --include=**/xxx.spec.ts --no-watch --browsers=ChromeHeadless`
+2. Führe Tests aus: `npm test -- <pfad/zur/xxx.spec.ts>` (Vitest, single-run; ein Datei-Pfad als Argument)
 3. Behebe Fehler bis Tests grün sind
+4. Zum Schluss die **komplette** Suite grün laufen lassen: `npm test`
 
 ## Testpyramide
 * **Unit Tests:** 70-80% der Tests (dieser Command)
@@ -62,11 +63,27 @@ Fahre ab Abschnitt "Vorgehen" fort.
 ---
 
 ## Test-Anforderungen
-* **Tool:** Jasmine mit Karma
+* **Tool:** **Vitest** (Runner `@angular/build:unit-test`, `runner: "vitest"`, jsdom) – **kein Karma/Jasmine mehr**.
 * **Namenskonvention:** `*.spec.ts` (gleicher Ordner wie Quell-Datei)
 * Mocke alle externen Abhängigkeiten (Services, HTTP-Calls)
 * Teste: Initialisierung, Inputs/Outputs, public Methoden, Edge Cases, Fehlerbehandlung
 * Keine E2E-Aspekte (DOM-Interaktion, Routing) - nur isolierte Logik
+
+## Test-Infrastruktur (Vitest) — verbindlich beachten
+* **Globals aktiv:** `describe`, `it`, `expect`, `beforeEach`, `afterEach`, `vi` sind global verfügbar – **nicht** importieren.
+* **Spies statt Jasmine:** `createSpyObj`/`SpyObj` aus `src/testing/spy.ts` verwenden (Ersatz für `jasmine.createSpyObj`/`jasmine.SpyObj`).
+  * `import { createSpyObj, SpyObj } from '<relativer-pfad>/testing/spy';`
+  * `spy.method.and.returnValue(x)` → `spy.method.mockReturnValue(x)`
+  * `spy.method.and.callFake(fn)` → `spy.method.mockImplementation(fn)`
+  * `spy.method.and.throwError(...)` → `spy.method.mockImplementation(() => { throw ... })`
+  * `spy.calls.reset()` → `spy.mockClear()`
+* **`vi.spyOn` ruft standardmäßig DURCH** (anders als Jasmine): zum Stubben immer `.mockImplementation(() => {})` bzw. `.mockReturnValue(...)` anhängen (z.B. `vi.spyOn(window, 'confirm').mockReturnValue(true)`).
+* **Matcher:** `toBeTrue()`/`toBeFalse()` gibt es NICHT → `toBe(true)`/`toBe(false)`. `jasmine.any(...)`/`jasmine.objectContaining(...)` → `expect.any(...)`/`expect.objectContaining(...)`.
+* **Async/Timer:** zone.js patcht Vitest NICHT → Angulars `fakeAsync`/`tick`/`waitForAsync` werfen „ProxyZone not found".
+  * `fakeAsync`/`tick` aus `src/testing/fake-async.ts` importieren (Vitest-Faketimer-Shim), **nicht** aus `@angular/core/testing`.
+  * `waitForAsync(() => {...})` → `async () => { await ... }`.
+* **jsdom-Shims** in `src/test-setup.ts` bereits vorhanden: `URL.createObjectURL`/`revokeObjectURL`, `DataTransfer`, `DragEvent`. Für Download-Tests genügt i.d.R. `vi.spyOn(URL, 'createObjectURL')`/`vi.spyOn(document, 'createElement')`.
+* **HTTP:** `HttpClientTestingModule` + `HttpTestingController` werden weiterhin verwendet (kein `provideHttpClientTesting`).
 
 ## Service Tests
 
@@ -132,7 +149,9 @@ describe('XxxService', () => {
 
 ### List-Component Test (exakt einhalten)
 ```typescript
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { createSpyObj, SpyObj } from '../../../testing/spy';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { fakeAsync, tick } from '../../../testing/fake-async';
 import { XxxListComponent } from './xxx-list.component';
 import { XxxService } from '../../services/xxx.service';
 import { TranslationService } from '../../services/translation.service';
@@ -142,9 +161,9 @@ describe('XxxListComponent', () => {
   let component: XxxListComponent;
   let fixture: ComponentFixture<XxxListComponent>;
 
-  // Services IMMER als jasmine.SpyObj mocken
-  let xxxServiceSpy: jasmine.SpyObj<XxxService>;
-  let translationServiceSpy: jasmine.SpyObj<TranslationService>;
+  // Services IMMER als SpyObj (aus testing/spy) mocken
+  let xxxServiceSpy: SpyObj<XxxService>;
+  let translationServiceSpy: SpyObj<TranslationService>;
 
   // Testdaten als Konstanten
   const mockItems: Xxx[] = [
@@ -154,17 +173,17 @@ describe('XxxListComponent', () => {
 
   beforeEach(async () => {
     // SpyObj mit ALLEN Methoden die im Component verwendet werden
-    xxxServiceSpy = jasmine.createSpyObj('XxxService', [
+    xxxServiceSpy = createSpyObj<XxxService>('XxxService', [
       'getAllXxx', 'createXxx', 'updateXxx', 'deleteXxx'
     ]);
-    xxxServiceSpy.getAllXxx.and.returnValue(of(mockItems));
-    xxxServiceSpy.createXxx.and.returnValue(of(mockItems[0]));
-    xxxServiceSpy.updateXxx.and.returnValue(of(mockItems[0]));
-    xxxServiceSpy.deleteXxx.and.returnValue(of(void 0));
+    xxxServiceSpy.getAllXxx.mockReturnValue(of(mockItems));
+    xxxServiceSpy.createXxx.mockReturnValue(of(mockItems[0]));
+    xxxServiceSpy.updateXxx.mockReturnValue(of(mockItems[0]));
+    xxxServiceSpy.deleteXxx.mockReturnValue(of(void 0));
 
     // TranslationService: translate gibt Key zurück
-    translationServiceSpy = jasmine.createSpyObj('TranslationService', ['translate']);
-    translationServiceSpy.translate.and.callFake((key: string) => key);
+    translationServiceSpy = createSpyObj<TranslationService>('TranslationService', ['translate']);
+    translationServiceSpy.translate.mockImplementation((key: string) => key);
 
     // Standalone Component wird in imports importiert (NICHT in declarations)
     await TestBed.configureTestingModule({
@@ -196,7 +215,7 @@ describe('XxxListComponent', () => {
   describe('onCreateNew', () => {
     it('should set showForm to true and selectedItem to null', () => {
       component.onCreateNew();
-      expect(component.showForm).toBeTrue();
+      expect(component.showForm).toBe(true);
       expect(component.selectedItem).toBeNull();
     });
   });
@@ -204,7 +223,7 @@ describe('XxxListComponent', () => {
   describe('onEdit', () => {
     it('should set showForm to true with copied item', () => {
       component.onEdit(mockItems[0]);
-      expect(component.showForm).toBeTrue();
+      expect(component.showForm).toBe(true);
       expect(component.selectedItem).toEqual(mockItems[0]);
       expect(component.selectedItem).not.toBe(mockItems[0]); // Kopie, nicht Referenz
     });
@@ -223,7 +242,7 @@ describe('XxxListComponent', () => {
     });
 
     it('should show error message on failure', () => {
-      xxxServiceSpy.createXxx.and.returnValue(throwError(() => ({ error: 'Fehler' })));
+      xxxServiceSpy.createXxx.mockReturnValue(throwError(() => ({ error: 'Fehler' })));
       component.onFormSubmit({ /* ... ohne id */ } as Xxx);
       expect(component.messageType).toBe('error');
     });
@@ -231,13 +250,13 @@ describe('XxxListComponent', () => {
 
   describe('onDelete', () => {
     it('should call delete and reload', () => {
-      spyOn(window, 'confirm').and.returnValue(true);
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
       component.onDelete(1);
       expect(xxxServiceSpy.deleteXxx).toHaveBeenCalledWith(1);
     });
 
     it('should not call delete when cancelled', () => {
-      spyOn(window, 'confirm').and.returnValue(false);
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
       component.onDelete(1);
       expect(xxxServiceSpy.deleteXxx).not.toHaveBeenCalled();
     });
@@ -246,8 +265,8 @@ describe('XxxListComponent', () => {
   describe('messages', () => {
     it('should auto-dismiss success message after 5s', fakeAsync(() => {
       component.showForm = false;
-      xxxServiceSpy.deleteXxx.and.returnValue(of(void 0));
-      spyOn(window, 'confirm').and.returnValue(true);
+      xxxServiceSpy.deleteXxx.mockReturnValue(of(void 0));
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
       component.onDelete(1);
       expect(component.message).not.toBe('');
       tick(5000);
@@ -256,6 +275,8 @@ describe('XxxListComponent', () => {
   });
 });
 ```
+
+> **Import-Pfad-Hinweis:** `../../../testing/spy` und `../../../testing/fake-async` gelten für Komponenten unter `src/app/components/<name>/`. Tiefe je nach Ordnerebene anpassen (Service unter `src/app/services/` → `../../testing/...`).
 
 ### Form-Component Test (exakt einhalten)
 ```typescript
@@ -302,32 +323,32 @@ describe('XxxFormComponent', () => {
   describe('isFormValid', () => {
     it('should return false when required field empty', () => {
       component.formData = { /* leere Felder */ } as Xxx;
-      expect(component.isFormValid()).toBeFalse();
+      expect(component.isFormValid()).toBe(false);
     });
 
     it('should return true when all required fields filled', () => {
       component.formData = { /* alle Felder */ };
-      expect(component.isFormValid()).toBeTrue();
+      expect(component.isFormValid()).toBe(true);
     });
   });
 
   describe('events', () => {
     it('should emit save on valid submit', () => {
-      spyOn(component.save, 'emit');
+      vi.spyOn(component.save, 'emit');
       component.formData = { /* gültige Daten */ };
       component.onSubmit();
       expect(component.save.emit).toHaveBeenCalledWith(component.formData);
     });
 
     it('should not emit save on invalid submit', () => {
-      spyOn(component.save, 'emit');
+      vi.spyOn(component.save, 'emit');
       component.formData = { /* ungültige Daten */ } as Xxx;
       component.onSubmit();
       expect(component.save.emit).not.toHaveBeenCalled();
     });
 
     it('should emit cancel', () => {
-      spyOn(component.cancel, 'emit');
+      vi.spyOn(component.cancel, 'emit');
       component.onCancel();
       expect(component.cancel.emit).toHaveBeenCalled();
     });
@@ -337,12 +358,13 @@ describe('XxxFormComponent', () => {
 
 **Verbindliche Regeln für Component-Tests:**
 * Standalone Components in `imports` (nicht `declarations`)
-* Services als `jasmine.createSpyObj` mit ALLEN verwendeten Methoden
-* TranslationService-Mock: `translate: (k: string) => k` (gibt Key zurück)
+* Services als `createSpyObj<T>(...)` aus `src/testing/spy.ts` mit ALLEN verwendeten Methoden (nicht `jasmine.createSpyObj`)
+* TranslationService-Mock: `translate: (k: string) => k` (gibt Key zurück); bei `SpyObj` via `.mockImplementation((k) => k)`
 * Testdaten als `const` oben im describe-Block
 * Prüfe dass `onEdit` eine Kopie erstellt (nicht die Referenz)
 * Teste Success- und Error-Pfade bei CRUD-Operationen
-* `fakeAsync`/`tick` für setTimeout-Tests (Message auto-dismiss)
+* `fakeAsync`/`tick` aus `src/testing/fake-async.ts` für setTimeout-Tests (Message auto-dismiss)
+* Browser-/Global-Spies mit `vi.spyOn(...)` + `.mockReturnValue/.mockImplementation` (ruft sonst durch)
 
 ### Naming-Konvention für describe/it Blöcke
 
@@ -396,10 +418,11 @@ describe('XxxComponent', () => {
 
 ## Ausführung
 
-Nach dem Erstellen der Tests ausführen und Fehler beheben bis alle Tests grün sind:
+Nach dem Erstellen der Tests ausführen und Fehler beheben bis alle Tests grün sind (Vitest, jsdom, single-run):
 
 | Befehl | Beschreibung |
 |--------|--------------|
-| `npm.cmd test -- --browsers=ChromeHeadless --watch=false` | Alle Tests (headless, einmalig) |
-| `npm.cmd test -- --include=**/tarif.service.spec.ts` | Einzelne Test-Datei |
-| `npm.cmd test -- --code-coverage --browsers=ChromeHeadless --watch=false` | Mit Coverage-Report |
+| `npm test` | Alle Tests (Vitest, single-run, headless jsdom) |
+| `npm test -- src/app/services/tarif.service.spec.ts` | Einzelne Test-Datei (Pfad als Argument) |
+| `npm run test:watch` | Watch-Modus (lokale Entwicklung) |
+| `npm run test:coverage` | Mit Coverage-Report (`coverage/frontend-service`) |
