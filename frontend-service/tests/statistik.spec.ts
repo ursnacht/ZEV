@@ -31,7 +31,9 @@ test.describe('Statistik Page', () => {
         await expect(submitButton).toBeVisible();
 
         // Check that PDF export button exists and is disabled (no data loaded yet)
-        const pdfButton = page.locator('button.zev-button--secondary');
+        // PDF-Export-Button gezielt: sekundär, aber NICHT --compact (die Download-CSV-Buttons
+        // in "Summen pro Einheit" sind ebenfalls --secondary, aber --compact).
+        const pdfButton = page.locator('button.zev-button--secondary:not(.zev-button--compact)');
         await expect(pdfButton).toBeVisible();
         await expect(pdfButton).toBeDisabled();
 
@@ -91,7 +93,9 @@ test.describe('Statistik Page', () => {
             await expect(statusIndicator).toBeVisible();
 
             // PDF button should now be enabled
-            const pdfButton = page.locator('button.zev-button--secondary');
+            // PDF-Export-Button gezielt: sekundär, aber NICHT --compact (die Download-CSV-Buttons
+        // in "Summen pro Einheit" sind ebenfalls --secondary, aber --compact).
+        const pdfButton = page.locator('button.zev-button--secondary:not(.zev-button--compact)');
             await expect(pdfButton).toBeEnabled();
         }
     });

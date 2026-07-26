@@ -5,16 +5,21 @@ import ch.nacht.dto.MonatsStatistikDTO;
 import ch.nacht.dto.StatistikDTO;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
+import ch.nacht.entity.Messwerte;
+import ch.nacht.entity.Translation;
 import ch.nacht.entity.Verteilmodus;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -26,6 +31,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -504,6 +511,164 @@ public class StatistikServiceTest {
         StatistikDTO result = statistikService.getStatistik(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31));
 
         assertEquals(Verteilmodus.PRODUCER_MESSUNG, result.getVerteilmodus());
+    }
+
+    // ==================== CSV-Export der 15-Min-Werte (Spec Export-Messdaten) ====================
+
+    private final LocalDate exportVon = LocalDate.of(2024, 1, 1);
+    private final LocalDate exportBis = LocalDate.of(2024, 1, 31);
+
+    /** Stubt die drei Spaltentitel-Übersetzungen (DE/EN). */
+    private void stubExportTitel() {
+        when(translationService.getTranslationByKey("EXPORT_SPALTE_DATUM_ZEIT"))
+                .thenReturn(Optional.of(new Translation("EXPORT_SPALTE_DATUM_ZEIT", "Datum+Zeit", "Date+Time")));
+        when(translationService.getTranslationByKey("EXPORT_SPALTE_ENERGIEBEZUG_TOTAL"))
+                .thenReturn(Optional.of(new Translation("EXPORT_SPALTE_ENERGIEBEZUG_TOTAL", "Energiebezug Total kWh", "Energy consumption total kWh")));
+        when(translationService.getTranslationByKey("EXPORT_SPALTE_ANTEIL_ZEV"))
+                .thenReturn(Optional.of(new Translation("EXPORT_SPALTE_ANTEIL_ZEV", "Anteil Bezug aus ZEV kWh", "Share from ZEV kWh")));
+    }
+
+    @Test
+    void exportMesswerteCsv_Consumer_ReturnsHeaderWithTranslatedTitlesAndTotalsAndOneRowPerInterval() {
+        consumer1.setOrgId(1L);
+        when(einheitRepository.findById(2L)).thenReturn(Optional.of(consumer1));
+        stubExportTitel();
+
+        Messwerte m1 = new Messwerte(LocalDateTime.of(2024, 1, 1, 0, 0), 1.5, 1.0, consumer1);
+        Messwerte m2 = new Messwerte(LocalDateTime.of(2024, 1, 1, 0, 15), 2.25, 1.5, consumer1);
+        when(messwerteRepository.findByEinheitAndZeitBetween(eq(consumer1), any(), any()))
+                .thenReturn(new java.util.ArrayList<>(Arrays.asList(m1, m2)));
+
+        byte[] result = statistikService.exportMesswerteCsv(2L, exportVon, exportBis, "de");
+
+        String csv = new String(result, StandardCharsets.UTF_8);
+        String[] lines = csv.split("\n");
+        assertEquals(3, lines.length, "Kopfzeile + 2 Datenzeilen");
+        // Header: übersetzte Titel + Monatstotal in Klammern (Summe der gerundeten Zeilen)
+        assertEquals("Datum+Zeit,Energiebezug Total kWh (3.750),Anteil Bezug aus ZEV kWh (2.500)", lines[0]);
+        // Datenzeilen: Zeit dd.MM.yyyy HH:mm, Punkt-Dezimal, 3 NKS
+        assertEquals("01.01.2024 00:00,1.500,1.000", lines[1]);
+        assertEquals("01.01.2024 00:15,2.250,1.500", lines[2]);
+
+        verify(hibernateFilterService).enableOrgFilter();
+    }
+
+    @Test
+    void exportMesswerteCsv_HeaderTotalEqualsSumOfRoundedRows() {
+        // Drei Intervalle mit 0.0005 → je gerundet auf 0.001; Summe der GERUNDETEN Werte = 0.003
+        // (Summe der Rohwerte 0.0015 gerundet wäre 0.002 → beweist: Header aus Rundungsbasis der Zeilen).
+        consumer1.setOrgId(1L);
+        when(einheitRepository.findById(2L)).thenReturn(Optional.of(consumer1));
+        stubExportTitel();
+
+        Messwerte m1 = new Messwerte(LocalDateTime.of(2024, 1, 1, 0, 0), 0.0005, 0.0004, consumer1);
+        Messwerte m2 = new Messwerte(LocalDateTime.of(2024, 1, 1, 0, 15), 0.0005, 0.0004, consumer1);
+        Messwerte m3 = new Messwerte(LocalDateTime.of(2024, 1, 1, 0, 30), 0.0005, 0.0004, consumer1);
+        when(messwerteRepository.findByEinheitAndZeitBetween(eq(consumer1), any(), any()))
+                .thenReturn(new java.util.ArrayList<>(Arrays.asList(m1, m2, m3)));
+
+        byte[] result = statistikService.exportMesswerteCsv(2L, exportVon, exportBis, "de");
+
+        String csv = new String(result, StandardCharsets.UTF_8);
+        String[] lines = csv.split("\n");
+        // Header-Total = Summe der gerundeten Zeilen (0.001 * 3 = 0.003 / 0.000 * 3 = 0.000)
+        assertEquals("Datum+Zeit,Energiebezug Total kWh (0.003),Anteil Bezug aus ZEV kWh (0.000)", lines[0]);
+        assertEquals("01.01.2024 00:00,0.001,0.000", lines[1]);
+        assertEquals("01.01.2024 00:15,0.001,0.000", lines[2]);
+        assertEquals("01.01.2024 00:30,0.001,0.000", lines[3]);
+    }
+
+    @Test
+    void exportMesswerteCsv_RoundsToThreeDecimalsHalfUp() {
+        consumer1.setOrgId(1L);
+        when(einheitRepository.findById(2L)).thenReturn(Optional.of(consumer1));
+        stubExportTitel();
+
+        // 1.2345 → 1.235 (HALF_UP), 0.1234 → 0.123
+        Messwerte m1 = new Messwerte(LocalDateTime.of(2024, 1, 1, 0, 0), 1.2345, 0.1234, consumer1);
+        when(messwerteRepository.findByEinheitAndZeitBetween(eq(consumer1), any(), any()))
+                .thenReturn(new java.util.ArrayList<>(List.of(m1)));
+
+        byte[] result = statistikService.exportMesswerteCsv(2L, exportVon, exportBis, "de");
+
+        String[] lines = new String(result, StandardCharsets.UTF_8).split("\n");
+        assertEquals("01.01.2024 00:00,1.235,0.123", lines[1]);
+    }
+
+    @Test
+    void exportMesswerteCsv_EnglishLanguage_UsesEnglishTitles() {
+        consumer1.setOrgId(1L);
+        when(einheitRepository.findById(2L)).thenReturn(Optional.of(consumer1));
+        stubExportTitel();
+
+        Messwerte m1 = new Messwerte(LocalDateTime.of(2024, 1, 1, 0, 0), 1.0, 0.5, consumer1);
+        when(messwerteRepository.findByEinheitAndZeitBetween(eq(consumer1), any(), any()))
+                .thenReturn(new java.util.ArrayList<>(List.of(m1)));
+
+        byte[] result = statistikService.exportMesswerteCsv(2L, exportVon, exportBis, "en");
+
+        String[] lines = new String(result, StandardCharsets.UTF_8).split("\n");
+        assertEquals("Date+Time,Energy consumption total kWh (1.000),Share from ZEV kWh (0.500)", lines[0]);
+    }
+
+    @Test
+    void exportMesswerteCsv_EmptyMesswerte_ReturnsHeaderOnlyWithZeroTotals() {
+        consumer1.setOrgId(1L);
+        when(einheitRepository.findById(2L)).thenReturn(Optional.of(consumer1));
+        stubExportTitel();
+        when(messwerteRepository.findByEinheitAndZeitBetween(eq(consumer1), any(), any()))
+                .thenReturn(new java.util.ArrayList<>());
+
+        byte[] result = statistikService.exportMesswerteCsv(2L, exportVon, exportBis, "de");
+
+        String csv = new String(result, StandardCharsets.UTF_8);
+        String[] lines = csv.split("\n");
+        assertEquals(1, lines.length, "Nur Kopfzeile, keine Datenzeilen");
+        // Leeres Ergebnis: Totals konsistent auf 3 NKS formatiert (Summen mit Skala 3 initialisiert).
+        assertEquals("Datum+Zeit,Energiebezug Total kWh (0.000),Anteil Bezug aus ZEV kWh (0.000)", lines[0]);
+
+        verify(hibernateFilterService).enableOrgFilter();
+    }
+
+    @Test
+    void exportMesswerteCsv_ForeignOrg_ThrowsIllegalArgumentException_NoExport() {
+        // Einheit gehört zu fremder Org (99L); aktueller Kontext = 1L (aus setUp)
+        consumer1.setOrgId(99L);
+        when(einheitRepository.findById(2L)).thenReturn(Optional.of(consumer1));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> statistikService.exportMesswerteCsv(2L, exportVon, exportBis, "de"));
+        assertEquals("EINHEIT_NICHT_GEFUNDEN", ex.getMessage());
+
+        verify(hibernateFilterService).enableOrgFilter();
+        // Kein Fremd-Export: es werden keine Messwerte geladen
+        verify(messwerteRepository, never()).findByEinheitAndZeitBetween(any(), any(), any());
+    }
+
+    @Test
+    void exportMesswerteCsv_EinheitNotFound_ThrowsIllegalArgumentException() {
+        when(einheitRepository.findById(99L)).thenReturn(Optional.empty());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> statistikService.exportMesswerteCsv(99L, exportVon, exportBis, "de"));
+        assertEquals("EINHEIT_NICHT_GEFUNDEN", ex.getMessage());
+
+        verify(messwerteRepository, never()).findByEinheitAndZeitBetween(any(), any(), any());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = EinheitTyp.class, names = {"PRODUCER", "BEZUG", "RUECKLIEFERUNG"})
+    void exportMesswerteCsv_NonConsumer_ThrowsIllegalArgumentException(EinheitTyp typ) {
+        Einheit einheit = new Einheit("Nicht-Consumer", typ);
+        einheit.setId(2L);
+        einheit.setOrgId(1L);
+        when(einheitRepository.findById(2L)).thenReturn(Optional.of(einheit));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> statistikService.exportMesswerteCsv(2L, exportVon, exportBis, "de"));
+        assertEquals("EXPORT_NUR_CONSUMER", ex.getMessage());
+
+        verify(messwerteRepository, never()).findByEinheitAndZeitBetween(any(), any(), any());
     }
 
     /** Minimales, vollständiges Stub-Set für einen getStatistik-Lauf über einen Monat. */

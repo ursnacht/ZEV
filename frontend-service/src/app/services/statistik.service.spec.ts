@@ -183,4 +183,44 @@ describe('StatistikService', () => {
       req.flush(new Blob());
     });
   });
+
+  describe('exportCsv', () => {
+    it('should make GET request with blob response type and all query params', () => {
+      const mockBlob = new Blob(['Datum+Zeit,Total,ZEV'], { type: 'text/csv' });
+
+      service.exportCsv(42, '2024-02-01', '2024-02-29', 'de').subscribe(blob => {
+        expect(blob).toEqual(mockBlob);
+      });
+
+      const req = httpMock.expectOne(r =>
+        r.url === `${apiUrl}/export/csv` &&
+        r.params.get('einheitId') === '42' &&
+        r.params.get('von') === '2024-02-01' &&
+        r.params.get('bis') === '2024-02-29' &&
+        r.params.get('sprache') === 'de'
+      );
+      expect(req.request.method).toBe('GET');
+      expect(req.request.responseType).toBe('blob');
+      req.flush(mockBlob);
+    });
+
+    it('should include einheitId, von, bis and sprache as query parameters', () => {
+      service.exportCsv(7, '2024-04-01', '2024-06-30', 'fr').subscribe();
+
+      const req = httpMock.expectOne(r => r.url === `${apiUrl}/export/csv`);
+      expect(req.request.params.get('einheitId')).toBe('7');
+      expect(req.request.params.get('von')).toBe('2024-04-01');
+      expect(req.request.params.get('bis')).toBe('2024-06-30');
+      expect(req.request.params.get('sprache')).toBe('fr');
+      req.flush(new Blob());
+    });
+
+    it('should use de as default sprache when not provided', () => {
+      service.exportCsv(1, '2024-01-01', '2024-01-31').subscribe();
+
+      const req = httpMock.expectOne(r => r.url === `${apiUrl}/export/csv`);
+      expect(req.request.params.get('sprache')).toBe('de');
+      req.flush(new Blob());
+    });
+  });
 });

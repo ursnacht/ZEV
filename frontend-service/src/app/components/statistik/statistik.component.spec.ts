@@ -4,7 +4,7 @@ import { fakeAsync, tick } from '../../../testing/fake-async';
 import { StatistikComponent } from './statistik.component';
 import { StatistikService } from '../../services/statistik.service';
 import { TranslationService } from '../../services/translation.service';
-import { Statistik, MonatsStatistik } from '../../models/statistik.model';
+import { Statistik, MonatsStatistik, EinheitSummen } from '../../models/statistik.model';
 import { of, throwError } from 'rxjs';
 
 describe('StatistikComponent', () => {
@@ -56,9 +56,10 @@ describe('StatistikComponent', () => {
   };
 
   beforeEach(async () => {
-    statistikServiceSpy = createSpyObj<StatistikService>('StatistikService', ['getStatistik', 'exportPdf']);
+    statistikServiceSpy = createSpyObj<StatistikService>('StatistikService', ['getStatistik', 'exportPdf', 'exportCsv']);
     statistikServiceSpy.getStatistik.mockReturnValue(of(mockStatistik));
     statistikServiceSpy.exportPdf.mockReturnValue(of(new Blob(['pdf'], { type: 'application/pdf' })));
+    statistikServiceSpy.exportCsv.mockReturnValue(of(new Blob(['csv'], { type: 'text/csv' })));
 
     translationServiceSpy = createSpyObj<TranslationService>('TranslationService', ['translate', 'getCurrentLanguage']);
     translationServiceSpy.translate.mockImplementation((key: string) => key);
@@ -287,6 +288,62 @@ describe('StatistikComponent', () => {
       expect(component.messageType).toBe('error');
       expect(component.message).toContain('FEHLER_BEIM_EXPORT');
       expect(component.message).toContain('PDF error');
+    });
+  });
+
+  describe('onDownloadCsv', () => {
+    const consumerEinheit: EinheitSummen = {
+      einheitId: 42,
+      einheitName: 'Wohnung 1',
+      einheitTyp: 'CONSUMER',
+      summeTotal: 123.456,
+      summeZev: 100.5,
+      summeZevCalculated: 99.9
+    };
+
+    let linkSpy: SpyObj<HTMLAnchorElement>;
+
+    beforeEach(() => {
+      vi.spyOn(window.URL, 'createObjectURL').mockReturnValue('blob:fake-url');
+      vi.spyOn(window.URL, 'revokeObjectURL').mockImplementation(() => {});
+      linkSpy = createSpyObj<HTMLAnchorElement>('a', ['click']);
+      vi.spyOn(document, 'createElement').mockReturnValue(linkSpy as unknown as HTMLAnchorElement);
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('should call exportCsv with einheitId, monat.von, monat.bis and current language', () => {
+      component.onDownloadCsv(mockMonat, consumerEinheit);
+      expect(translationServiceSpy.getCurrentLanguage).toHaveBeenCalled();
+      expect(statistikServiceSpy.exportCsv).toHaveBeenCalledWith(42, '2024-02-01', '2024-02-29', 'de');
+    });
+
+    it('should trigger a download on success', () => {
+      component.onDownloadCsv(mockMonat, consumerEinheit);
+      expect(window.URL.createObjectURL).toHaveBeenCalled();
+      expect(linkSpy.click).toHaveBeenCalled();
+      expect(window.URL.revokeObjectURL).toHaveBeenCalledWith('blob:fake-url');
+    });
+
+    it('should build filename from sanitized unit name and yyyy-MM', () => {
+      // Space is not in [A-Za-z0-9._-] and is therefore replaced with '_'
+      component.onDownloadCsv(mockMonat, consumerEinheit);
+      expect(linkSpy.download).toBe('verbrauch_Wohnung_1_2024-02.csv');
+    });
+
+    it('should sanitize special characters in the unit name', () => {
+      const einheit: EinheitSummen = { ...consumerEinheit, einheitName: 'Wohnung A/B' };
+      component.onDownloadCsv(mockMonat, einheit);
+      expect(linkSpy.download).toBe('verbrauch_Wohnung_A_B_2024-02.csv');
+    });
+
+    it('should show translated error message on service failure', () => {
+      statistikServiceSpy.exportCsv.mockReturnValue(throwError(() => new Error('CSV error')));
+      component.onDownloadCsv(mockMonat, consumerEinheit);
+      expect(component.messageType).toBe('error');
+      expect(component.message).toBe('EXPORT_CSV_FEHLER');
     });
   });
 

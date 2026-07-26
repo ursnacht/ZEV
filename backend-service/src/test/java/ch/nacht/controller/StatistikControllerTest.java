@@ -23,6 +23,7 @@ import java.util.List;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -244,5 +245,78 @@ public class StatistikControllerTest {
             .andExpect(status().isOk());
 
         verify(statistikPdfService).generatePdf(any(StatistikDTO.class), eq("fr"));
+    }
+
+    // ==================== GET /api/statistik/export/csv ====================
+
+    @Test
+    void exportCsv_ValidRequest_ReturnsCsvAttachment() throws Exception {
+        byte[] csvBytes = "Datum+Zeit,Total (1.000),ZEV (0.500)\n".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        when(statistikService.exportMesswerteCsv(eq(2L),
+                eq(LocalDate.of(2024, 1, 1)), eq(LocalDate.of(2024, 1, 31)), eq("de")))
+            .thenReturn(csvBytes);
+
+        mockMvc.perform(get("/api/statistik/export/csv")
+                .param("einheitId", "2")
+                .param("von", "2024-01-01")
+                .param("bis", "2024-01-31")
+                .param("sprache", "de"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Content-Disposition", "attachment; filename=verbrauch_2_2024-01.csv"))
+            .andExpect(content().contentTypeCompatibleWith(MediaType.valueOf("text/csv")))
+            .andExpect(content().bytes(csvBytes));
+
+        verify(statistikService).exportMesswerteCsv(eq(2L),
+                eq(LocalDate.of(2024, 1, 1)), eq(LocalDate.of(2024, 1, 31)), eq("de"));
+    }
+
+    @Test
+    void exportCsv_DefaultSprache_UsesDe() throws Exception {
+        byte[] csvBytes = "Header\n".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        when(statistikService.exportMesswerteCsv(anyLong(), any(), any(), eq("de")))
+            .thenReturn(csvBytes);
+
+        mockMvc.perform(get("/api/statistik/export/csv")
+                .param("einheitId", "2")
+                .param("von", "2024-01-01")
+                .param("bis", "2024-01-31"))
+            .andExpect(status().isOk());
+
+        verify(statistikService).exportMesswerteCsv(anyLong(), any(), any(), eq("de"));
+    }
+
+    @Test
+    void exportCsv_VonAfterBis_ReturnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/statistik/export/csv")
+                .param("einheitId", "2")
+                .param("von", "2024-02-01")
+                .param("bis", "2024-01-31"))
+            .andExpect(status().isBadRequest());
+
+        verify(statistikService, never()).exportMesswerteCsv(anyLong(), any(), any(), anyString());
+    }
+
+    @Test
+    void exportCsv_ServiceThrowsIllegalArgumentException_ReturnsBadRequest() throws Exception {
+        when(statistikService.exportMesswerteCsv(anyLong(), any(), any(), anyString()))
+            .thenThrow(new IllegalArgumentException("EINHEIT_NICHT_GEFUNDEN"));
+
+        mockMvc.perform(get("/api/statistik/export/csv")
+                .param("einheitId", "999")
+                .param("von", "2024-01-01")
+                .param("bis", "2024-01-31"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void exportCsv_ServiceThrowsRuntimeException_ReturnsInternalServerError() throws Exception {
+        when(statistikService.exportMesswerteCsv(anyLong(), any(), any(), anyString()))
+            .thenThrow(new RuntimeException("DB Fehler"));
+
+        mockMvc.perform(get("/api/statistik/export/csv")
+                .param("einheitId", "2")
+                .param("von", "2024-01-01")
+                .param("bis", "2024-01-31"))
+            .andExpect(status().isInternalServerError());
     }
 }

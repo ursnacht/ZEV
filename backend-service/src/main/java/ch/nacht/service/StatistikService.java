@@ -419,8 +419,9 @@ public class StatistikService {
         werte.sort(Comparator.comparing(Messwerte::getZeit));
 
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
-        BigDecimal totalSum = BigDecimal.ZERO;
-        BigDecimal zevSum = BigDecimal.ZERO;
+        // Skala 3 fixieren, damit auch das leere Ergebnis konsistent "0.000" ausgibt (3 NKS).
+        BigDecimal totalSum = BigDecimal.ZERO.setScale(3, RoundingMode.HALF_UP);
+        BigDecimal zevSum = BigDecimal.ZERO.setScale(3, RoundingMode.HALF_UP);
         List<String> zeilen = new ArrayList<>();
         for (Messwerte m : werte) {
             BigDecimal total = round3(m.getTotal());
