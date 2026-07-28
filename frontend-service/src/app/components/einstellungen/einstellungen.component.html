@@ -19,6 +19,15 @@
     <div class="zev-form-container zev-form-container--narrow">
       <form (ngSubmit)="onSubmit()">
         <div class="zev-form-group">
+          <label for="verteilmodus">{{ 'VERTEILMODUS' | translate }}:</label>
+          <select id="verteilmodus" class="zev-select"
+            [(ngModel)]="formData.verteilmodus" name="verteilmodus">
+            <option value="PRODUCER_MESSUNG">{{ 'VERTEILMODUS_PRODUCER_MESSUNG' | translate }}</option>
+            <option value="BILANZ">{{ 'VERTEILMODUS_BILANZ' | translate }}</option>
+          </select>
+        </div>
+
+        <div class="zev-form-group">
           <label for="zahlungsfrist">{{ 'ZAHLUNGSFRIST' | translate }}:</label>
           <input type="text" id="zahlungsfrist" class="zev-input"
             [(ngModel)]="formData.zahlungsfrist" name="zahlungsfrist"
@@ -45,15 +54,6 @@
               {{ 'PFLICHTFELD' | translate }}
             </div>
           }
-        </div>
-
-        <div class="zev-form-group">
-          <label for="verteilmodus">{{ 'VERTEILMODUS' | translate }}:</label>
-          <select id="verteilmodus" class="zev-select"
-            [(ngModel)]="formData.verteilmodus" name="verteilmodus">
-            <option value="PRODUCER_MESSUNG">{{ 'VERTEILMODUS_PRODUCER_MESSUNG' | translate }}</option>
-            <option value="BILANZ">{{ 'VERTEILMODUS_BILANZ' | translate }}</option>
-          </select>
         </div>
 
         <div class="zev-form-section">
