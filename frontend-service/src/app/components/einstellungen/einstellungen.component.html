@@ -27,33 +27,37 @@
           </select>
         </div>
 
-        <div class="zev-form-group">
-          <label for="zahlungsfrist">{{ 'ZAHLUNGSFRIST' | translate }}:</label>
-          <input type="text" id="zahlungsfrist" class="zev-input"
-            [(ngModel)]="formData.zahlungsfrist" name="zahlungsfrist"
-            required placeholder="z.B. 30 Tage" />
-          @if (!formData.zahlungsfrist.trim()) {
-            <div class="zev-form-error">
-              {{ 'PFLICHTFELD' | translate }}
-            </div>
-          }
-        </div>
+        <div class="zev-form-section">
+          <h3 class="zev-form-section__title">{{ 'RECHNUNGSKONFIGURATION' | translate }}</h3>
 
-        <div class="zev-form-group">
-          <label for="iban">{{ 'IBAN' | translate }}:</label>
-          <input type="text" id="iban" class="zev-input"
-            [(ngModel)]="formData.iban" name="iban"
-            required placeholder="CH00 0000 0000 0000 0000 0" />
-          @if (formData.iban && !isIbanValid()) {
-            <div class="zev-form-error">
-              {{ 'IBAN_UNGUELTIG' | translate }}
-            </div>
-          }
-          @if (!formData.iban.trim()) {
-            <div class="zev-form-error">
-              {{ 'PFLICHTFELD' | translate }}
-            </div>
-          }
+          <div class="zev-form-group">
+            <label for="zahlungsfrist">{{ 'ZAHLUNGSFRIST' | translate }}:</label>
+            <input type="text" id="zahlungsfrist" class="zev-input"
+              [(ngModel)]="formData.zahlungsfrist" name="zahlungsfrist"
+              required placeholder="z.B. 30 Tage" />
+            @if (!formData.zahlungsfrist.trim()) {
+              <div class="zev-form-error">
+                {{ 'PFLICHTFELD' | translate }}
+              </div>
+            }
+          </div>
+
+          <div class="zev-form-group">
+            <label for="iban">{{ 'IBAN' | translate }}:</label>
+            <input type="text" id="iban" class="zev-input"
+              [(ngModel)]="formData.iban" name="iban"
+              required placeholder="CH00 0000 0000 0000 0000 0" />
+            @if (formData.iban && !isIbanValid()) {
+              <div class="zev-form-error">
+                {{ 'IBAN_UNGUELTIG' | translate }}
+              </div>
+            }
+            @if (!formData.iban.trim()) {
+              <div class="zev-form-error">
+                {{ 'PFLICHTFELD' | translate }}
+              </div>
+            }
+          </div>
         </div>
 
         <div class="zev-form-section">
