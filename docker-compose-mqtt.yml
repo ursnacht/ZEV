@@ -89,10 +89,15 @@ services:
     volumes:
       - ./keycloak/realms:/opt/keycloak/data/import
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9000/health/ready" ]
+      # Echte Readiness ohne curl/wget (im KC-Image nicht vorhanden): Bash-/dev/tcp-Probe auf den
+      # Realm 'zev', der erst nach vollständigem Start + Realm-Import bedient wird.
+      # (/health/ready liegt in KC 26 auf der Management-Schnittstelle und ist bei KC_HTTP_PORT=9000
+      #  nicht unter :9000 erreichbar → wäre dauerhaft rot.)
+      test: ["CMD", "bash", "-c", 'exec 3<>/dev/tcp/127.0.0.1/9000 && printf "GET /realms/zev HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3 && grep -q "200 OK" <&3']
       interval: 10s
       timeout: 5s
       retries: 30
+      start_period: 40s
     networks:
       - zev-network
 
@@ -173,8 +178,12 @@ services:
       - SBA_USER=${SBA_USER:-sba}
       - SBA_PASSWORD=${SBA_PASSWORD:-sba}
     depends_on:
-      - backend-service
-      - admin-service
+      keycloak:
+        condition: service_healthy
+      backend-service:
+        condition: service_started
+      admin-service:
+        condition: service_started
     networks:
       - zev-network
     restart: unless-stopped
