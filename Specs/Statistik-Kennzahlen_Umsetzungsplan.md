@@ -15,8 +15,10 @@ Die Statistik-Seite erhält je Monat ein **Kennzahlen-Panel** mit fachlichen Ene
 | `dto/MonatsStatistikDTO.java` | Neue transiente Felder: `autarkiegrad`, `eigenverbrauchsquote`, `netzbezugsquote`, `einspeisequote`, `zevEigenverbrauch`, `batterieNetto`, `batterieGeladen`, `batterieEntladen`, `batterieWirkungsgrad` (alle `Double`, `null` = „–") + `batterieKennzahlenVerfuegbar`/`kennzahlenBerechnet` (boolean, optional) |
 | `service/StatistikService.java` | In `berechneMonatsStatistik(...)`: KPI-Berechnung aus vorhandenen Summen (Stufe 1) + Netto-Speicherfluss; Stufe 2: Batterie geladen/entladen aus Intervall-Aggregat |
 | `repository/MesswerteRepository.java` | **Neue** Aggregat-Query „Netto je `zeit`" für Stufe 2 (bedingte Summen über `EinheitTyp` je Zeitstempel), Alternative: Intervall-Loop über `findDistinctZeitBetween`+`findByZeitAndEinheitTyp` |
-| `service/StatistikPdfService.java` | KPIs an den JasperReports-Datencontext übergeben (Felder/Parameter je Monat) |
-| `resources/reports/statistik.jrxml` | Kennzahlen-Block je Monat; Summen-Vergleich im Bilanzmodus ausblenden (modus-abhängig) |
+| `service/StatistikPdfService.java` | KPIs an den JasperReports-Datencontext übergeben; Parameter `IST_BILANZ` |
+| `util/PdfNumberFormat.java` | **neu** — zentrale locale-unabhängige Zahlenformatierung (Punkt-Dezimal, Hochkomma-Gruppierung) für das gesamte PDF |
+| `resources/reports/statistik.jrxml` | Kennzahlen-Block je Monat; Summen-Vergleich im Bilanzmodus ausblenden; alle Zahlen über `PdfNumberFormat` |
+| `resources/reports/einheit-summen.jrxml` | Subreport-Zahlen (Total/ZEV/ZEV berechnet) über `PdfNumberFormat` vereinheitlicht |
 
 ### Frontend
 | Datei | Änderung |
@@ -29,21 +31,22 @@ Die Statistik-Seite erhält je Monat ein **Kennzahlen-Panel** mit fachlichen Ene
 ### Übersetzungen
 | Datei | Änderung |
 |-------|----------|
-| `resources/db/migration/V90__Add_Statistik_Kennzahlen_Translations.sql` | Neue Keys DE/EN (`ON CONFLICT (key) DO NOTHING`) |
+| `resources/db/migration/V90__Add_Statistik_Kennzahlen_Translations.sql` | Kennzahlen-Labels DE/EN (`ON CONFLICT (key) DO NOTHING`) |
+| `resources/db/migration/V91__Add_Statistik_Kennzahlen_Hinweise_Translations.sql` | Erklärende Hinweise/Tooltips je Kennzahl DE/EN |
 
 ## Phasen-Tabelle
 
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
-| [ ] | 1. Backend-DTO | `MonatsStatistikDTO` um berechnete KPI-Felder + Getter/Setter erweitern (kein Schema-Change) |
-| [ ] | 2. Backend-Service (Stufe 1) | In `StatistikService.berechneMonatsStatistik(...)` Quoten-KPIs, ZEV-Eigenverbrauch und Netto-Speicherfluss aus vorhandenen Summen berechnen; `null` bei Nenner=0 / fehlenden Bilanz-Daten |
-| [ ] | 3. Frontend-Model | `MonatsStatistik` (statistik.model.ts) um KPI-Felder (`number \| null`) ergänzen |
-| [ ] | 4. Frontend-Komponente | Kennzahlen-Panel im `statistik.component.html` (Design-System `.zev-panel`/`.zev-info-row`); Summen-Vergleich per `@if (!isBilanz)` ausblenden; Formatierung/„–" + „berechnet"-Markierung im `.component.ts` |
-| [ ] | 5. Übersetzungen | Flyway `V90__Add_Statistik_Kennzahlen_Translations.sql` (DE/EN) |
-| [ ] | 6. Backend-Batterie (Stufe 2) | Neue Aggregat-Query in `MesswerteRepository` (Netto je `zeit`); in `StatistikService` `batterieGeladen`/`batterieEntladen`/`batterieWirkungsgrad` berechnen (nur bei Producer + Bezug + Rücklieferung) |
-| [ ] | 7. Frontend-Batterie (Stufe 2) | Batterie-Block im Panel (geladen/entladen/Wirkungsgrad), als „berechnet/geschätzt" markiert; nur anzeigen bei vorhandenen Werten |
-| [ ] | 8. PDF-Export | `StatistikPdfService` + `statistik.jrxml`: KPIs je Monat ins PDF (Quoten in beiden Modi, Batterie als „berechnet"; Summen-Vergleich im Bilanzmodus ausgeblendet) |
-| [ ] | 9. Tests | Backend: `StatistikServiceTest` (KPI-Formeln, Nenner=0, fehlende Bilanz-Daten, Batterie geladen/entladen, Wirkungsgrad geladen=0); `JasperTemplateCompileTest` (PDF kompiliert). Frontend: `statistik.component.spec.ts` (Panel, „–", Vergleich-Ausblenden bilanz). E2E: KPI-Panel sichtbar (`statistik.spec.ts`) |
+| [x] | 1. Backend-DTO | `MonatsStatistikDTO` um berechnete KPI-Felder + Getter/Setter erweitert (kein Schema-Change) |
+| [x] | 2. Backend-Service (Stufe 1) | In `StatistikService.berechneMonatsStatistik(...)` `berechneKennzahlen(...)`: Quoten-KPIs, ZEV-Eigenverbrauch und Netto-Speicherfluss aus vorhandenen Summen; `null` bei Nenner=0 / fehlenden Bilanz-Daten |
+| [x] | 3. Frontend-Model | `MonatsStatistik` (statistik.model.ts) um KPI-Felder (`number \| null`) ergänzt |
+| [x] | 4. Frontend-Komponente | Kennzahlen-Panel im `statistik.component.html` (Design-System `.zev-info-row`); Summen-Vergleich per `@if (!isBilanz)` ausgeblendet; `formatPercent()` + „–" + `.zev-tag`-„berechnet"-Markierung; erklärender `title`-Tooltip je Kennzahl |
+| [x] | 5. Übersetzungen | Flyway `V90__Add_Statistik_Kennzahlen_Translations.sql` (DE/EN) angelegt |
+| [x] | 6. Backend-Batterie (Stufe 2) | Neue Aggregat-Query `sumBilanzKomponentenPerZeitBetween` in `MesswerteRepository` (Netto je `zeit`); `berechneBatterieKennzahlen(...)` berechnet geladen/entladen/Wirkungsgrad (nur bei Producer + Bezug + Rücklieferung) |
+| [x] | 7. Frontend-Batterie (Stufe 2) | Batterie-Block im Panel (Netto/geladen/entladen/Wirkungsgrad), als „berechnet" markiert; nur bei `batterieKennzahlenVerfuegbar` |
+| [x] | 8. PDF-Export | `StatistikPdfService` (Parameter `IST_BILANZ`) + `statistik.jrxml`: Kennzahlen-Block je Monat, Batterie als „berechnet"; Summen-Vergleich im Bilanzmodus ausgeblendet; `JasperTemplateCompileTest` grün |
+| [ ] | 9. Tests | Backend: `StatistikServiceTest` (KPI-Formeln, Nenner=0, fehlende Bilanz-Daten, Batterie geladen/entladen, Wirkungsgrad geladen=0). Frontend: `statistik.component.spec.ts` (Panel, „–", Vergleich-Ausblenden bilanz). E2E: KPI-Panel sichtbar (`statistik.spec.ts`). **→ separate Test-Commands** |
 
 ## Berechnungslogik (Referenz für die Umsetzung)
 
@@ -74,7 +77,7 @@ Alle Prozent-KPIs: Anzeige mit 1 Nachkommastelle + `%`; kWh wie bestehende Stati
 
 ### Frontend
 * `null` → Anzeige „–" (kein `NaN`, kein `0 %` als Fehlwert).
-* Prozent-Formatierung auf 1 Nachkommastelle (Schweizer Format, Dezimal-Komma) via bestehender Formatierung/Pipe.
+* Zahlenformat locale-unabhängig: **Punkt** als Dezimal-, **Hochkomma (`'`)** als Tausendertrennzeichen. Frontend über den seitenweiten Helfer `formatSwissNumber()` (basiert auf `toFixed`), den `formatNumber`/`formatDifferenz`/`formatPercent` nutzen; **gesamtes** PDF (statistik.jrxml + einheit-summen.jrxml) über `ch.nacht.util.PdfNumberFormat` (`String.format(Locale.ROOT, …)` mit Gruppierungs-Ersatz `,`→`'`).
 * Summen-Vergleich nur im Modus `PRODUCER_MESSUNG` rendern (`@if (!isBilanz)`); Kennzahlen-Panel in beiden Modi.
 * Ausschliesslich Design-System-Klassen; keine Ad-hoc-Styles in der Komponente.
 

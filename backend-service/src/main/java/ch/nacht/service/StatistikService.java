@@ -229,7 +229,75 @@ public class StatistikService {
         // Summen pro Einheit berechnen
         berechneEinheitSummen(dto, vonDateTime, bisDateTime);
 
+        // Statistik-Kennzahlen (Stufe 1: aus den Summen)
+        berechneKennzahlen(dto);
+        // Batterie geladen/entladen/Wirkungsgrad (Stufe 2: Pro-Intervall-Aggregation)
+        berechneBatterieKennzahlen(dto, vonDateTime, bisDateTime);
+
         return dto;
+    }
+
+    /**
+     * Berechnet die Statistik-Kennzahlen (Spec Statistik-Kennzahlen.md, Stufe 1) aus den
+     * bereits vorhandenen Monats-Summen. Quoten-KPIs sind modus-agnostisch (nur ZEV-/Total-Summen);
+     * `null` bei Nenner 0. Der Netto-Speicherfluss setzt Producer + Bilanz-Bezug + Rücklieferung
+     * voraus (sonst `null`). Batterie geladen/entladen/Wirkungsgrad werden in Stufe 2 ergänzt.
+     */
+    private void berechneKennzahlen(MonatsStatistikDTO dto) {
+        double p = dto.getSummeProducerTotal() != null ? dto.getSummeProducerTotal() : 0.0;
+        double c = dto.getSummeConsumerTotal() != null ? dto.getSummeConsumerTotal() : 0.0;
+        double cz = dto.getSummeConsumerZev() != null ? dto.getSummeConsumerZev() : 0.0;
+        double pz = dto.getSummeProducerZev() != null ? dto.getSummeProducerZev() : 0.0;
+
+        // Quoten-KPIs (Anteil 0..1); null wenn Nenner 0
+        dto.setAutarkiegrad(c > 0 ? cz / c : null);
+        dto.setNetzbezugsquote(c > 0 ? (c - cz) / c : null);
+        dto.setEigenverbrauchsquote(p > 0 ? pz / p : null);
+        dto.setEinspeisequote(p > 0 ? (p - pz) / p : null);
+        dto.setZevEigenverbrauch(cz);
+
+        // Netto-Speicherfluss (berechnet/geschätzt): nur bei Producer + Bilanz-Bezug + Rücklieferung
+        boolean producerVorhanden = p > 0;
+        boolean bezugVorhanden = dto.getBilanzBezugName() != null;
+        boolean ruecklieferungVorhanden = dto.getBilanzRuecklieferungName() != null;
+        boolean batterieVerfuegbar = producerVorhanden && bezugVorhanden && ruecklieferungVorhanden;
+        dto.setBatterieKennzahlenVerfuegbar(batterieVerfuegbar);
+        if (batterieVerfuegbar) {
+            double b = dto.getBilanzBezug() != null ? dto.getBilanzBezug() : 0.0;
+            double r = dto.getBilanzRuecklieferung() != null ? dto.getBilanzRuecklieferung() : 0.0;
+            dto.setBatterieNetto(p - c + b - r);
+        } else {
+            dto.setBatterieNetto(null);
+        }
+    }
+
+    /**
+     * Batterie-Kennzahlen (Spec Statistik-Kennzahlen.md, Stufe 2): geladen/entladen/Wirkungsgrad
+     * aus der Pro-Intervall-Aggregation. Je Intervall {@code Netto_i = P_i − C_i + B_i − R_i};
+     * geladen = Σ max(0, Netto_i), entladen = Σ max(0, −Netto_i), Wirkungsgrad = entladen/geladen
+     * (nur wenn geladen > 0). Nur wenn Producer + Bilanz-Bezug + Rücklieferung vorhanden.
+     */
+    private void berechneBatterieKennzahlen(MonatsStatistikDTO dto, LocalDateTime vonDateTime, LocalDateTime bisDateTime) {
+        if (!dto.isBatterieKennzahlenVerfuegbar()) {
+            return;
+        }
+        double geladen = 0.0;
+        double entladen = 0.0;
+        for (Object[] row : messwerteRepository.sumBilanzKomponentenPerZeitBetween(vonDateTime, bisDateTime)) {
+            double pI = ((Number) row[1]).doubleValue();
+            double cI = ((Number) row[2]).doubleValue();
+            double bI = ((Number) row[3]).doubleValue();
+            double rI = ((Number) row[4]).doubleValue();
+            double netto = pI - cI + bI - rI;
+            if (netto > 0) {
+                geladen += netto;
+            } else {
+                entladen += -netto;
+            }
+        }
+        dto.setBatterieGeladen(geladen);
+        dto.setBatterieEntladen(entladen);
+        dto.setBatterieWirkungsgrad(geladen > 0 ? entladen / geladen : null);
     }
 
     private void vergleicheSummen(MonatsStatistikDTO dto) {

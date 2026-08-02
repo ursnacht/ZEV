@@ -26,6 +26,20 @@ public class MonatsStatistikDTO {
     private Double bezugVonVnb;       // Verbrauch(Consumer Total) − zev(Consumer, gemessen)
     private Double ruecklieferung;    // Produktion(Producer Total) − zev(Producer)
 
+    // Statistik-Kennzahlen (Spec Statistik-Kennzahlen.md); berechnet, kein Schema-Change.
+    // Prozentwerte als Anteil (0..1); null = "–"/n/a (Nenner 0 bzw. fehlende Bilanz-Daten).
+    private Double autarkiegrad;              // Cz / C
+    private Double eigenverbrauchsquote;      // Pz / P
+    private Double netzbezugsquote;           // (C − Cz) / C
+    private Double einspeisequote;            // (P − Pz) / P
+    private Double zevEigenverbrauch;         // Cz (kWh)
+    // Batterie-Kennzahlen (berechnet/geschätzt aus der Energiebilanz); null = nicht ermittelbar.
+    private Double batterieNetto;             // P − C + B − R (kWh)
+    private Double batterieGeladen;           // Σ max(0, Netto_i) (kWh, Stufe 2)
+    private Double batterieEntladen;          // Σ max(0, −Netto_i) (kWh, Stufe 2)
+    private Double batterieWirkungsgrad;      // entladen / geladen
+    private boolean batterieKennzahlenVerfuegbar; // Producer + Bezug + Rücklieferung vorhanden
+
     // Bilanzmesspunkte (Netzanschluss): Summen der Typen BEZUG (positiv) / RUECKLIEFERUNG (Betrag)
     private Double bilanzBezug;
     private Double bilanzRuecklieferung;
@@ -293,5 +307,85 @@ public class MonatsStatistikDTO {
 
     public void setEinheitSummen(List<EinheitSummenDTO> einheitSummen) {
         this.einheitSummen = einheitSummen;
+    }
+
+    public Double getAutarkiegrad() {
+        return autarkiegrad;
+    }
+
+    public void setAutarkiegrad(Double autarkiegrad) {
+        this.autarkiegrad = autarkiegrad;
+    }
+
+    public Double getEigenverbrauchsquote() {
+        return eigenverbrauchsquote;
+    }
+
+    public void setEigenverbrauchsquote(Double eigenverbrauchsquote) {
+        this.eigenverbrauchsquote = eigenverbrauchsquote;
+    }
+
+    public Double getNetzbezugsquote() {
+        return netzbezugsquote;
+    }
+
+    public void setNetzbezugsquote(Double netzbezugsquote) {
+        this.netzbezugsquote = netzbezugsquote;
+    }
+
+    public Double getEinspeisequote() {
+        return einspeisequote;
+    }
+
+    public void setEinspeisequote(Double einspeisequote) {
+        this.einspeisequote = einspeisequote;
+    }
+
+    public Double getZevEigenverbrauch() {
+        return zevEigenverbrauch;
+    }
+
+    public void setZevEigenverbrauch(Double zevEigenverbrauch) {
+        this.zevEigenverbrauch = zevEigenverbrauch;
+    }
+
+    public Double getBatterieNetto() {
+        return batterieNetto;
+    }
+
+    public void setBatterieNetto(Double batterieNetto) {
+        this.batterieNetto = batterieNetto;
+    }
+
+    public Double getBatterieGeladen() {
+        return batterieGeladen;
+    }
+
+    public void setBatterieGeladen(Double batterieGeladen) {
+        this.batterieGeladen = batterieGeladen;
+    }
+
+    public Double getBatterieEntladen() {
+        return batterieEntladen;
+    }
+
+    public void setBatterieEntladen(Double batterieEntladen) {
+        this.batterieEntladen = batterieEntladen;
+    }
+
+    public Double getBatterieWirkungsgrad() {
+        return batterieWirkungsgrad;
+    }
+
+    public void setBatterieWirkungsgrad(Double batterieWirkungsgrad) {
+        this.batterieWirkungsgrad = batterieWirkungsgrad;
+    }
+
+    public boolean isBatterieKennzahlenVerfuegbar() {
+        return batterieKennzahlenVerfuegbar;
+    }
+
+    public void setBatterieKennzahlenVerfuegbar(boolean batterieKennzahlenVerfuegbar) {
+        this.batterieKennzahlenVerfuegbar = batterieKennzahlenVerfuegbar;
     }
 }

@@ -28,7 +28,7 @@ Je Monat werden folgende KPIs berechnet und angezeigt. **Grundlage sind ausschli
 5. **ZEV-Eigenverbrauch** = `Cz` (absolut, kWh) – der effektiv intern gedeckte Verbrauch. Modus-agnostisch, kein Bilanz-Bezug nötig. *Hinweis:* `summeConsumerZev` ist der **effektive/gemessene** ZEV-Anteil; die exakt **verteilte** Menge `S` steht in `summeConsumerZevCalculated`. Bei MQTT-Daten sind beide gleich (Sentinel `zev==0` wird mit dem verteilten Anteil überschrieben, `MesswerteService`), bei CSV-Consumern bleibt `summeConsumerZev` der gemessene Wert. Für diese Kennzahl wird bewusst `summeConsumerZev` verwendet (konsistent zum bestehenden Summen-Vergleich).
 6. **Netto-Speicherfluss** = `P − C + B − R` (absolut, kWh; > 0 = Netto-Ladung, < 0 = Netto-Entladung über den Zeitraum), mit Netzbezug `B = bilanzBezug`, Rücklieferung `R = bilanzRuecklieferung` (Betrag). **Berechneter Schätzwert** (Residuum der Energiebilanz, s. FR-2): nur wenn Producer **und** Bilanz-Bezug **und** Rücklieferung vorhanden; als **„berechnet/geschätzt"** gekennzeichnet.
 
-* Prozentwerte werden auf sinnvolle Genauigkeit gerundet (z.B. 1 Nachkommastelle) und mit `%` dargestellt.
+* Prozentwerte werden auf sinnvolle Genauigkeit gerundet (z.B. 1 Nachkommastelle) und mit `%` dargestellt. **Dezimaltrennzeichen ist der Punkt** (`.`), **Tausendertrennzeichen das Hochkomma** (`'`, Schweizer Konvention) – locale-unabhängig (Frontend `toFixed`, PDF `String.format(Locale.ROOT, …)` mit Gruppierungs-Ersatz `,`→`'`).
 * Die Quoten-KPIs (1–5) sind in beiden Verteilmodi verfügbar, sobald der jeweilige Nenner (`C` bzw. `P`) > 0 ist. Nur der Netto-Speicherfluss (6) und die Batterie-KPIs (FR-2) setzen zusätzlich Bilanz-Bezug **und** Rücklieferung voraus.
 * Fehlt eine benötigte Grösse (kein Producer → Nenner `P = 0`, kein Verbrauch → `C = 0`, bzw. für die Batterie-KPIs fehlende Bilanz-Daten), wird die betroffene Kennzahl als **„–"/n/a** angezeigt (kein Fehler, kein Abbruch).
 
@@ -48,31 +48,35 @@ Pro Intervall `i`: `Netto_i = P_i − C_i + B_i − R_i`, dann über den Zeitrau
 2. Im **Bilanzmodus** tritt das Kennzahlen-Panel an die Stelle des wenig aussagekräftigen Summen-Vergleichs: der **Summen-Vergleich wird im Bilanzmodus ausgeblendet**, das Kennzahlen-Panel ersetzt ihn.
 3. Im **Producer-Messung**-Modus bleibt der bestehende Summen-Vergleich unverändert erhalten (dort ist er als Plausibilitätsprüfung sinnvoll); das Kennzahlen-Panel wird zusätzlich angezeigt.
 4. Darstellung **ausschliesslich mit Design-System-Bausteinen** (`@zev/design-system`), analog zur bestehenden Statistik-Seite: ein `.zev-panel`/`.zev-panel--month` mit `.zev-panel__title`/`.zev-panel__content`, je Kennzahl eine `.zev-info-row` mit `.zev-info-label` + `.zev-info-value`. Keine komponenten-eigenen Ad-hoc-Styles; fehlende Bausteine (z.B. Markierung „berechnet/geschätzt") werden als wiederverwendbare Klasse **im Design-System** ergänzt. Batterie-Werte optisch als „berechnet" markiert.
+5. **Erklärender Hinweis je Kennzahl:** Jede Kennzahl trägt einen erklärenden Tooltip (natives `title`-Attribut auf der `.zev-info-row`), der dem Benutzer die Bedeutung der Kennzahl kurz erläutert. Die Hinweistexte sind via `TranslationService` übersetzt (DE/EN). Bei den Batterie-Kennzahlen bleibt der separate „berechnet"-Tooltip zusätzlich bestehen.
 
 ### FR-4: PDF-Export
 * Die Kennzahlen erscheinen **auch im Statistik-PDF** (`statistik.jrxml`) je Monat, analog zur Bildschirmanzeige: Quoten-KPIs (in beiden Modi) sowie – wo vorhanden – die als „berechnet/geschätzt" markierten Batterie-KPIs. Der Summen-Vergleich im PDF folgt derselben Modus-Logik wie die Bildschirmanzeige (im Bilanzmodus durch das Kennzahlen-Panel ersetzt).
 
 ### FR-5: Persistierung & i18n
 * **Keine** neue Tabelle/Spalte. Die Kennzahlen werden **berechnet** und im `MonatsStatistikDTO` als zusätzliche (transiente) Felder geliefert – kein Schema-Change.
-* Neue Übersetzungs-Keys via Flyway (`ON CONFLICT (key) DO NOTHING`, DE/EN), u.a.: `STATISTIK_KENNZAHLEN`, `KENNZAHL_AUTARKIEGRAD`, `KENNZAHL_EIGENVERBRAUCHSQUOTE`, `KENNZAHL_NETZBEZUGSQUOTE`, `KENNZAHL_EINSPEISEQUOTE`, `KENNZAHL_ZEV_EIGENVERBRAUCH`, `KENNZAHL_BATTERIE_NETTO`, `KENNZAHL_BATTERIE_GELADEN`, `KENNZAHL_BATTERIE_ENTLADEN`, `KENNZAHL_BATTERIE_WIRKUNGSGRAD`, `KENNZAHL_BERECHNET_HINWEIS`.
+* Neue Übersetzungs-Keys via Flyway (`ON CONFLICT (key) DO NOTHING`, DE/EN), u.a.: `STATISTIK_KENNZAHLEN`, `KENNZAHL_AUTARKIEGRAD`, `KENNZAHL_EIGENVERBRAUCHSQUOTE`, `KENNZAHL_NETZBEZUGSQUOTE`, `KENNZAHL_EINSPEISEQUOTE`, `KENNZAHL_ZEV_EIGENVERBRAUCH`, `KENNZAHL_BATTERIE_NETTO`, `KENNZAHL_BATTERIE_GELADEN`, `KENNZAHL_BATTERIE_ENTLADEN`, `KENNZAHL_BATTERIE_WIRKUNGSGRAD`, `KENNZAHL_BERECHNET`, `KENNZAHL_BERECHNET_HINWEIS`.
+* **Hinweis-Keys je Kennzahl** (Tooltips, FR-3.5): `KENNZAHL_AUTARKIEGRAD_HINWEIS`, `KENNZAHL_EIGENVERBRAUCHSQUOTE_HINWEIS`, `KENNZAHL_NETZBEZUGSQUOTE_HINWEIS`, `KENNZAHL_EINSPEISEQUOTE_HINWEIS`, `KENNZAHL_ZEV_EIGENVERBRAUCH_HINWEIS`, `KENNZAHL_BATTERIE_NETTO_HINWEIS`, `KENNZAHL_BATTERIE_GELADEN_HINWEIS`, `KENNZAHL_BATTERIE_ENTLADEN_HINWEIS`, `KENNZAHL_BATTERIE_WIRKUNGSGRAD_HINWEIS`.
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 * [ ] Je Monat wird ein Kennzahlen-Panel mit Autarkiegrad, Eigenverbrauchsquote, Netzbezugsquote, Einspeisequote und ZEV-Eigenverbrauch angezeigt.
 * [ ] Die Quoten-KPIs (Autarkiegrad, Eigenverbrauchsquote, Netzbezugs-/Einspeisequote, ZEV-Eigenverbrauch) werden in **beiden** Verteilmodi identisch berechnet und benötigen **keinen** Bilanz-Bezug.
-* [ ] **Autarkiegrad** = `summeConsumerZev / summeConsumerTotal`; Beispiel `Cz=600, C=1000` → `60,0 %`.
-* [ ] **Eigenverbrauchsquote** = `summeProducerZev / summeProducerTotal`; Beispiel `Pz=900, P=1200` → `75,0 %`. Im Modus `BILANZ` entspricht `Pz` der nicht eingespeisten Produktion `max(0, P − R)` (Batterieladung zählt mit); im Modus `PRODUCER_MESSUNG` der direkt verteilten Produktion.
-* [ ] **Netzbezugsquote** = `1 − Autarkiegrad` und **Einspeisequote** = `1 − Eigenverbrauchsquote`; im Beispiel `40,0 %` bzw. `25,0 %`.
+* [ ] **Autarkiegrad** = `summeConsumerZev / summeConsumerTotal`; Beispiel `Cz=600, C=1000` → `60.0 %`.
+* [ ] **Eigenverbrauchsquote** = `summeProducerZev / summeProducerTotal`; Beispiel `Pz=900, P=1200` → `75.0 %`. Im Modus `BILANZ` entspricht `Pz` der nicht eingespeisten Produktion `max(0, P − R)` (Batterieladung zählt mit); im Modus `PRODUCER_MESSUNG` der direkt verteilten Produktion.
+* [ ] **Netzbezugsquote** = `1 − Autarkiegrad` und **Einspeisequote** = `1 − Eigenverbrauchsquote`; im Beispiel `40.0 %` bzw. `25.0 %`.
 * [ ] **ZEV-Eigenverbrauch** = `summeConsumerZev` (kWh); im Beispiel `600 kWh`.
 * [ ] **Netto-Speicherfluss** = `Produktion − Verbrauch + Bezug − Rücklieferung`; Beispiel `P=1200, C=1000, B=400, R=300` → `+300 kWh` (Netto-Ladung).
 * [ ] **Batterie geladen/entladen** werden aus der Pro-Intervall-Summe der positiven bzw. negativen Nettos gebildet; Beispiel je Intervall `+5 / −3 / +2` → geladen `7`, entladen `3`.
-* [ ] **Round-Trip-Wirkungsgrad** = `entladen / geladen`; Beispiel `entladen=3, geladen=7` → `42,9 %`. Bei `geladen = 0` wird „–" angezeigt (keine Division durch 0).
+* [ ] **Round-Trip-Wirkungsgrad** = `entladen / geladen`; Beispiel `entladen=3, geladen=7` → `42.9 %`. Bei `geladen = 0` wird „–" angezeigt (keine Division durch 0).
 * [ ] Fehlt Producer (Nenner `P = 0`) → Eigenverbrauchsquote/Einspeisequote „–"; fehlt Verbrauch (Nenner `C = 0`) → Autarkiegrad/Netzbezugsquote „–". Keine Exception, kein NaN/Infinity.
 * [ ] Fehlt Bilanz-Bezug oder Rücklieferung → nur die Batterie-KPIs (Netto-Speicherfluss, geladen/entladen/Wirkungsgrad) werden als **„–"** angezeigt; die Quoten-KPIs bleiben verfügbar.
 * [ ] Batterie-Kennzahlen (inkl. Netto-Speicherfluss) sind als **„berechnet/geschätzt"** gekennzeichnet und werden nur bei vorhandenen Producer- **und** Bilanz-Daten (Bezug + Rücklieferung) gezeigt.
 * [ ] Im **Producer-Messung**-Modus bleibt der bestehende Summen-Vergleich erhalten; im **Bilanzmodus** wird er ausgeblendet und durch das Kennzahlen-Panel ersetzt.
 * [ ] Die Kennzahlen erscheinen auch im **Statistik-PDF** (`statistik.jrxml`) je Monat mit derselben Modus-Logik wie am Bildschirm.
 * [ ] Alle Texte via `TranslationService` (DE/EN); Prozentwerte mit `%`, kWh-Werte in kWh.
+* [ ] Alle Kennzahlen (Prozent- und kWh-Werte) verwenden den **Punkt** als Dezimaltrennzeichen und – bei Werten ≥ 1000 – das **Hochkomma** (`'`) als Tausendertrennzeichen, am Bildschirm und im PDF, unabhängig von der Server-/Browser-Locale (`60.0 %`; `1'234.567 kWh`, nicht `60,0 %` / `1,234.567 kWh`).
 * [ ] Das Kennzahlen-Panel nutzt **ausschliesslich** Design-System-Klassen (`.zev-panel`, `.zev-info-row`, `.zev-info-label`, `.zev-info-value`); keine komponenten-eigenen Ad-hoc-Styles. Eine ggf. neue „berechnet"-Kennzeichnung wird als Klasse im Design-System (`@zev/design-system`) ergänzt, nicht im Component-CSS.
+* [ ] Jede Kennzahl zeigt beim Hovern einen erklärenden Hinweis (`title`-Tooltip), der die Bedeutung der Kennzahl beschreibt; die Hinweistexte sind via `TranslationService` (DE/EN) übersetzt.
 * [ ] Statistik bleibt mit `statistik:read` erreichbar; Multi-Tenancy unverändert.
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
@@ -110,7 +114,8 @@ Pro Intervall `i`: `Netto_i = P_i − C_i + B_i − R_i`, dann über den Zeitrau
 * **Betroffener Code (Frontend):** `statistik.component.*` (+ `statistik.model.ts`) — Kennzahlen-Panel mit bestehenden Design-System-Bausteinen (`.zev-panel`/`.zev-info-row`), „berechnet"-Kennzeichnung; ggf. `statistik.service`/DTO-Mapping.
 * **Design-System (`design-system/src/components/statistik/`):** nur falls eine neue „berechnet/geschätzt"-Markierung benötigt wird → dort als wiederverwendbare Klasse ergänzen (nicht im Component-CSS).
 * **PDF-Export (Backend):** `service/StatistikPdfService.java` + `reports/statistik.jrxml` — Kennzahlen je Monat ins PDF aufnehmen (Quoten-KPIs in beiden Modi, Batterie-KPIs als „berechnet"; Summen-Vergleich im Bilanzmodus ausgeblendet).
-* **i18n:** neue Keys via Flyway (nächste freie Version zum Umsetzungszeitpunkt prüfen; aktuell höchste `V89`).
+* **PDF-Zahlenformat (Backend):** `util/PdfNumberFormat.java` — zentrale, locale-unabhängige Formatierung (Punkt-Dezimal, Hochkomma-Gruppierung) für **das gesamte** Statistik-PDF (`statistik.jrxml` **und** Subreport `einheit-summen.jrxml`), ersetzt die bisherigen `pattern="#,##0.000"`/`String.format(...)`-Stellen.
+* **i18n:** neue Keys via Flyway – `V90` (Kennzahlen-Labels) und `V91` (erklärende Hinweise/Tooltips).
 * **Datenmigration:** keine.
 
 ## 7. Abgrenzung / Out of Scope
@@ -127,4 +132,4 @@ Pro Intervall `i`: `Netto_i = P_i − C_i + B_i − R_i`, dann über den Zeitrau
 * [x] **Eigenverbrauchsquote-Definition:** **Entschieden:** `summeProducerZev / summeProducerTotal` (intern genutzte Produktion / Produktion), weil so **ohne zusätzliche Bilanz-Daten** in beiden Verteilmodi verfügbar. **Achtung modus-abhängige Bedeutung** (s. FR-1.2): Im Modus `BILANZ` wird `summeProducerZev` intern als `max(0, |Produktion| − |Rücklieferung|)` = `(P − R)` gebildet, d.h. eine **Batterieladung zählt hier als Eigenverbrauch mit** (Textbuch-Eigenverbrauchsquote – bewusst akzeptiert). Im Modus `PRODUCER_MESSUNG` ist `summeProducerZev` die direkt verteilte Produktion **ohne** Batterie. Analog Autarkiegrad über `summeConsumerZev / summeConsumerTotal`.
 * [x] **PDF-Export:** **Entschieden:** ja – die Kennzahlen erscheinen auch im Statistik-PDF (siehe FR-4).
 * [x] **Anzeige in beiden Modi:** **Entschieden:** in beiden Modi anzeigen (Quoten-KPIs sind modus-agnostisch; Batterie-KPIs nur bei vorhandenen Bilanz-Daten).
-* [x] **Rundung/Format:** **Entschieden:** Prozentwerte mit 1 Nachkommastelle, kWh-Werte wie in der bestehenden Statistik-Anzeige.
+* [x] **Rundung/Format:** **Entschieden:** Prozentwerte mit 1 Nachkommastelle. **Dezimaltrennzeichen = Punkt** (`.`), **Tausendertrennzeichen = Hochkomma** (`'`, Schweizer Konvention) – am Bildschirm (`toFixed` + Gruppierung) und im PDF (`String.format(Locale.ROOT, …)` mit `,`→`'`), locale-unabhängig.

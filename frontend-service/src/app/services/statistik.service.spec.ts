@@ -44,7 +44,17 @@ describe('StatistikService', () => {
         ruecklieferungBilanzGleich: true,
         ruecklieferungBilanzDifferenz: 0,
         tageAbweichungen: [],
-        einheitSummen: []
+        einheitSummen: [],
+        autarkiegrad: 0.8421,
+        eigenverbrauchsquote: 0.6667,
+        netzbezugsquote: 0.1579,
+        einspeisequote: 0.3333,
+        zevEigenverbrauch: 800,
+        batterieNetto: 250,
+        batterieGeladen: 300,
+        batterieEntladen: 50,
+        batterieWirkungsgrad: 0.1667,
+        batterieKennzahlenVerfuegbar: true
       }
     ],
     toleranz: 0.01

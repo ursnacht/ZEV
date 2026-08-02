@@ -47,6 +47,20 @@ public interface MesswerteRepository extends JpaRepository<Messwerte, Long> {
     @Query("SELECT DISTINCT m.einheit FROM Messwerte m WHERE m.zeit >= :dateFrom AND m.zeit < :dateTo")
     List<Einheit> findDistinctEinheitenInRange(@Param("dateFrom") LocalDateTime dateFrom, @Param("dateTo") LocalDateTime dateTo);
 
+    /**
+     * Aggregiert je 15-Min-Intervall (zeit) die Beträge der vier Bilanz-Komponenten für die
+     * Batterie-Kennzahlen (Spec Statistik-Kennzahlen.md, Stufe 2). Rückgabe je Zeile:
+     * {@code [zeit, produktion, verbrauch, bezug, ruecklieferung]} (alle als Betrag/positiv).
+     * JPQL → der Hibernate-orgFilter greift (Mandanten-Isolation).
+     */
+    @Query("SELECT m.zeit, "
+            + "COALESCE(SUM(CASE WHEN m.einheit.typ = ch.nacht.entity.EinheitTyp.PRODUCER THEN ABS(m.total) ELSE 0 END), 0), "
+            + "COALESCE(SUM(CASE WHEN m.einheit.typ = ch.nacht.entity.EinheitTyp.CONSUMER THEN m.total ELSE 0 END), 0), "
+            + "COALESCE(SUM(CASE WHEN m.einheit.typ = ch.nacht.entity.EinheitTyp.BEZUG THEN m.total ELSE 0 END), 0), "
+            + "COALESCE(SUM(CASE WHEN m.einheit.typ = ch.nacht.entity.EinheitTyp.RUECKLIEFERUNG THEN ABS(m.total) ELSE 0 END), 0) "
+            + "FROM Messwerte m WHERE m.zeit >= :dateFrom AND m.zeit < :dateTo GROUP BY m.zeit ORDER BY m.zeit")
+    List<Object[]> sumBilanzKomponentenPerZeitBetween(@Param("dateFrom") LocalDateTime dateFrom, @Param("dateTo") LocalDateTime dateTo);
+
     @Query("SELECT m FROM Messwerte m WHERE CAST(m.zeit AS LocalDate) = :date")
     List<Messwerte> findByDate(@Param("date") LocalDate date);
 

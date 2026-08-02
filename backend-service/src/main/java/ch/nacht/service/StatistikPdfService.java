@@ -86,6 +86,8 @@ public class StatistikPdfService {
         parameters.put("EINHEIT_SUMMEN_SUBREPORT", compiledEinheitSummenReport);
         // Anzeigename der Organisation (JWT-Claim displayName, Fallback Alias) für den Titel
         parameters.put("ORG_NAME", organizationContextService.getCurrentOrgName());
+        // Verteilmodus BILANZ → Summen-Vergleich wird durch das Kennzahlen-Panel ersetzt (ausgeblendet).
+        parameters.put("IST_BILANZ", statistik.getVerteilmodus() == ch.nacht.entity.Verteilmodus.BILANZ);
 
         // Monate als DataSource für das Detail-Band
         JRBeanCollectionDataSource monateDataSource =

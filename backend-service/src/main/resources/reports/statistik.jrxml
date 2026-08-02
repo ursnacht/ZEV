@@ -9,6 +9,7 @@
     <parameter name="ZEITRAUM" class="java.lang.String"/>
     <parameter name="GENERIERT_AM" class="java.lang.String"/>
     <parameter name="ORG_NAME" class="java.lang.String"/>
+    <parameter name="IST_BILANZ" class="java.lang.Boolean"/>
     <parameter name="EINHEIT_SUMMEN_SUBREPORT" class="net.sf.jasperreports.engine.JasperReport"/>
 
     <!-- Fields for MonatsStatistik detail band -->
@@ -39,6 +40,17 @@
     <field name="bilanzBezugName" class="java.lang.String"/>
     <field name="bilanzRuecklieferungName" class="java.lang.String"/>
     <field name="einheitSummen" class="java.util.List"/>
+    <!-- Statistik-Kennzahlen -->
+    <field name="autarkiegrad" class="java.lang.Double"/>
+    <field name="eigenverbrauchsquote" class="java.lang.Double"/>
+    <field name="netzbezugsquote" class="java.lang.Double"/>
+    <field name="einspeisequote" class="java.lang.Double"/>
+    <field name="zevEigenverbrauch" class="java.lang.Double"/>
+    <field name="batterieNetto" class="java.lang.Double"/>
+    <field name="batterieGeladen" class="java.lang.Double"/>
+    <field name="batterieEntladen" class="java.lang.Double"/>
+    <field name="batterieWirkungsgrad" class="java.lang.Double"/>
+    <field name="batterieKennzahlenVerfuegbar" class="java.lang.Boolean"/>
 
     <!-- Variable: Maximum of all sums for bar scaling -->
     <variable name="maxSumme" calculation="Nothing" resetType="None" class="java.lang.Double">
@@ -110,7 +122,7 @@
 
     <!-- Detail Band - One band per month -->
     <detail>
-        <band height="330">
+        <band height="470">
             <!-- Month header -->
             <element kind="textField" uuid="33333333-3333-3333-3333-33333333330c" x="0" y="10" width="555" height="25" forecolor="#333333" fontSize="14.0" bold="true" vTextAlign="Middle">
                 <expression><![CDATA[java.time.Month.of($F{monat}).getDisplayName(java.time.format.TextStyle.FULL, "de".equals($P{SPRACHE}) ? java.util.Locale.GERMAN : java.util.Locale.ENGLISH) + " " + $F{jahr} + " (" + $F{von}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + " - " + $F{bis}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + ")"]]></expression>
@@ -158,8 +170,8 @@
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
             </element>
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333314" x="170" y="96" width="100" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
-                <expression><![CDATA[$F{summeProducerTotal}]]></expression>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333314" x="170" y="96" width="100" height="16" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[ch.nacht.util.PdfNumberFormat.kwh($F{summeProducerTotal})]]></expression>
                 <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
@@ -176,8 +188,8 @@
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
             </element>
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333316" x="170" y="112" width="100" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
-                <expression><![CDATA[$F{summeConsumerTotal}]]></expression>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333316" x="170" y="112" width="100" height="16" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[ch.nacht.util.PdfNumberFormat.kwh($F{summeConsumerTotal})]]></expression>
                 <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
@@ -194,8 +206,8 @@
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
             </element>
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333318" x="170" y="128" width="100" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
-                <expression><![CDATA[$F{summeProducerZev}]]></expression>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333318" x="170" y="128" width="100" height="16" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[ch.nacht.util.PdfNumberFormat.kwh($F{summeProducerZev})]]></expression>
                 <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
@@ -212,8 +224,8 @@
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
             </element>
-            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331a" x="170" y="144" width="100" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
-                <expression><![CDATA[$F{summeConsumerZev}]]></expression>
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331a" x="170" y="144" width="100" height="16" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[ch.nacht.util.PdfNumberFormat.kwh($F{summeConsumerZev})]]></expression>
                 <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
@@ -230,8 +242,8 @@
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
             </element>
-            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331c" x="170" y="160" width="100" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
-                <expression><![CDATA[$F{summeConsumerZevCalculated}]]></expression>
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331c" x="170" y="160" width="100" height="16" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[ch.nacht.util.PdfNumberFormat.kwh($F{summeConsumerZevCalculated})]]></expression>
                 <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
@@ -251,9 +263,9 @@
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
             </element>
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333355" x="170" y="176" width="100" height="16" removeLineWhenBlank="true" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333355" x="170" y="176" width="100" height="16" removeLineWhenBlank="true" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
                 <printWhenExpression><![CDATA[$F{bilanzRuecklieferungName} != null]]></printWhenExpression>
-                <expression><![CDATA[$F{bilanzRuecklieferung}]]></expression>
+                <expression><![CDATA[ch.nacht.util.PdfNumberFormat.kwh($F{bilanzRuecklieferung})]]></expression>
                 <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
@@ -272,9 +284,9 @@
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
             </element>
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333352" x="170" y="192" width="100" height="16" removeLineWhenBlank="true" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333352" x="170" y="192" width="100" height="16" removeLineWhenBlank="true" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
                 <printWhenExpression><![CDATA[$F{bilanzBezugName} != null]]></printWhenExpression>
-                <expression><![CDATA[$F{bilanzBezug}]]></expression>
+                <expression><![CDATA[ch.nacht.util.PdfNumberFormat.kwh($F{bilanzBezug})]]></expression>
                 <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
@@ -285,83 +297,166 @@
                 <expression><![CDATA[ch.nacht.util.BarImageHelper.createBar($F{bilanzBezug}, $V{maxSumme}, 275, 14, new java.awt.Color(233, 30, 99))]]></expression>
             </element>
 
-            <!-- Summen Vergleich section -->
+            <!-- Summen Vergleich section (nur Producer-Messung-Modus; im Bilanzmodus durch die Kennzahlen ersetzt) -->
             <element kind="textField" uuid="33333333-3333-3333-3333-33333333331d" x="0" y="217" width="200" height="18" forecolor="#666666" fontSize="12.0" bold="true">
+                <printWhenExpression><![CDATA[!$P{IST_BILANZ}]]></printWhenExpression>
                 <expression><![CDATA[$P{TRANSLATIONS}.get("SUMMEN_VERGLEICH")]]></expression>
             </element>
             <element kind="textField" uuid="33333333-3333-3333-3333-33333333331e" x="200" y="217" width="355" height="15" forecolor="#999999" fontSize="8.0">
-                <expression><![CDATA[$P{TRANSLATIONS}.get("TOLERANZ") + ": " + String.format("%.3f", $P{STATISTIK}.getToleranz()) + " kWh"]]></expression>
+                <printWhenExpression><![CDATA[!$P{IST_BILANZ}]]></printWhenExpression>
+                <expression><![CDATA[$P{TRANSLATIONS}.get("TOLERANZ") + ": " + ch.nacht.util.PdfNumberFormat.kwh($P{STATISTIK}.getToleranz()) + " kWh"]]></expression>
             </element>
 
             <!-- Comparison: A = B -->
-            <element kind="staticText" uuid="33333333-3333-3333-3333-33333333331f" x="0" y="234" width="50" height="15" fontSize="9.0">
-                <text><![CDATA[A = B:]]></text>
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333331f" x="0" y="234" width="50" height="15" fontSize="9.0">
+                <printWhenExpression><![CDATA[!$P{IST_BILANZ}]]></printWhenExpression>
+                <expression><![CDATA["A = B:"]]></expression>
             </element>
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333320" x="50" y="234" width="150" height="15" forecolor="#4CAF50" fontSize="9.0">
                 <expression><![CDATA["✓ " + $P{TRANSLATIONS}.get("GLEICH")]]></expression>
-                <printWhenExpression><![CDATA[$F{summenCDGleich}]]></printWhenExpression>
+                <printWhenExpression><![CDATA[!$P{IST_BILANZ} && $F{summenCDGleich}]]></printWhenExpression>
             </element>
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333321" x="50" y="234" width="150" height="15" forecolor="#F44336" fontSize="9.0">
-                <expression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + String.format("%+.3f", $F{differenzCD}) + " kWh)"]]></expression>
-                <printWhenExpression><![CDATA[!$F{summenCDGleich}]]></printWhenExpression>
+                <expression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + ch.nacht.util.PdfNumberFormat.kwhSigned($F{differenzCD}) + " kWh)"]]></expression>
+                <printWhenExpression><![CDATA[!$P{IST_BILANZ} && !$F{summenCDGleich}]]></printWhenExpression>
             </element>
 
             <!-- Comparison: A = C -->
-            <element kind="staticText" uuid="33333333-3333-3333-3333-333333333322" x="200" y="234" width="50" height="15" fontSize="9.0">
-                <text><![CDATA[A = C:]]></text>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333322" x="200" y="234" width="50" height="15" fontSize="9.0">
+                <printWhenExpression><![CDATA[!$P{IST_BILANZ}]]></printWhenExpression>
+                <expression><![CDATA["A = C:"]]></expression>
             </element>
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333323" x="250" y="234" width="150" height="15" forecolor="#4CAF50" fontSize="9.0">
                 <expression><![CDATA["✓ " + $P{TRANSLATIONS}.get("GLEICH")]]></expression>
-                <printWhenExpression><![CDATA[$F{summenCEGleich}]]></printWhenExpression>
+                <printWhenExpression><![CDATA[!$P{IST_BILANZ} && $F{summenCEGleich}]]></printWhenExpression>
             </element>
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333324" x="250" y="234" width="150" height="15" forecolor="#F44336" fontSize="9.0">
-                <expression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + String.format("%+.3f", $F{differenzCE}) + " kWh)"]]></expression>
-                <printWhenExpression><![CDATA[!$F{summenCEGleich}]]></printWhenExpression>
+                <expression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + ch.nacht.util.PdfNumberFormat.kwhSigned($F{differenzCE}) + " kWh)"]]></expression>
+                <printWhenExpression><![CDATA[!$P{IST_BILANZ} && !$F{summenCEGleich}]]></printWhenExpression>
             </element>
 
             <!-- Comparison: B = C -->
-            <element kind="staticText" uuid="33333333-3333-3333-3333-333333333325" x="400" y="234" width="50" height="15" fontSize="9.0">
-                <text><![CDATA[B = C:]]></text>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333325" x="400" y="234" width="50" height="15" fontSize="9.0">
+                <printWhenExpression><![CDATA[!$P{IST_BILANZ}]]></printWhenExpression>
+                <expression><![CDATA["B = C:"]]></expression>
             </element>
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333326" x="450" y="234" width="105" height="15" forecolor="#4CAF50" fontSize="9.0">
                 <expression><![CDATA["✓ " + $P{TRANSLATIONS}.get("GLEICH")]]></expression>
-                <printWhenExpression><![CDATA[$F{summenDEGleich}]]></printWhenExpression>
+                <printWhenExpression><![CDATA[!$P{IST_BILANZ} && $F{summenDEGleich}]]></printWhenExpression>
             </element>
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333327" x="450" y="234" width="105" height="15" forecolor="#F44336" fontSize="9.0">
-                <expression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + String.format("%+.3f", $F{differenzDE}) + " kWh)"]]></expression>
-                <printWhenExpression><![CDATA[!$F{summenDEGleich}]]></printWhenExpression>
+                <expression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + ch.nacht.util.PdfNumberFormat.kwhSigned($F{differenzDE}) + " kWh)"]]></expression>
+                <printWhenExpression><![CDATA[!$P{IST_BILANZ} && !$F{summenDEGleich}]]></printWhenExpression>
             </element>
 
-            <!-- Comparison: Rücklieferung (berechnet) vs. Bilanzmesspunkt RUECKLIEFERUNG (nur falls Einheit vorhanden) -->
+            <!-- Comparison: Rücklieferung (berechnet) vs. Bilanzmesspunkt RUECKLIEFERUNG (nur Producer-Modus + Einheit vorhanden) -->
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333334" x="0" y="252" width="150" height="15" removeLineWhenBlank="true" fontSize="9.0">
-                <printWhenExpression><![CDATA[$F{bilanzRuecklieferungName} != null]]></printWhenExpression>
+                <printWhenExpression><![CDATA[!$P{IST_BILANZ} && $F{bilanzRuecklieferungName} != null]]></printWhenExpression>
                 <expression><![CDATA[$P{TRANSLATIONS}.get("VERGLEICH_RUECKLIEFERUNG") + ":"]]></expression>
             </element>
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333335" x="150" y="252" width="125" height="15" removeLineWhenBlank="true" forecolor="#4CAF50" fontSize="9.0">
                 <expression><![CDATA["✓ " + $P{TRANSLATIONS}.get("GLEICH")]]></expression>
-                <printWhenExpression><![CDATA[$F{bilanzRuecklieferungName} != null && $F{ruecklieferungBilanzGleich}]]></printWhenExpression>
+                <printWhenExpression><![CDATA[!$P{IST_BILANZ} && $F{bilanzRuecklieferungName} != null && $F{ruecklieferungBilanzGleich}]]></printWhenExpression>
             </element>
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333336" x="150" y="252" width="125" height="15" removeLineWhenBlank="true" forecolor="#F44336" fontSize="9.0">
-                <expression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + String.format("%+.3f", $F{ruecklieferungBilanzDifferenz}) + " kWh)"]]></expression>
-                <printWhenExpression><![CDATA[$F{bilanzRuecklieferungName} != null && !$F{ruecklieferungBilanzGleich}]]></printWhenExpression>
+                <expression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + ch.nacht.util.PdfNumberFormat.kwhSigned($F{ruecklieferungBilanzDifferenz}) + " kWh)"]]></expression>
+                <printWhenExpression><![CDATA[!$P{IST_BILANZ} && $F{bilanzRuecklieferungName} != null && !$F{ruecklieferungBilanzGleich}]]></printWhenExpression>
             </element>
 
-            <!-- Comparison: Bezug von VNB (berechnet) vs. Bilanzmesspunkt BEZUG (nur falls Einheit vorhanden) -->
+            <!-- Comparison: Bezug von VNB (berechnet) vs. Bilanzmesspunkt BEZUG (nur Producer-Modus + Einheit vorhanden) -->
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333331" x="280" y="252" width="130" height="15" removeLineWhenBlank="true" fontSize="9.0">
-                <printWhenExpression><![CDATA[$F{bilanzBezugName} != null]]></printWhenExpression>
+                <printWhenExpression><![CDATA[!$P{IST_BILANZ} && $F{bilanzBezugName} != null]]></printWhenExpression>
                 <expression><![CDATA[$P{TRANSLATIONS}.get("VERGLEICH_BEZUG") + ":"]]></expression>
             </element>
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333332" x="410" y="252" width="145" height="15" removeLineWhenBlank="true" forecolor="#4CAF50" fontSize="9.0">
                 <expression><![CDATA["✓ " + $P{TRANSLATIONS}.get("GLEICH")]]></expression>
-                <printWhenExpression><![CDATA[$F{bilanzBezugName} != null && $F{bezugBilanzGleich}]]></printWhenExpression>
+                <printWhenExpression><![CDATA[!$P{IST_BILANZ} && $F{bilanzBezugName} != null && $F{bezugBilanzGleich}]]></printWhenExpression>
             </element>
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333333" x="410" y="252" width="145" height="15" removeLineWhenBlank="true" forecolor="#F44336" fontSize="9.0">
-                <expression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + String.format("%+.3f", $F{bezugBilanzDifferenz}) + " kWh)"]]></expression>
-                <printWhenExpression><![CDATA[$F{bilanzBezugName} != null && !$F{bezugBilanzGleich}]]></printWhenExpression>
+                <expression><![CDATA["✗ " + $P{TRANSLATIONS}.get("UNGLEICH") + " (" + ch.nacht.util.PdfNumberFormat.kwhSigned($F{bezugBilanzDifferenz}) + " kWh)"]]></expression>
+                <printWhenExpression><![CDATA[!$P{IST_BILANZ} && $F{bilanzBezugName} != null && !$F{bezugBilanzGleich}]]></printWhenExpression>
+            </element>
+
+            <!-- Kennzahlen section (in beiden Verteilmodi) -->
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333360" x="0" y="275" width="555" height="18" forecolor="#666666" fontSize="12.0" bold="true">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("STATISTIK_KENNZAHLEN")]]></expression>
+                <box>
+                    <bottomPen lineWidth="1.0" lineColor="#DDDDDD"/>
+                </box>
+            </element>
+
+            <!-- Quoten-KPIs (linke Spalte) -->
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333361" x="0" y="296" width="200" height="15" fontSize="9.0">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_AUTARKIEGRAD") + ":"]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333362" x="200" y="296" width="75" height="15" fontSize="9.0" bold="true" hTextAlign="Right">
+                <expression><![CDATA[ch.nacht.util.PdfNumberFormat.percent($F{autarkiegrad})]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333363" x="0" y="312" width="200" height="15" fontSize="9.0">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_EIGENVERBRAUCHSQUOTE") + ":"]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333364" x="200" y="312" width="75" height="15" fontSize="9.0" bold="true" hTextAlign="Right">
+                <expression><![CDATA[ch.nacht.util.PdfNumberFormat.percent($F{eigenverbrauchsquote})]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333365" x="0" y="328" width="200" height="15" fontSize="9.0">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_NETZBEZUGSQUOTE") + ":"]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333366" x="200" y="328" width="75" height="15" fontSize="9.0" bold="true" hTextAlign="Right">
+                <expression><![CDATA[ch.nacht.util.PdfNumberFormat.percent($F{netzbezugsquote})]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333367" x="0" y="344" width="200" height="15" fontSize="9.0">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_EINSPEISEQUOTE") + ":"]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333368" x="200" y="344" width="75" height="15" fontSize="9.0" bold="true" hTextAlign="Right">
+                <expression><![CDATA[ch.nacht.util.PdfNumberFormat.percent($F{einspeisequote})]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333369" x="0" y="360" width="200" height="15" fontSize="9.0">
+                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_ZEV_EIGENVERBRAUCH") + ":"]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333336a" x="200" y="360" width="75" height="15" fontSize="9.0" bold="true" hTextAlign="Right">
+                <expression><![CDATA[$F{zevEigenverbrauch} != null ? ch.nacht.util.PdfNumberFormat.kwh($F{zevEigenverbrauch}) + " kWh" : "–"]]></expression>
+            </element>
+
+            <!-- Batterie-KPIs (rechte Spalte; nur wenn Producer + Bilanz-Bezug + Rücklieferung vorhanden) -->
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333336b" x="300" y="296" width="180" height="15" fontSize="9.0">
+                <printWhenExpression><![CDATA[$F{batterieKennzahlenVerfuegbar}]]></printWhenExpression>
+                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_BATTERIE_NETTO") + ":"]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333336c" x="480" y="296" width="75" height="15" fontSize="9.0" bold="true" hTextAlign="Right">
+                <printWhenExpression><![CDATA[$F{batterieKennzahlenVerfuegbar}]]></printWhenExpression>
+                <expression><![CDATA[$F{batterieNetto} != null ? ch.nacht.util.PdfNumberFormat.kwhSigned($F{batterieNetto}) + " kWh" : "–"]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333336d" x="300" y="312" width="180" height="15" fontSize="9.0">
+                <printWhenExpression><![CDATA[$F{batterieKennzahlenVerfuegbar}]]></printWhenExpression>
+                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_BATTERIE_GELADEN") + ":"]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333336e" x="480" y="312" width="75" height="15" fontSize="9.0" bold="true" hTextAlign="Right">
+                <printWhenExpression><![CDATA[$F{batterieKennzahlenVerfuegbar}]]></printWhenExpression>
+                <expression><![CDATA[$F{batterieGeladen} != null ? ch.nacht.util.PdfNumberFormat.kwh($F{batterieGeladen}) + " kWh" : "–"]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-33333333336f" x="300" y="328" width="180" height="15" fontSize="9.0">
+                <printWhenExpression><![CDATA[$F{batterieKennzahlenVerfuegbar}]]></printWhenExpression>
+                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_BATTERIE_ENTLADEN") + ":"]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333370" x="480" y="328" width="75" height="15" fontSize="9.0" bold="true" hTextAlign="Right">
+                <printWhenExpression><![CDATA[$F{batterieKennzahlenVerfuegbar}]]></printWhenExpression>
+                <expression><![CDATA[$F{batterieEntladen} != null ? ch.nacht.util.PdfNumberFormat.kwh($F{batterieEntladen}) + " kWh" : "–"]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333371" x="300" y="344" width="180" height="15" fontSize="9.0">
+                <printWhenExpression><![CDATA[$F{batterieKennzahlenVerfuegbar}]]></printWhenExpression>
+                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_BATTERIE_WIRKUNGSGRAD") + ":"]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333372" x="480" y="344" width="75" height="15" fontSize="9.0" bold="true" hTextAlign="Right">
+                <printWhenExpression><![CDATA[$F{batterieKennzahlenVerfuegbar}]]></printWhenExpression>
+                <expression><![CDATA[ch.nacht.util.PdfNumberFormat.percent($F{batterieWirkungsgrad})]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333373" x="300" y="360" width="255" height="24" forecolor="#999999" fontSize="7.0" italic="true">
+                <printWhenExpression><![CDATA[$F{batterieKennzahlenVerfuegbar}]]></printWhenExpression>
+                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_BERECHNET_HINWEIS")]]></expression>
             </element>
 
             <!-- Subreport: Summen pro Einheit -->
-            <element kind="subreport" uuid="33333333-3333-3333-3333-333333333330" x="0" y="275" width="555" height="50">
+            <element kind="subreport" uuid="33333333-3333-3333-3333-333333333330" x="0" y="392" width="555" height="50">
                 <printWhenExpression><![CDATA[$F{einheitSummen} != null && !$F{einheitSummen}.isEmpty()]]></printWhenExpression>
                 <parameter name="TRANSLATIONS">
                     <expression><![CDATA[$P{TRANSLATIONS}]]></expression>

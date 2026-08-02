@@ -59,6 +59,19 @@ export interface MonatsStatistik {
 
   // Summen pro Einheit
   einheitSummen: EinheitSummen[];
+
+  // Statistik-Kennzahlen (berechnet); Prozentwerte als Anteil (0..1), null = "–"
+  autarkiegrad: number | null;
+  eigenverbrauchsquote: number | null;
+  netzbezugsquote: number | null;
+  einspeisequote: number | null;
+  zevEigenverbrauch: number | null;
+  // Batterie-Kennzahlen (berechnet/geschätzt), null = nicht ermittelbar
+  batterieNetto: number | null;
+  batterieGeladen: number | null;
+  batterieEntladen: number | null;
+  batterieWirkungsgrad: number | null;
+  batterieKennzahlenVerfuegbar: boolean;
 }
 
 export interface Statistik {

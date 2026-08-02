@@ -20,6 +20,18 @@
 * Verwende immer das Schweizer Datumsformat dd.MM.yyyy
 * Verwende wo möglich und sinnvoll ein Feather Icon: Navigation, Seitentitel
 
+### Zahlenformatierung
+Zahlen werden **locale-unabhängig** im Schweizer Format dargestellt – überall gleich (Bildschirm **und** PDF):
+* **Dezimaltrennzeichen:** Punkt (`.`)
+* **Tausendertrennzeichen:** Hochkomma (`'`) – Beispiel: `1'234.567`
+* **Prozentwerte:** 1 Nachkommastelle mit `%` (z.B. `60.0 %`); Anteile (0..1) werden mit 100 multipliziert
+* **Fehlwert / n/a:** `–` (Gedankenstrich) bei `null`/nicht ermittelbar
+
+**Nicht** auf die JVM-/Browser-Locale verlassen (kein blosses `String.format("%.3f", …)` ohne Locale, kein Jasper-`pattern="#,##0.000"`) – diese liefern je nach Umgebung Komma oder abweichende Trennzeichen.
+
+* **Frontend:** über die Formatierungs-Helfer der Komponente (basieren auf `toFixed`, kein `toLocaleString`); vorhandenes Muster: `StatistikComponent.formatSwissNumber()` / `formatNumber()` / `formatDifferenz()` / `formatPercent()`.
+* **Backend / PDF (JasperReports):** über `ch.nacht.util.PdfNumberFormat` (`kwh()` / `kwhSigned()` / `percent()`), das `String.format(Locale.ROOT, …)` mit Gruppierungs-Ersatz `,`→`'` kapselt. In `.jrxml` die Werte über diesen Helfer ausgeben statt über `pattern`.
+
 ### Design System
 Das Design System (`/design-system`) enthält alle wiederverwendbaren UI-Komponenten und Styles.
 

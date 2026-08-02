@@ -190,11 +190,23 @@ export class StatistikComponent extends WithMessage implements OnInit {
     return isEqual ? 'zev-status-dot--success' : 'zev-status-dot--error';
   }
 
+  /**
+   * Zahl im Schweizer Format: Punkt als Dezimal-, Hochkomma (') als Tausendertrennzeichen,
+   * locale-unabhängig (basiert auf `toFixed`). Vorzeichen bleibt erhalten.
+   */
+  private formatSwissNumber(value: number, decimals = 3): string {
+    const fixed = Math.abs(value).toFixed(decimals);
+    const [intPart, fracPart] = fixed.split('.');
+    const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\'');
+    const sign = value < 0 ? '-' : '';
+    return fracPart ? `${sign}${grouped}.${fracPart}` : `${sign}${grouped}`;
+  }
+
   formatNumber(value: number | null | undefined): string {
     if (value === null || value === undefined) {
       return '-';
     }
-    return value.toFixed(3);
+    return this.formatSwissNumber(value);
   }
 
   /** Bilanz-Typen (Netzanschluss): nur `total` ist fachlich relevant, zev/zev_berechnet nicht. */
@@ -207,7 +219,18 @@ export class StatistikComponent extends WithMessage implements OnInit {
       return '-';
     }
     const prefix = value >= 0 ? '+' : '';
-    return `${prefix}${value.toFixed(3)}`;
+    return `${prefix}${this.formatSwissNumber(value)}`;
+  }
+
+  /**
+   * Prozent-Kennzahl (Anteil 0..1) als Prozentwert mit 1 Nachkommastelle; Punkt als Dezimal-
+   * und Hochkomma als Tausendertrennzeichen (konsistent zu formatNumber); null/undefined → "–".
+   */
+  formatPercent(value: number | null | undefined): string {
+    if (value === null || value === undefined) {
+      return '–';
+    }
+    return `${this.formatSwissNumber(value * 100, 1)} %`;
   }
 
   hasAbweichungen(monat: MonatsStatistik): boolean {

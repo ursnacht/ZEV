@@ -43,7 +43,17 @@ describe('StatistikComponent', () => {
     ruecklieferungBilanzGleich: true,
     ruecklieferungBilanzDifferenz: 0,
     tageAbweichungen: [],
-    einheitSummen: []
+    einheitSummen: [],
+    autarkiegrad: 0.8333,
+    eigenverbrauchsquote: 0.8,
+    netzbezugsquote: 0.1667,
+    einspeisequote: 0.2,
+    zevEigenverbrauch: 750,
+    batterieNetto: 100,
+    batterieGeladen: 120,
+    batterieEntladen: 20,
+    batterieWirkungsgrad: 0.1667,
+    batterieKennzahlenVerfuegbar: true
   };
 
   const mockStatistik: Statistik = {

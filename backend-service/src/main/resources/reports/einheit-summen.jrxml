@@ -76,8 +76,8 @@
             </element>
 
             <!-- Total (kWh) -->
-            <element kind="textField" uuid="44444444-4444-4444-4444-444444444412" x="255" y="0" width="100" height="16" pattern="#,##0.000" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
-                <expression><![CDATA[$F{summeTotal}]]></expression>
+            <element kind="textField" uuid="44444444-4444-4444-4444-444444444412" x="255" y="0" width="100" height="16" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[ch.nacht.util.PdfNumberFormat.kwh($F{summeTotal})]]></expression>
                 <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
@@ -85,7 +85,7 @@
 
             <!-- ZEV (kWh) - "-" fuer Bilanz-Typen (zev ohne fachliche Bedeutung, immer 0) -->
             <element kind="textField" uuid="44444444-4444-4444-4444-444444444413" x="355" y="0" width="100" height="16" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
-                <expression><![CDATA[($F{einheitTyp}.name().equals("BEZUG") || $F{einheitTyp}.name().equals("RUECKLIEFERUNG")) ? "-" : ($F{summeZev} != null ? String.format("%,.3f", $F{summeZev}) : null)]]></expression>
+                <expression><![CDATA[($F{einheitTyp}.name().equals("BEZUG") || $F{einheitTyp}.name().equals("RUECKLIEFERUNG")) ? "-" : ($F{summeZev} != null ? ch.nacht.util.PdfNumberFormat.kwh($F{summeZev}) : null)]]></expression>
                 <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>
@@ -93,7 +93,7 @@
 
             <!-- ZEV berechnet (kWh) - only for CONSUMER, "-" for PRODUCER -->
             <element kind="textField" uuid="44444444-4444-4444-4444-444444444414" x="455" y="0" width="100" height="16" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
-                <expression><![CDATA[$F{einheitTyp}.name().equals("CONSUMER") ? ($F{summeZevCalculated} != null ? String.format("%,.3f", $F{summeZevCalculated}) : "-") : "-"]]></expression>
+                <expression><![CDATA[$F{einheitTyp}.name().equals("CONSUMER") ? ($F{summeZevCalculated} != null ? ch.nacht.util.PdfNumberFormat.kwh($F{summeZevCalculated}) : "-") : "-"]]></expression>
                 <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
                 </box>

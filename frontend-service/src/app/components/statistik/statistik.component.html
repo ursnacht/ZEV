@@ -222,15 +222,65 @@
               }
             </tbody>
           </table>
-          <!-- Vergleiche -->
+          <!-- Statistik-Kennzahlen (in beiden Verteilmodi) -->
+          <div class="zev-comparison-section">
+            <h4>{{ 'STATISTIK_KENNZAHLEN' | translate }}</h4>
+            <div class="zev-info-row" [title]="'KENNZAHL_AUTARKIEGRAD_HINWEIS' | translate">
+              <span class="zev-info-label">{{ 'KENNZAHL_AUTARKIEGRAD' | translate }}:</span>
+              <span class="zev-info-value">{{ formatPercent(monat.autarkiegrad) }}</span>
+            </div>
+            <div class="zev-info-row" [title]="'KENNZAHL_EIGENVERBRAUCHSQUOTE_HINWEIS' | translate">
+              <span class="zev-info-label">{{ 'KENNZAHL_EIGENVERBRAUCHSQUOTE' | translate }}:</span>
+              <span class="zev-info-value">{{ formatPercent(monat.eigenverbrauchsquote) }}</span>
+            </div>
+            <div class="zev-info-row" [title]="'KENNZAHL_NETZBEZUGSQUOTE_HINWEIS' | translate">
+              <span class="zev-info-label">{{ 'KENNZAHL_NETZBEZUGSQUOTE' | translate }}:</span>
+              <span class="zev-info-value">{{ formatPercent(monat.netzbezugsquote) }}</span>
+            </div>
+            <div class="zev-info-row" [title]="'KENNZAHL_EINSPEISEQUOTE_HINWEIS' | translate">
+              <span class="zev-info-label">{{ 'KENNZAHL_EINSPEISEQUOTE' | translate }}:</span>
+              <span class="zev-info-value">{{ formatPercent(monat.einspeisequote) }}</span>
+            </div>
+            <div class="zev-info-row" [title]="'KENNZAHL_ZEV_EIGENVERBRAUCH_HINWEIS' | translate">
+              <span class="zev-info-label">{{ 'KENNZAHL_ZEV_EIGENVERBRAUCH' | translate }}:</span>
+              <span class="zev-info-value">{{ formatNumber(monat.zevEigenverbrauch) }} kWh</span>
+            </div>
+            @if (monat.batterieKennzahlenVerfuegbar) {
+              <div class="zev-info-row" [title]="'KENNZAHL_BATTERIE_NETTO_HINWEIS' | translate">
+                <span class="zev-info-label">
+                  {{ 'KENNZAHL_BATTERIE_NETTO' | translate }}:
+                  <span class="zev-tag" [title]="'KENNZAHL_BERECHNET_HINWEIS' | translate">{{ 'KENNZAHL_BERECHNET' | translate }}</span>
+                </span>
+                <span class="zev-info-value">{{ formatDifferenz(monat.batterieNetto) }} kWh</span>
+              </div>
+              <div class="zev-info-row" [title]="'KENNZAHL_BATTERIE_GELADEN_HINWEIS' | translate">
+                <span class="zev-info-label">
+                  {{ 'KENNZAHL_BATTERIE_GELADEN' | translate }}:
+                  <span class="zev-tag" [title]="'KENNZAHL_BERECHNET_HINWEIS' | translate">{{ 'KENNZAHL_BERECHNET' | translate }}</span>
+                </span>
+                <span class="zev-info-value">{{ formatNumber(monat.batterieGeladen) }} kWh</span>
+              </div>
+              <div class="zev-info-row" [title]="'KENNZAHL_BATTERIE_ENTLADEN_HINWEIS' | translate">
+                <span class="zev-info-label">
+                  {{ 'KENNZAHL_BATTERIE_ENTLADEN' | translate }}:
+                  <span class="zev-tag" [title]="'KENNZAHL_BERECHNET_HINWEIS' | translate">{{ 'KENNZAHL_BERECHNET' | translate }}</span>
+                </span>
+                <span class="zev-info-value">{{ formatNumber(monat.batterieEntladen) }} kWh</span>
+              </div>
+              <div class="zev-info-row" [title]="'KENNZAHL_BATTERIE_WIRKUNGSGRAD_HINWEIS' | translate">
+                <span class="zev-info-label">
+                  {{ 'KENNZAHL_BATTERIE_WIRKUNGSGRAD' | translate }}:
+                  <span class="zev-tag" [title]="'KENNZAHL_BERECHNET_HINWEIS' | translate">{{ 'KENNZAHL_BERECHNET' | translate }}</span>
+                </span>
+                <span class="zev-info-value">{{ formatPercent(monat.batterieWirkungsgrad) }}</span>
+              </div>
+            }
+          </div>
+
+          <!-- Vergleiche (nur im Producer-Messung-Modus; im Bilanzmodus ersetzt durch die Kennzahlen) -->
+          @if (!isBilanz) {
           <div class="zev-comparison-section">
             <h4>{{ 'SUMMEN_VERGLEICH' | translate }}</h4>
-            @if (isBilanz) {
-              <p class="zev-message zev-message--info">
-                <app-icon name="info"></app-icon>
-                {{ 'STATISTIK_MODUS_BILANZ_HINWEIS' | translate }}
-              </p>
-            }
             <p class="zev-toleranz-info">{{ 'TOLERANZ' | translate }}: {{ statistik?.toleranz }} kWh</p>
             <div class="zev-comparison-grid">
               <div class="zev-comparison-item">
@@ -294,6 +344,7 @@
               }
             </div>
           </div>
+          }
           <!-- Summen pro Einheit -->
           @if (monat.einheitSummen && monat.einheitSummen.length > 0) {
             <div class="zev-einheit-summen-section">
