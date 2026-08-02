@@ -47,8 +47,12 @@ Pro Intervall `i`: `Netto_i = P_i − C_i + B_i − R_i`, dann über den Zeitrau
 1. Das **Kennzahlen-Panel** wird je Monat angezeigt (in **beiden** Verteilmodi – die KPIs sind generell nützlich).
 2. Im **Bilanzmodus** tritt das Kennzahlen-Panel an die Stelle des wenig aussagekräftigen Summen-Vergleichs: der **Summen-Vergleich wird im Bilanzmodus ausgeblendet**, das Kennzahlen-Panel ersetzt ihn.
 3. Im **Producer-Messung**-Modus bleibt der bestehende Summen-Vergleich unverändert erhalten (dort ist er als Plausibilitätsprüfung sinnvoll); das Kennzahlen-Panel wird zusätzlich angezeigt.
-4. Darstellung **ausschliesslich mit Design-System-Bausteinen** (`@zev/design-system`), analog zur bestehenden Statistik-Seite: ein `.zev-panel`/`.zev-panel--month` mit `.zev-panel__title`/`.zev-panel__content`, je Kennzahl eine `.zev-info-row` mit `.zev-info-label` + `.zev-info-value`. Keine komponenten-eigenen Ad-hoc-Styles; fehlende Bausteine (z.B. Markierung „berechnet/geschätzt") werden als wiederverwendbare Klasse **im Design-System** ergänzt. Batterie-Werte optisch als „berechnet" markiert.
-5. **Erklärender Hinweis je Kennzahl:** Jede Kennzahl trägt einen erklärenden Tooltip (natives `title`-Attribut auf der `.zev-info-row`), der dem Benutzer die Bedeutung der Kennzahl kurz erläutert. Die Hinweistexte sind via `TranslationService` übersetzt (DE/EN). Bei den Batterie-Kennzahlen bleibt der separate „berechnet"-Tooltip zusätzlich bestehen.
+4. Darstellung **tabellarisch** mit Design-System-Bausteinen (`@zev/design-system`): eine `.zev-table`/`.zev-table--compact`/`.zev-table--auto` **ohne Titelzeile** (kein `<thead>`) mit **drei Spalten** je Kennzahl. `.zev-table--auto` begrenzt die Tabelle auf ihre **Inhaltsbreite**, damit die Bezeichnungs-Spalte nicht unnötig breit wird (nicht `width:100%`):
+   * Spalte 1 – **Bezeichnung** (linksbündig), inkl. „berechnet"-Markierung bei Batterie-Kennzahlen;
+   * Spalte 2 – **Wert** (rechtsbündig, `.zev-table__number`), Zahlen ohne Einheit;
+   * Spalte 3 – **Einheit** (linksbündig, z.B. `%`/`kWh`; bei n/a leer).
+   Keine komponenten-eigenen Ad-hoc-Styles; alle Klassen bestehen im Design-System.
+5. **Erklärender Hinweis je Kennzahl:** Jede Tabellenzeile (`<tr>`) trägt einen erklärenden Tooltip (natives `title`-Attribut), der dem Benutzer die Bedeutung der Kennzahl kurz erläutert. Die Hinweistexte sind via `TranslationService` übersetzt (DE/EN). Bei den Batterie-Kennzahlen bleibt der separate „berechnet"-Tooltip zusätzlich bestehen.
 
 ### FR-4: PDF-Export
 * Die Kennzahlen erscheinen **auch im Statistik-PDF** (`statistik.jrxml`) je Monat, analog zur Bildschirmanzeige: Quoten-KPIs (in beiden Modi) sowie – wo vorhanden – die als „berechnet/geschätzt" markierten Batterie-KPIs. Der Summen-Vergleich im PDF folgt derselben Modus-Logik wie die Bildschirmanzeige (im Bilanzmodus durch das Kennzahlen-Panel ersetzt).
@@ -75,7 +79,7 @@ Pro Intervall `i`: `Netto_i = P_i − C_i + B_i − R_i`, dann über den Zeitrau
 * [ ] Die Kennzahlen erscheinen auch im **Statistik-PDF** (`statistik.jrxml`) je Monat mit derselben Modus-Logik wie am Bildschirm.
 * [ ] Alle Texte via `TranslationService` (DE/EN); Prozentwerte mit `%`, kWh-Werte in kWh.
 * [ ] Alle Kennzahlen (Prozent- und kWh-Werte) verwenden den **Punkt** als Dezimaltrennzeichen und – bei Werten ≥ 1000 – das **Hochkomma** (`'`) als Tausendertrennzeichen, am Bildschirm und im PDF, unabhängig von der Server-/Browser-Locale (`60.0 %`; `1'234.567 kWh`, nicht `60,0 %` / `1,234.567 kWh`).
-* [ ] Das Kennzahlen-Panel nutzt **ausschliesslich** Design-System-Klassen (`.zev-panel`, `.zev-info-row`, `.zev-info-label`, `.zev-info-value`); keine komponenten-eigenen Ad-hoc-Styles. Eine ggf. neue „berechnet"-Kennzeichnung wird als Klasse im Design-System (`@zev/design-system`) ergänzt, nicht im Component-CSS.
+* [ ] Die Kennzahlen werden **tabellarisch** dargestellt (`.zev-table`/`.zev-table--compact`/`.zev-table--auto`, **ohne Titelzeile**): drei Spalten Bezeichnung (links) | Wert (rechtsbündig, `.zev-table__number`) | Einheit (links). Die Tabelle nutzt Inhaltsbreite (`.zev-table--auto`), die Bezeichnungs-Spalte ist nicht überbreit. Keine komponenten-eigenen Ad-hoc-Styles; ausschliesslich Design-System-Klassen.
 * [ ] Jede Kennzahl zeigt beim Hovern einen erklärenden Hinweis (`title`-Tooltip), der die Bedeutung der Kennzahl beschreibt; die Hinweistexte sind via `TranslationService` (DE/EN) übersetzt.
 * [ ] Statistik bleibt mit `statistik:read` erreichbar; Multi-Tenancy unverändert.
 

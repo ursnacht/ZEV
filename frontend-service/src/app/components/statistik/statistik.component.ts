@@ -11,6 +11,15 @@ import { TranslationService } from '../../services/translation.service';
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
 import { IconComponent } from '../icon/icon.component';
 
+/** Eine Kennzahl-Zeile für die tabellarische Darstellung (Bezeichnung | Wert | Einheit). */
+export interface KennzahlZeile {
+  labelKey: string;
+  hintKey: string;
+  value: string;
+  unit: string;
+  berechnet: boolean;
+}
+
 @Component({
   selector: 'app-statistik',
   standalone: true,
@@ -223,14 +232,59 @@ export class StatistikComponent extends WithMessage implements OnInit {
   }
 
   /**
-   * Prozent-Kennzahl (Anteil 0..1) als Prozentwert mit 1 Nachkommastelle; Punkt als Dezimal-
-   * und Hochkomma als Tausendertrennzeichen (konsistent zu formatNumber); null/undefined → "–".
+   * Baut die Kennzahlen-Zeilen eines Monats für die tabellarische Darstellung
+   * (Bezeichnung | Wert rechtsbündig | Einheit linksbündig). Batterie-Kennzahlen nur, wenn
+   * die dafür nötigen Bilanz-Daten vorhanden sind (`batterieKennzahlenVerfuegbar`).
    */
-  formatPercent(value: number | null | undefined): string {
-    if (value === null || value === undefined) {
-      return '–';
+  getKennzahlen(monat: MonatsStatistik): KennzahlZeile[] {
+    const zeilen: KennzahlZeile[] = [
+      this.percentZeile('KENNZAHL_AUTARKIEGRAD', monat.autarkiegrad, false),
+      this.percentZeile('KENNZAHL_EIGENVERBRAUCHSQUOTE', monat.eigenverbrauchsquote, false),
+      this.percentZeile('KENNZAHL_NETZBEZUGSQUOTE', monat.netzbezugsquote, false),
+      this.percentZeile('KENNZAHL_EINSPEISEQUOTE', monat.einspeisequote, false),
+      this.kwhZeile('KENNZAHL_ZEV_EIGENVERBRAUCH', monat.zevEigenverbrauch, false)
+    ];
+    if (monat.batterieKennzahlenVerfuegbar) {
+      zeilen.push(
+        this.signedKwhZeile('KENNZAHL_BATTERIE_NETTO', monat.batterieNetto),
+        this.kwhZeile('KENNZAHL_BATTERIE_GELADEN', monat.batterieGeladen, true),
+        this.kwhZeile('KENNZAHL_BATTERIE_ENTLADEN', monat.batterieEntladen, true),
+        this.percentZeile('KENNZAHL_BATTERIE_WIRKUNGSGRAD', monat.batterieWirkungsgrad, true)
+      );
     }
-    return `${this.formatSwissNumber(value * 100, 1)} %`;
+    return zeilen;
+  }
+
+  private percentZeile(labelKey: string, value: number | null, berechnet: boolean): KennzahlZeile {
+    return {
+      labelKey,
+      hintKey: labelKey + '_HINWEIS',
+      value: value === null || value === undefined ? '–' : this.formatSwissNumber(value * 100, 1),
+      unit: value === null || value === undefined ? '' : '%',
+      berechnet
+    };
+  }
+
+  private kwhZeile(labelKey: string, value: number | null, berechnet: boolean): KennzahlZeile {
+    return {
+      labelKey,
+      hintKey: labelKey + '_HINWEIS',
+      value: value === null || value === undefined ? '–' : this.formatSwissNumber(value),
+      unit: value === null || value === undefined ? '' : 'kWh',
+      berechnet
+    };
+  }
+
+  private signedKwhZeile(labelKey: string, value: number | null): KennzahlZeile {
+    return {
+      labelKey,
+      hintKey: labelKey + '_HINWEIS',
+      value: value === null || value === undefined
+        ? '–'
+        : (value >= 0 ? '+' : '') + this.formatSwissNumber(value),
+      unit: value === null || value === undefined ? '' : 'kWh',
+      berechnet: true
+    };
   }
 
   hasAbweichungen(monat: MonatsStatistik): boolean {

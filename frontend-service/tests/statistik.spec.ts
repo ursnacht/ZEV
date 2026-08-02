@@ -129,20 +129,24 @@ test.describe('Statistik Page - Monthly Statistics', () => {
             const barContainers = firstMonthPanel.locator('.zev-bar-container');
             expect(await barContainers.count()).toBeGreaterThan(0);
 
-            // Check for comparison section
-            const comparisonSection = firstMonthPanel.locator('.zev-comparison-section');
-            await expect(comparisonSection).toBeVisible();
+            // Kennzahlen-Panel (neues Feature): tabellarisch (ohne Titelzeile) im ersten
+            // .zev-comparison-section; wird in BEIDEN Verteilmodi angezeigt.
+            const kennzahlenTable = firstMonthPanel.locator('.zev-comparison-section .zev-table--compact').first();
+            await expect(kennzahlenTable).toBeVisible();
+            // Mindestens eine Kennzahl-Zeile mit rechtsbündigem Wert (.zev-table__number)
+            expect(await kennzahlenTable.locator('tbody tr').count()).toBeGreaterThan(0);
+            await expect(kennzahlenTable.locator('td.zev-table__number').first()).toBeVisible();
 
-            // Check for comparison grid items: 3 base comparisons (A=B, A=C, B=C)
-            // plus, for tenants using the Bilanzmodell, up to 2 extra comparisons
-            // (Bezug ↔ Bilanz, Rücklieferung ↔ Bilanz).
+            // Summen-Vergleich: nur im Producer-Messung-Modus vorhanden; im Bilanzmodus
+            // durch das Kennzahlen-Panel ersetzt (ausgeblendet). Daher modus-agnostisch:
+            // entweder 0 (Bilanz) oder 3 Basis-Vergleiche (A=B, A=C, B=C) + bis zu 2 Bilanz-
+            // Vergleiche (Bezug/Rücklieferung ↔ Bilanzmesspunkt).
             const comparisonCount = await firstMonthPanel.locator('.zev-comparison-item').count();
-            expect(comparisonCount).toBeGreaterThanOrEqual(3);
-            expect(comparisonCount).toBeLessThanOrEqual(5);
+            expect(comparisonCount === 0 || (comparisonCount >= 3 && comparisonCount <= 5)).toBeTruthy();
 
-            // Check for Einheit-Summen table (new feature)
-            const einheitSummenTable = firstMonthPanel.locator('.zev-table--compact');
-            if (await einheitSummenTable.isVisible()) {
+            // Einheit-Summen table (eigene Section; ebenfalls .zev-table--compact, daher gezielt scopen)
+            const einheitSummenTable = firstMonthPanel.locator('.zev-einheit-summen-section .zev-table--compact');
+            if (await einheitSummenTable.count() > 0 && await einheitSummenTable.first().isVisible()) {
                 // Verify table has producer/consumer rows
                 const producerRows = firstMonthPanel.locator('.zev-table__row--producer');
                 const consumerRows = firstMonthPanel.locator('.zev-table__row--consumer');

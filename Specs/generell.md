@@ -45,7 +45,7 @@ Die folgende Tabelle ist ein **Überblick, nicht vollständig**. Massgeblich (Qu
 | Formulare | `.zev-form-container`, `.zev-form-group`, `.zev-form-row`, `.zev-form-actions`, `.zev-form-section`, `.zev-date-range-row` |
 | Inputs | `.zev-input`, `.zev-select`, `.zev-form-error`, `.zev-form-hint` |
 | Buttons | `.zev-button`, `.zev-button--primary`, `.zev-button--secondary`, `.zev-button--danger`, `.zev-button--compact` |
-| Tabellen | `.zev-table`, `.zev-table__header--sortable`, `.zev-table__sort-indicator`, `.zev-table--compact` |
+| Tabellen | `.zev-table`, `.zev-table__header--sortable`, `.zev-table__sort-indicator`, `.zev-table--compact`, `.zev-table--auto` (Inhaltsbreite), `.zev-table__number` (rechtsbündig) |
 | Messages | `.zev-message`, `.zev-message--success`, `.zev-message--error`, `.zev-message--dismissible` |
 | Navigation | `.zev-navbar`, `.zev-navbar__link`, `.zev-navbar__link--active`, `.zev-hamburger` |
 | Kebab-Menü | `.zev-kebab-container`, `.zev-kebab-button`, `.zev-kebab-menu`, `.zev-kebab-menu__item`, `.zev-kebab-menu__item--danger` |

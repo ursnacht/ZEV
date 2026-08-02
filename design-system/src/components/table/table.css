@@ -47,6 +47,12 @@
   background-color: var(--color-gray-50);
 }
 
+/* Auto-Breite: Tabelle nur so breit wie ihr Inhalt (statt 100%).
+   Für kompakte Key-Value-Listen, damit die erste Spalte nicht unnötig breit wird. */
+.zev-table--auto {
+  width: auto;
+}
+
 /* Table Actions */
 .zev-table-actions {
   display: flex;
