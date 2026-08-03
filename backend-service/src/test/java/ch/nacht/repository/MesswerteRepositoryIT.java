@@ -316,6 +316,47 @@ class MesswerteRepositoryIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldSumBilanzKomponentenPerZeit() {
+        // Given: zwei Bilanz-Einheiten + Producer/Consumer, Werte über zwei 15-Min-Intervalle
+        Einheit bezug = einheitRepository.save(createEinheit("Netzbezug", EinheitTyp.BEZUG));
+        Einheit ruecklieferung = einheitRepository.save(createEinheit("Rücklieferung", EinheitTyp.RUECKLIEFERUNG));
+
+        LocalDateTime t1 = LocalDateTime.of(2024, 1, 15, 10, 0);
+        LocalDateTime t2 = LocalDateTime.of(2024, 1, 15, 10, 15);
+
+        // Intervall t1: P=100 (negativ gespeichert), C=60, B=40, R=30 (negativ gespeichert)
+        messwerteRepository.save(createMesswerte(t1, producer, -100.0, -80.0, null));
+        messwerteRepository.save(createMesswerte(t1, consumer1, 60.0, 50.0, 50.0));
+        messwerteRepository.save(createMesswerte(t1, bezug, 40.0, 0.0, null));
+        messwerteRepository.save(createMesswerte(t1, ruecklieferung, -30.0, 0.0, null));
+
+        // Intervall t2: nur Producer=50 und Consumer=20
+        messwerteRepository.save(createMesswerte(t2, producer, -50.0, -40.0, null));
+        messwerteRepository.save(createMesswerte(t2, consumer2, 20.0, 15.0, 15.0));
+
+        LocalDateTime from = LocalDateTime.of(2024, 1, 15, 0, 0);
+        LocalDateTime to = LocalDateTime.of(2024, 1, 16, 0, 0);
+
+        // When
+        List<Object[]> rows = messwerteRepository.sumBilanzKomponentenPerZeitBetween(from, to);
+
+        // Then: eine Zeile je Intervall, aufsteigend nach zeit; alle Komponenten als Betrag
+        assertThat(rows).hasSize(2);
+
+        Object[] row1 = rows.get(0);
+        assertThat(((Number) row1[1]).doubleValue()).isCloseTo(100.0, within(0.001)); // P
+        assertThat(((Number) row1[2]).doubleValue()).isCloseTo(60.0, within(0.001));  // C
+        assertThat(((Number) row1[3]).doubleValue()).isCloseTo(40.0, within(0.001));  // B
+        assertThat(((Number) row1[4]).doubleValue()).isCloseTo(30.0, within(0.001));  // R (Betrag)
+
+        Object[] row2 = rows.get(1);
+        assertThat(((Number) row2[1]).doubleValue()).isCloseTo(50.0, within(0.001)); // P
+        assertThat(((Number) row2[2]).doubleValue()).isCloseTo(20.0, within(0.001)); // C
+        assertThat(((Number) row2[3]).doubleValue()).isCloseTo(0.0, within(0.001));  // B
+        assertThat(((Number) row2[4]).doubleValue()).isCloseTo(0.0, within(0.001));  // R
+    }
+
+    @Test
     void shouldFindByDate() {
         // Given
         LocalDateTime day1Morning = LocalDateTime.of(2024, 1, 15, 8, 0);

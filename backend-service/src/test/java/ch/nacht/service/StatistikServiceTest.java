@@ -513,6 +513,189 @@ public class StatistikServiceTest {
         assertEquals(Verteilmodus.PRODUCER_MESSUNG, result.getVerteilmodus());
     }
 
+    // ==================== Statistik-Kennzahlen (Spec Statistik-Kennzahlen.md) ====================
+
+    private final LocalDate kpiVon = LocalDate.of(2024, 1, 1);
+    private final LocalDate kpiBis = LocalDate.of(2024, 1, 31);
+
+    /**
+     * Stubt einen vollständigen Ein-Monats-{@code getStatistik}-Lauf mit den vorgegebenen
+     * Typ-Summen. Producer-Werte werden negativ gespeichert (Betrag im Service gebildet),
+     * daher werden {@code producerTotal}/{@code producerZev} als negative Beträge übergeben.
+     */
+    private void stubKpiRun(double producerTotal, double consumerTotal,
+                            double producerZev, double consumerZev, double consumerZevCalc) {
+        when(messwerteRepository.findMaxZeit()).thenReturn(Optional.of(LocalDateTime.of(2024, 1, 31, 23, 45)));
+        when(einheitRepository.findAll()).thenReturn(Arrays.asList(producer, consumer1));
+        when(messwerteRepository.findDistinctEinheitenInRange(any(), any()))
+                .thenReturn(Arrays.asList(producer, consumer1));
+        when(messwerteRepository.findDistinctDatesInRange(any(), any())).thenReturn(Collections.emptyList());
+        when(messwerteRepository.sumTotalByEinheitTypAndZeitBetween(eq(EinheitTyp.PRODUCER), any(), any()))
+                .thenReturn(producerTotal);
+        when(messwerteRepository.sumTotalByEinheitTypAndZeitBetween(eq(EinheitTyp.CONSUMER), any(), any()))
+                .thenReturn(consumerTotal);
+        when(messwerteRepository.sumZevByEinheitTypAndZeitBetween(eq(EinheitTyp.PRODUCER), any(), any()))
+                .thenReturn(producerZev);
+        when(messwerteRepository.sumZevByEinheitTypAndZeitBetween(eq(EinheitTyp.CONSUMER), any(), any()))
+                .thenReturn(consumerZev);
+        when(messwerteRepository.sumZevCalculatedByEinheitTypAndZeitBetween(eq(EinheitTyp.CONSUMER), any(), any()))
+                .thenReturn(consumerZevCalc);
+        // Einheit-Summen (berechneEinheitSummen iteriert findAll) – für die KPIs irrelevant
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(any(), any(), any())).thenReturn(0.0);
+        when(messwerteRepository.sumZevByEinheitAndZeitBetween(any(), any(), any())).thenReturn(0.0);
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(any(), any(), any())).thenReturn(0.0);
+    }
+
+    /** Aktiviert die Bilanz-Einheiten (Bezug + Rücklieferung) und deren Monats-Summen (Beträge). */
+    private void stubBilanzEinheiten(double bezug, double ruecklieferung) {
+        Einheit bezugEinheit = new Einheit("Netzbezug", EinheitTyp.BEZUG);
+        bezugEinheit.setId(10L);
+        Einheit rueckEinheit = new Einheit("Rücklieferung", EinheitTyp.RUECKLIEFERUNG);
+        rueckEinheit.setId(11L);
+        when(einheitRepository.findFirstByTyp(EinheitTyp.BEZUG)).thenReturn(Optional.of(bezugEinheit));
+        when(einheitRepository.findFirstByTyp(EinheitTyp.RUECKLIEFERUNG)).thenReturn(Optional.of(rueckEinheit));
+        when(messwerteRepository.sumTotalByEinheitTypAndZeitBetween(eq(EinheitTyp.BEZUG), any(), any()))
+                .thenReturn(bezug);
+        // Rücklieferung wird negativ gespeichert → Betrag im Service
+        when(messwerteRepository.sumTotalByEinheitTypAndZeitBetween(eq(EinheitTyp.RUECKLIEFERUNG), any(), any()))
+                .thenReturn(-ruecklieferung);
+    }
+
+    private MonatsStatistikDTO ersterMonat() {
+        return statistikService.getStatistik(kpiVon, kpiBis).getMonate().get(0);
+    }
+
+    @Test
+    void berechneKennzahlen_QuotenAusSummen_KorrektBerechnet() {
+        // Cz=600, C=1000, Pz=900, P=1200 (Producer negativ gespeichert)
+        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertEquals(0.6, monat.getAutarkiegrad(), 1e-9);          // Cz/C
+        assertEquals(0.75, monat.getEigenverbrauchsquote(), 1e-9); // Pz/P
+        assertEquals(0.4, monat.getNetzbezugsquote(), 1e-9);       // (C−Cz)/C
+        assertEquals(0.25, monat.getEinspeisequote(), 1e-9);       // (P−Pz)/P
+        assertEquals(600.0, monat.getZevEigenverbrauch(), 1e-9);   // Cz
+    }
+
+    @Test
+    void berechneKennzahlen_NetzbezugsUndEinspeisequote_SindKomplemente() {
+        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertEquals(1.0 - monat.getAutarkiegrad(), monat.getNetzbezugsquote(), 1e-9);
+        assertEquals(1.0 - monat.getEigenverbrauchsquote(), monat.getEinspeisequote(), 1e-9);
+    }
+
+    @Test
+    void berechneKennzahlen_KeinVerbrauch_AutarkiegradUndNetzbezugsquoteNull() {
+        // C = 0 → Division-durch-0-KPIs auf null; producerbasierte KPIs bleiben
+        stubKpiRun(-1200.0, 0.0, -900.0, 0.0, 0.0);
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertNull(monat.getAutarkiegrad());
+        assertNull(monat.getNetzbezugsquote());
+        assertNotNull(monat.getEigenverbrauchsquote());
+        assertNotNull(monat.getEinspeisequote());
+    }
+
+    @Test
+    void berechneKennzahlen_KeinProducer_EigenverbrauchsUndEinspeisequoteNull() {
+        // P = 0 → producerbasierte KPIs auf null; consumerbasierte KPIs bleiben
+        stubKpiRun(0.0, 1000.0, 0.0, 600.0, 600.0);
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertNull(monat.getEigenverbrauchsquote());
+        assertNull(monat.getEinspeisequote());
+        assertEquals(0.6, monat.getAutarkiegrad(), 1e-9);
+        assertEquals(0.4, monat.getNetzbezugsquote(), 1e-9);
+        assertEquals(600.0, monat.getZevEigenverbrauch(), 1e-9);
+    }
+
+    @Test
+    void berechneKennzahlen_KeineBilanzDaten_BatterieNichtVerfuegbar() {
+        // findFirstByTyp(BEZUG/RUECKLIEFERUNG) nicht gestubt → Optional.empty()
+        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertFalse(monat.isBatterieKennzahlenVerfuegbar());
+        assertNull(monat.getBatterieNetto());
+        // Quoten-KPIs bleiben verfügbar
+        assertNotNull(monat.getAutarkiegrad());
+        // Pro-Intervall-Aggregation wird ohne Bilanz nicht aufgerufen
+        verify(messwerteRepository, never()).sumBilanzKomponentenPerZeitBetween(any(), any());
+    }
+
+    @Test
+    void berechneKennzahlen_NurBezugOhneRuecklieferung_BatterieNichtVerfuegbar() {
+        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
+        Einheit bezugEinheit = new Einheit("Netzbezug", EinheitTyp.BEZUG);
+        bezugEinheit.setId(10L);
+        when(einheitRepository.findFirstByTyp(EinheitTyp.BEZUG)).thenReturn(Optional.of(bezugEinheit));
+        // RUECKLIEFERUNG bleibt Optional.empty()
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertFalse(monat.isBatterieKennzahlenVerfuegbar());
+        assertNull(monat.getBatterieNetto());
+        verify(messwerteRepository, never()).sumBilanzKomponentenPerZeitBetween(any(), any());
+    }
+
+    @Test
+    void berechneKennzahlen_MitBilanzDaten_BatterieNettoBerechnet() {
+        // P=1200, C=1000, B=400, R=300 → Netto = 1200−1000+400−300 = +300
+        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
+        stubBilanzEinheiten(400.0, 300.0);
+        when(messwerteRepository.sumBilanzKomponentenPerZeitBetween(any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertTrue(monat.isBatterieKennzahlenVerfuegbar());
+        assertEquals(300.0, monat.getBatterieNetto(), 1e-9);
+    }
+
+    @Test
+    void berechneBatterieKennzahlen_ProIntervallAggregation_GeladenEntladenWirkungsgrad() {
+        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
+        stubBilanzEinheiten(400.0, 300.0);
+        // Netto_i = P_i − C_i + B_i − R_i: +5, −3, +2 → geladen 7, entladen 3
+        List<Object[]> rows = Arrays.asList(
+                new Object[]{LocalDateTime.of(2024, 1, 1, 0, 0), 5.0, 0.0, 0.0, 0.0},
+                new Object[]{LocalDateTime.of(2024, 1, 1, 0, 15), 0.0, 3.0, 0.0, 0.0},
+                new Object[]{LocalDateTime.of(2024, 1, 1, 0, 30), 2.0, 0.0, 0.0, 0.0}
+        );
+        when(messwerteRepository.sumBilanzKomponentenPerZeitBetween(any(), any())).thenReturn(rows);
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertEquals(7.0, monat.getBatterieGeladen(), 1e-9);
+        assertEquals(3.0, monat.getBatterieEntladen(), 1e-9);
+        assertEquals(3.0 / 7.0, monat.getBatterieWirkungsgrad(), 1e-9); // ≈ 42.9 %
+    }
+
+    @Test
+    void berechneBatterieKennzahlen_GeladenNull_WirkungsgradNull() {
+        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
+        stubBilanzEinheiten(400.0, 300.0);
+        // Nur negative Nettos → geladen = 0 → keine Division durch 0
+        List<Object[]> rows = Collections.singletonList(
+                new Object[]{LocalDateTime.of(2024, 1, 1, 0, 0), 0.0, 5.0, 0.0, 0.0}
+        );
+        when(messwerteRepository.sumBilanzKomponentenPerZeitBetween(any(), any())).thenReturn(rows);
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertEquals(0.0, monat.getBatterieGeladen(), 1e-9);
+        assertEquals(5.0, monat.getBatterieEntladen(), 1e-9);
+        assertNull(monat.getBatterieWirkungsgrad());
+    }
+
     // ==================== CSV-Export der 15-Min-Werte (Spec Export-Messdaten) ====================
 
     private final LocalDate exportVon = LocalDate.of(2024, 1, 1);

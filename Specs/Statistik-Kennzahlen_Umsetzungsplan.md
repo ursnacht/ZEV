@@ -46,7 +46,7 @@ Die Statistik-Seite erhält je Monat ein **Kennzahlen-Panel** mit fachlichen Ene
 | [x] | 6. Backend-Batterie (Stufe 2) | Neue Aggregat-Query `sumBilanzKomponentenPerZeitBetween` in `MesswerteRepository` (Netto je `zeit`); `berechneBatterieKennzahlen(...)` berechnet geladen/entladen/Wirkungsgrad (nur bei Producer + Bezug + Rücklieferung) |
 | [x] | 7. Frontend-Batterie (Stufe 2) | Batterie-Block im Panel (Netto/geladen/entladen/Wirkungsgrad), als „berechnet" markiert; nur bei `batterieKennzahlenVerfuegbar` |
 | [x] | 8. PDF-Export | `StatistikPdfService` (Parameter `IST_BILANZ`) + `statistik.jrxml`: Kennzahlen-Block je Monat, Batterie als „berechnet"; Summen-Vergleich im Bilanzmodus ausgeblendet; `JasperTemplateCompileTest` grün |
-| [ ] | 9. Tests | Backend: `StatistikServiceTest` (KPI-Formeln, Nenner=0, fehlende Bilanz-Daten, Batterie geladen/entladen, Wirkungsgrad geladen=0). Frontend: `statistik.component.spec.ts` (Panel, „–", Vergleich-Ausblenden bilanz). E2E: KPI-Panel sichtbar (`statistik.spec.ts`). **→ separate Test-Commands** |
+| [~] | 9. Tests | **Backend erledigt:** `PdfNumberFormatTest` (18), `StatistikServiceTest` (+10 KPI-Tests), `MesswerteRepositoryIT` (+1 Aggregat-Query) — 52 Unit + 13 IT grün. **Frontend erledigt:** `statistik.component.spec.ts` (+25: `getKennzahlen` Zeilen/Einheiten/„–"/Batterie-nur-bei-verfügbar/`berechnet`-Flag, `formatSwissNumber` Hochkomma-Gruppierung via `formatNumber`/`formatDifferenz`, `isBilanz`) — Suite 815 grün. **Offen:** E2E (`statistik.spec.ts` bereits angepasst; Verifikation nach Frontend-Redeploy) → `/5_e2e-tests` |
 
 ## Berechnungslogik (Referenz für die Umsetzung)
 

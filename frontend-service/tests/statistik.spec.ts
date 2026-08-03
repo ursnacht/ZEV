@@ -157,4 +157,43 @@ test.describe('Statistik Page - Monthly Statistics', () => {
             }
         }
     });
+
+    test('should render a non-empty title tooltip on every Kennzahl row', async ({ page }) => {
+        await navigateToStatistik(page);
+
+        // Submit form to load statistics
+        const submitButton = page.locator('button.zev-button--primary[type="submit"]');
+        await submitButton.click();
+
+        // Wait for response
+        await page.waitForTimeout(2000);
+
+        const monthPanels = page.locator('.zev-panel--month');
+        const monthPanelCount = await monthPanels.count();
+
+        // Nur prüfen, wenn Monatsdaten geladen wurden (Testdaten-abhängig).
+        if (monthPanelCount === 0) {
+            return;
+        }
+
+        const firstMonthPanel = monthPanels.first();
+
+        // Kennzahlen-Panel: headerless 3-Spalten-Tabelle im ersten .zev-comparison-section.
+        const kennzahlenTable = firstMonthPanel.locator('.zev-comparison-section .zev-table--compact').first();
+        await expect(kennzahlenTable).toBeVisible();
+
+        // Jede Kennzahl-Zeile ist eine <tr> mit einem erklärenden Tooltip (natives title-Attribut).
+        const kennzahlRows = kennzahlenTable.locator('tbody tr');
+        const rowCount = await kennzahlRows.count();
+        expect(rowCount).toBeGreaterThan(0);
+
+        // Jede Zeile trägt ein gesetztes, nicht-leeres title-Attribut.
+        // Bewusst KEIN Vergleich mit konkreten Übersetzungstexten: bei nicht angewendeten
+        // V90/V91-Migrationen erscheint der Rohkey - dieser ist ebenfalls nicht-leer.
+        for (let i = 0; i < rowCount; i++) {
+            const title = await kennzahlRows.nth(i).getAttribute('title');
+            expect(title).not.toBeNull();
+            expect((title ?? '').trim().length).toBeGreaterThan(0);
+        }
+    });
 });

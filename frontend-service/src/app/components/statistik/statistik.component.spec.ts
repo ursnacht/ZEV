@@ -472,6 +472,18 @@ describe('StatistikComponent', () => {
     it('should format zero correctly', () => {
       expect(component.formatNumber(0)).toBe('0.000');
     });
+
+    it('should group thousands with apostrophe', () => {
+      expect(component.formatNumber(1234.567)).toBe('1\'234.567');
+    });
+
+    it('should group millions with two apostrophes', () => {
+      expect(component.formatNumber(1234567)).toBe('1\'234\'567.000');
+    });
+
+    it('should format negative numbers with sign before grouped value', () => {
+      expect(component.formatNumber(-1234.5)).toBe('-1\'234.500');
+    });
   });
 
   describe('formatDifferenz', () => {
@@ -493,6 +505,14 @@ describe('StatistikComponent', () => {
 
     it('should prefix zero with "+"', () => {
       expect(component.formatDifferenz(0)).toBe('+0.000');
+    });
+
+    it('should group thousands and prefix positive with "+"', () => {
+      expect(component.formatDifferenz(1234.567)).toBe('+1\'234.567');
+    });
+
+    it('should group thousands for negative values without "+" prefix', () => {
+      expect(component.formatDifferenz(-1234567)).toBe('-1\'234\'567.000');
     });
   });
 
@@ -562,6 +582,160 @@ describe('StatistikComponent', () => {
 
     it('should return cyan for type E (Consumer ZEV Calculated)', () => {
       expect(component.getBarColor('E')).toBe('#00BCD4');
+    });
+  });
+
+  describe('getKennzahlen', () => {
+    // en-dash (U+2013) used by the component for null values
+    const ENDASH = '–';
+
+    const monatOhneBatterie: MonatsStatistik = {
+      ...mockMonat,
+      batterieKennzahlenVerfuegbar: false,
+      batterieNetto: null,
+      batterieGeladen: null,
+      batterieEntladen: null,
+      batterieWirkungsgrad: null
+    };
+
+    it('should return 5 rows when battery figures are not available', () => {
+      expect(component.getKennzahlen(monatOhneBatterie).length).toBe(5);
+    });
+
+    it('should return 9 rows when battery figures are available', () => {
+      expect(component.getKennzahlen(mockMonat).length).toBe(9);
+    });
+
+    it('should not include any battery rows when not available', () => {
+      const labels = component.getKennzahlen(monatOhneBatterie).map(z => z.labelKey);
+      expect(labels).toEqual([
+        'KENNZAHL_AUTARKIEGRAD',
+        'KENNZAHL_EIGENVERBRAUCHSQUOTE',
+        'KENNZAHL_NETZBEZUGSQUOTE',
+        'KENNZAHL_EINSPEISEQUOTE',
+        'KENNZAHL_ZEV_EIGENVERBRAUCH'
+      ]);
+    });
+
+    it('should include battery rows in order when available', () => {
+      const labels = component.getKennzahlen(mockMonat).map(z => z.labelKey);
+      expect(labels).toEqual([
+        'KENNZAHL_AUTARKIEGRAD',
+        'KENNZAHL_EIGENVERBRAUCHSQUOTE',
+        'KENNZAHL_NETZBEZUGSQUOTE',
+        'KENNZAHL_EINSPEISEQUOTE',
+        'KENNZAHL_ZEV_EIGENVERBRAUCH',
+        'KENNZAHL_BATTERIE_NETTO',
+        'KENNZAHL_BATTERIE_GELADEN',
+        'KENNZAHL_BATTERIE_ENTLADEN',
+        'KENNZAHL_BATTERIE_WIRKUNGSGRAD'
+      ]);
+    });
+
+    it('should derive hintKey by appending _HINWEIS to labelKey', () => {
+      component.getKennzahlen(mockMonat).forEach(zeile => {
+        expect(zeile.hintKey).toBe(zeile.labelKey + '_HINWEIS');
+      });
+    });
+
+    it('should format quota rows as percent with 1 decimal and "%" unit', () => {
+      const zeilen = component.getKennzahlen(mockMonat);
+      const autarkie = zeilen.find(z => z.labelKey === 'KENNZAHL_AUTARKIEGRAD')!;
+      expect(autarkie.value).toBe('83.3'); // 0.8333 * 100
+      expect(autarkie.unit).toBe('%');
+
+      const eigenverbrauch = zeilen.find(z => z.labelKey === 'KENNZAHL_EIGENVERBRAUCHSQUOTE')!;
+      expect(eigenverbrauch.value).toBe('80.0'); // 0.8 * 100
+      expect(eigenverbrauch.unit).toBe('%');
+    });
+
+    it('should render quota rows as "–" with empty unit when value is null', () => {
+      const monat: MonatsStatistik = { ...mockMonat, autarkiegrad: null };
+      const autarkie = component.getKennzahlen(monat).find(z => z.labelKey === 'KENNZAHL_AUTARKIEGRAD')!;
+      expect(autarkie.value).toBe(ENDASH);
+      expect(autarkie.unit).toBe('');
+    });
+
+    it('should format ZEV-Eigenverbrauch with 3 decimals and "kWh" unit', () => {
+      const zeile = component.getKennzahlen(mockMonat).find(z => z.labelKey === 'KENNZAHL_ZEV_EIGENVERBRAUCH')!;
+      expect(zeile.value).toBe('750.000');
+      expect(zeile.unit).toBe('kWh');
+    });
+
+    it('should render ZEV-Eigenverbrauch as "–" when null', () => {
+      const monat: MonatsStatistik = { ...mockMonat, zevEigenverbrauch: null };
+      const zeile = component.getKennzahlen(monat).find(z => z.labelKey === 'KENNZAHL_ZEV_EIGENVERBRAUCH')!;
+      expect(zeile.value).toBe(ENDASH);
+      expect(zeile.unit).toBe('');
+    });
+
+    it('should mark quota and ZEV rows as not calculated (berechnet=false)', () => {
+      const zeilen = component.getKennzahlen(mockMonat);
+      const nichtBerechnet = zeilen.slice(0, 5);
+      nichtBerechnet.forEach(z => expect(z.berechnet).toBe(false));
+    });
+
+    it('should mark battery rows as calculated (berechnet=true)', () => {
+      const zeilen = component.getKennzahlen(mockMonat);
+      const batterieZeilen = zeilen.slice(5);
+      expect(batterieZeilen.length).toBe(4);
+      batterieZeilen.forEach(z => expect(z.berechnet).toBe(true));
+    });
+
+    it('should prefix positive Batterie-Netto with "+" and unit "kWh"', () => {
+      const zeile = component.getKennzahlen(mockMonat).find(z => z.labelKey === 'KENNZAHL_BATTERIE_NETTO')!;
+      expect(zeile.value).toBe('+100.000'); // batterieNetto = 100
+      expect(zeile.unit).toBe('kWh');
+    });
+
+    it('should not prefix negative Batterie-Netto with "+"', () => {
+      const monat: MonatsStatistik = { ...mockMonat, batterieNetto: -50 };
+      const zeile = component.getKennzahlen(monat).find(z => z.labelKey === 'KENNZAHL_BATTERIE_NETTO')!;
+      expect(zeile.value).toBe('-50.000');
+    });
+
+    it('should format Batterie-Geladen/-Entladen as kWh with 3 decimals', () => {
+      const zeilen = component.getKennzahlen(mockMonat);
+      const geladen = zeilen.find(z => z.labelKey === 'KENNZAHL_BATTERIE_GELADEN')!;
+      const entladen = zeilen.find(z => z.labelKey === 'KENNZAHL_BATTERIE_ENTLADEN')!;
+      expect(geladen.value).toBe('120.000');
+      expect(geladen.unit).toBe('kWh');
+      expect(entladen.value).toBe('20.000');
+      expect(entladen.unit).toBe('kWh');
+    });
+
+    it('should format Batterie-Wirkungsgrad as percent with 1 decimal', () => {
+      const zeile = component.getKennzahlen(mockMonat).find(z => z.labelKey === 'KENNZAHL_BATTERIE_WIRKUNGSGRAD')!;
+      expect(zeile.value).toBe('16.7'); // 0.1667 * 100
+      expect(zeile.unit).toBe('%');
+    });
+
+    it('should group thousands in a large ZEV-Eigenverbrauch value', () => {
+      const monat: MonatsStatistik = { ...mockMonat, zevEigenverbrauch: 12345.678 };
+      const zeile = component.getKennzahlen(monat).find(z => z.labelKey === 'KENNZAHL_ZEV_EIGENVERBRAUCH')!;
+      expect(zeile.value).toBe('12\'345.678');
+    });
+  });
+
+  describe('isBilanz', () => {
+    it('should return false when statistik is null', () => {
+      component.statistik = null;
+      expect(component.isBilanz).toBe(false);
+    });
+
+    it('should return false when verteilmodus is PRODUCER_MESSUNG', () => {
+      component.statistik = { ...mockStatistik, verteilmodus: 'PRODUCER_MESSUNG' };
+      expect(component.isBilanz).toBe(false);
+    });
+
+    it('should return false when verteilmodus is undefined', () => {
+      component.statistik = { ...mockStatistik, verteilmodus: undefined };
+      expect(component.isBilanz).toBe(false);
+    });
+
+    it('should return true when verteilmodus is BILANZ', () => {
+      component.statistik = { ...mockStatistik, verteilmodus: 'BILANZ' };
+      expect(component.isBilanz).toBe(true);
     });
   });
 
