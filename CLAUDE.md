@@ -438,6 +438,7 @@ Additional documentation in `/docs/`:
 - `claude-code-architektur.md` - Claude Code architecture
 - `claude-code-zev-integration.md` - Claude Code ZEV integration
 - `archunit-tests.md` - ArchUnit test documentation
+- `Zaehlertausch.md` - Operations guide: replacing a meter without losing measurement data
 
 ## Docker Compose
 
