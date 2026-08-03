@@ -30,14 +30,23 @@ gefährdet die verknüpften Messwerte.
 
 ### 1. Vorbereitung
 - Ermitteln, ob sich mit dem neuen Zähler die **Messpunkt-/Zählpunkt-Kennung** ändert.
-- Endstand des alten Zählers und Anfangsstand des neuen Zählers protokollieren (für eine
-  eventuelle Korrektur des Grenzintervalls, siehe unten).
+- **Endstand des alten Zählers und Anfangsstand des neuen Zählers protokollieren** (mit Zeitstempel).
+  Das ist der Schlüssel zur späteren Korrektur des einen genullten Übergangsintervalls.
+- Möglichst einen **lastschwachen Zeitpunkt** wählen (z.B. nachts / geringe Produktion), damit das
+  betroffene Intervall wenig reale Energie enthält.
 
-### 2. Umschaltzeitpunkt auf eine Viertelstundengrenze legen
-Den Tausch möglichst auf `:00` / `:15` / `:30` / `:45` legen.
-- Auf der Grenze: kein Teilintervall wird angeschnitten – **kein** Datenverlust.
-- Mitten im Intervall: **genau dieses eine Intervall** wird durch den Reset-Guard auf `0` gesetzt
-  (kleiner, begrenzter Unterzähler – keine Korruption der übrigen Werte).
+### 2. Physischen Tausch möglichst kurz halten
+Während der Zähler offline ist, kommen keine Rohdaten → die betroffenen 15-Min-Intervalle bekommen
+schlicht **keinen Messwert** (echte Lücke = Ausfallzeit). Je kürzer die Offline-Zeit, desto weniger
+leere Intervalle.
+
+> **Kein Datenschutz durch „Viertelstundengrenze".** Die Aggregation bildet je Intervall die
+> Differenz absoluter Zählerstände (Stand am Ende − Stand am Anfang). Da der neue Zähler bei einem
+> **niedrigeren** Stand startet, gibt es **genau ein** Übergangsintervall mit `delta < 0`, das der
+> Reset-Guard auf `0` setzt – **unabhängig davon, ob der Tausch auf `:00/:15/:30/:45` fällt** (die
+> Grenze verschiebt nur, *welches* Intervall es trifft). Auch der Zeitpunkt des Aggregations-Jobs
+> (`:05/:20/:35/:50`) ist irrelevant: die Catch-up-Schleife verarbeitet spät eintreffende Rohdaten
+> korrekt. Entscheidend ist allein die **Zählerstands-Diskontinuität**, nicht die Uhrzeit.
 
 ### 3. Messpunkt anpassen (nur wenn sich die Kennung ändert)
 In der **Einheiten-Verwaltung** den `messpunkt` der betroffenen Einheit auf die neue Kennung setzen –
@@ -57,23 +66,48 @@ Stände → korrekt).
 - Statistik-Seite für den Umschalttag prüfen: ab dem ersten vollen Intervall nach dem Tausch
   erscheinen wieder plausible Werte.
 - Bei MQTT: im Log nach dem Eintrag „Rücksprung … Delta auf 0 gesetzt" suchen – er markiert das
-  genullte Grenzintervall (nur relevant, wenn nicht auf einer Viertelstundengrenze getauscht wurde).
+  eine genullte Übergangsintervall. Zusätzlich die während der Offline-Zeit fehlenden Intervalle
+  (leer/keine Daten) identifizieren.
 
-## Sonderfall: exakte Abrechnung über die Tausch-Grenze
+## Das eine Übergangsintervall (immer betroffen)
 
-Wurde nicht sauber auf einer Viertelstundengrenze getauscht, ist das eine Grenzintervall
-unterzählt (auf `0` gesetzt). Bei Bedarf lässt sich der betroffene `messwerte`-Datensatz manuell
-korrigieren – aus dem protokollierten Endstand (alt) und Anfangsstand (neu) den tatsächlichen
-Verbrauch/Erzeugung dieses Intervalls berechnen und setzen.
+Unabhängig vom Zeitpunkt wird **genau ein** Intervall – jenes, in dem der Zählerstand vom alten
+(hohen) auf den neuen (niedrigen) Wert springt – durch den Reset-Guard auf `0` gesetzt (die übrigen
+Werte bleiben korrekt). Wenn die Abrechnung dieses Intervall exakt braucht, den betroffenen
+`messwerte`-Datensatz **manuell korrigieren**: aus dem protokollierten **Endstand (alt)** und
+**Anfangsstand (neu)** den tatsächlichen Verbrauch/Erzeugung dieses Intervalls berechnen und setzen.
+
+> Ausnahme: Wird der neue Zähler auf den **Endstand des alten voreingestellt** (Zählerstands-
+> Übernahme), entsteht kein negatives Delta und **kein** genulltes Intervall. Bei Standard-Tauschen
+> aber selten.
+
+## ⚠️ Blindspot: neuer Zähler startet HÖHER als der alte
+
+Der Reset-Guard erkennt einen Tausch **nur am negativen Delta** (neuer Stand < alter). Startet der
+neue Zähler mit einem **höheren** absoluten Stand als der alte endete, ist das Delta **positiv** und
+wird als **echter Verbrauch/Erzeugung verbucht** – ein potenziell grosser Bogus-Wert im
+Übergangsintervall, **ohne** Log-Warnung. Aus den Werten allein ist ein Tausch also **nicht
+zuverlässig erkennbar**.
+
+**Bis eine explizite Tausch-Erkennung existiert (Zähler-Seriennummer im Payload oder
+Wechsel-Marker), zwingend eine der folgenden Massnahmen:**
+- Neuen Zähler beim Einbau **auf den Endstand des alten voreinstellen** (Zählerstands-Übernahme) →
+  Kontinuität, kein Delta-Problem; **oder**
+- Nach **jedem** Tausch das Übergangsintervall **manuell prüfen/korrigieren** – bei höherem Start
+  warnt weder Log noch Reset-Guard.
+
+> Geplante nachhaltige Lösung: Zähler-ID (Seriennummer) im MQTT-Payload + `zaehler_rohdaten`; die
+> Aggregation setzt bei Serien-Wechsel eine neue Baseline (robust in beide Richtungen). Siehe
+> offene Frage in `Specs/MQTT-Integration.md`.
 
 ## Checkliste
 
 - [ ] Einheit **behalten** (nicht löschen/neu anlegen)
-- [ ] Umschaltung möglichst auf `:00/:15/:30/:45`
+- [ ] Alter Endstand / neuer Anfangsstand **protokolliert** (mit Zeitstempel) – für die Korrektur des Übergangsintervalls
+- [ ] Physischen Tausch **kurz** halten (wenig Offline-Zeit = wenige leere Intervalle); lastschwacher Zeitpunkt
 - [ ] `messpunkt` angepasst, **falls** sich die Kennung ändert (bei geteiltem Bilanzmesspunkt beide Einheiten)
 - [ ] MQTT-Topic des neuen Zählers = `zev/{orgId}/{messpunkt}/messwert` (nur MQTT)
-- [ ] Alter Endstand / neuer Anfangsstand protokolliert (für optionale Grenzintervall-Korrektur)
-- [ ] Nach dem Tausch: Statistik/Log kontrolliert
+- [ ] Nach dem Tausch: Statistik/Log kontrolliert (leere Intervalle der Offline-Zeit + genulltes Übergangsintervall)
 
 ## Verweise
 
