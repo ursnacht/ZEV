@@ -35,6 +35,14 @@ public class ZaehlerRohdaten {
     @Column(name = "zaehlerstand_einspeisung", precision = 14, scale = 4, nullable = false)
     private BigDecimal zaehlerstandEinspeisung;
 
+    /**
+     * Seriennummer des liefernden Zählers (aus der Pi-Config je Messpunkt), beim Ingest
+     * normalisiert (getrimmt, max. 64 Zeichen). {@code null} = nicht gemeldet → die
+     * Zählertausch-Erkennung ist für dieses Intervall inaktiv (Fallback auf den Reset-Guard).
+     */
+    @Column(name = "seriennummer", length = 64)
+    private String seriennummer;
+
     @Column(name = "empfangen_am")
     private LocalDateTime empfangenAm;
 
@@ -102,6 +110,14 @@ public class ZaehlerRohdaten {
 
     public void setZaehlerstandEinspeisung(BigDecimal zaehlerstandEinspeisung) {
         this.zaehlerstandEinspeisung = zaehlerstandEinspeisung;
+    }
+
+    public String getSeriennummer() {
+        return seriennummer;
+    }
+
+    public void setSeriennummer(String seriennummer) {
+        this.seriennummer = seriennummer;
     }
 
     public LocalDateTime getEmpfangenAm() {

@@ -37,6 +37,9 @@ public class MqttIngestService {
 
     private static final Logger log = LoggerFactory.getLogger(MqttIngestService.class);
 
+    /** Spaltenlänge von {@code zaehler_rohdaten.seriennummer} – längere Werte werden gekürzt. */
+    private static final int MAX_SERIENNUMMER_LAENGE = 64;
+
     private final EinheitRepository einheitRepository;
     private final ZaehlerRohdatenRepository rohdatenRepository;
     private final ObjectMapper objectMapper;
@@ -147,8 +150,34 @@ public class MqttIngestService {
             row.setZaehlerstandBezug(bezug);
             row.setZaehlerstandEinspeisung(einspeisung);
         }
+        row.setSeriennummer(normalisiereSeriennummer(p.getSeriennummer()));
         row.setEmpfangenAm(LocalDateTime.now());
         row.setVerarbeitet(false);
         rohdatenRepository.save(row);
+    }
+
+    /**
+     * Normalisiert die optionale Seriennummer für die Zählertausch-Erkennung (FR-1.2):
+     * trimmen → leer = {@code null} → auf die Spaltenlänge (64) kürzen. Der Inhalt wird nicht
+     * interpretiert (keine Formatprüfung, kein Case-Mapping).
+     *
+     * <p>Die Kürzung ist zwingend: ein längerer Wert würde beim Insert an {@code VARCHAR(64)}
+     * scheitern und – da die Verarbeitung transaktional ist – die ganze Nachricht verwerfen
+     * (bei geteiltem Bilanzmesspunkt die Rohdaten beider Einheiten).
+     */
+    private String normalisiereSeriennummer(String seriennummer) {
+        if (seriennummer == null) {
+            return null;
+        }
+        String normalisiert = seriennummer.trim();
+        if (normalisiert.isEmpty()) {
+            return null;
+        }
+        if (normalisiert.length() > MAX_SERIENNUMMER_LAENGE) {
+            log.warn("MQTT: Seriennummer länger als {} Zeichen – gekürzt gespeichert",
+                    MAX_SERIENNUMMER_LAENGE);
+            return normalisiert.substring(0, MAX_SERIENNUMMER_LAENGE);
+        }
+        return normalisiert;
     }
 }

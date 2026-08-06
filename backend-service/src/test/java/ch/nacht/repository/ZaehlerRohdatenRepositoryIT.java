@@ -65,9 +65,15 @@ class ZaehlerRohdatenRepositoryIT extends AbstractIntegrationTest {
     }
 
     private ZaehlerRohdaten save(LocalDateTime zeit, String bezug, String einspeisung, boolean verarbeitet) {
+        return save(zeit, bezug, einspeisung, verarbeitet, null);
+    }
+
+    private ZaehlerRohdaten save(LocalDateTime zeit, String bezug, String einspeisung, boolean verarbeitet,
+                                 String seriennummer) {
         ZaehlerRohdaten r = new ZaehlerRohdaten(orgId, einheitId, zeit,
                 new BigDecimal(bezug), new BigDecimal(einspeisung));
         r.setVerarbeitet(verarbeitet);
+        r.setSeriennummer(seriennummer);
         r.setEmpfangenAm(LocalDateTime.now());
         return rohdatenRepository.save(r);
     }
@@ -184,6 +190,48 @@ class ZaehlerRohdatenRepositoryIT extends AbstractIntegrationTest {
         Optional<ZaehlerRohdaten> spaeterRow = rohdatenRepository.findByEinheitIdAndZeit(einheitId, spaeter);
         assertThat(spaeterRow).isPresent();
         assertThat(spaeterRow.get().isVerarbeitet()).isFalse();
+    }
+
+    // --- Seriennummer-Spalte (Spec Zaehlertausch-Erkennung.md, FR-2) ---------
+
+    @Test
+    void save_WithSeriennummer_PersistsValue() {
+        LocalDateTime zeit = LocalDateTime.of(2026, 1, 1, 10, 0);
+        save(zeit, "100.0", "5.0", false, "WAGO-8791234");
+
+        entityManager.flush();
+        entityManager.clear();
+
+        Optional<ZaehlerRohdaten> result = rohdatenRepository.findByEinheitIdAndZeit(einheitId, zeit);
+        assertThat(result).isPresent();
+        assertThat(result.get().getSeriennummer()).isEqualTo("WAGO-8791234");
+    }
+
+    @Test
+    void save_WithoutSeriennummer_PersistsNull() {
+        LocalDateTime zeit = LocalDateTime.of(2026, 1, 1, 10, 0);
+        save(zeit, "100.0", "5.0", false); // nullable: Bestandsdaten / Payload ohne Serie
+
+        entityManager.flush();
+        entityManager.clear();
+
+        Optional<ZaehlerRohdaten> result = rohdatenRepository.findByEinheitIdAndZeit(einheitId, zeit);
+        assertThat(result).isPresent();
+        assertThat(result.get().getSeriennummer()).isNull();
+    }
+
+    @Test
+    void save_SeriennummerMaxLength_PersistsFullValue() {
+        LocalDateTime zeit = LocalDateTime.of(2026, 1, 1, 10, 0);
+        String genau64 = "Y".repeat(64); // Spaltenlänge VARCHAR(64)
+        save(zeit, "100.0", "5.0", false, genau64);
+
+        entityManager.flush();
+        entityManager.clear();
+
+        Optional<ZaehlerRohdaten> result = rohdatenRepository.findByEinheitIdAndZeit(einheitId, zeit);
+        assertThat(result).isPresent();
+        assertThat(result.get().getSeriennummer()).isEqualTo(genau64);
     }
 
     @Test

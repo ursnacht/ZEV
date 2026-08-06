@@ -5,6 +5,7 @@ import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.ZaehlerRohdaten;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.ZaehlerRohdatenRepository;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
@@ -68,6 +69,15 @@ public class MqttIngestServiceTest {
     }
 
     private String payload(String timestamp, String bezug, String einspeisung) {
+        return payload(timestamp, bezug, einspeisung, null);
+    }
+
+    /**
+     * Wie {@link #payload(String, String, String)}, zusätzlich mit dem optionalen Feld
+     * {@code seriennummer}. {@code zusatzJson} ist ein rohes JSON-Fragment (z. B.
+     * {@code "seriennummer":"ABC123"}); {@code null} lässt das Feld weg.
+     */
+    private String payload(String timestamp, String bezug, String einspeisung, String zusatzJson) {
         StringBuilder sb = new StringBuilder("{");
         if (timestamp != null) {
             sb.append("\"timestamp\":\"").append(timestamp).append("\",");
@@ -78,11 +88,33 @@ public class MqttIngestServiceTest {
         if (einspeisung != null) {
             sb.append("\"zaehlerstandEinspeisung\":").append(einspeisung).append(",");
         }
+        if (zusatzJson != null) {
+            sb.append(zusatzJson).append(",");
+        }
         if (sb.charAt(sb.length() - 1) == ',') {
             sb.deleteCharAt(sb.length() - 1);
         }
         sb.append("}");
         return sb.toString();
+    }
+
+    /** JSON-Fragment {@code "seriennummer":"<wert>"} (Wert wird unverändert eingesetzt). */
+    private String seriennummerJson(String wert) {
+        return "\"seriennummer\":\"" + wert + "\"";
+    }
+
+    /** Fängt den einzigen gespeicherten Rohdatensatz ab. */
+    private ZaehlerRohdaten captureSavedRohdaten() {
+        ArgumentCaptor<ZaehlerRohdaten> captor = ArgumentCaptor.forClass(ZaehlerRohdaten.class);
+        verify(rohdatenRepository).save(captor.capture());
+        return captor.getValue();
+    }
+
+    /** Verdrahtet die Standard-Einheit + leeren Upsert-Treffer. */
+    private void stubEinheitOhneBestand() {
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT)).thenReturn(List.of(einheit));
+        when(rohdatenRepository.findByEinheitIdAndZeit(eq(EINHEIT_ID), any())).thenReturn(Optional.empty());
+        when(rohdatenRepository.save(any(ZaehlerRohdaten.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
     // --- Gültige Nachricht ---------------------------------------------------
@@ -323,5 +355,207 @@ public class MqttIngestServiceTest {
 
         verify(metrics).recordFailed();
         verify(rohdatenRepository, never()).save(any());
+    }
+
+    // --- Seriennummer (Spec Zaehlertausch-Erkennung.md, FR-1) ----------------
+
+    @Test
+    void handle_MitSeriennummer_SpeichertSeriennummer() {
+        // Arrange
+        stubEinheitOhneBestand();
+
+        // Act
+        service.handle(TOPIC, payload("2026-01-01T10:07:00+01:00", "123.4500", "10.0000",
+                seriennummerJson("WAGO-8791234")));
+
+        // Assert
+        assertEquals("WAGO-8791234", captureSavedRohdaten().getSeriennummer());
+        verify(metrics).recordProcessed();
+        verify(metrics, never()).recordFailed();
+    }
+
+    @Test
+    void handle_OhneSeriennummer_SeriennummerNull() {
+        // Arrange
+        stubEinheitOhneBestand();
+
+        // Act – Payload ohne das optionale Feld (Bestands-Publisher)
+        service.handle(TOPIC, payload("2026-01-01T10:07:00+01:00", "123.4500", "10.0000"));
+
+        // Assert – Rohdaten trotzdem gespeichert, Spalte bleibt NULL
+        ZaehlerRohdaten saved = captureSavedRohdaten();
+        assertNull(saved.getSeriennummer());
+        assertEquals(0, new BigDecimal("123.4500").compareTo(saved.getZaehlerstandBezug()));
+        verify(metrics).recordProcessed();
+        verify(metrics, never()).recordFailed();
+    }
+
+    @Test
+    void handle_SeriennummerJsonNull_SeriennummerNull() {
+        // Arrange
+        stubEinheitOhneBestand();
+
+        // Act
+        service.handle(TOPIC, payload("2026-01-01T10:07:00+01:00", "123.4500", "10.0000",
+                "\"seriennummer\":null"));
+
+        // Assert
+        assertNull(captureSavedRohdaten().getSeriennummer());
+        verify(metrics, never()).recordFailed();
+    }
+
+    @Test
+    void handle_SeriennummerMitWhitespace_WirdGetrimmt() {
+        // Arrange
+        stubEinheitOhneBestand();
+
+        // Act
+        service.handle(TOPIC, payload("2026-01-01T10:07:00+01:00", "123.4500", "10.0000",
+                seriennummerJson("  ABC123  ")));
+
+        // Assert – kein Scheinwechsel durch Leerzeichen
+        assertEquals("ABC123", captureSavedRohdaten().getSeriennummer());
+    }
+
+    @Test
+    void handle_SeriennummerNurWhitespace_WirdNull() {
+        // Arrange
+        stubEinheitOhneBestand();
+
+        // Act
+        service.handle(TOPIC, payload("2026-01-01T10:07:00+01:00", "123.4500", "10.0000",
+                seriennummerJson("   ")));
+
+        // Assert – wie fehlend behandelt → Fallback in der Aggregation
+        assertNull(captureSavedRohdaten().getSeriennummer());
+        verify(metrics, never()).recordFailed();
+    }
+
+    @Test
+    void handle_SeriennummerLeer_WirdNull() {
+        // Arrange
+        stubEinheitOhneBestand();
+
+        // Act
+        service.handle(TOPIC, payload("2026-01-01T10:07:00+01:00", "123.4500", "10.0000",
+                seriennummerJson("")));
+
+        // Assert
+        assertNull(captureSavedRohdaten().getSeriennummer());
+    }
+
+    @Test
+    void handle_SeriennummerLaengerAls64Zeichen_WirdGekuerztGespeichert() {
+        // Arrange – 80 Zeichen; ungekürzt würde der Insert an VARCHAR(64) scheitern und die
+        // ganze (transaktionale) Nachricht verwerfen.
+        stubEinheitOhneBestand();
+        String zuLang = "X".repeat(80);
+
+        // Act
+        service.handle(TOPIC, payload("2026-01-01T10:07:00+01:00", "123.4500", "10.0000",
+                seriennummerJson(zuLang)));
+
+        // Assert
+        assertEquals("X".repeat(64), captureSavedRohdaten().getSeriennummer());
+        verify(metrics).recordProcessed();
+        verify(metrics, never()).recordFailed();
+    }
+
+    @Test
+    void handle_SeriennummerGenau64Zeichen_UnveraendertGespeichert() {
+        // Arrange – Grenzwert: exakt die Spaltenlänge
+        stubEinheitOhneBestand();
+        String genau64 = "Y".repeat(64);
+
+        // Act
+        service.handle(TOPIC, payload("2026-01-01T10:07:00+01:00", "123.4500", "10.0000",
+                seriennummerJson(genau64)));
+
+        // Assert
+        assertEquals(genau64, captureSavedRohdaten().getSeriennummer());
+    }
+
+    @Test
+    void handle_SeriennummerMitWhitespaceUndUeberlaenge_ErstTrimmenDannKuerzen() {
+        // Arrange – Reihenfolge der Normalisierung: trimmen → kürzen (64 Nutzzeichen bleiben)
+        stubEinheitOhneBestand();
+        String kern = "Z".repeat(70);
+
+        // Act
+        service.handle(TOPIC, payload("2026-01-01T10:07:00+01:00", "123.4500", "10.0000",
+                seriennummerJson("   " + kern + "   ")));
+
+        // Assert
+        assertEquals("Z".repeat(64), captureSavedRohdaten().getSeriennummer());
+    }
+
+    @Test
+    void handle_GeteilterBilanzMesspunkt_SelbeSeriennummerAnBeidenEinheiten() {
+        // Arrange – ein physischer Bilanzzähler, zwei Einheiten (BEZUG + RUECKLIEFERUNG)
+        Einheit bezugEinheit = new Einheit("Bezug", EinheitTyp.BEZUG);
+        bezugEinheit.setId(20L);
+        bezugEinheit.setOrgId(ORG_ID);
+        bezugEinheit.setMesspunkt(MESSPUNKT);
+        Einheit ruecklieferungEinheit = new Einheit("Rücklieferung", EinheitTyp.RUECKLIEFERUNG);
+        ruecklieferungEinheit.setId(21L);
+        ruecklieferungEinheit.setOrgId(ORG_ID);
+        ruecklieferungEinheit.setMesspunkt(MESSPUNKT);
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT))
+                .thenReturn(List.of(bezugEinheit, ruecklieferungEinheit));
+        when(rohdatenRepository.findByEinheitIdAndZeit(anyLong(), any())).thenReturn(Optional.empty());
+        when(rohdatenRepository.save(any(ZaehlerRohdaten.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act – ein Config-Eintrag je Messpunkt ⇒ eine gemeinsame Serie für beide Einheiten
+        service.handle(TOPIC, payload("2026-01-01T10:07:00+01:00", "123.4500", "10.0000",
+                seriennummerJson("BILANZ-4711")));
+
+        // Assert – beide Rohdatensätze tragen dieselbe Serie
+        ArgumentCaptor<ZaehlerRohdaten> captor = ArgumentCaptor.forClass(ZaehlerRohdaten.class);
+        verify(rohdatenRepository, times(2)).save(captor.capture());
+        assertEquals("BILANZ-4711", captor.getAllValues().get(0).getSeriennummer());
+        assertEquals("BILANZ-4711", captor.getAllValues().get(1).getSeriennummer());
+        verify(metrics, never()).recordFailed();
+    }
+
+    @Test
+    void handle_BestehenderRohdatensatz_AktualisiertSeriennummer() {
+        // Arrange – Upsert-Zweig: vorhandene Zeile mit alter Serie
+        ZaehlerRohdaten existing = new ZaehlerRohdaten(ORG_ID, EINHEIT_ID,
+                LocalDateTime.of(2026, 1, 1, 10, 7),
+                new BigDecimal("100.0000"), new BigDecimal("5.0000"));
+        existing.setSeriennummer("SN-ALT");
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT)).thenReturn(List.of(einheit));
+        when(rohdatenRepository.findByEinheitIdAndZeit(eq(EINHEIT_ID), any())).thenReturn(Optional.of(existing));
+        when(rohdatenRepository.save(any(ZaehlerRohdaten.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act
+        service.handle(TOPIC, payload("2026-01-01T10:07:00+01:00", "123.4500", "10.0000",
+                seriennummerJson(" SN-NEU ")));
+
+        // Assert
+        ZaehlerRohdaten saved = captureSavedRohdaten();
+        assertSame(existing, saved);
+        assertEquals("SN-NEU", saved.getSeriennummer());
+    }
+
+    @Test
+    void handle_UnbekanntesZusatzfeldImPayload_WirdVerarbeitet() {
+        // Arrange – Spring Boot konfiguriert den injizierten ObjectMapper mit
+        // FAIL_ON_UNKNOWN_PROPERTIES = false; hier nachgestellt, damit der Deploy-Reihenfolge-
+        // Vertrag (Pi sendet ein Feld, das das Backend noch nicht kennt) geprüft wird.
+        MqttIngestService toleranterService = new MqttIngestService(einheitRepository, rohdatenRepository,
+                new ObjectMapper().registerModule(new JavaTimeModule())
+                        .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES),
+                metrics);
+        stubEinheitOhneBestand();
+
+        // Act
+        toleranterService.handle(TOPIC, payload("2026-01-01T10:07:00+01:00", "123.4500", "10.0000",
+                "\"qualitaet\":\"OK\"," + seriennummerJson("SN-1")));
+
+        // Assert – Nachricht nicht verworfen
+        assertEquals("SN-1", captureSavedRohdaten().getSeriennummer());
+        verify(metrics).recordProcessed();
+        verify(metrics, never()).recordFailed();
     }
 }

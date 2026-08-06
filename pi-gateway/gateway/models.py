@@ -36,6 +36,10 @@ class MeterConfig:
     host: str | None = None
     port: int = 502
     unit_id: int = 1
+    # Seriennummer des verbauten Geräts (Zählertausch-Erkennung, siehe
+    # Specs/Zaehlertausch-Erkennung.md). Optional; beim Zählertausch aktualisieren –
+    # der Wechsel dieses Werts ist das Signal, an dem das Backend den Tausch erkennt.
+    seriennummer: str | None = None
 
 
 @dataclass(frozen=True)
@@ -67,3 +71,4 @@ class MeterReading:
     timestamp: datetime            # aware; wird als lokale Zeit mit Offset publiziert
     zaehlerstand_bezug: float      # kWh, kumulativ, >= 0
     zaehlerstand_einspeisung: float  # kWh, kumulativ, >= 0
+    seriennummer: str | None = None  # aus der Config; None -> Feld wird nicht publiziert

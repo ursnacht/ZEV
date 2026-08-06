@@ -109,11 +109,16 @@ def _to_payload(reading: MeterReading) -> dict:
     Voraussetzung: die lokale Zeitzone des Pi ist korrekt gesetzt (NTP + Zeitzone, FR-6.3).
     """
     timestamp = reading.timestamp.astimezone().replace(microsecond=0)
-    return {
+    payload = {
         "timestamp": timestamp.isoformat(),
         "zaehlerstandBezug": round(reading.zaehlerstand_bezug, _KWH_DECIMALS),
         "zaehlerstandEinspeisung": round(reading.zaehlerstand_einspeisung, _KWH_DECIMALS),
     }
+    # Optionales Feld (Zählertausch-Erkennung): nur aufnehmen, wenn konfiguriert – so bleibt
+    # der Payload für Zähler ohne Seriennummer unverändert zum bisherigen Vertrag.
+    if reading.seriennummer:
+        payload["seriennummer"] = reading.seriennummer
+    return payload
 
 
 def _parse_broker_url(url: str) -> tuple[str, str, int]:

@@ -48,7 +48,8 @@ Der Pi publiziert die **absoluten kumulativen Zählerstände** zum Messzeitpunkt
 {
   "timestamp": "2026-06-19T14:30:00+02:00",
   "zaehlerstandBezug": 12345.678,
-  "zaehlerstandEinspeisung": 4321.000
+  "zaehlerstandEinspeisung": 4321.000,
+  "seriennummer": "WAGO-8791234"
 }
 ```
 | Feld | Typ | Pflicht | Beschreibung |
@@ -56,6 +57,11 @@ Der Pi publiziert die **absoluten kumulativen Zählerstände** zum Messzeitpunkt
 | `timestamp` | ISO 8601 (lokale Zeit mit Offset) | Ja | Zeitpunkt der Messung, z. B. `2026-06-19T14:30:00+02:00` |
 | `zaehlerstandBezug` | Decimal (kWh, kumulativ) | Ja | Absoluter Zählerstand Bezug/Verbrauch (monoton steigend) |
 | `zaehlerstandEinspeisung` | Decimal (kWh, kumulativ) | Ja | Absoluter Zählerstand Einspeisung (monoton steigend) |
+| `seriennummer` | String (max. 64) | **Nein** | Seriennummer des liefernden Zählers (aus der Pi-Config je `messpunkt`); Signal für die **Zählertausch-Erkennung** (`Specs/Zaehlertausch-Erkennung.md`). Wird nur gesendet, wenn konfiguriert; fehlt sie, gilt das bisherige Verhalten |
+
+> **Vertrags-Regel:** Die **Pflichtfelder** sind bindend und dürfen sich nicht ändern. **Additive
+> optionale Felder** (wie `seriennummer`) sind erlaubt: Der Backend-Parser toleriert unbekannte
+> Felder, daher ist die Deploy-Reihenfolge Pi/Backend in beide Richtungen unkritisch.
 
 > **Zeitzone (Wire = lokale Zeit mit Offset, Speicherung verbatim):** Der Pi sendet `timestamp`
 > als **lokale Zeit mit UTC-Offset** (ISO 8601, z. B. `2026-06-19T14:30:00+02:00`) – eindeutig

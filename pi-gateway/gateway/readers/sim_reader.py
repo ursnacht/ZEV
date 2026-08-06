@@ -66,4 +66,5 @@ class SimReader(Reader):
             timestamp=datetime.now(timezone.utc),
             zaehlerstand_bezug=round(self._bezug, 4),
             zaehlerstand_einspeisung=round(self._einspeisung, 4),
+            seriennummer=self.config.seriennummer,
         )

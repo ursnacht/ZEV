@@ -64,6 +64,7 @@ class ModbusReader(Reader):
             timestamp=datetime.now(timezone.utc),
             zaehlerstand_bezug=bezug,
             zaehlerstand_einspeisung=einspeisung,
+            seriennummer=self.config.seriennummer,
         )
 
     def _read_float(self, register: RegisterSpec, rolle: str) -> float:

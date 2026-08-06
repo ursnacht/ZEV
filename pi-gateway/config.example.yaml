@@ -20,8 +20,14 @@ broker:
 # Werte 'addr'/'typ'/'skalierung' sind BEISPIELHAFT – gemäss Datenblatt/mbpoll setzen.
 # Die 3 Wago hängen an EINEM Modbus-TCP-Hub (RTU→TCP): gleiche host/port (Hub-IP),
 # verschiedene unit_id (Slave-Adresse). Siehe docs/Netzwerk-Topologie-Hene.md.
+# seriennummer (optional): Seriennummer des verbauten Geräts, einmalig am Zähler abgelesen
+# (z. B. per mbpoll, siehe README). Sie ist das Signal für die Zählertausch-Erkennung im Backend:
+# BEIM ZÄHLERTAUSCH HIER DIE NEUE NUMMER EINTRAGEN, sonst bleibt der Tausch unerkannt.
+# Damit das beim ersten Tausch greift, müssen alle Zähler vorab eine Seriennummer haben
+# (siehe docs/Zaehlertausch.md). Fehlt sie, verhält sich das Backend wie bisher.
 zaehler:
   - messpunkt: "ID742-Wohnung-1"
+    seriennummer: "WAGO-8791234"
     protokoll: modbus-tcp
     host: 192.168.10.10          # IP des Modbus-TCP-Hubs (für alle Wago gleich)
     port: 502
@@ -31,6 +37,7 @@ zaehler:
       einspeisung: { addr: "6018", typ: float32, wortfolge: big, skalierung: 1.0 }  # OBIS 2.8.0
 
   - messpunkt: "ID742-Wohnung-2"
+    seriennummer: "WAGO-8791235"
     protokoll: modbus-tcp
     host: 192.168.10.10
     port: 502
@@ -40,6 +47,7 @@ zaehler:
       einspeisung: { addr: "6018", typ: float32, wortfolge: big, skalierung: 1.0 }
 
   - messpunkt: "ID742-Allgemein"
+    seriennummer: "WAGO-8791236"
     protokoll: modbus-tcp
     host: 192.168.10.10
     port: 502

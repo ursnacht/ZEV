@@ -51,11 +51,14 @@
 1. **Topic:** `zev/{orgId}/{messpunkt}/messwert` (exakt wie Backend-Subscription `zev/+/+/messwert`).
 2. **Payload (JSON, absolute Stände):**
    ```json
-   { "timestamp": "2026-06-19T14:30:00+02:00", "zaehlerstandBezug": 12345.678, "zaehlerstandEinspeisung": 4321.000 }
+   { "timestamp": "2026-06-19T14:30:00+02:00", "zaehlerstandBezug": 12345.678, "zaehlerstandEinspeisung": 4321.000,
+     "seriennummer": "WAGO-8791234" }
    ```
    `timestamp` in **lokaler Zeit mit UTC-Offset (ISO 8601)** (z. B. `+02:00`; eindeutig, kein DST-Problem), Stände in kWh (kumulativ, ≥ 0). Voraussetzung: korrekte lokale Zeitzone + NTP auf dem Pi (FR-6.3).
+   `seriennummer` ist **optional** und wird nur publiziert, wenn im jeweiligen `zaehler`-Eintrag konfiguriert (Zählertausch-Erkennung, s. FR-3.5).
 3. QoS **0 oder 1** genügt (Verlusttoleranz durch absolute Stände); stabile Client-ID.
-4. Topic/Payload müssen **byte-genau** zum Backend-Vertrag passen (Änderungen nur abgestimmt mit `MQTT-Integration.md`).
+4. Die **Pflichtfelder** von Topic/Payload müssen exakt zum Backend-Vertrag passen; **additive optionale Felder** sind erlaubt (das Backend toleriert unbekannte Felder). Änderungen nur abgestimmt mit `MQTT-Integration.md`.
+5. **Seriennummer (Zählertausch-Erkennung):** Je `zaehler`-Eintrag optional `seriennummer` (String, max. 64 Zeichen), einmalig am Gerät abgelesen. Der Publisher übernimmt den Wert unverändert in den Payload. **Beim Zählertausch ist dieser Wert zu aktualisieren – er ist das Signal**, an dem das Backend den Tausch erkennt (`Specs/Zaehlertausch-Erkennung.md`, Betrieb: `docs/Zaehlertausch.md`). Überlänge → Startfehler (`ConfigError`), damit ein Konfigurationsfehler sofort auffällt.
 
 ### FR-4: Übertragung & (optionale) Pufferung
 1. Bei nicht erreichbarem Broker/VPN ist ein **Nachrichtenverlust unkritisch** — der nächste erfolgreich übertragene Stand schliesst die Lücke (Backend bildet die Differenz).
@@ -83,6 +86,7 @@
 > # gleiche host/port (Hub-IP), unterschiedliche unit_id (Modbus-Slave-Adresse). Weitere anhängen.
 > zaehler:
 >   - messpunkt: "ID742-Wohnung-1"
+>     seriennummer: "WAGO-8791234"    # optional; beim Zählertausch aktualisieren (FR-3.5)
 >     protokoll: modbus-tcp
 >     host: 192.168.10.10             # IP des Modbus-TCP-Hubs (für alle Wago gleich)
 >     port: 502
@@ -125,7 +129,8 @@
 * [ ] Der Dienst liest **alle konfigurierten Zähler** (beliebige Anzahl; aktuell 3× Wago Modbus TCP, gPlug folgt später) im konfigurierten Intervall aus.
 * [ ] Ein zusätzlicher Zähler lässt sich **allein per Konfigurations-Eintrag** ergänzen (kein Code-Change/Rebuild).
 * [ ] Der Dienst publiziert die **absoluten Zählerstände** unverändert (keine Delta-Berechnung, keine „letzter Stand"-Persistenz).
-* [ ] Publizierte Topic-/Payload-Struktur entspricht exakt `MQTT-Integration.md` (`zev/{orgId}/{messpunkt}/messwert`, `{timestamp,zaehlerstandBezug,zaehlerstandEinspeisung}`).
+* [ ] Publizierte Topic-/Payload-Struktur entspricht `MQTT-Integration.md`: Topic `zev/{orgId}/{messpunkt}/messwert`, Pflichtfelder `{timestamp,zaehlerstandBezug,zaehlerstandEinspeisung}` – plus das **optionale** `seriennummer`, sofern konfiguriert.
+* [ ] Ist im `zaehler`-Eintrag eine `seriennummer` gesetzt, erscheint sie unverändert im Payload; fehlt sie, wird das Feld **weggelassen** (Payload identisch zum bisherigen Vertrag).
 * [ ] Bei Broker-/VPN-Ausfall entsteht **kein Datenverlust** in der Gesamtsumme (nächster übertragener Stand schliesst die Lücke); optionale Pufferung erhält zusätzlich die Auflösung.
 * [ ] Unvollständige/fehlgeschlagene Reads werden verworfen (nicht publiziert).
 * [ ] Dienst startet nach Reboot automatisch (`systemd`) und verbindet sich selbstständig neu.

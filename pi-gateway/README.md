@@ -36,17 +36,45 @@ config.yaml ─► config.py ─► main.py (Read-Loop)
 Topic: `zev/{orgId}/{messpunkt}/messwert`
 
 ```json
-{ "timestamp": "2026-06-19T14:30:00+02:00", "zaehlerstandBezug": 12345.678, "zaehlerstandEinspeisung": 4321.0 }
+{ "timestamp": "2026-06-19T14:30:00+02:00", "zaehlerstandBezug": 12345.678, "zaehlerstandEinspeisung": 4321.0,
+  "seriennummer": "WAGO-8791234" }
 ```
 
 `timestamp` in lokaler Zeit mit UTC-Offset (ISO 8601), Stände in kWh (kumulativ, ≥ 0).
-Muss byte-genau zu `Specs/MQTT-Integration.md` passen.
+`seriennummer` ist **optional** und wird nur gesendet, wenn in der Config gesetzt (Zählertausch-
+Erkennung, siehe unten). Die Pflichtfelder müssen exakt zu `Specs/MQTT-Integration.md` passen;
+**additive optionale Felder** sind erlaubt (das Backend toleriert unbekannte Felder).
 
 ## Konfiguration
 
 Vorlage: [`config.example.yaml`](./config.example.yaml). Nach `config.yaml` kopieren
 und anpassen. Die Zähler stehen als **Liste beliebiger Länge** (typisch 10–20+);
 ein zusätzlicher Zähler = nur ein weiterer Listeneintrag (kein Code-Change).
+
+### Seriennummer / Zählertausch-Erkennung
+
+Jeder `zaehler`-Eintrag kann eine `seriennummer` tragen (optional, max. 64 Zeichen):
+
+```yaml
+zaehler:
+  - messpunkt: "ID742-Wohnung-1"
+    seriennummer: "WAGO-8791234"   # beim Zählertausch aktualisieren!
+    protokoll: modbus-tcp
+```
+
+Das Backend erkennt einen **Zählertausch** daran, dass sich dieser Wert ändert, und verwirft dann
+das Übergangsintervall, statt einen falschen Verbrauch zu verbuchen (auch wenn der neue Zähler mit
+einem **höheren** Stand startet). Wichtig:
+
+- **Vor dem ersten Tausch alle Zähler befüllen** – wird die Nummer erst beim Tausch eingetragen,
+  fehlt die Vergleichsbasis und genau dieser Tausch bleibt unerkannt.
+- **Beim Tausch die Nummer aktualisieren** und das Gateway neu starten – das ist das Signal.
+- Fehlt die Nummer, verhält sich das Backend wie bisher (Fallback).
+
+Details: [`docs/Zaehlertausch.md`](../docs/Zaehlertausch.md) und
+[`Specs/Zaehlertausch-Erkennung.md`](../Specs/Zaehlertausch-Erkennung.md).
+Die Nummer wird einmalig am Gerät abgelesen (z. B. per `mbpoll`, siehe
+`Specs/Pi-Gateway-Software.md`).
 
 - **Secrets** kommen nicht in die YAML, sondern werden über `${MQTT_USERNAME}` /
   `${MQTT_PASSWORD}` aus der Umgebung aufgelöst (siehe `.env.example`).

@@ -33,6 +33,9 @@ _SUPPORTED_WORD_ORDERS = {"big", "little"}
 # Platzhalter-Register für den Simulator (liest keine echten Register).
 _DUMMY_REGISTER = RegisterSpec(addr=0)
 
+# Spaltenlänge von zaehler_rohdaten.seriennummer im Backend.
+_MAX_SERIENNUMMER_LAENGE = 64
+
 
 class ConfigError(Exception):
     """Ungültige oder unvollständige Konfiguration."""
@@ -146,10 +149,36 @@ def _parse_meters(data) -> list[MeterConfig]:
                 unit_id=int(entry.get("unit_id", 1)),
                 register_bezug=register_bezug,
                 register_einspeisung=register_einspeisung,
+                seriennummer=_parse_seriennummer(entry.get("seriennummer"), messpunkt),
             )
         )
 
     return meters
+
+
+def _parse_seriennummer(value, messpunkt: str) -> str | None:
+    """Optionale Seriennummer des Zählers (Zählertausch-Erkennung).
+
+    Fehlt sie, wird das Feld nicht publiziert und das Backend fällt auf das bisherige
+    Verhalten zurück. Überlänge ist ein ``ConfigError`` (statt stiller Kürzung im Backend),
+    damit ein Konfigurationsfehler schon beim Start auffällt.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ConfigError(
+            f"zaehler '{messpunkt}': seriennummer muss ein String sein "
+            f"(war: {type(value).__name__})."
+        )
+    seriennummer = value.strip()
+    if not seriennummer:
+        return None
+    if len(seriennummer) > _MAX_SERIENNUMMER_LAENGE:
+        raise ConfigError(
+            f"zaehler '{messpunkt}': seriennummer ist länger als "
+            f"{_MAX_SERIENNUMMER_LAENGE} Zeichen."
+        )
+    return seriennummer
 
 
 def _parse_register(data, messpunkt: str, rolle: str) -> RegisterSpec:

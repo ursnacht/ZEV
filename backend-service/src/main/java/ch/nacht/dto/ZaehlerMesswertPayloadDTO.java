@@ -9,12 +9,16 @@ import java.time.OffsetDateTime;
  *
  * <p>{@code timestamp} kommt als lokale Zeit mit Offset (ISO 8601, z. B.
  * {@code 2026-07-10T14:30:00+02:00}); die lokale Wanduhrzeit wird verbatim gespeichert.
+ *
+ * <p>{@code seriennummer} ist <b>optional</b> (Zählertausch-Erkennung, siehe
+ * {@code Specs/Zaehlertausch-Erkennung.md}): fehlt sie, läuft die Aggregation über den Fallback.
  */
 public class ZaehlerMesswertPayloadDTO {
 
     private OffsetDateTime timestamp;
     private BigDecimal zaehlerstandBezug;
     private BigDecimal zaehlerstandEinspeisung;
+    private String seriennummer;
 
     public OffsetDateTime getTimestamp() {
         return timestamp;
@@ -38,5 +42,13 @@ public class ZaehlerMesswertPayloadDTO {
 
     public void setZaehlerstandEinspeisung(BigDecimal zaehlerstandEinspeisung) {
         this.zaehlerstandEinspeisung = zaehlerstandEinspeisung;
+    }
+
+    public String getSeriennummer() {
+        return seriennummer;
+    }
+
+    public void setSeriennummer(String seriennummer) {
+        this.seriennummer = seriennummer;
     }
 }

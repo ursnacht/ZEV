@@ -23,8 +23,9 @@ broker:
 # "bezug" im Namen           -> nur Bezug wächst (positives total; Einzel-Zähler je Richtung)
 # "rücklieferung" im Namen   -> nur Einspeisung wächst (negatives total; Einzel-Zähler je Richtung)
 # sonst                      -> Consumer (positives total)
+# seriennummer (optional): Signal für die Zählertausch-Erkennung – beim Tausch aktualisieren.
 zaehler:
-  - { messpunkt: "MP-Wohnung-1",   protokoll: sim }
-  - { messpunkt: "MP-Wohnung-2",   protokoll: sim }
-  - { messpunkt: "MP-Producer",    protokoll: sim }
-  - { messpunkt: "Bilanz",         protokoll: sim }
+  - { messpunkt: "MP-Wohnung-1",   protokoll: sim, seriennummer: "SIM-0001" }
+  - { messpunkt: "MP-Wohnung-2",   protokoll: sim, seriennummer: "SIM-0002" }
+  - { messpunkt: "MP-Producer",    protokoll: sim, seriennummer: "SIM-0003" }
+  - { messpunkt: "Bilanz",         protokoll: sim, seriennummer: "SIM-0004" }

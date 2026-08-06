@@ -160,6 +160,24 @@ public class ZaehlerAggregationService {
             return false;
         }
 
+        // Zählertausch-Erkennung (Spec Zaehlertausch-Erkennung.md, FR-3): Wechselt die
+        // Seriennummer zwischen Referenz- und End-Stand, ist das Delta über die Tausch-Grenze
+        // bedeutungslos – unabhängig vom Vorzeichen. Dann kein Messwert (neue Baseline);
+        // ein bereits vorhandener messwerte-Satz bleibt unangetastet.
+        String serieReferenz = referenz.getSeriennummer();
+        String serieLetzter = letzter.getSeriennummer();
+        if (serieReferenz != null && serieLetzter != null && !serieReferenz.equals(serieLetzter)) {
+            log.warn("Zählerwechsel erkannt (einheit={}, intervall={} - {}): Seriennummer {} -> {}"
+                    + " – kein Messwert für das Übergangsintervall",
+                    einheitId, start, ende, serieReferenz, serieLetzter);
+            return false;
+        }
+        if (serieReferenz == null && serieLetzter != null) {
+            // Rollout-Marker (FR-4.2): ab hier trägt die Einheit eine Seriennummer.
+            log.info("Seriennummer erstmals vorhanden (einheit={}, intervall={} - {}, seriennummer={})"
+                    + " – Zählertausch-Erkennung ab jetzt aktiv", einheitId, start, ende, serieLetzter);
+        }
+
         BigDecimal deltaBezug = nichtNegativ(
                 letzter.getZaehlerstandBezug().subtract(referenz.getZaehlerstandBezug()),
                 einheitId, "Bezug", ende);
