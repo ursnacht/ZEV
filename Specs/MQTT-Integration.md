@@ -151,6 +151,11 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
    - `zev_mqtt_last_message_timestamp` (Gauge)
    - `zev_aggregation_runs_total` (Counter), `zev_aggregation_last_run_timestamp` (Gauge)
 2. Health-Indicator `/actuator/health/mqtt` zeigt den Broker-Verbindungsstatus.
+3. **Zähler-Ausfälle als Systemmeldung** (`SystemmeldungService`, Kategorie `SYSTEMMELDUNG_KATEGORIE_MQTT`): Der Aggregations-Job erkennt fehlende Zählerdaten am Abstand zwischen Referenz-Stand (letzter Stand vor dem Intervall) und Intervallstart und meldet sie mandantenbezogen:
+   * **Genau ein** Aggregationsintervall ohne Daten → **`INFO`** (`MQTT_ZAEHLER_LUECKE`). Der Verbrauch geht nicht verloren – er fällt gebündelt in das Folgeintervall.
+   * **Mehrere** aufeinanderfolgende Intervalle ohne Daten → **`WARN`** (`MQTT_ZAEHLER_AUSFALL`). Hier geht die 15-Minuten-Auflösung verloren: der gesamte Lückenverbrauch erscheint als Spitze in einem Intervall und **verzerrt die intervallweise Solarverteilung** zwischen den Consumern (die Einzelsumme des Zählers bleibt korrekt).
+   * **Keine** Meldung bei einzelnen ausgefallenen Messungen *innerhalb* eines Intervalls (z.B. 1 von 3 bei `publish_interval: 5m`): Da **absolute** Zählerstände übertragen werden, ist das Delta identisch – der Ausfall ist folgenlos und darf kein Rauschen erzeugen.
+   * Meldungstext/Kategorie via `TranslationService`; der Parameter nennt Einheit, Zeitraum und Anzahl fehlender Intervalle. Deduplizierung je Mandant + Meldungs-Key durch den bestehenden Zähler-Mechanismus (`erfasse`); **kein** Auto-Resolve – die Meldung dokumentiert ein vergangenes Ereignis und wird vom Betreiber als erledigt markiert.
 
 ### FR-9: Anpassung Solarverteilung (`zev`-Fallback)
 1. Die Solarverteilung (`SolarDistribution`) berechnet wie bisher `zev_calculated` pro Consumer/Intervall.
@@ -188,6 +193,10 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 
 **Monitoring & Kompatibilität:**
 * [ ] MQTT-Metriken unter `/actuator/prometheus`; `/actuator/health/mqtt` zeigt Status.
+* [ ] **Genau ein** Intervall ohne Zählerdaten → Systemmeldung `MQTT_ZAEHLER_LUECKE` mit Level **INFO**, Kategorie `SYSTEMMELDUNG_KATEGORIE_MQTT`, Parameter mit Einheiten-Name und Zeitraum; der Messwert des Folgeintervalls enthält den gesamten Lückenverbrauch.
+* [ ] **Mehrere** aufeinanderfolgende Intervalle ohne Zählerdaten → Systemmeldung `MQTT_ZAEHLER_AUSFALL` mit Level **WARN**; der Parameter nennt die Anzahl fehlender Intervalle.
+* [ ] **Keine** Systemmeldung, wenn der Referenz-Stand im unmittelbar vorangehenden Intervall liegt (lückenloser Betrieb) — insbesondere **nicht** bei einzelnen ausgefallenen Messungen innerhalb eines Intervalls.
+* [ ] Meldungen sind mandantenbezogen (`org_id` aus der Einheit) und werden je Meldungs-Key dedupliziert (Zähler + „zuletzt aufgetreten"); Texte via `TranslationService` (DE/EN).
 * [ ] Bestehender CSV-Upload unverändert nutzbar; Werte beider Quellen gleichwertig.
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
@@ -220,7 +229,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 | Negativer Zählerstand | WARN, verwerfen |
 | Timestamp in der Zukunft | WARN, trotzdem speichern |
 | Duplikat (Einheit + `zeit`) | Upsert |
-| Verlorene Nachricht(en) | kein Datenverlust — Differenz zum nächsten Stand deckt die Lücke; nur Auflösungsverlust |
+| Verlorene Nachricht(en) | kein Datenverlust — Differenz zum nächsten Stand deckt die Lücke; nur Auflösungsverlust. **Monitoring (FR-8.3):** einzelne Messung innerhalb eines Intervalls → keine Meldung; ein Intervall ohne Daten → INFO; mehrere → WARN |
 | Wiederaufnahme nach **längerem Unterbruch** (Pi/Broker offline, ggf. mehrere Tage) | **kein Datenverlust** — die Differenz zum letzten Vor-Unterbruch-Stand deckt den gesamten Zeitraum; der kumulierte Verbrauch fällt gebündelt als **ein** grosser `total` in das erste Intervall mit Meldung nach Wiederaufnahme (Auflösungsverlust, bewusster Trade-off der absoluten Stände). Der Referenzstand wird über `findFirstByEinheitIdAndZeitLessThanEqualOrderByZeitDesc` **unabhängig vom `verarbeitet`-Flag** gefunden; der Catch-up-Loop startet erst beim ersten unverarbeiteten Stand (die leeren Intervalle des Unterbruchs werden nicht durchlaufen). **Voraussetzung:** der Vor-Unterbruch-Stand existiert noch (Retention darf ihn nicht löschen, s. §8). |
 | Register-Stand < Referenz (Reset/Überlauf/Zählertausch) | Aggregation **je Register**: betroffenes Delta (`ΔBezug`/`ΔEinspeisung`) auf 0, Referenz neu setzen, WARN (negatives `total` aus Einspeisung bleibt gültig) |
 | Broker nicht erreichbar | Reconnect mit Exponential Backoff |

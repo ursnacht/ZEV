@@ -2,6 +2,7 @@ package ch.nacht.service;
 
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
+import ch.nacht.entity.MeldungLevel;
 import ch.nacht.entity.Messwerte;
 import ch.nacht.entity.Quelle;
 import ch.nacht.entity.ZaehlerRohdaten;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
@@ -50,17 +52,20 @@ public class ZaehlerAggregationService {
     private final EinheitRepository einheitRepository;
     private final MesswerteService messwerteService;
     private final MqttMetrics metrics;
+    private final SystemmeldungService systemmeldungService;
 
     public ZaehlerAggregationService(ZaehlerRohdatenRepository rohdatenRepository,
                                      MesswerteRepository messwerteRepository,
                                      EinheitRepository einheitRepository,
                                      MesswerteService messwerteService,
-                                     MqttMetrics metrics) {
+                                     MqttMetrics metrics,
+                                     SystemmeldungService systemmeldungService) {
         this.rohdatenRepository = rohdatenRepository;
         this.messwerteRepository = messwerteRepository;
         this.einheitRepository = einheitRepository;
         this.messwerteService = messwerteService;
         this.metrics = metrics;
+        this.systemmeldungService = systemmeldungService;
     }
 
     // Läuft 5 Minuten nach jeder Viertelstunde (:05/:20/:35/:50), damit spät eintreffende
@@ -160,6 +165,8 @@ public class ZaehlerAggregationService {
             return false;
         }
 
+        meldeDatenluecke(einheit, referenz, start);
+
         // Zählertausch-Erkennung (Spec Zaehlertausch-Erkennung.md, FR-3): Wechselt die
         // Seriennummer zwischen Referenz- und End-Stand, ist das Delta über die Tausch-Grenze
         // bedeutungslos – unabhängig vom Vorzeichen. Dann kein Messwert (neue Baseline);
@@ -210,6 +217,47 @@ public class ZaehlerAggregationService {
         messwert.setZev(einheit.getTyp() == EinheitTyp.PRODUCER ? total : 0.0);
         messwert.setQuelle(Quelle.MQTT); // zev_calculated bleibt null bis zur Solarverteilung
         messwerteRepository.save(messwert);
+    }
+
+    /**
+     * Meldet Datenlücken eines Zählers als Systemmeldung (MQTT-Integration, Monitoring).
+     *
+     * <p>Die Lückenlänge ergibt sich aus dem Abstand zwischen dem Referenz-Stand (letzter Stand
+     * vor dem Intervall) und dem Intervallstart: liegt der Referenz-Stand im unmittelbar
+     * vorangehenden Intervall, gab es keine Lücke. Da <b>absolute</b> Zählerstände übertragen
+     * werden, sind einzelne ausgefallene Messungen <i>innerhalb</i> eines Intervalls
+     * folgenlos – sie erzeugen bewusst keine Meldung.
+     *
+     * <ul>
+     *   <li><b>Genau ein</b> Intervall ohne Daten → {@code INFO}: der Verbrauch geht nicht
+     *       verloren, er fällt gebündelt in dieses Intervall.</li>
+     *   <li><b>Mehrere</b> Intervalle ohne Daten → {@code WARN}: die 15-Minuten-Auflösung geht
+     *       verloren; der gesamte Lückenverbrauch erscheint als Spitze in einem Intervall und
+     *       verzerrt damit die intervallweise Solarverteilung.</li>
+     * </ul>
+     */
+    private void meldeDatenluecke(Einheit einheit, ZaehlerRohdaten referenz, LocalDateTime start) {
+        long fehlendeIntervalle =
+                Duration.between(referenz.getZeit(), start).toMinutes() / INTERVALL_MINUTEN;
+        if (fehlendeIntervalle < 1) {
+            return;
+        }
+
+        String parameter = String.format("%s: %s – %s (%d Intervalle)",
+                einheit.getName(), referenz.getZeit(), start, fehlendeIntervalle);
+        if (fehlendeIntervalle == 1) {
+            log.info("Datenlücke: {} – ein Intervall ohne Zählerdaten (einheit={})",
+                    parameter, einheit.getId());
+            systemmeldungService.erfasse(einheit.getOrgId(), MeldungLevel.INFO,
+                    SystemmeldungService.KATEGORIE_MQTT, SystemmeldungService.KEY_ZAEHLER_LUECKE,
+                    parameter);
+        } else {
+            log.warn("Zähler-Ausfall: {} – mehrere Intervalle ohne Zählerdaten (einheit={})",
+                    parameter, einheit.getId());
+            systemmeldungService.erfasse(einheit.getOrgId(), MeldungLevel.WARN,
+                    SystemmeldungService.KATEGORIE_MQTT, SystemmeldungService.KEY_ZAEHLER_AUSFALL,
+                    parameter);
+        }
     }
 
     private BigDecimal nichtNegativ(BigDecimal delta, Long einheitId, String register, LocalDateTime ende) {

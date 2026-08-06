@@ -2,6 +2,7 @@ package ch.nacht.service;
 
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
+import ch.nacht.entity.MeldungLevel;
 import ch.nacht.entity.Messwerte;
 import ch.nacht.entity.Quelle;
 import ch.nacht.entity.ZaehlerRohdaten;
@@ -32,6 +33,7 @@ import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -68,6 +70,9 @@ public class ZaehlerAggregationServiceTest {
     @Mock
     private MqttMetrics metrics;
 
+    @Mock
+    private SystemmeldungService systemmeldungService;
+
     private ZaehlerAggregationService service;
 
     private Einheit einheit;
@@ -85,7 +90,7 @@ public class ZaehlerAggregationServiceTest {
     @BeforeEach
     void setUp() {
         service = new ZaehlerAggregationService(rohdatenRepository, messwerteRepository, einheitRepository,
-                messwerteService, metrics);
+                messwerteService, metrics, systemmeldungService);
 
         einheit = new Einheit("Wohnung 1", EinheitTyp.CONSUMER);
         einheit.setId(EINHEIT_ID);
@@ -629,5 +634,59 @@ public class ZaehlerAggregationServiceTest {
         assertEquals(7.0, captor.getAllValues().get(1).getTotal(), 1e-9);
         assertTrue(loggedContaining(Level.WARN, "Zählerwechsel erkannt", "SN-A -> SN-B"));
         assertTrue(loggedContaining(Level.WARN, "Zählerwechsel erkannt", "SN-B -> SN-A"));
+    }
+
+    // --- Monitoring von Datenlücken (Zähler-Ausfall) ------------------------
+
+    @Test
+    void aggregiere_LueckenlosOhneAusfall_KeineSystemmeldung() {
+        // Referenz liegt im unmittelbar vorangehenden Intervall → keine Lücke.
+        LocalDateTime q = floorAufQuartal(LocalDateTime.now());
+        stubCatchUpZeitreihe(
+                rohdaten(q.minusMinutes(15), "100.0", "0.0", null),
+                rohdaten(q, "110.0", "0.0", null));
+        when(messwerteRepository.findByEinheitAndZeit(eq(einheit), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.aggregiere();
+
+        verify(systemmeldungService, never()).erfasse(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void aggregiere_EinIntervallOhneDaten_ErfasstInfoMeldung() {
+        // Lücke von genau einem Intervall: Stand bei q-30 fehlt.
+        LocalDateTime q = floorAufQuartal(LocalDateTime.now());
+        stubCatchUpZeitreihe(
+                rohdaten(q.minusMinutes(30), "100.0", "0.0", null),
+                rohdaten(q, "130.0", "0.0", null));
+        when(messwerteRepository.findByEinheitAndZeit(eq(einheit), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.aggregiere();
+
+        verify(systemmeldungService).erfasse(eq(ORG_ID), eq(MeldungLevel.INFO),
+                eq(SystemmeldungService.KATEGORIE_MQTT), eq(SystemmeldungService.KEY_ZAEHLER_LUECKE),
+                contains("Wohnung 1"));
+        // Der Verbrauch geht nicht verloren – er fällt gebündelt in das Folgeintervall.
+        assertEquals(30.0, captureSavedMesswert().getTotal(), 1e-9);
+    }
+
+    @Test
+    void aggregiere_MehrereIntervalleOhneDaten_ErfasstWarnMeldung() {
+        // Lücke über drei Intervalle (q-60 → q).
+        LocalDateTime q = floorAufQuartal(LocalDateTime.now());
+        stubCatchUpZeitreihe(
+                rohdaten(q.minusMinutes(60), "100.0", "0.0", null),
+                rohdaten(q, "190.0", "0.0", null));
+        when(messwerteRepository.findByEinheitAndZeit(eq(einheit), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.aggregiere();
+
+        verify(systemmeldungService).erfasse(eq(ORG_ID), eq(MeldungLevel.WARN),
+                eq(SystemmeldungService.KATEGORIE_MQTT), eq(SystemmeldungService.KEY_ZAEHLER_AUSFALL),
+                contains("3 Intervalle"));
+        verify(systemmeldungService, never()).erfasse(any(), eq(MeldungLevel.INFO), any(), any(), any());
     }
 }

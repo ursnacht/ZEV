@@ -39,6 +39,13 @@ public class SystemmeldungService {
     /** Meldungs-/Fehler-Key: keine Bilanzdaten (Bezug) für die Verteilung vorhanden. */
     public static final String KEY_KEINE_BILANZDATEN = "BILANZMODELL_KEINE_BILANZDATEN";
 
+    /** Kategorie-Übersetzungs-Key für Meldungen der MQTT-Integration. */
+    public static final String KATEGORIE_MQTT = "SYSTEMMELDUNG_KATEGORIE_MQTT";
+    /** Meldungs-Key (INFO): genau ein Aggregationsintervall ohne Zählerdaten – wird kompensiert. */
+    public static final String KEY_ZAEHLER_LUECKE = "MQTT_ZAEHLER_LUECKE";
+    /** Meldungs-Key (WARN): Ausfall über mehrere Aggregationsintervalle – Auflösung geht verloren. */
+    public static final String KEY_ZAEHLER_AUSFALL = "MQTT_ZAEHLER_AUSFALL";
+
     /** Erlaubte, direkt sortierbare Entity-Properties (Whitelist gegen Sort-Injection). */
     private static final Set<String> SORTIERBAR = Set.of(
             "zuletztAufgetreten", "erstmalsAufgetreten", "zaehler", "kategorie", "meldungKey", "erledigt");
