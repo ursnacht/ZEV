@@ -229,3 +229,13 @@ input[type="date"].zev-input {
 .zev-filter-row .zev-form-group {
   margin-bottom: 0;
 }
+
+/* Aktions-Slot einer Filterzeile (z. B. Button rechts neben den Filtern).
+   Rechtsbündig und unten ausgerichtet, damit der Button auf Höhe der
+   Eingabefelder sitzt (die Filter tragen Labels darüber). */
+.zev-filter-row__actions {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacing-sm);
+  margin-left: auto;
+}

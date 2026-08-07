@@ -26,6 +26,12 @@
    * Beim **Wieder-Öffnen** werden `erledigt_am` und `erledigt_automatisch` zurückgesetzt.
    * Das Wieder-Öffnen wird **abgelehnt**, wenn bereits ein **offener** Eintrag mit demselben `meldung_key` im Mandanten existiert (Dedup-Invariante / UNIQUE-Teil-Index, s. FR-2) – mit verständlicher Fehlermeldung.
 6. **Löschen:** Einzelne Einträge können gelöscht werden (Kebab-Menü, `systemmeldungen:manage`).
+6a. **Alle erledigten Meldungen löschen (Aufräumen):** Ein Button **„Erledigte Meldungen löschen"** rechts in der Filterzeile löscht **alle erledigten** Meldungen des Mandanten endgültig aus der Datenbank.
+   * **Kontrollfrage vor dem Löschen** (Bestätigungsdialog): Die Aktion ist nicht umkehrbar; ohne Bestätigung passiert nichts.
+   * **Offene** Meldungen bleiben unberührt – unabhängig vom aktuell eingestellten Filter (der Filter beeinflusst nur die Anzeige, nicht den Löschumfang).
+   * Nach Ausführung: Erfolgsmeldung mit der **Anzahl** gelöschter Einträge, Liste wird neu geladen (zurück auf Seite 1).
+   * Berechtigung `systemmeldungen:manage` (Button nur dann sichtbar, Backend prüft zusätzlich).
+   * **Mandanten-Isolation:** Es werden ausschliesslich Meldungen des eigenen Mandanten gelöscht; die `org_id` stammt aus dem Security-Kontext und steht **explizit** in der Lösch-Bedingung (Hibernate-`@Filter` greift bei Bulk-`DELETE` nicht).
 7. **Nur-Lese-Zugriff:** Benutzer mit `systemmeldungen:read` (aber ohne `:manage`) sehen die Liste, Filter und Sortierung; Checkbox und Löschen sind deaktiviert/ausgeblendet.
 8. **Automatische Erzeugung (Backend):** Tritt ein unterstützter Fehler auf, wird **zusätzlich zum Log-Eintrag** eine Systemmeldung erzeugt (mit passendem **Level**; Bilanzmodell-Fehler = `ERROR`). Zu Beginn abgedeckt: **Bilanzmodell** – `BILANZMODELL_KEINE_BILANZDATEN` aus (a) dem manuellen Solarverteil-Lauf und (b) dem MQTT-Auto-Lauf.
    * **Deduplizierung:** Existiert bereits eine **offene** Meldung mit **gleichem Übersetzungs-Key (`meldung_key`)** im selben Mandanten – **unabhängig von den Parametern** –, wird **kein neuer** Eintrag erzeugt; stattdessen werden **`Zähler` um 1 erhöht**, **`zuletzt_aufgetreten` aktualisiert** und die **`parameter` auf das aktuelle Vorkommen** gesetzt. `erstmals_aufgetreten` bleibt unverändert.
@@ -62,6 +68,7 @@
 * **Menüposition:** im Hauptmenü **nach „Statistik"**.
 * **Icon:** Feather-Icon **`file-text`** (Navigation + Seitentitel).
 * **Filter** oberhalb der Tabelle (Erledigt-Status, Kategorie, Level) als Segmented-Control/Dropdown.
+* **Aktions-Button „Erledigte Meldungen löschen"** rechts in derselben Filterzeile (`.zev-filter-row__actions`), als `.zev-button--danger` mit Icon `trash-2`; nur mit `systemmeldungen:manage` sichtbar.
 * **Paginierung** unterhalb der Tabelle (Vorherige/Nächste + Seitenanzeige) – analog `datenbank-ansicht`.
 * **Erledigt** als `.zev-checkbox` in der Zeile; erledigte Zeilen dürfen optisch dezent abgesetzt werden (z.B. `.zev-text--muted`).
 * **Level** als Status-Badge (`.zev-status`, z.B. Farbstufen für ERROR/WARN/INFO).
@@ -85,6 +92,13 @@
 * [ ] Beim Wieder-Öffnen werden `erledigt_am`/`erledigt_automatisch` zurückgesetzt; existiert bereits ein offener Eintrag desselben `meldung_key`, wird das Wieder-Öffnen mit verständlicher Meldung abgelehnt.
 * [ ] Mit nur `systemmeldungen:read` ist die Liste sichtbar, Umschalten/Löschen jedoch nicht möglich (UI deaktiviert **und** Backend lehnt ab).
 * [ ] Löschen einer nicht (mehr) existierenden ID liefert **404** (kein 500).
+* [ ] Der Button „Erledigte Meldungen löschen" steht rechts in der Filterzeile und ist nur mit `systemmeldungen:manage` sichtbar.
+* [ ] Klick öffnet eine **Kontrollfrage**; bei Abbruch wird **nichts** gelöscht (kein Backend-Aufruf).
+* [ ] Nach Bestätigung sind **alle erledigten** Meldungen des Mandanten gelöscht, **alle offenen** bleiben erhalten – auch wenn der Filter gerade „Offene" oder eine Kategorie einschränkt.
+* [ ] Die Erfolgsmeldung nennt die **Anzahl** gelöschter Einträge; die Liste wird neu geladen (Seite 1).
+* [ ] Sind keine erledigten Meldungen vorhanden, meldet die Aktion **0 gelöschte Einträge** (kein Fehler).
+* [ ] **Mandanten-Isolation:** Meldungen anderer Mandanten bleiben unangetastet (`org_id` explizit in der Lösch-Bedingung, nicht über `orgFilter`).
+* [ ] Ohne `systemmeldungen:manage` lehnt das Backend den Endpunkt ab (403), auch bei direktem Aufruf.
 * [ ] Alle UI-Texte kommen aus dem `TranslationService` (DE/EN); die Meldung wird durch **Konkatenation** von `translate(meldung_key)` + `parameter` gerendert.
 * [ ] Multi-Tenancy: Ein Benutzer sieht nur Systemmeldungen des eigenen Mandanten; `org_id` wird serverseitig gesetzt.
 * [ ] Leere Liste zeigt einen Hinweis statt einer leeren Tabelle.
@@ -113,6 +127,9 @@
 | Gleicher Fehler mehrfach in kurzer Folge (15-Min-Job) | Dedup nach `meldung_key`: `Zähler`++, `zuletzt_aufgetreten`/`parameter`-Update statt Flut neuer Zeilen |
 | Fehler beim Schreiben der Systemmeldung | Wird geloggt, beeinflusst den auslösenden Lauf **nicht** (separate Transaktion, Fehler geschluckt) |
 | Erledigt markieren durch Nur-Leser | Backend lehnt ab (`systemmeldungen:manage` erforderlich) |
+| „Erledigte löschen" ohne erledigte Einträge | 0 gelöscht, Erfolgsmeldung mit Anzahl 0 (kein Fehler) |
+| „Erledigte löschen" bei aktivem Filter (z.B. „Offene"/Kategorie) | Der Filter beeinflusst **nur die Anzeige**: gelöscht werden **alle** erledigten Meldungen des Mandanten |
+| Abbruch der Kontrollfrage | Kein Backend-Aufruf, keine Änderung |
 | Erledigter Eintrag, Fehler tritt erneut auf | Neuer **offener** Eintrag; erledigter bleibt bestehen |
 | Auslösender Lauf wird wieder erfolgreich | **Auto-Resolve:** offene Einträge desselben Keys/Mandanten → erledigt (`erledigt_automatisch = true`) |
 | Fehler beim Auto-Resolve | Geloggt, **nicht** propagiert – der erfolgreiche Verteillauf bleibt unberührt |

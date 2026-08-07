@@ -81,6 +81,17 @@ public class SystemmeldungController {
         }
     }
 
+    /**
+     * Löscht alle erledigten Meldungen des Mandanten. Liegt vor {@code /{id}}, damit der
+     * literale Pfad nicht als ID interpretiert wird. Antwort: Anzahl gelöschter Einträge.
+     */
+    @DeleteMapping("/erledigt")
+    @PreAuthorize("hasAuthority('systemmeldungen:manage')")
+    public Map<String, Object> deleteErledigte() {
+        int anzahl = systemmeldungService.loescheAlleErledigten();
+        return Map.of("anzahl", anzahl);
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('systemmeldungen:manage')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {

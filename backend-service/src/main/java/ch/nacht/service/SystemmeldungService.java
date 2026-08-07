@@ -52,11 +52,14 @@ public class SystemmeldungService {
 
     private final SystemmeldungRepository systemmeldungRepository;
     private final HibernateFilterService hibernateFilterService;
+    private final OrganizationContextService organizationContextService;
 
     public SystemmeldungService(SystemmeldungRepository systemmeldungRepository,
-                                HibernateFilterService hibernateFilterService) {
+                                HibernateFilterService hibernateFilterService,
+                                OrganizationContextService organizationContextService) {
         this.systemmeldungRepository = systemmeldungRepository;
         this.hibernateFilterService = hibernateFilterService;
+        this.organizationContextService = organizationContextService;
     }
 
     /**
@@ -127,6 +130,23 @@ public class SystemmeldungService {
         }
         log.warn("Systemmeldung {} nicht gefunden (delete)", id);
         return false;
+    }
+
+    /**
+     * Löscht <b>alle erledigten</b> Meldungen des aktuellen Mandanten (benutzerausgelöstes
+     * Aufräumen) und gibt die Anzahl gelöschter Einträge zurück. Offene Meldungen bleiben
+     * unberührt.
+     *
+     * <p>Die Mandanten-Isolation erfolgt über die <b>explizite</b> {@code org_id} aus dem
+     * Security-Kontext, nicht über {@code orgFilter}: Hibernate-Filter greifen bei
+     * Bulk-{@code DELETE}-JPQL nicht.
+     */
+    @Transactional
+    public int loescheAlleErledigten() {
+        Long orgId = organizationContextService.getCurrentOrgId();
+        int anzahl = systemmeldungRepository.deleteErledigtByOrgId(orgId);
+        log.info("{} erledigte Systemmeldung(en) gelöscht (org={})", anzahl, orgId);
+        return anzahl;
     }
 
     // --- Business-Logic: Erfassung / Auto-Resolve / Retention (org-explizit) ---

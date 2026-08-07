@@ -56,4 +56,9 @@ export class SystemmeldungService {
   deleteSystemmeldung(id: number): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
   }
+
+  /** Löscht alle erledigten Meldungen des Mandanten; liefert die Anzahl gelöschter Einträge. */
+  deleteErledigte(): Observable<{ anzahl: number }> {
+    return this.http.delete<{ anzahl: number }>(`${this.apiUrl}/erledigt`);
+  }
 }

@@ -39,6 +39,14 @@
         }
       </select>
     </div>
+    @if (canManage) {
+      <div class="zev-filter-row__actions">
+        <button type="button" class="zev-button zev-button--danger" (click)="onDeleteErledigte()">
+          <app-icon name="trash-2"></app-icon>
+          {{ 'SYSTEMMELDUNGEN_ERLEDIGTE_LOESCHEN' | translate }}
+        </button>
+      </div>
+    }
   </div>
 
   @if (meldungen.length > 0) {

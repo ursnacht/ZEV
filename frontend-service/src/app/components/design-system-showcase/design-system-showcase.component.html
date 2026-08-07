@@ -506,6 +506,28 @@
   </div>
 
   <div class="subsection">
+    <h3>Filterzeile mit Aktions-Slot</h3>
+    <div class="zev-filter-row">
+      <div class="zev-form-group">
+        <label for="fr-status">Status</label>
+        <select id="fr-status" class="zev-select">
+          <option>Offene</option>
+          <option>Erledigte</option>
+        </select>
+      </div>
+      <div class="zev-form-group">
+        <label for="fr-kategorie">Kategorie</label>
+        <select id="fr-kategorie" class="zev-select">
+          <option>Alle</option>
+        </select>
+      </div>
+      <div class="zev-filter-row__actions">
+        <button class="zev-button zev-button--danger">Erledigte löschen</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="subsection">
     <h3>CSS Klassen</h3>
     <ul class="zev-list">
       <li><code>.zev-form-container</code> - Grauer Hintergrund-Container</li>
@@ -514,6 +536,8 @@
       <li><code>.zev-form-row</code> - Felder nebeneinander</li>
       <li><code>.zev-form-section</code> - Abschnitt mit Trennlinie oben</li>
       <li><code>.zev-form-section__title</code> - Abschnittstitel</li>
+      <li><code>.zev-filter-row</code> - Filterzeile (Selects nebeneinander)</li>
+      <li><code>.zev-filter-row__actions</code> - Aktions-Slot rechts in der Filterzeile (unten ausgerichtet)</li>
       <li><code>.zev-form-actions</code> - Button-Zeile am Ende</li>
       <li><code>.zev-form-actions--equal</code> - Buttons gleich breit</li>
       <li><code>.zev-form-hint</code> - Hinweistext unter Input</li>

@@ -6,6 +6,7 @@ import { WithMessage } from '../../utils/with-message';
 import { SystemmeldungService, SystemmeldungQuery } from '../../services/systemmeldung.service';
 import { ErledigtFilter, MeldungLevel, Systemmeldung } from '../../models/systemmeldung.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { TranslationService } from '../../services/translation.service';
 import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.component';
 import { IconComponent } from '../icon/icon.component';
 
@@ -47,7 +48,8 @@ export class SystemmeldungenComponent extends WithMessage implements OnInit {
     { label: 'LOESCHEN', action: 'delete', danger: true, icon: 'trash-2' }
   ];
 
-  constructor(private systemmeldungService: SystemmeldungService) { super(); }
+  constructor(private systemmeldungService: SystemmeldungService,
+              private translationService: TranslationService) { super(); }
 
   ngOnInit(): void {
     this.loadKategorien();
@@ -131,6 +133,27 @@ export class SystemmeldungenComponent extends WithMessage implements OnInit {
     if (action === 'delete') {
       this.onDelete(meldung.id);
     }
+  }
+
+  /**
+   * Löscht nach Rückfrage alle erledigten Meldungen des Mandanten. Offene Meldungen bleiben
+   * bestehen; die Aktion ist nicht umkehrbar, daher die Bestätigung.
+   */
+  onDeleteErledigte(): void {
+    if (!confirm(this.translationService.translate('SYSTEMMELDUNGEN_ERLEDIGTE_LOESCHEN_BESTAETIGUNG'))) {
+      return;
+    }
+    this.systemmeldungService.deleteErledigte().subscribe({
+      next: (result) => {
+        this.showMessage(
+          `${result.anzahl} ${this.translationService.translate('SYSTEMMELDUNGEN_ERLEDIGTE_GELOESCHT')}`,
+          'success'
+        );
+        this.page = 0;
+        this.load();
+      },
+      error: () => this.showMessage('SYSTEMMELDUNGEN_FEHLER', 'error')
+    });
   }
 
   onVorherigeSeite(): void {

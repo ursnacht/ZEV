@@ -80,6 +80,17 @@ public interface SystemmeldungRepository extends JpaRepository<Systemmeldung, Lo
                     @Param("meldungKey") String meldungKey,
                     @Param("jetzt") LocalDateTime jetzt);
 
+    /**
+     * Löscht alle erledigten Meldungen <b>eines Mandanten</b> (benutzerausgelöste Aufräumaktion).
+     *
+     * <p>{@code org_id} steht bewusst <b>explizit</b> in der Bedingung: Hibernate-{@code @Filter}
+     * greift bei Bulk-{@code DELETE}-JPQL <b>nicht</b>, ein Verlass auf {@code orgFilter} würde
+     * hier mandantenübergreifend löschen.
+     */
+    @Modifying
+    @Query("DELETE FROM Systemmeldung s WHERE s.erledigt = true AND s.orgId = :orgId")
+    int deleteErledigtByOrgId(@Param("orgId") Long orgId);
+
     // --- Retention (mandantenübergreifend) ---
 
     @Modifying

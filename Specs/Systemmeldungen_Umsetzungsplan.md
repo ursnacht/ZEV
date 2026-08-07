@@ -49,6 +49,7 @@ Eine mandantenfähige, benutzer­sichtbare **Systemmeldungen**-Seite, die Betrie
 | [x] | 11. Routing | Route `/systemmeldungen` mit `AuthGuard`, `data.permissions: ['systemmeldungen:read']` |
 | [x] | 12. Navigation | Menü-Eintrag **nach „Statistik"**, Icon `file-text` |
 | [x] | 13. Übersetzungen | `V87` – Menü/Titel, Spalten, Filter-Labels, Level-/Kategorie-Labels, Pagination, Aktionen (DE/EN) |
+| [x] | 14. Nachtrag (Vibe): „Erledigte Meldungen löschen" | Button rechts in der Filterzeile (nur `systemmeldungen:manage`) mit Kontrollfrage. **Backend:** `SystemmeldungRepository.deleteErledigtByOrgId(orgId)` (Bulk-`DELETE` mit **expliziter** `org_id` – `@Filter` greift dort nicht), `SystemmeldungService.loescheAlleErledigten()` (org aus `OrganizationContextService`, neuer Konstruktor-Parameter), `DELETE /api/systemmeldungen/erledigt` → `{anzahl}` (vor `/{id}` deklariert, damit der literale Pfad nicht als ID gelesen wird). **Frontend:** `deleteErledigte()` im Service, `onDeleteErledigte()` mit `confirm(...)` + Erfolgsmeldung inkl. Anzahl + Reload auf Seite 1. **Design-System:** neuer Aktions-Slot `.zev-filter-row__actions` in `form.css` (rechtsbündig, unten ausgerichtet) + Showcase-Beispiel. Übersetzungen `V94` (DE/EN). |
 
 > **Reihenfolge-Hinweis:** Backend (1–7) vor Frontend (9–12). Phase 8 (Keycloak) wird vom User ausgeführt (Realm-Reimport/Umgebung).
 
