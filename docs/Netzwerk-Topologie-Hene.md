@@ -7,7 +7,7 @@ flowchart TB
         W2["Stromzähler Wago 2"]
         W3["Stromzähler Wago 3"]
         HUB["Modbus-TCP-Hub<br/>(RTU → TCP Gateway)"]
-        BKW["Stromzähler BKW<br/>(gPlug)"]
+        BKW["Stromzähler BKW<br/>(WhatWatt Go)"]
         ROUTER{{"Router"}}
         RPI["Raspberry Pi<br/>VPN-Client<br/>Reader + MQTT-Publisher"]
     end
@@ -18,7 +18,7 @@ flowchart TB
     W2 -- "Modbus (RTU)" --> HUB
     W3 -- "Modbus (RTU)" --> HUB
     HUB -- "Modbus TCP" --> ROUTER
-    BKW -- "gPlug" --> ROUTER
+    BKW -- "WhatWatt" --> ROUTER
     ROUTER --- RPI
 
     RPI -. "liest aus" .-> W1
@@ -33,9 +33,9 @@ flowchart TB
 > **Zähler-Anbindung:** Die drei **Wago**-Zähler sind per **seriellem Modbus (RTU)** an einen
 > **Modbus-TCP-Hub** (RTU→TCP-Gateway) angeschlossen, der am Router hängt; der Pi liest sie per
 > **Modbus TCP** über den Hub (gemeinsame Hub-IP, je Zähler eine Unit-/Slave-ID). Der **BKW**-Zähler
-> ist separat über **gPlug** am Router.
+> ist separat über **WhatWatt** am Router und kann ebenfalls per **Modbus TCP** ausgelesen werden.
 >
-> **Datenfluss (Ziel, MQTT):** Der Pi liest die Zähler (Modbus TCP über den Hub / gPlug) und
+> **Datenfluss (Ziel, MQTT):** Der Pi liest die Zähler (Modbus TCP über den Hub / WhatWatt) und
 > **publiziert die absoluten Zählerstände** über den VPN-Tunnel an den
 > Mosquitto-**Broker auf dem NAS** (Variante B). Das ZEV-Backend abonniert sie und
 > **bildet die Deltas/15-Min-Werte** selbst — verlusttolerant (siehe
@@ -244,7 +244,7 @@ Getrennte User anlegen: einen für den **Pi (Publisher)** und einen für die
 - **ACLs**: Mit einer `acl_file` festlegen, dass der Pi nur in
   `zev/messwerte/#` publizieren und ZEV nur dort lesen darf.
 - **Firewall**: Port 1883/8883 nur über den VPN-Pfad zugänglich machen, nicht
-  ins offene Internet.
+  im offenen LAN und nicht aus dem Internet erreichbar.
 
 ### Einordnung in die ZEV-Architektur
 
@@ -435,4 +435,151 @@ dass keine Messwerte verloren gehen, während NAS oder VPN weg sind.
 Analog zur NAS-Anleitung mit `eclipse-mosquitto:2`; Volumes dann z. B. unter
 `/home/pi/mosquitto/{config,data,log}`. Sonst ist die native apt-Installation
 für den schlanken Pi vorzuziehen.
+
+## Zugriff & Diagnose
+
+Praxis-Notizen für den Zugriff auf die Anlage und die Fehlersuche an den Zählern.
+Unabhängig vom Broker-Setup oben.
+
+### Geräte-Inventar (Stand: August 2026)
+
+| Gerät | Adresse | Bemerkung |
+|-------|---------|-----------|
+| Raspberry Pi `rpi4sa` | `192.168.10.189` (eth0), `192.168.10.190` (wlan0), VPN `10.8.0.14` | **Beide** Interfaces liegen im selben Subnetz – bei Scans/Bindings beachten |
+| Router | `192.168.10.1` | `model=P5`, WebUI auf Port 80; dort die **DHCP-Lease-Liste** (zuverlässigste Geräteliste) |
+| Modbus-TCP-Hub | `192.168.10.10:502` | Gemeinsame IP für die drei Wago, je Zähler eine `unit_id` (1/2/3) |
+| WhatWatt Go (BKW-Zähler) | *noch nicht identifiziert* | Modbus TCP auf 502 + REST auf 80 erwartet (s. u.) |
+| `espressif.lan` | `192.168.10.220` | ESP32-Gerät, Modbus-TCP auf 502, **kein** Port 80, **kein** mDNS → vermutlich **nicht** das WhatWatt |
+
+### Werkzeuge installieren
+
+```bash
+sudo apt update && sudo apt install -y avahi-utils arp-scan nmap
+# mbpoll für Modbus (falls nicht vorhanden)
+sudo apt install -y mbpoll
+```
+
+### Zugriff auf die Anlage
+
+```bash
+ssh nafam@10.8.0.14                       # Pi über den VPN-Tunnel
+```
+
+**WebUIs im Zählernetz von der Workstation aus erreichen** – per SOCKS-Proxy über den
+Pi (dynamische Weiterleitung). Gegenüber `-L`-Portweiterleitung robuster, weil
+Router-Oberflächen oft absolute URLs/Redirects auf ihre echte IP verwenden:
+
+```bash
+ssh -N -D 1080 nafam@10.8.0.14
+```
+
+- **Firefox**: Einstellungen → Netzwerk-Einstellungen → Manuelle Konfiguration →
+  SOCKS-Host `localhost`, Port `1080`, **SOCKS v5**, „DNS über SOCKS v5" aktivieren.
+- Aufruf dann mit der **echten** Adresse: `http://192.168.10.1/`
+
+Einzelner Port statt Proxy (Alternative):
+
+```bash
+ssh -N -L 8080:192.168.10.1:80 nafam@10.8.0.14      # dann http://localhost:8080
+```
+
+### Netzwerk-Scan
+
+```bash
+sudo arp-scan -I eth0  192.168.10.0/24     # beide Interfaces getrennt scannen,
+sudo arp-scan -I wlan0 192.168.10.0/24     # da eth0/wlan0 im selben Subnetz liegen
+avahi-browse -art                          # mDNS-Dienste (nur .local-Geräte!)
+```
+
+> **`.lan` ≠ `.local`:** `avahi-resolve -a 192.168.10.220` liefert `espressif.lan` –
+> die Endung `.lan` ist die **DHCP-Domain des Routers**, nicht mDNS. Geräte ohne
+> mDNS-Ankündigung erscheinen deshalb **nicht** in `avahi-browse`, sind aber per
+> Router-DNS auflösbar. Verlässlichste Geräteliste bleibt die DHCP-Lease-Liste im Router.
+
+> **Vorsicht mit `nmap -p-`:** Geräte mit knappem Socket-Budget (ESP32) können durch
+> einen vollen Portscan überlastet werden und melden Ports dann **fälschlich als
+> geschlossen**. Bei Verdacht: einige Minuten warten, dann einen einzelnen, gezielten
+> Zugriff (`curl`/`mbpoll`) absetzen.
+
+### Modbus-Diagnose mit `mbpoll`
+
+```bash
+HUB=192.168.10.10
+mbpoll -a 1 -t 4:float -r 0x600C -c 1 -1 $HUB -p 502    # Wago 1, Bezug (OBIS 1.8.0)
+mbpoll -a 2 -t 4:float -r 0x600C -c 1 -1 $HUB -p 502    # Wago 2
+mbpoll -a 3 -t 4:float -r 0x600C -c 1 -1 $HUB -p 502    # Wago 3
+mbpoll -t 4:hex -r 0x4000 -c 2 -1 $HUB -p 502 -a 1 -0   # Seriennummer auslesen
+```
+
+**Fallen, die uns Zeit gekostet haben:**
+
+| Thema | Merksatz |
+|-------|----------|
+| **Function Code** | In `mbpoll` ist `-t 3` = **FC04 Input Register**, `-t 4` = **FC03 Holding Register** – die Zahlen sind *nicht* der Function Code! |
+| **Adress-Offset** | Ohne `-0` zählt `mbpoll` ab 1, mit `-0` ab 0 (PDU). Datenblätter nennen meist die PDU-Adresse → im Zweifel beide probieren. |
+| **`Illegal data address`** | Das Gerät **antwortet** – nur die Adresse (oder der Bereich `-c`) ist falsch. Bei `:float` liest `-c 12` bereits **24** Register! |
+| **`Connection timed out`** | Meist **kein** Adressproblem: viele embedded Server erlauben nur **eine** TCP-Verbindung und brauchen Pausen. Keine Schleifen, 30–60 s warten, `-o 5` für längeren Timeout, `ss -tn \| grep <ip>` auf hängende Verbindungen prüfen. |
+| **`exception_code=11`** | „Gateway target device failed to respond" – kommt vom **Hub**, nicht vom Zähler: der Hub erreicht den Slave auf der **RTU-Strecke** nicht (Verkabelung, Terminierung, Baudrate/Parität, Adresse, Timeout). Kein Netzwerkproblem – ein IP-Scan hilft hier nicht. |
+
+**Offener Punkt:** Der Zähler an `unit_id=2` liefert wiederkehrend `exception_code=11`.
+Häufigkeit und Verteilung auswerten:
+
+```bash
+journalctl -u pi-gateway --since "24 hours ago" | grep -o "dev_id=[0-9]*" | sort | uniq -c
+```
+
+Trifft es **immer** `dev_id=2`, deutet das auf Verkabelung/Adresse dieses Geräts;
+trifft es sporadisch alle, eher auf Bus-Timing bzw. einen zu knappen Response-Timeout.
+
+*Auswirkung auf die Daten:* Einzelne fehlgeschlagene Reads sind **folgenlos** – der Pi
+publiziert **absolute** Zählerstände, das Delta über die Intervallgrenze bleibt identisch.
+Erst wenn ein **ganzes 15-Min-Intervall** ohne Daten bleibt, geht die zeitliche Auflösung
+verloren (Verbrauch fällt gebündelt ins Folgeintervall). Das Backend meldet das als
+Systemmeldung: **INFO** bei einem Intervall, **WARN** bei mehreren
+(s. `Specs/MQTT-Integration.md`, FR-8.3).
+
+### WhatWatt Go (BKW-Zähler)
+
+Doku: https://documentation.whatwatt.ch/ · Modbus: https://documentation.whatwatt.ch/35-modbus/
+
+**REST-API** (Port 80) – der schnellste Weg zur Diagnose:
+
+```bash
+curl -sS -m 10 http://<ip>/api/v1/system    # Firmware-Version + Zähler-Verbindungsstatus
+curl -sS -m 10 http://<ip>/api/v1/report    # Live-Messwerte als JSON
+```
+
+Modbus-Dienst aktivieren/konfigurieren:
+
+```bash
+curl -X PUT -H 'Content-Type: application/json' \
+  -d '{"services":{"modbus":{"enable":true}}}' \
+  http://<ip>/api/v1/settings
+```
+
+**Modbus-Registerkarte** (0-basiert, read-only):
+
+| Größe | OBIS | Register | Typ | Anzahl | Scaler | Einheit |
+|-------|------|----------|-----|--------|--------|---------|
+| Bezug | 1.8.0 | **549** | float | 2 | 3 | Wh |
+| Einspeisung | 2.8.0 | **553** | float | 2 | 3 | Wh |
+
+```bash
+mbpoll -a 1 -0 -t 3:float -r 549 -c 1 -o 5 -1 <ip> -p 502    # Bezug (FC04!)
+mbpoll -a 1 -0 -t 3:float -r 553 -c 1 -o 5 -1 <ip> -p 502    # Einspeisung
+```
+
+- Registerkarte über **FC04 (Input Register, `-t 3`)** ab FW 1.2.20; **FC03 erst ab FW 2.0.2**.
+- Die Slave-Adresse ist laut Doku bedeutungslos (Gerät antwortet auf jede).
+- Das Layout enthält **Padding-Register, die immer 0 liefern** – Nullwerte können also
+  einfach die falsche Adresse bedeuten.
+- Liefern die *richtigen* Register 0, liest das Gerät nichts vom Zähler: In der Schweiz ist
+  die **Kundenschnittstelle am VNB-Zähler oft gesperrt** und muss beim Netzbetreiber
+  freigeschaltet werden (teils mit Schlüssel/PIN, der im Gerät zu hinterlegen ist).
+  `/api/v1/system` zeigt den Verbindungsstatus.
+
+> **Integrations-Hinweis:** Unser `pi-gateway/gateway/readers/modbus_reader.py` nutzt
+> `read_holding_registers` (**FC03**). Ein reiner Config-Eintrag genügt für das WhatWatt
+> also nur ab **FW ≥ 2.0.2**; andernfalls braucht der Reader ein Config-Feld
+> (z. B. `funktion: input|holding`), das auf `read_input_registers` umschaltet.
 
