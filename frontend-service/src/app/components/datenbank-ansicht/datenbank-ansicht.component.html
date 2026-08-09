@@ -39,21 +39,49 @@
     </div>
   </div>
 
+  <!-- Blätter-Bedienelemente; einmal definiert, oben und unter der Tabelle eingebunden.
+       `compact` steuert die Button-Grösse: oben aus (gleiche Höhe wie „Anzeigen"), unten an. -->
+  <ng-template #paginierung let-compact="compact">
+    <button type="button" class="zev-button zev-button--secondary"
+      [class.zev-button--compact]="compact"
+      [disabled]="page === 0 || loading" (click)="onVorherigeSeite()">
+      <app-icon name="chevron-left"></app-icon>
+      {{ 'DATENBANK_VORHERIGE' | translate }}
+    </button>
+    <span class="zev-text--muted">{{ 'DATENBANK_SEITE' | translate }} {{ page + 1 }}</span>
+    <button type="button" class="zev-button zev-button--secondary"
+      [class.zev-button--compact]="compact"
+      [disabled]="!result?.hatMehr || loading" (click)="onNaechsteSeite()">
+      {{ 'DATENBANK_NAECHSTE' | translate }}
+      <app-icon name="chevron-right"></app-icon>
+    </button>
+  </ng-template>
+
   <div class="zev-form-actions">
     <button type="button" class="zev-button zev-button--primary"
       [disabled]="!selectedTabelle || loading" (click)="onAnzeigen()">
       <app-icon name="search"></app-icon>
       {{ 'DATENBANK_ANZEIGEN' | translate }}
     </button>
+    <!-- Blättern auch oben, damit bei langen Tabellen nicht gescrollt werden muss.
+         Bewusst OHNE !loading: bliebe der Block beim Blättern nicht stehen, würde der
+         gerade geklickte Button unter dem Cursor verschwinden. -->
+    @if (result && result.zeilen.length > 0) {
+      <div class="zev-pagination zev-pagination--inline">
+        <ng-container *ngTemplateOutlet="paginierung; context: { compact: false }"></ng-container>
+      </div>
+    }
   </div>
 
-  @if (loading) {
+  <!-- Nur bei der ersten Abfrage; danach bleibt die Tabelle stehen und wird gedimmt
+       (sonst kollabiert die Seitenhöhe bei jedem Blättern -> starkes Flackern). -->
+  @if (loading && !result) {
     <p>{{ 'LADEN' | translate }}...</p>
   }
 
-  @if (result && !loading) {
+  @if (result) {
     @if (result.zeilen.length > 0) {
-      <div class="zev-datenbank-scroll">
+      <div class="zev-datenbank-scroll" [class.zev-busy]="loading">
         <table class="zev-table">
           <thead>
             <tr>
@@ -80,18 +108,8 @@
         </table>
       </div>
 
-      <div class="zev-datenbank-pagination">
-        <button type="button" class="zev-button zev-button--secondary zev-button--compact"
-          [disabled]="page === 0" (click)="onVorherigeSeite()">
-          <app-icon name="chevron-left"></app-icon>
-          {{ 'DATENBANK_VORHERIGE' | translate }}
-        </button>
-        <span class="zev-text--muted">{{ 'DATENBANK_SEITE' | translate }} {{ page + 1 }}</span>
-        <button type="button" class="zev-button zev-button--secondary zev-button--compact"
-          [disabled]="!result.hatMehr" (click)="onNaechsteSeite()">
-          {{ 'DATENBANK_NAECHSTE' | translate }}
-          <app-icon name="chevron-right"></app-icon>
-        </button>
+      <div class="zev-pagination zev-pagination--start">
+        <ng-container *ngTemplateOutlet="paginierung; context: { compact: true }"></ng-container>
       </div>
     } @else {
       <p class="zev-text--muted">{{ 'DATENBANK_KEINE_DATEN' | translate }}</p>

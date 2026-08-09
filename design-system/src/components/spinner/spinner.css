@@ -39,3 +39,15 @@
   color: var(--color-gray-500, #6b7280);
   font-size: var(--font-size-sm, 0.875rem);
 }
+
+/**
+ * Inhaltsbereich während einer laufenden Aktualisierung (z. B. Blättern in einer
+ * Tabelle): Der Inhalt bleibt stehen und wird nur gedimmt/gesperrt. Wichtig gegen
+ * Layout-Sprünge – würde der Bereich stattdessen ausgeblendet, kollabiert die
+ * Seitenhöhe bei jeder Aktualisierung sichtbar ("Flackern").
+ */
+.zev-busy {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity var(--transition-fast);
+}

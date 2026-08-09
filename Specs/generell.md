@@ -46,10 +46,11 @@ Die folgende Tabelle ist ein **Überblick, nicht vollständig**. Massgeblich (Qu
 | Inputs | `.zev-input`, `.zev-select`, `.zev-form-error`, `.zev-form-hint` |
 | Buttons | `.zev-button`, `.zev-button--primary`, `.zev-button--secondary`, `.zev-button--danger`, `.zev-button--compact` |
 | Tabellen | `.zev-table`, `.zev-table__header--sortable`, `.zev-table__sort-indicator`, `.zev-table--compact`, `.zev-table--auto` (Inhaltsbreite), `.zev-table__number` (rechtsbündig) |
+| Paginierung | `.zev-pagination` (zentriert), `.zev-pagination--start` (linksbündig), `.zev-pagination--inline` (in einer Aktionszeile, ohne Abstand oben) |
 | Messages | `.zev-message`, `.zev-message--success`, `.zev-message--error`, `.zev-message--dismissible` |
 | Navigation | `.zev-navbar`, `.zev-navbar__link`, `.zev-navbar__link--active`, `.zev-hamburger` |
 | Kebab-Menü | `.zev-kebab-container`, `.zev-kebab-button`, `.zev-kebab-menu`, `.zev-kebab-menu__item`, `.zev-kebab-menu__item--danger` |
-| Spinner | `.zev-spinner` |
+| Spinner / Ladezustand | `.zev-spinner`, `.zev-busy` (Inhalt bleibt stehen, gedimmt + gesperrt – verhindert Layout-Sprünge beim Aktualisieren) |
 | Status | `.zev-status` |
 | Drop-Zone | `.zev-drop-zone` |
 | Collapsible | `.zev-collapsible` |

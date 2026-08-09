@@ -111,3 +111,15 @@
   gap: var(--spacing-md);
   margin-top: var(--spacing-md);
 }
+
+/* Paginierung inline in einer Aktionszeile (direkt neben einem Button) statt als
+   eigene Zeile unter der Tabelle – erspart bei langen Tabellen das Scrollen zum
+   Blättern. Kein eigener Abstand nach oben; die Ausrichtung übernimmt die Zeile. */
+.zev-pagination--inline {
+  margin-top: 0;
+}
+
+/* Linksbündige Paginierung (statt der zentrierten Standard-Variante). */
+.zev-pagination--start {
+  justify-content: flex-start;
+}

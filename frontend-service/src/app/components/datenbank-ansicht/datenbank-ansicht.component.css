@@ -1,11 +1,5 @@
-/* Breite/generische Ergebnistabelle horizontal scrollbar halten */
+/* Breite/generische Ergebnistabelle horizontal scrollbar halten.
+   Die Paginierung kommt aus dem Design System (.zev-pagination). */
 .zev-datenbank-scroll {
   overflow-x: auto;
-}
-
-.zev-datenbank-pagination {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 1rem;
 }

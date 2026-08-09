@@ -50,6 +50,14 @@ Neuer Controller unter `/api/datenbank`, klassenweit `@PreAuthorize("hasAuthorit
 * Der Bereich wird in `/einstellungen` als eigener Abschnitt/Panel eingefügt (Design-System-`panel`/`card`), sichtbar nur bei `datenbank:read`.
 * Elemente: **Tabellen-Dropdown**, **WHERE-Textfeld** (Platzhalter mit Beispiel; **Enter** löst „Anzeigen" aus; **Löschen-Button ×** am rechten Feldrand leert das Feld, sichtbar nur bei nicht-leerem Inhalt), **„Anzeigen"-Button**, **Ergebnis-Tabelle** (Design-System-`table`) mit **klickbaren, sortierbaren Spaltenüberschriften** inkl. Richtungs-Indikator (▲/▼), **Pagination**, **Message-Bereich** (Design-System-`message`) für Fehler/Hinweise.
 * Der Löschen-Button nutzt das wiederverwendbare Design-System-Muster **`zev-input-wrapper` + `zev-input-clear`** (kein komponenteneigenes CSS).
+* **Paginierung doppelt – oben und unten (Nachtrag):** Die Blätter-Bedienelemente (Vorherige / Seitenanzeige / Nächste) erscheinen **zusätzlich oben** in der Aktionszeile, **direkt neben** dem „Anzeigen"-Button. So kann bei langen Ergebnistabellen geblättert werden, **ohne ans Seitenende scrollen** zu müssen. Die untere Paginierung bleibt bestehen.
+  * Beide Stellen zeigen **denselben Zustand** (Seitennummer, Aktiv-/Inaktiv-Zustand der Buttons) und lösen dieselben Aktionen aus; im Markup sind sie **einmal** definiert und werden zweimal eingebunden (keine Duplikation).
+  * Die obere Paginierung erscheint **nur**, wenn ein Ergebnis mit mindestens einer Zeile vorliegt und keine Abfrage läuft.
+  * **Beide** Paginierungen sind **linksbündig**. Darstellung über das Design-System: `.zev-pagination.zev-pagination--start` (unten) bzw. `.zev-pagination.zev-pagination--inline` (oben, ohne eigenen Abstand nach oben) – **kein** komponenteneigenes CSS.
+  * Die Blätter-Buttons haben oben die **normale** Button-Höhe (wie „Anzeigen"), unten die kompakte.
+* **Kein Flackern beim Blättern (Nachtrag):** Während einer laufenden Abfrage bleibt die bisherige Ergebnistabelle **stehen** und wird lediglich **gedimmt/gesperrt** (`.zev-busy`), statt ausgeblendet zu werden. Andernfalls kollabiert die Seitenhöhe bei jedem Seitenwechsel auf eine einzeilige „Laden…"-Meldung und wächst danach wieder – ein deutlich sichtbarer Layout-Sprung, bei dem zudem der gerade geklickte Blätter-Button unter dem Cursor verschwindet.
+  * Der eigenständige „Laden…"-Hinweis erscheint nur bei der **ersten** Abfrage (solange noch kein Ergebnis vorliegt).
+  * Die Blätter-Buttons sind während des Ladens **deaktiviert** (keine Doppelklicks/überholenden Abfragen).
 * Alle Texte via `TranslationService`/`TranslatePipe` (keine Hardcodings).
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
@@ -74,6 +82,13 @@ Neuer Controller unter `/api/datenbank`, klassenweit `@PreAuthorize("hasAuthorit
 * [ ] Der vorbefüllte Filter kann geändert/gelöscht werden; ohne `org_id`-Filter werden weiterhin Zeilen aller Mandanten angezeigt.
 * [ ] `GET /api/datenbank/standard-filter` mit einem nicht in der Whitelist enthaltenen Tabellennamen → `400`, kein SQL; Zugriff ohne `datenbank:read` → `403`.
 * [ ] Bei nicht-leerem Filter-Feld ist ein Löschen-Button (×) sichtbar; Klick leert das Feld; bei leerem Feld ist der Button ausgeblendet.
+* [ ] Liegt ein Ergebnis mit mindestens einer Zeile vor, sind die Blätter-Bedienelemente **zweimal** sichtbar: oben direkt neben „Anzeigen" und unterhalb der Tabelle; beide **linksbündig**.
+* [ ] Blättern über die **obere** Paginierung wirkt identisch zur unteren (gleiche Seite, gleicher Inhalt); die Seitenanzeige stimmt an beiden Stellen überein.
+* [ ] Auf Seite 1 ist „Vorherige" an **beiden** Stellen deaktiviert; ohne weitere Seiten (`hatMehr = false`) ist „Nächste" an beiden Stellen deaktiviert.
+* [ ] Solange kein Ergebnis vorliegt oder das Ergebnis leer ist, wird die **obere** Paginierung **nicht** angezeigt.
+* [ ] Die Blätter-Buttons haben oben dieselbe Höhe wie der „Anzeigen"-Button.
+* [ ] **Beim Blättern springt das Layout nicht:** Die bisherige Tabelle bleibt sichtbar (gedimmt) und wird erst beim Eintreffen der neuen Seite ersetzt; die Paginierung bleibt an beiden Stellen sichtbar.
+* [ ] Während des Ladens sind „Vorherige"/„Nächste" deaktiviert; der eigenständige „Laden…"-Hinweis erscheint nur, solange **noch kein** Ergebnis vorliegt.
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
