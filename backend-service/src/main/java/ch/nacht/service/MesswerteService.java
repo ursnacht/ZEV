@@ -428,9 +428,15 @@ public class MesswerteService {
      * abgeleitet – {@code S = max(0, ConsumerTotal − Bezug)} – und mit demselben Algorithmus wie
      * heute auf die Consumer verteilt. Iteriert <b>producer-unabhängig</b> (kein Skip bei fehlenden
      * Producern). Producer-{@code zev} ist nur statistisch: {@code |Produktion| − |Rücklieferung|},
-     * proportional (MQTT-Guard). Fehlt die {@code BEZUG}-Einheit oder deren Messwert in einem
-     * Intervall mit Consumern, bricht der Lauf mit {@code IllegalStateException} ab (Rollback über
-     * {@code @Transactional}); die fehlende {@code RUECKLIEFERUNG}-Einheit ist kein Abbruchgrund.
+     * proportional (MQTT-Guard).
+     *
+     * <p><b>Fehlende Bilanzdaten:</b> Fehlt der {@code BEZUG}-Messwert in einem einzelnen Intervall,
+     * wird <b>nur dieses Intervall übersprungen</b> und der Lauf fortgesetzt (FR-2.5); die Lücken
+     * werden am Ende als <b>eine</b> WARN-Systemmeldung mit Anzahl und Zeitraum gemeldet und in
+     * {@code CalculationResult.uebersprungeneIntervalle} zurückgegeben. Fehlt die
+     * {@code BEZUG}-<b>Einheit</b> ganz (Konfigurationsfehler – es liesse sich kein einziges
+     * Intervall verteilen), bricht der Lauf weiterhin mit {@code IllegalStateException} ab.
+     * Die fehlende {@code RUECKLIEFERUNG}-Einheit ist kein Abbruchgrund.
      */
     private CalculationResult distributeBilanz(List<LocalDateTime> distinctZeiten,
             LocalDateTime dateFrom, LocalDateTime dateTo, String algorithm, Long progressOrgId,
@@ -451,6 +457,10 @@ public class MesswerteService {
         int processedRecords = 0;
         BigDecimal totalSolarProduced = BigDecimal.ZERO; // hier: Summe der verteilten Menge S
         BigDecimal totalDistributed = BigDecimal.ZERO;
+        // Intervalle ohne Bilanzdaten werden übersprungen (FR-2.5), nicht abgebrochen.
+        int uebersprungen = 0;
+        LocalDateTime ersteLuecke = null;
+        LocalDateTime letzteLuecke = null;
 
         for (LocalDateTime zeit : distinctZeiten) {
             List<Messwerte> producers = messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.PRODUCER);
@@ -482,14 +492,18 @@ public class MesswerteService {
                 continue;
             }
 
-            // Bezug ist für dieses Intervall abrechnungskritisch.
+            // Ohne Bezugs-Messwert ist S für dieses Intervall nicht bestimmbar → Intervall
+            // überspringen und den Lauf fortsetzen (FR-2.5). Die Consumer behalten hier ihren
+            // bisherigen zev-Wert; die Lücke wird nach der Schleife als WARN gemeldet.
             List<Messwerte> bezugMesswerte = messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.BEZUG);
             if (bezugMesswerte.isEmpty()) {
-                String intervall = zeit.toLocalDate() + " " + zeit.toLocalTime();
-                systemmeldungService.erfasse(progressOrgId, MeldungLevel.ERROR,
-                        SystemmeldungService.KATEGORIE_BILANZMODELL, SystemmeldungService.KEY_KEINE_BILANZDATEN,
-                        intervall);
-                throw new IllegalStateException(SystemmeldungService.KEY_KEINE_BILANZDATEN + ": " + intervall);
+                uebersprungen++;
+                if (ersteLuecke == null) {
+                    ersteLuecke = zeit;
+                }
+                letzteLuecke = zeit;
+                log.warn("Bilanzmodell: keine Bilanzdaten (Bezug) für {} – Intervall übersprungen", zeit);
+                continue;
             }
 
             BigDecimal bezug = bezugMesswerte.stream()
@@ -536,13 +550,27 @@ public class MesswerteService {
             }
         }
 
-        // Erfolgreicher Bilanzlauf → offene Bilanzdaten-Meldungen des Mandanten auto-resolven (Selbstheilung).
+        if (uebersprungen > 0) {
+            // Lücken sind nicht still: EINE WARN-Meldung mit Anzahl und Zeitraum (nicht eine je
+            // Intervall). Der betroffene Verbrauch bleibt unverteilt – die Abrechnung ist für
+            // diese Intervalle unvollständig und muss nach Nachlieferung der Daten wiederholt werden.
+            String parameter = String.format("%d Intervall(e) ohne Bilanzdaten übersprungen (%s – %s)",
+                    uebersprungen, ersteLuecke, letzteLuecke);
+            systemmeldungService.erfasse(progressOrgId, MeldungLevel.WARN,
+                    SystemmeldungService.KATEGORIE_BILANZMODELL,
+                    SystemmeldungService.KEY_INTERVALLE_UEBERSPRUNGEN, parameter);
+            log.warn("Bilanzmodell: {}", parameter);
+        } else {
+            // Lückenloser Lauf → offene Lücken-Meldungen des Mandanten auto-resolven (Selbstheilung).
+            systemmeldungService.autoResolve(progressOrgId, SystemmeldungService.KEY_INTERVALLE_UEBERSPRUNGEN);
+        }
+        // Erfolgreicher Bilanzlauf → offene "keine BEZUG-Einheit"-Meldungen auto-resolven.
         systemmeldungService.autoResolve(progressOrgId, SystemmeldungService.KEY_KEINE_BILANZDATEN);
 
         long duration = System.currentTimeMillis() - startTime;
         log.info(
-                "Solar distribution (Bilanz) completed - timestamps: {}, records: {}, totalS: {} kWh, totalDistributed: {} kWh, duration: {} ms",
-                processedTimestamps, processedRecords, totalSolarProduced, totalDistributed, duration);
+                "Solar distribution (Bilanz) completed - timestamps: {}, skipped: {}, records: {}, totalS: {} kWh, totalDistributed: {} kWh, duration: {} ms",
+                processedTimestamps, uebersprungen, processedRecords, totalSolarProduced, totalDistributed, duration);
 
         return new CalculationResult(
                 processedTimestamps,
@@ -550,7 +578,8 @@ public class MesswerteService {
                 dateFrom,
                 dateTo,
                 totalSolarProduced.doubleValue(),
-                totalDistributed.doubleValue());
+                totalDistributed.doubleValue(),
+                uebersprungen);
     }
 
     /**
@@ -587,15 +616,25 @@ public class MesswerteService {
         private final LocalDateTime dateTo;
         private final double totalSolarProduced;
         private final double totalDistributed;
+        /** Bilanzmodus: Anzahl Intervalle, die wegen fehlender Bilanzdaten übersprungen wurden. */
+        private final int uebersprungeneIntervalle;
 
         public CalculationResult(int processedTimestamps, int processedRecords, LocalDateTime dateFrom,
                 LocalDateTime dateTo, double totalSolarProduced, double totalDistributed) {
+            this(processedTimestamps, processedRecords, dateFrom, dateTo, totalSolarProduced,
+                    totalDistributed, 0);
+        }
+
+        public CalculationResult(int processedTimestamps, int processedRecords, LocalDateTime dateFrom,
+                LocalDateTime dateTo, double totalSolarProduced, double totalDistributed,
+                int uebersprungeneIntervalle) {
             this.processedTimestamps = processedTimestamps;
             this.processedRecords = processedRecords;
             this.dateFrom = dateFrom;
             this.dateTo = dateTo;
             this.totalSolarProduced = totalSolarProduced;
             this.totalDistributed = totalDistributed;
+            this.uebersprungeneIntervalle = uebersprungeneIntervalle;
         }
 
         public int getProcessedTimestamps() {
@@ -620,6 +659,10 @@ public class MesswerteService {
 
         public double getTotalDistributed() {
             return totalDistributed;
+        }
+
+        public int getUebersprungeneIntervalle() {
+            return uebersprungeneIntervalle;
         }
     }
 }

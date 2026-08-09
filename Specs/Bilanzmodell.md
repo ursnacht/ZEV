@@ -23,9 +23,13 @@ Pro Zeitintervall mit `ConsumerTotal` = Summe Consumer-`total`, `Bezug` = `total
    - **Producer-unabhängige Iteration:** Im Bilanzmodus wird ein Intervall über **Consumer + BEZUG** verarbeitet, **nicht** producer-gesteuert. Der heutige Loop (`MesswerteService.distribute`) überspringt Intervalle ohne PRODUCER (`producers.isEmpty()` → `continue`); im BILANZ-Zweig darf dieser Skip **nicht** greifen, da `S` producer-unabhängig ist (bilanz-/batterie-only-ZEV ohne Producer-Messung ist ein gültiger Fall). Ein Intervall mit Consumern und Bezug, aber ohne Producer-Messwert, verteilt `S` regulär.
 3. **Consumer-`zev`:** je Consumer = zugeteilte Menge; `zev_calculated` = derselbe Wert. MQTT-Sentinel-Regel bleibt (`zev == 0` → berechneter Wert; gemessene CSV-Werte bleiben).
 4. **Producer-`zev` (nur Statistik):** = `|ProduktionTotal| − |Rücklieferung(Bilanz)|`, proportional zur Produktion auf die Producer verteilt (im ZEV verbrauchte Produktion lt. Bilanz). Beeinflusst die Verrechnung nicht. **Fehlt die `RUECKLIEFERUNG`-Einheit**, wird Producer-`zev` auf `0` gesetzt (Statistik unvollständig) — der Lauf **läuft weiter**, da dieser Wert nicht abrechnungsrelevant ist. Wie heute wird Producer-`zev` **nur bei `quelle == MQTT`** überschrieben; CSV-Producer behalten ihren gemessenen `zev`-Wert (bestehender Guard in `aktualisiereProducerZev` bleibt bestehen). Der Guard basiert bewusst auf `quelle` und **nicht** auf einem Feature Flag: Ob `zev` gemessen (CSV) oder berechnet (MQTT-Sentinel `zev == 0`) ist, ist eine Datenprovenienz-Entscheidung **pro Messwert** — ein mandantenweiter Flag könnte diese Unterscheidung nicht ausdrücken und würde gemessene CSV-Werte überschreiben (Datenverlust). Der mandantenweite Schalter ist bereits `verteilmodus`.
-5. **Nur `BEZUG` ist abrechnungskritisch:** Fehlt die **`BEZUG`-Einheit** oder fehlen deren Messwerte in einem Intervall, kann `S` (und damit die Consumer-Abrechnung) für dieses Intervall nicht bestimmt werden → **harter Abbruch** des Laufs, es werden **keine** teilweisen `zev`-Werte geschrieben (Rollback über `@Transactional`). Der Abbruch identifiziert das betroffene Intervall (Tag, Zeit) und verhält sich je nach Auslöser:
-   - **Manueller Lauf** (`/solar-calculation`): Abbruch mit `IllegalStateException`, deren Message den Key `BILANZMODELL_KEINE_BILANZDATEN` sowie das betroffene Intervall (Tag, Zeit) trägt → HTTP 400 (der Endpoint fängt `Exception` und liefert `message`; `IllegalStateException` ist zusätzlich im `GlobalExceptionHandler` auf 400 gemappt).
-   - **Automatischer Lauf** (`ZaehlerAggregationService`, MQTT): kein HTTP-Status — der Lauf des Mandanten bricht ab und loggt **ERROR** mit Intervall-Angabe (Tag, Zeit); übrige Mandanten laufen weiter.
+5. **Nur `BEZUG` ist abrechnungskritisch** — es sind aber zwei Fälle zu unterscheiden:
+   - **Fehlende Bilanzdaten in einzelnen Intervallen** (Datenlücke, z.B. Zähler-/Übertragungsausfall): `S` ist für dieses Intervall nicht bestimmbar → **nur dieses Intervall wird übersprungen, der Lauf läuft weiter** (Nachtrag; vormals harter Abbruch). Die Consumer behalten für das übersprungene Intervall ihren bisherigen `zev`-Wert; es wird nichts geschrieben.
+     * **Nicht still:** Nach dem Lauf wird **eine** Systemmeldung mit Level **`WARN`** erfasst (Key `BILANZMODELL_INTERVALLE_UEBERSPRUNGEN`, Kategorie Bilanzmodell) — mit **Anzahl** der übersprungenen Intervalle und dem **Zeitraum** (erste/letzte Lücke). Bewusst **eine** Sammelmeldung statt einer je Intervall.
+     * Die Anzahl wird zusätzlich im Ergebnis zurückgegeben (`CalculationResult.uebersprungeneIntervalle`) und je Lücke als `WARN` geloggt.
+     * **Konsequenz für die Abrechnung:** Für übersprungene Intervalle wird **kein ZEV-Anteil** verteilt — die Abrechnung ist dort unvollständig (zu niedriger ZEV-Anteil). Nach Nachlieferung der Bilanzdaten ist die Verteilung **erneut auszuführen**; ein lückenloser Folgelauf **auto-resolvt** die Meldung (Selbstheilung).
+     * Gilt gleichermaßen für den **manuellen** Lauf (kein HTTP-Fehler; Ergebnis enthält die Anzahl) und den **automatischen** Lauf (MQTT).
+   - **Fehlende `BEZUG`-Einheit** (Konfigurationsfehler, nicht Datenlücke): Es liesse sich **kein einziges** Intervall verteilen → weiterhin **harter Abbruch** mit `IllegalStateException` (Message = Key `BILANZMODELL_KEINE_BILANZDATEN`), Rollback über `@Transactional`, Systemmeldung mit Level `ERROR`. Manuell → HTTP 400; automatisch → ERROR-Log, übrige Mandanten laufen weiter.
    Die fehlende `RUECKLIEFERUNG`-Einheit ist **kein** Abbruchgrund (siehe FR-2.4).
 
 ### FR-3: Verrechnung
@@ -41,7 +45,7 @@ Pro Zeitintervall mit `ConsumerTotal` = Summe Consumer-`total`, `Bezug` = `total
 
 ### FR-5: Persistierung & i18n
 * Keine neue Tabelle/Spalte: `verteilmodus` wird als Feld in `RechnungKonfigurationDTO` (JSONB `einstellungen.konfiguration`) ergänzt.
-* Neue Übersetzungs-Keys via Flyway-Migration (`ON CONFLICT (key) DO NOTHING`): `VERTEILMODUS`, `VERTEILMODUS_PRODUCER_MESSUNG`, `VERTEILMODUS_BILANZ`, `BILANZMODELL_KEINE_BILANZDATEN`, `STATISTIK_MODUS_BILANZ_HINWEIS`, `STATISTIK_RUECKLIEFERUNG_GEMESSEN` (DE/EN).
+* Neue Übersetzungs-Keys via Flyway-Migration (`ON CONFLICT (key) DO NOTHING`): `VERTEILMODUS`, `VERTEILMODUS_PRODUCER_MESSUNG`, `VERTEILMODUS_BILANZ`, `BILANZMODELL_KEINE_BILANZDATEN`, `STATISTIK_MODUS_BILANZ_HINWEIS`, `STATISTIK_RUECKLIEFERUNG_GEMESSEN` (DE/EN) sowie – Nachtrag FR-2.5 – `BILANZMODELL_INTERVALLE_UEBERSPRUNGEN`.
 * Multi-Tenancy unverändert: die Einstellung liegt je `org_id` in `einstellungen`; `orgId` stammt aus dem Kontext, nicht aus dem Request.
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
@@ -56,8 +60,9 @@ Pro Zeitintervall mit `ConsumerTotal` = Summe Consumer-`total`, `Bezug` = `total
 * [ ] Beispiel `ConsumerTotal=10, Bezug=4` → `S=6` wird verteilt; Consumer-`zev`-Summe = 6, Netz-Anteil-Summe = 10 − 6 = 4 = Bezug (verrechnungstreu, FR-3.3).
 * [ ] `Bezug > ConsumerTotal` (z.B. Batterie lädt aus Netz) → `S=0`, kein ZEV-Anteil in diesem Intervall.
 * [ ] Intervall mit Consumern und Bezug, aber **ohne Producer-Messwert** → `S` wird trotzdem verteilt (kein producer-gesteuerter Skip im BILANZ-Zweig).
-* [ ] Fehlt die `BEZUG`-Einheit oder deren Messwerte in einem Intervall → **manueller** Lauf bricht mit `IllegalStateException` (Message = Key `BILANZMODELL_KEINE_BILANZDATEN` + Intervall Tag/Zeit) → HTTP 400 ab; keine `zev`-Werte werden geschrieben (Rollback).
-* [ ] Gleicher Fehlerfall im **MQTT-Auto-Lauf** → Lauf des Mandanten bricht ab, ERROR-Log mit Intervall-Angabe; übrige Mandanten laufen weiter; keine `zev`-Werte geschrieben.
+* [ ] Fehlt die **`BEZUG`-Einheit** → **manueller** Lauf bricht mit `IllegalStateException` (Message = Key `BILANZMODELL_KEINE_BILANZDATEN`) → HTTP 400 ab; keine `zev`-Werte werden geschrieben (Rollback).
+* [ ] Gleicher Konfigurationsfehler im **MQTT-Auto-Lauf** → Lauf des Mandanten bricht ab, ERROR-Log; übrige Mandanten laufen weiter; keine `zev`-Werte geschrieben.
+* [ ] Fehlen (nur) die **Bezugs-Messwerte einzelner Intervalle** → der Lauf bricht **nicht** ab: betroffene Intervalle werden übersprungen, die übrigen normal verteilt (manuell **und** automatisch).
 * [ ] Fehlt (nur) die `RUECKLIEFERUNG`-Einheit → Producer-`zev` = 0, der Lauf bricht **nicht** ab (Consumer-Abrechnung unberührt).
 * [ ] Producer-`zev` wird im Bilanzmodus nur bei `quelle == MQTT` gesetzt; CSV-Producer behalten den gemessenen `zev`.
 * [ ] Der Bilanzmodus greift auch beim **MQTT-Auto-Lauf** (`ZaehlerAggregationService`): der Modus wird org-explizit geladen (kein `getCurrentOrgId()`), keine `NoOrganizationException`.
@@ -87,10 +92,11 @@ Pro Zeitintervall mit `ConsumerTotal` = Summe Consumer-`total`, `Bezug` = `total
 | Szenario | Verhalten |
 |----------|-----------|
 | `verteilmodus` fehlt (Bestandsmandant) | wie `PRODUCER_MESSUNG` (Default) |
-| Modus `BILANZ`, aber keine `BEZUG`-Einheit / keine Bilanzdaten | Harter Abbruch, nichts wird geschrieben. Manuell: HTTP 400 mit `BILANZMODELL_KEINE_BILANZDATEN` + Intervall (Tag/Zeit). Auto: ERROR-Log mit Intervall, Mandant übersprungen |
+| Modus `BILANZ`, aber **keine `BEZUG`-Einheit** (Konfigurationsfehler) | Harter Abbruch, nichts wird geschrieben. Manuell: HTTP 400 mit `BILANZMODELL_KEINE_BILANZDATEN`. Auto: ERROR-Log, Mandant übersprungen, übrige laufen weiter |
 | `Bezug > ConsumerTotal` (Netzladung Batterie / Messdifferenz) | `S = 0` in diesem Intervall (kein negativer Eigenverbrauch) |
 | Keine Consumer im Intervall | nichts zu verteilen (`S` irrelevant), keine `zev`-Werte |
-| Bilanzdaten-Lücke einzelner Intervalle | **Harter Abbruch** (keine partielle Verteilung). Manuell: Fehlermeldung mit Intervall-Angabe (Tag, Zeit) → HTTP 400. Auto: Verteilung bricht ab und loggt **ERROR** mit Intervall-Angabe |
+| Bilanzdaten-Lücke einzelner Intervalle | **Intervall überspringen, Lauf fortsetzen** (FR-2.5). Für die Lücke wird nichts geschrieben; danach **eine** `WARN`-Systemmeldung `BILANZMODELL_INTERVALLE_UEBERSPRUNGEN` mit Anzahl + Zeitraum, je Lücke ein WARN-Log. Anzahl in `CalculationResult.uebersprungeneIntervalle`. Abrechnung für diese Intervalle unvollständig → nach Datennachlieferung erneut ausführen |
+| Lückenloser Folgelauf nach zuvor übersprungenen Intervallen | **Auto-Resolve** der offenen `BILANZMODELL_INTERVALLE_UEBERSPRUNGEN`-Meldung (Selbstheilung) |
 | Umstellung des Modus rückwirkend | Neuberechnung überschreibt `zev`/`zev_calculated` für den gewählten Zeitraum; Nutzer wird auf Auswirkung auf bereits erstellte Rechnungen hingewiesen |
 | Netzwerkfehler beim Laden von Statistik/Einstellungen | bestehende Fehlerbehandlung greift unverändert |
 
@@ -121,6 +127,10 @@ Vorab geklärt:
 * [x] **Producer:** unverändert (nur Grundgebühr).
 
 Geklärt (Review):
-* [x] Bei **Bilanzdaten-Lücken**: **harter Abbruch** (keine partielle Verteilung). Manuell → Fehlermeldung mit Intervall (Tag, Zeit)/HTTP 400; Auto → ERROR-Log mit Intervall. Siehe FR-2.5 / §5.
+* [x] Bei **Bilanzdaten-Lücken einzelner Intervalle**: Das betroffene Intervall wird **übersprungen**, der Lauf läuft weiter; für die Lücke wird **kein** `zev` geschrieben. Siehe FR-2.5 / §5.
+* [x] Nach einem Lauf mit Lücken existiert **genau eine** `WARN`-Systemmeldung `BILANZMODELL_INTERVALLE_UEBERSPRUNGEN` mit **Anzahl** und **Zeitraum** (nicht eine Meldung je Intervall); `CalculationResult.uebersprungeneIntervalle` nennt die Anzahl.
+* [x] Ein gültiges Intervall wird **auch dann** verteilt, wenn im selben Lauf ein anderes Intervall wegen fehlender Bilanzdaten übersprungen wurde.
+* [x] Ein **lückenloser** Folgelauf setzt die offene Übersprungen-Meldung automatisch auf erledigt (Auto-Resolve).
+* [x] Fehlt die **`BEZUG`-Einheit** ganz (Konfigurationsfehler), bricht der Lauf weiterhin hart ab (HTTP 400 / ERROR-Log, Rollback).
 * [x] **Modus-Wechsel mit bereits erstellten Rechnungen:** nur **Hinweis** (keine Sperre, keine automatische Neuberechnung). Siehe §5 / §7.
 * [x] **`RUECKLIEFERUNG`-Wert:** Im Bilanzmodus wird die **tatsächlich gemessene** Rücklieferung in der Statistik angezeigt (statt nur berechnet). Siehe FR-4.4.

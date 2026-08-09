@@ -135,9 +135,11 @@ public class ZaehlerAggregationService {
                 messwerteService.calculateSolarDistributionForOrg(org, von, bis, DEFAULT_ALGORITHM, false);
                 log.info("Solarverteilung nach Aggregation ausgeführt (org={}, {} – {})", org, von, bis);
             } catch (IllegalStateException ex) {
-                // Bilanzmodus ohne Bilanzdaten (BILANZMODELL_KEINE_BILANZDATEN): Verteilung des
-                // Mandanten bricht ab (kein HTTP-Kontext) – als ERROR mit Intervall-Angabe loggen;
-                // übrige Mandanten laufen weiter.
+                // Konfigurationsfehler im Bilanzmodus, z.B. fehlende BEZUG-Einheit
+                // (BILANZMODELL_KEINE_BILANZDATEN): Verteilung dieses Mandanten bricht ab
+                // (kein HTTP-Kontext) – als ERROR loggen; übrige Mandanten laufen weiter.
+                // Fehlende Bilanzdaten *einzelner Intervalle* führen NICHT hierher: sie werden
+                // übersprungen und als WARN-Systemmeldung gemeldet (Spec Bilanzmodell FR-2.5).
                 log.error("Solarverteilung nach Aggregation abgebrochen (org={}, {} – {}): {}",
                         org, von, bis, ex.getMessage());
             } catch (Exception ex) {

@@ -41,6 +41,7 @@ Ein alternatives, pro Mandant wählbares Abrechnungs-/Verteilmodell: Statt aus d
 | [x] | 8. Frontend-Einstellungen | Modus-Dropdown mit übersetzten Labels |
 | [x] | 9. Frontend-Statistik | Modus-Anzeige, Tautologie-Hinweis, gemessene Rücklieferung |
 | [x] | 10. Übersetzungen | Flyway-Migration `V85__Add_Bilanzmodell_Translations.sql` (DE/EN) |
+| [x] | 11. Nachtrag (Vibe): Lücken überspringen statt Abbruch | Fehlende Bilanzdaten **einzelner Intervalle** brechen den Lauf nicht mehr ab: `distributeBilanz` zählt die Lücke (`uebersprungen`, erste/letzte Zeit) und macht `continue`; nach der Schleife **eine** `WARN`-Systemmeldung `BILANZMODELL_INTERVALLE_UEBERSPRUNGEN` (neue Konstante im `SystemmeldungService`) mit Anzahl + Zeitraum, bei lückenlosem Lauf stattdessen `autoResolve`. `CalculationResult` um `uebersprungeneIntervalle` erweitert (6-arg-Konstruktor delegiert mit 0 → Producer-Zweig unverändert). Der Abbruch bei **fehlender `BEZUG`-Einheit** (Konfigurationsfehler) bleibt. Übersetzung `V95`. Tests: bestehender Abbruch-Test auf das neue Verhalten umgeschrieben + neuer Test „Lücke verhindert Verteilung des gültigen Intervalls nicht". |
 
 ---
 
@@ -127,12 +128,17 @@ Verteilmodus modus = einstellungenService.getVerteilmodus(progressOrgId);
    - `S = max(0, ConsumerTotal − Bezug)`; Verteilung von `S` über EQUAL_SHARE/PROPORTIONAL (dieselben Algorithmen, `S` statt `solarProduction`), je Consumer am eigenen `total` gekappt.
    - Consumer: `zev_calculated = zugeteilteMenge`; MQTT-Sentinel-Regel beibehalten (`zev == 0` → berechneter Wert; CSV-Werte bleiben).
    - **Producer-`zev` (nur Statistik):** `|ProduktionTotal| − |Rücklieferung(Bilanz)|` proportional zur Produktion; `aktualisiereProducerZev`-MQTT-Guard **beibehalten** (CSV-Producer unangetastet). Fehlt die `RUECKLIEFERUNG`-Einheit → Producer-`zev = 0`, Lauf läuft weiter.
-   - **Abbruch bei fehlenden Bilanzdaten** (fehlende `BEZUG`-Einheit oder fehlender `BEZUG`-Messwert im Intervall):
-     ```java
-     throw new IllegalStateException(
-         "BILANZMODELL_KEINE_BILANZDATEN: " + zeit.toLocalDate() + " " + zeit.toLocalTime());
-     ```
-     `distribute` ist `@Transactional` → alle bereits gespeicherten `zev`-Werte werden zurückgerollt (keine Teilwerte). Manueller Lauf: `MesswerteController` fängt `Exception` → HTTP 400 mit `message` (zusätzlich mappt `GlobalExceptionHandler` `IllegalStateException` auf 400). Auto-Lauf: `ZaehlerAggregationService` fängt und loggt — Log-Level dort ggf. auf ERROR anheben (s. Phase 5).
+   - **Fehlende Bilanzdaten — zwei Fälle** (Nachtrag, vormals in beiden Fällen harter Abbruch):
+     * **Fehlender `BEZUG`-Messwert im Intervall** (Datenlücke) → **Intervall überspringen**, Lauf fortsetzen:
+       ```java
+       if (bezugMesswerte.isEmpty()) { uebersprungen++; /* erste/letzte Lücke merken */ continue; }
+       ```
+       Nach der Schleife **eine** Sammelmeldung `WARN` (`BILANZMODELL_INTERVALLE_UEBERSPRUNGEN`) mit Anzahl + Zeitraum; Anzahl zusätzlich in `CalculationResult.uebersprungeneIntervalle`. Bei **lückenlosem** Lauf stattdessen `autoResolve` dieses Keys.
+     * **Fehlende `BEZUG`-Einheit** (Konfigurationsfehler) → weiterhin harter Abbruch:
+       ```java
+       throw new IllegalStateException("BILANZMODELL_KEINE_BILANZDATEN: keine BEZUG-Einheit vorhanden");
+       ```
+       `distribute` ist `@Transactional` → Rollback, keine Teilwerte. Manueller Lauf: `MesswerteController` fängt `Exception` → HTTP 400 mit `message` (zusätzlich mappt `GlobalExceptionHandler` `IllegalStateException` auf 400). Auto-Lauf: `ZaehlerAggregationService` fängt und loggt ERROR (s. Phase 5).
 
 ### Phase 5: Backend-`ZaehlerAggregationService`
 
@@ -209,7 +215,7 @@ ON CONFLICT (key) DO NOTHING;
 
 ### Backend-Validierungen
 1. **Modus-Default:** Fehlt `verteilmodus` / fehlt die ganze `konfiguration` → `PRODUCER_MESSUNG` (`getVerteilmodus`).
-2. **Bilanzdaten-Pflicht (nur BILANZ):** Fehlt die `BEZUG`-Einheit oder deren Messwert in einem Intervall → `IllegalStateException` mit Key `BILANZMODELL_KEINE_BILANZDATEN` + Intervall (Tag/Zeit); Rollback über `@Transactional`.
+2. **Bilanzdaten (nur BILANZ):** Fehlt die `BEZUG`-**Einheit** → `IllegalStateException` mit Key `BILANZMODELL_KEINE_BILANZDATEN`; Rollback über `@Transactional`. Fehlt nur der `BEZUG`-**Messwert einzelner Intervalle** → diese Intervalle werden übersprungen (kein Abbruch), Sammelmeldung `BILANZMODELL_INTERVALLE_UEBERSPRUNGEN` (WARN) mit Anzahl + Zeitraum.
 3. **Kein negativer Eigenverbrauch:** `S = max(0, ConsumerTotal − Bezug)`.
 4. **Producer-`zev` nur bei `quelle == MQTT`** überschreiben (CSV-Producer behalten gemessenen Wert).
 5. **Autorisierung unverändert:** Einstellungen `einstellungen:write`, Verteilung `messwerte:write`, Statistik `statistik:read` (`@PreAuthorize`). `orgId` nie aus dem Request im Hintergrund-Lauf.

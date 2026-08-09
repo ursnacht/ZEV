@@ -2,6 +2,7 @@ package ch.nacht.service;
 
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
+import ch.nacht.entity.MeldungLevel;
 import ch.nacht.entity.Messwerte;
 import ch.nacht.entity.Quelle;
 import ch.nacht.entity.Verteilmodus;
@@ -28,6 +29,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -1047,7 +1049,7 @@ public class MesswerteServiceTest {
     }
 
     @Test
-    void calculateSolarDistribution_Bilanz_FehlenderBezugMesswertImIntervall_ThrowsIllegalStateMitIntervall() {
+    void calculateSolarDistribution_Bilanz_FehlenderBezugMesswertImIntervall_IntervallUebersprungen() {
         LocalDateTime dateFrom = LocalDateTime.of(2024, 1, 1, 0, 0);
         LocalDateTime dateTo = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
         LocalDateTime zeit = LocalDateTime.of(2024, 1, 15, 12, 0);
@@ -1062,17 +1064,55 @@ public class MesswerteServiceTest {
         when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER)).thenReturn(List.of(consumer));
         when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.BEZUG)).thenReturn(Collections.emptyList());
 
-        IllegalStateException ex = assertThrows(
-            IllegalStateException.class,
-            () -> messwerteService.calculateSolarDistribution(dateFrom, dateTo, "EQUAL_SHARE"));
+        // FR-2.5: kein Abbruch – das Intervall wird übersprungen, der Lauf läuft weiter.
+        MesswerteService.CalculationResult result =
+                messwerteService.calculateSolarDistribution(dateFrom, dateTo, "EQUAL_SHARE");
 
-        assertTrue(ex.getMessage().contains("BILANZMODELL_KEINE_BILANZDATEN"),
-            "Message soll den Key tragen: " + ex.getMessage());
-        // Intervall-Angabe (Tag + Zeit)
-        assertTrue(ex.getMessage().contains("2024-01-15"), "Message soll den Tag tragen: " + ex.getMessage());
-        assertTrue(ex.getMessage().contains("12:00"), "Message soll die Zeit tragen: " + ex.getMessage());
-        // keine Teilwerte geschrieben
+        assertEquals(1, result.getUebersprungeneIntervalle());
+        assertEquals(0, result.getProcessedTimestamps());
+        // Für das übersprungene Intervall wird kein zev geschrieben
         verify(messwerteRepository, never()).save(any());
+        // Lücke wird als WARN gemeldet (nicht still), mit Anzahl im Parameter
+        verify(systemmeldungService).erfasse(any(), eq(MeldungLevel.WARN),
+                eq(SystemmeldungService.KATEGORIE_BILANZMODELL),
+                eq(SystemmeldungService.KEY_INTERVALLE_UEBERSPRUNGEN), contains("1 Intervall"));
+    }
+
+    @Test
+    void calculateSolarDistribution_Bilanz_LueckeUndGueltigesIntervall_VerteiltDenRest() {
+        LocalDateTime dateFrom = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime dateTo = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
+        LocalDateTime luecke = LocalDateTime.of(2024, 1, 15, 12, 0);
+        LocalDateTime gueltig = LocalDateTime.of(2024, 1, 15, 12, 15);
+
+        when(einstellungenService.getVerteilmodus(any())).thenReturn(Verteilmodus.BILANZ);
+        when(einheitRepository.existsByTyp(EinheitTyp.BEZUG)).thenReturn(true);
+        when(messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo))
+                .thenReturn(List.of(luecke, gueltig));
+        when(messwerteRepository.findByZeitAndEinheitTyp(any(), eq(EinheitTyp.PRODUCER)))
+                .thenReturn(Collections.emptyList());
+
+        // Intervall 1: Consumer ohne Bezug → übersprungen
+        when(messwerteRepository.findByZeitAndEinheitTyp(luecke, EinheitTyp.CONSUMER))
+                .thenReturn(List.of(new Messwerte(luecke, 10.0, 0.0, consumerEinheit)));
+        when(messwerteRepository.findByZeitAndEinheitTyp(luecke, EinheitTyp.BEZUG))
+                .thenReturn(Collections.emptyList());
+
+        // Intervall 2: Consumer 10, Bezug 4 → S = 6 wird verteilt
+        Messwerte consumer2 = new Messwerte(gueltig, 10.0, 0.0, consumerEinheit);
+        when(messwerteRepository.findByZeitAndEinheitTyp(gueltig, EinheitTyp.CONSUMER))
+                .thenReturn(List.of(consumer2));
+        when(messwerteRepository.findByZeitAndEinheitTyp(gueltig, EinheitTyp.BEZUG))
+                .thenReturn(List.of(new Messwerte(gueltig, 4.0, 0.0, bezugEinheit)));
+
+        MesswerteService.CalculationResult result =
+                messwerteService.calculateSolarDistribution(dateFrom, dateTo, "EQUAL_SHARE");
+
+        // Die Lücke verhindert die Verteilung des gültigen Intervalls NICHT
+        assertEquals(1, result.getUebersprungeneIntervalle());
+        assertEquals(1, result.getProcessedTimestamps());
+        assertEquals(6.0, consumer2.getZevCalculated(), 1e-9);
+        verify(messwerteRepository).save(consumer2);
     }
 
     @Test

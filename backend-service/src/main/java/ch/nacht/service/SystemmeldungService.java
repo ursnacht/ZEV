@@ -38,6 +38,8 @@ public class SystemmeldungService {
     public static final String KATEGORIE_BILANZMODELL = "SYSTEMMELDUNG_KATEGORIE_BILANZMODELL";
     /** Meldungs-/Fehler-Key: keine Bilanzdaten (Bezug) für die Verteilung vorhanden. */
     public static final String KEY_KEINE_BILANZDATEN = "BILANZMODELL_KEINE_BILANZDATEN";
+    /** Meldungs-Key (WARN): Intervalle ohne Bilanzdaten wurden bei der Verteilung übersprungen. */
+    public static final String KEY_INTERVALLE_UEBERSPRUNGEN = "BILANZMODELL_INTERVALLE_UEBERSPRUNGEN";
 
     /** Kategorie-Übersetzungs-Key für Meldungen der MQTT-Integration. */
     public static final String KATEGORIE_MQTT = "SYSTEMMELDUNG_KATEGORIE_MQTT";
