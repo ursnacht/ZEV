@@ -36,6 +36,11 @@ _DUMMY_REGISTER = RegisterSpec(addr=0)
 # Spaltenlänge von zaehler_rohdaten.seriennummer im Backend.
 _MAX_SERIENNUMMER_LAENGE = 64
 
+# Lese-Timeout je Zähler (Sekunden), wenn nichts konfiguriert ist. Bewusst grosszügig:
+# Ein RTU→TCP-Hub gibt die Anfrage seriell an den Zähler weiter und antwortet erst danach –
+# bei langsamen Bussen/vielen Slaves dauert das deutlich länger als bei direktem TCP.
+_DEFAULT_READ_TIMEOUT = 5.0
+
 
 class ConfigError(Exception):
     """Ungültige oder unvollständige Konfiguration."""
@@ -60,13 +65,15 @@ def load_config(path: str | Path) -> GatewayConfig:
     org_id = _require(raw, "org_id", int)
     interval = _parse_interval(_require(raw, "publish_interval", (str, int)))
     broker = _parse_broker(_require(raw, "broker", dict))
-    meters = _parse_meters(raw.get("zaehler"))
+    read_timeout = _parse_timeout(raw.get("read_timeout"), "read_timeout", _DEFAULT_READ_TIMEOUT)
+    meters = _parse_meters(raw.get("zaehler"), read_timeout)
 
     return GatewayConfig(
         org_id=org_id,
         publish_interval_seconds=interval,
         broker=broker,
         meters=meters,
+        read_timeout_seconds=read_timeout,
     )
 
 
@@ -102,7 +109,33 @@ def _parse_broker(data: dict) -> BrokerConfig:
     )
 
 
-def _parse_meters(data) -> list[MeterConfig]:
+def _parse_timeout(value, ctx: str, default: float) -> float:
+    """Timeout in Sekunden: Zahl (``5``, ``2.5``) oder Kurzform (``"5s"``, ``"1m"``).
+
+    ``None`` → ``default``. Muss > 0 sein.
+    """
+    if value is None:
+        return default
+    if isinstance(value, bool):  # bool ist int-Subtyp – hier nie gewollt
+        raise ConfigError(f"{ctx} muss eine Zahl oder Kurzform wie '5s' sein.")
+    if isinstance(value, (int, float)):
+        seconds = float(value)
+    elif isinstance(value, str):
+        text = value.strip().lower()
+        einheit = _INTERVAL_UNITS.get(text[-1:]) if text else None
+        try:
+            seconds = float(text[:-1]) * einheit if einheit else float(text)
+        except ValueError as exc:
+            raise ConfigError(f"{ctx} '{value}' ist keine gültige Zeitangabe.") from exc
+    else:
+        raise ConfigError(f"{ctx} muss eine Zahl oder Kurzform wie '5s' sein.")
+
+    if seconds <= 0:
+        raise ConfigError(f"{ctx} muss > 0 sein (war: {value}).")
+    return seconds
+
+
+def _parse_meters(data, read_timeout: float) -> list[MeterConfig]:
     if not isinstance(data, list) or not data:
         raise ConfigError("'zaehler' muss eine nicht-leere Liste sein.")
 
@@ -150,6 +183,10 @@ def _parse_meters(data) -> list[MeterConfig]:
                 register_bezug=register_bezug,
                 register_einspeisung=register_einspeisung,
                 seriennummer=_parse_seriennummer(entry.get("seriennummer"), messpunkt),
+                # Gleicher Schlüsselname wie global (`read_timeout`), nur enger gültig:
+                # je Zähler überschreibbar (z. B. ein langsamer Slave am Hub).
+                read_timeout_seconds=_parse_timeout(
+                    entry.get("read_timeout"), f"zaehler '{messpunkt}' read_timeout", read_timeout),
             )
         )
 

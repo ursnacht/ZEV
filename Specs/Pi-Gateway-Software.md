@@ -22,6 +22,9 @@
 2. **BKW via gPlug:** Auslesen über die gPlug-Schnittstelle (Protokoll siehe Offene Fragen).
 3. Jede physische Quelle ist einer **Einheit** über deren **`messpunkt`** zugeordnet (Konfiguration, kein Rückgriff auf interne DB-IDs).
 4. Lese-/Publish-Intervall konfigurierbar (Default z.B. 1–5 min).
+5. **Lese-Timeout konfigurierbar (Nachtrag):** Die Wartezeit auf die Antwort eines Zählers ist konfigurierbar, **global** über `read_timeout` (Default **5 s**) und je Zähler über `zaehler[].read_timeout` überschreibbar (gleicher Schlüsselname, nur enger gültig) (z.B. ein einzelner langsamer Slave am Hub). Angabe als Zahl (Sekunden) oder Kurzform (`"8s"`, `"1m"`); Werte ≤ 0 sowie ungültige Angaben führen zu einem `ConfigError` **beim Start** (kein stiller Fallback).
+   * Grund für den grosszügigen Default: An einem **RTU→TCP-Hub** wird die Anfrage seriell bis zum Slave durchgereicht und erst danach beantwortet — das dauert deutlich länger als bei direkt angebundenen TCP-Geräten.
+   * **Abgrenzung:** Das Timeout wirkt nur, wenn der Hub **gar nicht** antwortet. Antwortet er mit einer **Modbus-Exception** (z.B. `code 11` = *Gateway target device failed to respond*), ist die Anfrage bereits beantwortet — ein höheres Client-Timeout ändert daran **nichts**; Ursache und Abhilfe liegen dann auf der RTU-Strecke bzw. in der Hub-Konfiguration (siehe `docs/Netzwerk-Topologie-Hene.md`, Abschnitt „Modbus-Diagnose"). Die Fehlermeldung des Readers unterscheidet beide Fälle und nennt den Timeout-Hinweis nur bei ausbleibender Antwort.
 
 > **Manuelles Auslesen / Diagnose (CLI):** Zum Prüfen von Verkabelung/Registern
 > eignet sich `mbpoll` (`sudo apt install mbpoll`). „Adresse 1" = Modbus
@@ -76,6 +79,7 @@
 > # config.yaml auf dem Pi (Secrets via Env)
 > org_id: 42
 > publish_interval: 5m
+> read_timeout: 5s                  # Lese-Timeout je Zähler (Default 5s), unten überschreibbar
 > broker:
 >   url: tcp://nas.local:1883        # bzw. tls://nas.local:8883
 >   username: ${MQTT_USERNAME}
@@ -91,6 +95,7 @@
 >     host: 192.168.10.10             # IP des Modbus-TCP-Hubs (für alle Wago gleich)
 >     port: 502
 >     unit_id: 1                      # Slave-Adresse dieses Zählers am Hub
+>     # read_timeout: 8s              # optional: überschreibt den globalen Wert nur für diesen Zähler
 >     register:                       # Wirkenergie in kWh (Beispielwerte!)
 >       bezug:       { addr: 600C, typ: float32, wortfolge: big, skalierung: 1.0 }   # OBIS 1.8.0
 >       einspeisung: { addr: 6018, typ: float32, wortfolge: big, skalierung: 1.0 }   # OBIS 2.8.0
@@ -128,6 +133,10 @@
 
 * [ ] Der Dienst liest **alle konfigurierten Zähler** (beliebige Anzahl; aktuell 3× Wago Modbus TCP, gPlug folgt später) im konfigurierten Intervall aus.
 * [ ] Ein zusätzlicher Zähler lässt sich **allein per Konfigurations-Eintrag** ergänzen (kein Code-Change/Rebuild).
+* [ ] Ohne `read_timeout` in der Config gilt der Default **5 s**; ein gesetzter Wert (Zahl oder `"8s"`/`"1m"`) wird für **alle** Zähler übernommen.
+* [ ] `zaehler[].read_timeout` überschreibt den globalen Wert **nur für diesen Zähler**; die übrigen behalten `read_timeout`.
+* [ ] Ungültige Timeout-Angaben (`0`, negativ, nicht-numerisch, Boolean) führen zu einem `ConfigError` **beim Start** — kein stiller Fallback auf den Default.
+* [ ] Bleibt eine Antwort aus, nennt die Fehlermeldung den konfigurierten Timeout-Wert und den Hinweis, `timeout` zu erhöhen; bei einer **Modbus-Exception-Response** (z.B. `code 11`) erscheint dieser Hinweis **nicht** (dort hilft das Timeout nicht).
 * [ ] Der Dienst publiziert die **absoluten Zählerstände** unverändert (keine Delta-Berechnung, keine „letzter Stand"-Persistenz).
 * [ ] Publizierte Topic-/Payload-Struktur entspricht `MQTT-Integration.md`: Topic `zev/{orgId}/{messpunkt}/messwert`, Pflichtfelder `{timestamp,zaehlerstandBezug,zaehlerstandEinspeisung}` – plus das **optionale** `seriennummer`, sofern konfiguriert.
 * [ ] Ist im `zaehler`-Eintrag eine `seriennummer` gesetzt, erscheint sie unverändert im Payload; fehlt sie, wird das Feld **weggelassen** (Payload identisch zum bisherigen Vertrag).

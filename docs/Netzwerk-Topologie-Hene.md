@@ -519,7 +519,11 @@ mbpoll -t 4:hex -r 0x4000 -c 2 -1 $HUB -p 502 -a 1 -0   # Seriennummer auslesen
 | **Adress-Offset** | Ohne `-0` zählt `mbpoll` ab 1, mit `-0` ab 0 (PDU). Datenblätter nennen meist die PDU-Adresse → im Zweifel beide probieren. |
 | **`Illegal data address`** | Das Gerät **antwortet** – nur die Adresse (oder der Bereich `-c`) ist falsch. Bei `:float` liest `-c 12` bereits **24** Register! |
 | **`Connection timed out`** | Meist **kein** Adressproblem: viele embedded Server erlauben nur **eine** TCP-Verbindung und brauchen Pausen. Keine Schleifen, 30–60 s warten, `-o 5` für längeren Timeout, `ss -tn \| grep <ip>` auf hängende Verbindungen prüfen. |
-| **`exception_code=11`** | „Gateway target device failed to respond" – kommt vom **Hub**, nicht vom Zähler: der Hub erreicht den Slave auf der **RTU-Strecke** nicht (Verkabelung, Terminierung, Baudrate/Parität, Adresse, Timeout). Kein Netzwerkproblem – ein IP-Scan hilft hier nicht. |
+| **`exception_code=11`** | „Gateway target device failed to respond" – kommt vom **Hub**, nicht vom Zähler: der Hub erreicht den Slave auf der **RTU-Strecke** nicht (Verkabelung, Terminierung, Baudrate/Parität, Adresse, Timeout **am Hub**). Kein Netzwerkproblem – ein IP-Scan hilft hier nicht. **Auch das Client-Timeout des Gateways hilft nicht**: der Hub hat ja geantwortet (mit der Exception). Der relevante Timeout ist der **RTU-Response-Timeout im Hub**. |
+
+> **Client-Timeout des Pi-Gateways:** konfigurierbar über `read_timeout` (global, Default 5 s)
+> bzw. `zaehler[].read_timeout` je Zähler (s. `Specs/Pi-Gateway-Software.md`, FR-1.5). Wirkt nur bei
+> **ausbleibender** Antwort – nicht bei Exception-Responses wie `code 11` (s. Tabelle).
 
 **Offener Punkt:** Der Zähler an `unit_id=2` liefert wiederkehrend `exception_code=11`.
 Häufigkeit und Verteilung auswerten:

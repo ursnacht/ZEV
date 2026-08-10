@@ -25,14 +25,18 @@ _REGISTERS_PER_FLOAT32 = 2
 class ModbusReader(Reader):
     """Liest einen Wago-Zähler via Modbus TCP."""
 
-    def __init__(self, config: MeterConfig, timeout: float = 3.0) -> None:
+    def __init__(self, config: MeterConfig) -> None:
         super().__init__(config)
         if not config.host:
             raise ValueError(f"Modbus-Zähler '{config.messpunkt}' ohne host.")
+        # Timeout kommt aus der Konfiguration (global `read_timeout`, je Zähler
+        # via `zaehler[].read_timeout` überschreibbar) – keine zweite Quelle im Code.
+        log.debug("Modbus-Reader '%s': Lese-Timeout %.1fs",
+                  config.messpunkt, config.read_timeout_seconds)
         self._client = ModbusTcpClient(
             host=config.host,
             port=config.port,
-            timeout=timeout,
+            timeout=config.read_timeout_seconds,
         )
 
     def read(self) -> MeterReading:
@@ -74,9 +78,17 @@ class ModbusReader(Reader):
             slave=self.config.unit_id,
         )
         if response.isError():
+            # Timeout und Exception-Response unterscheiden: bei einer Exception-Response hat
+            # das Gerät/der Hub GEANTWORTET (z. B. code 11 = Gateway target device failed to
+            # respond) – dann hilft ein höheres Client-Timeout nicht, die Ursache liegt auf
+            # der RTU-Strecke bzw. am Hub. Timeout-Hinweis daher nur, wenn keine Antwort kam.
+            hinweis = ""
+            if "ExceptionResponse" not in str(response):
+                hinweis = (f" (keine Antwort innerhalb {self.config.read_timeout_seconds:.1f}s – "
+                           f"ggf. 'read_timeout' für diesen Zähler erhöhen)")
             raise ReadError(
                 f"'{self.messpunkt}' {rolle}: Modbus-Fehler bei Register "
-                f"0x{register.addr:04X} – {response}."
+                f"0x{register.addr:04X} – {response}.{hinweis}"
             )
 
         registers = response.registers

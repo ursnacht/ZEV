@@ -81,6 +81,12 @@ Die Nummer wird einmalig am Gerät abgelesen (z. B. per `mbpoll`, siehe
 - **Registeradressen:** als String = **Hexadezimal** (wie Wago-Datenblatt, daher quoten),
   als Integer = Dezimal.
 - **Intervall:** `publish_interval` z. B. `5m`, `30s`, `1h` oder reine Sekunden-Zahl.
+- **Lese-Timeout:** `read_timeout` (Default `5s`) gilt für alle Zähler; je Zähler mit
+  `zaehler[].read_timeout` überschreibbar. Zahl (Sekunden) oder Kurzform (`8s`, `1m`);
+  `0`/negativ/ungültig → Fehler beim Start.
+  Hochsetzen, wenn Reads mit *keine Antwort* fehlschlagen — an einem RTU→TCP-Hub reicht die
+  Anfrage seriell bis zum Slave durch. **Nicht** hilfreich bei einer Modbus-**Exception-Response**
+  (z. B. `code 11`): dort hat der Hub geantwortet, die Ursache liegt auf der RTU-Strecke.
 
 ## Lokale Installation (Entwicklung)
 
