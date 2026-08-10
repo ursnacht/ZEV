@@ -125,8 +125,11 @@ Konfigurations-Optionen wirken daher erst, wenn sie **manuell** eingetragen werd
       sudo systemctl start pi-gateway.service
       journalctl -u pi-gateway.service -f
       ```
-      Erwartet: je Zyklus ein Heartbeat („letzter erfolgreicher Read/Publish", Broker
-      verbunden) und pro Zähler ein erfolgreicher Read.
+      Erwartet: die Start-Zeile („Pi-Gateway startet: …") nennt Zähleranzahl, Intervall und
+      das wirksame **`Lese-Timeout`** — so ist sofort belegt, ob die Config-Änderung greift;
+      Zähler mit eigenem Wert erscheinen darunter als „Eigenes Lese-Timeout: …". Danach je
+      Zyklus ein Heartbeat („letzter erfolgreicher Read/Publish", Broker verbunden) und pro
+      Zähler ein erfolgreicher Read.
 
 ## 5. Ende-zu-Ende-Kontrolle
 

@@ -39,12 +39,14 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     log.info(
-        "Pi-Gateway startet: org_id=%s, %d Zähler, Intervall=%ds, Broker=%s",
+        "Pi-Gateway startet: org_id=%s, %d Zähler, Intervall=%ds, Lese-Timeout=%.1fs, Broker=%s",
         config.org_id,
         len(config.meters),
         config.publish_interval_seconds,
+        config.read_timeout_seconds,
         config.broker.url,
     )
+    _log_abweichende_timeouts(config)
 
     readers = _build_readers(config)
     publisher = MqttPublisher(config.org_id, config.broker)
@@ -106,6 +108,23 @@ def _read_and_publish(
         heartbeat.record_publish()
         return True
     return False
+
+
+def _log_abweichende_timeouts(config: GatewayConfig) -> None:
+    """Nennt Zähler mit eigenem `read_timeout`.
+
+    Ohne diese Zeile liesse sich der globale Wert aus der Start-Zeile als für alle Zähler
+    gültig missverstehen; die Reader loggen ihren Wert nur auf DEBUG.
+    """
+    abweichend = [
+        meter for meter in config.meters
+        if meter.read_timeout_seconds != config.read_timeout_seconds
+    ]
+    if abweichend:
+        log.info(
+            "Eigenes Lese-Timeout: %s",
+            ", ".join(f"{m.messpunkt}={m.read_timeout_seconds:.1f}s" for m in abweichend),
+        )
 
 
 def _build_readers(config: GatewayConfig) -> list[Reader]:

@@ -85,6 +85,10 @@ Die Nummer wird einmalig am Gerät abgelesen (z. B. per `mbpoll`, siehe
 - **Lese-Timeout:** `read_timeout` (Default `5s`) gilt für alle Zähler; je Zähler mit
   `zaehler[].read_timeout` überschreibbar. Zahl (Sekunden) oder Kurzform (`8s`, `1m`);
   `0`/negativ/ungültig → Fehler beim Start.
+  Der wirksame globale Wert steht **beim Start** im Log (`Lese-Timeout=…s` in der Zeile
+  „Pi-Gateway startet: …"); Zähler mit eigenem Wert folgen in einer Zeile
+  „Eigenes Lese-Timeout: …". Damit lässt sich nach einer Config-Änderung ohne Blick in die
+  `config.yaml` prüfen, ob sie greift.
   Hochsetzen, wenn Reads mit *keine Antwort* fehlschlagen — an einem RTU→TCP-Hub reicht die
   Anfrage seriell bis zum Slave durch. **Nicht** hilfreich bei einer Modbus-**Exception-Response**
   (z. B. `code 11`): dort hat der Hub geantwortet, die Ursache liegt auf der RTU-Strecke.
