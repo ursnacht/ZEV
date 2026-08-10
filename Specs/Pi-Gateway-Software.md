@@ -23,6 +23,12 @@
 3. Jede physische Quelle ist einer **Einheit** über deren **`messpunkt`** zugeordnet (Konfiguration, kein Rückgriff auf interne DB-IDs).
 4. Lese-/Publish-Intervall konfigurierbar (Default z.B. 1–5 min).
 5. **Lese-Timeout konfigurierbar (Nachtrag):** Die Wartezeit auf die Antwort eines Zählers ist konfigurierbar, **global** über `read_timeout` (Default **5 s**) und je Zähler über `zaehler[].read_timeout` überschreibbar (gleicher Schlüsselname, nur enger gültig) (z.B. ein einzelner langsamer Slave am Hub). Angabe als Zahl (Sekunden) oder Kurzform (`"8s"`, `"1m"`); Werte ≤ 0 sowie ungültige Angaben führen zu einem `ConfigError` **beim Start** (kein stiller Fallback). Der **wirksame globale Wert** wird **beim Start** in der Start-Log-Zeile ausgegeben (neben `org_id`, Zähleranzahl, Intervall, Broker), damit im Betrieb ohne Blick in die `config.yaml` erkennbar ist, welcher Timeout gilt – auch der stillschweigende Default. Zähler mit eigenem `read_timeout` werden zusätzlich in einer eigenen Zeile genannt, damit der globale Wert nicht als für alle Zähler gültig missverstanden wird (die Reader selbst loggen ihren Wert nur auf `DEBUG`).
+6. **Lese-Versuche / Retry (Nachtrag):** Ein fehlgeschlagener Read wird **wiederholt**, bevor der Zähler im Zyklus übersprungen wird. Anzahl über `read_attempts` konfigurierbar (**inklusive** Erstversuch, Default **2** = ein Wiederholversuch; `1` = kein Retry). Gilt **global**, nicht je Zähler — die beobachteten Fehler treffen wechselnde Zähler.
+   * **Begründung:** Am eingesetzten Kommunikationsmodul **WAGO 879-9000** ist **kein RTU-Response-Timeout einstellbar** (nur Baudrate/Parität der RS485-Seite, s. `docs/Netzwerk-Topologie-Hene.md`). Sporadische `exception_code=11` lassen sich daher nur client-seitig kompensieren.
+   * **Unschädlich:** Es werden **absolute** Zählerstände publiziert – ein doppelt gelesener Stand kann nichts verfälschen (keine Delta-Bildung auf dem Pi, FR-2).
+   * **Ablauf:** zwischen zwei Versuchen **0,5 s** Pause; jeder Versuch baut die Verbindung neu auf. Fehlgeschlagene Zwischenversuche werden auf `INFO` geloggt (mit Versuchszähler), der endgültige Fehlschlag auf `WARN`.
+   * **Kein Retry** bei unerwarteten Exceptions (Programmierfehler) – dort ist ein zweiter Versuch aussichtslos.
+   * **Zeitbudget:** `read_timeout × read_attempts` (+ Pausen) je Zähler muss deutlich unter dem `publish_interval` bleiben; ungültige Angaben (`0`, negativ, nicht-ganzzahlig, Boolean) führen zu `ConfigError` **beim Start**. Der wirksame Wert steht in der Start-Log-Zeile.
    * Grund für den grosszügigen Default: An einem **RTU→TCP-Hub** wird die Anfrage seriell bis zum Slave durchgereicht und erst danach beantwortet — das dauert deutlich länger als bei direkt angebundenen TCP-Geräten.
    * **Abgrenzung:** Das Timeout wirkt nur, wenn der Hub **gar nicht** antwortet. Antwortet er mit einer **Modbus-Exception** (z.B. `code 11` = *Gateway target device failed to respond*), ist die Anfrage bereits beantwortet — ein höheres Client-Timeout ändert daran **nichts**; Ursache und Abhilfe liegen dann auf der RTU-Strecke bzw. in der Hub-Konfiguration (siehe `docs/Netzwerk-Topologie-Hene.md`, Abschnitt „Modbus-Diagnose"). Die Fehlermeldung des Readers unterscheidet beide Fälle und nennt den Timeout-Hinweis nur bei ausbleibender Antwort.
 
@@ -80,6 +86,7 @@
 > org_id: 42
 > publish_interval: 5m
 > read_timeout: 5s                  # Lese-Timeout je Zähler (Default 5s), unten überschreibbar
+> read_attempts: 2                  # Lese-Versuche inkl. Erstversuch (Default 2, 1 = kein Retry)
 > broker:
 >   url: tcp://nas.local:1883        # bzw. tls://nas.local:8883
 >   username: ${MQTT_USERNAME}
@@ -138,6 +145,11 @@
 * [ ] Ungültige Timeout-Angaben (`0`, negativ, nicht-numerisch, Boolean) führen zu einem `ConfigError` **beim Start** — kein stiller Fallback auf den Default.
 * [ ] Die **Start-Log-Zeile** nennt neben `org_id`, Zähleranzahl, Intervall und Broker auch das **wirksame globale `read_timeout`** (auch wenn es der Default ist).
 * [ ] Sind für einzelne Zähler eigene `read_timeout`-Werte konfiguriert, werden **genau diese** Zähler beim Start zusätzlich mit ihrem Wert genannt; ohne Abweichung erscheint **keine** solche Zeile.
+* [ ] Ein fehlgeschlagener Read wird gemäss `read_attempts` **wiederholt**; gelingt der zweite Versuch, wird der Messwert publiziert und der Zyklus zählt als Erfolg.
+* [ ] Mit `read_attempts: 1` findet **kein** Wiederholversuch statt (bisheriges Verhalten); ohne Angabe gilt **2**.
+* [ ] Scheitern alle Versuche, wird der Zähler in diesem Zyklus übersprungen (`WARN` mit Anzahl der Versuche) – die übrigen Zähler laufen unbeeinflusst weiter.
+* [ ] Ungültige `read_attempts` (`0`, negativ, nicht-ganzzahlig, Boolean, String) führen zu einem `ConfigError` **beim Start**.
+* [ ] Die Start-Log-Zeile nennt die wirksame Anzahl **Lese-Versuche**.
 * [ ] Bleibt eine Antwort aus, nennt die Fehlermeldung den konfigurierten Timeout-Wert und den Hinweis, `timeout` zu erhöhen; bei einer **Modbus-Exception-Response** (z.B. `code 11`) erscheint dieser Hinweis **nicht** (dort hilft das Timeout nicht).
 * [ ] Der Dienst publiziert die **absoluten Zählerstände** unverändert (keine Delta-Berechnung, keine „letzter Stand"-Persistenz).
 * [ ] Publizierte Topic-/Payload-Struktur entspricht `MQTT-Integration.md`: Topic `zev/{orgId}/{messpunkt}/messwert`, Pflichtfelder `{timestamp,zaehlerstandBezug,zaehlerstandEinspeisung}` – plus das **optionale** `seriennummer`, sofern konfiguriert.

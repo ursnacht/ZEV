@@ -15,10 +15,11 @@ import os
 import signal
 import sys
 import threading
+import time
 
 from .config import ConfigError, load_config
 from .heartbeat import Heartbeat
-from .models import GatewayConfig, ReadError
+from .models import GatewayConfig, MeterReading, ReadError
 from .publisher import MqttPublisher
 from .readers.base import Reader
 from .readers.factory import create_reader
@@ -26,6 +27,10 @@ from .readers.factory import create_reader
 log = logging.getLogger("gateway")
 
 _DEFAULT_CONFIG = "/opt/pi-gateway/config.yaml"
+
+# Pause zwischen zwei Lese-Versuchen desselben Zählers. Gibt der RS485-Strecke einen Moment
+# Ruhe, bevor erneut angefragt wird; klein gegenüber dem Publish-Intervall (Minuten).
+_RETRY_DELAY_SECONDS = 0.5
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -39,11 +44,13 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     log.info(
-        "Pi-Gateway startet: org_id=%s, %d Zähler, Intervall=%ds, Lese-Timeout=%.1fs, Broker=%s",
+        "Pi-Gateway startet: org_id=%s, %d Zähler, Intervall=%ds, Lese-Timeout=%.1fs, "
+        "Lese-Versuche=%d, Broker=%s",
         config.org_id,
         len(config.meters),
         config.publish_interval_seconds,
         config.read_timeout_seconds,
+        config.read_attempts,
         config.broker.url,
     )
     _log_abweichende_timeouts(config)
@@ -80,7 +87,7 @@ def _run_loop(
         for reader in readers:
             if stop_event.is_set():
                 break
-            if _read_and_publish(reader, publisher, heartbeat):
+            if _read_and_publish(reader, publisher, heartbeat, config.read_attempts):
                 success += 1
 
         heartbeat.log_cycle(success, len(readers), publisher.is_connected())
@@ -92,15 +99,11 @@ def _read_and_publish(
     reader: Reader,
     publisher: MqttPublisher,
     heartbeat: Heartbeat,
+    attempts: int,
 ) -> bool:
     """Liest einen Zähler und publiziert ihn. Fehler bleiben lokal (kein Abbruch)."""
-    try:
-        reading = reader.read()
-    except ReadError as exc:
-        log.warning("Read übersprungen (%s): %s", reader.messpunkt, exc)
-        return False
-    except Exception:  # noqa: BLE001 - ein defekter Zähler darf die anderen nicht stoppen
-        log.exception("Unerwarteter Lesefehler bei '%s' – übersprungen.", reader.messpunkt)
+    reading = _read_with_retry(reader, attempts)
+    if reading is None:
         return False
 
     heartbeat.record_read()
@@ -108,6 +111,37 @@ def _read_and_publish(
         heartbeat.record_publish()
         return True
     return False
+
+
+def _read_with_retry(reader: Reader, attempts: int) -> MeterReading | None:
+    """Liest einen Zähler mit bis zu ``attempts`` Versuchen; ``None`` = endgültig gescheitert.
+
+    Sporadische Fehler auf der RTU-Strecke treffen wechselnde Zähler und sind mit einem
+    zweiten Versuch meist weg. Am WAGO-Kommunikationsmodul (879-9000) ist kein
+    Response-Timeout einstellbar, deshalb liegt die Kompensation hier.
+
+    Der Retry ist unschädlich, weil **absolute** Zählerstände publiziert werden – ein
+    doppelt gelesener Stand kann nichts verfälschen. Jeder Versuch baut die Verbindung
+    neu auf, da ``Reader.read()`` sie am Ende schliesst.
+
+    **Nicht** wiederholt werden unerwartete Exceptions (Programmierfehler o. Ä.) – dort ist
+    ein zweiter Versuch aussichtslos.
+    """
+    for versuch in range(1, attempts + 1):
+        try:
+            return reader.read()
+        except ReadError as exc:
+            if versuch >= attempts:
+                log.warning("Read übersprungen (%s) nach %d Versuch(en): %s",
+                            reader.messpunkt, versuch, exc)
+            else:
+                log.info("Read fehlgeschlagen (%s), Versuch %d/%d – neuer Versuch in %.1fs: %s",
+                         reader.messpunkt, versuch, attempts, _RETRY_DELAY_SECONDS, exc)
+                time.sleep(_RETRY_DELAY_SECONDS)
+        except Exception:  # noqa: BLE001 - ein defekter Zähler darf die anderen nicht stoppen
+            log.exception("Unerwarteter Lesefehler bei '%s' – übersprungen.", reader.messpunkt)
+            return None
+    return None
 
 
 def _log_abweichende_timeouts(config: GatewayConfig) -> None:

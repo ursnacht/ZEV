@@ -14,6 +14,12 @@ publish_interval: 5m             # z. B. "30s", "5m", "1h" oder reine Sekunden-Z
 # Je Zähler via zaehler[].read_timeout überschreibbar. Zahl (Sekunden) oder "8s"/"1m".
 read_timeout: 5s
 
+# Lese-Versuche je Zähler und Zyklus, inklusive Erstversuch (Default 2 = ein Retry).
+# 1 = kein Retry. Fängt sporadische RTU-Fehler ab (z. B. exception_code=11 vom
+# WAGO-Kommunikationsmodul 879-9000, das keinen einstellbaren Response-Timeout hat).
+# Unschädlich, weil absolute Zählerstände publiziert werden. Gilt global (nicht je Zähler).
+read_attempts: 2
+
 broker:
   url: tcp://nas.local:1883      # bzw. tls://nas.local:8883
   username: ${MQTT_USERNAME}     # aus der Umgebung (EnvironmentFile)

@@ -92,6 +92,13 @@ Die Nummer wird einmalig am Gerät abgelesen (z. B. per `mbpoll`, siehe
   Hochsetzen, wenn Reads mit *keine Antwort* fehlschlagen — an einem RTU→TCP-Hub reicht die
   Anfrage seriell bis zum Slave durch. **Nicht** hilfreich bei einer Modbus-**Exception-Response**
   (z. B. `code 11`): dort hat der Hub geantwortet, die Ursache liegt auf der RTU-Strecke.
+- **Lese-Versuche:** `read_attempts` (Default `2` = ein Wiederholversuch, `1` = keiner) gilt
+  **global**, nicht je Zähler. Fängt sporadische RTU-Fehler ab, die wechselnde Zähler treffen —
+  am WAGO-Kommunikationsmodul **879-9000** ist kein Response-Timeout einstellbar, deshalb wird
+  hier kompensiert. Zwischen den Versuchen liegen 0,5 s; die Verbindung wird neu aufgebaut.
+  Unschädlich, weil **absolute** Zählerstände publiziert werden — ein doppelt gelesener Stand
+  kann nichts verfälschen. Worst Case je Zähler: `read_timeout × read_attempts` (+ Pausen),
+  bei Defaults ~10,5 s — muss deutlich unter `publish_interval` bleiben.
 
 ## Lokale Installation (Entwicklung)
 

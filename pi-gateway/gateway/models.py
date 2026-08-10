@@ -66,6 +66,9 @@ class GatewayConfig:
     meters: list[MeterConfig] = field(default_factory=list)
     # Globaler Default für das Lese-Timeout (Sekunden); je Zähler überschreibbar.
     read_timeout_seconds: float = 5.0
+    # Lese-Versuche je Zähler und Zyklus, inklusive Erstversuch (1 = kein Retry).
+    # Gilt global, da sporadische RTU-Fehler wechselnde Zähler treffen.
+    read_attempts: int = 2
 
 
 @dataclass(frozen=True)

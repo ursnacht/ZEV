@@ -447,7 +447,7 @@ Unabhängig vom Broker-Setup oben.
 |-------|---------|-----------|
 | Raspberry Pi `rpi4sa` | `192.168.10.189` (eth0), `192.168.10.190` (wlan0), VPN `10.8.0.14` | **Beide** Interfaces liegen im selben Subnetz – bei Scans/Bindings beachten |
 | Router | `192.168.10.1` | `model=P5`, WebUI auf Port 80; dort die **DHCP-Lease-Liste** (zuverlässigste Geräteliste) |
-| Modbus-TCP-Hub | `192.168.10.10:502` | Gemeinsame IP für die drei Wago, je Zähler eine `unit_id` (1/2/3) |
+| Kommunikationsmodul **WAGO 879-9000** | `192.168.10.10:502` | Gemeinsame IP für die drei Wago, je Zähler eine `unit_id` (1/2/3). Details/Grenzen s. u. |
 | WhatWatt Go (BKW-Zähler) | *noch nicht identifiziert* | Modbus TCP auf 502 + REST auf 80 erwartet (s. u.) |
 | `espressif.lan` | `192.168.10.220` | ESP32-Gerät, Modbus-TCP auf 502, **kein** Port 80, **kein** mDNS → vermutlich **nicht** das WhatWatt |
 
@@ -519,21 +519,68 @@ mbpoll -t 4:hex -r 0x4000 -c 2 -1 $HUB -p 502 -a 1 -0   # Seriennummer auslesen
 | **Adress-Offset** | Ohne `-0` zählt `mbpoll` ab 1, mit `-0` ab 0 (PDU). Datenblätter nennen meist die PDU-Adresse → im Zweifel beide probieren. |
 | **`Illegal data address`** | Das Gerät **antwortet** – nur die Adresse (oder der Bereich `-c`) ist falsch. Bei `:float` liest `-c 12` bereits **24** Register! |
 | **`Connection timed out`** | Meist **kein** Adressproblem: viele embedded Server erlauben nur **eine** TCP-Verbindung und brauchen Pausen. Keine Schleifen, 30–60 s warten, `-o 5` für längeren Timeout, `ss -tn \| grep <ip>` auf hängende Verbindungen prüfen. |
-| **`exception_code=11`** | „Gateway target device failed to respond" – kommt vom **Hub**, nicht vom Zähler: der Hub erreicht den Slave auf der **RTU-Strecke** nicht (Verkabelung, Terminierung, Baudrate/Parität, Adresse, Timeout **am Hub**). Kein Netzwerkproblem – ein IP-Scan hilft hier nicht. **Auch das Client-Timeout des Gateways hilft nicht**: der Hub hat ja geantwortet (mit der Exception). Der relevante Timeout ist der **RTU-Response-Timeout im Hub**. |
+| **`exception_code=11`** | „Gateway target device failed to respond" – kommt vom **Kommunikationsmodul**, nicht vom Zähler: es erreicht den Slave auf der **RTU-Strecke** nicht (Verkabelung, Terminierung, Baudrate/Parität, Adresse, Versorgung). Kein Netzwerkproblem – ein IP-Scan hilft hier nicht. **Auch das Client-Timeout des Pi hilft nicht**: das Modul hat ja geantwortet (mit der Exception). **Und ein RTU-Response-Timeout am Modul ist beim 879-9000 nicht einstellbar** (s. u.) – kompensiert wird client-seitig über `read_attempts` (Retry, Default 2). |
 
 > **Client-Timeout des Pi-Gateways:** konfigurierbar über `read_timeout` (global, Default 5 s)
 > bzw. `zaehler[].read_timeout` je Zähler (s. `Specs/Pi-Gateway-Software.md`, FR-1.5). Wirkt nur bei
 > **ausbleibender** Antwort – nicht bei Exception-Responses wie `code 11` (s. Tabelle).
+>
+> **Retry des Pi-Gateways:** `read_attempts` (global, Default **2** = ein Wiederholversuch,
+> 0,5 s Pause, Verbindung wird neu aufgebaut). Das ist die Kompensation für sporadische
+> `code 11`, weil am Modul kein Response-Timeout einstellbar ist. Unschädlich, da absolute
+> Zählerstände publiziert werden (`Specs/Pi-Gateway-Software.md`, FR-1.6).
 
-**Offener Punkt:** Der Zähler an `unit_id=2` liefert wiederkehrend `exception_code=11`.
-Häufigkeit und Verteilung auswerten:
+### Das Kommunikationsmodul: WAGO 879-9000
+
+Der „Hub" auf `192.168.10.10` ist **kein** generisches RTU→TCP-Gateway, sondern das
+**Kommunikationsmodul der WAGO-MID-Zähler** ([Produktseite](https://www.wago.com/us/communication-module/p/879-9000),
+[Kurzanleitung PDF](https://www.tme.eu/Document/20b55b99db28c68f381d2192681b601b/879-9000-de.pdf)).
+
+- Klippt per **seitlicher UART-Schnittstelle** direkt an einen WAGO-Zähler (4PU/4PS/2PU CT),
+  wird von dort versorgt und liest dessen Daten — für **diesen** Zähler ist keine RS485-Verbindung nötig.
+- Über die **externe RS485** bis zu **32** Modbus-RTU-Zähler; dafür ist eine **externe
+  5-V-DC-Versorgung (500 mA)** erforderlich.
+- Konfiguration nur mit dem kostenlosen Windows-Tool **`TCPIPModuleConfig`** (Download auf der
+  Produktseite). Es findet Module per **Netzwerk-Broadcast** → über den VPN-Tunnel nicht ohne
+  Weiteres nutzbar; für die manuelle Eingabe gibt es „Additional device IP". Am einfachsten vor Ort.
+
+**Einstellbar** („Bereich E" des Tools) sind nur die Modbus-Parameter der Schnittstellen:
+
+| Parameter | UART-Seite | Externe RS485 |
+|---|---|---|
+| Baudrate | 115.200 bd (**fix**) | **300 … 115.200 bd wählbar** |
+| Parität | EVEN (**fix**) | EVEN / NONE / ODD |
+
+**Ein Response-/Antwort-Timeout ist nicht vorhanden.** Bei sporadischen `code 11` bleiben daher
+als Hebel: **Versorgung prüfen** (bei RS485-Zählern die externen 5 V/500 mA — fehlende Reserve ist
+ein plausibler Grund für Ausfälle über alle Zähler), **Baudrate senken** (am Modul *und* an allen
+Zählern gleich), **Terminierung** (120 Ω an beiden Busenden, keine langen Stichleitungen) — plus
+der client-seitige Retry (`read_attempts`).
+
+> **Diagnostisch wertvoll:** Hängt einer der Zähler per UART direkt am Modul, fällt *der* nie aus
+> (nur die RS485-Zähler), ist die RS485-Strecke eindeutig überführt.
+
+**Offener Punkt:** Es treten wiederkehrend `exception_code=11` auf – **nicht immer beim
+gleichen Zähler**, sondern über alle verteilt. Das spricht für eine **gemeinsame Ursache auf
+der RTU-Strecke** (Versorgung/Baudrate/Terminierung, s. Abschnitt zum 879-9000) und gegen
+Verkabelung oder Adresse eines einzelnen Geräts. Häufigkeit und Verteilung auswerten:
 
 ```bash
 journalctl -u pi-gateway --since "24 hours ago" | grep -o "dev_id=[0-9]*" | sort | uniq -c
 ```
 
-Trifft es **immer** `dev_id=2`, deutet das auf Verkabelung/Adresse dieses Geräts;
-trifft es sporadisch alle, eher auf Bus-Timing bzw. einen zu knappen Response-Timeout.
+Trifft es **immer** denselben `dev_id`, deutet das auf Verkabelung/Adresse dieses Geräts;
+trifft es sporadisch alle (aktueller Stand), auf eine gemeinsame Ursache auf dem RS485-Bus.
+Zum Vergleich unabhängig von unserer Software gegenprüfen:
+
+```bash
+for i in $(seq 1 50); do for a in 1 2 3; do
+  mbpoll -a $a -t 4:float -r 0x600C -c 1 -1 -o 2 $HUB -p 502 >/dev/null 2>&1 || echo "fail a=$a lauf=$i"
+done; done
+```
+
+Dieselbe Fehlerrate wie im Dienst → Ursache liegt sicher am Modul/RS485; sauber → unser
+Zugriffsmuster spielt mit hinein.
 
 *Auswirkung auf die Daten:* Einzelne fehlgeschlagene Reads sind **folgenlos** – der Pi
 publiziert **absolute** Zählerstände, das Delta über die Intervallgrenze bleibt identisch.

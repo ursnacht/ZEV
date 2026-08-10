@@ -41,6 +41,13 @@ _MAX_SERIENNUMMER_LAENGE = 64
 # bei langsamen Bussen/vielen Slaves dauert das deutlich länger als bei direktem TCP.
 _DEFAULT_READ_TIMEOUT = 5.0
 
+# Lese-Versuche je Zähler und Zyklus (inkl. Erstversuch). Default 2 = ein Wiederholversuch:
+# Auf der RTU-Strecke treten sporadische Fehler auf (z. B. `exception_code=11` vom
+# WAGO-Kommunikationsmodul 879-9000, das keinen einstellbaren Response-Timeout hat), die
+# wechselnde Zähler treffen. Ein Retry ist unschädlich, weil absolute Zählerstände
+# publiziert werden – ein doppelt gelesener Stand kann nichts verfälschen.
+_DEFAULT_READ_ATTEMPTS = 2
+
 
 class ConfigError(Exception):
     """Ungültige oder unvollständige Konfiguration."""
@@ -66,6 +73,7 @@ def load_config(path: str | Path) -> GatewayConfig:
     interval = _parse_interval(_require(raw, "publish_interval", (str, int)))
     broker = _parse_broker(_require(raw, "broker", dict))
     read_timeout = _parse_timeout(raw.get("read_timeout"), "read_timeout", _DEFAULT_READ_TIMEOUT)
+    read_attempts = _parse_attempts(raw.get("read_attempts"))
     meters = _parse_meters(raw.get("zaehler"), read_timeout)
 
     return GatewayConfig(
@@ -74,6 +82,7 @@ def load_config(path: str | Path) -> GatewayConfig:
         broker=broker,
         meters=meters,
         read_timeout_seconds=read_timeout,
+        read_attempts=read_attempts,
     )
 
 
@@ -133,6 +142,21 @@ def _parse_timeout(value, ctx: str, default: float) -> float:
     if seconds <= 0:
         raise ConfigError(f"{ctx} muss > 0 sein (war: {value}).")
     return seconds
+
+
+def _parse_attempts(value) -> int:
+    """Lese-Versuche je Zähler und Zyklus (inkl. Erstversuch). ``None`` → Default.
+
+    Muss eine ganze Zahl ≥ 1 sein; ``1`` bedeutet „kein Wiederholversuch". Ungültige
+    Angaben brechen den Start ab (kein stiller Fallback), analog ``read_timeout``.
+    """
+    if value is None:
+        return _DEFAULT_READ_ATTEMPTS
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ConfigError(f"read_attempts muss eine ganze Zahl >= 1 sein (war: {value!r}).")
+    if value < 1:
+        raise ConfigError(f"read_attempts muss >= 1 sein (war: {value}).")
+    return value
 
 
 def _parse_meters(data, read_timeout: float) -> list[MeterConfig]:

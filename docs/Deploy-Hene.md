@@ -120,6 +120,14 @@ Konfigurations-Optionen wirken daher erst, wenn sie **manuell** eingetragen werd
       read_timeout: 8s          # global
       # zaehler[].read_timeout: 20    # nur für einen langsamen Slave
       ```
+- [ ] **Lese-Versuche** (Default 2 = ein Retry) — fängt sporadische `exception_code=11` ab;
+      am WAGO 879-9000 ist kein Response-Timeout einstellbar (s.
+      [`docs/Netzwerk-Topologie-Hene.md`](./Netzwerk-Topologie-Hene.md)):
+      ```yaml
+      read_attempts: 2          # global; 1 = kein Retry
+      ```
+      Zeitbudget beachten: `read_timeout × read_attempts` je Zähler deutlich unter
+      `publish_interval` halten.
 - [ ] Neu starten und Logs beobachten:
       ```bash
       sudo systemctl start pi-gateway.service
