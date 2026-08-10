@@ -2,6 +2,7 @@ package ch.nacht.controller;
 
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.FeatureFlag;
+import ch.nacht.entity.MeldungLevel;
 import ch.nacht.exception.FeatureDisabledException;
 import ch.nacht.service.CalculationProgressService;
 import ch.nacht.service.EinheitService;
@@ -9,15 +10,19 @@ import ch.nacht.service.FeatureFlagService;
 import ch.nacht.service.MesswerteService;
 import ch.nacht.service.MetricsService;
 import ch.nacht.service.OrganizationContextService;
+import ch.nacht.service.SystemmeldungService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
@@ -26,24 +31,31 @@ import java.util.Map;
 public class MesswerteController {
 
     private static final Logger log = LoggerFactory.getLogger(MesswerteController.class);
+
+    /** Datumsformat für den Zeitraum in der Audit-Systemmeldung (Schweizer Format). */
+    private static final DateTimeFormatter DATUM_FORMAT = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+
     private final MesswerteService messwerteService;
     private final MetricsService metricsService;
     private final EinheitService einheitService;
     private final CalculationProgressService calculationProgressService;
     private final OrganizationContextService organizationContextService;
     private final FeatureFlagService featureFlagService;
+    private final SystemmeldungService systemmeldungService;
 
     public MesswerteController(MesswerteService messwerteService, MetricsService metricsService,
                                EinheitService einheitService,
                                CalculationProgressService calculationProgressService,
                                OrganizationContextService organizationContextService,
-                               FeatureFlagService featureFlagService) {
+                               FeatureFlagService featureFlagService,
+                               SystemmeldungService systemmeldungService) {
         this.messwerteService = messwerteService;
         this.metricsService = metricsService;
         this.einheitService = einheitService;
         this.calculationProgressService = calculationProgressService;
         this.organizationContextService = organizationContextService;
         this.featureFlagService = featureFlagService;
+        this.systemmeldungService = systemmeldungService;
         log.info("MesswerteController initialized");
     }
 
@@ -119,7 +131,8 @@ public class MesswerteController {
     public ResponseEntity<Map<String, Object>> calculateDistribution(
             @RequestParam("dateFrom") String dateFromStr,
             @RequestParam("dateTo") String dateToStr,
-            @RequestParam(value = "algorithm", defaultValue = "EQUAL_SHARE") String algorithm) {
+            @RequestParam(value = "algorithm", defaultValue = "EQUAL_SHARE") String algorithm,
+            @AuthenticationPrincipal Jwt jwt) {
 
         log.info("Distribution calculation request - dateFrom: {}, dateTo: {}, algorithm: {}",
                 dateFromStr, dateToStr, algorithm);
@@ -133,6 +146,9 @@ public class MesswerteController {
             LocalDateTime dateTimeTo = dateTo.atTime(23, 59, 59);
 
             log.debug("Parsed date range - from: {}, to: {}", dateTimeFrom, dateTimeTo);
+
+            // Audit-Systemmeldung VOR dem Lauf – so ist auch ein abgebrochener Lauf belegt.
+            erfasseManuellenStart(jwt, dateFrom, dateTo, algorithm);
 
             // Call the service to calculate distribution with selected algorithm
             MesswerteService.CalculationResult result = messwerteService.calculateSolarDistribution(dateTimeFrom,
@@ -160,6 +176,29 @@ public class MesswerteController {
             return ResponseEntity.badRequest().body(Map.of(
                     "status", "error",
                     "message", e.getMessage()));
+        }
+    }
+
+    /**
+     * Erfasst eine INFO-Systemmeldung als Audit-Spur für den <b>manuell</b> gestarteten
+     * Verteillauf (der MQTT-Auto-Lauf erzeugt sie bewusst nicht). Ein Eintrag pro Lauf,
+     * mit Benutzer, Zeitraum und Algorithmus.
+     *
+     * <p>Der Aufruf darf den Verteillauf nie beeinträchtigen: Fehler beim Erfassen werden
+     * nur geloggt (analog Spec „Fehler beim Schreiben der Systemmeldung").
+     */
+    private void erfasseManuellenStart(Jwt jwt, LocalDate dateFrom, LocalDate dateTo, String algorithm) {
+        try {
+            String benutzer = jwt != null ? jwt.getClaimAsString("preferred_username") : null;
+            // Nur die dynamischen Teile; die Beschriftung steckt im übersetzten Meldungstext (i18n).
+            String parameter = (benutzer != null && !benutzer.isBlank() ? benutzer : "unbekannt")
+                    + ", " + dateFrom.format(DATUM_FORMAT) + "–" + dateTo.format(DATUM_FORMAT)
+                    + ", " + algorithm;
+            systemmeldungService.erfasseAudit(organizationContextService.getCurrentOrgId(),
+                    MeldungLevel.INFO, SystemmeldungService.KATEGORIE_VERTEILUNG,
+                    SystemmeldungService.KEY_VERTEILUNG_MANUELL, parameter);
+        } catch (Exception e) {
+            log.warn("Audit-Systemmeldung für manuellen Verteillauf nicht erfasst: {}", e.getMessage());
         }
     }
 

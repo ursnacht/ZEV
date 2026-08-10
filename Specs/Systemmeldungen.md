@@ -21,7 +21,7 @@
    * über den **Erledigt-Status**: **Alle / Offene / Erledigte** (Default: **Offene**).
    * über die **Kategorie**: **Alle Kategorien** oder eine bestimmte Kategorie (zu Beginn nur „Bilanzmodell"; die Auswahl ergibt sich aus den vorhandenen Kategorien); Default: **Alle Kategorien**.
    * über das **Level**: **Alle Level** oder ein bestimmtes Level (INFO/WARN/ERROR); Default: **Alle Level**.
-4. **Sortierung** über **alle Spalten** (auf-/absteigend). Da die Liste **serverseitig paginiert** wird (FR-1.11), erfolgt auch die **Sortierung serverseitig** (`sortSpalte` + `sortRichtung`, analog Datenbank-Ansicht) auf den **gespeicherten Werten**: Zeitstempel und `Zähler` natürlich, **`Level` nach Schweregrad** (ERROR > WARN > INFO), `Kategorie`/`Meldung` nach dem gespeicherten Key. *(Eine Sortierung nach dem übersetzten Anzeigetext ist mit serverseitiger Paginierung nicht möglich.)*
+4. **Sortierung** über **alle Spalten** (auf-/absteigend). Da die Liste **serverseitig paginiert** wird (FR-1.12), erfolgt auch die **Sortierung serverseitig** (`sortSpalte` + `sortRichtung`, analog Datenbank-Ansicht) auf den **gespeicherten Werten**: Zeitstempel und `Zähler` natürlich, **`Level` nach Schweregrad** (ERROR > WARN > INFO), `Kategorie`/`Meldung` nach dem gespeicherten Key. *(Eine Sortierung nach dem übersetzten Anzeigetext ist mit serverseitiger Paginierung nicht möglich.)*
 5. **Erledigt umschalten:** Über die Checkbox in der Zeile kann eine Meldung als erledigt / wieder offen markiert werden. Erfordert `systemmeldungen:manage`.
    * Beim **Wieder-Öffnen** werden `erledigt_am` und `erledigt_automatisch` zurückgesetzt.
    * Das Wieder-Öffnen wird **abgelehnt**, wenn bereits ein **offener** Eintrag mit demselben `meldung_key` im Mandanten existiert (Dedup-Invariante / UNIQUE-Teil-Index, s. FR-2) – mit verständlicher Fehlermeldung.
@@ -40,7 +40,15 @@
    * **Org-explizit:** Im MQTT-Auto-Lauf ist die `org_id` bekannt und wird **explizit mitgegeben**. Dedup-Lookup und Erzeugung nutzen die **org-explizite** Variante der `SystemmeldungService`-Methoden (Parameter `orgId`, `HibernateFilterService.enableOrgFilter(orgId)`) und **nie** `getCurrentOrgId()`/den request-scoped Filter – sonst `NoOrganizationException` (analog `Bilanzmodell.md` FR-1.4). Im manuellen Lauf stammt die `orgId` aus dem Kontext.
 9. **Auto-Resolve (Selbstheilung):** Läuft der auslösende Vorgang für denselben Mandanten später **erfolgreich** durch, werden die zugehörigen **offenen** Einträge automatisch auf **erledigt** gesetzt (`erledigt = true`, `erledigt_am = jetzt`, `erledigt_automatisch = true`). Konkret: nach einem erfolgreichen Solarverteil-Lauf (manuell **oder** MQTT-Auto-Lauf) im Bilanzmodus werden offene Einträge des Mandanten mit `meldung_key = BILANZMODELL_KEINE_BILANZDATEN` aufgelöst (**org-explizit**, `orgId` wird im Auto-Lauf mitgegeben). So verrottet die Liste nicht; ein wiederkehrender Fehler erzeugt gemäss FR-1.8 wieder einen neuen offenen Eintrag. Das Auto-Resolve läuft im Erfolgsfall (kein Rollback) und darf den auslösenden Vorgang nicht beeinträchtigen (Fehler beim Auflösen werden geloggt, nicht propagiert). **Hinweis (akzeptiert):** Wechselt ein Mandant von `BILANZ` zu `PRODUCER_MESSUNG`, gibt es keinen erfolgreichen Bilanzlauf mehr – etwaige alte offene `BILANZMODELL_...`-Einträge bleiben dann bis zur manuellen Erledigung bzw. Retention bestehen (bewusst so).
 10. **Aufbewahrung / Retention:** Ein **geplanter Cleanup-Job** löscht **erledigte** Einträge, deren `erledigt_am` älter als eine konfigurierbare Frist ist (Default **90 Tage**, `application.yml`). **Offene** Einträge werden **nie** automatisch gelöscht. Der Job ist mandantenübergreifend, respektiert aber die Daten je `org_id`. **Wichtig:** Der Job ist **nicht** an das Spring-Profil `mqtt` gebunden (Systemmeldungen entstehen auch im manuellen Lauf ohne MQTT), sondern läuft in allen Umgebungen.
-11. **Paginierung:** Die Liste wird **serverseitig** seitenweise geladen – **analog zur Datenbank-Ansicht** in den Einstellungen (`DatenbankController`/`datenbank-ansicht`): 0-basierte `page`, feste Seitengrösse (Default **50**), das Backend liefert ein **`hatMehr`**-Flag (kein Gesamt-Count). Navigation über **Vorherige/Nächste Seite** (Vorherige deaktiviert auf Seite 0, Nächste deaktiviert bei `hatMehr = false`). Filter (FR-1.3) und Sortierung (FR-1.4) werden serverseitig angewandt; ein **Wechsel von Filter oder Sortierung setzt auf Seite 0 zurück**.
+11. **Audit-Meldung „Solar-Verteilung manuell gestartet"** (INFO): Startet ein Benutzer die Solar-Verteilung **manuell** (`POST /api/messwerte/calculate-distribution`), wird eine Systemmeldung mit Level `INFO`, Kategorie **„Solar-Verteilung"** (`SYSTEMMELDUNG_KATEGORIE_VERTEILUNG`) und `meldung_key = VERTEILUNG_MANUELL_GESTARTET` erfasst.
+   * **Inhalt (`parameter`):** **Benutzer** (Keycloak-Claim `preferred_username`; fehlt er: „unbekannt"), **Zeitraum** (`dd.MM.yyyy–dd.MM.yyyy`) und **Algorithmus** – nur die dynamischen Teile; die Beschriftung steckt im übersetzten Meldungstext (i18n, FR-1.2).
+   * **Zeitpunkt:** **vor** dem Verteillauf – damit ist auch ein **abgebrochener** Lauf belegt. Voraussetzung ist lediglich ein gültiger Zeitraum (schlägt bereits das Parsen der Datumsangaben fehl, wurde kein Lauf gestartet und es entsteht keine Meldung).
+   * **Ein Eintrag pro Lauf (Audit-Spur):** **keine** Deduplizierung nach `meldung_key` (abweichend von FR-1.8) – jeder Lauf bleibt einzeln nachvollziehbar.
+   * **Direkt als erledigt gespeichert** (`erledigt = true`, `erledigt_am = jetzt`, `erledigt_automatisch = true`). Grund: der UNIQUE-Teil-Index aus FR-2 erlaubt nur **einen offenen** Eintrag je (`org_id`, `meldung_key`) – mehrere offene Audit-Einträge sind damit ausgeschlossen. **Akzeptierte Folgen:** Audit-Einträge erscheinen **nicht** im Default-Filter „Offene" (nur unter „Erledigte"/„Alle"), werden von „Erledigte Meldungen löschen" (FR-1.6a) **mitgelöscht** und von der Retention (FR-1.10) nach Ablauf der Frist entfernt.
+   * **Nur der manuelle Lauf:** Der **MQTT-Auto-Lauf** (`ZaehlerAggregationService`) erzeugt diese Meldung bewusst **nicht** – sie belegt eine Benutzeraktion.
+   * **Entkoppelt:** eigene Transaktion (`REQUIRES_NEW`); ein Fehler beim Erfassen wird nur geloggt und beeinträchtigt den Verteillauf **nicht**.
+   * **Robustheit:** `parameter` wird auf die Spaltenbreite (500 Zeichen) gekürzt, da Algorithmus und Zeitraum aus Request-Parametern stammen.
+12. **Paginierung:** Die Liste wird **serverseitig** seitenweise geladen – **analog zur Datenbank-Ansicht** in den Einstellungen (`DatenbankController`/`datenbank-ansicht`): 0-basierte `page`, feste Seitengrösse (Default **50**), das Backend liefert ein **`hatMehr`**-Flag (kein Gesamt-Count). Navigation über **Vorherige/Nächste Seite** (Vorherige deaktiviert auf Seite 0, Nächste deaktiviert bei `hatMehr = false`). Filter (FR-1.3) und Sortierung (FR-1.4) werden serverseitig angewandt; ein **Wechsel von Filter oder Sortierung setzt auf Seite 0 zurück**.
 
 ### FR-2: Persistierung
 * Neue Tabelle `zev.systemmeldung` (Flyway-Migration), mandantenfähig (`org_id`, Hibernate-`@Filter` `orgFilter` analog zu den übrigen Entities):
@@ -87,6 +95,12 @@
 * [ ] Ist der passende Eintrag bereits **erledigt**, erzeugt ein erneutes Auftreten einen **neuen offenen** Eintrag.
 * [ ] **Auto-Resolve:** Nach einem **erfolgreichen** Solarverteil-Lauf (manuell oder MQTT-Auto-Lauf) im Bilanzmodus werden offene Einträge des Mandanten mit `meldung_key = BILANZMODELL_KEINE_BILANZDATEN` automatisch auf erledigt gesetzt (`erledigt_am` gesetzt, `erledigt_automatisch = true`); ein Fehler beim Auflösen beeinträchtigt den Verteillauf nicht.
 * [ ] **Retention:** Der Cleanup-Job löscht **erledigte** Einträge mit `erledigt_am` älter als die konfigurierte Frist (Default 90 Tage); **offene** Einträge werden nie automatisch gelöscht.
+* [ ] **Manueller Verteillauf:** Beim Start der Solar-Verteilung über `POST /api/messwerte/calculate-distribution` entsteht eine Systemmeldung mit Level `INFO`, Kategorie `SYSTEMMELDUNG_KATEGORIE_VERTEILUNG` und `meldung_key = VERTEILUNG_MANUELL_GESTARTET`.
+* [ ] Der `parameter` dieser Meldung enthält **Benutzername** (`preferred_username`), **Zeitraum** (`dd.MM.yyyy–dd.MM.yyyy`) und **Algorithmus**; fehlt der Benutzer-Claim, steht „unbekannt".
+* [ ] Die Meldung entsteht **auch dann**, wenn der Verteillauf anschliessend fehlschlägt (sie wird **vor** dem Lauf geschrieben).
+* [ ] **Jeder** manuelle Lauf erzeugt einen **eigenen** Eintrag (keine Dedup/Zähler-Erhöhung); die Einträge sind **direkt erledigt** (`erledigt = true`, `erledigt_am` gesetzt, `erledigt_automatisch = true`) und damit unter dem Filter „Erledigte"/„Alle" sichtbar, nicht unter „Offene".
+* [ ] Der **MQTT-Auto-Lauf** erzeugt **keine** solche Meldung.
+* [ ] Ein Fehler beim Erfassen dieser Meldung lässt den Verteillauf unbeeinflusst (Antwort weiterhin `success`).
 * [ ] Die Systemmeldung wird auch dann persistiert, wenn der auslösende Verteillauf zurückrollt (separate Transaktion) – der Verteillauf selbst wird durch das Schreiben der Meldung nicht beeinflusst.
 * [ ] Mit `systemmeldungen:manage` kann der Erledigt-Status umgeschaltet und ein Eintrag gelöscht werden; nach jeder Mutation ist die Liste aktualisiert.
 * [ ] Beim Wieder-Öffnen werden `erledigt_am`/`erledigt_automatisch` zurückgesetzt; existiert bereits ein offener Eintrag desselben `meldung_key`, wird das Wieder-Öffnen mit verständlicher Meldung abgelehnt.
@@ -134,6 +148,9 @@
 | Auslösender Lauf wird wieder erfolgreich | **Auto-Resolve:** offene Einträge desselben Keys/Mandanten → erledigt (`erledigt_automatisch = true`) |
 | Fehler beim Auto-Resolve | Geloggt, **nicht** propagiert – der erfolgreiche Verteillauf bleibt unberührt |
 | Wachstum der Tabelle | Retention-Job löscht erledigte Einträge älter als die Frist (Default 90 Tage); offene bleiben |
+| Manueller Verteillauf bricht ab | Der Audit-Eintrag (FR-1.11) bleibt bestehen – er wird **vor** dem Lauf und in eigener Transaktion geschrieben |
+| Ungültiges Start-/Enddatum beim manuellen Lauf | Kein Lauf, **kein** Audit-Eintrag (Abbruch bereits beim Parsen); HTTP 400 wie bisher |
+| Überlanger `parameter` (z.B. sehr langer `algorithm`-Parameter) | Auf 500 Zeichen gekürzt statt Insert-Fehler |
 
 ## 6. Abhängigkeiten & betroffene Funktionalität
 * **Voraussetzungen:** Bilanzmodell (`Specs/Bilanzmodell.md`) als erste Fehlerquelle; Design System (Tabelle, Kebab-Menü, Checkbox, Filter, Empty-State); `TranslationService`; Multi-Tenancy (`OrganizationContextService`, `HibernateFilterService`).
@@ -143,6 +160,7 @@
 * **Neuer Code (Frontend):** `models/systemmeldung.model.ts`, `services/systemmeldung.service.ts`, `components/systemmeldungen/` (List-Component mit Filter/Sortierung/**Paginierung (Vorherige/Nächste)**/Kebab, analog `datenbank-ansicht`), Route in `app.routes.ts`, Menü-Eintrag in `app.component.html`.
 * **Berechtigungen:** neue Permissions `systemmeldungen:read` / `systemmeldungen:manage` in Keycloak-Realm + `Specs/Berechtigungen.md`.
 * **i18n:** neue Übersetzungs-Keys (Menü/Seitentitel, Spalten, Filter, Aktionen, Meldungs-Keys) via Flyway (`ON CONFLICT (key) DO NOTHING`, DE/EN). Der Key `BILANZMODELL_KEINE_BILANZDATEN` existiert bereits.
+* **Audit-Meldung manueller Verteillauf (FR-1.11):** `controller/MesswerteController.java` (Endpoint `calculate-distribution` – Benutzer aus `@AuthenticationPrincipal Jwt` / Claim `preferred_username`, `orgId` aus dem Kontext) und `service/SystemmeldungService.java` (neue Methode `erfasseAudit(...)` ohne Dedup, Eintrag direkt erledigt); Übersetzungen via Flyway `V97`.
 * **Datenmigration:** keine (nur neue Tabelle + Übersetzungs-Keys; nächste freie Flyway-Version zum Umsetzungszeitpunkt prüfen).
 
 ## 7. Abgrenzung / Out of Scope
@@ -167,5 +185,8 @@ Geklärt (im Dokument eingearbeitet):
 * [x] **Meldungs-Rendering:** **Konkatenation** `translate(meldung_key)` + `parameter` (keine Platzhalter-Interpolation in der Übersetzungs-Infrastruktur).
 * [x] **Paginierung:** **serverseitig**, analog Datenbank-Ansicht (`page`/`size`=50/`hatMehr`, Vorherige/Nächste).
 * [x] **Sortierung:** dadurch **serverseitig** auf gespeicherten Werten (Level nach Schweregrad, Meldung/Kategorie nach Key) – ersetzt die frühere Idee „nach übersetztem Anzeigetext" (mit serverseitiger Paginierung nicht umsetzbar).
+
+* [x] **Audit-Meldung manueller Verteillauf:** **ein Eintrag pro Lauf** (Audit-Spur, keine Dedup), Inhalt **Benutzer + Zeitraum + Algorithmus**, geschrieben **vor** dem Lauf (damit auch abgebrochene Läufe belegt sind).
+* [x] **Umgang mit der Dedup-Invariante:** Audit-Einträge werden **direkt als erledigt** gespeichert – der UNIQUE-Teil-Index erlaubt nur einen offenen Eintrag je Key/Mandant. Akzeptiert: nicht im Default-Filter „Offene", werden von „Erledigte Meldungen löschen" und von der Retention mitgelöscht.
 
 Noch offen: –

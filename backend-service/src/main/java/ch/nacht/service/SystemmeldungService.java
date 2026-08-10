@@ -48,6 +48,14 @@ public class SystemmeldungService {
     /** Meldungs-Key (WARN): Ausfall über mehrere Aggregationsintervalle – Auflösung geht verloren. */
     public static final String KEY_ZAEHLER_AUSFALL = "MQTT_ZAEHLER_AUSFALL";
 
+    /** Kategorie-Übersetzungs-Key für Meldungen zur Solar-Verteilung. */
+    public static final String KATEGORIE_VERTEILUNG = "SYSTEMMELDUNG_KATEGORIE_VERTEILUNG";
+    /** Meldungs-Key (INFO, Audit): die Solar-Verteilung wurde manuell gestartet. */
+    public static final String KEY_VERTEILUNG_MANUELL = "VERTEILUNG_MANUELL_GESTARTET";
+
+    /** Maximale Länge von {@code parameter} (DB-Spaltenbreite). */
+    private static final int PARAMETER_MAX_LAENGE = 500;
+
     /** Erlaubte, direkt sortierbare Entity-Properties (Whitelist gegen Sort-Injection). */
     private static final Set<String> SORTIERBAR = Set.of(
             "zuletztAufgetreten", "erstmalsAufgetreten", "zaehler", "kategorie", "meldungKey", "erledigt");
@@ -179,6 +187,41 @@ public class SystemmeldungService {
             systemmeldungRepository.findByOrgIdAndMeldungKeyAndErledigtFalse(orgId, meldungKey)
                     .ifPresent(m -> inkrementiere(m, jetzt, parameter));
         }
+    }
+
+    /**
+     * Erfasst einen <b>Audit-Eintrag</b>: <b>ein Eintrag pro Vorgang</b>, ohne Deduplizierung –
+     * damit bleibt jeder einzelne Vorgang nachvollziehbar (Audit-Spur), statt zu einem Zähler
+     * zusammengefasst zu werden.
+     *
+     * <p>Der Eintrag wird <b>direkt als erledigt</b> gespeichert
+     * ({@code erledigt = true}, {@code erledigtAm = jetzt}, {@code erledigtAutomatisch = true}).
+     * Das ist keine Kosmetik, sondern von der Dedup-Invariante erzwungen: der UNIQUE-Teil-Index
+     * {@code (org_id, meldung_key) WHERE erledigt = FALSE} erlaubt nur <b>einen offenen</b> Eintrag
+     * je Key und Mandant. Folgen: Audit-Einträge erscheinen <b>nicht</b> im Default-Filter
+     * „Offene" (nur unter „Erledigte"/„Alle"), werden von „Erledigte Meldungen löschen"
+     * mitgelöscht und nach Ablauf der Retention-Frist entfernt.
+     *
+     * <p>Eigene Transaktion ({@code REQUIRES_NEW}) und org-explizit – wie {@link #erfasse}.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void erfasseAudit(Long orgId, MeldungLevel level, String kategorie, String meldungKey, String parameter) {
+        LocalDateTime jetzt = LocalDateTime.now();
+        Systemmeldung neu = new Systemmeldung(level, kategorie, meldungKey, kuerze(parameter), jetzt, jetzt);
+        neu.setOrgId(orgId);
+        neu.setErledigt(true);
+        neu.setErledigtAm(jetzt);
+        neu.setErledigtAutomatisch(true);
+        systemmeldungRepository.saveAndFlush(neu);
+        log.info("Audit-Systemmeldung erfasst (org={}, key={}, level={})", orgId, meldungKey, level);
+    }
+
+    /** Kürzt {@code parameter} auf die Spaltenbreite – Teile stammen aus Request-Parametern. */
+    private String kuerze(String parameter) {
+        if (parameter == null || parameter.length() <= PARAMETER_MAX_LAENGE) {
+            return parameter;
+        }
+        return parameter.substring(0, PARAMETER_MAX_LAENGE);
     }
 
     private void inkrementiere(Systemmeldung meldung, LocalDateTime jetzt, String parameter) {

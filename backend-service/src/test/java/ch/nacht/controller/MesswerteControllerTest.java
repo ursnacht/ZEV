@@ -3,6 +3,7 @@ package ch.nacht.controller;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.FeatureFlag;
+import ch.nacht.entity.MeldungLevel;
 import ch.nacht.service.CalculationProgressService;
 import ch.nacht.service.EinheitService;
 import ch.nacht.service.FeatureFlagService;
@@ -10,10 +11,17 @@ import ch.nacht.service.MesswerteService;
 import ch.nacht.service.MetricsService;
 import ch.nacht.service.OrganisationService;
 import ch.nacht.service.OrganizationContextService;
+import ch.nacht.service.SystemmeldungService;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -34,6 +42,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -66,6 +76,9 @@ public class MesswerteControllerTest {
     @MockitoBean
     private FeatureFlagService featureFlagService;
 
+    @MockitoBean
+    private SystemmeldungService systemmeldungService;
+
     private Einheit testEinheit;
 
     @BeforeEach
@@ -74,6 +87,25 @@ public class MesswerteControllerTest {
         testEinheit.setId(1L);
         // Feature-Flag standardmässig aktiv, damit der Upload-Endpunkt nicht gesperrt wird.
         when(featureFlagService.isEnabled(any(), eq(FeatureFlag.MESSWERTE_UPLOAD))).thenReturn(true);
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
+
+    /**
+     * Setzt einen angemeldeten Benutzer im Security-Kontext. Der {@code jwt()}-Postprocessor von
+     * Spring Security Test greift hier nicht: mit {@code addFilters = false} fehlt der Filter,
+     * der den Kontext aus dem Request lädt – {@code @AuthenticationPrincipal} bliebe {@code null}.
+     */
+    private void angemeldetAls(String benutzername) {
+        Jwt jwt = Jwt.withTokenValue("test-token")
+                .header("alg", "none")
+                .claim("preferred_username", benutzername)
+                .build();
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt,
+                List.of(new SimpleGrantedAuthority("messwerte:write"))));
     }
 
     // ==================== Upload Endpoint Tests ====================
@@ -306,6 +338,99 @@ public class MesswerteControllerTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.status", is("error")))
             .andExpect(jsonPath("$.message", is("Calculation failed")));
+    }
+
+    // ==================== Audit-Systemmeldung (manueller Verteillauf) ====================
+
+    @Test
+    void calculateDistribution_ValidRequest_ErfasstAuditSystemmeldung() throws Exception {
+        angemeldetAls("testuser");
+        // OrganizationInterceptor läuft vor @PreAuthorize und würde ohne Organisation 403 werfen.
+        when(organizationContextService.hasOrganization()).thenReturn(true);
+        when(organizationContextService.getCurrentOrgId()).thenReturn(42L);
+        when(messwerteService.calculateSolarDistribution(any(), any(), anyString()))
+            .thenReturn(new MesswerteService.CalculationResult(
+                1, 1,
+                LocalDateTime.of(2024, 1, 1, 0, 0),
+                LocalDateTime.of(2024, 1, 31, 23, 59, 59),
+                1.0, 1.0));
+
+        mockMvc.perform(post("/api/messwerte/calculate-distribution")
+                .param("dateFrom", "2024-01-01")
+                .param("dateTo", "2024-01-31")
+                .param("algorithm", "PROPORTIONAL"))
+            .andExpect(status().isOk());
+
+        ArgumentCaptor<String> parameter = ArgumentCaptor.forClass(String.class);
+        verify(systemmeldungService).erfasseAudit(eq(42L), eq(MeldungLevel.INFO),
+                eq(SystemmeldungService.KATEGORIE_VERTEILUNG),
+                eq(SystemmeldungService.KEY_VERTEILUNG_MANUELL), parameter.capture());
+        assertEquals("testuser, 01.01.2024–31.01.2024, PROPORTIONAL", parameter.getValue());
+    }
+
+    @Test
+    void calculateDistribution_OhneJwt_ErfasstAuditMitUnbekanntemBenutzer() throws Exception {
+        when(messwerteService.calculateSolarDistribution(any(), any(), anyString()))
+            .thenReturn(new MesswerteService.CalculationResult(
+                0, 0,
+                LocalDateTime.of(2024, 1, 1, 0, 0),
+                LocalDateTime.of(2024, 1, 31, 23, 59, 59),
+                0.0, 0.0));
+
+        mockMvc.perform(post("/api/messwerte/calculate-distribution")
+                .param("dateFrom", "2024-01-01")
+                .param("dateTo", "2024-01-31"))
+            .andExpect(status().isOk());
+
+        ArgumentCaptor<String> parameter = ArgumentCaptor.forClass(String.class);
+        verify(systemmeldungService).erfasseAudit(any(), eq(MeldungLevel.INFO), anyString(), anyString(),
+                parameter.capture());
+        assertTrue(parameter.getValue().startsWith("unbekannt, "), parameter.getValue());
+    }
+
+    @Test
+    void calculateDistribution_LaufSchlaegtFehl_AuditSystemmeldungTrotzdemErfasst() throws Exception {
+        when(messwerteService.calculateSolarDistribution(any(), any(), anyString()))
+            .thenThrow(new IllegalStateException("BILANZMODELL_KEINE_BILANZDATEN"));
+
+        mockMvc.perform(post("/api/messwerte/calculate-distribution")
+                .param("dateFrom", "2024-01-01")
+                .param("dateTo", "2024-01-31"))
+            .andExpect(status().isBadRequest());
+
+        // Die Meldung wird VOR dem Lauf geschrieben – ein abgebrochener Lauf ist damit belegt.
+        verify(systemmeldungService).erfasseAudit(any(), eq(MeldungLevel.INFO), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void calculateDistribution_UngueltigesDatum_KeineAuditSystemmeldung() throws Exception {
+        mockMvc.perform(post("/api/messwerte/calculate-distribution")
+                .param("dateFrom", "kein-datum")
+                .param("dateTo", "2024-01-31"))
+            .andExpect(status().isBadRequest());
+
+        verify(systemmeldungService, never()).erfasseAudit(any(), any(), anyString(), anyString(), anyString());
+        verify(messwerteService, never()).calculateSolarDistribution(any(), any(), anyString());
+    }
+
+    @Test
+    void calculateDistribution_AuditErfassungSchlaegtFehl_LaufBleibtErfolgreich() throws Exception {
+        doThrow(new RuntimeException("DB weg"))
+            .when(systemmeldungService).erfasseAudit(any(), any(), anyString(), anyString(), anyString());
+        when(messwerteService.calculateSolarDistribution(any(), any(), anyString()))
+            .thenReturn(new MesswerteService.CalculationResult(
+                1, 1,
+                LocalDateTime.of(2024, 1, 1, 0, 0),
+                LocalDateTime.of(2024, 1, 31, 23, 59, 59),
+                1.0, 1.0));
+
+        mockMvc.perform(post("/api/messwerte/calculate-distribution")
+                .param("dateFrom", "2024-01-01")
+                .param("dateTo", "2024-01-31"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status", is("success")));
+
+        verify(messwerteService).calculateSolarDistribution(any(), any(), anyString());
     }
 
     @Test
