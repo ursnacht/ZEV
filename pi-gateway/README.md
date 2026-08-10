@@ -10,6 +10,7 @@ verlusttolerant.
 - **Umsetzungsplan:** [`Specs/Pi-Gateway-Software_Umsetzungsplan.md`](../Specs/Pi-Gateway-Software_Umsetzungsplan.md)
 - **MQTT-Vertrag (Backend):** [`Specs/MQTT-Integration.md`](../Specs/MQTT-Integration.md)
 - **Topologie/Broker:** [`docs/Netzwerk-Topologie-Hene.md`](../docs/Netzwerk-Topologie-Hene.md)
+- **Deploy (NAS + Pi zusammen):** [`docs/Deploy-Hene.md`](../docs/Deploy-Hene.md)
 
 > Dies ist ein **eigenständiges Python-Artefakt**, nicht Teil der ZEV-Java/Angular-App.
 

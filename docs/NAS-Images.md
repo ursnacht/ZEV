@@ -10,6 +10,10 @@ Diese Anleitung beschreibt, wie die drei lokal gebauten ZEV-Images
 > paketiert – siehe [`scripts/package-pi-gateway.ps1`](../scripts/package-pi-gateway.ps1) bzw.
 > [`pi-gateway/README.md`](../pi-gateway/README.md).
 
+> **Release über beide Seiten (NAS + Pi)?** Die zusammenhängende Reihenfolge inkl.
+> Migrations-Prüfung, Pi-Config-Nachzug und Ende-zu-Ende-Kontrolle steht in
+> [`docs/Deploy-Hene.md`](./Deploy-Hene.md). Dieses Dokument hier deckt den NAS-Teil ab.
+
 > Die übrigen Images (`postgres`, `keycloak`, `prometheus`, `grafana`, `eclipse-mosquitto`)
 > zieht das NAS direkt aus den öffentlichen Registries und müssen **nicht** übertragen werden.
 
