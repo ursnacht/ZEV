@@ -32,7 +32,9 @@ class MeterConfig:
     messpunkt: str
     protokoll: str                # "modbus-tcp"; später "gplug"
     register_bezug: RegisterSpec
-    register_einspeisung: RegisterSpec
+    # None = in der Config nicht angegeben (typisch bei Konsumenten): das Register wird
+    # NICHT gelesen, publiziert wird 0 (Payload-Vertrag bleibt vollständig).
+    register_einspeisung: RegisterSpec | None
     host: str | None = None
     port: int = 502
     unit_id: int = 1

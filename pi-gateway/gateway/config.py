@@ -194,7 +194,7 @@ def _parse_meters(data, read_timeout: float) -> list[MeterConfig]:
             host = _require(entry, "host", str, ctx=f"zaehler[{index}] '{messpunkt}'")
             register = _require(entry, "register", dict, ctx=f"zaehler[{index}] '{messpunkt}'")
             register_bezug = _parse_register(register.get("bezug"), messpunkt, "bezug")
-            register_einspeisung = _parse_register(
+            register_einspeisung = _parse_register_optional(
                 register.get("einspeisung"), messpunkt, "einspeisung")
 
         meters.append(
@@ -240,6 +240,20 @@ def _parse_seriennummer(value, messpunkt: str) -> str | None:
             f"{_MAX_SERIENNUMMER_LAENGE} Zeichen."
         )
     return seriennummer
+
+
+def _parse_register_optional(data, messpunkt: str, rolle: str) -> RegisterSpec | None:
+    """Wie :func:`_parse_register`, aber ``None``, wenn der Block **fehlt**.
+
+    Konsumenten speisen nicht ein – dort erspart ein fehlendes ``register.einspeisung``
+    einen Modbus-Zugriff je Zyklus; publiziert wird 0.
+
+    Ein **vorhandener, aber fehlerhafter** Block bleibt ein ``ConfigError``: ein Tippfehler
+    (z. B. ``adr`` statt ``addr``) darf nicht stillschweigend zu 0 werden.
+    """
+    if data is None:
+        return None
+    return _parse_register(data, messpunkt, rolle)
 
 
 def _parse_register(data, messpunkt: str, rolle: str) -> RegisterSpec:

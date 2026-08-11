@@ -81,6 +81,12 @@ Die Nummer wird einmalig am Gerät abgelesen (z. B. per `mbpoll`, siehe
   `${MQTT_PASSWORD}` aus der Umgebung aufgelöst (siehe `.env.example`).
 - **Registeradressen:** als String = **Hexadezimal** (wie Wago-Datenblatt, daher quoten),
   als Integer = Dezimal.
+- **`register.einspeisung` ist optional:** Fehlt der Block — typisch bei **Konsumenten**, die
+  nicht einspeisen —, wird das Register **nicht gelesen** und `0` publiziert. Das spart je
+  Zyklus und Zähler einen Modbus-Zugriff und entlastet die RS485-Strecke. Beim Start erscheint
+  dazu eine `INFO`-Zeile je betroffenem Zähler. `register.bezug` bleibt **Pflicht**, und ein
+  **vorhandener, aber fehlerhafter** `einspeisung`-Block bleibt ein Startfehler — ein Tippfehler
+  soll nicht stillschweigend zu 0 werden.
 - **Intervall:** `publish_interval` z. B. `5m`, `30s`, `1h` oder reine Sekunden-Zahl.
 - **Lese-Timeout:** `read_timeout` (Default `5s`) gilt für alle Zähler; je Zähler mit
   `zaehler[].read_timeout` überschreibbar. Zahl (Sekunden) oder Kurzform (`8s`, `1m`);

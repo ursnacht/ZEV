@@ -33,6 +33,11 @@ class ModbusReader(Reader):
         # via `zaehler[].read_timeout` überschreibbar) – keine zweite Quelle im Code.
         log.debug("Modbus-Reader '%s': Lese-Timeout %.1fs",
                   config.messpunkt, config.read_timeout_seconds)
+        if config.register_einspeisung is None:
+            # Bewusste Konfigurationsentscheidung -> beim Start sichtbar machen (INFO),
+            # damit ein versehentlich fehlender Block nicht unbemerkt 0 liefert.
+            log.info("Modbus-Reader '%s': kein Einspeisung-Register konfiguriert – "
+                     "es wird nicht gelesen und 0 publiziert.", config.messpunkt)
         self._client = ModbusTcpClient(
             host=config.host,
             port=config.port,
@@ -48,7 +53,12 @@ class ModbusReader(Reader):
                 )
 
             bezug = self._read_float(self.config.register_bezug, rolle="bezug")
-            einspeisung = self._read_float(self.config.register_einspeisung, rolle="einspeisung")
+            # Fehlt das Einspeisung-Register (typisch Konsument), wird es nicht gelesen:
+            # ein Modbus-Zugriff weniger je Zyklus und Zähler – entlastet die RS485-Strecke.
+            einspeisung = (
+                0.0 if self.config.register_einspeisung is None
+                else self._read_float(self.config.register_einspeisung, rolle="einspeisung")
+            )
         finally:
             # An einem RTU->TCP-Hub mit wenigen erlaubten Sockets darf immer nur EINE
             # Verbindung offen sein. Da die Zähler sequenziell gelesen werden, hält das

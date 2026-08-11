@@ -128,6 +128,19 @@ Konfigurations-Optionen wirken daher erst, wenn sie **manuell** eingetragen werd
       ```
       Zeitbudget beachten: `read_timeout × read_attempts` je Zähler deutlich unter
       `publish_interval` halten.
+- [ ] **Optional: `register.einspeisung` bei Konsumenten entfernen** — halbiert die
+      Modbus-Anfragen dieser Zähler und entlastet die RS485-Strecke; publiziert wird dann `0`:
+      ```yaml
+      zaehler:
+        - messpunkt: "ID742-Wohnung-1"
+          register:
+            bezug: { addr: "600C", typ: float32, wortfolge: big, skalierung: 1.0 }
+            # einspeisung: entfällt -> wird nicht gelesen, 0 publiziert
+      ```
+      **Nur bei Zählern, die tatsächlich nicht einspeisen.** Lieferte ein Zähler bisher echte
+      Werte, fällt der Stand einmalig auf 0 (negatives Delta → Reset-Guard im Backend, kein
+      Datenschaden, aber die Einspeisung dieses Intervalls fehlt). Kontrolle im Log: je
+      betroffenem Zähler eine `INFO`-Zeile „kein Einspeisung-Register konfiguriert".
 - [ ] Neu starten und Logs beobachten:
       ```bash
       sudo systemctl start pi-gateway.service

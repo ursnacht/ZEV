@@ -29,6 +29,11 @@
    * **Ablauf:** zwischen zwei Versuchen **0,5 s** Pause; jeder Versuch baut die Verbindung neu auf. Fehlgeschlagene Zwischenversuche werden auf `INFO` geloggt (mit Versuchszähler), der endgültige Fehlschlag auf `WARN`.
    * **Kein Retry** bei unerwarteten Exceptions (Programmierfehler) – dort ist ein zweiter Versuch aussichtslos.
    * **Zeitbudget:** `read_timeout × read_attempts` (+ Pausen) je Zähler muss deutlich unter dem `publish_interval` bleiben; ungültige Angaben (`0`, negativ, nicht-ganzzahlig, Boolean) führen zu `ConfigError` **beim Start**. Der wirksame Wert steht in der Start-Log-Zeile.
+7. **`register.einspeisung` optional (Nachtrag):** **Konsumenten** speisen nicht ein – dort ist der Block `register.einspeisung` **weglassbar**. Fehlt er, wird das Register **nicht gelesen** und im Payload **`zaehlerstandEinspeisung: 0`** publiziert.
+   * **Nutzen:** ein Modbus-Zugriff weniger je Zyklus und Zähler – halbiert die Anfragen für reine Konsumenten und entlastet damit die RS485-Strecke (relevant angesichts der sporadischen `exception_code=11`, s. FR-1.6).
+   * **Payload-Vertrag unverändert:** `zaehlerstandEinspeisung` bleibt ein **Pflichtfeld** (`MQTT-Integration.md`, FR-3) und wird mit `0` gefüllt – das Feld wird **nicht** weggelassen. Das Backend bleibt unberührt.
+   * **`register.bezug` bleibt Pflicht**; ein **vorhandener, aber fehlerhafter** `einspeisung`-Block führt weiterhin zu `ConfigError` **beim Start** – ein Tippfehler (z.B. `adr` statt `addr`) darf nicht stillschweigend zu 0 werden.
+   * **Sichtbarkeit:** Beim Start wird je betroffenem Zähler eine `INFO`-Zeile geloggt, damit ein *versehentlich* fehlender Block nicht unbemerkt 0 liefert.
    * Grund für den grosszügigen Default: An einem **RTU→TCP-Hub** wird die Anfrage seriell bis zum Slave durchgereicht und erst danach beantwortet — das dauert deutlich länger als bei direkt angebundenen TCP-Geräten.
    * **Abgrenzung:** Das Timeout wirkt nur, wenn der Hub **gar nicht** antwortet. Antwortet er mit einer **Modbus-Exception** (z.B. `code 11` = *Gateway target device failed to respond*), ist die Anfrage bereits beantwortet — ein höheres Client-Timeout ändert daran **nichts**; Ursache und Abhilfe liegen dann auf der RTU-Strecke bzw. in der Hub-Konfiguration (siehe `docs/Netzwerk-Topologie-Hene.md`, Abschnitt „Modbus-Diagnose"). Die Fehlermeldung des Readers unterscheidet beide Fälle und nennt den Timeout-Hinweis nur bei ausbleibender Antwort.
 
@@ -106,6 +111,8 @@
 >     register:                       # Wirkenergie in kWh (Beispielwerte!)
 >       bezug:       { addr: 600C, typ: float32, wortfolge: big, skalierung: 1.0 }   # OBIS 1.8.0
 >       einspeisung: { addr: 6018, typ: float32, wortfolge: big, skalierung: 1.0 }   # OBIS 2.8.0
+>   # Konsument ohne Einspeisung: 'einspeisung' weglassen -> Register wird nicht gelesen,
+>   # publiziert wird 0 (FR-1.7).
 >   - messpunkt: "ID742-Wohnung-2"
 >     protokoll: modbus-tcp
 >     host: 192.168.10.10
@@ -113,7 +120,6 @@
 >     unit_id: 2
 >     register:
 >       bezug:       { addr: 600C, typ: float32, wortfolge: big, skalierung: 1.0 }
->       einspeisung: { addr: 6018, typ: float32, wortfolge: big, skalierung: 1.0 }
 >   - messpunkt: "ID742-Allgemein"
 >     protokoll: modbus-tcp
 >     host: 192.168.10.10
@@ -150,6 +156,10 @@
 * [ ] Scheitern alle Versuche, wird der Zähler in diesem Zyklus übersprungen (`WARN` mit Anzahl der Versuche) – die übrigen Zähler laufen unbeeinflusst weiter.
 * [ ] Ungültige `read_attempts` (`0`, negativ, nicht-ganzzahlig, Boolean, String) führen zu einem `ConfigError` **beim Start**.
 * [ ] Die Start-Log-Zeile nennt die wirksame Anzahl **Lese-Versuche**.
+* [ ] Fehlt `register.einspeisung`, wird dieses Register **nicht** gelesen (nur **ein** Modbus-Zugriff je Zyklus) und der Payload enthält `zaehlerstandEinspeisung: 0` – das Feld fehlt **nicht**.
+* [ ] Ist `register.einspeisung` konfiguriert, verhält sich der Reader unverändert (zwei Zugriffe, echter Wert).
+* [ ] Ein **vorhandener, aber fehlerhafter** `einspeisung`-Block (z.B. `addr` fehlt) führt zu `ConfigError` **beim Start**; ein fehlendes `register.bezug` ebenso.
+* [ ] Für jeden Zähler ohne `einspeisung`-Register erscheint beim Start eine `INFO`-Zeile.
 * [ ] Bleibt eine Antwort aus, nennt die Fehlermeldung den konfigurierten Timeout-Wert und den Hinweis, `timeout` zu erhöhen; bei einer **Modbus-Exception-Response** (z.B. `code 11`) erscheint dieser Hinweis **nicht** (dort hilft das Timeout nicht).
 * [ ] Der Dienst publiziert die **absoluten Zählerstände** unverändert (keine Delta-Berechnung, keine „letzter Stand"-Persistenz).
 * [ ] Publizierte Topic-/Payload-Struktur entspricht `MQTT-Integration.md`: Topic `zev/{orgId}/{messpunkt}/messwert`, Pflichtfelder `{timestamp,zaehlerstandBezug,zaehlerstandEinspeisung}` – plus das **optionale** `seriennummer`, sofern konfiguriert.
@@ -192,6 +202,8 @@
 | Uhr driftet / kein NTP | WARN; Zeitstempel bleiben lokale Zeit mit Offset; Betreiber-Alarm |
 | Doppelter Publish (nach Reconnect) | Backend behandelt idempotent (Unique-Constraint) |
 | Prozessabsturz/Neustart | `systemd` startet neu; kein „letzter Stand" nötig (zustandslos) |
+| `register.einspeisung` fehlt (Konsument) | Register wird **nicht gelesen**, `zaehlerstandEinspeisung: 0` publiziert; `INFO` beim Start (FR-1.7) |
+| `register.einspeisung` **nachträglich entfernt**, obwohl der Zähler bisher echte Werte lieferte | Der Stand fällt einmalig auf 0 → das Backend sieht ein **negatives Delta** und nullt es per Reset-Guard (`MQTT-Integration.md`). Kein Datenschaden, aber die Einspeisung dieses Intervalls fehlt – nur bei Zählern entfernen, die tatsächlich nicht einspeisen |
 
 ## 6. Abhängigkeiten & betroffene Funktionalität
 * **Vertrag/Backend:** `Specs/MQTT-Integration.md` (Topic, Payload, QoS, Delta-Bildung/Aggregation) — **maßgeblich**.
