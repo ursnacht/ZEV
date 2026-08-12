@@ -28,9 +28,17 @@
   <div class="zev-form-group">
     <label for="dbWhere">{{ 'DATENBANK_FILTER' | translate }}:</label>
     <div class="zev-input-wrapper">
+      <!-- list= bietet die zuletzt verwendeten Filter dieser Tabelle als native Auswahlliste an
+           (lokal im Browser gespeichert, siehe DatenbankFilterHistorieService). -->
       <input type="text" id="dbWhere" class="zev-input" [(ngModel)]="whereClause" name="dbWhere"
         placeholder="org_id = 42 AND zeit > '2026-01-01'"
+        list="dbWhereHistorie" autocomplete="off"
         (keyup.enter)="!(!selectedTabelle || loading) && onAnzeigen()" />
+      <datalist id="dbWhereHistorie">
+        @for (eintrag of filterHistorie; track eintrag) {
+          <option [value]="eintrag"></option>
+        }
+      </datalist>
       @if (whereClause) {
         <button type="button" class="zev-input-clear" (click)="onFilterLeeren()"
           [attr.aria-label]="'DATENBANK_FILTER_LEEREN' | translate"

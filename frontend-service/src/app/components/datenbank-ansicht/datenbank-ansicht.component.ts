@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WithMessage } from '../../utils/with-message';
 import { DatenbankService } from '../../services/datenbank.service';
+import { DatenbankFilterHistorieService } from '../../services/datenbank-filter-historie.service';
 import { DatenbankAbfrageResponse, SortRichtung } from '../../models/datenbank.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
@@ -29,8 +30,13 @@ export class DatenbankAnsichtComponent extends WithMessage implements OnInit {
   loading = false;
   sortSpalte: string | null = null;
   sortRichtung: SortRichtung = 'ASC';
+  /** Zuletzt verwendete Filter der gewählten Tabelle (lokal im Browser, neuester zuerst). */
+  filterHistorie: string[] = [];
 
-  constructor(private datenbankService: DatenbankService) { super(); }
+  constructor(
+    private datenbankService: DatenbankService,
+    private filterHistorieService: DatenbankFilterHistorieService
+  ) { super(); }
 
   ngOnInit(): void {
     this.loadTabellen();
@@ -47,11 +53,13 @@ export class DatenbankAnsichtComponent extends WithMessage implements OnInit {
    * Bei Tabellenwechsel: bisheriges Ergebnis verwerfen und den Standard-Filter setzen.
    * Hat die Tabelle eine {@code org_id}-Spalte, wird als Default die Organisation des
    * eingeloggten Benutzers vorgeschlagen; andernfalls bleibt der Filter leer.
+   * Zusätzlich wird die lokale Filter-Historie der neuen Tabelle geladen.
    */
   onTabelleChange(): void {
     this.result = null;
     this.dismissMessage();
     this.whereClause = '';
+    this.filterHistorie = this.filterHistorieService.getHistorie(this.selectedTabelle);
     if (!this.selectedTabelle) {
       return;
     }
@@ -106,9 +114,13 @@ export class DatenbankAnsichtComponent extends WithMessage implements OnInit {
     }
     this.loading = true;
     this.dismissMessage();
+    // Tabelle/Filter des Requests festhalten: bis zur Antwort kann das Feld bereits
+    // wieder geändert worden sein – in die Historie gehört der tatsächlich abgefragte Filter.
+    const tabelle = this.selectedTabelle;
+    const where = this.whereClause?.trim() || undefined;
     this.datenbankService.abfrage({
-      tabelle: this.selectedTabelle,
-      where: this.whereClause?.trim() || undefined,
+      tabelle,
+      where,
       page: this.page,
       size: this.size,
       sortSpalte: this.sortSpalte || undefined,
@@ -117,6 +129,13 @@ export class DatenbankAnsichtComponent extends WithMessage implements OnInit {
       next: (result) => {
         this.result = result;
         this.loading = false;
+        // Nur erfolgreich ausgeführte (also gültige) Filter merken
+        if (where) {
+          const historie = this.filterHistorieService.addFilter(tabelle, where);
+          if (tabelle === this.selectedTabelle) {
+            this.filterHistorie = historie;
+          }
+        }
       },
       error: (error) => {
         this.result = null;
