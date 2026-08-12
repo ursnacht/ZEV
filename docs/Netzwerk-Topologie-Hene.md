@@ -489,6 +489,46 @@ Einzelner Port statt Proxy (Alternative):
 ssh -N -L 8080:192.168.10.1:80 nafam@10.8.0.14      # dann http://localhost:8080
 ```
 
+### DB-Zugriff auf das NAS (SSH-Tunnel für DB-Tools)
+
+Für Schema-Browsing, Joins oder Exporte mit einem DB-Tool (DBeaver/DataGrip). Für reine
+Inspektion im Betrieb gibt es alternativ die **Datenbank-Ansicht** unter `/einstellungen`
+(read-only, nur `zev_admin`, s. `Specs/Datenbank-Ansicht.md`).
+
+**Der Tunnel muss auf die Container-IP zeigen, nicht auf `localhost`:**
+
+```bash
+ssh <user>@nasnafam.synology.me \
+  "sudo docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' postgres"
+```
+
+```bash
+ssh -N -o ServerAliveInterval=30 -L 15432:<container-ip>:5432 <user>@nasnafam.synology.me
+```
+
+Das Ziel in `-L` wird **vom NAS** aufgelöst; die Container-IP im Docker-Bridge-Netz
+(`zev-network`) ist von dort erreichbar. DB-Tool danach auf `localhost:15432`, Datenbank
+`zev`, Credentials aus `.env.mqtt` **auf dem NAS**. Schemas: `zev` (Anwendung), `keycloak`
+(Identity).
+
+**Fallen, die uns Zeit gekostet haben:**
+
+| Symptom | Ursache / Lösung |
+|---------|------------------|
+| `administratively prohibited: open failed` | `AllowTcpForwarding no` in `/etc/ssh/sshd_config` des NAS (DSM-Default). Auf `yes` setzen, `sudo sshd -t` prüfen, `sudo synosystemctl restart sshd`. **DSM-Updates setzen das zurück.** |
+| `no pg_hba.conf entry for host "127.0.0.1", user postgres, database zev` | Tunnel zeigt auf `localhost:5432` des NAS — das ist **DSM's eigener PostgreSQL**, nicht die ZEV-DB. Erkennungsmerkmal: Der ZEV-Container sieht Clients immer als `172.x.0.1` (Bridge-Gateway), **nie** als `127.0.0.1`. → Auf die Container-IP tunneln (oben). |
+| Tunnel ging gestern, heute nicht mehr | Die Container-IP ändert sich beim Neuaufsetzen des Stacks → neu ermitteln. Dauerhaft stabiler: ZEV-Postgres in der NAS-Compose auf einen freien Host-Port legen (`"15432:5432"` statt `"5432:5432"`, da 5432 von DSM belegt ist) und wieder auf `localhost` tunneln. |
+
+Lokal bewusst Port **15432**: Auf `5432` läuft die lokale Dev-Datenbank — sonst verbindet
+sich das DB-Tool unbemerkt auf die falsche Instanz.
+
+```bash
+# Diagnose auf dem NAS, wenn der Tunnel steht, aber die Verbindung scheitert
+sudo ss -tlnp | grep 5432                         # docker-proxy oder DSM-postgres?
+sudo docker ps --format '{{.Names}}\t{{.Ports}}'  # veröffentlicht der Container 5432?
+sudo docker logs --tail 20 postgres               # taucht der Versuch überhaupt auf?
+```
+
 ### Netzwerk-Scan
 
 ```bash
