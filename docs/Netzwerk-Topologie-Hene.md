@@ -443,13 +443,19 @@ Unabhängig vom Broker-Setup oben.
 
 ### Geräte-Inventar (Stand: August 2026)
 
-| Gerät | Adresse | Bemerkung |
-|-------|---------|-----------|
-| Raspberry Pi `rpi4sa` | `192.168.10.189` (eth0), `192.168.10.190` (wlan0), VPN `10.8.0.14` | **Beide** Interfaces liegen im selben Subnetz – bei Scans/Bindings beachten |
-| Router | `192.168.10.1` | `model=P5`, WebUI auf Port 80; dort die **DHCP-Lease-Liste** (zuverlässigste Geräteliste) |
-| Kommunikationsmodul **WAGO 879-9000** | `192.168.10.10:502` | Gemeinsame IP für die drei Wago, je Zähler eine `unit_id` (1/2/3). Details/Grenzen s. u. |
-| WhatWatt Go (BKW-Zähler) | *noch nicht identifiziert* | Modbus TCP auf 502 + REST auf 80 erwartet (s. u.) |
-| `espressif.lan` | `192.168.10.220` | ESP32-Gerät, Modbus-TCP auf 502, **kein** Port 80, **kein** mDNS → vermutlich **nicht** das WhatWatt |
+| Gerät                                 | Adresse                                                            | Bemerkung                                                                                                                                                          |
+|---------------------------------------|--------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Raspberry Pi `rpi4sa`                 | `192.168.10.189` (eth0), `192.168.10.190` (wlan0), VPN `10.8.0.14` | **DHCP-Reservierung** im Router. **Beide** Interfaces liegen im selben Subnetz – bei Scans/Bindings beachten                                                       |
+| Router                                | `192.168.10.1`                                                     | `model=P5`, WebUI auf Port 80; dort die **DHCP-Lease-Liste** (zuverlässigste Geräteliste) und die Reservierungen                                                   |
+| Kommunikationsmodul **WAGO 879-9000** | `192.168.10.164:502`                                               | Gemeinsame IP für die drei Wago, je Zähler eine `unit_id` (1/2/3). Details/Grenzen s. u. **Reservierung prüfen** – die IP steht als `host` in der Pi-`config.yaml` |
+| WhatWatt Go (BKW-Zähler)              | `192.168.10.193:502`                                               | **Angeschlossen und auslesbar** (Stand 08/2026), **DHCP-Reservierung** im Router; Registerkarte s. u.                                                              |
+| **Wechselrichter** (`espressif.lan`)  | `192.168.10.220`                                                   | ESP32-basiert, Modbus TCP auf 502 offen, **kein** Port 80, **kein** mDNS. War zeitweise fälschlich als WhatWatt-Kandidat geführt                                   |
+
+> **Feste Adressen:** Pi und WhatWatt haben eine **DHCP-Reservierung** im Router (Stand 08/2026).
+> Wichtig, weil die IP des WhatWatt (`192.168.10.193`) und die des WAGO-Moduls (`192.168.10.164`)
+> als `host` in der Pi-`config.yaml` stehen: ein Lease-Wechsel würde die betroffenen Zähler
+> **stillschweigend** ausfallen lassen (Read-Fehler, keine Rohdaten). Für das WAGO-Modul ist
+> die Reservierung daher ebenfalls zu setzen, falls noch nicht vorhanden.
 
 ### Werkzeuge installieren
 
@@ -616,9 +622,15 @@ curl -X PUT -H 'Content-Type: application/json' \
 | Einspeisung | 2.8.0 | **553** | float | 2 | 3 | Wh |
 
 ```bash
-mbpoll -a 1 -0 -t 3:float -r 549 -c 1 -o 5 -1 <ip> -p 502    # Bezug (FC04!)
-mbpoll -a 1 -0 -t 3:float -r 553 -c 1 -o 5 -1 <ip> -p 502    # Einspeisung
+WW=192.168.10.193
+mbpoll -a 1 -0 -t 3:float -r 1   -c 3 -o 5 -1 $WW -p 502     # Probe: Spannungen L1-L3 (~230 V)
+mbpoll -a 1 -0 -t 3:float -r 549 -c 4 -o 5 -1 $WW -p 502     # 1.8.0, 3.8.0, 2.8.0, 4.8.0 (FC04!)
+mbpoll -a 1 -0 -t 3:float -r 549 -c 1 -o 5 -1 $WW -p 502     # nur Bezug
+mbpoll -a 1 -0 -t 3:float -r 553 -c 1 -o 5 -1 $WW -p 502     # nur Einspeisung
 ```
+
+Bei `:float` zählt `-c` in **Floats**, nicht in Registern (`-c 4` = 8 Register). Die
+Spannungsprobe zuerst: zeigt sie ~230 V, sind Adressierung **und** Wortfolge bestätigt.
 
 - Registerkarte über **FC04 (Input Register, `-t 3`)** ab FW 1.2.20; **FC03 erst ab FW 2.0.2**.
 - Die Slave-Adresse ist laut Doku bedeutungslos (Gerät antwortet auf jede).
@@ -628,6 +640,10 @@ mbpoll -a 1 -0 -t 3:float -r 553 -c 1 -o 5 -1 <ip> -p 502    # Einspeisung
   die **Kundenschnittstelle am VNB-Zähler oft gesperrt** und muss beim Netzbetreiber
   freigeschaltet werden (teils mit Schlüssel/PIN, der im Gerät zu hinterlegen ist).
   `/api/v1/system` zeigt den Verbindungsstatus.
+- **Stand 08/2026: angeschlossen, Register liefern Werte.** Die Registerkarte oben ist durch die
+  Geräte-Konfiguration bestätigt (Block `start_address: 549`, `word_order: msw`, `float` = 2
+  Register → `1.8.0` = 549, `3.8.0` = 551, `2.8.0` = 553, `4.8.0` = 555). Einträge **ohne `id`**
+  sind Padding und liefern konstant 0 – ein Nullwert heisst also oft nur „falsche Adresse".
 
 > **Integrations-Hinweis:** Unser `pi-gateway/gateway/readers/modbus_reader.py` nutzt
 > `read_holding_registers` (**FC03**). Ein reiner Config-Eintrag genügt für das WhatWatt
