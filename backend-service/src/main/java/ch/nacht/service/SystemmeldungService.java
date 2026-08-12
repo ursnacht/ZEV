@@ -47,6 +47,8 @@ public class SystemmeldungService {
     public static final String KEY_ZAEHLER_LUECKE = "MQTT_ZAEHLER_LUECKE";
     /** Meldungs-Key (WARN): Ausfall über mehrere Aggregationsintervalle – Auflösung geht verloren. */
     public static final String KEY_ZAEHLER_AUSFALL = "MQTT_ZAEHLER_AUSFALL";
+    /** Meldungs-Key (INFO, Audit): Zählerwechsel über die Seriennummer erkannt. */
+    public static final String KEY_ZAEHLERTAUSCH = "MQTT_ZAEHLERTAUSCH";
 
     /** Kategorie-Übersetzungs-Key für Meldungen zur Solar-Verteilung. */
     public static final String KATEGORIE_VERTEILUNG = "SYSTEMMELDUNG_KATEGORIE_VERTEILUNG";

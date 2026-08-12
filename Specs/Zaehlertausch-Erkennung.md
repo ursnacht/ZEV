@@ -42,6 +42,14 @@
 3. Das Verhalten ist **richtungsunabhängig** (neuer Stand höher **oder** niedriger) – der bisherige Bogus-Wert bei höherem Startstand entfällt.
 4. Ein erkannter Wechsel wird als `log.info`/`log.warn` mit Einheit, Intervall und alter/neuer Serie protokolliert (Nachvollziehbarkeit).
 
+### FR-5: Systemmeldung bei erkanntem Zählerwechsel (Nachtrag)
+1. Zusätzlich zum Log-Eintrag (FR-3.4) entsteht je erkanntem Wechsel eine **Systemmeldung** mit Level **`INFO`**, Kategorie **`SYSTEMMELDUNG_KATEGORIE_MQTT`** und `meldung_key = MQTT_ZAEHLERTAUSCH`. Grund: der Log ist für Benutzer praktisch unauffindbar, der Tausch ist aber ein bestätigungsrelevantes Ereignis (`Specs/Systemmeldungen.md`).
+2. **Inhalt (`parameter`):** **Einheit** (Name), **Seriennummer alt → neu** und das **Übergangsintervall** (`dd.MM.yyyy HH:mm`) – nur die dynamischen Teile; die Beschriftung steckt im übersetzten Meldungstext (i18n).
+3. **Ein Eintrag pro Ereignis (Audit-Spur):** Erfassung **ohne** Deduplizierung nach `meldung_key`, daher direkt als **erledigt** gespeichert (`erledigt_automatisch = true`; erzwungen durch den UNIQUE-Teil-Index, s. `Systemmeldungen.md` FR-2). Begründung: Ein physischer Tausch am **Bilanzmesspunkt** löst die Erkennung **zweimal** aus, weil dieser Messpunkt auf **zwei** Einheiten gemappt ist (BEZUG und RUECKLIEFERUNG). Mit Dedup würde der zweite Eintrag den ersten überschreiben und nur den Zähler erhöhen – welche Einheit betroffen war, wäre nicht mehr erkennbar.
+   * **Akzeptierte Folge:** Die Einträge erscheinen **nicht** im Default-Filter „Offene", sondern nur unter „Erledigte"/„Alle"; sie werden von „Erledigte Meldungen löschen" und von der Retention mitgelöscht.
+4. **Entkoppelt:** eigene Transaktion (`REQUIRES_NEW`); ein Fehler beim Erfassen wird nur geloggt und bricht die **Aggregation nicht ab** (auch nicht für die übrigen Einheiten).
+5. Der **Rollout-Marker** (FR-4.2) erzeugt **keine** Systemmeldung – er bleibt ein reiner Log-Hinweis (kein Ereignis, sondern ein einmaliger Zustandsübergang beim Rollout).
+
 ### FR-4: Fallback bei fehlender Seriennummer
 1. Ist bei `referenz` **oder** `letzter` die Serie `NULL` (Bestandsdaten, gemischter Rollout, Payload ohne `seriennummer`) → **kein** Serien-Vergleich möglich → Verhalten **exakt wie heute** (Delta-Bildung + Reset-Guard). Damit bleibt das System ohne Pi-Update voll funktionsfähig; die neue Erkennung greift automatisch, sobald beide Stände eine Serie tragen.
 2. **Rollout-Marker (Log-Hinweis):** **Je Übergang** – d.h. in jedem Intervall mit `referenz.seriennummer == NULL` **und** `letzter.seriennummer != NULL` – wird ein Log-Hinweis geschrieben (Einheit, Intervall, neue Serie), damit im Log nachvollziehbar ist, **ab wann** die Tausch-Erkennung für diese Einheit aktiv ist. Kein Dedup-State nötig: der Übergang tritt beim Rollout natürlicherweise genau einmal je Einheit auf (bei Nachverarbeitung spät eintreffender Daten kann er erneut greifen – das ist akzeptiert). Das Intervall selbst läuft über den Fallback (kein Baseline-Reset), da ein `NULL`-Stand keinen Wechsel belegt.
@@ -57,6 +65,10 @@
 * [ ] **Rücktausch A→B→A:** jeder Serien-Wechsel wird eigenständig behandelt → zwei Übergangsintervalle ohne Messwert (bei A→B und bei B→A); die Intervalle dazwischen mit jeweils gleicher Serie rechnen korrekt.
 * [ ] **Fallback:** fehlt eine der beiden Serien (`NULL`) → Verhalten identisch zu heute (Delta + Reset-Guard); bestehende Aggregations-Tests bleiben grün.
 * [ ] Erkannter Wechsel wird mit Einheit/Intervall/alter+neuer Serie geloggt.
+* [ ] **Systemmeldung:** Je erkanntem Wechsel entsteht eine Meldung mit Level `INFO`, Kategorie `SYSTEMMELDUNG_KATEGORIE_MQTT` und `meldung_key = MQTT_ZAEHLERTAUSCH`; der `parameter` nennt **Einheit**, **alte → neue Seriennummer** und das **Übergangsintervall**.
+* [ ] Die Meldung wird **ohne Deduplizierung** erfasst (ein Eintrag je Ereignis) und ist direkt **erledigt** – ein Tausch am geteilten Bilanzmesspunkt erzeugt damit **zwei** Einträge (BEZUG und RUECKLIEFERUNG), nicht einen mit Zähler 2.
+* [ ] **Kein** Serien-Wechsel (gleiche Serie oder eine Serie `NULL`) → **keine** Systemmeldung.
+* [ ] Schlägt das Erfassen der Meldung fehl, läuft die Aggregation unbeeinflusst weiter (Fehler nur geloggt).
 * [ ] **Rollout-Marker:** Ein Intervall mit `referenz.seriennummer == NULL` **und** `letzter.seriennummer != NULL` erzeugt einen Log-Hinweis (Einheit, Intervall, neue Serie); das Intervall selbst wird über den Fallback verarbeitet (kein Baseline-Reset).
 * [ ] **Gleiche Serie trotz physischem Tausch** (Pi-Config nicht aktualisiert) → Verhalten unverändert wie heute (Delta + Reset-Guard); die Erkennung greift bewusst **nicht** – dokumentiertes Restrisiko, kein Fehlerfall der Implementierung.
 * [ ] Migration fügt `seriennummer` (nullable) auf `zaehler_rohdaten` hinzu; bestehende Zeilen behalten `NULL`; Mandanten-Isolation (`org_id`/`orgFilter`) unverändert.

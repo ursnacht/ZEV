@@ -33,6 +33,7 @@ import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -466,6 +467,59 @@ public class ZaehlerAggregationServiceTest {
                         String.valueOf(EINHEIT_ID), intervall[0].toString(), intervall[1].toString(),
                         "SN-ALT", "SN-NEU"),
                 "WARN mit Einheit, Intervall und alter/neuer Serie erwartet, war: " + logAppender.list);
+    }
+
+    @Test
+    void aggregiere_SerienWechsel_ErfasstInfoSystemmeldung() {
+        // Arrange
+        stubCatchUpEinInterval();
+        stubStaende(rohdaten("10000.0", "0.0", "SN-ALT"), rohdaten("50000.0", "0.0", "SN-NEU"));
+
+        // Act
+        service.aggregiere();
+
+        // Assert – Audit-Eintrag (ein Eintrag je Ereignis, kein Dedup)
+        ArgumentCaptor<String> parameter = ArgumentCaptor.forClass(String.class);
+        verify(systemmeldungService).erfasseAudit(eq(ORG_ID), eq(MeldungLevel.INFO),
+                eq(SystemmeldungService.KATEGORIE_MQTT), eq(SystemmeldungService.KEY_ZAEHLERTAUSCH),
+                parameter.capture());
+        assertTrue(parameter.getValue().contains("Wohnung 1"), parameter.getValue());
+        assertTrue(parameter.getValue().contains("SN-ALT"), parameter.getValue());
+        assertTrue(parameter.getValue().contains("SN-NEU"), parameter.getValue());
+        // Nicht deduplizierend erfassen – sonst überschreibt ein zweiter Tausch den ersten.
+        verify(systemmeldungService, never()).erfasse(any(), any(),
+                eq(SystemmeldungService.KATEGORIE_MQTT), eq(SystemmeldungService.KEY_ZAEHLERTAUSCH),
+                anyString());
+    }
+
+    @Test
+    void aggregiere_GleicheSeriennummer_KeineZaehlertauschMeldung() {
+        // Arrange – kein Wechsel
+        stubCatchUpEinInterval();
+        stubStaende(rohdaten("100.0", "50.0", "SN-1"), rohdaten("110.0", "52.0", "SN-1"));
+        when(messwerteRepository.findByEinheitAndZeit(eq(einheit), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act
+        service.aggregiere();
+
+        // Assert
+        verify(systemmeldungService, never()).erfasseAudit(any(), any(), anyString(), anyString(),
+                anyString());
+    }
+
+    @Test
+    void aggregiere_SerienWechselMeldungSchlaegtFehl_AggregationLaeuftWeiter() {
+        // Arrange – das Erfassen der Meldung darf die Aggregation nicht abbrechen
+        stubCatchUpEinInterval();
+        stubStaende(rohdaten("10000.0", "0.0", "SN-ALT"), rohdaten("50000.0", "0.0", "SN-NEU"));
+        doThrow(new RuntimeException("DB weg")).when(systemmeldungService)
+                .erfasseAudit(any(), any(), anyString(), anyString(), anyString());
+
+        // Act + Assert – keine Exception nach aussen
+        service.aggregiere();
+        verify(messwerteRepository, never()).save(any());
+        assertTrue(loggedContaining(Level.WARN, "Zählerwechsel erkannt"));
     }
 
     @Test

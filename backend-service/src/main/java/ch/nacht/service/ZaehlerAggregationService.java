@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Map;
@@ -46,6 +47,9 @@ public class ZaehlerAggregationService {
     private static final int MAX_INTERVALLE = 10_000; // Schutz gegen Runaway-Catch-up
     // Algorithmus für die automatische Verteilung nach der Aggregation
     private static final String DEFAULT_ALGORITHM = "PROPORTIONAL";
+    // Zeitangaben in Systemmeldungs-Parametern: Schweizer Format, da direkt in der UI sichtbar.
+    private static final DateTimeFormatter ZEIT_FORMAT =
+            DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
 
     private final ZaehlerRohdatenRepository rohdatenRepository;
     private final MesswerteRepository messwerteRepository;
@@ -179,6 +183,7 @@ public class ZaehlerAggregationService {
             log.warn("Zählerwechsel erkannt (einheit={}, intervall={} - {}): Seriennummer {} -> {}"
                     + " – kein Messwert für das Übergangsintervall",
                     einheitId, start, ende, serieReferenz, serieLetzter);
+            meldeZaehlerwechsel(einheit, serieReferenz, serieLetzter, ende);
             return false;
         }
         if (serieReferenz == null && serieLetzter != null) {
@@ -246,7 +251,8 @@ public class ZaehlerAggregationService {
         }
 
         String parameter = String.format("%s: %s – %s (%d Intervalle)",
-                einheit.getName(), referenz.getZeit(), start, fehlendeIntervalle);
+                einheit.getName(), ZEIT_FORMAT.format(referenz.getZeit()),
+                ZEIT_FORMAT.format(start), fehlendeIntervalle);
         if (fehlendeIntervalle == 1) {
             log.info("Datenlücke: {} – ein Intervall ohne Zählerdaten (einheit={})",
                     parameter, einheit.getId());
@@ -259,6 +265,32 @@ public class ZaehlerAggregationService {
             systemmeldungService.erfasse(einheit.getOrgId(), MeldungLevel.WARN,
                     SystemmeldungService.KATEGORIE_MQTT, SystemmeldungService.KEY_ZAEHLER_AUSFALL,
                     parameter);
+        }
+    }
+
+    /**
+     * Meldet einen erkannten Zählerwechsel als <b>INFO-Systemmeldung</b> (Audit-Spur).
+     *
+     * <p>Bewusst {@code erfasseAudit} statt {@code erfasse}: ein Zählerwechsel ist ein
+     * <b>einzelnes Ereignis</b>, das je Einheit nachvollziehbar bleiben muss. Ein physischer
+     * Tausch am <b>Bilanzmesspunkt</b> löst die Erkennung sogar <b>zweimal</b> aus – dieser
+     * Messpunkt ist auf zwei Einheiten gemappt (BEZUG und RUECKLIEFERUNG). Mit Dedup nach
+     * {@code meldungKey} würde der zweite Eintrag den ersten überschreiben und nur den Zähler
+     * erhöhen; die Information, <i>welche</i> Einheit betroffen war, wäre verloren.
+     *
+     * <p>Fehler beim Erfassen dürfen die Aggregation nicht beeinträchtigen.
+     */
+    private void meldeZaehlerwechsel(Einheit einheit, String serieAlt, String serieNeu,
+                                     LocalDateTime ende) {
+        try {
+            String parameter = String.format("%s: %s → %s (Intervall %s)",
+                    einheit.getName(), serieAlt, serieNeu, ZEIT_FORMAT.format(ende));
+            systemmeldungService.erfasseAudit(einheit.getOrgId(), MeldungLevel.INFO,
+                    SystemmeldungService.KATEGORIE_MQTT, SystemmeldungService.KEY_ZAEHLERTAUSCH,
+                    parameter);
+        } catch (Exception e) {
+            log.warn("Systemmeldung zum Zählerwechsel konnte nicht erfasst werden (einheit={}): {}",
+                    einheit.getId(), e.getMessage());
         }
     }
 
