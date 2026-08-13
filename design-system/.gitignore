@@ -3,3 +3,4 @@ dist/
 .storybook-out/
 *.log
 .DS_Store
+node/
