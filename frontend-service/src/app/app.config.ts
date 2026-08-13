@@ -1,6 +1,6 @@
 import { ApplicationConfig } from '@angular/core';
 import { provideRouter } from '@angular/router';
-import { provideHttpClient, withInterceptors, withXhr } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import {
     provideKeycloak,
     createInterceptorCondition,
@@ -51,7 +51,7 @@ export function buildAppConfig(config: RuntimeConfig): ApplicationConfig {
                 useValue: [urlCondition]
             },
             provideRouter(routes),
-            provideHttpClient(withXhr(), withInterceptors([includeBearerTokenInterceptor, errorInterceptor]))
+            provideHttpClient(withInterceptors([includeBearerTokenInterceptor, errorInterceptor]))
         ]
     };
 }

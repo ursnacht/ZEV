@@ -1,4 +1,4 @@
-import { Component, OnInit, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 
 interface Quarter {
@@ -11,7 +11,6 @@ interface Quarter {
   selector: 'app-quarter-selector',
   standalone: true,
   imports: [TranslatePipe],
-  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <div class="zev-quarter-selector">
       <span class="zev-quarter-selector__label">{{ 'QUARTAL_WAEHLEN' | translate }}:</span>

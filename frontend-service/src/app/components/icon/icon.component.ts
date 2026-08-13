@@ -1,11 +1,10 @@
-import { Component, Input, ChangeDetectionStrategy } from '@angular/core';
+import { Component, Input } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ICONS } from './icons';
 
 @Component({
   selector: 'app-icon',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './icon.component.html'
 })
 export class IconComponent {

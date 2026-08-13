@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TarifService } from '../../services/tarif.service';
 import { Tarif, ValidationResult } from '../../models/tarif.model';
@@ -16,7 +16,6 @@ import { IconComponent } from '../icon/icon.component';
   standalone: true,
   imports: [CommonModule, TarifFormComponent, TranslatePipe, SwissDatePipe, KebabMenuComponent, ColumnResizeDirective, IconComponent],
   templateUrl: './tarif-list.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./tarif-list.component.css']
 })
 export class TarifListComponent implements OnInit {

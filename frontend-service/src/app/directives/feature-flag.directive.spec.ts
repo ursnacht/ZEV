@@ -1,4 +1,4 @@
-import { Component, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { createSpyObj, SpyObj } from '../../testing/spy';
 import { FeatureFlagDirective } from './feature-flag.directive';
@@ -7,7 +7,6 @@ import { FeatureFlagService } from '../services/feature-flag.service';
 @Component({
   standalone: true,
   imports: [FeatureFlagDirective],
-  changeDetection: ChangeDetectionStrategy.Eager,
   template: `<div class="flagged" *appFeature="'MESSWERTE_UPLOAD'">content</div>`
 })
 class HostComponent {}

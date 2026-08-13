@@ -17,34 +17,35 @@
   },
   "private": true,
   "engines": {
-    "node": "^22.22.3 || ^24.15.0 || >=26.0.0"
+    "node": ">=20.19.0"
   },
   "dependencies": {
-    "@angular/animations": "^22.1.1",
-    "@angular/common": "^22.1.1",
-    "@angular/compiler": "^22.1.1",
-    "@angular/core": "^22.1.1",
-    "@angular/forms": "^22.1.1",
-    "@angular/platform-browser": "^22.1.1",
-    "@angular/platform-browser-dynamic": "^22.1.1",
-    "@angular/router": "^22.1.1",
+    "@angular/animations": "^21.2.17",
+    "@angular/common": "^21.2.17",
+    "@angular/compiler": "^21.2.17",
+    "@angular/core": "^21.2.17",
+    "@angular/forms": "^21.2.17",
+    "@angular/platform-browser": "^21.2.17",
+    "@angular/platform-browser-dynamic": "^21.2.17",
+    "@angular/router": "^21.2.17",
     "@zev/design-system": "file:../design-system",
     "chart.js": "4.5.1",
-    "keycloak-angular": "^22.0.0",
-    "keycloak-js": "^26.2.4",
+    "keycloak-angular": "^21.0.0",
+    "keycloak-js": "^25.0.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
-    "zone.js": "^0.16.2"
+    "zone.js": "~0.15.0"
   },
   "devDependencies": {
-    "@angular/build": "^22.1.4",
-    "@angular/cli": "^22.1.4",
-    "@angular/compiler-cli": "^22.1.1",
+    "@angular-devkit/build-angular": "^21.2.18",
+    "@angular/cli": "^21.2.18",
+    "@angular/compiler-cli": "^21.2.17",
     "@playwright/test": "^1.58.0",
+    "@types/keycloak-js": "^2.5.4",
     "@vitest/coverage-v8": "^4.1.9",
-    "jsdom": "^30.0.1",
-    "license-checker-rseidelsohn": "^5.0.1",
-    "typescript": "~6.0.3",
+    "jsdom": "^29.1.1",
+    "license-checker-rseidelsohn": "^4.4.2",
+    "typescript": "~5.9.3",
     "vitest": "^4.1.9"
   }
 }

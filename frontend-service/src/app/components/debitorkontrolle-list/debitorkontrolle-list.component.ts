@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
@@ -27,7 +27,6 @@ import { IconComponent } from '../icon/icon.component';
     KebabMenuComponent, ColumnResizeDirective, IconComponent
   ],
   templateUrl: './debitorkontrolle-list.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./debitorkontrolle-list.component.css']
 })
 export class DebitorkontrolleListComponent extends WithMessage implements OnInit {

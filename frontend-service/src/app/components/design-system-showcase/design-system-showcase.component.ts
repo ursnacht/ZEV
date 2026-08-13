@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
@@ -10,7 +10,6 @@ import { ICONS } from '../icon/icons';
   standalone: true,
   imports: [TranslatePipe, QuarterSelectorComponent, IconComponent, FormsModule],
   templateUrl: './design-system-showcase.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './design-system-showcase.component.css'
 })
 export class DesignSystemShowcaseComponent {

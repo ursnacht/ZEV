@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WithMessage } from '../../utils/with-message';
@@ -17,7 +17,6 @@ import { formatTarifLuecke } from '../../utils/tarif-luecke.util';
   standalone: true,
   imports: [CommonModule, FormsModule, TranslatePipe, QuarterSelectorComponent, IconComponent, EinheitSelectorComponent],
   templateUrl: './rechnungen.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./rechnungen.component.css']
 })
 export class RechnungenComponent extends WithMessage implements OnInit {

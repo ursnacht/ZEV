@@ -1,11 +1,10 @@
-import { Component, ViewChild, ElementRef, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ViewChild, ElementRef } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ColumnResizeDirective } from './column-resize.directive';
 
 @Component({
   standalone: true,
   imports: [ColumnResizeDirective],
-  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <table #testTable class="zev-table" appColumnResize>
       <thead>
