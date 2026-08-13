@@ -23,6 +23,86 @@ Pro Zeitintervall mit `ConsumerTotal` = Summe Consumer-`total`, `Bezug` = `total
    - **Producer-unabhängige Iteration:** Im Bilanzmodus wird ein Intervall über **Consumer + BEZUG** verarbeitet, **nicht** producer-gesteuert. Der heutige Loop (`MesswerteService.distribute`) überspringt Intervalle ohne PRODUCER (`producers.isEmpty()` → `continue`); im BILANZ-Zweig darf dieser Skip **nicht** greifen, da `S` producer-unabhängig ist (bilanz-/batterie-only-ZEV ohne Producer-Messung ist ein gültiger Fall). Ein Intervall mit Consumern und Bezug, aber ohne Producer-Messwert, verteilt `S` regulär.
 3. **Consumer-`zev`:** je Consumer = zugeteilte Menge; `zev_calculated` = derselbe Wert. MQTT-Sentinel-Regel bleibt (`zev == 0` → berechneter Wert; gemessene CSV-Werte bleiben).
 4. **Producer-`zev` (nur Statistik):** = `|ProduktionTotal| − |Rücklieferung(Bilanz)|`, proportional zur Produktion auf die Producer verteilt (im ZEV verbrauchte Produktion lt. Bilanz). Beeinflusst die Verrechnung nicht. **Fehlt die `RUECKLIEFERUNG`-Einheit**, wird Producer-`zev` auf `0` gesetzt (Statistik unvollständig) — der Lauf **läuft weiter**, da dieser Wert nicht abrechnungsrelevant ist. Wie heute wird Producer-`zev` **nur bei `quelle == MQTT`** überschrieben; CSV-Producer behalten ihren gemessenen `zev`-Wert (bestehender Guard in `aktualisiereProducerZev` bleibt bestehen). Der Guard basiert bewusst auf `quelle` und **nicht** auf einem Feature Flag: Ob `zev` gemessen (CSV) oder berechnet (MQTT-Sentinel `zev == 0`) ist, ist eine Datenprovenienz-Entscheidung **pro Messwert** — ein mandantenweiter Flag könnte diese Unterscheidung nicht ausdrücken und würde gemessene CSV-Werte überschreiben (Datenverlust). Der mandantenweite Schalter ist bereits `verteilmodus`.
+
+#### FR-2.4a: Berechnung von Producer-`zev` im Detail
+Umsetzung: `MesswerteService.distributeBilanz` (Ermittlung der Menge) + `MesswerteService.aktualisiereProducerZev` (Aufteilung/Persistenz). Pro Zeitintervall:
+
+1. **Im ZEV verbrauchte Produktion lt. Bilanz:**
+   ```
+   imZev = max(0, Σ|total_p| − Σ|total_r|)
+   ```
+   * `total_p` = `total` aller `PRODUCER`-Messwerte des Intervalls **mit `total < 0`** (nur echte Produktion)
+   * `total_r` = `total` aller Messwerte der `RUECKLIEFERUNG`-Bilanz-Einheit
+   * `max(0, …)`: Ist die Rücklieferung grösser als die Produktion (Messdifferenz/Zeitversatz), gilt `0` — kein negativer Eigenverbrauch.
+2. **Aufteilung proportional zur eigenen Produktion** (bei mehreren Producern):
+   ```
+   anteil_i = imZev × |total_i| / Σ|total_j|      (BigDecimal, 10 Nachkommastellen, HALF_UP)
+   zev_i    = −anteil_i
+   ```
+   Das **negative Vorzeichen** ist gewollt: Bei Produktion ist `total` negativ, `zev` bleibt dazu vorzeichenkonsistent.
+3. **Guards** (in dieser Reihenfolge wirksam):
+
+   | Fall | Ergebnis |
+   |------|----------|
+   | `quelle != MQTT` (z.B. CSV) | Messwert bleibt **unangetastet** (gemessener ZEV-Anteil, s. FR-2.4) |
+   | Producer mit `total >= 0` (z.B. Steuergerät, kein Produktions-Messwert) | `zev = 0` |
+   | Keine `RUECKLIEFERUNG`-Einheit vorhanden | `zev = 0` für alle Producer des Intervalls (`imZev` nicht bestimmbar) |
+   | Keine Consumer im Intervall | Producer-`zev` wird **trotzdem** aus `imZev` gesetzt — die Ermittlung hängt allein an Produktion/Rücklieferung. **Abweichung zum Modus `PRODUCER_MESSUNG`**, wo Producer-`zev` in diesem Fall auf `0` gesetzt wird (dort ist die Verteilsumme die Quelle, und die ist ohne Consumer 0). |
+   | Intervall wegen fehlender Bilanzdaten übersprungen (FR-2.5) | Producer-`zev` ist **trotzdem gesetzt**: Es wird **vor** der Bezugs-Prüfung geschrieben, da `imZev` den Bezug nicht braucht. Nur die Consumer-Verteilung entfällt. |
+
+4. **Producer-`zev` ist nicht die an die Consumer verteilte Menge.** Im Bilanzmodus werden zwei Schätzer derselben physikalischen Grösse **getrennt** ermittelt:
+
+   | | Formel | Verwendung |
+   |---|---|---|
+   | Consumer-Seite | `S = max(0, ConsumerTotal − Bezug)` | **abrechnungsrelevant** (FR-2.1/2.2) |
+   | Producer-Seite | `imZev = max(0, Produktion − Rücklieferung)` | **nur Statistik** |
+
+   Beide dürfen auseinanderlaufen — z.B. durch Verbraucher, die nicht als ZEV-Consumer erfasst sind, durch Speicherverluste oder durch Messungenauigkeit/Zeitversatz der Bilanzzähler. Das ist **kein Fehlerfall** und wird nicht korrigiert oder gemeldet; die Verrechnung folgt ausschliesslich der Consumer-Seite (FR-3).
+   > *Abgrenzung zum Modus `PRODUCER_MESSUNG`:* Dort wird dieselbe Methode mit der **tatsächlich an die Consumer verteilten** Menge aufgerufen, Producer-`zev` ist dort also per Konstruktion identisch mit der Verteilsumme. Diese Kopplung entfällt im Bilanzmodus bewusst.
+
+#### FR-2.4b: Differenz Producer-`zev` ↔ Consumer-`zev` (Interpretation/Diagnose)
+Die Differenz der beiden Summen ist **kein Rechenfehler, sondern der Restposten der Knotenbilanz am Hausanschluss**: Energie, die erzeugt oder bezogen wurde, aber weder eingespeist noch bei einem ZEV-Consumer gemessen wurde.
+
+Mit `P = |Σ Producer-zev| = imZev` und `C = Σ Consumer-zev = S` gilt — solange **keine** der beiden `max(0, …)`-Klemmungen greift:
+
+```
+Δ = P − C = (Produktion − Rücklieferung) − (ConsumerTotal − Bezug)
+          = (Produktion + Bezug) − (Rücklieferung + ConsumerTotal)
+             └── kommt herein ──┘   └──── geht gemessen hinaus ────┘
+```
+
+Die beiden Summen stammen aus **disjunkten Zählergruppen** (Producer + `RUECKLIEFERUNG` ↔ Consumer + `BEZUG`); Δ ist genau die Lücke zwischen ihnen.
+
+**Woraus sich Δ zusammensetzt:**
+
+| Δ > 0 (mehr herein als gemessen hinaus) | Δ < 0 (Consumer verbrauchen mehr als erklärbar) |
+|---|---|
+| Verbraucher, die **nicht** als ZEV-Consumer erfasst sind (Allgemeinstrom, WP, Ladestation, Lift) | **Batterieentladung** — Quelle ohne gemessene Produktion |
+| **Batterieladung** — Senke im Intervall | Lücken in den Producer-/Rücklieferungs-Messwerten (Produktion untererfasst) |
+| Verluste (Wechselrichter je nach Messpunkt, Leitungen, Speicher-Roundtrip) | Zeitversatz zwischen Zählern an Intervallgrenzen (dreht sich meist im Folgeintervall wieder heraus) |
+| Messtoleranzen / unterschiedliche Genauigkeitsklassen der Zähler | dito |
+
+Ein **konstanter positiver Sockel** ist der Normalfall (unerfasste Allgemeinverbraucher + Verluste). Aussagekräftig sind nicht der Absolutwert, sondern **Sprünge** und **Vorzeichenwechsel** — sie deuten auf Datenlücken oder Zählerprobleme.
+
+**Wann die Gleichung nicht gilt** (Δ dann nicht als Knotenbilanz interpretierbar):
+1. **Klemmung:** Intervalle mit `Rücklieferung > Produktion` bzw. `Bezug > ConsumerTotal` liefern `0` statt eines negativen Werts → über einen Zeitraum summiert ist Δ zu positiv verzerrt.
+2. **Übersprungene Intervalle** (kein Bezugs-Messwert, FR-2.5): Producer-`zev` wird geschrieben, die Consumer behalten ihren **alten** Wert aus einem früheren Lauf — für solche Zeiträume ist Δ bedeutungslos.
+3. **Datenprovenienz:** Producer-`zev` wird nur bei `quelle = MQTT` überschrieben, Consumer-`zev` nur beim Sentinel `zev == 0`. Bei CSV-Daten vergleicht Δ zwei **gemessene** Werte statt der Bilanz-Grössen.
+4. **Rundung** auf 3 Nachkommastellen je Zuteilung (`SolarDistribution.adjustRounding`) — vernachlässigbar, aber nicht exakt null.
+
+**Warum die Kennzahl nützlich ist:** Im Bilanzmodus ist der Vergleich „Bezug von VNB (berechnet) ↔ Bilanz-Bezug" tautologisch (FR-3.3/FR-4.2) und kann nichts aufdecken. Δ ist die einzige Grösse, die Producer- und Rücklieferungszähler **unabhängig** gegen die Consumer-Seite stellt — der brauchbare Plausibilitätscheck. Sinnvoll als **relative** Kennzahl `Δ / Produktion` je Monat:
+
+```sql
+SELECT date_trunc('month', m.zeit) AS monat,
+       ROUND((SUM(-m.zev) FILTER (WHERE e.typ = 'PRODUCER'))::numeric, 1) AS prod_zev,
+       ROUND((SUM( m.zev) FILTER (WHERE e.typ = 'CONSUMER'))::numeric, 1) AS cons_zev,
+       ROUND((COALESCE(SUM(-m.zev) FILTER (WHERE e.typ = 'PRODUCER'), 0)
+            - COALESCE(SUM( m.zev) FILTER (WHERE e.typ = 'CONSUMER'), 0))::numeric, 1) AS delta
+FROM zev.messwerte m
+JOIN zev.einheit e ON e.id = m.einheit_id
+WHERE m.org_id = <orgId>
+GROUP BY 1 ORDER BY 1;
+```
 5. **Nur `BEZUG` ist abrechnungskritisch** — es sind aber zwei Fälle zu unterscheiden:
    - **Fehlende Bilanzdaten in einzelnen Intervallen** (Datenlücke, z.B. Zähler-/Übertragungsausfall): `S` ist für dieses Intervall nicht bestimmbar → **nur dieses Intervall wird übersprungen, der Lauf läuft weiter** (Nachtrag; vormals harter Abbruch). Die Consumer behalten für das übersprungene Intervall ihren bisherigen `zev`-Wert; es wird nichts geschrieben.
      * **Nicht still:** Nach dem Lauf wird **eine** Systemmeldung mit Level **`WARN`** erfasst (Key `BILANZMODELL_INTERVALLE_UEBERSPRUNGEN`, Kategorie Bilanzmodell) — mit **Anzahl** der übersprungenen Intervalle und dem **Zeitraum** (erste/letzte Lücke). Bewusst **eine** Sammelmeldung statt einer je Intervall.
@@ -65,6 +145,13 @@ Pro Zeitintervall mit `ConsumerTotal` = Summe Consumer-`total`, `Bezug` = `total
 * [ ] Fehlen (nur) die **Bezugs-Messwerte einzelner Intervalle** → der Lauf bricht **nicht** ab: betroffene Intervalle werden übersprungen, die übrigen normal verteilt (manuell **und** automatisch).
 * [ ] Fehlt (nur) die `RUECKLIEFERUNG`-Einheit → Producer-`zev` = 0, der Lauf bricht **nicht** ab (Consumer-Abrechnung unberührt).
 * [ ] Producer-`zev` wird im Bilanzmodus nur bei `quelle == MQTT` gesetzt; CSV-Producer behalten den gemessenen `zev`.
+* [ ] Beispiel `Produktion=8, Rücklieferung=3`, ein MQTT-Producer → `imZev=5`, dessen `zev = −5` (negatives Vorzeichen, konsistent zu `total`).
+* [ ] Zwei MQTT-Producer mit `total = −6` / `−2` und `imZev = 4` → `zev = −3` / `−1` (proportional zur eigenen Produktion).
+* [ ] `Rücklieferung > Produktion` (Messdifferenz/Zeitversatz) → `imZev = 0`, Producer-`zev = 0` (kein negativer Eigenverbrauch).
+* [ ] Ein Producer-Messwert mit `total >= 0` (Steuergerät) erhält `zev = 0` und geht nicht in die Produktionssumme ein.
+* [ ] Intervall **ohne Consumer**: Producer-`zev` wird dennoch aus `imZev` gesetzt (im Unterschied zu `PRODUCER_MESSUNG`, wo dann `0` gesetzt wird).
+* [ ] Intervall **ohne Bezugs-Messwert** (übersprungen, FR-2.5): Producer-`zev` ist gesetzt, Consumer-`zev` unverändert.
+* [ ] Producer-`zev`-Summe und Consumer-`zev`-Summe eines Zeitraums dürfen differieren; das erzeugt **keine** Systemmeldung und keine Korrektur.
 * [ ] Der Bilanzmodus greift auch beim **MQTT-Auto-Lauf** (`ZaehlerAggregationService`): der Modus wird org-explizit geladen (kein `getCurrentOrgId()`), keine `NoOrganizationException`.
 * [ ] Bei `verteilmodus = PRODUCER_MESSUNG` ist das Verteilergebnis **identisch** zu heute (Regression).
 
@@ -94,7 +181,9 @@ Pro Zeitintervall mit `ConsumerTotal` = Summe Consumer-`total`, `Bezug` = `total
 | `verteilmodus` fehlt (Bestandsmandant) | wie `PRODUCER_MESSUNG` (Default) |
 | Modus `BILANZ`, aber **keine `BEZUG`-Einheit** (Konfigurationsfehler) | Harter Abbruch, nichts wird geschrieben. Manuell: HTTP 400 mit `BILANZMODELL_KEINE_BILANZDATEN`. Auto: ERROR-Log, Mandant übersprungen, übrige laufen weiter |
 | `Bezug > ConsumerTotal` (Netzladung Batterie / Messdifferenz) | `S = 0` in diesem Intervall (kein negativer Eigenverbrauch) |
-| Keine Consumer im Intervall | nichts zu verteilen (`S` irrelevant), keine `zev`-Werte |
+| Keine Consumer im Intervall | nichts zu verteilen (`S` irrelevant), keine Consumer-`zev`-Werte; Producer-`zev` wird dennoch aus `imZev` gesetzt (FR-2.4a) |
+| `Rücklieferung > Produktion` im Intervall (Messdifferenz/Zeitversatz) | `imZev = 0` → Producer-`zev = 0`; kein Abbruch, keine Meldung (nicht abrechnungsrelevant) |
+| Producer-`zev`-Summe ≠ Consumer-`zev`-Summe über den Zeitraum | **kein Fehlerfall** — zwei getrennt ermittelte Schätzer derselben Grösse (FR-2.4a.4); die Differenz ist der Restposten der Knotenbilanz (Interpretation und Grenzen: FR-2.4b). Verrechnung folgt allein der Consumer-Seite |
 | Bilanzdaten-Lücke einzelner Intervalle | **Intervall überspringen, Lauf fortsetzen** (FR-2.5). Für die Lücke wird nichts geschrieben; danach **eine** `WARN`-Systemmeldung `BILANZMODELL_INTERVALLE_UEBERSPRUNGEN` mit Anzahl + Zeitraum, je Lücke ein WARN-Log. Anzahl in `CalculationResult.uebersprungeneIntervalle`. Abrechnung für diese Intervalle unvollständig → nach Datennachlieferung erneut ausführen |
 | Lückenloser Folgelauf nach zuvor übersprungenen Intervallen | **Auto-Resolve** der offenen `BILANZMODELL_INTERVALLE_UEBERSPRUNGEN`-Meldung (Selbstheilung) |
 | Umstellung des Modus rückwirkend | Neuberechnung überschreibt `zev`/`zev_calculated` für den gewählten Zeitraum; Nutzer wird auf Auswirkung auf bereits erstellte Rechnungen hingewiesen |
@@ -118,6 +207,7 @@ Pro Zeitintervall mit `ConsumerTotal` = Summe Consumer-`total`, `Bezug` = `total
 * **Explizite Speicher-Modellierung** — im Bilanzmodell nicht nötig (Batterie implizit über die Bilanz); die explizite Variante bleibt als `Specs/Batteriespeicher.md` bestehen (Koexistenz, andere Mandanten).
 * **Automatische Modus-Erkennung** — der Modus wird bewusst manuell je Mandant gesetzt (keine Auto-Umschaltung).
 * **Rückwirkende automatische Neuberechnung/Neuverrechnung** bereits gestellter Rechnungen bei Modus-Wechsel — nur Hinweis, keine automatische Korrektur.
+* **Δ (FR-2.4b) als Kennzahl in Statistik/Monitoring** — bewusst **nicht** umgesetzt: keine Anzeige, kein Schwellwert, keine Systemmeldung. FR-2.4b beschreibt die Grösse für die **manuelle Diagnose** (Abfrage/Datenbank-Ansicht). Eine Aufnahme in die Statistik wäre eine eigene Anforderung.
 
 ## 8. Offene Fragen
 Vorab geklärt:
