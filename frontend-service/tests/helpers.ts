@@ -93,11 +93,19 @@ export async function handleKeycloakLogin(
 export async function navigateToHome(page: Page): Promise<void> {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await handleKeycloakLogin(page);
-    // Ensure navbar is fully loaded and stable
-    const navbar = page.locator('.zev-navbar');
-    await navbar.waitFor({ state: 'visible', timeout: 15000 });
-    // Wait for Angular to stabilize
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await waitForAppReady(page);
+}
+
+/**
+ * Wartet auf einen **deterministischen** Bereitschafts-Zustand der App: Navbar sichtbar und
+ * Hamburger-Button bedienbar. Ersetzt das frühere `waitForLoadState('networkidle')`, das
+ * unzuverlässig ist (Playwright rät davon ab), in Firefox anders greift als in Chromium und
+ * dessen Timeout hier zudem verschluckt wurde – der Helper kehrte dann zurück, bevor die Seite
+ * bereit war, und der Test lief in die Assertion (Hauptquelle der Flakiness).
+ */
+export async function waitForAppReady(page: Page): Promise<void> {
+    await page.locator('.zev-navbar').waitFor({ state: 'visible', timeout: 15000 });
+    await page.locator('.zev-hamburger[aria-label="Menu"]').waitFor({ state: 'visible', timeout: 15000 });
 }
 
 /**
@@ -108,9 +116,7 @@ export async function navigateToHome(page: Page): Promise<void> {
 export async function loginAs(page: Page, username: string, password: string): Promise<void> {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await handleKeycloakLogin(page, username, password);
-    const navbar = page.locator('.zev-navbar');
-    await navbar.waitFor({ state: 'visible', timeout: 15000 });
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await waitForAppReady(page);
 }
 
 /**
@@ -145,8 +151,10 @@ export async function navigateViaMenu(page: Page, href: string): Promise<void> {
             await page.goto(href, { waitUntil: 'domcontentloaded' });
         }
     }
-    // Wait for navigation to complete
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    // Auf die tatsächliche Route warten (statt auf 'networkidle'): deterministisch, gilt auch
+    // nach dem goto-Fallback oben und schlägt bei ausbleibender Navigation ehrlich fehl,
+    // statt den Test stillschweigend zu früh weiterlaufen zu lassen.
+    await page.waitForURL((url) => url.pathname === href, { timeout: 15000 });
 }
 
 /**

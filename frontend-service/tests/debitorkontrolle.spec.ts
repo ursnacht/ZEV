@@ -26,8 +26,15 @@ async function setDateRange(page: Page, von: string, bis: string): Promise<void>
     await dateFrom.fill(von);
     await dateFrom.dispatchEvent('change');
     await dateTo.fill(bis);
-    await dateTo.dispatchEvent('change');
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    // Auf das konkrete Nachladen warten statt auf 'networkidle': Die Datumsänderung löst ein
+    // GET /api/debitoren aus; darauf zu warten ist deterministisch und browser-unabhängig.
+    await Promise.all([
+        page.waitForResponse(
+            (res) => res.url().includes('/api/debitoren') && res.request().method() === 'GET',
+            { timeout: 15000 }
+        ),
+        dateTo.dispatchEvent('change')
+    ]);
 }
 
 /**
@@ -596,8 +603,15 @@ test.describe('Debitorkontrolle - Kebab quick actions for Zahldatum', () => {
     async function clickQuickAction(page: Page, row: ReturnType<Page['locator']>, label: string): Promise<void> {
         await row.locator('.zev-kebab-button').click();
         await row.locator('.zev-kebab-menu--open').waitFor({ state: 'visible', timeout: 2000 });
-        await row.locator('.zev-kebab-menu__item', { hasText: label }).click();
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+        // Die Quick-Action schreibt (PUT/POST) und die Liste lädt anschliessend neu; auf das
+        // GET danach warten statt auf 'networkidle' (unzuverlässig, Timeout wurde verschluckt).
+        await Promise.all([
+            page.waitForResponse(
+                (res) => res.url().includes('/api/debitoren') && res.request().method() === 'GET',
+                { timeout: 15000 }
+            ),
+            row.locator('.zev-kebab-menu__item', { hasText: label }).click()
+        ]);
     }
 
     test('should set Zahldatum via "Heute"/"Gestern" and clear it via "Zahldatum löschen"', async ({ page }) => {

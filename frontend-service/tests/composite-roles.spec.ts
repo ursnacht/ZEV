@@ -24,7 +24,8 @@ test.describe.configure({ mode: 'serial' });
 
 async function gotoRoute(page: Page, route: string): Promise<void> {
     await page.goto(route, { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    // Auf die Route warten statt auf 'networkidle' (unzuverlässig, Timeout wurde verschluckt).
+    await page.waitForURL((url) => url.pathname === route, { timeout: 15000 });
 }
 
 test.describe('Composite-Roles: permission-basierter Zugriff', () => {
