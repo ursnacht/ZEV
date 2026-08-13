@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Tarif, TarifTyp } from '../../models/tarif.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
@@ -9,6 +9,7 @@ import { IconComponent } from '../icon/icon.component';
   standalone: true,
   imports: [FormsModule, TranslatePipe, IconComponent],
   templateUrl: './tarif-form.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./tarif-form.component.css']
 })
 export class TarifFormComponent implements OnInit {

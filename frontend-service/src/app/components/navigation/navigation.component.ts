@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, OnDestroy, HostListener, HostBinding } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy, HostListener, HostBinding, ChangeDetectionStrategy } from '@angular/core';
 import { Router, RouterModule, NavigationEnd } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
@@ -17,6 +17,7 @@ import { FeatureFlagDirective } from '../../directives/feature-flag.directive';
   standalone: true,
   imports: [RouterModule, TranslatePipe, IconComponent, FeatureFlagDirective],
   templateUrl: './navigation.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./navigation.component.css']
 })
 export class NavigationComponent implements OnInit, OnDestroy {

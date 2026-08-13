@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnDestroy, OnInit, ChangeDetectorRef, ChangeDetectionStrategy } from '@angular/core';
 import { WithMessage } from '../../utils/with-message';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -27,6 +27,7 @@ interface ChartData {
   standalone: true,
   imports: [CommonModule, FormsModule, TranslatePipe, EinheitTypPipe, QuarterSelectorComponent, IconComponent, EinheitSelectorComponent],
   templateUrl: './messwerte-chart.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./messwerte-chart.component.css']
 })
 export class MesswerteChartComponent extends WithMessage implements OnInit, OnDestroy {

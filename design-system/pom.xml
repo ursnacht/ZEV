@@ -22,10 +22,10 @@
             <plugin>
                 <groupId>com.github.eirslett</groupId>
                 <artifactId>frontend-maven-plugin</artifactId>
-                <version>1.15.0</version>
+                <version>2.0.2</version>
                 <configuration>
-                    <nodeVersion>v20.19.0</nodeVersion>
-                    <npmVersion>10.8.2</npmVersion>
+                    <nodeVersion>v24.19.0</nodeVersion>
+                    <npmVersion>11.17.0</npmVersion>
                     <workingDirectory>${project.basedir}</workingDirectory>
                 </configuration>
                 <executions>

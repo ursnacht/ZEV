@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WithMessage } from '../../utils/with-message';
@@ -18,6 +18,7 @@ import { IconComponent } from '../icon/icon.component';
   standalone: true,
   imports: [CommonModule, FormsModule, TranslatePipe, IconComponent],
   templateUrl: './datenbank-ansicht.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./datenbank-ansicht.component.css']
 })
 export class DatenbankAnsichtComponent extends WithMessage implements OnInit {

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WithMessage } from '../../utils/with-message';
@@ -25,6 +25,7 @@ export interface KennzahlZeile {
   standalone: true,
   imports: [CommonModule, FormsModule, TranslatePipe, EinheitTypPipe, SwissDatePipe, QuarterSelectorComponent, IconComponent],
   templateUrl: './statistik.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./statistik.component.css']
 })
 export class StatistikComponent extends WithMessage implements OnInit {

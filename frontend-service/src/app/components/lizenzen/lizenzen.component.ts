@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LizenzenService } from '../../services/lizenzen.service';
@@ -11,6 +11,7 @@ import { IconComponent } from '../icon/icon.component';
   standalone: true,
   imports: [CommonModule, FormsModule, TranslatePipe, IconComponent],
   templateUrl: './lizenzen.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./lizenzen.component.css']
 })
 export class LizenzenComponent implements OnInit {

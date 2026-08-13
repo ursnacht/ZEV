@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { WithMessage } from '../../utils/with-message';
 import { CommonModule } from '@angular/common';
 import { EinheitService } from '../../services/einheit.service';
@@ -16,6 +16,7 @@ import { IconComponent } from '../icon/icon.component';
   standalone: true,
   imports: [CommonModule, EinheitFormComponent, TranslatePipe, EinheitTypPipe, KebabMenuComponent, ColumnResizeDirective, IconComponent],
   templateUrl: './einheit-list.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./einheit-list.component.css']
 })
 export class EinheitListComponent extends WithMessage implements OnInit {
