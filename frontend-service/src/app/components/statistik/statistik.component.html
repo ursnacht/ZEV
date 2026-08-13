@@ -129,7 +129,8 @@
               </tr>
             </thead>
             <tbody>
-              <tr>
+              <!-- title je Zeile: erklärender Hinweis zum visualisierten Wert (wie bei den Kennzahlen) -->
+              <tr [title]="'PRODUKTION_TOTAL_HINWEIS' | translate">
                 <td>{{ 'PRODUKTION_TOTAL' | translate }}</td>
                 <td class="zev-table__bar-cell">
                   <div class="zev-bar-container">
@@ -141,7 +142,7 @@
                 </td>
                 <td class="zev-table__number">{{ formatNumber(monat.summeProducerTotal) }}</td>
               </tr>
-              <tr>
+              <tr [title]="'VERBRAUCH_TOTAL_HINWEIS' | translate">
                 <td>{{ 'VERBRAUCH_TOTAL' | translate }}</td>
                 <td class="zev-table__bar-cell">
                   <div class="zev-bar-container">
@@ -153,7 +154,7 @@
                 </td>
                 <td class="zev-table__number">{{ formatNumber(monat.summeConsumerTotal) }}</td>
               </tr>
-              <tr>
+              <tr [title]="'ZEV_PRODUCER_HINWEIS' | translate">
                 <td>{{ 'ZEV_PRODUCER' | translate }} (A)</td>
                 <td class="zev-table__bar-cell">
                   <div class="zev-bar-container">
@@ -165,7 +166,7 @@
                 </td>
                 <td class="zev-table__number">{{ formatNumber(monat.summeProducerZev) }}</td>
               </tr>
-              <tr>
+              <tr [title]="'ZEV_CONSUMER_HINWEIS' | translate">
                 <td>{{ 'ZEV_CONSUMER' | translate }} (B)</td>
                 <td class="zev-table__bar-cell">
                   <div class="zev-bar-container">
@@ -177,7 +178,7 @@
                 </td>
                 <td class="zev-table__number">{{ formatNumber(monat.summeConsumerZev) }}</td>
               </tr>
-              <tr>
+              <tr [title]="'ZEV_CONSUMER_BERECHNET_HINWEIS' | translate">
                 <td>{{ 'ZEV_CONSUMER_BERECHNET' | translate }} (C)</td>
                 <td class="zev-table__bar-cell">
                   <div class="zev-bar-container">
@@ -193,7 +194,7 @@
                    Die berechneten Werte "Bezug von VNB"/"Rücklieferung" werden nicht mehr als
                    Zeilen angezeigt, sondern nur noch im Summen-Vergleich verwendet (FR-5.7). -->
               @if (monat.bilanzRuecklieferungName) {
-                <tr>
+                <tr [title]="'STATISTIK_BILANZ_RUECKLIEFERUNG_HINWEIS' | translate">
                   <td>{{ isBilanz ? ('STATISTIK_RUECKLIEFERUNG_GEMESSEN' | translate) : monat.bilanzRuecklieferungName }}</td>
                   <td class="zev-table__bar-cell">
                     <div class="zev-bar-container">
@@ -207,7 +208,7 @@
                 </tr>
               }
               @if (monat.bilanzBezugName) {
-                <tr>
+                <tr [title]="'STATISTIK_BILANZ_BEZUG_HINWEIS' | translate">
                   <td>{{ monat.bilanzBezugName }}</td>
                   <td class="zev-table__bar-cell">
                     <div class="zev-bar-container">

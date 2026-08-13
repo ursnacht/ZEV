@@ -524,3 +524,23 @@ Die kWh-Werte in den Statistik-Tabellen erschienen im Web linksbündig, obwohl `
 - **`design-system/src/components/statistik/statistik.css`**: Regel auf höhere Spezifität angehoben (`.zev-table th.zev-table__number, .zev-table td.zev-table__number { text-align: right }`); anschliessend `npm run build` im Design System.
 - **Keine Frontend-Code-Änderung**: die Tabellenzellen tragen bereits die Klasse `.zev-table__number`.
 - **Keine neuen Texte/Backend/Tests**: rein visuell, konsistent mit der PDF-Ausgabe.
+
+### Erklärender Hinweis (`title`) je visualisiertem Wert
+
+Die Zeilen der Summen-Tabelle mit Balken tragen neu einen erklärenden Tooltip – analog zu den
+Statistik-Kennzahlen (`Specs/Statistik-Kennzahlen.md` FR-3.5, dort `<tr [title]="kz.hintKey | translate">`).
+
+- **`statistik.component.html`**: `[title]="'<KEY>_HINWEIS' | translate"` auf allen sieben `<tr>` der
+  Tabelle `.zev-table--bars` (Produktion Total, Verbrauch Total, ZEV Produzent, ZEV Konsumenten,
+  ZEV Konsumenten berechnet sowie die beiden optionalen Bilanz-Zeilen). Kein Component-Code nötig –
+  die Zeilen sind statisch, ein View-Model wie `getKennzahlen()` wäre hier Overhead.
+- **Bilanz-Zeilen**: generische Keys `STATISTIK_BILANZ_BEZUG_HINWEIS` /
+  `STATISTIK_BILANZ_RUECKLIEFERUNG_HINWEIS`, da die Beschriftung dieser Zeilen der **Einheiten-Name**
+  ist (bzw. im Bilanzmodus `STATISTIK_RUECKLIEFERUNG_GEMESSEN`) und nicht als Key taugt.
+- **i18n**: `V99__Add_Statistik_Visualisierung_Hinweise_Translations.sql` (DE/EN,
+  `ON CONFLICT (key) DO NOTHING`) mit den sieben `*_HINWEIS`-Keys. V98 war die höchste angewandte
+  Migration (via `zev-db` geprüft).
+- **Kein Design-System-/CSS-Anteil**: natives `title`-Attribut, wie bei den Kennzahlen und den
+  Vergleichs-Items (`TOOLTIP_VERGLEICH_*`).
+- **PDF unverändert**: Tooltips existieren nur im Web (`StatistikPdfService` nicht betroffen).
+- **Tests**: keine Anpassung nötig – `statistik.component.spec.ts` prüft die Balken-Tabelle nicht.

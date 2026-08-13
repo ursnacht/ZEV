@@ -37,6 +37,17 @@
 * Die Seite soll im Menu wählbar sein
 * Alle Texte mehrsprachig machen und in die Datenbank aufnehmen
 * **Darstellung numerischer Werte:** Alle kWh-Werte in den Tabellen (Summen-Tabelle, „Summen pro Einheit", Tage-mit-Abweichungen) werden **rechtsbündig** dargestellt – konsistent mit der PDF-Ausgabe. Umgesetzt über die Design-System-Klasse `.zev-table__number`.
+* **Erklärender Hinweis je visualisiertem Wert (Nachtrag):** Jede Zeile der Summen-Tabelle mit Balken (Spalten „Beschreibung / Visualisierung / Wert") trägt einen erklärenden Tooltip (natives `title`-Attribut auf dem `<tr>`), der die Bedeutung des dargestellten Werts kurz erläutert – **analog zu den Kennzahlen** (`Specs/Statistik-Kennzahlen.md` FR-3.5).
+  * Betroffen sind alle Zeilen: Produktion (Total), Verbrauch (Total), ZEV Produzent, ZEV Konsumenten, ZEV Konsumenten (berechnet) sowie – falls vorhanden – die beiden **Bilanz-Zeilen** (`BEZUG`/`RUECKLIEFERUNG`).
+  * Für die Bilanz-Zeilen ist der Hinweis **generisch** formuliert (die Beschriftung ist der Einheiten-Name bzw. im Bilanzmodus „Rücklieferung (gemessen)"), also unabhängig vom konkreten Einheiten-Namen.
+  * Die Hinweistexte kommen via `TranslationService` (DE/EN), Key-Konvention `<LABEL_KEY>_HINWEIS` wie bei den Kennzahlen.
+  * Rein additiv: **kein** neues CSS (natives `title`), keine Änderung an Werten, Balken oder der PDF-Ausgabe (Tooltips existieren nur im Web).
+  * **Akzeptanzkriterien:**
+    * [ ] Hovern über eine Zeile der Summen-Tabelle zeigt einen erklärenden Hinweis; jede der fünf Standard-Zeilen hat einen **eigenen**, inhaltlich passenden Text.
+    * [ ] Sind Bilanz-Einheiten vorhanden, tragen auch deren Zeilen einen Hinweis; fehlen sie, entfallen die Zeilen samt Hinweis (keine leeren Tooltips).
+    * [ ] Die Hinweise sind in DE und EN vorhanden und werden über den `TranslationService` geladen (keine Hardcodings im Template).
+    * [ ] Alle Hinweis-Keys sind per Flyway-Migration angelegt: Die `TranslatePipe` fällt bei fehlendem Key auf den **Key-Namen** zurück (`TranslationService.translate`), ein Tooltip wie „PRODUKTION_TOTAL_HINWEIS" wäre also direkt sichtbar und gilt als Fehler.
+    * [ ] Werte, Balkenlängen, Sortierung und PDF-Ausgabe sind unverändert.
 
 ### 3. Technische Spezifikationen (Technical Specs)
 * Verwende das Design System
