@@ -122,6 +122,18 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test-classic</artifactId>
       <scope>test</scope>
+      <exclusions>
+        <!-- spring-boot-grpc-test (neu ab Spring Boot 4.1) registriert
+             GrpcPortInfoApplicationContextInitializer$Listener implements
+             ApplicationListener<org.springframework.grpc.server.lifecycle.GrpcServerStartedEvent>.
+             Ohne spring-grpc auf dem Classpath scheitert beim ersten publishEvent die Aufloesung
+             des Event-Typs -> TypeNotPresentException, jeder @SpringBootTest-Kontext bricht ab.
+             Wir nutzen kein gRPC, daher ausschliessen. -->
+        <exclusion>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-grpc-test</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>

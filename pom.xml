@@ -6,7 +6,7 @@
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>4.0.7</version>
+    <version>4.1.0</version>
     <relativePath/>
   </parent>
 
@@ -27,27 +27,20 @@
   <properties>
     <java.version>25</java.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <!-- ACHTUNG: An die Spring-Boot-Minor-Version gekoppelt (SBA 4.0.x <-> Spring Boot 4.0.x).
-         Erst zusammen mit einem Spring-Boot-Upgrade anheben, nie einzeln:
+    <!-- ACHTUNG: An die Spring-Boot-Minor-Version gekoppelt (SBA 4.x.y <-> Spring Boot 4.x).
+         Nie einzeln anheben, immer zusammen mit dem Parent oben:
          SBA 4.1.2 auf Spring Boot 4.0.7 bricht beim Start des admin-service mit
          NoClassDefFoundError org.springframework.boot.http.client.InetAddressFilter
          (Klasse existiert erst ab Spring Boot 4.1) - verifiziert 2026-08-13. -->
-    <spring-boot-admin.version>4.0.4</spring-boot-admin.version>
+    <spring-boot-admin.version>4.1.2</spring-boot-admin.version>
     <!-- Sicherheits-Override der Spring-Boot-verwalteten Versionen (CVE-Fixes).
-         Anheben gegenueber Spring Boot 4.0.6 (tomcat 11.0.21, netty 4.2.12.Final).
-         Entfernen, sobald ein Spring-Boot-Parent-Update diese Versionen mitbringt. -->
-    <!-- tomcat 11.0.21 -> 11.0.22 behebt (CRITICAL):
-         CVE-2026-41284, CVE-2026-41293, CVE-2026-42498, CVE-2026-43512,
-         CVE-2026-43513, CVE-2026-43514, CVE-2026-43515 -->
-    <tomcat.version>11.0.22</tomcat.version>
-    <!-- netty 4.2.12.Final -> 4.2.15.Final behebt (CRITICAL):
-         CVE-2026-41417, CVE-2026-42577, CVE-2026-42578, CVE-2026-42579,
-         CVE-2026-42580, CVE-2026-42581, CVE-2026-42582, CVE-2026-42583,
-         CVE-2026-42584, CVE-2026-42585, CVE-2026-42586, CVE-2026-42587,
-         CVE-2026-44248 -->
-    <netty.version>4.2.15.Final</netty.version>
-    <!-- postgresql 42.7.10 -> 42.7.12 behebt (HIGH):
-         CVE-2026-42198 (client-seitiger DoS im pgjdbc-Treiber); 42.7.13 = aktueller Patch -->
+         Entfernen, sobald ein Spring-Boot-Parent-Update diese Versionen mitbringt.
+         Die frueheren Overrides fuer tomcat (11.0.22) und netty (4.2.15.Final) sind mit
+         Spring Boot 4.1.0 entfallen - das BOM pinnt exakt dieselben Versionen. -->
+    <!-- postgresql: Spring Boot 4.1.0 pinnt 42.7.11, das ist ZU ALT.
+         42.7.12 behebt CVE-2026-42198 (HIGH, client-seitiger DoS im pgjdbc-Treiber),
+         42.7.13 = aktueller Patch. Override muss bleiben, sonst Downgrade auf eine
+         verwundbare Version. -->
     <postgresql.version>42.7.13</postgresql.version>
   </properties>
 </project>
