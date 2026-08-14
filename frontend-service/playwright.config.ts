@@ -17,8 +17,10 @@ export default defineConfig({
     reporter: process.env['CI'] ? 'list' : 'html',
     /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
     use: {
-        /* Base URL to use in actions like `await page.goto('/')`. */
-        baseURL: 'http://localhost:4200',
+        /* Base URL to use in actions like `await page.goto('/')`.
+         * Default ist der Container-Stack hinter dem Reverse-Proxy (caddy, eine Origin).
+         * Gegen den Angular-Dev-Server testen: E2E_BASE_URL=http://localhost:4200 setzen. */
+        baseURL: process.env['E2E_BASE_URL'] ?? 'http://localhost:8000',
         /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
         trace: 'on-first-retry',
         /* Use a fresh browser context for each test to avoid session conflicts */

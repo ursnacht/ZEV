@@ -17,7 +17,8 @@ setup('authenticate', async ({ page }) => {
     await page.click('input[type="submit"]');
 
     // Wait for redirect back to the app
-    await page.waitForURL('http://localhost:4200/**');
+    // Keine feste Basis-URL: die Anwendung laeuft je nach Umgebung unter :8000 oder :4200.
+    await page.waitForURL((url) => !url.pathname.includes('/realms/'));
 
     // Verify we're logged in by checking for the navbar
     await expect(page.locator('.zev-navbar')).toBeVisible();

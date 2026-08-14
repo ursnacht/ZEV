@@ -61,9 +61,13 @@ export async function handleKeycloakLogin(
                 }
             }
 
-            // Wait for redirect and app to load
+            // Warten, bis der Browser Keycloak verlassen hat - bewusst OHNE feste Basis-URL:
+            // Die Anwendung laeuft je nach Umgebung unter :8000 (Reverse-Proxy) oder :4200
+            // (Dev-Server). Eine hartcodierte URL wuerde hier nicht matchen, in den Timeout
+            // laufen und JEDEN Test um die volle Wartezeit verlaengern (der catch-Zweig unten
+            // faengt das stillschweigend ab - Symptom: alles ist langsam, nichts schlaegt fehl).
             try {
-                await page.waitForURL('http://localhost:4200/**', { timeout: 15000 });
+                await page.waitForURL((url) => !url.pathname.includes('/realms/'), { timeout: 15000 });
                 // Wait for navbar to appear after login
                 await navbarLocator.waitFor({ state: 'visible', timeout: 10000 });
             } catch {
