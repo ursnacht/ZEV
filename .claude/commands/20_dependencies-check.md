@@ -151,6 +151,25 @@ Klassifikation analog zum Maven-Teil:
 > **Angular-Upgrade-Gate:** `keycloak-angular` / `keycloak-js` koppeln an die Angular-Major-Version
 > (aktuell Angular 21, `keycloak-angular ^21.0.0` / `keycloak-js ^25.0.0`). Angular-Major-Upgrades
 > daher **nicht** ohne Kompatibilitäts-Check der Keycloak-Adapter durchführen.
+>
+> **Angular 22 / keycloak-js 26 sind aktuell blockiert — nicht als Bump-Kandidat vorschlagen.**
+> `keycloak-js` **26** nutzt `crypto.randomUUID` (für `state`/`nonce` in `createLoginUrl`) und
+> `crypto.subtle` (PKCE-Code-Challenge). Beide sind ausschliesslich in **Secure Contexts**
+> verfügbar (HTTPS oder `localhost`). Die NAS-Installation läuft über HTTP (VPN `10.8.x.x` /
+> LAN `192.168.x.x`, kein öffentlicher DNS-Name), dort bricht der Login-Redirect mit
+> `Web Crypto API is not available.` ab. Version 25 kommt ohne aus (`crypto.getRandomValues`
+> mit `Math.random`-Fallback, PKCE-Hash über `js-sha256`). Ein Abschalten von PKCE hilft
+> **nicht** — `state`/`nonce` brauchen `createUUID` unabhängig davon.
+>
+> Das Upgrade wurde am 2026-08-13 eingespielt und mit `7e0a2da` wieder zurückgerollt
+> (Entscheidung: bei Angular 21 bleiben). Voraussetzung für einen neuen Anlauf ist **HTTPS auf
+> dem NAS** (`docs/NAS-Proxy.md` Schritt 6); danach `git revert 7e0a2da`.
+>
+> **Wichtig für die Bewertung:** Dieser Bruch ist lokal **prinzipiell unsichtbar** —
+> `http://localhost:4200` gilt immer als Secure Context, Unit- und E2E-Tests waren vollständig
+> grün. Browser-Krypto-abhängige Bibliotheken lassen sich also nicht durch die Testsuite
+> absichern; sie brauchen einen Smoke-Test gegen die echte NAS-Origin. Schnellster Check der
+> **ausgelieferten** Version: `curl -s http://<nas>:4200/assets/frontend-licenses.json`.
 
 ---
 
