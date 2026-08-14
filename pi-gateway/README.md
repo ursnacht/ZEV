@@ -110,7 +110,7 @@ Die Nummer wird einmalig am Gerät abgelesen (z. B. per `mbpoll`, siehe
 
 ```bash
 cd pi-gateway
-python3 -m venv .venv
+python -m venv .venv
 . .venv/bin/activate
 pip install -e .            # bzw. pip install -r requirements.txt
 
