@@ -1,0 +1,28 @@
+# Einziger Einstiegspunkt für die ZEV-Anwendung (Reverse-Proxy, pfadbasiert).
+# Siehe docs/NAS-Proxy.md und Specs/NAS-Einheitlicher-Hostname_Umsetzungsplan.md
+#
+# Bewusst OHNE Hostname als Site-Adresse: Caddy lauscht auf Container-Port 80 und
+# beantwortet jeden Host. Das Host-Mapping macht Docker (auf dem NAS "8000:80", weil
+# DSMs eigener nginx die Ports 80/443 belegt). So funktioniert derselbe Caddyfile
+# unabhängig davon, ob über Name (http://nafam.zev:8000) oder IP zugegriffen wird.
+#
+# Für HTTPS später: ":80" durch den Hostnamen ersetzen (z.B. "nafam.zev"), Port 443
+# mappen und die tls-Direktive ergänzen.
+:80 {
+	# Backend-API: KEIN Prefix-Stripping (das Backend erwartet /api/...)
+	handle /api/* {
+		reverse_proxy backend-service:8090
+	}
+
+	# Keycloak unter /auth
+	# Voraussetzung: Container mit KC_HTTP_RELATIVE_PATH=/auth und KC_PROXY_HEADERS=xforwarded
+	# (siehe Umsetzungsplan Phase 3) - vorher liefert dieser Pfad 404.
+	handle /auth/* {
+		reverse_proxy keycloak:9000
+	}
+
+	# Alles andere -> Angular-Frontend
+	handle {
+		reverse_proxy frontend-service:8080
+	}
+}

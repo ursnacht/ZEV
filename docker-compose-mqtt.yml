@@ -188,7 +188,26 @@ services:
       - zev-network
     restart: unless-stopped
 
+  caddy:
+    image: caddy:2
+    container_name: caddy
+    ports:
+      - "8000:80"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - frontend-service
+      - backend-service
+      - keycloak
+    networks:
+      - zev-network
+    restart: unless-stopped
+
 volumes:
+  caddy-data:
+  caddy-config:
   postgres-data:
 networks:
   zev-network:

@@ -81,6 +81,51 @@ Reihenfolge zusammen und ergänzt die Kontrollschritte:
       statt Text) bedeuten: Migration fehlt oder Translation-Cache noch warm →
       Migrationen prüfen, ggf. Backend neu starten.
 
+## 2b. Client-Zugriff einrichten (einmalig je Gerät)
+
+Die Anwendung läuft hinter dem Reverse-Proxy unter **`http://nafam.zev:8000`**
+(s. `Specs/NAS-Einheitlicher-Hostname_Umsetzungsplan.md`). Auf den Endgeräten ist deshalb
+nur **eines** nötig: `nafam.zev` muss auf `192.168.7.240` auflösen. Kein Proxy, keine
+Zertifikate, keine Portfreigaben auf dem Client.
+
+> **Warum ausgerechnet die LAN-Adresse?** `192.168.7.240` ist die **universelle** Adresse:
+> Im NAS-LAN direkt erreichbar, und von aussen über den VPN-Tunnel, weil das VPN die Route
+> `192.168.7.0/24` pusht (`route print` zeigt sie via `10.8.0.5`). Ein Eintrag stimmt damit
+> in **beiden** Situationen — die VPN-Adresse `10.8.0.1` wird nicht mehr gebraucht.
+
+- [ ] **Notebooks (Standortwechsel)** — hosts-Eintrag, gilt im LAN *und* über VPN:
+      ```
+      # C:\Windows\System32\drivers\etc\hosts   (als Administrator)
+      192.168.7.240  nafam.zev
+      ```
+      danach `ipconfig /flushdns`
+- [ ] **Geräte unterwegs, die kein hosts pflegen können** (Smartphones/Tablets) — DNS über
+      den VPN-Tunnel beziehen. In der `.ovpn`-Datei des Clients ergänzen:
+      ```
+      dhcp-option DNS 192.168.7.240
+      ```
+      Profil neu importieren, Verbindung neu aufbauen. Die DSM-GUI des VPN-Servers bietet
+      für OpenVPN **kein** DNS-Push-Feld — der Eintrag erfolgt daher client-seitig (oder
+      server-seitig in `openvpn.conf`, was DSM-Updates aber überschreiben).
+- [ ] **Stationäre Geräte im NAS-LAN** (optional, zentral): im Router DHCP-Option 6 auf
+      `192.168.7.240` setzen. Wirkt nur im NAS-LAN; mobile Geräte bekommen andernorts
+      automatisch den dortigen DNS.
+
+> **Zwei Fallen:**
+> 1. **Keinen festen DNS-Server im Adapter eintragen.** An anderen Standorten ohne VPN ist
+>    `192.168.7.240` unerreichbar, und das Gerät löst dann **gar nichts** mehr auf — das
+>    Symptom sieht aus wie „Internet kaputt".
+> 2. **Keinen zweiten DNS daneben** (Router oder 1.1.1.1). Der kennt `nafam.zev` nicht;
+>    die Anwendung wäre sporadisch nicht erreichbar. Ausfallsicherheit gäbe es nur über
+>    einen zweiten internen DNS mit derselben Zone.
+
+- [ ] Prüfen (vom jeweiligen Gerät):
+      ```bash
+      nslookup nafam.zev
+      curl -s http://nafam.zev:8000/assets/config.json
+      ```
+      Erwartet: `{"apiBaseUrl":"","keycloak":{"url":"http://nafam.zev:8000/auth",…}}`
+
 ## 3. Pi: Code aktualisieren
 
 - [ ] ZIP bauen (enthält **keine** `config.yaml`/`.env`/`.venv`):
@@ -192,3 +237,6 @@ Konfigurations-Optionen wirken daher erst, wenn sie **manuell** eingetragen werd
 | Reads schlagen mit „keine Antwort" fehl | `read_timeout` erhöhen (Schritt 4) |
 | `ExceptionResponse … exception_code=11` | **Kein** Timeout-Problem: der Hub hat geantwortet. Ursache auf der RTU-Strecke bzw. am Hub — s. `docs/Netzwerk-Topologie-Hene.md`, „Modbus-Diagnose" |
 | Keine Rohdaten trotz laufendem Pi | Broker-Verbindung (`/actuator/health/mqtt`), Topic/`org_id`, Einheit mit passendem `messpunkt` vorhanden? |
+| `nafam.zev` wird nicht gefunden | Namensauflösung auf dem Client fehlt → Schritt 2b (hosts-Eintrag bzw. DNS). Gegenprobe: `curl http://192.168.7.240:8000/` funktioniert, `nafam.zev` nicht |
+| Anwendung lädt, aber Login-Redirect bleibt hängen | Zugriff über eine **andere** Adresse als `nafam.zev:8000` (z.B. direkt über IP/Port 4200): Die Redirect-URI passt dann nicht zur Client-Konfiguration im Realm. Immer über den Proxy-Hostnamen zugreifen |
+| Nach Standortwechsel plötzlich gar kein DNS mehr | Fest eingetragener DNS-Server im Adapter statt hosts-Eintrag → Schritt 2b, Falle 1 |
