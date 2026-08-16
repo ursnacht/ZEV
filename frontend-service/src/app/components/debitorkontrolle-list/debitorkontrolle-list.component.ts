@@ -13,6 +13,7 @@ import { DebitorkontrolleFormComponent } from '../debitorkontrolle-form/debitork
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { SwissDatePipe } from '../../pipes/swiss-date.pipe';
+import { SwissNumberPipe } from '../../pipes/swiss-number.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.component';
 import { ColumnResizeDirective } from '../../directives/column-resize.directive';
@@ -23,7 +24,7 @@ import { IconComponent } from '../icon/icon.component';
   standalone: true,
   imports: [
     CommonModule, FormsModule, DebitorkontrolleFormComponent,
-    QuarterSelectorComponent, TranslatePipe, SwissDatePipe,
+    QuarterSelectorComponent, TranslatePipe, SwissDatePipe, SwissNumberPipe,
     KebabMenuComponent, ColumnResizeDirective, IconComponent
   ],
   templateUrl: './debitorkontrolle-list.component.html',

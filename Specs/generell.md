@@ -27,10 +27,11 @@ Zahlen werden **locale-unabhängig** im Schweizer Format dargestellt – überal
 * **Prozentwerte:** 1 Nachkommastelle mit `%` (z.B. `60.0 %`); Anteile (0..1) werden mit 100 multipliziert
 * **Fehlwert / n/a:** `–` (Gedankenstrich) bei `null`/nicht ermittelbar
 
-**Nicht** auf die JVM-/Browser-Locale verlassen (kein blosses `String.format("%.3f", …)` ohne Locale, kein Jasper-`pattern="#,##0.000"`) – diese liefern je nach Umgebung Komma oder abweichende Trennzeichen.
+**Nicht** auf die JVM-/Browser-Locale verlassen (kein blosses `String.format("%.3f", …)` ohne Locale, kein Jasper-`pattern="#,##0.000"`, **keine Angular-`number`-Pipe**, kein `toLocaleString()`) – diese liefern je nach Umgebung ein Komma (`en-US`) oder ein typografisches Apostroph U+2019 (`de-CH`) statt des ASCII-Hochkommas.
 
-* **Frontend:** über die Formatierungs-Helfer der Komponente (basieren auf `toFixed`, kein `toLocaleString`); vorhandenes Muster: `StatistikComponent.formatSwissNumber()` / `formatNumber()` / `formatDifferenz()` / `formatPercent()`.
-* **Backend / PDF (JasperReports):** über `ch.nacht.util.PdfNumberFormat` (`kwh()` / `kwhSigned()` / `percent()`), das `String.format(Locale.ROOT, …)` mit Gruppierungs-Ersatz `,`→`'` kapselt. In `.jrxml` die Werte über diesen Helfer ausgeben statt über `pattern`.
+* **Frontend:** `SwissNumberPipe` im Template (`{{ wert | swissNumber:2 }}`) bzw. `formatSwissNumber()` / `formatSwissNumberOrFallback()` aus `src/app/utils/number-utils.ts` im TypeScript. Beide sind die **einzige** Quelle der Formatierung; komponenteneigene Helfer (`formatBetrag`, `formatPreis`, `StatistikComponent.formatSwissNumber`) delegieren dorthin.
+* **Backend / PDF (JasperReports):** über `ch.nacht.util.PdfNumberFormat` (`decimals(wert, n)` / `kwh()` / `chf()` / `kwhSigned()` / `percent()`), das `String.format(Locale.ROOT, …)` mit Gruppierungs-Ersatz `,`→`'` kapselt. In `.jrxml` die Werte über diesen Helfer ausgeben statt über `pattern`.
+* **Ausnahme QR-Rechnung:** Die Betragsfelder im Einzahlungsschein (`rechnung.jrxml`, Empfangsschein und Zahlteil) folgen den Vorgaben der QR-Rechnung und **nicht** dieser Regel – dort gilt das vorgeschriebene Format des Standards, nicht das Hochkomma.
 
 ### Design System
 Das Design System (`/design-system`) enthält alle wiederverwendbaren UI-Komponenten und Styles.

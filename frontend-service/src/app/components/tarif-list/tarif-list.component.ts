@@ -9,6 +9,7 @@ import { SwissDatePipe } from '../../pipes/swiss-date.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.component';
 import { ColumnResizeDirective } from '../../directives/column-resize.directive';
+import { formatSwissNumber } from '../../utils/number-utils';
 import { IconComponent } from '../icon/icon.component';
 
 @Component({
@@ -166,7 +167,7 @@ export class TarifListComponent implements OnInit {
   }
 
   formatPreis(preis: number): string {
-    return preis.toFixed(5);
+    return formatSwissNumber(preis, 5);
   }
 
   onValidateQuartale(): void {

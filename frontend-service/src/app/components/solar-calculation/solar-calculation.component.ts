@@ -7,6 +7,7 @@ import { switchMap } from 'rxjs/operators';
 import { MesswerteService, CalculationResponse } from '../../services/messwerte.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { SwissDatePipe } from '../../pipes/swiss-date.pipe';
+import { SwissNumberPipe } from '../../pipes/swiss-number.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
 import { IconComponent } from '../icon/icon.component';
@@ -14,7 +15,8 @@ import { IconComponent } from '../icon/icon.component';
 @Component({
   selector: 'app-solar-calculation',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe, SwissDatePipe, QuarterSelectorComponent, IconComponent],
+  imports: [CommonModule, FormsModule, TranslatePipe, SwissDatePipe, SwissNumberPipe,
+    QuarterSelectorComponent, IconComponent],
   templateUrl: './solar-calculation.component.html',
   styleUrls: ['./solar-calculation.component.css']
 })

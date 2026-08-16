@@ -13,12 +13,30 @@ public final class PdfNumberFormat {
     private PdfNumberFormat() {
     }
 
-    /** Zahl mit 3 Nachkommastellen; {@code null} → leerer String. Beispiel: {@code 1'234.567}. */
-    public static String kwh(Number value) {
+    /**
+     * Zahl mit frei waehlbarer Nachkommastellenzahl; {@code null} → leerer String.
+     * Beispiel: {@code decimals(1234.5, 2)} → {@code 1'234.50}.
+     *
+     * @param value Wert
+     * @param nachkommastellen Anzahl Nachkommastellen
+     * @return Formatierter Wert im Schweizer Format
+     */
+    public static String decimals(Number value, int nachkommastellen) {
         if (value == null) {
             return "";
         }
-        return String.format(Locale.ROOT, "%,.3f", value.doubleValue()).replace(',', '\'');
+        return String.format(Locale.ROOT, "%,." + nachkommastellen + "f", value.doubleValue())
+                .replace(',', '\'');
+    }
+
+    /** Zahl mit 3 Nachkommastellen; {@code null} → leerer String. Beispiel: {@code 1'234.567}. */
+    public static String kwh(Number value) {
+        return decimals(value, 3);
+    }
+
+    /** Geldbetrag mit 2 Nachkommastellen; {@code null} → leerer String. Beispiel: {@code 1'234.50}. */
+    public static String chf(Number value) {
+        return decimals(value, 2);
     }
 
     /** Wie {@link #kwh(Number)}, aber mit Vorzeichen (auch bei ≥ 0). {@code null} → leerer String. */

@@ -7,6 +7,7 @@ import { Statistik, MonatsStatistik, TagMitAbweichung, EinheitSummen } from '../
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { EinheitTypPipe } from '../../pipes/einheit-typ.pipe';
 import { SwissDatePipe } from '../../pipes/swiss-date.pipe';
+import { formatSwissNumber } from '../../utils/number-utils';
 import { TranslationService } from '../../services/translation.service';
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
 import { IconComponent } from '../icon/icon.component';
@@ -201,14 +202,10 @@ export class StatistikComponent extends WithMessage implements OnInit {
 
   /**
    * Zahl im Schweizer Format: Punkt als Dezimal-, Hochkomma (') als Tausendertrennzeichen,
-   * locale-unabhängig (basiert auf `toFixed`). Vorzeichen bleibt erhalten.
+   * locale-unabhängig. Delegiert an den geteilten Helfer in `utils/number-utils`.
    */
   private formatSwissNumber(value: number, decimals = 3): string {
-    const fixed = Math.abs(value).toFixed(decimals);
-    const [intPart, fracPart] = fixed.split('.');
-    const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\'');
-    const sign = value < 0 ? '-' : '';
-    return fracPart ? `${sign}${grouped}.${fracPart}` : `${sign}${grouped}`;
+    return formatSwissNumber(value, decimals);
   }
 
   formatNumber(value: number | null | undefined): string {

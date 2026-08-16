@@ -86,11 +86,11 @@
         </div>
         <div class="summary-item">
           <span class="label">{{ 'GESAMT_SOLAR_PRODUKTION' | translate }}:</span>
-          <span class="value">{{ result.totalSolarProduced | number:'1.2-2' }} kWh</span>
+          <span class="value">{{ result.totalSolarProduced | swissNumber:2 }} kWh</span>
         </div>
         <div class="summary-item">
           <span class="label">{{ 'GESAMT_VERTEILT' | translate }}:</span>
-          <span class="value">{{ result.totalDistributed | number:'1.2-2' }} kWh</span>
+          <span class="value">{{ result.totalDistributed | swissNumber:2 }} kWh</span>
         </div>
       </div>
     </div>

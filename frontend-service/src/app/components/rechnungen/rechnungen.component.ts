@@ -5,6 +5,7 @@ import { WithMessage } from '../../utils/with-message';
 import { RechnungService, GeneratedRechnung } from '../../services/rechnung.service';
 import { Einheit } from '../../models/einheit.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { formatSwissNumber } from '../../utils/number-utils';
 import { TranslationService } from '../../services/translation.service';
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
 import { IconComponent } from '../icon/icon.component';
@@ -144,7 +145,7 @@ export class RechnungenComponent extends WithMessage implements OnInit {
   }
 
   formatBetrag(betrag: number): string {
-    return betrag.toFixed(2);
+    return formatSwissNumber(betrag, 2);
   }
 
   getTotalBetrag(): number {
