@@ -339,6 +339,10 @@ describe('TarifListComponent', () => {
       expect(component.formatPreis(0.195)).toBe('0.19500');
       expect(component.formatPreis(0.34192)).toBe('0.34192');
     });
+
+    it('should group thousands with an apostrophe (Swiss format)', () => {
+      expect(component.formatPreis(1234.5)).toBe('1\'234.50000');
+    });
   });
 
   describe('message timeout', () => {

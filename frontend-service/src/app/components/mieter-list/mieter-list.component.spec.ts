@@ -1,6 +1,7 @@
 import { createSpyObj, SpyObj } from '../../../testing/spy';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { fakeAsync, tick } from '../../../testing/fake-async';
+import { Router } from '@angular/router';
 import { MieterListComponent } from './mieter-list.component';
 import { MieterService } from '../../services/mieter.service';
 import { EinheitService } from '../../services/einheit.service';
@@ -230,6 +231,23 @@ describe('MieterListComponent', () => {
       vi.spyOn(component, 'onDelete').mockImplementation(() => {});
       component.onMenuAction('delete', mockMieter[0]);
       expect(component.onDelete).toHaveBeenCalledWith(mockMieter[0].id);
+    });
+
+    it('should call onTarifpositionen for tarifpositionen action', () => {
+      vi.spyOn(component, 'onTarifpositionen').mockImplementation(() => {});
+      component.onMenuAction('tarifpositionen', mockMieter[0]);
+      expect(component.onTarifpositionen).toHaveBeenCalledWith(mockMieter[0]);
+    });
+  });
+
+  describe('onTarifpositionen', () => {
+    it('should navigate to the tarifpositionen page with the mieter preselected', () => {
+      const navigateSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+      component.onTarifpositionen(mockMieter[0]);
+
+      expect(navigateSpy).toHaveBeenCalledWith(['/tarifpositionen'], { queryParams: { mieterId: 1 } });
+      navigateSpy.mockRestore();
     });
   });
 

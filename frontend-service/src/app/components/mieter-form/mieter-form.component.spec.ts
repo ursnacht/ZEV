@@ -74,6 +74,54 @@ describe('MieterFormComponent', () => {
     });
   });
 
+  describe('ladepunkt', () => {
+    const mieterOhneLadepunkt: Mieter = {
+      id: 1,
+      name: 'Max Muster',
+      strasse: 'Musterstr. 1',
+      plz: '8000',
+      ort: 'Zürich',
+      mietbeginn: '2024-01-01',
+      einheitId: 1
+    };
+
+    it('should be empty by default', () => {
+      expect(component.formData.ladepunkt).toBeUndefined();
+    });
+
+    it('should populate the ladepunkt from the mieter input', () => {
+      component.mieter = { ...mieterOhneLadepunkt, ladepunkt: 'LP-01' };
+      component.ngOnInit();
+      expect(component.formData.ladepunkt).toBe('LP-01');
+    });
+
+    it('should stay undefined when the mieter has no ladepunkt', () => {
+      component.mieter = mieterOhneLadepunkt;
+      component.ngOnInit();
+      expect(component.formData.ladepunkt).toBeUndefined();
+    });
+
+    it('should be optional for form validity', () => {
+      component.formData = { ...mieterOhneLadepunkt };
+      expect(component.isFormValid()).toBe(true);
+    });
+
+    it('should not block the form when a ladepunkt is set', () => {
+      component.formData = { ...mieterOhneLadepunkt, ladepunkt: 'LP-01' };
+      expect(component.isFormValid()).toBe(true);
+    });
+
+    it('should emit the ladepunkt on save', () => {
+      const saveSpy = vi.spyOn(component.save, 'emit');
+      component.formData = { ...mieterOhneLadepunkt, ladepunkt: 'LP-01' };
+
+      component.onSubmit();
+
+      const emitted = saveSpy.mock.calls[0][0] as Mieter;
+      expect(emitted.ladepunkt).toBe('LP-01');
+    });
+  });
+
   describe('isFormValid', () => {
     it('should return false when name is empty', () => {
       component.formData = {

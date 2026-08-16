@@ -1,0 +1,769 @@
+import { createSpyObj, SpyObj } from '../../../testing/spy';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { fakeAsync, tick } from '../../../testing/fake-async';
+import { ActivatedRoute } from '@angular/router';
+import { of, throwError } from 'rxjs';
+import { TarifpositionListComponent } from './tarifposition-list.component';
+import { TarifpositionService } from '../../services/tarifposition.service';
+import { TarifService } from '../../services/tarif.service';
+import { MieterService } from '../../services/mieter.service';
+import { TranslationService } from '../../services/translation.service';
+import { Erfassungsart, Tarifposition } from '../../models/tarifposition.model';
+import { Tarif, TarifTyp } from '../../models/tarif.model';
+import { Mieter } from '../../models/mieter.model';
+
+const HINWEIS_STORAGE_KEY = 'zev.tarifposition.hinweisAusgeblendet';
+
+describe('TarifpositionListComponent', () => {
+  let component: TarifpositionListComponent;
+  let fixture: ComponentFixture<TarifpositionListComponent>;
+  let tarifpositionServiceSpy: SpyObj<TarifpositionService>;
+  let tarifServiceSpy: SpyObj<TarifService>;
+  let mieterServiceSpy: SpyObj<MieterService>;
+  let translationServiceSpy: SpyObj<TranslationService>;
+
+  /** Query-Parameter der Route – je Test vor dem Erzeugen der Komponente setzbar. */
+  let queryParams: Record<string, string>;
+
+  const mockMieter: Mieter[] = [
+    {
+      id: 1, name: 'Zwahlen Zoe', strasse: 'Testweg 2', plz: '3000', ort: 'Bern',
+      mietbeginn: '2024-01-01', einheitId: 1, ladepunkt: 'LP-01'
+    },
+    {
+      id: 2, name: 'Anders Anna', strasse: 'Musterstr. 1', plz: '8000', ort: 'Zürich',
+      mietbeginn: '2024-01-01', einheitId: 2
+    }
+  ];
+
+  const mockTarife: Tarif[] = [
+    {
+      id: 3, bezeichnung: 'Ladestrom 2026', tariftyp: TarifTyp.LADESTROM,
+      preis: 0.35, gueltigVon: '2026-01-01', gueltigBis: '2026-12-31'
+    },
+    {
+      id: 1, bezeichnung: 'ZEV Tarif', tariftyp: TarifTyp.ZEV,
+      preis: 0.195, gueltigVon: '2026-01-01', gueltigBis: '2026-12-31'
+    },
+    {
+      id: 2, bezeichnung: 'VNB Tarif', tariftyp: TarifTyp.VNB,
+      preis: 0.342, gueltigVon: '2026-01-01', gueltigBis: '2026-12-31'
+    }
+  ];
+
+  const mockPositionen: Tarifposition[] = [
+    {
+      id: 10, mieterId: 1, tarifId: 3, tarifBezeichnung: 'Ladestrom 2026', tarifPreis: 0.35,
+      jahr: 2026, quartal: 4, menge: 100, erfassungsart: Erfassungsart.MANUELL, quellReferenz: 'LP-01'
+    },
+    {
+      id: 11, mieterId: 1, tarifId: 3, tarifBezeichnung: 'Ladestrom 2027', tarifPreis: 0.38,
+      jahr: 2027, quartal: 1, menge: 50, erfassungsart: Erfassungsart.IMPORT, quellReferenz: 'LP-01'
+    }
+  ];
+
+  /** Frische Kopien, damit die In-Place-Sortierung der Komponente die Fixtures nicht verändert. */
+  const positionenKopie = () => mockPositionen.map(p => ({ ...p }));
+
+  const createComponent = (): void => {
+    fixture = TestBed.createComponent(TarifpositionListComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  };
+
+  beforeEach(async () => {
+    localStorage.clear();
+    queryParams = {};
+
+    tarifpositionServiceSpy = createSpyObj<TarifpositionService>('TarifpositionService', [
+      'getByMieter', 'createTarifposition', 'updateTarifposition', 'deleteTarifposition'
+    ]);
+    tarifServiceSpy = createSpyObj<TarifService>('TarifService', ['getAllTarife']);
+    mieterServiceSpy = createSpyObj<MieterService>('MieterService', ['getAllMieter']);
+    translationServiceSpy = createSpyObj<TranslationService>('TranslationService', ['translate']);
+
+    tarifpositionServiceSpy.getByMieter.mockImplementation(() => of(positionenKopie()));
+    tarifpositionServiceSpy.createTarifposition.mockReturnValue(of(mockPositionen[0]));
+    tarifpositionServiceSpy.updateTarifposition.mockReturnValue(of(mockPositionen[0]));
+    tarifpositionServiceSpy.deleteTarifposition.mockReturnValue(of(undefined));
+    tarifServiceSpy.getAllTarife.mockReturnValue(of(mockTarife));
+    mieterServiceSpy.getAllMieter.mockReturnValue(of(mockMieter));
+    translationServiceSpy.translate.mockImplementation((key: string) => key);
+
+    const routeStub = {
+      snapshot: {
+        queryParamMap: {
+          get: (key: string) => queryParams[key] ?? null
+        }
+      }
+    };
+
+    await TestBed.configureTestingModule({
+      imports: [TarifpositionListComponent],
+      providers: [
+        { provide: TarifpositionService, useValue: tarifpositionServiceSpy },
+        { provide: TarifService, useValue: tarifServiceSpy },
+        { provide: MieterService, useValue: mieterServiceSpy },
+        { provide: TranslationService, useValue: translationServiceSpy },
+        { provide: ActivatedRoute, useValue: routeStub }
+      ]
+    }).compileComponents();
+
+    createComponent();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+
+  describe('initialization', () => {
+    it('should load mieter on init', () => {
+      expect(mieterServiceSpy.getAllMieter).toHaveBeenCalled();
+      expect(component.mieterListe.length).toBe(2);
+    });
+
+    it('should sort the mieter list by name', () => {
+      expect(component.mieterListe[0].name).toBe('Anders Anna');
+      expect(component.mieterListe[1].name).toBe('Zwahlen Zoe');
+    });
+
+    it('should load tarife on init', () => {
+      expect(tarifServiceSpy.getAllTarife).toHaveBeenCalled();
+    });
+
+    it('should only offer manually captured tariff types (LADESTROM)', () => {
+      expect(component.tarife.length).toBe(1);
+      expect(component.tarife[0].tariftyp).toBe(TarifTyp.LADESTROM);
+    });
+
+    it('should not preselect a mieter without query parameter', () => {
+      expect(component.selectedMieterId).toBeNull();
+      expect(tarifpositionServiceSpy.getByMieter).not.toHaveBeenCalled();
+      expect(component.positionen).toEqual([]);
+    });
+
+    it('should not show form initially', () => {
+      expect(component.showForm).toBe(false);
+    });
+
+    it('should default to quartal sorted descending (newest first)', () => {
+      expect(component.sortColumn).toBe('quartal');
+      expect(component.sortDirection).toBe('desc');
+    });
+
+    it('should have menu items for edit, copy and delete', () => {
+      expect(component.menuItems.length).toBe(3);
+      expect(component.menuItems[0].action).toBe('edit');
+      expect(component.menuItems[1].action).toBe('copy');
+      expect(component.menuItems[2].action).toBe('delete');
+    });
+
+    it('should show error message when loading mieter fails', () => {
+      mieterServiceSpy.getAllMieter.mockReturnValue(throwError(() => new Error('Network error')));
+      component.loadMieter();
+      expect(component.message).toBe('FEHLER_LADEN_MIETER');
+      expect(component.messageType).toBe('error');
+    });
+
+    it('should show error message when loading tarife fails', () => {
+      tarifServiceSpy.getAllTarife.mockReturnValue(throwError(() => new Error('Network error')));
+      component.loadTarife();
+      expect(component.message).toBe('FEHLER_LADEN_TARIFE');
+      expect(component.messageType).toBe('error');
+    });
+  });
+
+  describe('mieter preselection via query parameter', () => {
+    it('should preselect the mieter from ?mieterId and load the positions', () => {
+      queryParams['mieterId'] = '1';
+      createComponent();
+
+      expect(component.selectedMieterId).toBe(1);
+      expect(tarifpositionServiceSpy.getByMieter).toHaveBeenCalledWith(1);
+      expect(component.positionen.length).toBe(2);
+    });
+
+    it('should ignore an unknown mieterId', () => {
+      queryParams['mieterId'] = '999';
+      createComponent();
+
+      expect(component.selectedMieterId).toBeNull();
+      expect(tarifpositionServiceSpy.getByMieter).not.toHaveBeenCalled();
+    });
+
+    it('should ignore a non-numeric mieterId', () => {
+      queryParams['mieterId'] = 'abc';
+      createComponent();
+
+      expect(component.selectedMieterId).toBeNull();
+      expect(tarifpositionServiceSpy.getByMieter).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('mehrfachverrechnungs-hinweis', () => {
+    it('should be visible by default', () => {
+      expect(component.hinweisSichtbar).toBe(true);
+    });
+
+    it('should hide the hinweis on dismiss', () => {
+      component.dismissHinweis();
+      expect(component.hinweisSichtbar).toBe(false);
+    });
+
+    it('should remember the dismissal in localStorage', () => {
+      component.dismissHinweis();
+      expect(localStorage.getItem(HINWEIS_STORAGE_KEY)).toBe('true');
+    });
+
+    it('should stay hidden on the next visit', () => {
+      component.dismissHinweis();
+      createComponent();
+      expect(component.hinweisSichtbar).toBe(false);
+    });
+
+    it('should stay visible when localStorage holds another value', () => {
+      localStorage.setItem(HINWEIS_STORAGE_KEY, 'false');
+      createComponent();
+      expect(component.hinweisSichtbar).toBe(true);
+    });
+
+    it('should still hide the hinweis when localStorage is unavailable', () => {
+      const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
+        .mockImplementation(() => { throw new Error('localStorage disabled'); });
+
+      expect(() => component.dismissHinweis()).not.toThrow();
+      expect(component.hinweisSichtbar).toBe(false);
+
+      setItemSpy.mockRestore();
+    });
+
+    it('should show the hinweis when reading localStorage throws', () => {
+      const getItemSpy = vi.spyOn(Storage.prototype, 'getItem')
+        .mockImplementation(() => { throw new Error('localStorage disabled'); });
+
+      createComponent();
+      expect(component.hinweisSichtbar).toBe(true);
+
+      getItemSpy.mockRestore();
+    });
+  });
+
+  describe('loadPositionen', () => {
+    it('should clear positions and skip the request when no mieter is selected', () => {
+      component.positionen = positionenKopie();
+      component.selectedMieterId = null;
+
+      component.loadPositionen();
+
+      expect(component.positionen).toEqual([]);
+      expect(tarifpositionServiceSpy.getByMieter).not.toHaveBeenCalled();
+    });
+
+    it('should load the positions of the selected mieter', () => {
+      component.selectedMieterId = 1;
+      component.loadPositionen();
+
+      expect(tarifpositionServiceSpy.getByMieter).toHaveBeenCalledWith(1);
+      expect(component.positionen.length).toBe(2);
+    });
+
+    it('should show error message on failure', () => {
+      tarifpositionServiceSpy.getByMieter.mockReturnValue(throwError(() => new Error('Network error')));
+      component.selectedMieterId = 1;
+
+      component.loadPositionen();
+
+      expect(component.message).toBe('FEHLER_LADEN_TARIFPOSITIONEN');
+      expect(component.messageType).toBe('error');
+    });
+  });
+
+  describe('onMieterChange', () => {
+    beforeEach(() => {
+      component.selectedMieterId = 1;
+    });
+
+    it('should hide the form and clear the selected position', () => {
+      component.showForm = true;
+      component.selectedPosition = { ...mockPositionen[0] };
+
+      component.onMieterChange();
+
+      expect(component.showForm).toBe(false);
+      expect(component.selectedPosition).toBeNull();
+    });
+
+    it('should clear a pending message', () => {
+      component.message = 'FEHLER_LADEN_TARIFPOSITIONEN';
+      component.messagePersistent = true;
+
+      component.onMieterChange();
+
+      expect(component.message).toBe('');
+      expect(component.messagePersistent).toBe(false);
+    });
+
+    it('should reload the positions of the new mieter', () => {
+      component.onMieterChange();
+      expect(tarifpositionServiceSpy.getByMieter).toHaveBeenCalledWith(1);
+    });
+  });
+
+  describe('onCreateNew', () => {
+    it('should show the form without a selected position', () => {
+      component.selectedPosition = { ...mockPositionen[0] };
+      component.onCreateNew();
+      expect(component.selectedPosition).toBeNull();
+      expect(component.showForm).toBe(true);
+    });
+  });
+
+  describe('onEdit', () => {
+    it('should show the form with the position', () => {
+      component.onEdit(mockPositionen[0]);
+      expect(component.selectedPosition).toEqual(mockPositionen[0]);
+      expect(component.showForm).toBe(true);
+    });
+
+    it('should create a copy of the position (not the reference)', () => {
+      component.onEdit(mockPositionen[0]);
+      expect(component.selectedPosition).not.toBe(mockPositionen[0]);
+    });
+
+    it('should keep the id so the form updates the existing position', () => {
+      component.onEdit(mockPositionen[0]);
+      expect(component.selectedPosition!.id).toBe(10);
+    });
+  });
+
+  describe('onCopy', () => {
+    it('should show the form without an id', () => {
+      component.onCopy(mockPositionen[0]);
+      expect(component.showForm).toBe(true);
+      expect(component.selectedPosition!.id).toBeUndefined();
+    });
+
+    it('should copy all values except the id', () => {
+      const original = mockPositionen[0];
+      component.onCopy(original);
+
+      expect(component.selectedPosition!.mieterId).toBe(original.mieterId);
+      expect(component.selectedPosition!.tarifId).toBe(original.tarifId);
+      expect(component.selectedPosition!.jahr).toBe(original.jahr);
+      expect(component.selectedPosition!.quartal).toBe(original.quartal);
+      expect(component.selectedPosition!.menge).toBe(original.menge);
+      expect(component.selectedPosition!.quellReferenz).toBe(original.quellReferenz);
+    });
+
+    it('should not modify the source position', () => {
+      const original = { ...mockPositionen[0] };
+      component.onCopy(mockPositionen[0]);
+      expect(mockPositionen[0]).toEqual(original);
+      expect(component.selectedPosition).not.toBe(mockPositionen[0]);
+    });
+  });
+
+  describe('onDelete', () => {
+    beforeEach(() => {
+      component.selectedMieterId = 1;
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+    });
+
+    it('should do nothing when the id is undefined', () => {
+      component.onDelete(undefined);
+      expect(window.confirm).not.toHaveBeenCalled();
+      expect(tarifpositionServiceSpy.deleteTarifposition).not.toHaveBeenCalled();
+    });
+
+    it('should ask for confirmation', () => {
+      component.onDelete(10);
+      expect(window.confirm).toHaveBeenCalled();
+      expect(translationServiceSpy.translate).toHaveBeenCalledWith('CONFIRM_DELETE_TARIFPOSITION');
+    });
+
+    it('should delete the position on confirm', () => {
+      component.onDelete(10);
+      expect(tarifpositionServiceSpy.deleteTarifposition).toHaveBeenCalledWith(10);
+    });
+
+    it('should show a success message and reload', () => {
+      tarifpositionServiceSpy.getByMieter.mockClear();
+      component.onDelete(10);
+      expect(component.message).toBe('TARIFPOSITION_GELOESCHT');
+      expect(component.messageType).toBe('success');
+      expect(tarifpositionServiceSpy.getByMieter).toHaveBeenCalled();
+    });
+
+    it('should not delete when the user cancels', () => {
+      (window.confirm as unknown as ReturnType<typeof vi.fn>).mockReturnValue(false);
+      component.onDelete(10);
+      expect(tarifpositionServiceSpy.deleteTarifposition).not.toHaveBeenCalled();
+    });
+
+    it('should show the server error message on failure', () => {
+      tarifpositionServiceSpy.deleteTarifposition
+        .mockReturnValue(throwError(() => ({ error: 'TARIFPOSITION_REFERENZIERT' })));
+      component.onDelete(10);
+      expect(component.message).toBe('TARIFPOSITION_REFERENZIERT');
+      expect(component.messageType).toBe('error');
+    });
+
+    it('should fall back to the generic error message', () => {
+      tarifpositionServiceSpy.deleteTarifposition
+        .mockReturnValue(throwError(() => new Error('Network error')));
+      component.onDelete(10);
+      expect(component.message).toBe('FEHLER_LOESCHEN_TARIFPOSITION');
+      expect(component.messageType).toBe('error');
+    });
+  });
+
+  describe('onMenuAction', () => {
+    it('should call onEdit for the edit action', () => {
+      vi.spyOn(component, 'onEdit').mockImplementation(() => {});
+      component.onMenuAction('edit', mockPositionen[0]);
+      expect(component.onEdit).toHaveBeenCalledWith(mockPositionen[0]);
+    });
+
+    it('should call onCopy for the copy action', () => {
+      vi.spyOn(component, 'onCopy').mockImplementation(() => {});
+      component.onMenuAction('copy', mockPositionen[0]);
+      expect(component.onCopy).toHaveBeenCalledWith(mockPositionen[0]);
+    });
+
+    it('should call onDelete with the id for the delete action', () => {
+      vi.spyOn(component, 'onDelete').mockImplementation(() => {});
+      component.onMenuAction('delete', mockPositionen[0]);
+      expect(component.onDelete).toHaveBeenCalledWith(10);
+    });
+
+    it('should ignore an unknown action', () => {
+      vi.spyOn(component, 'onEdit').mockImplementation(() => {});
+      vi.spyOn(component, 'onCopy').mockImplementation(() => {});
+      vi.spyOn(component, 'onDelete').mockImplementation(() => {});
+
+      component.onMenuAction('unbekannt', mockPositionen[0]);
+
+      expect(component.onEdit).not.toHaveBeenCalled();
+      expect(component.onCopy).not.toHaveBeenCalled();
+      expect(component.onDelete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('onFormSubmit - create', () => {
+    const newPosition: Tarifposition = {
+      mieterId: 1, tarifId: 3, jahr: 2026, quartal: 2, menge: 42
+    };
+
+    beforeEach(() => {
+      component.selectedMieterId = 1;
+    });
+
+    it('should call createTarifposition when the position has no id', () => {
+      component.onFormSubmit(newPosition);
+      expect(tarifpositionServiceSpy.createTarifposition).toHaveBeenCalledWith(newPosition);
+      expect(tarifpositionServiceSpy.updateTarifposition).not.toHaveBeenCalled();
+    });
+
+    it('should hide the form and show a success message', () => {
+      component.showForm = true;
+      component.onFormSubmit(newPosition);
+      expect(component.showForm).toBe(false);
+      expect(component.message).toBe('TARIFPOSITION_ERSTELLT');
+      expect(component.messageType).toBe('success');
+    });
+
+    it('should reload the positions after create', () => {
+      tarifpositionServiceSpy.getByMieter.mockClear();
+      component.onFormSubmit(newPosition);
+      expect(tarifpositionServiceSpy.getByMieter).toHaveBeenCalledWith(1);
+    });
+
+    it('should show the duplicate message from the server and keep the form open', () => {
+      tarifpositionServiceSpy.createTarifposition
+        .mockReturnValue(throwError(() => ({ error: 'TARIFPOSITION_DUPLIKAT' })));
+      component.showForm = true;
+
+      component.onFormSubmit(newPosition);
+
+      expect(component.message).toBe('TARIFPOSITION_DUPLIKAT');
+      expect(component.messageType).toBe('error');
+      expect(component.showForm).toBe(true);
+    });
+
+    it('should fall back to the generic error message', () => {
+      tarifpositionServiceSpy.createTarifposition
+        .mockReturnValue(throwError(() => new Error('Network error')));
+      component.onFormSubmit(newPosition);
+      expect(component.message).toBe('FEHLER_ERSTELLEN_TARIFPOSITION');
+      expect(component.messageType).toBe('error');
+    });
+  });
+
+  describe('onFormSubmit - update', () => {
+    const existingPosition: Tarifposition = { ...mockPositionen[0], menge: 250 };
+
+    beforeEach(() => {
+      component.selectedMieterId = 1;
+    });
+
+    it('should call updateTarifposition when the position has an id', () => {
+      component.onFormSubmit(existingPosition);
+      expect(tarifpositionServiceSpy.updateTarifposition).toHaveBeenCalledWith(10, existingPosition);
+      expect(tarifpositionServiceSpy.createTarifposition).not.toHaveBeenCalled();
+    });
+
+    it('should hide the form and show a success message', () => {
+      component.showForm = true;
+      component.onFormSubmit(existingPosition);
+      expect(component.showForm).toBe(false);
+      expect(component.message).toBe('TARIFPOSITION_AKTUALISIERT');
+      expect(component.messageType).toBe('success');
+    });
+
+    it('should reload the positions after update', () => {
+      tarifpositionServiceSpy.getByMieter.mockClear();
+      component.onFormSubmit(existingPosition);
+      expect(tarifpositionServiceSpy.getByMieter).toHaveBeenCalledWith(1);
+    });
+
+    it('should show the server error message and keep the form open', () => {
+      tarifpositionServiceSpy.updateTarifposition
+        .mockReturnValue(throwError(() => ({ error: 'TARIFPOSITION_DUPLIKAT' })));
+      component.showForm = true;
+
+      component.onFormSubmit(existingPosition);
+
+      expect(component.message).toBe('TARIFPOSITION_DUPLIKAT');
+      expect(component.showForm).toBe(true);
+    });
+
+    it('should fall back to the generic error message', () => {
+      tarifpositionServiceSpy.updateTarifposition
+        .mockReturnValue(throwError(() => new Error('Network error')));
+      component.onFormSubmit(existingPosition);
+      expect(component.message).toBe('FEHLER_AKTUALISIEREN_TARIFPOSITION');
+    });
+  });
+
+  describe('onFormCancel', () => {
+    it('should hide the form and clear the selected position', () => {
+      component.showForm = true;
+      component.selectedPosition = { ...mockPositionen[0] };
+
+      component.onFormCancel();
+
+      expect(component.showForm).toBe(false);
+      expect(component.selectedPosition).toBeNull();
+    });
+  });
+
+  describe('onSort', () => {
+    beforeEach(() => {
+      component.positionen = positionenKopie();
+    });
+
+    it('should toggle the direction when clicking the same column', () => {
+      component.sortColumn = 'menge';
+      component.sortDirection = 'asc';
+      component.onSort('menge');
+      expect(component.sortDirection).toBe('desc');
+    });
+
+    it('should start ascending when switching to another column', () => {
+      component.sortColumn = 'quartal';
+      component.sortDirection = 'desc';
+      component.onSort('menge');
+      expect(component.sortColumn).toBe('menge');
+      expect(component.sortDirection).toBe('asc');
+    });
+
+    it('should sort by quartal chronologically across year boundaries', () => {
+      component.sortColumn = null;
+      component.sortDirection = 'asc';
+      component.onSort('quartal');
+
+      expect(component.positionen[0].jahr).toBe(2026);
+      expect(component.positionen[0].quartal).toBe(4);
+      expect(component.positionen[1].jahr).toBe(2027);
+      expect(component.positionen[1].quartal).toBe(1);
+    });
+
+    it('should sort by quartal descending across year boundaries', () => {
+      component.sortColumn = 'quartal';
+      component.sortDirection = 'asc';
+      component.onSort('quartal');
+
+      expect(component.positionen[0].jahr).toBe(2027);
+      expect(component.positionen[1].jahr).toBe(2026);
+    });
+
+    it('should sort by menge', () => {
+      component.sortColumn = null;
+      component.onSort('menge');
+      expect(component.positionen.map(p => p.menge)).toEqual([50, 100]);
+    });
+
+    it('should sort by tarifPreis', () => {
+      component.sortColumn = null;
+      component.onSort('tarifPreis');
+      expect(component.positionen.map(p => p.tarifPreis)).toEqual([0.35, 0.38]);
+    });
+
+    it('should sort by the calculated betrag', () => {
+      component.sortColumn = null;
+      component.onSort('betrag');
+      // 50 * 0.38 = 19 vor 100 * 0.35 = 35
+      expect(component.positionen[0].id).toBe(11);
+      expect(component.positionen[1].id).toBe(10);
+    });
+
+    it('should sort by tarifBezeichnung case-insensitively', () => {
+      component.positionen = [
+        { ...mockPositionen[0], tarifBezeichnung: 'zeta' },
+        { ...mockPositionen[1], tarifBezeichnung: 'Alpha' }
+      ];
+      component.sortColumn = null;
+      component.onSort('tarifBezeichnung');
+      expect(component.positionen.map(p => p.tarifBezeichnung)).toEqual(['Alpha', 'zeta']);
+    });
+
+    it('should sort by erfassungsart', () => {
+      component.sortColumn = null;
+      component.onSort('erfassungsart');
+      expect(component.positionen.map(p => p.erfassungsart))
+        .toEqual([Erfassungsart.IMPORT, Erfassungsart.MANUELL]);
+    });
+
+    it('should put positions without a value last', () => {
+      component.positionen = [
+        { ...mockPositionen[0], erfassungsart: undefined },
+        { ...mockPositionen[1], erfassungsart: Erfassungsart.MANUELL }
+      ];
+      component.sortColumn = null;
+      component.onSort('erfassungsart');
+      expect(component.positionen[0].erfassungsart).toBe(Erfassungsart.MANUELL);
+      expect(component.positionen[1].erfassungsart).toBeUndefined();
+    });
+  });
+
+  describe('sort persistence', () => {
+    beforeEach(() => {
+      component.selectedMieterId = 1;
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+    });
+
+    it('should keep the chosen sorting after loading', () => {
+      component.sortColumn = 'menge';
+      component.sortDirection = 'asc';
+
+      component.loadPositionen();
+
+      expect(component.positionen.map(p => p.menge)).toEqual([50, 100]);
+    });
+
+    it('should keep the chosen sorting after creating a position', () => {
+      component.sortColumn = 'menge';
+      component.sortDirection = 'asc';
+
+      component.onFormSubmit({ mieterId: 1, tarifId: 3, jahr: 2026, quartal: 1, menge: 1 });
+
+      expect(component.sortColumn).toBe('menge');
+      expect(component.positionen.map(p => p.menge)).toEqual([50, 100]);
+    });
+
+    it('should keep the chosen sorting after deleting a position', () => {
+      component.sortColumn = 'menge';
+      component.sortDirection = 'desc';
+
+      component.onDelete(10);
+
+      expect(component.sortDirection).toBe('desc');
+      expect(component.positionen.map(p => p.menge)).toEqual([100, 50]);
+    });
+
+    it('should leave the order untouched when no sort column is set', () => {
+      component.sortColumn = null;
+
+      component.loadPositionen();
+
+      expect(component.positionen.map(p => p.id)).toEqual([10, 11]);
+    });
+  });
+
+  describe('berechneBetrag', () => {
+    it('should multiply menge with the tarif price', () => {
+      expect(component.berechneBetrag(mockPositionen[0])).toBeCloseTo(35, 5);
+    });
+
+    it('should return 0 when the price is missing', () => {
+      expect(component.berechneBetrag({ ...mockPositionen[0], tarifPreis: undefined })).toBe(0);
+    });
+
+    it('should return 0 when the menge is missing', () => {
+      expect(component.berechneBetrag({ ...mockPositionen[0], menge: undefined as unknown as number }))
+        .toBe(0);
+    });
+
+    it('should return 0 for a zero menge', () => {
+      expect(component.berechneBetrag({ ...mockPositionen[0], menge: 0 })).toBe(0);
+    });
+  });
+
+  describe('selectedMieterLadepunkt', () => {
+    it('should return the ladepunkt of the selected mieter', () => {
+      component.selectedMieterId = 1;
+      expect(component.selectedMieterLadepunkt).toBe('LP-01');
+    });
+
+    it('should return an empty string when the mieter has no ladepunkt', () => {
+      component.selectedMieterId = 2;
+      expect(component.selectedMieterLadepunkt).toBe('');
+    });
+
+    it('should return an empty string when no mieter is selected', () => {
+      component.selectedMieterId = null;
+      expect(component.selectedMieterLadepunkt).toBe('');
+    });
+  });
+
+  describe('messages', () => {
+    beforeEach(() => {
+      component.selectedMieterId = 1;
+    });
+
+    it('should auto-dismiss a success message after 5 seconds', fakeAsync(() => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+      component.onDelete(10);
+
+      expect(component.message).toBe('TARIFPOSITION_GELOESCHT');
+      expect(component.messagePersistent).toBe(false);
+      tick(5000);
+      expect(component.message).toBe('');
+    }));
+
+    it('should keep an error message until it is dismissed', fakeAsync(() => {
+      tarifpositionServiceSpy.getByMieter.mockReturnValue(throwError(() => new Error('Network error')));
+
+      component.loadPositionen();
+
+      expect(component.messagePersistent).toBe(true);
+      tick(5000);
+      expect(component.message).toBe('FEHLER_LADEN_TARIFPOSITIONEN');
+    }));
+
+    it('should clear message and persistence flag on dismissMessage', () => {
+      component.message = 'FEHLER_LADEN_TARIFPOSITIONEN';
+      component.messagePersistent = true;
+
+      component.dismissMessage();
+
+      expect(component.message).toBe('');
+      expect(component.messagePersistent).toBe(false);
+    });
+  });
+});

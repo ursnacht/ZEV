@@ -288,6 +288,11 @@ describe('RechnungenComponent', () => {
     it('should truncate beyond two decimal places', () => {
       expect(component.formatBetrag(1.234)).toBe('1.23');
     });
+
+    it('should group thousands with an apostrophe (Swiss format)', () => {
+      expect(component.formatBetrag(1234.5)).toBe('1\'234.50');
+      expect(component.formatBetrag(1234567.891)).toBe('1\'234\'567.89');
+    });
   });
 
   describe('getTotalBetrag', () => {
