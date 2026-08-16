@@ -294,6 +294,76 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
         assertThat(result).isEmpty();
     }
 
+    // ==================== existsByLadepunkt (Spec Ladestromtarif.md) ====================
+
+    @Test
+    void shouldSaveMieterWithLadepunkt() {
+        // Given
+        Mieter mieter = createMieter("Mit Ladepunkt", LocalDate.of(2026, 1, 1), null);
+        mieter.setLadepunkt("LP-01");
+
+        // When
+        Mieter saved = mieterRepository.save(mieter);
+
+        // Then
+        assertThat(saved.getLadepunkt()).isEqualTo("LP-01");
+    }
+
+    @Test
+    void shouldDetectExistingLadepunkt() {
+        // Given – a tenant already using the identifier
+        mieterRepository.save(withLadepunkt("Bestehend", LocalDate.of(2023, 1, 1), "LP-01"));
+
+        // When – a new tenant wants the same identifier
+        boolean exists = mieterRepository.existsByLadepunkt("LP-01", -1L);
+
+        // Then
+        assertThat(exists).isTrue();
+    }
+
+    @Test
+    void shouldNotDetectDifferentLadepunkt() {
+        // Given
+        mieterRepository.save(withLadepunkt("Bestehend", LocalDate.of(2023, 1, 1), "LP-01"));
+
+        // When
+        boolean exists = mieterRepository.existsByLadepunkt("LP-02", -1L);
+
+        // Then
+        assertThat(exists).isFalse();
+    }
+
+    @Test
+    void shouldExcludeSelfWhenCheckingLadepunkt() {
+        // Given – existing tenant keeping their own identifier while being edited
+        Mieter existing = mieterRepository.save(
+                withLadepunkt("Selbst", LocalDate.of(2023, 1, 1), "LP-01"));
+
+        // When
+        boolean exists = mieterRepository.existsByLadepunkt("LP-01", existing.getId());
+
+        // Then
+        assertThat(exists).isFalse();
+    }
+
+    @Test
+    void shouldNotDetectLadepunktWhenAllTenantsHaveNone() {
+        // Given – tenants without a charging point identifier
+        mieterRepository.save(createMieter("Ohne Ladepunkt", LocalDate.of(2023, 1, 1), null));
+
+        // When
+        boolean exists = mieterRepository.existsByLadepunkt("LP-01", -1L);
+
+        // Then
+        assertThat(exists).isFalse();
+    }
+
+    private Mieter withLadepunkt(String name, LocalDate mietbeginn, String ladepunkt) {
+        Mieter mieter = createMieter(name, mietbeginn, mietbeginn.plusYears(1));
+        mieter.setLadepunkt(ladepunkt);
+        return mieter;
+    }
+
     @Test
     void shouldFindByEinheitIdAndQuartal_OrderedByMietbeginn() {
         // Given – two tenants within the same quarter

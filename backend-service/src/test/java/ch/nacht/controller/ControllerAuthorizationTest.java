@@ -5,6 +5,7 @@ import ch.nacht.service.EinstellungenService;
 import ch.nacht.service.FeatureFlagService;
 import ch.nacht.service.OrganisationService;
 import ch.nacht.service.OrganizationContextService;
+import ch.nacht.service.TarifpositionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,13 +18,18 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -35,7 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Authentifizierung → 401. Deckt insbesondere die Abgrenzung {@code org_admin} (darf Einstellungen,
  * aber keine Feature-Flags) ab.
  */
-@WebMvcTest({EinstellungenController.class, FeatureFlagController.class})
+@WebMvcTest({EinstellungenController.class, FeatureFlagController.class, TarifpositionController.class})
 @Import(SecurityConfig.class)
 @TestPropertySource(properties = "app.cors.allowed-origins=http://localhost:4200")
 class ControllerAuthorizationTest {
@@ -48,6 +54,9 @@ class ControllerAuthorizationTest {
 
     @MockitoBean
     private FeatureFlagService featureFlagService;
+
+    @MockitoBean
+    private TarifpositionService tarifpositionService;
 
     @MockitoBean
     private OrganizationContextService organizationContextService;
@@ -123,5 +132,75 @@ class ControllerAuthorizationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"enabled\":true}"))
                 .andExpect(status().isForbidden());
+    }
+
+    // ==================== Tarifpositionen: mieter:read vs. rechnungen:manage ====================
+    // Spec Ladestromtarif.md NFR-2: Lesen über mieter:read, Schreiben über rechnungen:manage.
+
+    @Test
+    void getTarifpositionen_withMieterRead_reachesController() throws Exception {
+        when(tarifpositionService.getByMieter(1L)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/tarifpositionen?mieterId=1")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("mieter:read"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getTarifpositionen_withoutPermission_forbidden() throws Exception {
+        mockMvc.perform(get("/api/tarifpositionen?mieterId=1")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("messwerte:read"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getTarifpositionen_unauthenticated_unauthorized() throws Exception {
+        mockMvc.perform(get("/api/tarifpositionen?mieterId=1"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void createTarifposition_withRechnungenManage_reachesController() throws Exception {
+        // Service weist die Eingabe fachlich ab -> 400 belegt, dass der Controller erreicht wurde
+        when(tarifpositionService.saveTarifposition(any()))
+                .thenThrow(new IllegalArgumentException("Tarif nicht gefunden"));
+
+        mockMvc.perform(post("/api/tarifpositionen")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("rechnungen:manage")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mieterId\":1,\"tarifId\":1,\"jahr\":2026,\"quartal\":1,\"menge\":10}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createTarifposition_withMieterReadOnly_forbidden() throws Exception {
+        // Lesen genügt zum Erfassen nicht
+        mockMvc.perform(post("/api/tarifpositionen")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("mieter:read")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mieterId\":1,\"tarifId\":1,\"jahr\":2026,\"quartal\":1,\"menge\":10}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void deleteTarifposition_withMieterReadOnly_forbidden() throws Exception {
+        mockMvc.perform(delete("/api/tarifpositionen/1")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("mieter:read")))
+                        .with(csrf()))
+                .andExpect(status().isForbidden());
+
+        verify(tarifpositionService, never()).deleteTarifposition(any());
+    }
+
+    @Test
+    void deleteTarifposition_withRechnungenManage_reachesController() throws Exception {
+        when(tarifpositionService.deleteTarifposition(1L)).thenReturn(true);
+
+        mockMvc.perform(delete("/api/tarifpositionen/1")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("rechnungen:manage")))
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
     }
 }

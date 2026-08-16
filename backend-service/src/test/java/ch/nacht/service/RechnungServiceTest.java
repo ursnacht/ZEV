@@ -9,6 +9,7 @@ import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Mieter;
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
+import ch.nacht.entity.Tarifposition;
 import ch.nacht.exception.TarifLuecke;
 import ch.nacht.exception.TarifLueckenException;
 import ch.nacht.repository.EinheitRepository;
@@ -798,6 +799,352 @@ public class RechnungServiceTest {
 
         // GRUNDGEBUEHR not flagged for producers → no invoice
         assertEquals(0, rechnungen.size());
+    }
+
+    // ─── Tarifpositionen (Ladestrom, Spec Ladestromtarif.md) ────────────────────
+
+    /** Tarif vom Typ LADESTROM, gültig für das ganze Jahr 2024. */
+    private Tarif ladestromTarif(String bezeichnung, String preis) {
+        Tarif tarif = new Tarif(
+            bezeichnung, TarifTyp.LADESTROM, new BigDecimal(preis),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
+        );
+        tarif.setId(99L);
+        return tarif;
+    }
+
+    private Tarifposition tarifposition(Tarif tarif, Mieter mieter, int jahr, int quartal, String menge) {
+        Tarifposition position = new Tarifposition(mieter, tarif, jahr, quartal, new BigDecimal(menge));
+        position.setId(1L);
+        return position;
+    }
+
+    /** Standard-Mieter mit ZEV/VNB-Messwerten für die Rechnungstests. */
+    private Mieter mieterMitMesswerten(LocalDate von, LocalDate bis) {
+        Mieter mieter = new Mieter("Max Muster", LocalDate.of(2023, 1, 1), 1L);
+        mieter.setId(1L);
+
+        when(tarifService.getTarifeForZeitraum(TarifTyp.ZEV, von, bis))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.VNB, von, bis))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(150.0);
+
+        return mieter;
+    }
+
+    @Test
+    void berechneRechnung_TarifpositionMitMenge_AddsLadestromZeile() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Mieter mieter = mieterMitMesswerten(von, bis);
+        Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
+        when(tarifpositionService.getFuerRechnung(1L, von, bis))
+            .thenReturn(List.of(tarifposition(ladestrom, mieter, 2024, 1, "120.000")));
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
+
+        TarifZeileDTO zeile = rechnung.getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.LADESTROM)
+            .findFirst().orElseThrow();
+
+        assertEquals("Ladestrom", zeile.getBezeichnung());
+        // Quartalsgrenzen als Von/Bis, nicht der Rechnungszeitraum
+        assertEquals(LocalDate.of(2024, 1, 1), zeile.getVon());
+        assertEquals(LocalDate.of(2024, 3, 31), zeile.getBis());
+        assertEquals(120.0, zeile.getMenge(), 0.001);
+        assertEquals(0.35, zeile.getPreis(), 0.00001);
+        assertEquals(42.0, zeile.getBetrag(), 0.01); // 120 * 0.35
+        assertEquals("KWH", zeile.getMengeneinheit());
+    }
+
+    @Test
+    void berechneRechnung_TarifpositionQ3_UsesQuartalBoundsAsPeriod() {
+        LocalDate von = LocalDate.of(2024, 7, 1);
+        LocalDate bis = LocalDate.of(2024, 9, 30);
+
+        Mieter mieter = mieterMitMesswerten(von, bis);
+        Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
+        when(tarifpositionService.getFuerRechnung(1L, von, bis))
+            .thenReturn(List.of(tarifposition(ladestrom, mieter, 2024, 3, "10.000")));
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
+
+        TarifZeileDTO zeile = rechnung.getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.LADESTROM)
+            .findFirst().orElseThrow();
+
+        assertEquals(LocalDate.of(2024, 7, 1), zeile.getVon());
+        assertEquals(LocalDate.of(2024, 9, 30), zeile.getBis());
+    }
+
+    @Test
+    void berechneRechnung_TarifpositionMenge_RoundedLikeZevVnbLines() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Mieter mieter = mieterMitMesswerten(von, bis);
+        Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
+        // Gespeichert mit 3 NKS, dargestellt/verrechnet gerundet wie ZEV/VNB
+        when(tarifpositionService.getFuerRechnung(1L, von, bis))
+            .thenReturn(List.of(tarifposition(ladestrom, mieter, 2024, 1, "120.567")));
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
+
+        TarifZeileDTO zeile = rechnung.getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.LADESTROM)
+            .findFirst().orElseThrow();
+
+        assertEquals(121.0, zeile.getMenge(), 0.001);
+        assertEquals(42.35, zeile.getBetrag(), 0.01);
+    }
+
+    @Test
+    void berechneRechnung_TarifpositionBetrag_FlowsIntoTotalRundungAndEndbetrag() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Mieter mieter = mieterMitMesswerten(von, bis);
+        Tarif ladestrom = ladestromTarif("Ladestrom", "0.33000");
+        when(tarifpositionService.getFuerRechnung(1L, von, bis))
+            .thenReturn(List.of(tarifposition(ladestrom, mieter, 2024, 1, "7.000")));
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
+
+        // ZEV 100 * 0.20 = 20.00, VNB 50 * 0.34 = 17.00, Ladestrom 7 * 0.33 = 2.31 → 39.31
+        assertEquals(39.31, rechnung.getTotalBetrag(), 0.001);
+        assertEquals(39.30, rechnung.getEndBetrag(), 0.001);
+        assertEquals(-0.01, rechnung.getRundung(), 0.001);
+    }
+
+    @Test
+    void berechneRechnung_TarifpositionMitQuellReferenz_AppendsItToBezeichnung() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Mieter mieter = mieterMitMesswerten(von, bis);
+        Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
+        Tarifposition position = tarifposition(ladestrom, mieter, 2024, 1, "10.000");
+        position.setQuellReferenz("LP-01");
+        when(tarifpositionService.getFuerRechnung(1L, von, bis)).thenReturn(List.of(position));
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
+
+        TarifZeileDTO zeile = rechnung.getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.LADESTROM)
+            .findFirst().orElseThrow();
+
+        assertEquals("Ladestrom (LP-01)", zeile.getBezeichnung());
+    }
+
+    @Test
+    void berechneRechnung_TarifpositionOhneQuellReferenz_KeepsBezeichnung() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Mieter mieter = mieterMitMesswerten(von, bis);
+        Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
+        when(tarifpositionService.getFuerRechnung(1L, von, bis))
+            .thenReturn(List.of(tarifposition(ladestrom, mieter, 2024, 1, "10.000")));
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
+
+        TarifZeileDTO zeile = rechnung.getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.LADESTROM)
+            .findFirst().orElseThrow();
+
+        assertEquals("Ladestrom", zeile.getBezeichnung());
+    }
+
+    @Test
+    void berechneRechnung_TarifpositionMitLeererQuellReferenz_KeepsBezeichnung() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Mieter mieter = mieterMitMesswerten(von, bis);
+        Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
+        Tarifposition position = tarifposition(ladestrom, mieter, 2024, 1, "10.000");
+        position.setQuellReferenz("   ");
+        when(tarifpositionService.getFuerRechnung(1L, von, bis)).thenReturn(List.of(position));
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
+
+        TarifZeileDTO zeile = rechnung.getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.LADESTROM)
+            .findFirst().orElseThrow();
+
+        assertEquals("Ladestrom", zeile.getBezeichnung());
+    }
+
+    @Test
+    void berechneRechnung_ZweiQuartaleImZeitraum_CreatesTwoLadestromZeilen() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 6, 30);
+
+        Mieter mieter = mieterMitMesswerten(von, bis);
+        Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
+        when(tarifpositionService.getFuerRechnung(1L, von, bis)).thenReturn(List.of(
+            tarifposition(ladestrom, mieter, 2024, 1, "100.000"),
+            tarifposition(ladestrom, mieter, 2024, 2, "200.000")
+        ));
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
+
+        List<TarifZeileDTO> ladestromZeilen = rechnung.getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.LADESTROM)
+            .toList();
+
+        assertEquals(2, ladestromZeilen.size());
+        assertEquals(LocalDate.of(2024, 1, 1), ladestromZeilen.get(0).getVon());
+        assertEquals(LocalDate.of(2024, 3, 31), ladestromZeilen.get(0).getBis());
+        assertEquals(LocalDate.of(2024, 4, 1), ladestromZeilen.get(1).getVon());
+        assertEquals(LocalDate.of(2024, 6, 30), ladestromZeilen.get(1).getBis());
+        // 100 * 0.35 + 200 * 0.35 = 105.00, dazu ZEV 20.00 + VNB 17.00
+        assertEquals(142.0, rechnung.getTotalBetrag(), 0.01);
+    }
+
+    @Test
+    void berechneRechnung_KeineTarifpositionen_RechnungUnveraendert() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 1, 31);
+
+        Mieter mieter = mieterMitMesswerten(von, bis);
+        when(tarifpositionService.getFuerRechnung(1L, von, bis)).thenReturn(Collections.emptyList());
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
+
+        // Nur ZEV + VNB wie bisher - keine leere Zeile, kein Fehler
+        assertEquals(2, rechnung.getTarifZeilen().size());
+        assertEquals(37.0, rechnung.getTotalBetrag(), 0.01);
+    }
+
+    @Test
+    void berechneRechnung_OhneMieter_QueriesNoTarifpositionen() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 1, 31);
+
+        when(tarifService.getTarifeForZeitraum(TarifTyp.ZEV, von, bis))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.VNB, von, bis))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(eq(consumer), any(), any()))
+            .thenReturn(150.0);
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
+
+        assertEquals(2, rechnung.getTarifZeilen().size());
+        verify(tarifpositionService, never()).getFuerRechnung(any(), any(), any());
+    }
+
+    @Test
+    void berechneRechnung_LadestromZeilen_AfterZevVnbAndBeforeGrundgebuehr() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Mieter mieter = mieterMitMesswerten(von, bis);
+        Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
+        when(tarifpositionService.getFuerRechnung(1L, von, bis))
+            .thenReturn(List.of(tarifposition(ladestrom, mieter, 2024, 1, "10.000")));
+
+        Tarif grundgebuehr = new Tarif(
+            "Grundgebühr 2024", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
+        );
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(Collections.singletonList(grundgebuehr));
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
+
+        List<TarifTyp> reihenfolge = rechnung.getTarifZeilen().stream()
+            .map(TarifZeileDTO::getTyp)
+            .toList();
+
+        assertEquals(List.of(TarifTyp.ZEV, TarifTyp.VNB, TarifTyp.LADESTROM, TarifTyp.GRUNDGEBUEHR),
+            reihenfolge);
+    }
+
+    @Test
+    void berechneRechnungen_MieterwechselImQuartal_EachInvoiceOnlyOwnPosition() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Mieter mieterA = new Mieter("Mieter A", LocalDate.of(2023, 1, 1), 1L);
+        mieterA.setId(1L);
+        mieterA.setMietende(LocalDate.of(2024, 2, 29));
+
+        Mieter mieterB = new Mieter("Mieter B", LocalDate.of(2024, 3, 1), 1L);
+        mieterB.setId(2L);
+
+        Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
+
+        doNothing().when(tarifService).validateTarifAbdeckung(von, bis);
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumer));
+        when(mieterService.getMieterForQuartal(eq(1L), any(), any()))
+            .thenReturn(Arrays.asList(mieterA, mieterB));
+        when(tarifService.getTarifeForZeitraum(any(), any(), any()))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(150.0);
+
+        // Jeder Mieter traegt seine eigene Q1-Position - obwohl beide Rechnungen nur einen
+        // Teil von Q1 abdecken (Ueberschneidungsregel FR-1.5).
+        when(tarifpositionService.getFuerRechnung(eq(1L), any(), any()))
+            .thenReturn(List.of(tarifposition(ladestrom, mieterA, 2024, 1, "100.000")));
+        when(tarifpositionService.getFuerRechnung(eq(2L), any(), any()))
+            .thenReturn(List.of(tarifposition(ladestrom, mieterB, 2024, 1, "200.000")));
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(1L), von, bis);
+
+        assertEquals(2, rechnungen.size());
+
+        TarifZeileDTO zeileA = rechnungen.get(0).getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.LADESTROM)
+            .findFirst().orElseThrow();
+        TarifZeileDTO zeileB = rechnungen.get(1).getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.LADESTROM)
+            .findFirst().orElseThrow();
+
+        assertEquals(100.0, zeileA.getMenge(), 0.001);
+        assertEquals(200.0, zeileB.getMenge(), 0.001);
+        // Je Rechnung genau eine Ladestrom-Zeile - keine fremde Position
+        assertEquals(1, rechnungen.get(0).getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.LADESTROM).count());
+        assertEquals(1, rechnungen.get(1).getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.LADESTROM).count());
+    }
+
+    @Test
+    void berechneRechnungen_Produzent_HasNoTarifpositionsZeilen() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Einheit producer = new Einheit("Solaranlage", EinheitTyp.PRODUCER);
+        producer.setId(2L);
+
+        Tarif grundgebuehr = new Tarif(
+            "Grundgebühr 2024", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)
+        );
+        grundgebuehr.setProduzentVerrechnen(true);
+
+        when(einheitRepository.findById(2L)).thenReturn(Optional.of(producer));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(Collections.singletonList(grundgebuehr));
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(2L), von, bis);
+
+        assertEquals(1, rechnungen.size());
+        assertTrue(rechnungen.get(0).getTarifZeilen().stream()
+            .noneMatch(z -> z.getTyp() == TarifTyp.LADESTROM));
+        verify(tarifpositionService, never()).getFuerRechnung(any(), any(), any());
     }
 
     @Test
