@@ -1,28 +1,11 @@
+/*
+ * Debitorkontrolle List Component
+ * Tabellen-Styles (.zev-table__checkbox-col, .zev-table__row--selected) kommen aus dem
+ * Design System - hier stehen nur komponentenspezifische Ergaenzungen.
+ */
+
 .debitor-einheit {
   color: var(--color-gray-600);
   font-size: 0.875rem;
   margin-left: 0.25rem;
-}
-
-.zev-table__checkbox-col {
-  width: 2.5rem;
-  text-align: center;
-}
-
-.zev-table__row--selected {
-  background-color: var(--color-gray-400);
-}
-
-[data-theme="dark"] .zev-table__row--selected:hover {
-  background-color: var(--color-gray-300);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .zev-table__row--selected {
-    background-color: var(--color-gray-200);
-  }
-
-  :root:not([data-theme="light"]) .zev-table__row--selected:hover {
-    background-color: var(--color-gray-300);
-  }
 }

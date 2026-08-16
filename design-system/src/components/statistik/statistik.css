@@ -140,14 +140,6 @@
   padding: var(--spacing-xs) var(--spacing-12) !important;
 }
 
-/* Numeric Column Alignment.
-   Höhere Spezifität als `.zev-table th, .zev-table td { text-align: left }`
-   (table.css), damit kWh-Werte rechtsbündig erscheinen – analog zum PDF. */
-.zev-table th.zev-table__number,
-.zev-table td.zev-table__number {
-  text-align: right;
-}
-
 /* Row Type Variants */
 .zev-table__row--producer {
   background-color: rgba(76, 175, 80, 0.1);

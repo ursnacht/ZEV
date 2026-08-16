@@ -59,6 +59,45 @@
   gap: var(--spacing-sm);
 }
 
+/* Numerische Spalten rechtsbündig.
+   Höhere Spezifität als `.zev-table th, .zev-table td { text-align: left }` weiter oben.
+   Stand hier zuvor in statistik.css - die Klasse wird inzwischen von allen Tabellen mit
+   Zahlenspalten genutzt und gehört deshalb zur Tabellen-Komponente. */
+.zev-table th.zev-table__number,
+.zev-table td.zev-table__number {
+  text-align: right;
+}
+
+/* Schmale Spalte fuer eine Auswahl-Checkbox (Mehrfachauswahl).
+   Wie bei `__number` mit `th`/`td` qualifiziert, damit die Zentrierung die linksbuendige
+   Grundregel `.zev-table th, .zev-table td` weiter oben schlaegt. */
+.zev-table th.zev-table__checkbox-col,
+.zev-table td.zev-table__checkbox-col {
+  width: 2.5rem;
+  text-align: center;
+}
+
+/* Ausgewaehlte Zeile (Mehrfachauswahl). Die `:hover`-Variante ist noetig, weil sonst
+   `.zev-table tr:hover` die Auswahl genau dann uebermalt, wenn der Zeiger auf der Zeile steht. */
+.zev-table__row--selected,
+.zev-table__row--selected:hover {
+  background-color: var(--color-gray-400);
+}
+
+[data-theme="dark"] .zev-table__row--selected:hover {
+  background-color: var(--color-gray-300);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .zev-table__row--selected {
+    background-color: var(--color-gray-200);
+  }
+
+  :root:not([data-theme="light"]) .zev-table__row--selected:hover {
+    background-color: var(--color-gray-300);
+  }
+}
+
 /* Sortable Table Headers */
 .zev-table__header--sortable {
   cursor: pointer;

@@ -58,6 +58,23 @@
   border-color: #1971c2;
 }
 
+/* Statische Meldung: bleibt im Textfluss statt als Overlay. Fuer dauerhafte Hinweise, die eine
+   Seite erklaeren - als Overlay wuerden sie den Inhalt verdecken und mit den kurzlebigen
+   Erfolgs-/Fehlermeldungen kollidieren, die denselben fixen Platz belegen.
+   `relative` statt `static`, damit `.zev-message__dismiss` weiterhin daran ausgerichtet wird. */
+.zev-message--statisch {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  z-index: auto;
+  min-width: 0;
+  max-width: none;
+  margin-bottom: var(--spacing-md);
+  box-shadow: none;
+  text-align: left;
+}
+
 /* Dismissible Message */
 .zev-message--dismissible {
   cursor: pointer;

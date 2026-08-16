@@ -37,21 +37,3 @@
   text-align: left;
 }
 
-.zev-message--clickable {
-  cursor: pointer;
-  padding-right: var(--spacing-xl);
-}
-
-.zev-message__dismiss {
-  position: absolute;
-  right: var(--spacing-sm);
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 1.5rem;
-  font-weight: bold;
-  opacity: 0.7;
-}
-
-.zev-message__dismiss:hover {
-  opacity: 1;
-}

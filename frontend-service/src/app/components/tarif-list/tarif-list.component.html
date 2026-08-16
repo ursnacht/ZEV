@@ -3,7 +3,7 @@
 
   @if (message) {
     <div class="zev-message" [ngClass]="'zev-message--' + messageType"
-      [class.zev-message--clickable]="messagePersistent" (click)="messagePersistent && dismissMessage()">
+      [class.zev-message--dismissible]="messagePersistent" (click)="messagePersistent && dismissMessage()">
       <span>{{ message | translate }}</span>
       @if (validationErrors.length > 0) {
         <ul class="validation-errors">

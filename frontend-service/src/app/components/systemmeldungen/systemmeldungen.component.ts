@@ -8,6 +8,7 @@ import { ErledigtFilter, MeldungLevel, Systemmeldung } from '../../models/system
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.component';
+import { ColumnResizeDirective } from '../../directives/column-resize.directive';
 import { IconComponent } from '../icon/icon.component';
 
 /**
@@ -18,7 +19,8 @@ import { IconComponent } from '../icon/icon.component';
 @Component({
   selector: 'app-systemmeldungen',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe, KebabMenuComponent, IconComponent],
+  imports: [CommonModule, FormsModule, TranslatePipe, KebabMenuComponent, ColumnResizeDirective,
+    IconComponent],
   templateUrl: './systemmeldungen.component.html',
   styleUrls: ['./systemmeldungen.component.css']
 })

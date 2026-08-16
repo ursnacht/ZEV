@@ -566,6 +566,10 @@
       <span>Fehler mit Schliessen-Button</span>
       <span class="zev-message__dismiss">&times;</span>
     </div>
+    <div class="zev-message zev-message--info zev-message--statisch zev-message--dismissible">
+      <span>Dauerhafter Hinweis im Textfluss (nicht fixiert), wegklickbar</span>
+      <span class="zev-message__dismiss">&times;</span>
+    </div>
   </div>
 
   <div class="subsection">
@@ -576,6 +580,7 @@
       <li><code>.zev-message--error</code> - Fehlermeldung (rot)</li>
       <li><code>.zev-message--warning</code> - Warnmeldung (gelb)</li>
       <li><code>.zev-message--info</code> - Information (blau)</li>
+      <li><code>.zev-message--statisch</code> - Im Textfluss statt fixiert (dauerhafte Hinweise)</li>
       <li><code>.zev-message--dismissible</code> - Klickbar zum Schliessen</li>
       <li><code>.zev-message__dismiss</code> - Schliessen-Symbol (&times;)</li>
     </ul>
@@ -606,20 +611,24 @@
     <table class="zev-table">
       <thead>
         <tr>
+          <th class="zev-table__checkbox-col"></th>
           <th class="zev-table__header--sortable">
             ID
             <span class="zev-table__sort-indicator">▲</span>
           </th>
           <th class="zev-table__header--sortable">Name</th>
           <th class="zev-table__header--sortable">Type</th>
+          <th class="zev-table__number zev-table__header--sortable">Menge (kWh)</th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody>
         <tr>
+          <td class="zev-table__checkbox-col"><input type="checkbox" class="zev-checkbox"></td>
           <td>1</td>
           <td>Beispiel A</td>
           <td>Produktion</td>
+          <td class="zev-table__number">1250.000</td>
           <td>
             <div class="zev-table-actions">
               <button class="zev-button zev-button--secondary">Edit</button>
@@ -627,10 +636,12 @@
             </div>
           </td>
         </tr>
-        <tr>
+        <tr class="zev-table__row--selected">
+          <td class="zev-table__checkbox-col"><input type="checkbox" class="zev-checkbox" checked></td>
           <td>2</td>
-          <td>Beispiel B</td>
+          <td>Beispiel B (ausgewählt)</td>
           <td>Verbrauch</td>
+          <td class="zev-table__number">650.000</td>
           <td>
             <div class="zev-table-actions">
               <button class="zev-button zev-button--secondary">Edit</button>
@@ -640,6 +651,21 @@
         </tr>
       </tbody>
     </table>
+  </div>
+
+  <div class="subsection">
+    <h3>CSS Klassen</h3>
+    <ul class="zev-list">
+      <li><code>.zev-table</code> - Basis-Klasse</li>
+      <li><code>.zev-table--striped</code> / <code>--compact</code> / <code>--auto</code> - Varianten</li>
+      <li><code>.zev-table__header--sortable</code> + <code>.zev-table__sort-indicator</code> - sortierbare Spalte</li>
+      <li><code>.zev-table__number</code> - numerische Spalte (rechtsbündig)</li>
+      <li><code>.zev-table__checkbox-col</code> - schmale Spalte für die Auswahl-Checkbox</li>
+      <li><code>.zev-table__row--selected</code> - ausgewählte Zeile (Mehrfachauswahl)</li>
+      <li><code>.zev-table-actions</code> - Button-Gruppe in der Aktionsspalte</li>
+      <li><code>appColumnResize</code> - Direktive für veränderbare Spaltenbreiten
+        (<code>ColumnResizeDirective</code>, ergänzt <code>.zev-table__resize-handle</code> selbst)</li>
+    </ul>
   </div>
 </section>
 
