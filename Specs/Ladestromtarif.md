@@ -68,6 +68,7 @@
   - **Formular** (Design-System-`form`): Tarif (Dropdown), **Jahr** und **Quartal** als je ein Dropdown, Menge, Bemerkung; Speichern/Abbrechen.
     Bewusst **nicht** die `QuarterSelectorComponent`: Sie arbeitet mit Datumsbereichen (`@Input selectedVon/selectedBis`, `@Output {von, bis}`), die Position speichert aber `jahr` + `quartal` — eine Hin- und Rueckrechnung waere unnoetiger Umweg. Die Quell-Referenz wird aus dem Ladepunkt des Mieters vorbelegt und ist aenderbar. Vorlagen: `tarif-form` / `tarif-list`.
   - Leere Liste → Hinweis „keine Positionen erfasst" (kein leeres Tabellengerüst).
+  - **Dauerhafter Hinweis** in der Ansicht: Positionen werden bei **jeder** Rechnungserstellung erneut aufgenommen — es gibt keinen „bereits verrechnet"-Status. Gegenmassnahme ist organisatorisch (Rechnungen je Zeitraum nur einmal erstellen), nicht technisch.
 * **Rechnung (Web + PDF):** Die Ladestrom-Zeilen erscheinen **nach** den ZEV-/VNB-Zeilen und **vor** der Grundgebühr, mit `mengeneinheit = "kWh"`. Keine strukturelle Änderung am Rechnungslayout — es kommen nur Zeilen dazu.
 * **Zahlenformatierung** nach `Specs/generell.md`: Dezimalpunkt, Hochkomma als Tausendertrennzeichen (`1'234.567`), `–` bei Fehlwerten — in Liste, Formular **und** PDF gleich.
 * Alle Texte via `TranslationService`/`TranslatePipe`, keine Hardcodings.
@@ -89,6 +90,7 @@
 * [ ] Eine Ladepunkt-Kennung, die bereits einem anderen Mieter desselben Mandanten gehoert, wird **abgewiesen** (Meldung, kein Datensatz).
 * [ ] Manuell erfasste Positionen tragen `erfassungsart = MANUELL`; die Quell-Referenz ist aus dem Ladepunkt des Mieters vorbelegt und aenderbar.
 * [ ] Die Liste weist die Herkunft je Position aus (manuell/importiert).
+* [ ] In der Ansicht steht der Hinweis, dass Positionen bei jeder Rechnungserstellung erneut aufgenommen werden.
 
 ### Rechnung
 * [ ] Rechnung über ein Quartal, in dem der Mieter eine Position mit Menge > 0 hat → die Position erscheint als eigene Zeile mit korrektem Betrag (`Menge × Preis`).
@@ -174,7 +176,6 @@
 * **Keine Sonderbehandlung des Ladestrom-Messpunkts** in der Verteilung; er wird wie jede andere Einheit abgerechnet.
 
 ## 8. Offene Fragen
-* [ ] **Doppelverrechnungsschutz:** Soll eine Position nach dem Erstellen einer Rechnung als „verrechnet" markiert werden? Das würde ein Persistieren der Rechnung (oder zumindest eines Verrechnungsvermerks) voraussetzen — heute nicht vorhanden. Vorschlag: vorerst bewusst ohne, dafür Hinweis in der Erfassungsmaske.
 * [ ] **Schnittstelle Lademanagement:** Welches System, welches Protokoll (API/CSV/OCPP), welche Granularität (je Ladepunkt, je Nutzer, je Quartal)? Eigene Spec, sobald bekannt. Die Tarif-Auflösung ist bereits geklärt: höchstens ein gültiger `LADESTROM`-Tarif je Zeitraum, höchstens eine Position je Mieter und Quartal — damit ist die Zuordnung eindeutig. Die **Identifikation des Mieters** laeuft ueber `mieter.ladepunkt`; offen bleibt, **welche Kennung** das Lademanagement liefert (Ladepunkt-ID, RFID-Karte, Benutzerkonto) und damit, was fachlich in dieses Feld gehoert. Ebenfalls dort zu regeln: der Umgang mit bereits manuell erfassten Positionen.
 
 ### Beantwortet (in §1/§2 eingearbeitet)
@@ -185,4 +186,5 @@
 | Tarifgültigkeit vs. Quartal | Weder harte Abweisung noch Warnung: stattdessen **Eindeutigkeit** je Mieter/Quartal/Tariftyp und höchstens **ein gültiger** `LADESTROM`-Tarif je Zeitraum |
 | Tarif-Auflösung beim Import | Nur ein gültiger Tarif je Zeitraum und Mieter |
 | Zuordnung des Ladestrom-Messpunkts | Über einen **Mieter** (Eigentümer als Mieter-Datensatz) |
+| Doppelverrechnungsschutz | **Vorerst bewusst ohne.** Ein „bereits verrechnet"-Status setzte voraus, dass Rechnungen (oder ein Verrechnungsvermerk) persistiert werden — das ist heute nicht der Fall und waere ein eigenes Vorhaben. Stattdessen ein Hinweis in der Erfassungsmaske (FR-3) |
 | Ladepunkt-Kennung | Am **Mieter** (Zuordnung, mandantenweit eindeutig, hoechstens eine je Mieter) **und** an der Position (Herkunft: `erfassungsart` + `quell_referenz`) |
