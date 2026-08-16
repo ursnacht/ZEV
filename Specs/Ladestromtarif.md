@@ -18,7 +18,7 @@
 | **Tarif-Typisierung** | Neuer `TarifTyp.LADESTROM`, verwaltet in der bestehenden Tarifverwaltung. **Bewusst ein spezifischer Typ und kein generisches `ZUSATZ`:** Der spätere automatische Import aus dem Lademanagement muss die bezogenen Mengen einem Tarif zuordnen können — das geht über den **Typ** maschinell zuverlässig, über eine Bezeichnung nicht. |
 | **Datenhaltung** | **Generische** Tabelle `tarifposition` für manuell erfasste Mengen zu einem beliebigen Tarif — nicht ladestrom-spezifisch. Weitere Anwendungsfälle (Sauna, Waschküche, …) kommen ohne Schema-Änderung dazu. |
 | **Genau ein gültiger Tarif** | Je Zeitraum darf **höchstens ein** `LADESTROM`-Tarif gültig sein, und je Mieter und Quartal existiert **höchstens eine** Ladestrom-Position. Damit ist die Zuordnung beim späteren Import eindeutig. |
-| **Ladepunkt-Zuordnung** | Der Mieter traegt eine **Ladepunkt-Kennung** (Stammdaten) — daran erkennt der spaetere Import, wem eine Menge gehoert. Jeder Mieter hat **hoechstens einen** Ladepunkt. Zusaetzlich traegt jede Position ihre **Herkunft** (manuell/importiert + Quell-Referenz) als Nachweis. |
+| **Ladepunkt-Zuordnung** | Der Mieter traegt eine **Ladepunkt-Kennung** (Stammdaten) — daran erkennt der spaetere Import, wem eine Menge gehoert. Jeder Mieter hat **hoechstens einen** Ladepunkt. Zusaetzlich traegt jede Position ihre **Erfassungsart** (manuell/importiert) und die **Quell-Referenz** als Nachweis. |
 | **Mehrere Ladestationen** | Hinter einem Ladestrom-Messpunkt dürfen beliebig viele Ladestationen stehen — für ZEV ist nur die Summe am Messpunkt relevant. |
 
 ## 2. Funktionale Anforderungen (FR) - Was soll das System tun?
@@ -27,7 +27,7 @@
 1. Ein Benutzer legt in der **Tarifverwaltung** einen Tarif vom Typ **`LADESTROM`** an (Bezeichnung, Preis in CHF/kWh, Gültigkeit von/bis) — analog zu ZEV/VNB. Überschneidet sich die Gültigkeit mit einem bestehenden `LADESTROM`-Tarif, wird das **abgewiesen** (FR-2).
 2. Er öffnet die **Mieterverwaltung** und wählt beim Mieter im Kebab-Menü **„Tarifpositionen"**.
 3. Es erscheint die Liste der erfassten Positionen dieses Mieters (Tarif, Quartal, Menge, Betrag) mit *Anlegen*, *Bearbeiten* und *Löschen*.
-4. Beim Anlegen wählt er: **Tarif** (Auswahl aus den `LADESTROM`-Tarifen), **Jahr + Quartal** (Quartal-Selektor wie andernorts) und die **Menge in kWh**. Existiert für diesen Mieter, dieses Quartal und diesen **Tariftyp** bereits eine Position, wird das abgewiesen — die bestehende ist zu bearbeiten.
+4. Beim Anlegen wählt er: **Tarif** (Auswahl aus den `LADESTROM`-Tarifen), **Jahr + Quartal** (zwei einfache Dropdowns) und die **Menge in kWh**. Existiert für diesen Mieter, dieses Quartal und diesen **Tariftyp** bereits eine Position, wird das abgewiesen — die bestehende ist zu bearbeiten.
 5. Bei der **Rechnungserzeugung** für Einheit + Mieter + Zeitraum werden automatisch alle Positionen **dieses Mieters** aufgenommen, deren Quartal sich mit dem Rechnungszeitraum **überschneidet** und deren **Menge > 0** ist.
 6. Jede aufgenommene Position erscheint als **eigene Tarifzeile** (Bezeichnung des Tarifs, Quartalsgrenzen als Von/Bis, Menge in kWh, Preis, Betrag) und fliesst in Total, Rundung und Endbetrag ein. Menge und Betrag werden **wie die bestehenden ZEV-/VNB-Zeilen** gerundet dargestellt; gespeichert bleibt die Menge mit drei Nachkommastellen.
 
@@ -46,14 +46,14 @@
   | `jahr` | INT | ja | z.B. 2026 |
   | `quartal` | INT | ja | 1–4 |
   | `menge` | NUMERIC(12,3) | ja | ≥ 0. **Nicht** `menge_kwh`: die Einheit ergibt sich aus dem Tarif, damit später auch nicht-kWh-Positionen möglich sind |
-  | `quelle` | VARCHAR(10) | ja | `MANUELL` (Default) oder `IMPORT` — Herkunft der Menge |
+  | `erfassungsart` | VARCHAR(20) | ja | `MANUELL` (Default) oder `IMPORT` — Herkunft der Menge. **Nicht** `quelle`: `ch.nacht.entity.Quelle` existiert bereits (CSV/MQTT/API, `Messwerte.quelle`). Neues Enum `Erfassungsart`, `EnumType.STRING`, `length = 20` wie die bestehende Konvention |
   | `quell_referenz` | VARCHAR(64) | nein | Kennung, aus der die Menge stammt (bei Import die Ladepunkt-Kennung); bei manueller Erfassung aus dem Mieter vorbelegt |
   | `bemerkung` | VARCHAR(200) | nein | freier Text, rein informativ |
 
 * **Index:** auf (`org_id`, `mieter_id`, `jahr`, `quartal`) — deckt sowohl die Abfrage bei der Rechnungserzeugung als auch die Eindeutigkeitsprüfung ab.
 * **Eindeutigkeit je Tariftyp:** Pro (`org_id`, `mieter_id`, `jahr`, `quartal`, **Tariftyp**) ist **höchstens eine** Position zulässig. Da der Typ am Tarif hängt und nicht in der Tabelle steht, wird die Regel **im Service** geprüft; die Datenbank sichert zusätzlich UNIQUE (`org_id`, `mieter_id`, `tarif_id`, `jahr`, `quartal`) als Netz gegen exakte Duplikate.
 * **Neues Feld am Mieter:** `mieter.ladepunkt` (VARCHAR(64), optional). Es ist die **Zuordnungsgrundlage** fuer den spaeteren Import und je Mandant **eindeutig** (UNIQUE `org_id`, `ladepunkt`, sofern gesetzt) — zwei Mieter mit derselben Kennung wuerden den Import mehrdeutig machen. Nicht jeder Mieter hat einen Ladepunkt; das Feld bleibt dann leer.
-* **Herkunft je Position:** `quelle` unterscheidet manuell erfasste von importierten Mengen, `quell_referenz` haelt fest, woher eine importierte Menge stammt. Damit ist spaeter belegbar, warum eine Menge auf der Rechnung steht — bei manuell erfassten Betraegen, die direkt Geld bewegen, ist das der eigentliche Zweck.
+* **Herkunft je Position:** `erfassungsart` unterscheidet manuell erfasste von importierten Mengen, `quell_referenz` haelt fest, woher eine importierte Menge stammt. Damit ist spaeter belegbar, warum eine Menge auf der Rechnung steht — bei manuell erfassten Betraegen, die direkt Geld bewegen, ist das der eigentliche Zweck.
 * **Höchstens ein gültiger `LADESTROM`-Tarif je Zeitraum:** Diese Regel gilt **automatisch, ohne neuen Code** — `TarifService.saveTarif` prüft bereits typbezogen auf Überschneidung (`existsOverlappingTarif(tariftyp, …)`) und weist überlappende Tarife für **jeden** Typ ab. Mit dem neuen Enum-Wert greift die Prüfung ohne Zutun auch für `LADESTROM`. Damit ist der Tarif für ein Quartal eindeutig bestimmbar — Voraussetzung für den späteren automatischen Import. Das zugehörige Akzeptanzkriterium dient der **Regressionsabsicherung**, nicht der Neuentwicklung.
 * **`TarifTyp`** wird um den Wert `LADESTROM` erweitert. Die Spalte `tarif.tariftyp` ist `VARCHAR`/`EnumType.STRING` → **keine DDL-Änderung** am Tarif nötig.
 * **Zulässige Tariftypen für Positionen:** Die Prüfung erfolgt gegen eine **Menge manuell erfasster Typen** (aktuell `{ LADESTROM }`), nicht gegen einen einzelnen Wert. Ein weiterer Anwendungsfall erweitert nur diese Menge — Tabelle, Service und UI bleiben unverändert. `ZEV`, `VNB` und `GRUNDGEBUEHR` sind ausgeschlossen, da sie aus Messwerten bzw. der Laufzeit berechnet werden.
@@ -65,9 +65,11 @@
 * **Tarifpositionen** (neue, generische Ansicht, erreichbar über das Kebab-Menü des **Mieters**):
   - **Liste** (Design-System-`table`): Tarif-Bezeichnung, Jahr/Quartal, Menge (rechtsbündig `.zev-table__number`; Mengeneinheit aus dem Tarif, aktuell durchgehend kWh), Preis, Betrag, Kebab-Menü mit *Bearbeiten* / *Löschen*.
   - Die Liste weist die **Herkunft** aus (manuell/importiert); importierte Positionen sind als solche erkennbar.
-  - **Formular** (Design-System-`form`): Tarif (Dropdown), Jahr + Quartal, Menge, Bemerkung; Speichern/Abbrechen. Die Quell-Referenz wird aus dem Ladepunkt des Mieters vorbelegt und ist aenderbar. Vorlagen: `tarif-form` / `tarif-list`.
+  - **Formular** (Design-System-`form`): Tarif (Dropdown), **Jahr** und **Quartal** als je ein Dropdown, Menge, Bemerkung; Speichern/Abbrechen.
+    Bewusst **nicht** die `QuarterSelectorComponent`: Sie arbeitet mit Datumsbereichen (`@Input selectedVon/selectedBis`, `@Output {von, bis}`), die Position speichert aber `jahr` + `quartal` — eine Hin- und Rueckrechnung waere unnoetiger Umweg. Die Quell-Referenz wird aus dem Ladepunkt des Mieters vorbelegt und ist aenderbar. Vorlagen: `tarif-form` / `tarif-list`.
   - Leere Liste → Hinweis „keine Positionen erfasst" (kein leeres Tabellengerüst).
 * **Rechnung (Web + PDF):** Die Ladestrom-Zeilen erscheinen **nach** den ZEV-/VNB-Zeilen und **vor** der Grundgebühr, mit `mengeneinheit = "kWh"`. Keine strukturelle Änderung am Rechnungslayout — es kommen nur Zeilen dazu.
+* **Zahlenformatierung** nach `Specs/generell.md`: Dezimalpunkt, Hochkomma als Tausendertrennzeichen (`1'234.567`), `–` bei Fehlwerten — in Liste, Formular **und** PDF gleich.
 * Alle Texte via `TranslationService`/`TranslatePipe`, keine Hardcodings.
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
@@ -85,7 +87,7 @@
 * [ ] Positionen sind mandantengetrennt: Ein Mandant sieht ausschliesslich seine eigenen (`org_id`).
 * [ ] Am Mieter laesst sich eine **Ladepunkt-Kennung** erfassen; sie ist optional.
 * [ ] Eine Ladepunkt-Kennung, die bereits einem anderen Mieter desselben Mandanten gehoert, wird **abgewiesen** (Meldung, kein Datensatz).
-* [ ] Manuell erfasste Positionen tragen `quelle = MANUELL`; die Quell-Referenz ist aus dem Ladepunkt des Mieters vorbelegt und aenderbar.
+* [ ] Manuell erfasste Positionen tragen `erfassungsart = MANUELL`; die Quell-Referenz ist aus dem Ladepunkt des Mieters vorbelegt und aenderbar.
 * [ ] Die Liste weist die Herkunft je Position aus (manuell/importiert).
 
 ### Rechnung
@@ -117,7 +119,8 @@
 * **Nachvollziehbarkeit:** Da die Menge manuell erfasst wird und direkt Geld bewegt, ist die Bemerkung als Beleg-Hinweis vorgesehen; Änderungen an Positionen werden geloggt.
 
 ### NFR-3: Kompatibilität
-* Rein additiv: neue Tabelle, neuer Enum-Wert, zusätzliche Rechnungszeilen. Bestehende Rechnungen ohne Positionen sind **bit-identisch** zu vorher.
+* Rein additiv: neue Tabelle, neue Enums, zusätzliche Rechnungszeilen. Bestehende Rechnungen ohne Positionen sind **bit-identisch** zu vorher.
+* **Weder PDF-Template noch Web-Ansicht müssen angepasst werden:** `rechnung.jrxml` kennt nur die Felder `bezeichnung, von, bis, menge, mengeneinheit, preis, betrag` — **kein** `typ` — und rendert die Positionen damit typunabhängig; die `rechnungen`-Komponente verzweigt ebenfalls nirgends nach `TarifTyp`. Neue Zeilenarten erscheinen automatisch. Das Akzeptanzkriterium „identisch in Web und PDF" bleibt als Regressionsschutz.
 * Die Erweiterung von `TarifTyp` erfordert keine DDL an `tarif` (String-Enum), aber eine Prüfung aller Stellen, die über `TarifTyp` verzweigen (`RechnungService`, `TarifService`, Frontend-Dropdowns, PDF-Export).
 * Neue Übersetzungs-Keys via Flyway (`ON CONFLICT (key) DO NOTHING`); nächste freie Migrationsnummer zum Umsetzungszeitpunkt eruieren (aktuell wäre es `V100`).
 
@@ -145,10 +148,10 @@
   - `entity/TarifTyp.java` — neuer Wert `LADESTROM`
   - `entity/Tarifposition.java`, `repository/TarifpositionRepository.java`, `service/TarifpositionService.java`, `controller/TarifpositionController.java` (Vorlagen: `Tarif*`)
   - `dto/TarifpositionDTO.java`
-  - `entity/Mieter.java` + `dto/MieterDTO.java` — neues Feld `ladepunkt` (mandantenweit eindeutig)
+  - `entity/Erfassungsart.java` — neues Enum `{ MANUELL, IMPORT }` (Name bewusst **nicht** `Quelle`, das ist bereits vergeben)
+  - `entity/Mieter.java` — neues Feld `ladepunkt` (mandantenweit eindeutig). Ein `MieterDTO` gibt es **nicht**; `MieterController` liefert die Entity direkt — das bleibt unveraendert
   - `service/MieterService.java` — Eindeutigkeitspruefung der Ladepunkt-Kennung
   - `service/RechnungService.java` — zusätzliche Zeilen nach ZEV/VNB, vor Grundgebühr; Positionen über den Mieter der Rechnung
-  - `service/RechnungPdfService.java` / JasperReports-Template — neue Zeilen im Positionsblock (**nach jeder `.jrxml`-Änderung `mvn test -Dtest=JasperTemplateCompileTest`**)
   - Flyway: neue Tabelle + Sequenz + Index, neue Übersetzungs-Keys
 * **Betroffener Code (Frontend):**
   - `models/tarifposition.model.ts`, `services/tarifposition.service.ts`
@@ -182,4 +185,4 @@
 | Tarifgültigkeit vs. Quartal | Weder harte Abweisung noch Warnung: stattdessen **Eindeutigkeit** je Mieter/Quartal/Tariftyp und höchstens **ein gültiger** `LADESTROM`-Tarif je Zeitraum |
 | Tarif-Auflösung beim Import | Nur ein gültiger Tarif je Zeitraum und Mieter |
 | Zuordnung des Ladestrom-Messpunkts | Über einen **Mieter** (Eigentümer als Mieter-Datensatz) |
-| Ladepunkt-Kennung | Am **Mieter** (Zuordnung, mandantenweit eindeutig, hoechstens eine je Mieter) **und** an der Position (Herkunft: `quelle` + `quell_referenz`) |
+| Ladepunkt-Kennung | Am **Mieter** (Zuordnung, mandantenweit eindeutig, hoechstens eine je Mieter) **und** an der Position (Herkunft: `erfassungsart` + `quell_referenz`) |
