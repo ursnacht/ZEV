@@ -52,7 +52,7 @@ Fahre ab Abschnitt "Vorgehen" fort.
 
 ### Phase 3: Test-Erstellung
 1. Erstelle Tests für fehlende Cases (Vorlagen unten beachten)
-2. Führe Tests aus: `npm test -- <pfad/zur/xxx.spec.ts>` (Vitest, single-run; ein Datei-Pfad als Argument)
+2. Führe Tests aus: `npm test -- --include=<pfad/zur/xxx.spec.ts>` (Vitest, single-run; `--include` mehrfach angebbar). **Ohne `--include`** deutet `ng test` den Pfad als Projektnamen und bricht mit `Invalid values: Argument: project` ab.
 3. Behebe Fehler bis Tests grün sind
 4. Zum Schluss die **komplette** Suite grün laufen lassen: `npm test`
 
@@ -423,6 +423,6 @@ Nach dem Erstellen der Tests ausführen und Fehler beheben bis alle Tests grün 
 | Befehl | Beschreibung |
 |--------|--------------|
 | `npm test` | Alle Tests (Vitest, single-run, headless jsdom) |
-| `npm test -- src/app/services/tarif.service.spec.ts` | Einzelne Test-Datei (Pfad als Argument) |
+| `npm test -- --include=src/app/services/tarif.service.spec.ts` | Einzelne Test-Datei (`--include` mehrfach angebbar) |
 | `npm run test:watch` | Watch-Modus (lokale Entwicklung) |
 | `npm run test:coverage` | Mit Coverage-Report (`coverage/frontend-service`) |
