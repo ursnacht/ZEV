@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { WithMessage } from '../../utils/with-message';
 import { MieterService } from '../../services/mieter.service';
 import { EinheitService } from '../../services/einheit.service';
@@ -32,13 +33,15 @@ export class MieterListComponent extends WithMessage implements OnInit {
   menuItems: KebabMenuItem[] = [
     { label: 'BEARBEITEN', action: 'edit', icon: 'edit-2' },
     { label: 'KOPIEREN', action: 'copy', icon: 'copy' },
+    { label: 'TARIFPOSITIONEN', action: 'tarifpositionen', icon: 'zap' },
     { label: 'LOESCHEN', action: 'delete', danger: true, icon: 'trash-2' }
   ];
 
   constructor(
     private mieterService: MieterService,
     private einheitService: EinheitService,
-    private translationService: TranslationService
+    private translationService: TranslationService,
+    private router: Router
   ) { super(); }
 
   ngOnInit(): void {
@@ -116,10 +119,22 @@ export class MieterListComponent extends WithMessage implements OnInit {
       case 'copy':
         this.onCopy(mieter);
         break;
+      case 'tarifpositionen':
+        this.onTarifpositionen(mieter);
+        break;
       case 'delete':
         this.onDelete(mieter.id);
         break;
     }
+  }
+
+  /**
+   * Sprung auf die Tarifpositionen-Seite mit vorgewaehltem Mieter.
+   * Eigene Seite statt Inline-Ansicht, weil /mieter `mieter:manage` verlangt - ein `zev_user`
+   * darf Positionen erfassen, kaeme hier aber gar nicht her.
+   */
+  onTarifpositionen(mieter: Mieter): void {
+    this.router.navigate(['/tarifpositionen'], { queryParams: { mieterId: mieter.id } });
   }
 
   onFormSubmit(mieter: Mieter): void {

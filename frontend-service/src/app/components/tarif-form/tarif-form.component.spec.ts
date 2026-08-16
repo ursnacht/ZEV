@@ -62,11 +62,12 @@ describe('TarifFormComponent', () => {
       expect(component.formData.gueltigBis).toBe('2024-12-31');
     });
 
-    it('should have three tarif type options', () => {
-      expect(component.tarifTypOptions.length).toBe(3);
+    it('should have four tarif type options', () => {
+      expect(component.tarifTypOptions.length).toBe(4);
       expect(component.tarifTypOptions[0].value).toBe(TarifTyp.ZEV);
       expect(component.tarifTypOptions[1].value).toBe(TarifTyp.VNB);
       expect(component.tarifTypOptions[2].value).toBe(TarifTyp.GRUNDGEBUEHR);
+      expect(component.tarifTypOptions[3].value).toBe(TarifTyp.LADESTROM);
     });
 
     it('should default produzentVerrechnen to false', () => {

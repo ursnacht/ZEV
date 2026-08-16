@@ -80,11 +80,12 @@ describe('MieterListComponent', () => {
       expect(component.sortDirection).toBe('asc');
     });
 
-    it('should have menu items for edit, copy and delete', () => {
-      expect(component.menuItems.length).toBe(3);
+    it('should have menu items for edit, copy, tarifpositionen and delete', () => {
+      expect(component.menuItems.length).toBe(4);
       expect(component.menuItems[0].action).toBe('edit');
       expect(component.menuItems[1].action).toBe('copy');
-      expect(component.menuItems[2].action).toBe('delete');
+      expect(component.menuItems[2].action).toBe('tarifpositionen');
+      expect(component.menuItems[3].action).toBe('delete');
     });
   });
 

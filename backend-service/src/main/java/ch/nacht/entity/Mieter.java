@@ -55,6 +55,15 @@ public class Mieter {
     @Column(name = "einheit_id", nullable = false)
     private Long einheitId;
 
+    /**
+     * Ladepunkt-Kennung des Mieters — Zuordnungsgrundlage für den späteren automatischen Import
+     * aus dem Lademanagement. Optional; falls gesetzt, mandantenweit eindeutig (sonst wäre die
+     * Zuordnung einer importierten Menge mehrdeutig).
+     */
+    @Size(max = 64, message = "Ladepunkt must not exceed 64 characters")
+    @Column(name = "ladepunkt", length = 64)
+    private String ladepunkt;
+
     public Mieter() {
     }
 
@@ -134,6 +143,14 @@ public class Mieter {
 
     public void setEinheitId(Long einheitId) {
         this.einheitId = einheitId;
+    }
+
+    public String getLadepunkt() {
+        return ladepunkt;
+    }
+
+    public void setLadepunkt(String ladepunkt) {
+        this.ladepunkt = ladepunkt;
     }
 
     @Override

@@ -1,0 +1,127 @@
+<div class="zev-container">
+  <h1><app-icon name="zap" size="lg"></app-icon> {{ 'TARIFPOSITIONEN_VERWALTUNG' | translate }}</h1>
+
+  @if (message) {
+    <div class="zev-message" [ngClass]="'zev-message--' + messageType"
+      [class.zev-message--dismissible]="messagePersistent" (click)="messagePersistent && dismissMessage()">
+      <span>{{ message | translate }}</span>
+      @if (messagePersistent) {
+        <span class="zev-message__dismiss">&times;</span>
+      }
+    </div>
+  }
+
+  <!-- Positionen werden bei JEDER Rechnungserstellung erneut aufgenommen; es gibt bewusst
+       keinen "bereits verrechnet"-Status (Rechnungen werden nicht persistiert). -->
+  @if (hinweisSichtbar) {
+    <div class="zev-message zev-message--info zev-message--statisch zev-message--dismissible"
+      (click)="dismissHinweis()">
+      <span>{{ 'TARIFPOSITION_MEHRFACHVERRECHNUNG_HINWEIS' | translate }}</span>
+      <span class="zev-message__dismiss">&times;</span>
+    </div>
+  }
+
+  <div class="zev-form-group">
+    <label for="mieterAuswahl">{{ 'MIETER' | translate }}:</label>
+    <select id="mieterAuswahl" class="zev-input" name="mieterAuswahl"
+      [(ngModel)]="selectedMieterId" (ngModelChange)="onMieterChange()">
+      <option [ngValue]="null">{{ 'MIETER_WAEHLEN' | translate }}</option>
+      @for (m of mieterListe; track m.id) {
+        <option [ngValue]="m.id">{{ m.name }}</option>
+      }
+    </select>
+  </div>
+
+  @if (selectedMieterId) {
+    @if (!showForm) {
+      <div>
+        <div class="zev-button-row">
+          <button class="zev-button zev-button--primary" (click)="onCreateNew()">
+            <app-icon name="plus"></app-icon>
+            {{ 'NEUE_TARIFPOSITION_ERSTELLEN' | translate }}
+          </button>
+        </div>
+
+        @if (positionen.length > 0) {
+          <table class="zev-table" appColumnResize>
+            <thead>
+              <tr>
+                <th class="zev-table__header--sortable" (click)="onSort('tarifBezeichnung')">
+                  {{ 'TARIF' | translate }}
+                  @if (sortColumn === 'tarifBezeichnung') {
+                    <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+                  }
+                </th>
+                <th class="zev-table__header--sortable" (click)="onSort('quartal')">
+                  {{ 'QUARTAL' | translate }}
+                  @if (sortColumn === 'quartal') {
+                    <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+                  }
+                </th>
+                <th class="zev-table__number zev-table__header--sortable" (click)="onSort('menge')">
+                  {{ 'MENGE' | translate }} (kWh)
+                  @if (sortColumn === 'menge') {
+                    <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+                  }
+                </th>
+                <th class="zev-table__number zev-table__header--sortable" (click)="onSort('tarifPreis')">
+                  {{ 'PREIS' | translate }}
+                  @if (sortColumn === 'tarifPreis') {
+                    <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+                  }
+                </th>
+                <th class="zev-table__number zev-table__header--sortable" (click)="onSort('betrag')">
+                  {{ 'BETRAG' | translate }}
+                  @if (sortColumn === 'betrag') {
+                    <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+                  }
+                </th>
+                <th class="zev-table__header--sortable" (click)="onSort('erfassungsart')">
+                  {{ 'HERKUNFT' | translate }}
+                  @if (sortColumn === 'erfassungsart') {
+                    <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+                  }
+                </th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (position of positionen; track position.id) {
+                <tr>
+                  <td>{{ position.tarifBezeichnung }}</td>
+                  <td>Q{{ position.quartal }}/{{ position.jahr }}</td>
+                  <td class="zev-table__number">{{ position.menge | swissNumber:3 }}</td>
+                  <td class="zev-table__number">{{ position.tarifPreis | swissNumber:5 }}</td>
+                  <td class="zev-table__number">{{ berechneBetrag(position) | swissNumber:2 }}</td>
+                  <td>
+                    {{ (position.erfassungsart === Erfassungsart.IMPORT
+                        ? 'ERFASSUNGSART_IMPORT' : 'ERFASSUNGSART_MANUELL') | translate }}
+                    @if (position.quellReferenz) {
+                      <span class="zev-text--muted"> ({{ position.quellReferenz }})</span>
+                    }
+                  </td>
+                  <td>
+                    <app-kebab-menu [items]="menuItems"
+                      (itemClick)="onMenuAction($event, position)">
+                    </app-kebab-menu>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        } @else {
+          <p class="zev-text--muted">{{ 'KEINE_TARIFPOSITIONEN' | translate }}</p>
+        }
+      </div>
+    } @else {
+      <app-tarifposition-form
+        [position]="selectedPosition"
+        [mieterId]="selectedMieterId"
+        [tarife]="tarife"
+        [ladepunkt]="selectedMieterLadepunkt"
+        (save)="onFormSubmit($event)"
+        (cancel)="onFormCancel()">
+      </app-tarifposition-form>
+    }
+  }
+</div>

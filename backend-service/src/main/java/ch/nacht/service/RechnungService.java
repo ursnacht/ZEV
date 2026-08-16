@@ -9,6 +9,7 @@ import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Mieter;
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
+import ch.nacht.entity.Tarifposition;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
 import org.slf4j.Logger;
@@ -35,6 +36,7 @@ public class RechnungService {
     private final EinstellungenService einstellungenService;
     private final TarifService tarifService;
     private final MieterService mieterService;
+    private final TarifpositionService tarifpositionService;
     private final HibernateFilterService hibernateFilterService;
 
     public RechnungService(EinheitRepository einheitRepository,
@@ -42,12 +44,14 @@ public class RechnungService {
                            EinstellungenService einstellungenService,
                            TarifService tarifService,
                            MieterService mieterService,
+                           TarifpositionService tarifpositionService,
                            HibernateFilterService hibernateFilterService) {
         this.einheitRepository = einheitRepository;
         this.messwerteRepository = messwerteRepository;
         this.einstellungenService = einstellungenService;
         this.tarifService = tarifService;
         this.mieterService = mieterService;
+        this.tarifpositionService = tarifpositionService;
         this.hibernateFilterService = hibernateFilterService;
     }
 
@@ -172,6 +176,9 @@ public class RechnungService {
         // Calculate VNB tariff lines (based on total - zevCalculated measurements)
         totalBetrag += berechneTarifZeilen(rechnung, einheit, von, bis, vnbTarife, TarifTyp.VNB);
 
+        // Manually captured positions (Ladestrom etc.) - after ZEV/VNB, before GRUNDGEBUEHR
+        totalBetrag += berechneTarifpositionsZeilen(rechnung, mieter, von, bis);
+
         // Calculate GRUNDGEBUEHR lines (optional - no error if no tariff found)
         List<Tarif> grundgebuehrTarife = tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis);
         if (!grundgebuehrTarife.isEmpty()) {
@@ -251,6 +258,71 @@ public class RechnungService {
      * @param tarife List of applicable GRUNDGEBUEHR tariffs
      * @return Total amount for all GRUNDGEBUEHR lines
      */
+    /**
+     * Add one line per manually captured tariff position of the tenant.
+     *
+     * <p>A position is included when its quarter <b>overlaps</b> the billing period — not only
+     * when the quarter lies fully inside it. Reason: a tenant moving out mid-quarter is billed
+     * for a partial period only, and with the stricter rule their position would never appear.
+     * Double billing cannot arise because each position belongs to exactly one tenant.
+     *
+     * @param rechnung Invoice to add the lines to
+     * @param mieter Tenant (may be null for vacant units - then there are no positions)
+     * @param von Period start (inclusive)
+     * @param bis Period end (inclusive)
+     * @return Sum of the added line amounts
+     */
+    private double berechneTarifpositionsZeilen(RechnungDTO rechnung, Mieter mieter,
+                                                LocalDate von, LocalDate bis) {
+        if (mieter == null) {
+            return 0.0;
+        }
+
+        double total = 0.0;
+        for (Tarifposition position : tarifpositionService.getFuerRechnung(mieter.getId(), von, bis)) {
+            // Same rounding as the ZEV/VNB lines, so an invoice does not mix conventions.
+            double menge = Math.round(position.getMenge().doubleValue());
+            double preis = position.getTarif().getPreis().doubleValue();
+            double betrag = menge * preis;
+
+            rechnung.addTarifZeile(new TarifZeileDTO(
+                    bezeichnungMitQuellReferenz(position),
+                    TarifpositionService.quartalBeginn(position.getJahr(), position.getQuartal()),
+                    TarifpositionService.quartalEnde(position.getJahr(), position.getQuartal()),
+                    menge,
+                    preis,
+                    betrag,
+                    position.getTarif().getTariftyp(),
+                    "KWH"
+            ));
+            total += betrag;
+
+            log.debug("Tarifposition line (Q{}/{}): {} * {} = {} CHF",
+                    position.getQuartal(), position.getJahr(), menge, preis, betrag);
+        }
+        return total;
+    }
+
+    /**
+     * Bezeichnung der Rechnungszeile, ergaenzt um die Quell-Referenz der Position (z.B. die
+     * Ladepunkt-Kennung), sofern erfasst: {@code "Ladestrom (LP-01)"}.
+     *
+     * <p>Bewusst im bestehenden Bezeichnungsfeld statt als eigene Spalte: {@code rechnung.jrxml}
+     * kennt nur die Felder bezeichnung/von/bis/menge/mengeneinheit/preis/betrag. So erscheint die
+     * Angabe ohne Layoutaenderung in Web und PDF identisch.
+     *
+     * @param position Tarifposition
+     * @return Bezeichnung mit Quell-Referenz in Klammern, sonst die Bezeichnung allein
+     */
+    private String bezeichnungMitQuellReferenz(Tarifposition position) {
+        String bezeichnung = position.getTarif().getBezeichnung();
+        String quellReferenz = position.getQuellReferenz();
+        if (quellReferenz == null || quellReferenz.isBlank()) {
+            return bezeichnung;
+        }
+        return bezeichnung + " (" + quellReferenz.trim() + ")";
+    }
+
     private double berechneGrundgebuehrZeilen(RechnungDTO rechnung, LocalDate von, LocalDate bis,
                                                List<Tarif> tarife) {
         double total = 0.0;

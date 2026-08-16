@@ -1,0 +1,301 @@
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
+import { TarifpositionService } from '../../services/tarifposition.service';
+import { TarifService } from '../../services/tarif.service';
+import { MieterService } from '../../services/mieter.service';
+import { TranslationService } from '../../services/translation.service';
+import { Tarifposition, Erfassungsart } from '../../models/tarifposition.model';
+import { Tarif, TarifTyp, MANUELL_ERFASSTE_TARIFTYPEN } from '../../models/tarif.model';
+import { Mieter } from '../../models/mieter.model';
+import { TarifpositionFormComponent } from '../tarifposition-form/tarifposition-form.component';
+import { TranslatePipe } from '../../pipes/translate.pipe';
+import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.component';
+import { ColumnResizeDirective } from '../../directives/column-resize.directive';
+import { SwissNumberPipe } from '../../pipes/swiss-number.pipe';
+import { IconComponent } from '../icon/icon.component';
+
+/** Sortierbare Spalten der Positionsliste. `betrag` ist berechnet, `quartal` umfasst Jahr + Quartal. */
+export type TarifpositionSortColumn =
+  'tarifBezeichnung' | 'quartal' | 'menge' | 'tarifPreis' | 'betrag' | 'erfassungsart';
+
+/**
+ * Erfassung manuell gepflegter Tarifpositionen je Mieter und Quartal (aktuell Ladestrom).
+ *
+ * Eigene Seite statt nur eines Kebab-Eintrags beim Mieter: Die Route /mieter verlangt
+ * `mieter:manage`, das ein `zev_user` nicht hat — er käme sonst gar nicht bis zur Erfassung.
+ */
+@Component({
+  selector: 'app-tarifposition-list',
+  standalone: true,
+  imports: [CommonModule, FormsModule, TarifpositionFormComponent, TranslatePipe, SwissNumberPipe,
+    KebabMenuComponent, ColumnResizeDirective, IconComponent],
+  templateUrl: './tarifposition-list.component.html',
+  styleUrls: ['./tarifposition-list.component.css']
+})
+export class TarifpositionListComponent implements OnInit {
+  /** Merker für den weggeklickten Mehrfachverrechnungs-Hinweis (rein lokal, kein Backend). */
+  private static readonly HINWEIS_STORAGE_KEY = 'zev.tarifposition.hinweisAusgeblendet';
+
+  mieterListe: Mieter[] = [];
+  selectedMieterId: number | null = null;
+  positionen: Tarifposition[] = [];
+  tarife: Tarif[] = [];
+  selectedPosition: Tarifposition | null = null;
+  showForm = false;
+  message = '';
+  messageType: 'success' | 'error' = 'success';
+  messagePersistent = false;
+  hinweisSichtbar = true;
+  // Startwert entspricht der Reihenfolge, in der das Backend liefert (neuestes Quartal zuerst)
+  sortColumn: TarifpositionSortColumn | null = 'quartal';
+  sortDirection: 'asc' | 'desc' = 'desc';
+
+  readonly Erfassungsart = Erfassungsart;
+
+  menuItems: KebabMenuItem[] = [
+    { label: 'BEARBEITEN', action: 'edit', icon: 'edit-2' },
+    { label: 'KOPIEREN', action: 'copy', icon: 'copy' },
+    { label: 'LOESCHEN', action: 'delete', danger: true, icon: 'trash-2' }
+  ];
+
+  constructor(
+    private tarifpositionService: TarifpositionService,
+    private tarifService: TarifService,
+    private mieterService: MieterService,
+    private translationService: TranslationService,
+    private route: ActivatedRoute
+  ) { }
+
+  ngOnInit(): void {
+    this.hinweisSichtbar = !this.leseHinweisAusgeblendet();
+    this.loadMieter();
+    this.loadTarife();
+  }
+
+  /**
+   * Blendet den Mehrfachverrechnungs-Hinweis dauerhaft aus (pro Browser).
+   * Der Hinweis ist eine einmalige Erklärung, keine Fehlermeldung – er muss nicht bei jedem
+   * Seitenaufruf erneut weggeklickt werden.
+   */
+  dismissHinweis(): void {
+    this.hinweisSichtbar = false;
+    try {
+      localStorage.setItem(TarifpositionListComponent.HINWEIS_STORAGE_KEY, 'true');
+    } catch {
+      // localStorage nicht verfügbar – der Hinweis erscheint dann beim nächsten Aufruf erneut
+    }
+  }
+
+  private leseHinweisAusgeblendet(): boolean {
+    try {
+      return localStorage.getItem(TarifpositionListComponent.HINWEIS_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  loadMieter(): void {
+    this.mieterService.getAllMieter().subscribe({
+      next: (data) => {
+        this.mieterListe = [...data].sort((a, b) => a.name.localeCompare(b.name));
+        // Vorauswahl aus dem Kebab-Sprung der Mieterverwaltung (?mieterId=…)
+        const param = this.route.snapshot.queryParamMap.get('mieterId');
+        const vorauswahl = param ? Number(param) : null;
+        if (vorauswahl && this.mieterListe.some(m => m.id === vorauswahl)) {
+          this.selectedMieterId = vorauswahl;
+          this.loadPositionen();
+        }
+      },
+      error: () => this.showMessage('FEHLER_LADEN_MIETER', 'error')
+    });
+  }
+
+  loadTarife(): void {
+    this.tarifService.getAllTarife().subscribe({
+      next: (data) => {
+        this.tarife = data.filter(t => MANUELL_ERFASSTE_TARIFTYPEN.includes(t.tariftyp as TarifTyp));
+      },
+      error: () => this.showMessage('FEHLER_LADEN_TARIFE', 'error')
+    });
+  }
+
+  loadPositionen(): void {
+    if (!this.selectedMieterId) {
+      this.positionen = [];
+      return;
+    }
+    this.tarifpositionService.getByMieter(this.selectedMieterId).subscribe({
+      next: (data) => {
+        this.positionen = data;
+        this.sortiere();
+      },
+      error: () => this.showMessage('FEHLER_LADEN_TARIFPOSITIONEN', 'error')
+    });
+  }
+
+  onMieterChange(): void {
+    this.showForm = false;
+    this.selectedPosition = null;
+    this.dismissMessage();
+    this.loadPositionen();
+  }
+
+  onCreateNew(): void {
+    this.selectedPosition = null;
+    this.showForm = true;
+  }
+
+  onEdit(position: Tarifposition): void {
+    this.selectedPosition = { ...position };
+    this.showForm = true;
+  }
+
+  /**
+   * Öffnet das Formular mit den Werten der Position, aber ohne ID – gespeichert wird eine neue
+   * Position. Jahr/Quartal bleiben bewusst unverändert (analog Tarife): Da je Mieter, Quartal und
+   * Tariftyp nur eine Position zulässig ist, muss der Zeitraum ohnehin bewusst gewählt werden;
+   * eine unveränderte Kopie weist der Server mit der Duplikat-Meldung ab.
+   */
+  onCopy(position: Tarifposition): void {
+    const { id, ...positionOhneId } = position;
+    this.selectedPosition = { ...positionOhneId } as Tarifposition;
+    this.showForm = true;
+  }
+
+  onDelete(id: number | undefined): void {
+    if (!id) return;
+
+    if (confirm(this.translationService.translate('CONFIRM_DELETE_TARIFPOSITION'))) {
+      this.tarifpositionService.deleteTarifposition(id).subscribe({
+        next: () => {
+          this.showMessage('TARIFPOSITION_GELOESCHT', 'success');
+          this.loadPositionen();
+        },
+        error: (error) => this.showMessage(error.error || 'FEHLER_LOESCHEN_TARIFPOSITION', 'error')
+      });
+    }
+  }
+
+  onMenuAction(action: string, position: Tarifposition): void {
+    switch (action) {
+      case 'edit':
+        this.onEdit(position);
+        break;
+      case 'copy':
+        this.onCopy(position);
+        break;
+      case 'delete':
+        this.onDelete(position.id);
+        break;
+    }
+  }
+
+  onFormSubmit(position: Tarifposition): void {
+    if (position.id) {
+      this.tarifpositionService.updateTarifposition(position.id, position).subscribe({
+        next: () => {
+          this.showMessage('TARIFPOSITION_AKTUALISIERT', 'success');
+          this.showForm = false;
+          this.loadPositionen();
+        },
+        error: (error) => this.showMessage(error.error || 'FEHLER_AKTUALISIEREN_TARIFPOSITION', 'error')
+      });
+    } else {
+      this.tarifpositionService.createTarifposition(position).subscribe({
+        next: () => {
+          this.showMessage('TARIFPOSITION_ERSTELLT', 'success');
+          this.showForm = false;
+          this.loadPositionen();
+        },
+        error: (error) => this.showMessage(error.error || 'FEHLER_ERSTELLEN_TARIFPOSITION', 'error')
+      });
+    }
+  }
+
+  onFormCancel(): void {
+    this.showForm = false;
+    this.selectedPosition = null;
+  }
+
+  onSort(column: TarifpositionSortColumn): void {
+    if (this.sortColumn === column) {
+      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortColumn = column;
+      this.sortDirection = 'asc';
+    }
+    this.sortiere();
+  }
+
+  /**
+   * Sortiert die geladenen Positionen nach der aktuellen Spalte. Wird auch nach jedem Neuladen
+   * aufgerufen, damit eine gewählte Sortierung das Erfassen oder Löschen einer Position überlebt.
+   */
+  private sortiere(): void {
+    const column = this.sortColumn;
+    if (!column) {
+      return;
+    }
+    this.positionen.sort((a, b) => {
+      let aValue = this.sortWert(a, column);
+      let bValue = this.sortWert(b, column);
+
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+
+      if (aValue < bValue) {
+        return this.sortDirection === 'asc' ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return this.sortDirection === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+  }
+
+  private sortWert(position: Tarifposition, column: TarifpositionSortColumn): string | number | undefined {
+    switch (column) {
+      // Jahr und Quartal stehen in einer Spalte - zusammengesetzt sortieren, sonst landete
+      // Q1/2027 vor Q4/2026
+      case 'quartal':
+        return (position.jahr ?? 0) * 4 + (position.quartal ?? 0);
+      case 'betrag':
+        return this.berechneBetrag(position);
+      default:
+        return position[column];
+    }
+  }
+
+  /** Ladepunkt des gewählten Mieters – wird im Formular als Quell-Referenz vorbelegt. */
+  get selectedMieterLadepunkt(): string {
+    return this.mieterListe.find(m => m.id === this.selectedMieterId)?.ladepunkt ?? '';
+  }
+
+  berechneBetrag(position: Tarifposition): number {
+    return (position.menge ?? 0) * (position.tarifPreis ?? 0);
+  }
+
+  dismissMessage(): void {
+    this.message = '';
+    this.messagePersistent = false;
+  }
+
+  private showMessage(message: string, type: 'success' | 'error', persistent?: boolean): void {
+    this.message = message;
+    this.messageType = type;
+    const isPersistent = persistent !== undefined ? persistent : type === 'error';
+    this.messagePersistent = isPersistent;
+    if (!isPersistent) {
+      setTimeout(() => {
+        this.message = '';
+      }, 5000);
+    }
+  }
+}

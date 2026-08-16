@@ -45,6 +45,13 @@
         </a>
       </li>
       <li>
+        <a routerLink="/tarifpositionen" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
+          (click)="closeMenu()">
+          <app-icon name="zap"></app-icon>
+          {{ 'TARIFPOSITIONEN' | translate }}
+        </a>
+      </li>
+      <li>
         <a routerLink="/rechnungen" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
           <app-icon name="file-text"></app-icon>

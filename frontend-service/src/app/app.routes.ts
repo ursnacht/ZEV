@@ -8,6 +8,7 @@ import { StatistikComponent } from './components/statistik/statistik.component';
 import { RechnungenComponent } from './components/rechnungen/rechnungen.component';
 import { TarifListComponent } from './components/tarif-list/tarif-list.component';
 import { MieterListComponent } from './components/mieter-list/mieter-list.component';
+import { TarifpositionListComponent } from './components/tarifposition-list/tarifposition-list.component';
 import { EinstellungenComponent } from './components/einstellungen/einstellungen.component';
 import { DesignSystemShowcaseComponent } from './components/design-system-showcase/design-system-showcase.component';
 import { LizenzenComponent } from './components/lizenzen/lizenzen.component';
@@ -31,6 +32,7 @@ export const routes: Routes = [
   { path: 'debitoren', component: DebitorkontrolleListComponent, canActivate: [AuthGuard], data: { permissions: ['debitoren:manage'] } },
   { path: 'tarife', component: TarifListComponent, canActivate: [AuthGuard], data: { permissions: ['tarife:manage'] } },
   { path: 'mieter', component: MieterListComponent, canActivate: [AuthGuard], data: { permissions: ['mieter:manage'] } },
+  { path: 'tarifpositionen', component: TarifpositionListComponent, canActivate: [AuthGuard], data: { permissions: ['rechnungen:manage'] } },
   { path: 'design-system', component: DesignSystemShowcaseComponent, canActivate: [AuthGuard] },
   { path: 'einstellungen', component: EinstellungenComponent, canActivate: [AuthGuard], data: { permissions: ['einstellungen:write'] } },
   { path: 'translations', component: TranslationEditorComponent, canActivate: [AuthGuard], data: { permissions: ['translations:manage'] } },

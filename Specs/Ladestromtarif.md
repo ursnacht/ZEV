@@ -29,7 +29,7 @@
 3. Es erscheint die Liste der erfassten Positionen dieses Mieters (Tarif, Quartal, Menge, Betrag) mit *Anlegen*, *Bearbeiten* und *Löschen*.
 4. Beim Anlegen wählt er: **Tarif** (Auswahl aus den `LADESTROM`-Tarifen), **Jahr + Quartal** (zwei einfache Dropdowns) und die **Menge in kWh**. Existiert für diesen Mieter, dieses Quartal und diesen **Tariftyp** bereits eine Position, wird das abgewiesen — die bestehende ist zu bearbeiten.
 5. Bei der **Rechnungserzeugung** für Einheit + Mieter + Zeitraum werden automatisch alle Positionen **dieses Mieters** aufgenommen, deren Quartal sich mit dem Rechnungszeitraum **überschneidet** und deren **Menge > 0** ist.
-6. Jede aufgenommene Position erscheint als **eigene Tarifzeile** (Bezeichnung des Tarifs, Quartalsgrenzen als Von/Bis, Menge in kWh, Preis, Betrag) und fliesst in Total, Rundung und Endbetrag ein. Menge und Betrag werden **wie die bestehenden ZEV-/VNB-Zeilen** gerundet dargestellt; gespeichert bleibt die Menge mit drei Nachkommastellen.
+6. Jede aufgenommene Position erscheint als **eigene Tarifzeile** (Bezeichnung des Tarifs, Quartalsgrenzen als Von/Bis, Menge in kWh, Preis, Betrag) und fliesst in Total, Rundung und Endbetrag ein. Ist an der Position eine **Quell-Referenz** erfasst, steht sie in der Bezeichnung in Klammern dahinter (`Ladestrom (LP-01)`) — damit ist auf der Rechnung nachvollziehbar, aus welchem Ladepunkt die Menge stammt. Ohne Quell-Referenz bleibt die Bezeichnung unverändert. Menge und Betrag werden **wie die bestehenden ZEV-/VNB-Zeilen** gerundet dargestellt; gespeichert bleibt die Menge mit drei Nachkommastellen.
 
 > **Warum Überschneidung und nicht „Quartal vollständig im Zeitraum"?** Das folgt zwingend aus dem Anker am Mieter: Zieht ein Mieter Mitte Quartal aus, deckt **seine** Rechnung nur einen Teil des Quartals ab. Bei der strengeren Regel würde seine Position nie verrechnet. Doppelverrechnung entsteht dadurch nicht, weil jede Position genau **einem** Mieter gehört und ein Mieter je Zeitraum einmal abgerechnet wird — offen bleibt nur der allgemeine Fall zweier überlappender Rechnungsläufe für denselben Mieter (§8).
 
@@ -55,7 +55,7 @@
 * **Neues Feld am Mieter:** `mieter.ladepunkt` (VARCHAR(64), optional). Es ist die **Zuordnungsgrundlage** fuer den spaeteren Import und je Mandant **eindeutig** (UNIQUE `org_id`, `ladepunkt`, sofern gesetzt) — zwei Mieter mit derselben Kennung wuerden den Import mehrdeutig machen. Nicht jeder Mieter hat einen Ladepunkt; das Feld bleibt dann leer.
 * **Herkunft je Position:** `erfassungsart` unterscheidet manuell erfasste von importierten Mengen, `quell_referenz` haelt fest, woher eine importierte Menge stammt. Damit ist spaeter belegbar, warum eine Menge auf der Rechnung steht — bei manuell erfassten Betraegen, die direkt Geld bewegen, ist das der eigentliche Zweck.
 * **Höchstens ein gültiger `LADESTROM`-Tarif je Zeitraum:** Diese Regel gilt **automatisch, ohne neuen Code** — `TarifService.saveTarif` prüft bereits typbezogen auf Überschneidung (`existsOverlappingTarif(tariftyp, …)`) und weist überlappende Tarife für **jeden** Typ ab. Mit dem neuen Enum-Wert greift die Prüfung ohne Zutun auch für `LADESTROM`. Damit ist der Tarif für ein Quartal eindeutig bestimmbar — Voraussetzung für den späteren automatischen Import. Das zugehörige Akzeptanzkriterium dient der **Regressionsabsicherung**, nicht der Neuentwicklung.
-* **`TarifTyp`** wird um den Wert `LADESTROM` erweitert. Die Spalte `tarif.tariftyp` ist `VARCHAR`/`EnumType.STRING` → **keine DDL-Änderung** am Tarif nötig.
+* **`TarifTyp`** wird um den Wert `LADESTROM` erweitert. Die Spalte `tarif.tariftyp` ist zwar `VARCHAR(20)`/`EnumType.STRING` (keine Typänderung nötig), trägt aber den CHECK-Constraint `tarif_tariftyp_check`, der die erlaubten Werte **explizit aufzählt** (zuletzt gesetzt in `V50`). Er **muss** um `LADESTROM` erweitert werden, sonst scheitert das Anlegen eines Ladestromtarifs mit `DataIntegrityViolationException`.
 * **Zulässige Tariftypen für Positionen:** Die Prüfung erfolgt gegen eine **Menge manuell erfasster Typen** (aktuell `{ LADESTROM }`), nicht gegen einen einzelnen Wert. Ein weiterer Anwendungsfall erweitert nur diese Menge — Tabelle, Service und UI bleiben unverändert. `ZEV`, `VNB` und `GRUNDGEBUEHR` sind ausgeschlossen, da sie aus Messwerten bzw. der Laufzeit berechnet werden.
 * Rechnungen bleiben **unpersistiert**; die Tarifpositionen sind die einzige neue dauerhafte Datenhaltung.
 
@@ -63,13 +63,16 @@
 * **Mieterverwaltung:** Das Mieter-Formular erhaelt das optionale Feld **Ladepunkt**.
 * **Tarifverwaltung:** Der Typ `LADESTROM` erscheint im bestehenden Typ-Dropdown; bei überlappender Gültigkeit erscheint eine verständliche Fehlermeldung. Sonst keine Änderung an der Maske.
 * **Tarifpositionen** (neue, generische Ansicht, erreichbar über das Kebab-Menü des **Mieters**):
-  - **Liste** (Design-System-`table`): Tarif-Bezeichnung, Jahr/Quartal, Menge (rechtsbündig `.zev-table__number`; Mengeneinheit aus dem Tarif, aktuell durchgehend kWh), Preis, Betrag, Kebab-Menü mit *Bearbeiten* / *Löschen*.
+  - **Liste** (Design-System-`table`): Tarif-Bezeichnung, Jahr/Quartal, Menge (rechtsbündig `.zev-table__number`; Mengeneinheit aus dem Tarif, aktuell durchgehend kWh), Preis, Betrag, Kebab-Menü mit *Bearbeiten* / *Kopieren* / *Löschen*.
+  - **Kopieren** (analog Tarifverwaltung): öffnet das Formular mit allen Werten der Position, aber **ohne ID** — gespeichert wird eine neue Position. Jahr und Quartal werden **nicht** automatisch weitergeschaltet; da je Mieter, Quartal und Tariftyp nur **eine** Position zulässig ist (FR-1.3), muss der Zeitraum bewusst gewählt werden. Eine unverändert gespeicherte Kopie wird mit der Duplikat-Meldung abgewiesen — das ist die gewollte Absicherung, kein Fehler.
+  - Die Liste verhält sich wie die übrigen Verwaltungstabellen (Tarife, Einheiten, Mieter): **sortierbar** über alle Datenspalten (`.zev-table__header--sortable` + `.zev-table__sort-indicator`) und mit **veränderbarer Spaltenbreite** (`appColumnResize`). Die Spalte Quartal sortiert nach Jahr **und** Quartal zusammen, die Spalte Betrag nach dem berechneten Wert. Eine gewählte Sortierung bleibt nach Erfassen, Ändern und Löschen erhalten.
   - Die Liste weist die **Herkunft** aus (manuell/importiert); importierte Positionen sind als solche erkennbar.
   - **Formular** (Design-System-`form`): Tarif (Dropdown), **Jahr** und **Quartal** als je ein Dropdown, Menge, Bemerkung; Speichern/Abbrechen.
     Bewusst **nicht** die `QuarterSelectorComponent`: Sie arbeitet mit Datumsbereichen (`@Input selectedVon/selectedBis`, `@Output {von, bis}`), die Position speichert aber `jahr` + `quartal` — eine Hin- und Rueckrechnung waere unnoetiger Umweg. Die Quell-Referenz wird aus dem Ladepunkt des Mieters vorbelegt und ist aenderbar. Vorlagen: `tarif-form` / `tarif-list`.
   - Leere Liste → Hinweis „keine Positionen erfasst" (kein leeres Tabellengerüst).
-  - **Dauerhafter Hinweis** in der Ansicht: Positionen werden bei **jeder** Rechnungserstellung erneut aufgenommen — es gibt keinen „bereits verrechnet"-Status. Gegenmassnahme ist organisatorisch (Rechnungen je Zeitraum nur einmal erstellen), nicht technisch.
+  - **Hinweis** in der Ansicht: Positionen werden bei **jeder** Rechnungserstellung erneut aufgenommen — es gibt keinen „bereits verrechnet"-Status. Gegenmassnahme ist organisatorisch (Rechnungen je Zeitraum nur einmal erstellen), nicht technisch. Der Hinweis steht **im Textfluss** (nicht als Overlay, das sonst mit den Erfolgs-/Fehlermeldungen kollidiert) und ist **wegklickbar**; die Entscheidung wird pro Browser in `localStorage` gemerkt, weil er einmalig erklärt und nicht bei jedem Seitenaufruf erneut weggeklickt werden soll.
 * **Rechnung (Web + PDF):** Die Ladestrom-Zeilen erscheinen **nach** den ZEV-/VNB-Zeilen und **vor** der Grundgebühr, mit `mengeneinheit = "kWh"`. Keine strukturelle Änderung am Rechnungslayout — es kommen nur Zeilen dazu.
+  - Die **Quell-Referenz** wird in das bestehende Feld `bezeichnung` eingebettet (`Ladestrom (LP-01)`), **nicht** als eigene Spalte: `rechnung.jrxml` kennt nur `bezeichnung/von/bis/menge/mengeneinheit/preis/betrag`, eine neue Spalte hiesse Template- und Layoutänderung für eine Angabe, die nur eine Zeilenart betrifft. Das Template hängt den Zeitraum bereits selbst in Klammern an, die Zeile lautet also `Ladestrom (LP-01) (01.07.2026 - 30.09.2026)`.
 * **Zahlenformatierung** nach `Specs/generell.md`: Dezimalpunkt, Hochkomma als Tausendertrennzeichen (`1'234.567`), `–` bei Fehlwerten — in Liste, Formular **und** PDF gleich.
 * Alle Texte via `TranslationService`/`TranslatePipe`, keine Hardcodings.
 
@@ -82,6 +85,8 @@
 
 ### Erfassung
 * [ ] Zu einem Mieter lassen sich Positionen für **mehrere Quartale** erfassen.
+* [ ] Über *Kopieren* im Kebab-Menü öffnet sich das Formular mit den Werten der gewählten Position (Tarif, Jahr, Quartal, Menge, Quell-Referenz, Bemerkung); Speichern legt eine **neue** Position an, die Ausgangsposition bleibt unverändert.
+* [ ] Eine Kopie, die ohne Änderung von Jahr/Quartal gespeichert wird, wird mit der Duplikat-Meldung abgewiesen (kein zweiter Datensatz).
 * [ ] Eine zweite Position für denselben Mieter, dasselbe Quartal und denselben **Tariftyp** wird **abgewiesen** (Meldung, kein Datensatz) — auch dann, wenn ein anderer `LADESTROM`-Tarif gewählt wird.
 * [ ] Menge < 0 wird abgewiesen; Menge = 0 ist speicherbar, erzeugt aber **keine** Rechnungszeile (FR-1.5).
 * [ ] Als Tarif sind ausschliesslich `LADESTROM`-Tarife wählbar.
@@ -90,7 +95,10 @@
 * [ ] Eine Ladepunkt-Kennung, die bereits einem anderen Mieter desselben Mandanten gehoert, wird **abgewiesen** (Meldung, kein Datensatz).
 * [ ] Manuell erfasste Positionen tragen `erfassungsart = MANUELL`; die Quell-Referenz ist aus dem Ladepunkt des Mieters vorbelegt und aenderbar.
 * [ ] Die Liste weist die Herkunft je Position aus (manuell/importiert).
-* [ ] In der Ansicht steht der Hinweis, dass Positionen bei jeder Rechnungserstellung erneut aufgenommen werden.
+* [ ] Jede Datenspalte der Liste ist auf- und absteigend sortierbar; die Spalte Quartal sortiert chronologisch über Jahresgrenzen hinweg (Q4/2026 vor Q1/2027).
+* [ ] Eine gewählte Sortierung bleibt nach dem Erfassen, Ändern oder Löschen einer Position erhalten.
+* [ ] Die Spaltenbreiten der Liste lassen sich mit der Maus verändern.
+* [ ] In der Ansicht steht der Hinweis, dass Positionen bei jeder Rechnungserstellung erneut aufgenommen werden; er lässt sich wegklicken und bleibt danach ausgeblendet.
 
 ### Rechnung
 * [ ] Rechnung über ein Quartal, in dem der Mieter eine Position mit Menge > 0 hat → die Position erscheint als eigene Zeile mit korrektem Betrag (`Menge × Preis`).
@@ -100,6 +108,7 @@
 * [ ] Rechnung über ein Halbjahr mit Positionen in beiden Quartalen → **beide** Zeilen erscheinen.
 * [ ] Einheit/Mieter ohne Positionen → Rechnung unverändert wie heute (keine leere Zeile, kein Fehler).
 * [ ] Rechnung **ohne** Mieter (Einheit ohne Zuordnung im Zeitraum) → keine Tarifpositionen, kein Fehler.
+* [ ] Ist an der Position eine Quell-Referenz erfasst, erscheint sie auf der Rechnungszeile in Klammern hinter der Tarif-Bezeichnung; ohne Quell-Referenz steht dort unverändert nur die Bezeichnung.
 * [ ] Die Ladestrom-Zeilen erscheinen identisch in der **Web-Ansicht** und im **PDF**.
 * [ ] Produzenten-Rechnungen bleiben unverändert (nur Grundgebühr).
 
@@ -123,7 +132,7 @@
 ### NFR-3: Kompatibilität
 * Rein additiv: neue Tabelle, neue Enums, zusätzliche Rechnungszeilen. Bestehende Rechnungen ohne Positionen sind **bit-identisch** zu vorher.
 * **Weder PDF-Template noch Web-Ansicht müssen angepasst werden:** `rechnung.jrxml` kennt nur die Felder `bezeichnung, von, bis, menge, mengeneinheit, preis, betrag` — **kein** `typ` — und rendert die Positionen damit typunabhängig; die `rechnungen`-Komponente verzweigt ebenfalls nirgends nach `TarifTyp`. Neue Zeilenarten erscheinen automatisch. Das Akzeptanzkriterium „identisch in Web und PDF" bleibt als Regressionsschutz.
-* Die Erweiterung von `TarifTyp` erfordert keine DDL an `tarif` (String-Enum), aber eine Prüfung aller Stellen, die über `TarifTyp` verzweigen (`RechnungService`, `TarifService`, Frontend-Dropdowns, PDF-Export).
+* Die Erweiterung von `TarifTyp` erfordert eine DDL-Migration an `tarif` (CHECK-Constraint `tarif_tariftyp_check`, siehe FR-2) sowie eine Prüfung aller Stellen, die über `TarifTyp` verzweigen (`RechnungService`, `TarifService`, Frontend-Dropdowns, PDF-Export).
 * Neue Übersetzungs-Keys via Flyway (`ON CONFLICT (key) DO NOTHING`); nächste freie Migrationsnummer zum Umsetzungszeitpunkt eruieren (aktuell wäre es `V100`).
 
 ## 5. Edge Cases & Fehlerbehandlung

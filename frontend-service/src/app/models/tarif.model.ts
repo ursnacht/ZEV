@@ -1,8 +1,16 @@
 export enum TarifTyp {
   ZEV = 'ZEV',
   VNB = 'VNB',
-  GRUNDGEBUEHR = 'GRUNDGEBUEHR'
+  GRUNDGEBUEHR = 'GRUNDGEBUEHR',
+  /** Ladestrom: Menge kommt nicht aus Messwerten, sondern aus erfassten Tarifpositionen. */
+  LADESTROM = 'LADESTROM'
 }
+
+/**
+ * Tariftypen, deren Menge manuell als Tarifposition erfasst wird.
+ * Bewusst eine Liste: ein weiterer Anwendungsfall erweitert nur sie.
+ */
+export const MANUELL_ERFASSTE_TARIFTYPEN: TarifTyp[] = [TarifTyp.LADESTROM];
 
 export interface Tarif {
   id?: number;

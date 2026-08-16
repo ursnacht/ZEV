@@ -52,6 +52,9 @@ public class RechnungServiceTest {
     private MieterService mieterService;
 
     @Mock
+    private TarifpositionService tarifpositionService;
+
+    @Mock
     private HibernateFilterService hibernateFilterService;
 
     @InjectMocks
