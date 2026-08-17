@@ -7,7 +7,7 @@ in der bestehenden Tarifverwaltung, dazu eine **generische** Tabelle `tarifposit
 Mieter und Quartal eine manuell erfasste Menge hinterlegt wird. Bei der Rechnungserzeugung
 erscheinen diese Positionen automatisch als zusätzliche Zeilen. Die Erfassung läuft über eine
 **eigene Seite** `/tarifpositionen`; der spätere automatische Bezug aus dem Lademanagement ist
-vorbereitet (Ladepunkt-Kennung am Mieter, Erfassungsart je Position), aber nicht Teil dieser
+vorbereitet (Erfassungsart und Quell-Referenz je Position), aber nicht Teil dieser
 Umsetzung.
 
 Grundlage: [`Specs/Ladestromtarif.md`](./Ladestromtarif.md).
@@ -34,8 +34,6 @@ Grundlage: [`Specs/Ladestromtarif.md`](./Ladestromtarif.md).
 
 **Backend (geändert):**
 - `entity/TarifTyp.java` – neuer Wert `LADESTROM`
-- `entity/Mieter.java` – neues Feld `ladepunkt` (optional, mandantenweit eindeutig)
-- `service/MieterService.java` – Eindeutigkeitsprüfung der Ladepunkt-Kennung
 - `service/RechnungService.java` – zusätzliche Tarifzeilen nach ZEV/VNB, vor Grundgebühr
 
 **Frontend (neu):**
@@ -47,7 +45,6 @@ Grundlage: [`Specs/Ladestromtarif.md`](./Ladestromtarif.md).
 - `app.routes.ts` – Route `/tarifpositionen`
 - `components/navigation/navigation.component.html` – Menüeintrag
 - `components/mieter-list/` – Kebab-Eintrag „Tarifpositionen" (Sprung mit `queryParams`)
-- `components/mieter-form/` – Feld „Ladepunkt"
 - `components/tarif-form/` – Typ-Dropdown um `LADESTROM`
 
 **Design System (geändert):**
@@ -59,6 +56,7 @@ Grundlage: [`Specs/Ladestromtarif.md`](./Ladestromtarif.md).
 - `V100__Create_Tarifposition.sql` – Tabelle, Sequenz, Indizes, `mieter.ladepunkt`
 - `V101__Add_Ladestromtarif_Translations.sql` – i18n (DE/EN)
 - `V102__Extend_Tariftyp_Check_Ladestrom.sql` – CHECK-Constraint `tarif_tariftyp_check` um `LADESTROM` erweitern
+- `V103__Remove_Mieter_Ladepunkt.sql` – nimmt `mieter.ladepunkt` aus V100 wieder zurück (siehe Phase 14)
 
 ## Umsetzungsreihenfolge (Phasen)
 
@@ -73,11 +71,12 @@ Grundlage: [`Specs/Ladestromtarif.md`](./Ladestromtarif.md).
 | [x] | 6. Mieter erweitern | `Mieter.ladepunkt` + Eindeutigkeitsprüfung in `MieterService.save…`. **Kein DTO anlegen** – `MieterController` liefert die Entity direkt, das bleibt so. |
 | [x] | 7. RechnungService | Nach den ZEV-/VNB-Zeilen und **vor** der Grundgebühr: Positionen des Mieters laden, deren Quartal sich mit `von`/`bis` **überschneidet** und `menge > 0`; je Position eine `TarifZeileDTO` (`bezeichnung` = Tarif-Bezeichnung, ergänzt um die **Quell-Referenz** in Klammern via `bezeichnungMitQuellReferenz()`, sofern erfasst; `von`/`bis` = Quartalsgrenzen, `mengeneinheit` = "kWh", `typ` = `LADESTROM`). Ohne Mieter (`mieter == null`) keine Positionen. Produzenten-Rechnungen unberührt. |
 | [x] | 8. Frontend Model + Service | `tarifposition.model.ts`, `tarifposition.service.ts` (`getByMieter`, `create`, `update`, `delete`), `subscribe({ next, error })`. |
-| [x] | 9. Frontend Komponente | `tarifposition-list` (standalone, `WithMessage`): oben **Mieter-Auswahl** (Dropdown), darunter Liste (`.zev-table`, Menge rechtsbündig `.zev-table__number`, Spalte Herkunft, **sortierbar** über alle Datenspalten und **spaltenbreiten-veränderbar** via `appColumnResize` – wie `tarif-list`/`einheit-list`/`mieter-list`) und eingebettetes Formular über `showForm` – Muster `tarif-list`/`tarif-form`. Kebab-Menü *Bearbeiten* / *Kopieren* (`const { id, ...ohneId }`, Muster `tarif-list.onCopy`) / *Löschen*; der Key `KOPIEREN` existiert seit `V35`. **Jahr und Quartal als je ein Dropdown**, bewusst nicht `QuarterSelectorComponent` (die arbeitet mit Datumsbereichen). Quell-Referenz aus dem Ladepunkt des Mieters vorbelegen. Hinweis in der Ansicht, dass Positionen bei jeder Rechnungserstellung erneut aufgenommen werden (kein „bereits verrechnet"-Status) — im Textfluss (`zev-message--statisch`, neue Design-System-Variante) und wegklickbar, gemerkt in `localStorage`. |
+| [x] | 9. Frontend Komponente | `tarifposition-list` (standalone, `WithMessage`): oben **Mieter-Auswahl** (Dropdown), darunter Liste (`.zev-table`, Menge rechtsbündig `.zev-table__number`, Spalte Herkunft, **sortierbar** über alle Datenspalten und **spaltenbreiten-veränderbar** via `appColumnResize` – wie `tarif-list`/`einheit-list`/`mieter-list`) und eingebettetes Formular über `showForm` – Muster `tarif-list`/`tarif-form`. Kebab-Menü *Bearbeiten* / *Kopieren* (`const { id, ...ohneId }`, Muster `tarif-list.onCopy`) / *Löschen*; der Key `KOPIEREN` existiert seit `V35`. **Jahr und Quartal als je ein Dropdown**, bewusst nicht `QuarterSelectorComponent` (die arbeitet mit Datumsbereichen). Quell-Referenz frei erfassbar. Hinweis in der Ansicht, dass Positionen bei jeder Rechnungserstellung erneut aufgenommen werden (kein „bereits verrechnet"-Status) — im Textfluss (`zev-message--statisch`, neue Design-System-Variante) und wegklickbar, gemerkt in `localStorage`. |
 | [x] | 10. Routing | `app.routes.ts`: `{ path: 'tarifpositionen', component: TarifpositionListComponent, canActivate: [AuthGuard], data: { permissions: ['rechnungen:manage'] } }`. |
 | [x] | 11. Navigation + Kebab | Menüeintrag in `navigation.component.html` (Icon + `TARIFPOSITIONEN`-Key; **keine** Sichtbarkeitsprüfung im Template – Projektkonvention, der `AuthGuard` blockt). Kebab-Eintrag „Tarifpositionen" in `mieter-list` mit `routerLink="/tarifpositionen"` und `queryParams: { mieterId }`; die Komponente liest den Parameter und wählt den Mieter vor. |
-| [x] | 12. Formulare ergänzen | `mieter-form`: Feld „Ladepunkt" (optional). `tarif-form`: `LADESTROM` im Typ-Dropdown. |
+| [x] | 12. Formulare ergänzen | `tarif-form`: `LADESTROM` im Typ-Dropdown. (Das ursprünglich hier ergänzte Feld „Ladepunkt" im `mieter-form` ist mit Phase 14 wieder entfallen.) |
 | [x] | 13. Übersetzungen | `V101__Add_Ladestromtarif_Translations.sql` (DE/EN, `ON CONFLICT (key) DO NOTHING`): Menü- und Seitentitel, Spaltenüberschriften, Formularlabels, Erfassungsart-Werte, Fehlermeldungen (Duplikat, negative Menge, unzulässiger Tariftyp, doppelte Ladepunkt-Kennung), Tariftyp `LADESTROM`, Hinweistext zur Mehrfachverrechnung. |
+| [x] | 14. Ladepunkt am Mieter zurücknehmen | `V103__Remove_Mieter_Ladepunkt.sql` plus Entfernen von `Mieter.ladepunkt`, `MieterRepository.existsByLadepunkt`, der Prüfung in `MieterService`, dem Feld im `mieter-form` und der Vorbelegung der Quell-Referenz. **Grund:** Ein Attribut hält genau einen Wert, ein Nutzer kann aber mehrere Ladestationen haben — und ein Ladestations-Nutzer ist nicht zwingend Mieter einer Wohnung. Die Zuordnung löst das Zielbild strukturell (Spec Abschnitt 7). Die Übersetzungs-Keys `LADEPUNKT` und `LADEPUNKT_HINT` bleiben bestehen — sie werden dort wiederverwendet. |
 
 > **Tests** (`/3_backend-tests`, `/4_frontend-unit-tests`, `/5_e2e-tests`) werden separat erstellt und
 > sind **nicht** Teil dieser Umsetzung. Schwerpunkte: Eindeutigkeit je Tariftyp, Überschneidungsregel
@@ -92,7 +91,6 @@ Grundlage: [`Specs/Ladestromtarif.md`](./Ladestromtarif.md).
 - **`menge`:** `≥ 0`; `< 0` → `400`. `= 0` ist gültig, erzeugt aber keine Rechnungszeile.
 - **`quartal`:** `1..4`; **`jahr`:** plausibel (2000–2100).
 - **Eindeutigkeit:** höchstens eine Position je (`org_id`, `mieter_id`, `jahr`, `quartal`, **Tariftyp**) – im Service geprüft, da der Typ am Tarif hängt; DB-UNIQUE über `tarif_id` als Netz gegen exakte Duplikate.
-- **`mieter.ladepunkt`:** falls gesetzt, mandantenweit eindeutig → sonst `400` mit Hinweis auf den belegenden Mieter.
 - **Autorisierung:** Schreiben `rechnungen:manage`, Lesen `mieter:read` – sonst `403`.
 - **Mandantentrennung:** `orgFilter` in jedem Service-Zugriff; `orgId` **nie** aus dem Request.
 
@@ -106,7 +104,7 @@ Grundlage: [`Specs/Ladestromtarif.md`](./Ladestromtarif.md).
 ## Offene Punkte / Annahmen
 
 - **Doppelverrechnungsschutz: entschieden — vorerst ohne** (2026-08-16). Rechnungen werden nicht persistiert, es gibt keinen „bereits verrechnet"-Status; zwei Läufe über denselben Zeitraum nehmen die Position zweimal auf. Abgesichert wird das **organisatorisch** plus einem dauerhaften Hinweis in der Erfassungsansicht (Phase 9). Ein technischer Schutz setzte das Persistieren von Rechnungen voraus und waere ein eigenes Vorhaben.
-- **Schnittstelle Lademanagement: out of scope.** Vorbereitet sind `mieter.ladepunkt` und `erfassungsart`/`quell_referenz`; `IMPORT` wird in dieser Umsetzung nie geschrieben.
+- **Schnittstelle Lademanagement: out of scope.** Vorbereitet sind `erfassungsart` und `quell_referenz`; `IMPORT` wird in dieser Umsetzung nie geschrieben. Das entschiedene Zielbild (Einheit vom Typ `LADESTATION`, Kennung in `einheit.messpunkt`, mehrere Einheiten je Mieter) steht in `Specs/Ladestromtarif.md`, Abschnitt 7.
 - **Migrationsnummern `V100`–`V102`** waren zum Umsetzungszeitpunkt frei (`V99` war die höchste vorhandene), alle drei sind angewendet.
 - **Gelernt:** Ein neuer `TarifTyp` ist **nicht** rein additiv – der CHECK-Constraint auf `tarif.tariftyp` zählt die Werte auf. Bei künftigen Enum-Erweiterungen die DB-Constraints der betroffenen Spalte prüfen (`pg_get_constraintdef`), nicht nur den Spaltentyp.
 - **Mieter-Auswahl auf der neuen Seite:** Annahme – alle Mieter des Mandanten, alphabetisch, ohne Filter auf aktive Mietverhältnisse. Bei vielen Mietern wäre eine Suche nachzurüsten.

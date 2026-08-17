@@ -73,7 +73,6 @@ public class TarifpositionServiceTest {
         testMieter = new Mieter("Max Muster", LocalDate.of(2026, 1, 1), 1L);
         testMieter.setId(1L);
         testMieter.setOrgId(testOrgId);
-        testMieter.setLadepunkt("LP-01");
 
         ladestromTarif = new Tarif(
                 "Ladestrom",

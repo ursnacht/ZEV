@@ -99,17 +99,6 @@ public class MieterService {
             }
         }
 
-        // Validate: charging point identifier must be unique per tenant, otherwise a later
-        // import from the charge management could not assign a quantity unambiguously.
-        // Blank input is normalised to null so that empty strings do not collide with each other.
-        if (mieter.getLadepunkt() != null && mieter.getLadepunkt().isBlank()) {
-            mieter.setLadepunkt(null);
-        }
-        if (mieter.getLadepunkt() != null
-                && mieterRepository.existsByLadepunkt(mieter.getLadepunkt(), excludeId)) {
-            throw new IllegalArgumentException("Ladepunkt ist bereits einem anderen Mieter zugeordnet");
-        }
-
         // Set org_id for new tenant
         if (mieter.getId() == null) {
             mieter.setOrgId(organizationContextService.getCurrentOrgId());

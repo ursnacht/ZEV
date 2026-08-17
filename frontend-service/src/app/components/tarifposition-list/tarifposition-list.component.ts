@@ -273,11 +273,6 @@ export class TarifpositionListComponent implements OnInit {
     }
   }
 
-  /** Ladepunkt des gewählten Mieters – wird im Formular als Quell-Referenz vorbelegt. */
-  get selectedMieterLadepunkt(): string {
-    return this.mieterListe.find(m => m.id === this.selectedMieterId)?.ladepunkt ?? '';
-  }
-
   berechneBetrag(position: Tarifposition): number {
     return (position.menge ?? 0) * (position.tarifPreis ?? 0);
   }

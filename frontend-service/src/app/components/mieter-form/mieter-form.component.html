@@ -78,13 +78,6 @@
       </div>
     </div>
 
-    <div class="zev-form-group">
-      <label for="ladepunkt">{{ 'LADEPUNKT' | translate }}:</label>
-      <input type="text" id="ladepunkt" class="zev-input" [(ngModel)]="formData.ladepunkt"
-        name="ladepunkt" maxlength="64" />
-      <div class="zev-form-hint">{{ 'LADEPUNKT_HINT' | translate }}</div>
-    </div>
-
     @if (!isDateRangeValid()) {
       <div class="zev-form-error">
         {{ 'MIETENDE_NACH_MIETBEGINN' | translate }}

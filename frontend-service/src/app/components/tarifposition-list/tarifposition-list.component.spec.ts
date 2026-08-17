@@ -28,7 +28,7 @@ describe('TarifpositionListComponent', () => {
   const mockMieter: Mieter[] = [
     {
       id: 1, name: 'Zwahlen Zoe', strasse: 'Testweg 2', plz: '3000', ort: 'Bern',
-      mietbeginn: '2024-01-01', einheitId: 1, ladepunkt: 'LP-01'
+      mietbeginn: '2024-01-01', einheitId: 1
     },
     {
       id: 2, name: 'Anders Anna', strasse: 'Musterstr. 1', plz: '8000', ort: 'Zürich',
@@ -710,23 +710,6 @@ describe('TarifpositionListComponent', () => {
 
     it('should return 0 for a zero menge', () => {
       expect(component.berechneBetrag({ ...mockPositionen[0], menge: 0 })).toBe(0);
-    });
-  });
-
-  describe('selectedMieterLadepunkt', () => {
-    it('should return the ladepunkt of the selected mieter', () => {
-      component.selectedMieterId = 1;
-      expect(component.selectedMieterLadepunkt).toBe('LP-01');
-    });
-
-    it('should return an empty string when the mieter has no ladepunkt', () => {
-      component.selectedMieterId = 2;
-      expect(component.selectedMieterLadepunkt).toBe('');
-    });
-
-    it('should return an empty string when no mieter is selected', () => {
-      component.selectedMieterId = null;
-      expect(component.selectedMieterLadepunkt).toBe('');
     });
   });
 

@@ -103,20 +103,4 @@ public interface MieterRepository extends JpaRepository<Mieter, Long> {
         @Param("quartalBeginn") LocalDate quartalBeginn,
         @Param("quartalEnde") LocalDate quartalEnde
     );
-
-    /**
-     * Check if another tenant already uses the given charging point identifier.
-     * The identifier must be unique per tenant so that an imported quantity can be assigned
-     * unambiguously.
-     *
-     * @param ladepunkt Charging point identifier
-     * @param excludeId ID to exclude (use -1 for new tenants)
-     * @return true if another tenant already uses this identifier
-     */
-    @Query("SELECT COUNT(m) > 0 FROM Mieter m WHERE m.ladepunkt = :ladepunkt "
-            + "AND m.id != :excludeId")
-    boolean existsByLadepunkt(
-        @Param("ladepunkt") String ladepunkt,
-        @Param("excludeId") Long excludeId
-    );
 }

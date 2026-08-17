@@ -98,14 +98,7 @@ describe('TarifpositionFormComponent', () => {
       expect(component.formData.tarifId).toBe(0);
     });
 
-    it('should prefill quellReferenz from the ladepunkt of the mieter', () => {
-      component.ladepunkt = 'LP-01';
-      component.ngOnInit();
-      expect(component.formData.quellReferenz).toBe('LP-01');
-    });
-
-    it('should leave quellReferenz undefined when the mieter has no ladepunkt', () => {
-      component.ladepunkt = '';
+    it('should leave quellReferenz undefined for a new position', () => {
       component.ngOnInit();
       expect(component.formData.quellReferenz).toBeUndefined();
     });
@@ -134,13 +127,6 @@ describe('TarifpositionFormComponent', () => {
       component.position = existingPosition;
       component.ngOnInit();
       expect(component.formData).not.toBe(existingPosition);
-    });
-
-    it('should not overwrite quellReferenz of an existing position with the ladepunkt', () => {
-      component.ladepunkt = 'LP-99';
-      component.position = existingPosition;
-      component.ngOnInit();
-      expect(component.formData.quellReferenz).toBe('LP-01');
     });
 
     it('should add a jahr outside the default options and keep the list sorted', () => {

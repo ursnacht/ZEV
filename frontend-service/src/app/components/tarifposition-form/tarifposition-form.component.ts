@@ -23,8 +23,6 @@ export class TarifpositionFormComponent implements OnInit {
   @Input() position: Tarifposition | null = null;
   @Input() mieterId: number | null = null;
   @Input() tarife: Tarif[] = [];
-  /** Ladepunkt des Mieters – belegt die Quell-Referenz vor. */
-  @Input() ladepunkt = '';
   @Output() save = new EventEmitter<Tarifposition>();
   @Output() cancel = new EventEmitter<void>();
 
@@ -55,8 +53,7 @@ export class TarifpositionFormComponent implements OnInit {
         tarifId: this.tarife.length === 1 ? (this.tarife[0].id ?? 0) : 0,
         jahr: aktuellesJahr,
         quartal: this.aktuellesQuartal(),
-        menge: 0,
-        quellReferenz: this.ladepunkt || undefined
+        menge: 0
       };
     }
   }

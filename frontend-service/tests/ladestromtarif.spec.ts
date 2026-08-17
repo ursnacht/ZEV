@@ -5,7 +5,6 @@ import { clickKebabMenuItem, navigateViaMenu, openKebabMenu, waitForFormResult, 
  * tests / ladestromtarif.spec.ts
  * E2E-Tests für das Feature "Ladestromtarif" (Specs/Ladestromtarif.md):
  *   - Tariftyp LADESTROM in der Tarifverwaltung (anlegen, ändern, löschen, Überschneidung)
- *   - Feld "Ladepunkt" am Mieter (optional, mandantenweit eindeutig)
  *   - Kebab-Eintrag "Tarifpositionen" in der Mieterverwaltung (Sprung mit ?mieterId)
  *   - Seite /tarifpositionen: Mieter-Auswahl, Hinweis, Erfassen/Bearbeiten/Kopieren/Löschen,
  *     Sortierung, Spaltenbreiten
@@ -34,7 +33,8 @@ const TARIF_BIS = '2098-12-31';
 
 /** Eigener Mieter für die Positions-Tests - hält die Testdaten von den Echtdaten getrennt. */
 const MIETER_NAME = 'E2E Ladestrom Mieter';
-const MIETER_LADEPUNKT = 'LP-E2E-SHARED';
+/** Herkunft einer Position - seit dem Wegfall des Mieter-Ladepunkts wird sie von Hand erfasst. */
+const QUELL_REFERENZ = 'LP-E2E-SHARED';
 /**
  * Mietzeit der Testmieter: weit in der Vergangenheit und **befristet**.
  * `MieterService.saveMieter` lässt je Einheit nur einen Mieter ohne Mietende zu und weist
@@ -42,10 +42,7 @@ const MIETER_LADEPUNKT = 'LP-E2E-SHARED';
  * Mieter. Jeder Testmieter belegt daher ein eigenes, längst abgelaufenes Jahr.
  */
 const MIETJAHRE = {
-    geteilt: '2010',
-    ladepunkt: '2011',
-    duplikatErster: '2012',
-    duplikatZweiter: '2013'
+    geteilt: '2010'
 };
 
 /** Mieter/Einheit aus den Basisdaten für den Rechnungstest (hat keine eigenen Positionen). */
@@ -206,7 +203,6 @@ async function ensureLadestromTarif(page: Page): Promise<void> {
 
 interface MieterDaten {
     name: string;
-    ladepunkt?: string;
     /** Jahr der (befristeten) Mietzeit, siehe MIETJAHRE. */
     mietjahr: string;
 }
@@ -226,9 +222,6 @@ async function createMieter(page: Page, daten: MieterDaten): Promise<boolean> {
     await page.locator('#ort').fill('Bern');
     await page.locator('#mietbeginn').fill(`${daten.mietjahr}-01-01`);
     await page.locator('#mietende').fill(`${daten.mietjahr}-12-31`);
-    if (daten.ladepunkt !== undefined) {
-        await page.locator('#ladepunkt').fill(daten.ladepunkt);
-    }
 
     await clearMessages(page);
     await page.locator('button[type="submit"]').click();
@@ -271,7 +264,6 @@ async function ensureTestMieter(page: Page): Promise<void> {
     }
     const ok = await createMieter(page, {
         name: MIETER_NAME,
-        ladepunkt: MIETER_LADEPUNKT,
         mietjahr: MIETJAHRE.geteilt
     });
     if (!ok) {
@@ -569,64 +561,10 @@ test.describe('Ladestromtarif - Tarifverwaltung', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Mieterverwaltung: Ladepunkt und Kebab-Sprung
+// Mieterverwaltung: Kebab-Sprung
 // ---------------------------------------------------------------------------
 
 test.describe('Ladestromtarif - Mieter', () => {
-    test('should save an optional Ladepunkt on a Mieter and keep it when editing', async ({ page }) => {
-        await navigateToMieter(page);
-
-        await page.locator('button.zev-button--primary').first().click();
-        await expect(page.locator('#ladepunkt')).toBeVisible();
-        // Das Feld ist optional - ohne Eingabe ist das Formular gültig
-        await expect(page.locator('#ladepunkt')).toHaveValue('');
-
-        const form = page.locator('form');
-        await form.locator('button.zev-button--secondary').click();
-        await expect(form).not.toBeVisible();
-
-        const name = `E2E LP Mieter ${Date.now()}`;
-        const ladepunkt = `LP-E2E-${Date.now()}`;
-        createdMieterNames.push(name);
-        expect(await createMieter(page, { name, ladepunkt, mietjahr: MIETJAHRE.ladepunkt })).toBe(true);
-
-        await waitForTableWithData(page, 10000);
-        const row = page.locator(`tr:has-text("${name}")`);
-        await expect(row).toBeVisible({ timeout: 10000 });
-
-        // Der Ladepunkt ist gespeichert und erscheint beim Bearbeiten wieder
-        await clickKebabMenuItem(page, row, 'edit');
-        await expect(page.locator('form')).toBeVisible({ timeout: 5000 });
-        await expect(page.locator('#ladepunkt')).toHaveValue(ladepunkt);
-        await page.locator('form button.zev-button--secondary').click();
-    });
-
-    test('should reject a Ladepunkt that already belongs to another Mieter', async ({ page }) => {
-        await navigateToMieter(page);
-
-        const ersterName = `E2E LP Erster ${Date.now()}`;
-        const ladepunkt = `LP-E2E-DUP-${Date.now()}`;
-        createdMieterNames.push(ersterName);
-        expect(await createMieter(page, {
-            name: ersterName, ladepunkt, mietjahr: MIETJAHRE.duplikatErster
-        })).toBe(true);
-        await waitForTableWithData(page, 10000);
-
-        // Bewusst eine andere, überschneidungsfreie Mietzeit: So kann die Ablehnung nur am
-        // doppelten Ladepunkt liegen.
-        const zweiterName = `E2E LP Zweiter ${Date.now()}`;
-        const abgewiesen = await createMieter(page, {
-            name: zweiterName, ladepunkt, mietjahr: MIETJAHRE.duplikatZweiter
-        });
-        expect(abgewiesen).toBe(false);
-        await expect(page.locator('.zev-message--error')).toBeVisible();
-
-        // Kein Datensatz angelegt
-        await page.locator('form button.zev-button--secondary').click();
-        await waitForTableWithData(page, 10000);
-        await expect(page.locator(`tr:has-text("${zweiterName}")`)).toHaveCount(0);
-    });
-
     test('should jump from the Mieter kebab menu to the Tarifpositionen page with the tenant preselected',
         async ({ page }) => {
             await navigateToMieter(page);
@@ -705,21 +643,20 @@ test.describe('Ladestromtarif - Tarifpositionen', () => {
         await expect(page.locator('button[type="submit"]')).toBeEnabled();
     });
 
-    test('should create positions for several quarters, prefill the source reference and show the origin',
+    test('should create positions for several quarters, record the source reference and show the origin',
         async ({ page }) => {
             await navigateToTarifpositionen(page);
             await selectMieter(page, MIETER_NAME);
             mieterMitPositionen.push(MIETER_NAME);
 
             await openPositionsForm(page);
-            // Quell-Referenz ist aus dem Ladepunkt des Mieters vorbelegt
-            await expect(page.locator('#quellReferenz')).toHaveValue(MIETER_LADEPUNKT);
 
             expect(await submitPositionsForm(page, {
                 tarif: TARIF_NAME,
                 jahr: '2027',
                 quartal: '1',
                 menge: '123.5',
+                quellReferenz: QUELL_REFERENZ,
                 bemerkung: 'E2E Beleg'
             })).toBe(true);
 
@@ -742,7 +679,7 @@ test.describe('Ladestromtarif - Tarifpositionen', () => {
             await expect(q1).toContainText('61.75');
             // Herkunft: manuell erfasst, mit Quell-Referenz
             await expect(q1).toContainText(/manuell|manual/i);
-            await expect(q1).toContainText(MIETER_LADEPUNKT);
+            await expect(q1).toContainText(QUELL_REFERENZ);
         });
 
     test('should reject a second position for the same tenant, quarter and tariff type', async ({ page }) => {
