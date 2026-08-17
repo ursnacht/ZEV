@@ -1,7 +1,14 @@
 # Ladestromtarif
 
+> **Stand:** Der **Anker der Tarifposition ist seit [`Specs/Ladestationen.md`](./Ladestationen.md)
+> die Einheit**, nicht mehr der Mieter: Jede Ladestation ist eine eigene Einheit vom Typ
+> `LADESTATION`, deren `messpunkt` die RFID trägt, und ein Mieter kann mehreren Einheiten
+> zugeordnet sein. Dieses Dokument bleibt massgebend für **Tariftyp, Tabelle `tarifposition`,
+> Erfassungsmaske und Rechnungsintegration**; wo es um die Zuordnung geht, gilt `Ladestationen.md`.
+> Die Stellen sind unten entsprechend nachgezogen.
+
 ## 1. Ziel & Kontext - Warum wird das Feature benötigt?
-* **Was soll erreicht werden:** Der Strom für das Laden von Fahrzeugen soll den Mietern zu einem **eigenen Tarif** verrechnet werden — getrennt von ZEV- und VNB-Anteil. Dazu wird **je Mieter** eine Tarifposition erfasst (Tarif, Quartal, Menge in kWh), die bei der Rechnungserzeugung automatisch als zusätzliche Zeile erscheint.
+* **Was soll erreicht werden:** Der Strom für das Laden von Fahrzeugen soll den Mietern zu einem **eigenen Tarif** verrechnet werden — getrennt von ZEV- und VNB-Anteil. Dazu wird **je Ladestations-Einheit** eine Tarifposition erfasst (Tarif, Quartal, Menge in kWh), die bei der Rechnungserzeugung automatisch als zusätzliche Zeile erscheint. (Ursprünglich je Mieter — siehe Stand-Hinweis.)
 * **Warum machen wir das:** Ladestrom ist ein abgrenzbarer, oft deutlich grösserer Verbrauch, der über eine **eigene Ladeinfrastruktur mit eigenem Messpunkt** läuft. Die Weiterverrechnung an den einzelnen Mieter braucht deshalb einen eigenen Preis und eine eigene Zeile auf der Rechnung — die Zuordnung „welcher Mieter hat wie viel geladen" kommt nicht aus den ZEV-Messwerten, sondern aus dem Lademanagement.
 * **Aktueller Stand:**
   - `Tarif` kennt die Typen `ZEV`, `VNB`, `GRUNDGEBUEHR` (`TarifTyp`), jeweils mit Bezeichnung, Preis und Gültigkeitszeitraum (`Specs/Tarifverwaltung.md`).
@@ -14,24 +21,25 @@
 | **Solarverteilung** | Ladestationen werden **nicht** gesondert behandelt — der Ladestrom-Messpunkt ist eine normale `CONSUMER`-Einheit und nimmt regulär an der Verteilung teil. Keine Priorisierung. |
 | **Steuerung** | PV-Überschuss-/dynamisches Laden übernimmt die **Ladeinfrastruktur**, nicht ZEV. ZEV rechnet nur ab. |
 | **Messpunkt-Rechnung** | Der Ladestrom-Messpunkt wird wie jede Einheit abgerechnet und ist einem **Mieter** zugeordnet (der Eigentümer wird dafür als Mieter-Datensatz geführt). Die Mieter zahlen ihren Ladestrom über die Tarifpositionen; die Differenz zwischen Ladestromtarif und tatsächlichen ZEV-/VNB-Kosten bleibt beim Eigentümer. |
-| **Anker der Position** | Am **Mieter**. Damit ist ein **Mieterwechsel innerhalb eines Quartals** sauber abgebildet: Jeder Mieter trägt seine eigene Menge, ohne Aufteilungsregel. |
+| **Zuordnung der Menge** | Über die **Ladestations-Einheit** und deren Mieter (`Ladestationen.md`). Ein Nutzer ohne Wohnung wird über seine Ladestation abgerechnet. |
+| **Anker der Position** | An der **Einheit** vom Typ `LADESTATION` (`Ladestationen.md`). Ein **Mieterwechsel innerhalb eines Quartals** bleibt eindeutig, weil dabei die RFID invalidiert und eine neue Einheit angelegt wird — jede Einheit gehört über ihre Lebensdauer genau einem Nutzer. *(Ursprünglich am Mieter.)* |
 | **Tarif-Typisierung** | Neuer `TarifTyp.LADESTROM`, verwaltet in der bestehenden Tarifverwaltung. **Bewusst ein spezifischer Typ und kein generisches `ZUSATZ`:** Der spätere automatische Import aus dem Lademanagement muss die bezogenen Mengen einem Tarif zuordnen können — das geht über den **Typ** maschinell zuverlässig, über eine Bezeichnung nicht. |
 | **Datenhaltung** | **Generische** Tabelle `tarifposition` für manuell erfasste Mengen zu einem beliebigen Tarif — nicht ladestrom-spezifisch. Weitere Anwendungsfälle (Sauna, Waschküche, …) kommen ohne Schema-Änderung dazu. |
-| **Genau ein gültiger Tarif** | Je Zeitraum darf **höchstens ein** `LADESTROM`-Tarif gültig sein, und je Mieter und Quartal existiert **höchstens eine** Ladestrom-Position. Damit ist die Zuordnung beim späteren Import eindeutig. |
-| **Ladepunkt-Zuordnung** | In dieser Umsetzung gibt es **kein** Stammdatenfeld fuer den Ladepunkt. Die Herkunft haelt jede Position selbst fest: **Erfassungsart** (manuell/importiert) und **Quell-Referenz**. Die strukturelle Zuordnung fuer den spaeteren Import beschreibt Abschnitt 7 (Zielbild) — ein Attribut reicht dafuer nicht, weil ein Nutzer mehrere Ladestationen haben kann. |
+| **Genau ein gültiger Tarif** | Je Zeitraum darf **höchstens ein** `LADESTROM`-Tarif gültig sein, und je Einheit und Quartal existiert **höchstens eine** Ladestrom-Position. Damit ist die Zuordnung beim späteren Import eindeutig. |
+| **Ladepunkt-Zuordnung** | Kein Stammdatenfeld am Mieter — ein Attribut kann genau einen Wert halten, ein Nutzer aber mehrere Ladestationen haben. Die Kennung steht am `messpunkt` der Ladestations-Einheit (`Ladestationen.md`); die Herkunft je Position halten **Erfassungsart** (manuell/importiert) und **Quell-Referenz** fest. |
 | **Mehrere Ladestationen** | Hinter einem Ladestrom-Messpunkt dürfen beliebig viele Ladestationen stehen — für ZEV ist nur die Summe am Messpunkt relevant. |
 
 ## 2. Funktionale Anforderungen (FR) - Was soll das System tun?
 
 ### FR-1: Ablauf / Flow
 1. Ein Benutzer legt in der **Tarifverwaltung** einen Tarif vom Typ **`LADESTROM`** an (Bezeichnung, Preis in CHF/kWh, Gültigkeit von/bis) — analog zu ZEV/VNB. Überschneidet sich die Gültigkeit mit einem bestehenden `LADESTROM`-Tarif, wird das **abgewiesen** (FR-2).
-2. Er öffnet die **Mieterverwaltung** und wählt beim Mieter im Kebab-Menü **„Tarifpositionen"**.
+2. Er öffnet die **Einheiten-Verwaltung** und wählt bei der Ladestation im Kebab-Menü **„Tarifpositionen"**. *(Ursprünglich beim Mieter.)*
 3. Es erscheint die Liste der erfassten Positionen dieses Mieters (Tarif, Quartal, Menge, Betrag) mit *Anlegen*, *Bearbeiten* und *Löschen*.
 4. Beim Anlegen wählt er: **Tarif** (Auswahl aus den `LADESTROM`-Tarifen), **Jahr + Quartal** (zwei einfache Dropdowns) und die **Menge in kWh**. Existiert für diesen Mieter, dieses Quartal und diesen **Tariftyp** bereits eine Position, wird das abgewiesen — die bestehende ist zu bearbeiten.
 5. Bei der **Rechnungserzeugung** für Einheit + Mieter + Zeitraum werden automatisch alle Positionen **dieses Mieters** aufgenommen, deren Quartal sich mit dem Rechnungszeitraum **überschneidet** und deren **Menge > 0** ist.
 6. Jede aufgenommene Position erscheint als **eigene Tarifzeile** (Bezeichnung des Tarifs, Quartalsgrenzen als Von/Bis, Menge in kWh, Preis, Betrag) und fliesst in Total, Rundung und Endbetrag ein. Ist an der Position eine **Quell-Referenz** erfasst, steht sie in der Bezeichnung in Klammern dahinter (`Ladestrom (LP-01)`) — damit ist auf der Rechnung nachvollziehbar, aus welchem Ladepunkt die Menge stammt. Ohne Quell-Referenz bleibt die Bezeichnung unverändert. Menge und Betrag werden **wie die bestehenden ZEV-/VNB-Zeilen** gerundet dargestellt; gespeichert bleibt die Menge mit drei Nachkommastellen.
 
-> **Warum Überschneidung und nicht „Quartal vollständig im Zeitraum"?** Das folgt zwingend aus dem Anker am Mieter: Zieht ein Mieter Mitte Quartal aus, deckt **seine** Rechnung nur einen Teil des Quartals ab. Bei der strengeren Regel würde seine Position nie verrechnet. Doppelverrechnung entsteht dadurch nicht, weil jede Position genau **einem** Mieter gehört und ein Mieter je Zeitraum einmal abgerechnet wird — offen bleibt nur der allgemeine Fall zweier überlappender Rechnungsläufe für denselben Mieter (§8).
+> **Warum Überschneidung und nicht „Quartal vollständig im Zeitraum"?** Zieht ein Mieter Mitte Quartal aus, deckt **seine** Rechnung nur einen Teil des Quartals ab. Bei der strengeren Regel würde seine Position nie verrechnet. Doppelverrechnung entsteht dadurch nicht, weil eine Ladestations-Einheit über ihre Lebensdauer genau einem Nutzer gehört (beim Wechsel entsteht eine neue Einheit mit neuer RFID, `Ladestationen.md`) — offen bleibt nur der allgemeine Fall zweier überlappender Rechnungsläufe für denselben Mieter (§8).
 
 ### FR-2: Persistierung
 * Neue Tabelle **`tarifposition`** — **bewusst generisch**, nicht ladestrom-spezifisch. Sie nimmt **manuell erfasste Mengen zu einem beliebigen Tarif** auf; Ladestrom ist der erste Anwendungsfall, weitere (Sauna, Waschküche, Wärmepumpe …) kommen ohne Schema-Änderung dazu. Die fachliche Bedeutung steckt ausschliesslich im referenzierten Tarif.
@@ -41,7 +49,7 @@
   |---|---|---|---|
   | `id` | BIGINT | ja | Sequenz `zev.tarifposition_seq` |
   | `org_id` | BIGINT | ja | Mandant |
-  | `mieter_id` | BIGINT | ja | FK auf `mieter`, **ON DELETE CASCADE** — **Anker der Position** |
+  | `einheit_id` | BIGINT | ja | FK auf `einheit`, **ON DELETE CASCADE** — **Anker der Position** (bis `V106` war es `mieter_id`, siehe Stand-Hinweis) |
   | `tarif_id` | BIGINT | ja | FK auf `tarif`, **ON DELETE RESTRICT** (ein referenzierter Tarif ist nicht löschbar) — der Typ des Tarifs bestimmt die Bedeutung der Position |
   | `jahr` | INT | ja | z.B. 2026 |
   | `quartal` | INT | ja | 1–4 |
@@ -50,9 +58,9 @@
   | `quell_referenz` | VARCHAR(64) | nein | Kennung, aus der die Menge stammt (bei Import die Ladepunkt-Kennung); bei manueller Erfassung frei erfassbar |
   | `bemerkung` | VARCHAR(200) | nein | freier Text, rein informativ |
 
-* **Index:** auf (`org_id`, `mieter_id`, `jahr`, `quartal`) — deckt sowohl die Abfrage bei der Rechnungserzeugung als auch die Eindeutigkeitsprüfung ab.
-* **Eindeutigkeit je Tariftyp:** Pro (`org_id`, `mieter_id`, `jahr`, `quartal`, **Tariftyp**) ist **höchstens eine** Position zulässig. Da der Typ am Tarif hängt und nicht in der Tabelle steht, wird die Regel **im Service** geprüft; die Datenbank sichert zusätzlich UNIQUE (`org_id`, `mieter_id`, `tarif_id`, `jahr`, `quartal`) als Netz gegen exakte Duplikate.
-* **Kein neues Feld am Mieter.** Ein `ladepunkt`-Attribut war in einer fruehen Fassung vorgesehen und wurde mit `V103` wieder entfernt: Es kann genau einen Wert halten, ein Nutzer kann aber mehrere Ladestationen verwenden — und ein Ladestations-Nutzer ist nicht zwingend Mieter einer Wohnung. Die Zuordnung loest das Zielbild in Abschnitt 7 strukturell.
+* **Index:** auf (`org_id`, `einheit_id`, `jahr`, `quartal`) — deckt sowohl die Abfrage bei der Rechnungserzeugung als auch die Eindeutigkeitsprüfung ab.
+* **Eindeutigkeit je Tariftyp:** Pro (`org_id`, `einheit_id`, `jahr`, `quartal`, **Tariftyp**) ist **höchstens eine** Position zulässig. Da der Typ am Tarif hängt und nicht in der Tabelle steht, wird die Regel **im Service** geprüft; die Datenbank sichert zusätzlich UNIQUE (`org_id`, `einheit_id`, `tarif_id`, `jahr`, `quartal`) als Netz gegen exakte Duplikate.
+* **Kein neues Feld am Mieter.** Ein `ladepunkt`-Attribut war in einer fruehen Fassung vorgesehen und wurde mit `V103` wieder entfernt: Es kann genau einen Wert halten, ein Nutzer kann aber mehrere Ladestationen verwenden — und ein Ladestations-Nutzer ist nicht zwingend Mieter einer Wohnung. Strukturell geloest ist die Zuordnung in [`Specs/Ladestationen.md`](./Ladestationen.md).
 * **Herkunft je Position:** `erfassungsart` unterscheidet manuell erfasste von importierten Mengen, `quell_referenz` haelt fest, woher eine importierte Menge stammt. Damit ist spaeter belegbar, warum eine Menge auf der Rechnung steht — bei manuell erfassten Betraegen, die direkt Geld bewegen, ist das der eigentliche Zweck.
 * **Höchstens ein gültiger `LADESTROM`-Tarif je Zeitraum:** Diese Regel gilt **automatisch, ohne neuen Code** — `TarifService.saveTarif` prüft bereits typbezogen auf Überschneidung (`existsOverlappingTarif(tariftyp, …)`) und weist überlappende Tarife für **jeden** Typ ab. Mit dem neuen Enum-Wert greift die Prüfung ohne Zutun auch für `LADESTROM`. Damit ist der Tarif für ein Quartal eindeutig bestimmbar — Voraussetzung für den späteren automatischen Import. Das zugehörige Akzeptanzkriterium dient der **Regressionsabsicherung**, nicht der Neuentwicklung.
 * **`TarifTyp`** wird um den Wert `LADESTROM` erweitert. Die Spalte `tarif.tariftyp` ist zwar `VARCHAR(20)`/`EnumType.STRING` (keine Typänderung nötig), trägt aber den CHECK-Constraint `tarif_tariftyp_check`, der die erlaubten Werte **explizit aufzählt** (zuletzt gesetzt in `V50`). Er **muss** um `LADESTROM` erweitert werden, sonst scheitert das Anlegen eines Ladestromtarifs mit `DataIntegrityViolationException`.
@@ -61,9 +69,9 @@
 
 ### FR-3: Layout
 * **Tarifverwaltung:** Der Typ `LADESTROM` erscheint im bestehenden Typ-Dropdown; bei überlappender Gültigkeit erscheint eine verständliche Fehlermeldung. Sonst keine Änderung an der Maske.
-* **Tarifpositionen** (neue, generische Ansicht, erreichbar über das Kebab-Menü des **Mieters**):
+* **Tarifpositionen** (neue, generische Ansicht, erreichbar über das Kebab-Menü der **Einheit**):
   - **Liste** (Design-System-`table`): Tarif-Bezeichnung, Jahr/Quartal, Menge (rechtsbündig `.zev-table__number`; Mengeneinheit aus dem Tarif, aktuell durchgehend kWh), Preis, Betrag, Kebab-Menü mit *Bearbeiten* / *Kopieren* / *Löschen*.
-  - **Kopieren** (analog Tarifverwaltung): öffnet das Formular mit allen Werten der Position, aber **ohne ID** — gespeichert wird eine neue Position. Jahr und Quartal werden **nicht** automatisch weitergeschaltet; da je Mieter, Quartal und Tariftyp nur **eine** Position zulässig ist (FR-1.3), muss der Zeitraum bewusst gewählt werden. Eine unverändert gespeicherte Kopie wird mit der Duplikat-Meldung abgewiesen — das ist die gewollte Absicherung, kein Fehler.
+  - **Kopieren** (analog Tarifverwaltung): öffnet das Formular mit allen Werten der Position, aber **ohne ID** — gespeichert wird eine neue Position. Jahr und Quartal werden **nicht** automatisch weitergeschaltet; da je Einheit, Quartal und Tariftyp nur **eine** Position zulässig ist (FR-1.3), muss der Zeitraum bewusst gewählt werden. Eine unverändert gespeicherte Kopie wird mit der Duplikat-Meldung abgewiesen — das ist die gewollte Absicherung, kein Fehler.
   - Die Liste verhält sich wie die übrigen Verwaltungstabellen (Tarife, Einheiten, Mieter): **sortierbar** über alle Datenspalten (`.zev-table__header--sortable` + `.zev-table__sort-indicator`) und mit **veränderbarer Spaltenbreite** (`appColumnResize`). Die Spalte Quartal sortiert nach Jahr **und** Quartal zusammen, die Spalte Betrag nach dem berechneten Wert. Eine gewählte Sortierung bleibt nach Erfassen, Ändern und Löschen erhalten.
   - Die Liste weist die **Herkunft** aus (manuell/importiert); importierte Positionen sind als solche erkennbar.
   - **Formular** (Design-System-`form`): Tarif (Dropdown), **Jahr** und **Quartal** als je ein Dropdown, Menge, Bemerkung; Speichern/Abbrechen.
@@ -83,10 +91,10 @@
 * [ ] Ein `LADESTROM`-Tarif beeinflusst die Solarverteilung **nicht** und erzeugt ohne erfasste Position **keine** Rechnungszeile.
 
 ### Erfassung
-* [ ] Zu einem Mieter lassen sich Positionen für **mehrere Quartale** erfassen.
+* [ ] Zu einer Ladestations-Einheit lassen sich Positionen für **mehrere Quartale** erfassen.
 * [ ] Über *Kopieren* im Kebab-Menü öffnet sich das Formular mit den Werten der gewählten Position (Tarif, Jahr, Quartal, Menge, Quell-Referenz, Bemerkung); Speichern legt eine **neue** Position an, die Ausgangsposition bleibt unverändert.
 * [ ] Eine Kopie, die ohne Änderung von Jahr/Quartal gespeichert wird, wird mit der Duplikat-Meldung abgewiesen (kein zweiter Datensatz).
-* [ ] Eine zweite Position für denselben Mieter, dasselbe Quartal und denselben **Tariftyp** wird **abgewiesen** (Meldung, kein Datensatz) — auch dann, wenn ein anderer `LADESTROM`-Tarif gewählt wird.
+* [ ] Eine zweite Position für dieselbe Einheit, dasselbe Quartal und denselben **Tariftyp** wird **abgewiesen** (Meldung, kein Datensatz) — auch dann, wenn ein anderer `LADESTROM`-Tarif gewählt wird.
 * [ ] Menge < 0 wird abgewiesen; Menge = 0 ist speicherbar, erzeugt aber **keine** Rechnungszeile (FR-1.5).
 * [ ] Als Tarif sind ausschliesslich `LADESTROM`-Tarife wählbar.
 * [ ] Positionen sind mandantengetrennt: Ein Mandant sieht ausschliesslich seine eigenen (`org_id`).
@@ -98,10 +106,10 @@
 * [ ] In der Ansicht steht der Hinweis, dass Positionen bei jeder Rechnungserstellung erneut aufgenommen werden; er lässt sich wegklicken und bleibt danach ausgeblendet.
 
 ### Rechnung
-* [ ] Rechnung über ein Quartal, in dem der Mieter eine Position mit Menge > 0 hat → die Position erscheint als eigene Zeile mit korrektem Betrag (`Menge × Preis`).
+* [ ] Rechnung über ein Quartal, in dem eine dem Mieter zugeordnete Einheit eine Position mit Menge > 0 hat → die Position erscheint als eigene Zeile mit korrektem Betrag (`Menge × Preis`).
 * [ ] Der Betrag der Ladestrom-Zeilen fliesst in `totalBetrag`, `rundung` (5 Rappen) und `endBetrag` ein.
 * [ ] Menge und Betrag einer Ladestrom-Zeile werden mit derselben Rundung dargestellt wie die ZEV-/VNB-Zeilen derselben Rechnung.
-* [ ] **Mieterwechsel im Quartal:** Mieter A (Jan–Feb) und Mieter B (ab März) haben je eine Q1-Position → **jeder erhält auf seiner Rechnung ausschliesslich seine eigene** Position, obwohl beide Rechnungen nur einen Teil von Q1 abdecken.
+* [ ] **Mieterwechsel im Quartal:** Mieter A (Jan–Feb, alte RFID-Einheit) und Mieter B (ab März, neue RFID-Einheit) haben je eine Q1-Position → **jeder erhält auf seiner Rechnung ausschliesslich seine eigene** Position, obwohl beide Rechnungen nur einen Teil von Q1 abdecken.
 * [ ] Rechnung über ein Halbjahr mit Positionen in beiden Quartalen → **beide** Zeilen erscheinen.
 * [ ] Einheit/Mieter ohne Positionen → Rechnung unverändert wie heute (keine leere Zeile, kein Fehler).
 * [ ] Rechnung **ohne** Mieter (Einheit ohne Zuordnung im Zeitraum) → keine Tarifpositionen, kein Fehler.
@@ -116,13 +124,13 @@
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
 ### NFR-1: Performance
-* Pro Rechnung eine zusätzliche, indizierte Abfrage (`mieter_id` + Zeitraum). Bei realistischen Mengen (wenige Positionen je Mieter und Jahr) vernachlässigbar.
+* Pro Rechnung eine zusätzliche, indizierte Abfrage (`einheit_id` + Zeitraum). Bei realistischen Mengen (wenige Positionen je Einheit und Jahr) vernachlässigbar.
 * Die Rechnungserzeugung über alle Einheiten darf sich dadurch nicht spürbar verlängern (Richtwert: < 5 % zusätzliche Laufzeit).
 
 ### NFR-2: Sicherheit
 * **Permissions:** Schreiben `rechnungen:manage` (Fachrollen `zev_user`, `org_admin`, `zev_admin` — konsistent damit, dass diese Rollen bereits Rechnungen erstellen und Debitoren verwalten). Lesen über `mieter:read`. Backend durchgängig `@PreAuthorize("hasAuthority('…')")`, Frontend zusätzlich über die Route/`AuthGuard`.
 * **Multi-Tenancy:** `org_id` an der Entity, `@Filter(name = "orgFilter")`, im Service `hibernateFilterService.enableOrgFilter()`. `orgId` stammt **immer** aus dem Organisations-Kontext, nie aus dem Request.
-* **Validierung:** `menge ≥ 0`, `quartal ∈ 1..4`, `jahr` plausibel (z.B. 2000–2100), `tarif_id` muss existieren **und** einen zulässigen Typ haben, Eindeutigkeit je Mieter/Quartal/Tariftyp — alles **serverseitig** geprüft, nicht nur im Formular.
+* **Validierung:** `menge ≥ 0`, `quartal ∈ 1..4`, `jahr` plausibel (z.B. 2000–2100), `tarif_id` muss existieren **und** einen zulässigen Typ haben, Eindeutigkeit je Einheit/Quartal/Tariftyp — alles **serverseitig** geprüft, nicht nur im Formular.
 * **Nachvollziehbarkeit:** Da die Menge manuell erfasst wird und direkt Geld bewegt, ist die Bemerkung als Beleg-Hinweis vorgesehen; Änderungen an Positionen werden geloggt.
 
 ### NFR-3: Kompatibilität
@@ -136,11 +144,12 @@
 |----------|-----------|
 | Keine Positionen erfasst | Rechnung wie bisher, keine zusätzliche Zeile |
 | Menge = 0 | Position bleibt gespeichert, erscheint **nicht** auf der Rechnung |
-| Mieterwechsel innerhalb des Quartals | Jeder Mieter trägt seine eigene Position; beide Rechnungen enthalten je die eigene Menge (Überschneidungsregel, FR-1.5) |
-| Rechnungszeitraum überschneidet das Quartal nur teilweise | Position wird **vollständig** aufgenommen — keine anteilige Aufteilung; die erfasste Menge gilt als die des jeweiligen Mieters |
+| Mieterwechsel innerhalb des Quartals | Jeder Mieter hat seine eigene Ladestations-Einheit (neue RFID) und damit seine eigene Position; beide Rechnungen enthalten je die eigene Menge (Überschneidungsregel, FR-1.5) |
+| Rechnungszeitraum überschneidet das Quartal nur teilweise | Position wird **vollständig** aufgenommen — keine anteilige Aufteilung; die erfasste Menge gilt als die der jeweiligen Einheit |
 | Tarif ist im gewählten Quartal nicht gültig | Zulässig: Der Tarif ist die bewusste Wahl des Benutzers, verrechnet wird sein Preis. Die Eindeutigkeit sichert die Regel „ein gültiger Tarif je Zeitraum" |
 | Tarif wird gelöscht, während Positionen darauf verweisen | Löschen wird **abgewiesen** (referenzielle Integrität), Meldung mit Anzahl betroffener Positionen |
-| Mieter wird gelöscht | Zugehörige Positionen werden mitgelöscht (`ON DELETE CASCADE`) |
+| Mieter wird gelöscht | **Abgewiesen**, solange an einer zugeordneten Einheit Positionen hängen (`Ladestationen.md`) |
+| Ladestations-Einheit wird gelöscht | Zugehörige Positionen werden mitgelöscht (`ON DELETE CASCADE`) |
 | Importierte Menge trifft auf eine manuell erfasste Position | Regel ist Teil der Schnittstellen-Spec (§8): Vorschlag ist, manuell erfasste Positionen **nicht** stillschweigend zu ueberschreiben, sondern zu melden |
 | Zweimalige Rechnungserstellung für denselben Mieter und Zeitraum | Die Position erscheint **beide Male** — es gibt keinen „bereits verrechnet"-Status (Rechnungen sind nicht persistiert, siehe §8) |
 | Ungültige Eingaben (negative Menge, Quartal 5, fehlender Tarif) | `400` mit verständlicher Meldung, kein Datensatz |
@@ -169,38 +178,30 @@
 * **Keine Priorisierung in der Solarverteilung.** Ladestationen bleiben normale Consumer (bewusster Entscheid, s. §1).
 * **Keine Steuerung/Lastmanagement** — PV-Überschussladen liegt bei der Ladeinfrastruktur.
 * **Keine automatische Schnittstelle zum Lademanagement.** Die Mengen werden vorerst **manuell** erfasst; der automatische Bezug ist der geplante Folgeschritt (§8).
-* **Keine Aufschlüsselung nach Ladevorgang, Fahrzeug oder RFID-Karte** — nur eine Summe je Mieter, Tariftyp und Quartal.
+* **Keine Aufschlüsselung nach Ladevorgang oder Fahrzeug** — nur eine Summe je Einheit, Tariftyp und Quartal. (Die RFID identifiziert seit `Ladestationen.md` die Ladestations-Einheit, nicht den einzelnen Ladevorgang.)
 * **Keine weiteren Tarif-Anwendungsfälle in dieser Umsetzung.** Die Tabelle ist generisch angelegt, umgesetzt und getestet wird aber ausschliesslich der Ladestrom-Fall; Sauna & Co. sind Folgeanforderungen.
 * **Keine anteilige Aufteilung** einer Position auf Teilzeiträume.
 * **Keine Persistierung der Rechnung** und damit kein „bereits verrechnet"-Status (unverändert zum heutigen Verhalten).
 * **Keine Sonderbehandlung des Ladestrom-Messpunkts** in der Verteilung; er wird wie jede andere Einheit abgerechnet.
 
-### Zielbild (entschieden, noch nicht umgesetzt)
+### Umgesetzt in einer Folge-Spec
 
-Die manuelle Erfassung ist eine Zwischenstufe. Fuer den automatischen Bezug aus dem Lademanagement gilt folgendes Modell — entschieden am 17.08.2026, umzusetzen als eigenes Vorhaben:
-
-* **Ladestation als eigene Einheit.** Neuer `EinheitTyp` **`LADESTATION`**. Die Kennung des Ladepunkts steht im bereits vorhandenen Feld `einheit.messpunkt` — **kein neues Attribut**. Ein Nutzer mit zwei Ladestationen hat zwei solche Einheiten.
-* **Nutzer ist nicht zwingend Mieter einer Wohnung.** Der Nutzer einer Ladestation wird als Mieter-Datensatz **dieser Einheit** gefuehrt; Mietbeginn/Mietende werden zum Nutzungszeitraum, die Regel "nur ein offener Mieter je Einheit" zu "nur ein aktiver Nutzer je Ladestation".
-* **Mehrere Einheiten je Mieter (1:n).** Damit Wohnung und Ladestation(en) auf **einer** Rechnung erscheinen, muss ein Mieter mehreren Einheiten zugeordnet werden koennen — heute ist `mieter.einheit_id` eine einzelne Pflicht-Referenz.
-* **Tarifposition an der Einheit verankert** (statt am Mieter), weil sie zur Ladestation gehoert und ihren Zeitbezug selbst traegt.
-
-Offene Punkte dieses Vorhabens:
-
-* **Doppelverrechnung bei Mieterwechsel.** Ein rein einheiten-gebundener Anker fuehrt dazu, dass eine Quartalsposition auf den Rechnungen **beider** Mieter erscheint, die sich das Quartal teilen — der heutige Mieter-Anker verhindert das. Zu loesen entweder ueber einen Zeitraum an der Zuordnung Mieter-Einheit oder ueber einen echten Von/Bis-Zeitraum an der Position statt Jahr/Quartal. Letzteres passt ohnehin besser zu importierten, datierten Mengen.
-* **Eindeutigkeit von `messpunkt`.** Das Feld ist heute bewusst **nicht** eindeutig (BEZUG und RUECKLIEFERUNG teilen sich einen Messpunkt, siehe `EinheitRepository.findAllByOrgIdAndMesspunkt`). Fuer die Import-Zuordnung braucht es einen partiellen Unique-Index, z.B. `(org_id, messpunkt) WHERE typ = 'LADESTATION'`.
-* **Verteilung und Bilanz.** Ein neuer Typ wird an rund 40 Stellen in 9 Backend-Dateien ausgewertet. Zu entscheiden ist, ob Ladestations-Einheiten an der Solarverteilung teilnehmen und wie sich das auf den Bilanzabgleich (`Specs/Bilanzmodell.md`) auswirkt, sobald Messwerte fliessen.
-* **Vertragspartner als Fernziel.** `Mieter` vermischt zwei Rollen: Mietverhaeltnis (Einheit + Zeitraum) und Rechnungsempfaenger (Name + Adresse). Derselbe Nutzer erscheint dadurch je Einheit erneut, mit dupliziertem Namen und Adresse. Eine eigene Vertragspartner-Entitaet, auf die Mietverhaeltnisse und Ladestations-Nutzungen zeigen, raeumt das auf — eigenes Vorhaben, das Rechnung, Debitor und Mieterverwaltung beruehrt.
+Das frühere „Zielbild" dieses Abschnitts ist umgesetzt und vollständig nach
+[`Specs/Ladestationen.md`](./Ladestationen.md) gewandert: Ladestationen als eigene Einheiten vom
+Typ `LADESTATION` mit der RFID im `messpunkt`, Tarifposition an der Einheit, mehrere Einheiten je
+Mieter. Dort stehen auch die verbliebenen offenen Punkte (Teilnahme an der Solarverteilung und
+Bilanzabgleich, Vertragspartner-Entität als Fernziel).
 
 ## 8. Offene Fragen
-* [ ] **Schnittstelle Lademanagement:** Welches System, welches Protokoll (API/CSV/OCPP), welche Granularität (je Ladepunkt, je Nutzer, je Quartal)? Eigene Spec, sobald bekannt. Die Tarif-Auflösung ist bereits geklärt: höchstens ein gültiger `LADESTROM`-Tarif je Zeitraum, höchstens eine Position je Mieter und Quartal — damit ist die Zuordnung eindeutig. Die **Identifikation des Nutzers** ist offen: welche Kennung das Lademanagement liefert (Ladepunkt-ID, RFID-Karte, Benutzerkonto) und wie sie auf eine Ladestations-Einheit abgebildet wird (Abschnitt 7). Ebenfalls dort zu regeln: der Umgang mit bereits manuell erfassten Positionen.
+* [ ] **Schnittstelle Lademanagement:** Welches System, welches Protokoll (API/CSV/OCPP), welche Granularität (je Ladepunkt, je Nutzer, je Quartal)? Eigene Spec, sobald bekannt. Die Tarif-Auflösung ist bereits geklärt: höchstens ein gültiger `LADESTROM`-Tarif je Zeitraum, höchstens eine Position je Einheit und Quartal — damit ist die Zuordnung eindeutig. Die **Identifikation des Nutzers** ist inzwischen geklärt (`Ladestationen.md`): Das Lademanagement meldet je **RFID**, und die RFID steht im `messpunkt` der Ladestations-Einheit. Offen bleiben Protokoll und Granularität. Ebenfalls dort zu regeln: der Umgang mit bereits manuell erfassten Positionen.
 
 ### Beantwortet (in §1/§2 eingearbeitet)
 | Frage | Antwort |
 |---|---|
 | Permission | `rechnungen:manage` |
-| Mieterwechsel im Quartal | Anker am **Mieter** — jeder trägt seine eigene Position |
-| Tarifgültigkeit vs. Quartal | Weder harte Abweisung noch Warnung: stattdessen **Eindeutigkeit** je Mieter/Quartal/Tariftyp und höchstens **ein gültiger** `LADESTROM`-Tarif je Zeitraum |
-| Tarif-Auflösung beim Import | Nur ein gültiger Tarif je Zeitraum und Mieter |
+| Mieterwechsel im Quartal | Ursprünglich Anker am **Mieter**; seit `Ladestationen.md` an der **Einheit** — beim Wechsel entsteht mit der neuen RFID eine neue Einheit, jeder trägt damit weiterhin seine eigene Position |
+| Tarifgültigkeit vs. Quartal | Weder harte Abweisung noch Warnung: stattdessen **Eindeutigkeit** je Einheit/Quartal/Tariftyp und höchstens **ein gültiger** `LADESTROM`-Tarif je Zeitraum |
+| Tarif-Auflösung beim Import | Nur ein gültiger Tarif je Zeitraum und Einheit |
 | Zuordnung des Ladestrom-Messpunkts | Über einen **Mieter** (Eigentümer als Mieter-Datensatz) |
 | Doppelverrechnungsschutz | **Vorerst bewusst ohne.** Ein „bereits verrechnet"-Status setzte voraus, dass Rechnungen (oder ein Verrechnungsvermerk) persistiert werden — das ist heute nicht der Fall und waere ein eigenes Vorhaben. Stattdessen ein Hinweis in der Erfassungsmaske (FR-3) |
-| Ladepunkt-Kennung | In dieser Umsetzung **nur an der Position** (`erfassungsart` + `quell_referenz`). Das urspruengliche Feld am Mieter ist mit `V103` entfallen; strukturell geloest wird die Zuordnung im Zielbild (Abschnitt 7) |
+| Ladepunkt-Kennung | An der Position als Herkunft (`erfassungsart` + `quell_referenz`) und seit `Ladestationen.md` als **RFID im `messpunkt`** der Ladestations-Einheit. Das urspruengliche Feld am Mieter ist mit `V103` entfallen |

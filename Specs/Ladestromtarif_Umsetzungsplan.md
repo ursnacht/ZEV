@@ -12,6 +12,11 @@ Umsetzung.
 
 Grundlage: [`Specs/Ladestromtarif.md`](./Ladestromtarif.md).
 
+> **Stand:** Die Phasentabelle unten hält fest, was **damals** umgesetzt wurde — inklusive des
+> Ankers am Mieter und des inzwischen entfallenen `mieter.ladepunkt`. Der Anker liegt seit
+> [`Specs/Ladestationen.md`](./Ladestationen.md) an der **Einheit** (`V106`). Die Phasen bleiben
+> als Historie stehen; die Validierungsregeln weiter unten sind nachgezogen.
+
 > **Zwei Arbeitspakete, die es NICHT gibt** – beide im Review verifiziert, damit sie nicht aus
 > Gewohnheit doch eingeplant werden:
 > * **Keine Tarif-Überschneidungsprüfung bauen.** `TarifService.saveTarif` prüft bereits
@@ -86,11 +91,11 @@ Grundlage: [`Specs/Ladestromtarif.md`](./Ladestromtarif.md).
 ## Validierungen
 
 ### Backend (massgeblich)
-- **`mieter_id`:** muss existieren und zum Mandanten gehören → sonst `400`.
+- **`einheit_id`:** muss existieren, zum Mandanten gehören und vom Typ `LADESTATION` sein → sonst `400`. *(Bis `V106` war es `mieter_id`.)*
 - **`tarif_id`:** muss existieren **und** einen Typ aus der Menge der manuell erfassten Typen haben (aktuell nur `LADESTROM`) → sonst `400`.
 - **`menge`:** `≥ 0`; `< 0` → `400`. `= 0` ist gültig, erzeugt aber keine Rechnungszeile.
 - **`quartal`:** `1..4`; **`jahr`:** plausibel (2000–2100).
-- **Eindeutigkeit:** höchstens eine Position je (`org_id`, `mieter_id`, `jahr`, `quartal`, **Tariftyp**) – im Service geprüft, da der Typ am Tarif hängt; DB-UNIQUE über `tarif_id` als Netz gegen exakte Duplikate.
+- **Eindeutigkeit:** höchstens eine Position je (`org_id`, `einheit_id`, `jahr`, `quartal`, **Tariftyp**) – im Service geprüft, da der Typ am Tarif hängt; DB-UNIQUE über `tarif_id` als Netz gegen exakte Duplikate.
 - **Autorisierung:** Schreiben `rechnungen:manage`, Lesen `mieter:read` – sonst `403`.
 - **Mandantentrennung:** `orgFilter` in jedem Service-Zugriff; `orgId` **nie** aus dem Request.
 
@@ -104,7 +109,7 @@ Grundlage: [`Specs/Ladestromtarif.md`](./Ladestromtarif.md).
 ## Offene Punkte / Annahmen
 
 - **Doppelverrechnungsschutz: entschieden — vorerst ohne** (2026-08-16). Rechnungen werden nicht persistiert, es gibt keinen „bereits verrechnet"-Status; zwei Läufe über denselben Zeitraum nehmen die Position zweimal auf. Abgesichert wird das **organisatorisch** plus einem dauerhaften Hinweis in der Erfassungsansicht (Phase 9). Ein technischer Schutz setzte das Persistieren von Rechnungen voraus und waere ein eigenes Vorhaben.
-- **Schnittstelle Lademanagement: out of scope.** Vorbereitet sind `erfassungsart` und `quell_referenz`; `IMPORT` wird in dieser Umsetzung nie geschrieben. Das entschiedene Zielbild (Einheit vom Typ `LADESTATION`, Kennung in `einheit.messpunkt`, mehrere Einheiten je Mieter) steht in `Specs/Ladestromtarif.md`, Abschnitt 7.
+- **Schnittstelle Lademanagement: out of scope.** Vorbereitet sind `erfassungsart` und `quell_referenz`; `IMPORT` wird in dieser Umsetzung nie geschrieben. Das Zielbild (Einheit vom Typ `LADESTATION`, Kennung in `einheit.messpunkt`, mehrere Einheiten je Mieter) ist inzwischen umgesetzt und steht in [`Specs/Ladestationen.md`](./Ladestationen.md).
 - **Migrationsnummern `V100`–`V102`** waren zum Umsetzungszeitpunkt frei (`V99` war die höchste vorhandene), alle drei sind angewendet.
 - **Gelernt:** Ein neuer `TarifTyp` ist **nicht** rein additiv – der CHECK-Constraint auf `tarif.tariftyp` zählt die Werte auf. Bei künftigen Enum-Erweiterungen die DB-Constraints der betroffenen Spalte prüfen (`pg_get_constraintdef`), nicht nur den Spaltentyp.
 - **Mieter-Auswahl auf der neuen Seite:** Annahme – alle Mieter des Mandanten, alphabetisch, ohne Filter auf aktive Mietverhältnisse. Bei vielen Mietern wäre eine Suche nachzurüsten.
