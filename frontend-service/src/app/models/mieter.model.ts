@@ -6,5 +6,9 @@ export interface Mieter {
   ort?: string;
   mietbeginn: string;  // ISO date format: YYYY-MM-DD
   mietende?: string;   // ISO date format: YYYY-MM-DD, optional
-  einheitId: number;
+  /**
+   * Zugeordnete Einheiten (Wohnung und/oder Ladestation(en)) - mindestens eine.
+   * Ersetzt das fruehere Einzelfeld `einheitId`; siehe Specs/Ladestationen.md.
+   */
+  einheitIds: number[];
 }

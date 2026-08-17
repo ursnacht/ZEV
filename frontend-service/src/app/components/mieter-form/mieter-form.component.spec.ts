@@ -41,7 +41,7 @@ describe('MieterFormComponent', () => {
       expect(component.formData.strasse).toBe('');
       expect(component.formData.plz).toBe('');
       expect(component.formData.ort).toBe('');
-      expect(component.formData.einheitId).toBe(0);
+      expect(component.formData.einheitIds).toEqual([]);
     });
 
     it('should set default mietbeginn to today', () => {
@@ -58,7 +58,7 @@ describe('MieterFormComponent', () => {
         ort: 'Zürich',
         mietbeginn: '2024-01-01',
         mietende: '2025-12-31',
-        einheitId: 1
+        einheitIds: [1]
       };
 
       component.mieter = inputMieter;
@@ -70,7 +70,7 @@ describe('MieterFormComponent', () => {
       expect(component.formData.ort).toBe('Zürich');
       expect(component.formData.mietbeginn).toBe('2024-01-01');
       expect(component.formData.mietende).toBe('2025-12-31');
-      expect(component.formData.einheitId).toBe(1);
+      expect(component.formData.einheitIds).toEqual([1]);
     });
   });
 
@@ -82,7 +82,7 @@ describe('MieterFormComponent', () => {
         plz: '8000',
         ort: 'Zürich',
         mietbeginn: '2024-01-01',
-        einheitId: 1
+        einheitIds: [1]
       };
       expect(component.isFormValid()).toBe(false);
     });
@@ -94,7 +94,7 @@ describe('MieterFormComponent', () => {
         plz: '8000',
         ort: 'Zürich',
         mietbeginn: '2024-01-01',
-        einheitId: 1
+        einheitIds: [1]
       };
       expect(component.isFormValid()).toBe(false);
     });
@@ -106,7 +106,7 @@ describe('MieterFormComponent', () => {
         plz: '8000',
         ort: 'Zürich',
         mietbeginn: '2024-01-01',
-        einheitId: 1
+        einheitIds: [1]
       };
       expect(component.isFormValid()).toBe(false);
     });
@@ -118,7 +118,7 @@ describe('MieterFormComponent', () => {
         plz: '',
         ort: 'Zürich',
         mietbeginn: '2024-01-01',
-        einheitId: 1
+        einheitIds: [1]
       };
       expect(component.isFormValid()).toBe(false);
     });
@@ -130,7 +130,7 @@ describe('MieterFormComponent', () => {
         plz: '8000',
         ort: '',
         mietbeginn: '2024-01-01',
-        einheitId: 1
+        einheitIds: [1]
       };
       expect(component.isFormValid()).toBe(false);
     });
@@ -142,19 +142,19 @@ describe('MieterFormComponent', () => {
         plz: '8000',
         ort: 'Zürich',
         mietbeginn: '',
-        einheitId: 1
+        einheitIds: [1]
       };
       expect(component.isFormValid()).toBe(false);
     });
 
-    it('should return false when einheitId is 0', () => {
+    it('should return false when no einheit is assigned', () => {
       component.formData = {
         name: 'Max',
         strasse: 'Str. 1',
         plz: '8000',
         ort: 'Zürich',
         mietbeginn: '2024-01-01',
-        einheitId: 0
+        einheitIds: []
       };
       expect(component.isFormValid()).toBe(false);
     });
@@ -167,7 +167,7 @@ describe('MieterFormComponent', () => {
         ort: 'Zürich',
         mietbeginn: '2024-12-31',
         mietende: '2024-01-01',
-        einheitId: 1
+        einheitIds: [1]
       };
       expect(component.isFormValid()).toBe(false);
     });
@@ -179,7 +179,7 @@ describe('MieterFormComponent', () => {
         plz: '8000',
         ort: 'Zürich',
         mietbeginn: '2024-01-01',
-        einheitId: 1
+        einheitIds: [1]
       };
       expect(component.isFormValid()).toBe(true);
     });
@@ -192,7 +192,7 @@ describe('MieterFormComponent', () => {
         ort: 'Zürich',
         mietbeginn: '2024-01-01',
         mietende: '',
-        einheitId: 1
+        einheitIds: [1]
       };
       expect(component.isFormValid()).toBe(true);
     });
@@ -239,7 +239,7 @@ describe('MieterFormComponent', () => {
         plz: '8000',
         ort: 'Zürich',
         mietbeginn: '2024-01-01',
-        einheitId: 1
+        einheitIds: [1]
       };
 
       component.onSubmit();
@@ -255,7 +255,7 @@ describe('MieterFormComponent', () => {
         plz: '',
         ort: '',
         mietbeginn: '',
-        einheitId: 0
+        einheitIds: []
       };
 
       component.onSubmit();
@@ -280,7 +280,7 @@ describe('MieterFormComponent', () => {
         ort: 'Zürich',
         mietbeginn: '2024-01-01',
         mietende: '',
-        einheitId: 1
+        einheitIds: [1]
       };
 
       component.onSubmit();

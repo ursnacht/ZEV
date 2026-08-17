@@ -2,7 +2,8 @@ package ch.nacht.controller;
 
 import ch.nacht.dto.TarifpositionDTO;
 import ch.nacht.entity.Erfassungsart;
-import ch.nacht.entity.Mieter;
+import ch.nacht.entity.Einheit;
+import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
 import ch.nacht.entity.Tarifposition;
@@ -60,7 +61,7 @@ public class TarifpositionControllerTest {
 
     private ObjectMapper objectMapper;
 
-    private Mieter testMieter;
+    private Einheit testEinheit;
     private Tarif ladestromTarif;
     private Tarifposition testPosition1;
     private Tarifposition testPosition2;
@@ -70,8 +71,9 @@ public class TarifpositionControllerTest {
         objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
 
-        testMieter = new Mieter("Max Muster", LocalDate.of(2026, 1, 1), 1L);
-        testMieter.setId(1L);
+        testEinheit = new Einheit("Ladestation 1", EinheitTyp.LADESTATION);
+        testEinheit.setId(1L);
+        testEinheit.setMesspunkt("RFID-001");
 
         ladestromTarif = new Tarif(
                 "Ladestrom",
@@ -81,19 +83,19 @@ public class TarifpositionControllerTest {
                 LocalDate.of(2026, 12, 31));
         ladestromTarif.setId(10L);
 
-        testPosition1 = new Tarifposition(testMieter, ladestromTarif, 2026, 3, new BigDecimal("120.500"));
+        testPosition1 = new Tarifposition(testEinheit, ladestromTarif, 2026, 3, new BigDecimal("120.500"));
         testPosition1.setId(1L);
         testPosition1.setQuellReferenz("LP-01");
         testPosition1.setBemerkung("Beleg 42");
 
-        testPosition2 = new Tarifposition(testMieter, ladestromTarif, 2026, 4, new BigDecimal("80.000"));
+        testPosition2 = new Tarifposition(testEinheit, ladestromTarif, 2026, 4, new BigDecimal("80.000"));
         testPosition2.setId(2L);
         testPosition2.setErfassungsart(Erfassungsart.IMPORT);
     }
 
     private TarifpositionDTO neuesDto() {
         TarifpositionDTO dto = new TarifpositionDTO();
-        dto.setMieterId(1L);
+        dto.setEinheitId(1L);
         dto.setTarifId(10L);
         dto.setJahr(2026);
         dto.setQuartal(3);
@@ -106,16 +108,16 @@ public class TarifpositionControllerTest {
     // ==================== GET /api/tarifpositionen ====================
 
     @Test
-    void getByMieter_ReturnsListOfPositions() throws Exception {
-        when(tarifpositionService.getByMieter(1L))
+    void getByEinheit_ReturnsListOfPositions() throws Exception {
+        when(tarifpositionService.getByEinheit(1L))
                 .thenReturn(Arrays.asList(testPosition1, testPosition2));
 
-        mockMvc.perform(get("/api/tarifpositionen").param("mieterId", "1"))
+        mockMvc.perform(get("/api/tarifpositionen").param("einheitId", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].id", is(1)))
-                .andExpect(jsonPath("$[0].mieterId", is(1)))
-                .andExpect(jsonPath("$[0].mieterName", is("Max Muster")))
+                .andExpect(jsonPath("$[0].einheitId", is(1)))
+                .andExpect(jsonPath("$[0].einheitName", is("Ladestation 1")))
                 .andExpect(jsonPath("$[0].tarifId", is(10)))
                 .andExpect(jsonPath("$[0].tarifBezeichnung", is("Ladestrom")))
                 .andExpect(jsonPath("$[0].tarifPreis", is(0.35000)))
@@ -129,19 +131,19 @@ public class TarifpositionControllerTest {
 
     @Test
     void getByMieter_NoPositions_ReturnsEmptyList() throws Exception {
-        when(tarifpositionService.getByMieter(1L)).thenReturn(Collections.emptyList());
+        when(tarifpositionService.getByEinheit(1L)).thenReturn(Collections.emptyList());
 
-        mockMvc.perform(get("/api/tarifpositionen").param("mieterId", "1"))
+        mockMvc.perform(get("/api/tarifpositionen").param("einheitId", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(0)));
     }
 
     @Test
-    void getByMieter_MissingMieterId_ReturnsBadRequest() throws Exception {
+    void getByMieter_MissingEinheitId_ReturnsBadRequest() throws Exception {
         mockMvc.perform(get("/api/tarifpositionen"))
                 .andExpect(status().isBadRequest());
 
-        verify(tarifpositionService, never()).getByMieter(any());
+        verify(tarifpositionService, never()).getByEinheit(any());
     }
 
     // ==================== GET /api/tarifpositionen/{id} ====================
@@ -194,7 +196,7 @@ public class TarifpositionControllerTest {
 
         // Beim Anlegen darf keine ID mitgegeben werden
         assertNull(uebergeben.getId());
-        assertEquals(1L, uebergeben.getMieter().getId());
+        assertEquals(1L, uebergeben.getEinheit().getId());
         assertEquals(10L, uebergeben.getTarif().getId());
         assertEquals(2026, uebergeben.getJahr());
         assertEquals(3, uebergeben.getQuartal());

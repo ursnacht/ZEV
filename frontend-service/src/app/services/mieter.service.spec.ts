@@ -15,7 +15,7 @@ describe('MieterService', () => {
     plz: '8000',
     ort: 'Zürich',
     mietbeginn: '2024-01-01',
-    einheitId: 1
+    einheitIds: [1]
   };
 
   const mockMieterList: Mieter[] = [
@@ -28,7 +28,7 @@ describe('MieterService', () => {
       ort: 'Bern',
       mietbeginn: '2024-06-01',
       mietende: '2025-05-31',
-      einheitId: 3
+      einheitIds: [3]
     }
   ];
 
@@ -95,7 +95,7 @@ describe('MieterService', () => {
         plz: '4000',
         ort: 'Basel',
         mietbeginn: '2025-01-01',
-        einheitId: 2
+        einheitIds: [2]
       };
 
       const createdMieter = { ...newMieter, id: 3 };

@@ -1,7 +1,9 @@
 package ch.nacht.service;
 
 import ch.nacht.entity.Mieter;
+import ch.nacht.repository.MieterEinheitRepository;
 import ch.nacht.repository.MieterRepository;
+import ch.nacht.repository.TarifpositionRepository;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,6 +30,12 @@ public class MieterServiceTest {
 
     @Mock
     private MieterRepository mieterRepository;
+
+    @Mock
+    private MieterEinheitRepository mieterEinheitRepository;
+
+    @Mock
+    private TarifpositionRepository tarifpositionRepository;
 
     @Mock
     private OrganizationContextService organizationContextService;
@@ -60,7 +68,7 @@ public class MieterServiceTest {
     void getAllMieter_ReturnsSortedList() {
         Mieter mieter2 = new Mieter("Anna Beispiel", LocalDate.of(2024, 4, 1), 2L);
         mieter2.setId(2L);
-        when(mieterRepository.findAllByOrderByEinheitIdAscMietbeginnDesc())
+        when(mieterRepository.findAllByOrderByNameAscMietbeginnDesc())
                 .thenReturn(Arrays.asList(testMieter, mieter2));
 
         List<Mieter> result = mieterService.getAllMieter();
@@ -68,12 +76,12 @@ public class MieterServiceTest {
         assertEquals(2, result.size());
         assertEquals("Max Muster", result.get(0).getName());
         verify(hibernateFilterService).enableOrgFilter();
-        verify(mieterRepository).findAllByOrderByEinheitIdAscMietbeginnDesc();
+        verify(mieterRepository).findAllByOrderByNameAscMietbeginnDesc();
     }
 
     @Test
     void getAllMieter_EmptyList_ReturnsEmptyList() {
-        when(mieterRepository.findAllByOrderByEinheitIdAscMietbeginnDesc())
+        when(mieterRepository.findAllByOrderByNameAscMietbeginnDesc())
                 .thenReturn(Collections.emptyList());
 
         List<Mieter> result = mieterService.getAllMieter();

@@ -3,6 +3,8 @@ package ch.nacht.repository;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -28,4 +30,21 @@ public interface EinheitRepository extends JpaRepository<Einheit, Long> {
 
     /** Eindeutigkeit der Bilanz-Typen je Mandant beim Update (orgFilter muss aktiv sein). */
     boolean existsByTypAndIdNot(EinheitTyp typ, Long id);
+
+    /**
+     * Prüft, ob eine <b>andere</b> Ladestations-Einheit dieselbe RFID (`messpunkt`) trägt.
+     * Nur für {@code LADESTATION}: Die Bilanz-Typen dürfen sich einen Messpunkt teilen, deshalb
+     * ist die Eindeutigkeit auf diesen Typ eingeschränkt (orgFilter muss aktiv sein).
+     *
+     * @param messpunkt RFID der Ladestation
+     * @param excludeId Eigene ID beim Update, {@code -1} beim Anlegen
+     * @return true, wenn die RFID bereits einer anderen Ladestation gehört
+     */
+    @Query("SELECT COUNT(e) > 0 FROM Einheit e WHERE e.messpunkt = :messpunkt "
+            + "AND e.typ = ch.nacht.entity.EinheitTyp.LADESTATION "
+            + "AND e.id != :excludeId")
+    boolean existsLadestationWithMesspunkt(
+        @Param("messpunkt") String messpunkt,
+        @Param("excludeId") Long excludeId
+    );
 }

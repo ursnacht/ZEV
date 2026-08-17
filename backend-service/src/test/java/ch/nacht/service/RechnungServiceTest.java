@@ -813,8 +813,16 @@ public class RechnungServiceTest {
         return tarif;
     }
 
-    private Tarifposition tarifposition(Tarif tarif, Mieter mieter, int jahr, int quartal, String menge) {
-        Tarifposition position = new Tarifposition(mieter, tarif, jahr, quartal, new BigDecimal(menge));
+    /** Ladestations-Einheit, an der die Tarifpositionen haengen (Specs/Ladestationen.md). */
+    private Einheit ladestation() {
+        Einheit einheit = new Einheit("Ladestation", EinheitTyp.LADESTATION);
+        einheit.setId(900L);
+        einheit.setMesspunkt("RFID-900");
+        return einheit;
+    }
+
+    private Tarifposition tarifposition(Tarif tarif, Einheit einheit, int jahr, int quartal, String menge) {
+        Tarifposition position = new Tarifposition(einheit, tarif, jahr, quartal, new BigDecimal(menge));
         position.setId(1L);
         return position;
     }
@@ -843,8 +851,8 @@ public class RechnungServiceTest {
 
         Mieter mieter = mieterMitMesswerten(von, bis);
         Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
-        when(tarifpositionService.getFuerRechnung(1L, von, bis))
-            .thenReturn(List.of(tarifposition(ladestrom, mieter, 2024, 1, "120.000")));
+        when(tarifpositionService.getFuerRechnung(anyCollection(), eq(von), eq(bis)))
+            .thenReturn(List.of(tarifposition(ladestrom, ladestation(), 2024, 1, "120.000")));
 
         RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
 
@@ -869,8 +877,8 @@ public class RechnungServiceTest {
 
         Mieter mieter = mieterMitMesswerten(von, bis);
         Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
-        when(tarifpositionService.getFuerRechnung(1L, von, bis))
-            .thenReturn(List.of(tarifposition(ladestrom, mieter, 2024, 3, "10.000")));
+        when(tarifpositionService.getFuerRechnung(anyCollection(), eq(von), eq(bis)))
+            .thenReturn(List.of(tarifposition(ladestrom, ladestation(), 2024, 3, "10.000")));
 
         RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
 
@@ -890,8 +898,8 @@ public class RechnungServiceTest {
         Mieter mieter = mieterMitMesswerten(von, bis);
         Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
         // Gespeichert mit 3 NKS, dargestellt/verrechnet gerundet wie ZEV/VNB
-        when(tarifpositionService.getFuerRechnung(1L, von, bis))
-            .thenReturn(List.of(tarifposition(ladestrom, mieter, 2024, 1, "120.567")));
+        when(tarifpositionService.getFuerRechnung(anyCollection(), eq(von), eq(bis)))
+            .thenReturn(List.of(tarifposition(ladestrom, ladestation(), 2024, 1, "120.567")));
 
         RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
 
@@ -910,8 +918,8 @@ public class RechnungServiceTest {
 
         Mieter mieter = mieterMitMesswerten(von, bis);
         Tarif ladestrom = ladestromTarif("Ladestrom", "0.33000");
-        when(tarifpositionService.getFuerRechnung(1L, von, bis))
-            .thenReturn(List.of(tarifposition(ladestrom, mieter, 2024, 1, "7.000")));
+        when(tarifpositionService.getFuerRechnung(anyCollection(), eq(von), eq(bis)))
+            .thenReturn(List.of(tarifposition(ladestrom, ladestation(), 2024, 1, "7.000")));
 
         RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
 
@@ -928,9 +936,9 @@ public class RechnungServiceTest {
 
         Mieter mieter = mieterMitMesswerten(von, bis);
         Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
-        Tarifposition position = tarifposition(ladestrom, mieter, 2024, 1, "10.000");
+        Tarifposition position = tarifposition(ladestrom, ladestation(), 2024, 1, "10.000");
         position.setQuellReferenz("LP-01");
-        when(tarifpositionService.getFuerRechnung(1L, von, bis)).thenReturn(List.of(position));
+        when(tarifpositionService.getFuerRechnung(anyCollection(), eq(von), eq(bis))).thenReturn(List.of(position));
 
         RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
 
@@ -948,8 +956,8 @@ public class RechnungServiceTest {
 
         Mieter mieter = mieterMitMesswerten(von, bis);
         Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
-        when(tarifpositionService.getFuerRechnung(1L, von, bis))
-            .thenReturn(List.of(tarifposition(ladestrom, mieter, 2024, 1, "10.000")));
+        when(tarifpositionService.getFuerRechnung(anyCollection(), eq(von), eq(bis)))
+            .thenReturn(List.of(tarifposition(ladestrom, ladestation(), 2024, 1, "10.000")));
 
         RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
 
@@ -967,9 +975,9 @@ public class RechnungServiceTest {
 
         Mieter mieter = mieterMitMesswerten(von, bis);
         Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
-        Tarifposition position = tarifposition(ladestrom, mieter, 2024, 1, "10.000");
+        Tarifposition position = tarifposition(ladestrom, ladestation(), 2024, 1, "10.000");
         position.setQuellReferenz("   ");
-        when(tarifpositionService.getFuerRechnung(1L, von, bis)).thenReturn(List.of(position));
+        when(tarifpositionService.getFuerRechnung(anyCollection(), eq(von), eq(bis))).thenReturn(List.of(position));
 
         RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
 
@@ -987,9 +995,9 @@ public class RechnungServiceTest {
 
         Mieter mieter = mieterMitMesswerten(von, bis);
         Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
-        when(tarifpositionService.getFuerRechnung(1L, von, bis)).thenReturn(List.of(
-            tarifposition(ladestrom, mieter, 2024, 1, "100.000"),
-            tarifposition(ladestrom, mieter, 2024, 2, "200.000")
+        when(tarifpositionService.getFuerRechnung(anyCollection(), eq(von), eq(bis))).thenReturn(List.of(
+            tarifposition(ladestrom, ladestation(), 2024, 1, "100.000"),
+            tarifposition(ladestrom, ladestation(), 2024, 2, "200.000")
         ));
 
         RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
@@ -1013,7 +1021,7 @@ public class RechnungServiceTest {
         LocalDate bis = LocalDate.of(2024, 1, 31);
 
         Mieter mieter = mieterMitMesswerten(von, bis);
-        when(tarifpositionService.getFuerRechnung(1L, von, bis)).thenReturn(Collections.emptyList());
+        when(tarifpositionService.getFuerRechnung(anyCollection(), eq(von), eq(bis))).thenReturn(Collections.emptyList());
 
         RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
 
@@ -1049,8 +1057,8 @@ public class RechnungServiceTest {
 
         Mieter mieter = mieterMitMesswerten(von, bis);
         Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
-        when(tarifpositionService.getFuerRechnung(1L, von, bis))
-            .thenReturn(List.of(tarifposition(ladestrom, mieter, 2024, 1, "10.000")));
+        when(tarifpositionService.getFuerRechnung(anyCollection(), eq(von), eq(bis)))
+            .thenReturn(List.of(tarifposition(ladestrom, ladestation(), 2024, 1, "10.000")));
 
         Tarif grundgebuehr = new Tarif(
             "Grundgebühr 2024", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
@@ -1096,10 +1104,12 @@ public class RechnungServiceTest {
 
         // Jeder Mieter traegt seine eigene Q1-Position - obwohl beide Rechnungen nur einen
         // Teil von Q1 abdecken (Ueberschneidungsregel FR-1.5).
-        when(tarifpositionService.getFuerRechnung(eq(1L), any(), any()))
-            .thenReturn(List.of(tarifposition(ladestrom, mieterA, 2024, 1, "100.000")));
-        when(tarifpositionService.getFuerRechnung(eq(2L), any(), any()))
-            .thenReturn(List.of(tarifposition(ladestrom, mieterB, 2024, 1, "200.000")));
+        when(mieterService.getEinheitIds(mieterA.getId())).thenReturn(List.of(1L));
+        when(mieterService.getEinheitIds(mieterB.getId())).thenReturn(List.of(2L));
+        when(tarifpositionService.getFuerRechnung(eq(List.of(1L)), any(), any()))
+            .thenReturn(List.of(tarifposition(ladestrom, ladestation(), 2024, 1, "100.000")));
+        when(tarifpositionService.getFuerRechnung(eq(List.of(2L)), any(), any()))
+            .thenReturn(List.of(tarifposition(ladestrom, ladestation(), 2024, 1, "200.000")));
 
         List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(1L), von, bis);
 

@@ -21,13 +21,15 @@ import { IconComponent } from '../icon/icon.component';
 })
 export class TarifpositionFormComponent implements OnInit {
   @Input() position: Tarifposition | null = null;
-  @Input() mieterId: number | null = null;
+  @Input() einheitId: number | null = null;
+  /** Messpunkt (RFID) der gewaehlten Einheit - belegt die Quell-Referenz vor. */
+  @Input() messpunkt = '';
   @Input() tarife: Tarif[] = [];
   @Output() save = new EventEmitter<Tarifposition>();
   @Output() cancel = new EventEmitter<void>();
 
   formData: Tarifposition = {
-    mieterId: 0,
+    einheitId: 0,
     tarifId: 0,
     jahr: new Date().getFullYear(),
     quartal: 1,
@@ -49,11 +51,12 @@ export class TarifpositionFormComponent implements OnInit {
       }
     } else {
       this.formData = {
-        mieterId: this.mieterId ?? 0,
+        einheitId: this.einheitId ?? 0,
         tarifId: this.tarife.length === 1 ? (this.tarife[0].id ?? 0) : 0,
         jahr: aktuellesJahr,
         quartal: this.aktuellesQuartal(),
-        menge: 0
+        menge: 0,
+        quellReferenz: this.messpunkt || undefined
       };
     }
   }
@@ -70,7 +73,7 @@ export class TarifpositionFormComponent implements OnInit {
 
   isFormValid(): boolean {
     return !!(
-      this.formData.mieterId &&
+      this.formData.einheitId &&
       this.formData.tarifId &&
       this.formData.jahr &&
       this.formData.quartal &&

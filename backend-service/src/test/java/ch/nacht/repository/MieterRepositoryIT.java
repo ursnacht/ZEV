@@ -4,6 +4,7 @@ import ch.nacht.AbstractIntegrationTest;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Mieter;
+import ch.nacht.entity.MieterEinheit;
 import ch.nacht.entity.Organisation;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +36,9 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
     private EinheitRepository einheitRepository;
 
     @Autowired
+    private MieterEinheitRepository mieterEinheitRepository;
+
+    @Autowired
     private OrganisationRepository organisationRepository;
 
     private Long TEST_ORG_ID;
@@ -42,6 +46,7 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        mieterEinheitRepository.deleteAll();
         mieterRepository.deleteAll();
         einheitRepository.deleteAll();
 
@@ -58,8 +63,19 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
 
     @AfterEach
     void tearDown() {
+        mieterEinheitRepository.deleteAll();
         mieterRepository.deleteAll();
         einheitRepository.deleteAll();
+    }
+
+    /**
+     * Speichert den Mieter samt Zuordnung zur Test-Einheit. Seit {@code V105} liegt die Beziehung
+     * in {@code mieter_einheit}; ohne die Zuordnung findet keine der Einheiten-Abfragen etwas.
+     */
+    private Mieter saveMieterMitEinheit(String name, LocalDate mietbeginn, LocalDate mietende) {
+        Mieter gespeichert = mieterRepository.save(createMieter(name, mietbeginn, mietende));
+        mieterEinheitRepository.save(new MieterEinheit(TEST_ORG_ID, gespeichert.getId(), einheitId));
+        return gespeichert;
     }
 
     private Mieter createMieter(String name, LocalDate mietbeginn, LocalDate mietende) {
@@ -71,7 +87,6 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
         mieter.setOrt("Zürich");
         mieter.setMietbeginn(mietbeginn);
         mieter.setMietende(mietende);
-        mieter.setEinheitId(einheitId);
         return mieter;
     }
 
@@ -88,22 +103,26 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
         assertThat(saved.getName()).isEqualTo("Max Mustermann");
         assertThat(saved.getMietbeginn()).isEqualTo(LocalDate.of(2024, 1, 1));
         assertThat(saved.getMietende()).isNull();
-        assertThat(saved.getEinheitId()).isEqualTo(einheitId);
         assertThat(saved.getOrgId()).isEqualTo(TEST_ORG_ID);
     }
 
     @Test
-    void shouldFindAllByOrderByEinheitIdAscMietbeginnDesc() {
-        // Given – two mieter on the same Einheit, one starts later
-        mieterRepository.save(createMieter("Erster Mieter", LocalDate.of(2023, 1, 1), LocalDate.of(2023, 12, 31)));
-        mieterRepository.save(createMieter("Zweiter Mieter", LocalDate.of(2024, 1, 1), null));
+    void shouldFindAllByOrderByNameAscMietbeginnDesc() {
+        // Given – zwei Mietzeiten desselben Namens plus ein alphabetisch spaeterer Name
+        saveMieterMitEinheit("Anna Beispiel", LocalDate.of(2023, 1, 1), LocalDate.of(2023, 12, 31));
+        saveMieterMitEinheit("Anna Beispiel", LocalDate.of(2024, 1, 1), null);
+        saveMieterMitEinheit("Zora Muster", LocalDate.of(2022, 1, 1), null);
 
         // When
-        List<Mieter> result = mieterRepository.findAllByOrderByEinheitIdAscMietbeginnDesc();
+        List<Mieter> result = mieterRepository.findAllByOrderByNameAscMietbeginnDesc();
 
         // Then
-        assertThat(result).hasSize(2);
-        // Within the same einheitId, ordered by mietbeginn desc → newest first
+        assertThat(result).hasSize(3);
+        // Primaer nach Name aufsteigend ...
+        assertThat(result.get(0).getName()).isEqualTo("Anna Beispiel");
+        assertThat(result.get(1).getName()).isEqualTo("Anna Beispiel");
+        assertThat(result.get(2).getName()).isEqualTo("Zora Muster");
+        // ... bei gleichem Namen nach Mietbeginn absteigend (neueste Mietzeit zuerst)
         assertThat(result.get(0).getMietbeginn()).isEqualTo(LocalDate.of(2024, 1, 1));
         assertThat(result.get(1).getMietbeginn()).isEqualTo(LocalDate.of(2023, 1, 1));
     }
@@ -111,8 +130,8 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldFindByEinheitIdOrderByMietbeginnDesc() {
         // Given
-        mieterRepository.save(createMieter("Alt", LocalDate.of(2022, 6, 1), LocalDate.of(2023, 5, 31)));
-        mieterRepository.save(createMieter("Neu", LocalDate.of(2023, 6, 1), null));
+        saveMieterMitEinheit("Alt", LocalDate.of(2022, 6, 1), LocalDate.of(2023, 5, 31));
+        saveMieterMitEinheit("Neu", LocalDate.of(2023, 6, 1), null);
 
         // When
         List<Mieter> result = mieterRepository.findByEinheitIdOrderByMietbeginnDesc(einheitId);
@@ -126,7 +145,7 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldFindByEinheitIdOrderByMietbeginnDesc_ReturnsEmptyForOtherEinheit() {
         // Given
-        mieterRepository.save(createMieter("Mieter A", LocalDate.of(2024, 1, 1), null));
+        saveMieterMitEinheit("Mieter A", LocalDate.of(2024, 1, 1), null);
 
         // When – search for a non-existent einheit
         List<Mieter> result = mieterRepository.findByEinheitIdOrderByMietbeginnDesc(99999L);
@@ -138,7 +157,7 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldDetectOverlappingMieterOpenEnded_WhenOpenEndedExists() {
         // Given – a current open-ended tenant
-        mieterRepository.save(createMieter("Aktueller Mieter", LocalDate.of(2024, 1, 1), null));
+        saveMieterMitEinheit("Aktueller Mieter", LocalDate.of(2024, 1, 1), null);
 
         // When – new tenant starting any date (open-ended) → overlap exists
         boolean overlaps = mieterRepository.existsOverlappingMieterOpenEnded(
@@ -151,7 +170,7 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldNotDetectOverlappingMieterOpenEnded_WhenPreviousTenantEnded() {
         // Given – a past tenant who already moved out before the new one starts
-        mieterRepository.save(createMieter("Alter Mieter", LocalDate.of(2023, 1, 1), LocalDate.of(2023, 12, 31)));
+        saveMieterMitEinheit("Alter Mieter", LocalDate.of(2023, 1, 1), LocalDate.of(2023, 12, 31));
 
         // When – new open-ended tenant starting after old one ended → no overlap
         boolean overlaps = mieterRepository.existsOverlappingMieterOpenEnded(
@@ -164,7 +183,7 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldExcludeSelfWhenCheckingOpenEndedOverlap() {
         // Given – existing open-ended mieter
-        Mieter existing = mieterRepository.save(createMieter("Selbst", LocalDate.of(2024, 1, 1), null));
+        Mieter existing = saveMieterMitEinheit("Selbst", LocalDate.of(2024, 1, 1), null);
 
         // When – check overlap excluding itself (edit scenario)
         boolean overlaps = mieterRepository.existsOverlappingMieterOpenEnded(
@@ -177,8 +196,8 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldDetectOverlappingMieterBounded_WhenPeriodsOverlap() {
         // Given – existing tenant 2024-01-01 to 2024-12-31
-        mieterRepository.save(createMieter("Bestehender Mieter",
-                LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)));
+        saveMieterMitEinheit("Bestehender Mieter",
+                LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31));
 
         // When – new bounded tenant overlapping the middle
         boolean overlaps = mieterRepository.existsOverlappingMieterBounded(
@@ -194,8 +213,8 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldNotDetectOverlappingMieterBounded_WhenPeriodsAdjacent() {
         // Given – existing tenant ends 2023-12-31
-        mieterRepository.save(createMieter("Vorheriger Mieter",
-                LocalDate.of(2023, 1, 1), LocalDate.of(2023, 12, 31)));
+        saveMieterMitEinheit("Vorheriger Mieter",
+                LocalDate.of(2023, 1, 1), LocalDate.of(2023, 12, 31));
 
         // When – new bounded tenant starts exactly on 2024-01-01 (adjacent, not overlapping)
         boolean overlaps = mieterRepository.existsOverlappingMieterBounded(
@@ -211,7 +230,7 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldDetectOtherMieterWithoutMietende_WhenOpenEndedExists() {
         // Given – existing open-ended tenant
-        mieterRepository.save(createMieter("Offener Mieter", LocalDate.of(2024, 1, 1), null));
+        saveMieterMitEinheit("Offener Mieter", LocalDate.of(2024, 1, 1), null);
 
         // When – check for another open-ended tenant on the same unit
         boolean exists = mieterRepository.existsOtherMieterWithoutMietende(einheitId, -1L);
@@ -223,7 +242,7 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldNotDetectOtherMieterWithoutMietende_WhenAllTenantsHaveMietende() {
         // Given – all tenants have an end date
-        mieterRepository.save(createMieter("Abgeschlossen", LocalDate.of(2023, 1, 1), LocalDate.of(2023, 12, 31)));
+        saveMieterMitEinheit("Abgeschlossen", LocalDate.of(2023, 1, 1), LocalDate.of(2023, 12, 31));
 
         // When
         boolean exists = mieterRepository.existsOtherMieterWithoutMietende(einheitId, -1L);
@@ -235,7 +254,7 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldExcludeSelfWhenCheckingOtherMieterWithoutMietende() {
         // Given – existing open-ended mieter
-        Mieter existing = mieterRepository.save(createMieter("Selbst offen", LocalDate.of(2024, 1, 1), null));
+        Mieter existing = saveMieterMitEinheit("Selbst offen", LocalDate.of(2024, 1, 1), null);
 
         // When – check excluding itself
         boolean exists = mieterRepository.existsOtherMieterWithoutMietende(einheitId, existing.getId());
@@ -247,8 +266,8 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldFindByEinheitIdAndQuartal_WhenMieterOverlapsQuartal() {
         // Given – tenant active during Q1 2024
-        mieterRepository.save(createMieter("Quartal Mieter",
-                LocalDate.of(2024, 1, 15), LocalDate.of(2024, 6, 30)));
+        saveMieterMitEinheit("Quartal Mieter",
+                LocalDate.of(2024, 1, 15), LocalDate.of(2024, 6, 30));
 
         // When – query for Q1 2024 (Jan–Mar)
         List<Mieter> result = mieterRepository.findByEinheitIdAndQuartal(
@@ -264,8 +283,8 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldFindByEinheitIdAndQuartal_WhenMieterIsOpenEndedAndStartsBeforeQuartal() {
         // Given – open-ended tenant who started before the quarter
-        mieterRepository.save(createMieter("Dauerhaft",
-                LocalDate.of(2023, 6, 1), null));
+        saveMieterMitEinheit("Dauerhaft",
+                LocalDate.of(2023, 6, 1), null);
 
         // When – query for Q2 2024
         List<Mieter> result = mieterRepository.findByEinheitIdAndQuartal(
@@ -281,8 +300,8 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldNotFindByEinheitIdAndQuartal_WhenMieterEndedBeforeQuartal() {
         // Given – tenant who ended before the quarter started
-        mieterRepository.save(createMieter("Abgelaufen",
-                LocalDate.of(2022, 1, 1), LocalDate.of(2022, 12, 31)));
+        saveMieterMitEinheit("Abgelaufen",
+                LocalDate.of(2022, 1, 1), LocalDate.of(2022, 12, 31));
 
         // When – query for Q1 2024
         List<Mieter> result = mieterRepository.findByEinheitIdAndQuartal(
@@ -297,10 +316,10 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldFindByEinheitIdAndQuartal_OrderedByMietbeginn() {
         // Given – two tenants within the same quarter
-        mieterRepository.save(createMieter("Späterer Mieter",
-                LocalDate.of(2024, 2, 1), LocalDate.of(2024, 3, 15)));
-        mieterRepository.save(createMieter("Früherer Mieter",
-                LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31)));
+        saveMieterMitEinheit("Späterer Mieter",
+                LocalDate.of(2024, 2, 1), LocalDate.of(2024, 3, 15));
+        saveMieterMitEinheit("Früherer Mieter",
+                LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31));
 
         // When
         List<Mieter> result = mieterRepository.findByEinheitIdAndQuartal(

@@ -28,7 +28,9 @@
       <label for="messpunkt">{{ 'MESSPUNKT' | translate }}:</label>
       <input type="text" id="messpunkt" class="zev-input" [(ngModel)]="formData.messpunkt" name="messpunkt" maxlength="50"
         [placeholder]="'MESSPUNKT_PLACEHOLDER' | translate" />
-      <div class="zev-form-hint">{{ 'MESSPUNKT_HINT' | translate }}</div>
+      <div class="zev-form-hint">
+        {{ (formData.typ === EinheitTyp.LADESTATION ? 'MESSPUNKT_HINT_LADESTATION' : 'MESSPUNKT_HINT') | translate }}
+      </div>
     </div>
 
     <div class="zev-form-actions zev-form-actions--equal">

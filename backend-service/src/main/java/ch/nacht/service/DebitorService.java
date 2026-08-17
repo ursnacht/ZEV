@@ -4,6 +4,7 @@ import ch.nacht.dto.DebitorDTO;
 import ch.nacht.entity.Debitor;
 import ch.nacht.repository.DebitorRepository;
 import ch.nacht.repository.EinheitRepository;
+import ch.nacht.repository.MieterEinheitRepository;
 import ch.nacht.repository.MieterRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +16,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Service for managing debitor entries (invoice tracking).
@@ -27,17 +29,20 @@ public class DebitorService {
     private final DebitorRepository debitorRepository;
     private final MieterRepository mieterRepository;
     private final EinheitRepository einheitRepository;
+    private final MieterEinheitRepository mieterEinheitRepository;
     private final OrganizationContextService organizationContextService;
     private final HibernateFilterService hibernateFilterService;
 
     public DebitorService(DebitorRepository debitorRepository,
                           MieterRepository mieterRepository,
                           EinheitRepository einheitRepository,
+                          MieterEinheitRepository mieterEinheitRepository,
                           OrganizationContextService organizationContextService,
                           HibernateFilterService hibernateFilterService) {
         this.debitorRepository = debitorRepository;
         this.mieterRepository = mieterRepository;
         this.einheitRepository = einheitRepository;
+        this.mieterEinheitRepository = mieterEinheitRepository;
         this.organizationContextService = organizationContextService;
         this.hibernateFilterService = hibernateFilterService;
     }
@@ -177,8 +182,14 @@ public class DebitorService {
         dto.setZahldatum(d.getZahldatum());
         mieterRepository.findById(d.getMieterId()).ifPresent(m -> {
             dto.setMieterName(m.getName());
-            einheitRepository.findById(m.getEinheitId())
-                    .ifPresent(e -> dto.setEinheitName(e.getName()));
+            // Ein Mieter kann mehreren Einheiten zugeordnet sein (Wohnung + Ladestation(en)) -
+            // fuer die Debitorenanzeige werden alle Namen genannt.
+            String einheiten = mieterEinheitRepository.findEinheitIdsByMieterId(m.getId()).stream()
+                    .map(einheitRepository::findById)
+                    .filter(Optional::isPresent)
+                    .map(e -> e.get().getName())
+                    .collect(Collectors.joining(", "));
+            dto.setEinheitName(einheiten.isEmpty() ? null : einheiten);
         });
         return dto;
     }

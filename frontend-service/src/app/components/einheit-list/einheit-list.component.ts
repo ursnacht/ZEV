@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { WithMessage } from '../../utils/with-message';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { EinheitService } from '../../services/einheit.service';
 import { Einheit } from '../../models/einheit.model';
 import { EinheitTypPipe } from '../../pipes/einheit-typ.pipe';
@@ -28,12 +29,14 @@ export class EinheitListComponent extends WithMessage implements OnInit {
 
   menuItems: KebabMenuItem[] = [
     { label: 'BEARBEITEN', action: 'edit', icon: 'edit-2' },
+    { label: 'TARIFPOSITIONEN', action: 'tarifpositionen', icon: 'zap' },
     { label: 'LOESCHEN', action: 'delete', danger: true, icon: 'trash-2' }
   ];
 
   constructor(
     private einheitService: EinheitService,
-    private translationService: TranslationService
+    private translationService: TranslationService,
+    private router: Router
   ) { super(); }
 
   ngOnInit(): void {
@@ -82,10 +85,22 @@ export class EinheitListComponent extends WithMessage implements OnInit {
       case 'edit':
         this.onEdit(einheit);
         break;
+      case 'tarifpositionen':
+        this.onTarifpositionen(einheit);
+        break;
       case 'delete':
         this.onDelete(einheit.id);
         break;
     }
+  }
+
+  /**
+   * Sprung auf die Tarifpositionen-Seite mit vorgewaehlter Einheit.
+   * Der Eintrag steht hier statt beim Mieter, weil die Position an der Einheit haengt
+   * (Specs/Ladestationen.md).
+   */
+  onTarifpositionen(einheit: Einheit): void {
+    this.router.navigate(['/tarifpositionen'], { queryParams: { einheitId: einheit.id } });
   }
 
   onFormSubmit(einheit: Einheit): void {

@@ -11,14 +11,16 @@ import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
 
 /**
- * Manuell erfasste Menge zu einem Tarif, je Mieter und Quartal.
+ * Manuell erfasste Menge zu einem Tarif, je Einheit und Quartal.
  *
  * <p>Bewusst <b>generisch</b>: Die fachliche Bedeutung steckt ausschliesslich im referenzierten
  * {@link Tarif} — erster Anwendungsfall ist Ladestrom ({@link TarifTyp#LADESTROM}), weitere
  * (Sauna, Waschküche, …) kommen ohne Schema-Änderung dazu.
  *
- * <p>Anker ist der <b>Mieter</b>, nicht die Einheit: Damit ist ein Mieterwechsel innerhalb eines
- * Quartals ohne Aufteilungsregel abgebildet — jeder Mieter trägt seine eigene Menge.
+ * <p>Anker ist die <b>Einheit</b> (Typ {@code LADESTATION}), nicht der Mieter: Die Menge gehört
+ * zur Ladestation. Ein Mieterwechsel innerhalb eines Quartals bleibt trotzdem eindeutig, weil
+ * dabei die RFID invalidiert und eine neue Ladestations-Einheit angelegt wird — jede Einheit
+ * gehört über ihre ganze Lebensdauer genau einem Nutzer (Specs/Ladestationen.md).
  */
 @Entity
 @Table(name = "tarifposition", schema = "zev")
@@ -33,10 +35,10 @@ public class Tarifposition {
     @Column(name = "org_id", nullable = false)
     private Long orgId;
 
-    @NotNull(message = "Mieter is required")
+    @NotNull(message = "Einheit is required")
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "mieter_id", nullable = false)
-    private Mieter mieter;
+    @JoinColumn(name = "einheit_id", nullable = false)
+    private Einheit einheit;
 
     @NotNull(message = "Tarif is required")
     @ManyToOne(fetch = FetchType.LAZY)
@@ -77,8 +79,8 @@ public class Tarifposition {
     public Tarifposition() {
     }
 
-    public Tarifposition(Mieter mieter, Tarif tarif, Integer jahr, Integer quartal, BigDecimal menge) {
-        this.mieter = mieter;
+    public Tarifposition(Einheit einheit, Tarif tarif, Integer jahr, Integer quartal, BigDecimal menge) {
+        this.einheit = einheit;
         this.tarif = tarif;
         this.jahr = jahr;
         this.quartal = quartal;
@@ -101,12 +103,12 @@ public class Tarifposition {
         this.orgId = orgId;
     }
 
-    public Mieter getMieter() {
-        return mieter;
+    public Einheit getEinheit() {
+        return einheit;
     }
 
-    public void setMieter(Mieter mieter) {
-        this.mieter = mieter;
+    public void setEinheit(Einheit einheit) {
+        this.einheit = einheit;
     }
 
     public Tarif getTarif() {
@@ -168,7 +170,7 @@ public class Tarifposition {
     @Override
     public String toString() {
         return "Tarifposition{id=" + id + ", orgId=" + orgId
-                + ", mieter=" + (mieter != null ? mieter.getId() : null)
+                + ", einheit=" + (einheit != null ? einheit.getId() : null)
                 + ", tarif=" + (tarif != null ? tarif.getId() : null)
                 + ", jahr=" + jahr + ", quartal=" + quartal + ", menge=" + menge
                 + ", erfassungsart=" + erfassungsart + "}";

@@ -44,7 +44,7 @@ describe('TarifpositionFormComponent', () => {
 
     fixture = TestBed.createComponent(TarifpositionFormComponent);
     component = fixture.componentInstance;
-    component.mieterId = 7;
+    component.einheitId = 7;
     component.tarife = mockTarife;
     fixture.detectChanges();
   });
@@ -55,7 +55,7 @@ describe('TarifpositionFormComponent', () => {
 
   describe('initialization', () => {
     it('should set default values when no position is provided', () => {
-      expect(component.formData.mieterId).toBe(7);
+      expect(component.formData.einheitId).toBe(7);
       expect(component.formData.tarifId).toBe(0);
       expect(component.formData.jahr).toBe(aktuellesJahr);
       expect(component.formData.quartal).toBe(aktuellesQuartal);
@@ -73,11 +73,11 @@ describe('TarifpositionFormComponent', () => {
       expect(component.quartalOptionen).toEqual([1, 2, 3, 4]);
     });
 
-    it('should fall back to mieterId 0 when no mieter is given', () => {
+    it('should fall back to einheitId 0 when no mieter is given', () => {
       const fresh = TestBed.createComponent(TarifpositionFormComponent).componentInstance;
       fresh.tarife = mockTarife;
       fresh.ngOnInit();
-      expect(fresh.formData.mieterId).toBe(0);
+      expect(fresh.formData.einheitId).toBe(0);
     });
 
     it('should preselect the tarif when exactly one is available', () => {
@@ -107,7 +107,7 @@ describe('TarifpositionFormComponent', () => {
   describe('initialization with position input', () => {
     const existingPosition: Tarifposition = {
       id: 5,
-      mieterId: 7,
+      einheitId: 7,
       tarifId: 3,
       jahr: aktuellesJahr,
       quartal: 2,
@@ -157,7 +157,7 @@ describe('TarifpositionFormComponent', () => {
 
   describe('isFormValid', () => {
     const validData: Tarifposition = {
-      mieterId: 7,
+      einheitId: 7,
       tarifId: 3,
       jahr: 2026,
       quartal: 1,
@@ -170,7 +170,7 @@ describe('TarifpositionFormComponent', () => {
     });
 
     it('should return false when no mieter is set', () => {
-      component.formData = { ...validData, mieterId: 0 };
+      component.formData = { ...validData, einheitId: 0 };
       expect(component.isFormValid()).toBe(false);
     });
 
@@ -217,7 +217,7 @@ describe('TarifpositionFormComponent', () => {
 
   describe('events', () => {
     const validData: Tarifposition = {
-      mieterId: 7,
+      einheitId: 7,
       tarifId: 3,
       jahr: 2026,
       quartal: 1,

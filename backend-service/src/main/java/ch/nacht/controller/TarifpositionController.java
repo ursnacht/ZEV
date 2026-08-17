@@ -1,7 +1,7 @@
 package ch.nacht.controller;
 
 import ch.nacht.dto.TarifpositionDTO;
-import ch.nacht.entity.Mieter;
+import ch.nacht.entity.Einheit;
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.Tarifposition;
 import ch.nacht.service.TarifpositionService;
@@ -36,9 +36,9 @@ public class TarifpositionController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('mieter:read')")
-    public List<TarifpositionDTO> getByMieter(@RequestParam Long mieterId) {
-        log.info("Fetching tariff positions for mieter {}", mieterId);
-        List<TarifpositionDTO> positionen = tarifpositionService.getByMieter(mieterId).stream()
+    public List<TarifpositionDTO> getByEinheit(@RequestParam Long einheitId) {
+        log.info("Fetching tariff positions for einheit {}", einheitId);
+        List<TarifpositionDTO> positionen = tarifpositionService.getByEinheit(einheitId).stream()
                 .map(TarifpositionDTO::von)
                 .toList();
         log.info("Retrieved {} tariff positions", positionen.size());
@@ -88,16 +88,16 @@ public class TarifpositionController {
     }
 
     /**
-     * Map the DTO onto an entity. Mieter and Tarif carry the ID only — der Service löst sie auf
-     * und prüft dabei Existenz, Mandant und zulässigen Tariftyp.
+     * Map the DTO onto an entity. Einheit and Tarif carry the ID only — der Service löst sie auf
+     * und prüft dabei Existenz, Mandant, Einheiten-Typ und zulässigen Tariftyp.
      */
     private Tarifposition nachEntity(TarifpositionDTO dto, Long id) {
         Tarifposition position = new Tarifposition();
         position.setId(id);
-        if (dto.getMieterId() != null) {
-            Mieter mieter = new Mieter();
-            mieter.setId(dto.getMieterId());
-            position.setMieter(mieter);
+        if (dto.getEinheitId() != null) {
+            Einheit einheit = new Einheit();
+            einheit.setId(dto.getEinheitId());
+            position.setEinheit(einheit);
         }
         if (dto.getTarifId() != null) {
             Tarif tarif = new Tarif();

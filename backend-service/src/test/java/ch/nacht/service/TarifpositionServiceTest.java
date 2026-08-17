@@ -1,11 +1,12 @@
 package ch.nacht.service;
 
 import ch.nacht.entity.Erfassungsart;
-import ch.nacht.entity.Mieter;
+import ch.nacht.entity.Einheit;
+import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
 import ch.nacht.entity.Tarifposition;
-import ch.nacht.repository.MieterRepository;
+import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.TarifRepository;
 import ch.nacht.repository.TarifpositionRepository;
 
@@ -32,10 +33,10 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Unit-Tests für {@link TarifpositionService} (Spec Ladestromtarif.md).
+ * Unit-Tests für {@link TarifpositionService} (Specs/Ladestationen.md).
  *
- * <p>Schwerpunkte: Auflösung und Validierung von Mieter/Tarif, die Regel „höchstens eine Position
- * je Mieter, Quartal und Tariftyp", die Beschränkung auf manuell erfasste Tariftypen, die
+ * <p>Schwerpunkte: Auflösung und Validierung von Einheit/Tarif, die Regel „höchstens eine Position
+ * je Einheit, Quartal und Tariftyp", die Beschränkung auf manuell erfasste Tariftypen, die
  * Mandanten-Zuordnung beim Anlegen bzw. Beibehalten beim Ändern sowie die Quartals-Hilfsmethoden.
  */
 @ExtendWith(MockitoExtension.class)
@@ -45,7 +46,7 @@ public class TarifpositionServiceTest {
     private TarifpositionRepository tarifpositionRepository;
 
     @Mock
-    private MieterRepository mieterRepository;
+    private EinheitRepository einheitRepository;
 
     @Mock
     private TarifRepository tarifRepository;
@@ -61,7 +62,7 @@ public class TarifpositionServiceTest {
     private TarifpositionService tarifpositionService;
 
     private Long testOrgId;
-    private Mieter testMieter;
+    private Einheit testEinheit;
     private Tarif ladestromTarif;
     private Tarifposition testPosition1;
     private Tarifposition testPosition2;
@@ -70,9 +71,10 @@ public class TarifpositionServiceTest {
     void setUp() {
         testOrgId = 1L;
 
-        testMieter = new Mieter("Max Muster", LocalDate.of(2026, 1, 1), 1L);
-        testMieter.setId(1L);
-        testMieter.setOrgId(testOrgId);
+        testEinheit = new Einheit("Ladestation 1", EinheitTyp.LADESTATION);
+        testEinheit.setId(1L);
+        testEinheit.setMesspunkt("RFID-001");
+        testEinheit.setOrgId(testOrgId);
 
         ladestromTarif = new Tarif(
                 "Ladestrom",
@@ -83,12 +85,12 @@ public class TarifpositionServiceTest {
         ladestromTarif.setId(10L);
         ladestromTarif.setOrgId(testOrgId);
 
-        testPosition1 = new Tarifposition(testMieter, ladestromTarif, 2026, 3, new BigDecimal("120.500"));
+        testPosition1 = new Tarifposition(testEinheit, ladestromTarif, 2026, 3, new BigDecimal("120.500"));
         testPosition1.setId(1L);
         testPosition1.setOrgId(testOrgId);
         testPosition1.setQuellReferenz("LP-01");
 
-        testPosition2 = new Tarifposition(testMieter, ladestromTarif, 2026, 4, new BigDecimal("80.000"));
+        testPosition2 = new Tarifposition(testEinheit, ladestromTarif, 2026, 4, new BigDecimal("80.000"));
         testPosition2.setId(2L);
         testPosition2.setOrgId(testOrgId);
     }
@@ -97,21 +99,21 @@ public class TarifpositionServiceTest {
 
     @Test
     void getByMieter_ReturnsList() {
-        when(tarifpositionRepository.findByMieterId(1L))
+        when(tarifpositionRepository.findByEinheitId(1L))
                 .thenReturn(Arrays.asList(testPosition1, testPosition2));
 
-        List<Tarifposition> result = tarifpositionService.getByMieter(1L);
+        List<Tarifposition> result = tarifpositionService.getByEinheit(1L);
 
         assertEquals(2, result.size());
         verify(hibernateFilterService).enableOrgFilter();
-        verify(tarifpositionRepository).findByMieterId(1L);
+        verify(tarifpositionRepository).findByEinheitId(1L);
     }
 
     @Test
     void getByMieter_NoPositions_ReturnsEmptyList() {
-        when(tarifpositionRepository.findByMieterId(99L)).thenReturn(Collections.emptyList());
+        when(tarifpositionRepository.findByEinheitId(99L)).thenReturn(Collections.emptyList());
 
-        List<Tarifposition> result = tarifpositionService.getByMieter(99L);
+        List<Tarifposition> result = tarifpositionService.getByEinheit(99L);
 
         assertTrue(result.isEmpty());
         verify(hibernateFilterService).enableOrgFilter();
@@ -145,14 +147,14 @@ public class TarifpositionServiceTest {
     void getFuerRechnung_TranslatesPeriodIntoQuarterBounds() {
         LocalDate von = LocalDate.of(2026, 7, 1);
         LocalDate bis = LocalDate.of(2026, 9, 30);
-        when(tarifpositionRepository.findByMieterIdAndQuartalOverlapping(1L, 2026, 3, 2026, 3))
+        when(tarifpositionRepository.findByEinheitIdsAndQuartalOverlapping(List.of(1L), 2026, 3, 2026, 3))
                 .thenReturn(List.of(testPosition1));
 
-        List<Tarifposition> result = tarifpositionService.getFuerRechnung(1L, von, bis);
+        List<Tarifposition> result = tarifpositionService.getFuerRechnung(List.of(1L), von, bis);
 
         assertEquals(1, result.size());
         verify(hibernateFilterService).enableOrgFilter();
-        verify(tarifpositionRepository).findByMieterIdAndQuartalOverlapping(1L, 2026, 3, 2026, 3);
+        verify(tarifpositionRepository).findByEinheitIdsAndQuartalOverlapping(List.of(1L), 2026, 3, 2026, 3);
     }
 
     @Test
@@ -160,13 +162,13 @@ public class TarifpositionServiceTest {
         // Halbjahresrechnung Q4/2026 - Q1/2027
         LocalDate von = LocalDate.of(2026, 10, 1);
         LocalDate bis = LocalDate.of(2027, 3, 31);
-        when(tarifpositionRepository.findByMieterIdAndQuartalOverlapping(1L, 2026, 4, 2027, 1))
+        when(tarifpositionRepository.findByEinheitIdsAndQuartalOverlapping(List.of(1L), 2026, 4, 2027, 1))
                 .thenReturn(Arrays.asList(testPosition2, testPosition1));
 
-        List<Tarifposition> result = tarifpositionService.getFuerRechnung(1L, von, bis);
+        List<Tarifposition> result = tarifpositionService.getFuerRechnung(List.of(1L), von, bis);
 
         assertEquals(2, result.size());
-        verify(tarifpositionRepository).findByMieterIdAndQuartalOverlapping(1L, 2026, 4, 2027, 1);
+        verify(tarifpositionRepository).findByEinheitIdsAndQuartalOverlapping(List.of(1L), 2026, 4, 2027, 1);
     }
 
     @Test
@@ -174,13 +176,13 @@ public class TarifpositionServiceTest {
         // Mieterwechsel: Rechnung deckt nur die zweite Haelfte von Q1 ab
         LocalDate von = LocalDate.of(2026, 3, 1);
         LocalDate bis = LocalDate.of(2026, 3, 31);
-        when(tarifpositionRepository.findByMieterIdAndQuartalOverlapping(1L, 2026, 1, 2026, 1))
+        when(tarifpositionRepository.findByEinheitIdsAndQuartalOverlapping(List.of(1L), 2026, 1, 2026, 1))
                 .thenReturn(List.of(testPosition1));
 
-        List<Tarifposition> result = tarifpositionService.getFuerRechnung(1L, von, bis);
+        List<Tarifposition> result = tarifpositionService.getFuerRechnung(List.of(1L), von, bis);
 
         assertEquals(1, result.size());
-        verify(tarifpositionRepository).findByMieterIdAndQuartalOverlapping(1L, 2026, 1, 2026, 1);
+        verify(tarifpositionRepository).findByEinheitIdsAndQuartalOverlapping(List.of(1L), 2026, 1, 2026, 1);
     }
 
     // ==================== Quartals-Hilfsmethoden ====================
@@ -220,11 +222,11 @@ public class TarifpositionServiceTest {
 
     @Test
     void saveTarifposition_ValidNewPosition_SavesSuccessfully() {
-        Tarifposition neu = new Tarifposition(testMieter, ladestromTarif, 2026, 2, new BigDecimal("42.000"));
+        Tarifposition neu = new Tarifposition(testEinheit, ladestromTarif, 2026, 2, new BigDecimal("42.000"));
 
-        when(mieterRepository.findById(1L)).thenReturn(Optional.of(testMieter));
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
         when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
-        when(tarifpositionRepository.existsByMieterAndQuartalAndTariftyp(
+        when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 eq(1L), eq(2026), eq(2), anySet(), eq(-1L))).thenReturn(false);
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
         when(tarifpositionRepository.save(any(Tarifposition.class)))
@@ -246,11 +248,11 @@ public class TarifpositionServiceTest {
 
     @Test
     void saveTarifposition_NewPosition_ChecksOnlyManuellErfasstTypes() {
-        Tarifposition neu = new Tarifposition(testMieter, ladestromTarif, 2026, 2, new BigDecimal("42.000"));
+        Tarifposition neu = new Tarifposition(testEinheit, ladestromTarif, 2026, 2, new BigDecimal("42.000"));
 
-        when(mieterRepository.findById(1L)).thenReturn(Optional.of(testMieter));
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
         when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
-        when(tarifpositionRepository.existsByMieterAndQuartalAndTariftyp(
+        when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 anyLong(), anyInt(), anyInt(), anySet(), anyLong())).thenReturn(false);
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
         when(tarifpositionRepository.save(any(Tarifposition.class))).thenAnswer(i -> i.getArgument(0));
@@ -259,7 +261,7 @@ public class TarifpositionServiceTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Set<TarifTyp>> typenCaptor = ArgumentCaptor.forClass(Set.class);
-        verify(tarifpositionRepository).existsByMieterAndQuartalAndTariftyp(
+        verify(tarifpositionRepository).existsByEinheitAndQuartalAndTariftyp(
                 eq(1L), eq(2026), eq(2), typenCaptor.capture(), eq(-1L));
         assertEquals(TarifTyp.MANUELL_ERFASST, typenCaptor.getValue());
         assertTrue(typenCaptor.getValue().contains(TarifTyp.LADESTROM));
@@ -268,11 +270,11 @@ public class TarifpositionServiceTest {
     @Test
     void saveTarifposition_MengeZero_SavesSuccessfully() {
         // Menge = 0 ist speicherbar (erzeugt spaeter keine Rechnungszeile)
-        Tarifposition neu = new Tarifposition(testMieter, ladestromTarif, 2026, 2, BigDecimal.ZERO);
+        Tarifposition neu = new Tarifposition(testEinheit, ladestromTarif, 2026, 2, BigDecimal.ZERO);
 
-        when(mieterRepository.findById(1L)).thenReturn(Optional.of(testMieter));
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
         when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
-        when(tarifpositionRepository.existsByMieterAndQuartalAndTariftyp(
+        when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 anyLong(), anyInt(), anyInt(), anySet(), anyLong())).thenReturn(false);
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
         when(tarifpositionRepository.save(any(Tarifposition.class))).thenAnswer(i -> i.getArgument(0));
@@ -285,12 +287,12 @@ public class TarifpositionServiceTest {
 
     @Test
     void saveTarifposition_NoErfassungsart_DefaultsToManuell() {
-        Tarifposition neu = new Tarifposition(testMieter, ladestromTarif, 2026, 2, new BigDecimal("10.000"));
+        Tarifposition neu = new Tarifposition(testEinheit, ladestromTarif, 2026, 2, new BigDecimal("10.000"));
         neu.setErfassungsart(null);
 
-        when(mieterRepository.findById(1L)).thenReturn(Optional.of(testMieter));
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
         when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
-        when(tarifpositionRepository.existsByMieterAndQuartalAndTariftyp(
+        when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 anyLong(), anyInt(), anyInt(), anySet(), anyLong())).thenReturn(false);
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
         when(tarifpositionRepository.save(any(Tarifposition.class))).thenAnswer(i -> i.getArgument(0));
@@ -302,13 +304,13 @@ public class TarifpositionServiceTest {
 
     @Test
     void saveTarifposition_ImportErfassungsart_IsPreserved() {
-        Tarifposition neu = new Tarifposition(testMieter, ladestromTarif, 2026, 2, new BigDecimal("10.000"));
+        Tarifposition neu = new Tarifposition(testEinheit, ladestromTarif, 2026, 2, new BigDecimal("10.000"));
         neu.setErfassungsart(Erfassungsart.IMPORT);
         neu.setQuellReferenz("LP-01");
 
-        when(mieterRepository.findById(1L)).thenReturn(Optional.of(testMieter));
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
         when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
-        when(tarifpositionRepository.existsByMieterAndQuartalAndTariftyp(
+        when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 anyLong(), anyInt(), anyInt(), anySet(), anyLong())).thenReturn(false);
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
         when(tarifpositionRepository.save(any(Tarifposition.class))).thenAnswer(i -> i.getArgument(0));
@@ -321,13 +323,13 @@ public class TarifpositionServiceTest {
 
     @Test
     void saveTarifposition_ExistingPosition_KeepsOrgIdFromDatabase() {
-        Tarifposition geaendert = new Tarifposition(testMieter, ladestromTarif, 2026, 3, new BigDecimal("150.000"));
+        Tarifposition geaendert = new Tarifposition(testEinheit, ladestromTarif, 2026, 3, new BigDecimal("150.000"));
         geaendert.setId(1L);
         // orgId bewusst nicht gesetzt - das DTO traegt sie nicht
 
-        when(mieterRepository.findById(1L)).thenReturn(Optional.of(testMieter));
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
         when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
-        when(tarifpositionRepository.existsByMieterAndQuartalAndTariftyp(
+        when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 eq(1L), eq(2026), eq(3), anySet(), eq(1L))).thenReturn(false);
         when(tarifpositionRepository.findById(1L)).thenReturn(Optional.of(testPosition1));
         when(tarifpositionRepository.save(any(Tarifposition.class))).thenAnswer(i -> i.getArgument(0));
@@ -341,30 +343,30 @@ public class TarifpositionServiceTest {
 
     @Test
     void saveTarifposition_ExistingPosition_ExcludesItselfFromDuplicateCheck() {
-        Tarifposition geaendert = new Tarifposition(testMieter, ladestromTarif, 2026, 3, new BigDecimal("150.000"));
+        Tarifposition geaendert = new Tarifposition(testEinheit, ladestromTarif, 2026, 3, new BigDecimal("150.000"));
         geaendert.setId(1L);
 
-        when(mieterRepository.findById(1L)).thenReturn(Optional.of(testMieter));
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
         when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
-        when(tarifpositionRepository.existsByMieterAndQuartalAndTariftyp(
+        when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 anyLong(), anyInt(), anyInt(), anySet(), anyLong())).thenReturn(false);
         when(tarifpositionRepository.findById(1L)).thenReturn(Optional.of(testPosition1));
         when(tarifpositionRepository.save(any(Tarifposition.class))).thenAnswer(i -> i.getArgument(0));
 
         tarifpositionService.saveTarifposition(geaendert);
 
-        verify(tarifpositionRepository).existsByMieterAndQuartalAndTariftyp(
+        verify(tarifpositionRepository).existsByEinheitAndQuartalAndTariftyp(
                 eq(1L), eq(2026), eq(3), anySet(), eq(1L));
     }
 
     @Test
     void saveTarifposition_ExistingPositionNotFound_ThrowsException() {
-        Tarifposition geaendert = new Tarifposition(testMieter, ladestromTarif, 2026, 3, new BigDecimal("150.000"));
+        Tarifposition geaendert = new Tarifposition(testEinheit, ladestromTarif, 2026, 3, new BigDecimal("150.000"));
         geaendert.setId(99L);
 
-        when(mieterRepository.findById(1L)).thenReturn(Optional.of(testMieter));
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
         when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
-        when(tarifpositionRepository.existsByMieterAndQuartalAndTariftyp(
+        when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 anyLong(), anyInt(), anyInt(), anySet(), anyLong())).thenReturn(false);
         when(tarifpositionRepository.findById(99L)).thenReturn(Optional.empty());
 
@@ -379,11 +381,11 @@ public class TarifpositionServiceTest {
 
     @Test
     void saveTarifposition_DuplicateForSameQuartalAndTariftyp_ThrowsException() {
-        Tarifposition duplikat = new Tarifposition(testMieter, ladestromTarif, 2026, 3, new BigDecimal("50.000"));
+        Tarifposition duplikat = new Tarifposition(testEinheit, ladestromTarif, 2026, 3, new BigDecimal("50.000"));
 
-        when(mieterRepository.findById(1L)).thenReturn(Optional.of(testMieter));
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
         when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
-        when(tarifpositionRepository.existsByMieterAndQuartalAndTariftyp(
+        when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 eq(1L), eq(2026), eq(3), anySet(), eq(-1L))).thenReturn(true);
 
         IllegalArgumentException exception = assertThrows(
@@ -408,11 +410,11 @@ public class TarifpositionServiceTest {
                 LocalDate.of(2027, 12, 31));
         andererLadestromTarif.setId(11L);
 
-        Tarifposition duplikat = new Tarifposition(testMieter, andererLadestromTarif, 2026, 3, new BigDecimal("50.000"));
+        Tarifposition duplikat = new Tarifposition(testEinheit, andererLadestromTarif, 2026, 3, new BigDecimal("50.000"));
 
-        when(mieterRepository.findById(1L)).thenReturn(Optional.of(testMieter));
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
         when(tarifRepository.findById(11L)).thenReturn(Optional.of(andererLadestromTarif));
-        when(tarifpositionRepository.existsByMieterAndQuartalAndTariftyp(
+        when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 eq(1L), eq(2026), eq(3), anySet(), eq(-1L))).thenReturn(true);
 
         IllegalArgumentException exception = assertThrows(
@@ -434,9 +436,9 @@ public class TarifpositionServiceTest {
                 LocalDate.of(2026, 12, 31));
         zevTarif.setId(20L);
 
-        Tarifposition neu = new Tarifposition(testMieter, zevTarif, 2026, 1, new BigDecimal("10.000"));
+        Tarifposition neu = new Tarifposition(testEinheit, zevTarif, 2026, 1, new BigDecimal("10.000"));
 
-        when(mieterRepository.findById(1L)).thenReturn(Optional.of(testMieter));
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
         when(tarifRepository.findById(20L)).thenReturn(Optional.of(zevTarif));
 
         IllegalArgumentException exception = assertThrows(
@@ -458,9 +460,9 @@ public class TarifpositionServiceTest {
                 LocalDate.of(2026, 12, 31));
         grundgebuehr.setId(21L);
 
-        Tarifposition neu = new Tarifposition(testMieter, grundgebuehr, 2026, 1, new BigDecimal("10.000"));
+        Tarifposition neu = new Tarifposition(testEinheit, grundgebuehr, 2026, 1, new BigDecimal("10.000"));
 
-        when(mieterRepository.findById(1L)).thenReturn(Optional.of(testMieter));
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
         when(tarifRepository.findById(21L)).thenReturn(Optional.of(grundgebuehr));
 
         IllegalArgumentException exception = assertThrows(
@@ -473,7 +475,7 @@ public class TarifpositionServiceTest {
     }
 
     @Test
-    void saveTarifposition_MieterMissing_ThrowsException() {
+    void saveTarifposition_EinheitMissing_ThrowsException() {
         Tarifposition ohneMieter = new Tarifposition(null, ladestromTarif, 2026, 1, new BigDecimal("10.000"));
 
         IllegalArgumentException exception = assertThrows(
@@ -481,32 +483,32 @@ public class TarifpositionServiceTest {
                 () -> tarifpositionService.saveTarifposition(ohneMieter)
         );
 
-        assertThat(exception.getMessage(), containsString("Mieter ist erforderlich"));
+        assertThat(exception.getMessage(), containsString("Einheit ist erforderlich"));
         verify(tarifpositionRepository, never()).save(any());
     }
 
     @Test
-    void saveTarifposition_MieterNotFound_ThrowsException() {
-        Mieter unbekannt = new Mieter("Unbekannt", LocalDate.of(2026, 1, 1), 1L);
+    void saveTarifposition_EinheitNotFound_ThrowsException() {
+        Einheit unbekannt = new Einheit("Unbekannt", EinheitTyp.LADESTATION);
         unbekannt.setId(99L);
         Tarifposition neu = new Tarifposition(unbekannt, ladestromTarif, 2026, 1, new BigDecimal("10.000"));
 
-        when(mieterRepository.findById(99L)).thenReturn(Optional.empty());
+        when(einheitRepository.findById(99L)).thenReturn(Optional.empty());
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
                 () -> tarifpositionService.saveTarifposition(neu)
         );
 
-        assertThat(exception.getMessage(), containsString("Mieter nicht gefunden"));
+        assertThat(exception.getMessage(), containsString("Einheit nicht gefunden"));
         verify(tarifpositionRepository, never()).save(any());
     }
 
     @Test
     void saveTarifposition_TarifMissing_ThrowsException() {
-        Tarifposition ohneTarif = new Tarifposition(testMieter, null, 2026, 1, new BigDecimal("10.000"));
+        Tarifposition ohneTarif = new Tarifposition(testEinheit, null, 2026, 1, new BigDecimal("10.000"));
 
-        when(mieterRepository.findById(1L)).thenReturn(Optional.of(testMieter));
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
@@ -521,9 +523,9 @@ public class TarifpositionServiceTest {
     void saveTarifposition_TarifNotFound_ThrowsException() {
         Tarif unbekannt = new Tarif();
         unbekannt.setId(99L);
-        Tarifposition neu = new Tarifposition(testMieter, unbekannt, 2026, 1, new BigDecimal("10.000"));
+        Tarifposition neu = new Tarifposition(testEinheit, unbekannt, 2026, 1, new BigDecimal("10.000"));
 
-        when(mieterRepository.findById(1L)).thenReturn(Optional.of(testMieter));
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
         when(tarifRepository.findById(99L)).thenReturn(Optional.empty());
 
         IllegalArgumentException exception = assertThrows(
@@ -536,26 +538,26 @@ public class TarifpositionServiceTest {
     }
 
     @Test
-    void saveTarifposition_ResolvesMieterAndTarifFromDatabase() {
+    void saveTarifposition_ResolvesEinheitAndTarifFromDatabase() {
         // Controller liefert nur die IDs - der Service muss die vollstaendigen Entities einsetzen
-        Mieter nurId = new Mieter();
+        Einheit nurId = new Einheit();
         nurId.setId(1L);
         Tarif tarifNurId = new Tarif();
         tarifNurId.setId(10L);
         Tarifposition neu = new Tarifposition(nurId, tarifNurId, 2026, 2, new BigDecimal("10.000"));
 
-        when(mieterRepository.findById(1L)).thenReturn(Optional.of(testMieter));
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
         when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
-        when(tarifpositionRepository.existsByMieterAndQuartalAndTariftyp(
+        when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 anyLong(), anyInt(), anyInt(), anySet(), anyLong())).thenReturn(false);
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
         when(tarifpositionRepository.save(any(Tarifposition.class))).thenAnswer(i -> i.getArgument(0));
 
         Tarifposition result = tarifpositionService.saveTarifposition(neu);
 
-        assertSame(testMieter, result.getMieter());
+        assertSame(testEinheit, result.getEinheit());
         assertSame(ladestromTarif, result.getTarif());
-        assertEquals("Max Muster", result.getMieter().getName());
+        assertEquals("Ladestation 1", result.getEinheit().getName());
     }
 
     // ==================== deleteTarifposition ====================

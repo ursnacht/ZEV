@@ -5,15 +5,16 @@ export enum Erfassungsart {
 }
 
 /**
- * Manuell erfasste Menge zu einem Tarif, je Mieter und Quartal.
+ * Manuell erfasste Menge zu einem Tarif, je Einheit und Quartal.
  *
  * Bewusst generisch: Die fachliche Bedeutung steckt im referenzierten Tarif — erster
  * Anwendungsfall ist Ladestrom.
  */
 export interface Tarifposition {
   id?: number;
-  mieterId: number;
-  mieterName?: string;        // nur lesend vom Backend geliefert
+  einheitId: number;
+  einheitName?: string;        // nur lesend vom Backend geliefert
+  einheitMesspunkt?: string;   // nur lesend; RFID, belegt die Quell-Referenz vor
   tarifId: number;
   tarifBezeichnung?: string;  // nur lesend
   tarifPreis?: number;        // nur lesend

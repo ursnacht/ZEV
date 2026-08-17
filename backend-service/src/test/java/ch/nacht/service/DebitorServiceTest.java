@@ -6,6 +6,7 @@ import ch.nacht.entity.Einheit;
 import ch.nacht.entity.Mieter;
 import ch.nacht.repository.DebitorRepository;
 import ch.nacht.repository.EinheitRepository;
+import ch.nacht.repository.MieterEinheitRepository;
 import ch.nacht.repository.MieterRepository;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +36,9 @@ public class DebitorServiceTest {
     private MieterRepository mieterRepository;
 
     @Mock
+    private MieterEinheitRepository mieterEinheitRepository;
+
+    @Mock
     private EinheitRepository einheitRepository;
 
     @Mock
@@ -61,7 +65,7 @@ public class DebitorServiceTest {
         testMieter = new Mieter();
         testMieter.setId(10L);
         testMieter.setName("Max Muster");
-        testMieter.setEinheitId(5L);
+        testMieter.setEinheitIds(java.util.List.of(5L));
 
         testEinheit = new Einheit();
         testEinheit.setId(5L);
@@ -92,6 +96,7 @@ public class DebitorServiceTest {
         when(debitorRepository.findByDatumVonBetween(VON, BIS))
                 .thenReturn(List.of(testDebitor1));
         when(mieterRepository.findById(10L)).thenReturn(Optional.of(testMieter));
+        when(mieterEinheitRepository.findEinheitIdsByMieterId(10L)).thenReturn(List.of(5L));
         when(einheitRepository.findById(5L)).thenReturn(Optional.of(testEinheit));
 
         List<DebitorDTO> result = debitorService.getDebitoren(VON, BIS);
@@ -129,6 +134,7 @@ public class DebitorServiceTest {
     void getDebitoren_EinheitNotFound_EinheitNameIsNull() {
         when(debitorRepository.findByDatumVonBetween(VON, BIS)).thenReturn(List.of(testDebitor1));
         when(mieterRepository.findById(10L)).thenReturn(Optional.of(testMieter));
+        when(mieterEinheitRepository.findEinheitIdsByMieterId(10L)).thenReturn(List.of(5L));
         when(einheitRepository.findById(5L)).thenReturn(Optional.empty());
 
         List<DebitorDTO> result = debitorService.getDebitoren(VON, BIS);
@@ -144,6 +150,7 @@ public class DebitorServiceTest {
     void getDebitorById_Found_ReturnsDTO() {
         when(debitorRepository.findById(1L)).thenReturn(Optional.of(testDebitor1));
         when(mieterRepository.findById(10L)).thenReturn(Optional.of(testMieter));
+        when(mieterEinheitRepository.findEinheitIdsByMieterId(10L)).thenReturn(List.of(5L));
         when(einheitRepository.findById(5L)).thenReturn(Optional.of(testEinheit));
 
         Optional<DebitorDTO> result = debitorService.getDebitorById(1L);
@@ -172,6 +179,7 @@ public class DebitorServiceTest {
         when(organizationContextService.getCurrentOrgId()).thenReturn(ORG_ID);
         when(debitorRepository.save(any())).thenReturn(testDebitor1);
         when(mieterRepository.findById(10L)).thenReturn(Optional.of(testMieter));
+        when(mieterEinheitRepository.findEinheitIdsByMieterId(10L)).thenReturn(List.of(5L));
         when(einheitRepository.findById(5L)).thenReturn(Optional.of(testEinheit));
 
         DebitorDTO result = debitorService.create(dto);
@@ -290,6 +298,7 @@ public class DebitorServiceTest {
         when(debitorRepository.findById(1L)).thenReturn(Optional.of(testDebitor1));
         when(debitorRepository.save(testDebitor1)).thenReturn(testDebitor1);
         when(mieterRepository.findById(10L)).thenReturn(Optional.of(testMieter));
+        when(mieterEinheitRepository.findEinheitIdsByMieterId(10L)).thenReturn(List.of(5L));
         when(einheitRepository.findById(5L)).thenReturn(Optional.of(testEinheit));
 
         DebitorDTO result = debitorService.update(1L, dto);

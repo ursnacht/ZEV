@@ -59,10 +59,11 @@ describe('EinheitListComponent', () => {
       expect(component.sortDirection).toBe('asc');
     });
 
-    it('should have menu items for edit and delete', () => {
-      expect(component.menuItems.length).toBe(2);
+    it('should have menu items for edit, tarifpositionen and delete', () => {
+      expect(component.menuItems.length).toBe(3);
       expect(component.menuItems[0].action).toBe('edit');
-      expect(component.menuItems[1].action).toBe('delete');
+      expect(component.menuItems[1].action).toBe('tarifpositionen');
+      expect(component.menuItems[2].action).toBe('delete');
     });
   });
 

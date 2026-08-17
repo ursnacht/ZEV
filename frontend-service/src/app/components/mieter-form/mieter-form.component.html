@@ -3,16 +3,18 @@
 
   <form (ngSubmit)="onSubmit()">
     <div class="zev-form-group">
-      <label for="einheitId">{{ 'EINHEIT' | translate }}:</label>
-      <select id="einheitId" class="zev-select" [(ngModel)]="formData.einheitId" name="einheitId" required>
-        <option [value]="0" disabled>{{ 'EINHEIT_AUSWAEHLEN' | translate }}</option>
-        @for (einheit of einheiten; track einheit) {
-          <option [value]="einheit.id">
-            {{ getEinheitDisplayName(einheit) }}
-          </option>
+      <label>{{ 'EINHEITEN' | translate }}:</label>
+      <div class="zev-checkbox-group">
+        @for (einheit of einheiten; track einheit.id) {
+          <div class="zev-checkbox-item">
+            <input type="checkbox" [id]="'einheit-' + einheit.id" class="zev-checkbox"
+              [checked]="isEinheitSelected(einheit.id)" (change)="toggleEinheit(einheit.id)" />
+            <label [for]="'einheit-' + einheit.id">{{ getEinheitDisplayName(einheit) }}</label>
+          </div>
         }
-      </select>
-      @if (formData.einheitId === 0) {
+      </div>
+      <div class="zev-form-hint">{{ 'EINHEITEN_HINT' | translate }}</div>
+      @if (formData.einheitIds.length === 0) {
         <div class="zev-form-error">
           {{ 'EINHEIT_IST_ERFORDERLICH' | translate }}
         </div>

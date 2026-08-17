@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 /**
  * Transportobjekt für eine {@link Tarifposition}.
  *
- * <p>Bewusst mit flachen IDs statt der Entity: {@code mieter} und {@code tarif} sind
+ * <p>Bewusst mit flachen IDs statt der Entity: {@code einheit} und {@code tarif} sind
  * {@code LAZY}-Beziehungen, deren direkte Serialisierung Proxy-Fehler auslöst und mehr Daten
  * preisgäbe als nötig. Bezeichnung und Preis des Tarifs werden mitgeliefert, damit die Liste
  * ohne Zusatzabfrage darstellbar ist.
@@ -16,8 +16,10 @@ import java.math.BigDecimal;
 public class TarifpositionDTO {
 
     private Long id;
-    private Long mieterId;
-    private String mieterName;
+    private Long einheitId;
+    private String einheitName;
+    /** Messpunkt der Einheit = RFID; belegt im Formular die Quell-Referenz vor. */
+    private String einheitMesspunkt;
     private Long tarifId;
     private String tarifBezeichnung;
     private BigDecimal tarifPreis;
@@ -40,9 +42,10 @@ public class TarifpositionDTO {
     public static TarifpositionDTO von(Tarifposition position) {
         TarifpositionDTO dto = new TarifpositionDTO();
         dto.setId(position.getId());
-        if (position.getMieter() != null) {
-            dto.setMieterId(position.getMieter().getId());
-            dto.setMieterName(position.getMieter().getName());
+        if (position.getEinheit() != null) {
+            dto.setEinheitId(position.getEinheit().getId());
+            dto.setEinheitName(position.getEinheit().getName());
+            dto.setEinheitMesspunkt(position.getEinheit().getMesspunkt());
         }
         if (position.getTarif() != null) {
             dto.setTarifId(position.getTarif().getId());
@@ -66,20 +69,28 @@ public class TarifpositionDTO {
         this.id = id;
     }
 
-    public Long getMieterId() {
-        return mieterId;
+    public Long getEinheitId() {
+        return einheitId;
     }
 
-    public void setMieterId(Long mieterId) {
-        this.mieterId = mieterId;
+    public void setEinheitId(Long einheitId) {
+        this.einheitId = einheitId;
     }
 
-    public String getMieterName() {
-        return mieterName;
+    public String getEinheitName() {
+        return einheitName;
     }
 
-    public void setMieterName(String mieterName) {
-        this.mieterName = mieterName;
+    public void setEinheitName(String einheitName) {
+        this.einheitName = einheitName;
+    }
+
+    public String getEinheitMesspunkt() {
+        return einheitMesspunkt;
+    }
+
+    public void setEinheitMesspunkt(String einheitMesspunkt) {
+        this.einheitMesspunkt = einheitMesspunkt;
     }
 
     public Long getTarifId() {

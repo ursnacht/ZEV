@@ -1,6 +1,5 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
 import { WithMessage } from '../../utils/with-message';
 import { MieterService } from '../../services/mieter.service';
 import { EinheitService } from '../../services/einheit.service';
@@ -33,15 +32,13 @@ export class MieterListComponent extends WithMessage implements OnInit {
   menuItems: KebabMenuItem[] = [
     { label: 'BEARBEITEN', action: 'edit', icon: 'edit-2' },
     { label: 'KOPIEREN', action: 'copy', icon: 'copy' },
-    { label: 'TARIFPOSITIONEN', action: 'tarifpositionen', icon: 'zap' },
     { label: 'LOESCHEN', action: 'delete', danger: true, icon: 'trash-2' }
   ];
 
   constructor(
     private mieterService: MieterService,
     private einheitService: EinheitService,
-    private translationService: TranslationService,
-    private router: Router
+    private translationService: TranslationService
   ) { super(); }
 
   ngOnInit(): void {
@@ -52,8 +49,10 @@ export class MieterListComponent extends WithMessage implements OnInit {
   loadEinheiten(): void {
     this.einheitService.getAllEinheiten().subscribe({
       next: (data) => {
-        // Only CONSUMER units can have tenants
-        this.einheiten = data.filter(e => e.typ === EinheitTyp.CONSUMER);
+        // Mietbar sind Wohnungen und Ladestationen. Produzenten und die Bilanz-Messpunkte
+        // (BEZUG/RUECKLIEFERUNG) haben keine Mieter.
+        this.einheiten = data.filter(
+          e => e.typ === EinheitTyp.CONSUMER || e.typ === EinheitTyp.LADESTATION);
         this.applySorting();
       },
       error: () => {
@@ -77,6 +76,11 @@ export class MieterListComponent extends WithMessage implements OnInit {
   getEinheitName(einheitId: number): string {
     const einheit = this.einheiten.find(e => e.id === einheitId);
     return einheit ? einheit.name : `ID: ${einheitId}`;
+  }
+
+  /** Namen aller zugeordneten Einheiten - ein Mieter kann Wohnung und Ladestation(en) haben. */
+  getEinheitNamen(mieter: Mieter): string {
+    return (mieter.einheitIds ?? []).map(id => this.getEinheitName(id)).join(', ');
   }
 
   onCreateNew(): void {
@@ -119,22 +123,10 @@ export class MieterListComponent extends WithMessage implements OnInit {
       case 'copy':
         this.onCopy(mieter);
         break;
-      case 'tarifpositionen':
-        this.onTarifpositionen(mieter);
-        break;
       case 'delete':
         this.onDelete(mieter.id);
         break;
     }
-  }
-
-  /**
-   * Sprung auf die Tarifpositionen-Seite mit vorgewaehltem Mieter.
-   * Eigene Seite statt Inline-Ansicht, weil /mieter `mieter:manage` verlangt - ein `zev_user`
-   * darf Positionen erfassen, kaeme hier aber gar nicht her.
-   */
-  onTarifpositionen(mieter: Mieter): void {
-    this.router.navigate(['/tarifpositionen'], { queryParams: { mieterId: mieter.id } });
   }
 
   onFormSubmit(mieter: Mieter): void {
@@ -192,8 +184,8 @@ export class MieterListComponent extends WithMessage implements OnInit {
         aValue = `${a.plz || ''} ${a.ort || ''}`.trim();
         bValue = `${b.plz || ''} ${b.ort || ''}`.trim();
       } else if (column === 'einheitId') {
-        aValue = this.getEinheitName(a.einheitId);
-        bValue = this.getEinheitName(b.einheitId);
+        aValue = this.getEinheitNamen(a);
+        bValue = this.getEinheitNamen(b);
       } else {
         aValue = (a as any)[column];
         bValue = (b as any)[column];

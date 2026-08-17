@@ -26,12 +26,13 @@ export class MieterFormComponent implements OnInit {
     ort: '',
     mietbeginn: '',
     mietende: '',
-    einheitId: 0
+    einheitIds: []
   };
 
   ngOnInit(): void {
     if (this.mieter) {
-      this.formData = { ...this.mieter };
+      // Die Einheiten-Liste mitkopieren, sonst zeigten Formular und Liste auf dasselbe Array
+      this.formData = { ...this.mieter, einheitIds: [...(this.mieter.einheitIds ?? [])] };
     } else {
       // Set default mietbeginn to today
       const today = new Date().toISOString().split('T')[0];
@@ -61,7 +62,7 @@ export class MieterFormComponent implements OnInit {
       this.formData.plz?.trim() &&
       this.formData.ort?.trim() &&
       this.formData.mietbeginn &&
-      this.formData.einheitId > 0 &&
+      this.formData.einheitIds.length > 0 &&
       this.isDateRangeValid()
     );
   }
@@ -75,5 +76,22 @@ export class MieterFormComponent implements OnInit {
 
   getEinheitDisplayName(einheit: Einheit): string {
     return `${einheit.name} (ID: ${einheit.id})`;
+  }
+
+  isEinheitSelected(einheitId: number | undefined): boolean {
+    return einheitId !== undefined && this.formData.einheitIds.includes(einheitId);
+  }
+
+  /** Schaltet die Zuordnung einer Einheit um. Mindestens eine bleibt Pflicht (isFormValid). */
+  toggleEinheit(einheitId: number | undefined): void {
+    if (einheitId === undefined) {
+      return;
+    }
+    const index = this.formData.einheitIds.indexOf(einheitId);
+    if (index >= 0) {
+      this.formData.einheitIds.splice(index, 1);
+    } else {
+      this.formData.einheitIds.push(einheitId);
+    }
   }
 }

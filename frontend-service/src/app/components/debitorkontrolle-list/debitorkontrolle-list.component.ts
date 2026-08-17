@@ -104,7 +104,10 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
   loadEinheiten(): void {
     this.einheitService.getAllEinheiten().subscribe({
       next: (data) => {
-        this.einheiten = data.filter(e => e.typ === EinheitTyp.CONSUMER);
+        // Nachschlagetabelle fuer die Einheitennamen eines Mieters - er kann Wohnung
+        // und Ladestation(en) haben.
+        this.einheiten = data.filter(
+          e => e.typ === EinheitTyp.CONSUMER || e.typ === EinheitTyp.LADESTATION);
       },
       error: () => {
         this.showMessage('FEHLER_LADEN_EINHEITEN', 'error');
@@ -331,8 +334,10 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
   getEinheitName(mieterId: number): string {
     const m = this.mieter.find(x => x.id === mieterId);
     if (!m) return '';
-    const e = this.einheiten.find(x => x.id === m.einheitId);
-    return e ? e.name : '';
+    return (m.einheitIds ?? [])
+      .map(id => this.einheiten.find(x => x.id === id)?.name)
+      .filter((name): name is string => !!name)
+      .join(', ');
   }
 
 }

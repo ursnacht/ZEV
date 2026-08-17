@@ -105,7 +105,7 @@ public class MieterControllerTest {
                 .andExpect(jsonPath("$.ort", is("Bern")))
                 .andExpect(jsonPath("$.mietbeginn", is("2024-01-01")))
                 .andExpect(jsonPath("$.mietende", is("2024-12-31")))
-                .andExpect(jsonPath("$.einheitId", is(1)));
+                .andExpect(jsonPath("$.einheitIds[0]", is(1)));
     }
 
     @Test
@@ -202,7 +202,7 @@ public class MieterControllerTest {
     }
 
     @Test
-    void createMieter_MissingEinheitId_ReturnsBadRequest() throws Exception {
+    void createMieter_MissingEinheiten_ReturnsBadRequest() throws Exception {
         String json = """
                 {
                     "name": "Test",
@@ -213,12 +213,15 @@ public class MieterControllerTest {
                 }
                 """;
 
+        // Die Pflichtpruefung "mindestens eine Einheit" liegt seit Specs/Ladestationen.md im
+        // Service, nicht mehr als @NotNull am Feld - der Controller macht daraus ein 400.
+        when(mieterService.saveMieter(any()))
+                .thenThrow(new IllegalArgumentException("Mindestens eine Einheit ist erforderlich"));
+
         mockMvc.perform(post("/api/mieter")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json))
                 .andExpect(status().isBadRequest());
-
-        verify(mieterService, never()).saveMieter(any());
     }
 
     // ==================== PUT /api/mieter/{id} Tests ====================

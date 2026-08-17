@@ -1,11 +1,12 @@
 package ch.nacht.service;
 
+import ch.nacht.entity.Einheit;
+import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Erfassungsart;
-import ch.nacht.entity.Mieter;
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
 import ch.nacht.entity.Tarifposition;
-import ch.nacht.repository.MieterRepository;
+import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.TarifRepository;
 import ch.nacht.repository.TarifpositionRepository;
 import org.slf4j.Logger;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,49 +28,52 @@ public class TarifpositionService {
     private static final Logger log = LoggerFactory.getLogger(TarifpositionService.class);
 
     private final TarifpositionRepository tarifpositionRepository;
-    private final MieterRepository mieterRepository;
+    private final EinheitRepository einheitRepository;
     private final TarifRepository tarifRepository;
     private final OrganizationContextService organizationContextService;
     private final HibernateFilterService hibernateFilterService;
 
     public TarifpositionService(TarifpositionRepository tarifpositionRepository,
-                                MieterRepository mieterRepository,
+                                EinheitRepository einheitRepository,
                                 TarifRepository tarifRepository,
                                 OrganizationContextService organizationContextService,
                                 HibernateFilterService hibernateFilterService) {
         this.tarifpositionRepository = tarifpositionRepository;
-        this.mieterRepository = mieterRepository;
+        this.einheitRepository = einheitRepository;
         this.tarifRepository = tarifRepository;
         this.organizationContextService = organizationContextService;
         this.hibernateFilterService = hibernateFilterService;
     }
 
     /**
-     * Get all positions of a tenant.
+     * Get all positions of a unit.
      *
-     * @param mieterId Tenant ID
+     * @param einheitId Unit ID
      * @return List of positions, newest quarter first
      */
     @Transactional(readOnly = true)
-    public List<Tarifposition> getByMieter(Long mieterId) {
+    public List<Tarifposition> getByEinheit(Long einheitId) {
         hibernateFilterService.enableOrgFilter();
-        return tarifpositionRepository.findByMieterId(mieterId);
+        return tarifpositionRepository.findByEinheitId(einheitId);
     }
 
     /**
-     * Get the positions of a tenant whose quarter overlaps the given billing period.
+     * Get the positions of the given units whose quarter overlaps the billing period.
      * Only positions with a quantity greater than zero are returned.
      *
-     * @param mieterId Tenant ID
+     * @param einheitIds Unit IDs of the tenant
      * @param von Period start (inclusive)
      * @param bis Period end (inclusive)
      * @return Positions, oldest quarter first
      */
     @Transactional(readOnly = true)
-    public List<Tarifposition> getFuerRechnung(Long mieterId, LocalDate von, LocalDate bis) {
+    public List<Tarifposition> getFuerRechnung(Collection<Long> einheitIds, LocalDate von, LocalDate bis) {
         hibernateFilterService.enableOrgFilter();
-        return tarifpositionRepository.findByMieterIdAndQuartalOverlapping(
-                mieterId,
+        if (einheitIds.isEmpty()) {
+            return List.of();
+        }
+        return tarifpositionRepository.findByEinheitIdsAndQuartalOverlapping(
+                einheitIds,
                 von.getYear(), quartalVon(von),
                 bis.getYear(), quartalVon(bis));
     }
@@ -120,10 +125,10 @@ public class TarifpositionService {
     /**
      * Save a new or updated position.
      *
-     * <p>Validates that the referenced tariff is of a manually captured type and that no other
-     * position for the same tenant, quarter and tariff <b>type</b> exists. The latter rule is
-     * stricter than the database constraint (which covers the exact tariff only), because two
-     * different LADESTROM tariffs would otherwise bypass it.
+     * <p>Validates that the referenced unit is a charging station, that the tariff is of a
+     * manually captured type and that no other position for the same unit, quarter and tariff
+     * <b>type</b> exists. The latter rule is stricter than the database constraint (which covers
+     * the exact tariff only), because two different LADESTROM tariffs would otherwise bypass it.
      *
      * @param tarifposition Position to save
      * @return Saved position
@@ -134,7 +139,7 @@ public class TarifpositionService {
         hibernateFilterService.enableOrgFilter();
         log.info("Saving tariff position: {}", tarifposition);
 
-        Mieter mieter = resolveMieter(tarifposition);
+        Einheit einheit = resolveEinheit(tarifposition);
         Tarif tarif = resolveTarif(tarifposition);
 
         if (!TarifTyp.MANUELL_ERFASST.contains(tarif.getTariftyp())) {
@@ -143,14 +148,14 @@ public class TarifpositionService {
         }
 
         Long excludeId = tarifposition.getId() != null ? tarifposition.getId() : -1L;
-        if (tarifpositionRepository.existsByMieterAndQuartalAndTariftyp(
-                mieter.getId(), tarifposition.getJahr(), tarifposition.getQuartal(),
+        if (tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
+                einheit.getId(), tarifposition.getJahr(), tarifposition.getQuartal(),
                 TarifTyp.MANUELL_ERFASST, excludeId)) {
             throw new IllegalArgumentException(
-                    "Für diesen Mieter und dieses Quartal existiert bereits eine Position");
+                    "Für diese Einheit und dieses Quartal existiert bereits eine Position");
         }
 
-        tarifposition.setMieter(mieter);
+        tarifposition.setEinheit(einheit);
         tarifposition.setTarif(tarif);
         if (tarifposition.getErfassungsart() == null) {
             tarifposition.setErfassungsart(Erfassungsart.MANUELL);
@@ -202,12 +207,17 @@ public class TarifpositionService {
         return tarifpositionRepository.countByTarifId(tarifId);
     }
 
-    private Mieter resolveMieter(Tarifposition tarifposition) {
-        if (tarifposition.getMieter() == null || tarifposition.getMieter().getId() == null) {
-            throw new IllegalArgumentException("Mieter ist erforderlich");
+    private Einheit resolveEinheit(Tarifposition tarifposition) {
+        if (tarifposition.getEinheit() == null || tarifposition.getEinheit().getId() == null) {
+            throw new IllegalArgumentException("Einheit ist erforderlich");
         }
-        return mieterRepository.findById(tarifposition.getMieter().getId())
-                .orElseThrow(() -> new IllegalArgumentException("Mieter nicht gefunden"));
+        Einheit einheit = einheitRepository.findById(tarifposition.getEinheit().getId())
+                .orElseThrow(() -> new IllegalArgumentException("Einheit nicht gefunden"));
+        if (einheit.getTyp() != EinheitTyp.LADESTATION) {
+            throw new IllegalArgumentException(
+                    "Positionen sind nur für Einheiten vom Typ Ladestation zulässig");
+        }
+        return einheit;
     }
 
     private Tarif resolveTarif(Tarifposition tarifposition) {

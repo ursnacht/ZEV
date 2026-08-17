@@ -21,18 +21,22 @@
     </div>
   }
 
+  @if (ladestationen.length === 0) {
+    <p class="zev-text--muted">{{ 'KEINE_LADESTATION_HINT' | translate }}</p>
+  }
+
   <div class="zev-form-group">
-    <label for="mieterAuswahl">{{ 'MIETER' | translate }}:</label>
-    <select id="mieterAuswahl" class="zev-input" name="mieterAuswahl"
-      [(ngModel)]="selectedMieterId" (ngModelChange)="onMieterChange()">
-      <option [ngValue]="null">{{ 'MIETER_WAEHLEN' | translate }}</option>
-      @for (m of mieterListe; track m.id) {
-        <option [ngValue]="m.id">{{ m.name }}</option>
+    <label for="einheitAuswahl">{{ 'EINHEIT' | translate }}:</label>
+    <select id="einheitAuswahl" class="zev-input" name="einheitAuswahl"
+      [(ngModel)]="selectedEinheitId" (ngModelChange)="onEinheitChange()">
+      <option [ngValue]="null">{{ 'EINHEIT_WAEHLEN' | translate }}</option>
+      @for (e of ladestationen; track e.id) {
+        <option [ngValue]="e.id">{{ e.name }}{{ e.messpunkt ? ' (' + e.messpunkt + ')' : '' }}</option>
       }
     </select>
   </div>
 
-  @if (selectedMieterId) {
+  @if (selectedEinheitId) {
     @if (!showForm) {
       <div>
         <div class="zev-button-row">
@@ -116,7 +120,8 @@
     } @else {
       <app-tarifposition-form
         [position]="selectedPosition"
-        [mieterId]="selectedMieterId"
+        [einheitId]="selectedEinheitId"
+        [messpunkt]="selectedEinheitMesspunkt"
         [tarife]="tarife"
         (save)="onFormSubmit($event)"
         (cancel)="onFormCancel()">

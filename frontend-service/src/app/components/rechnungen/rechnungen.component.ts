@@ -27,6 +27,8 @@ export class RechnungenComponent extends WithMessage implements OnInit {
   generating = false;
 
   generatedRechnungen: GeneratedRechnung[] = [];
+  /** Gewaehlte Einheiten - fuer den Abgleich, welche keine Rechnung ergeben haben. */
+  private selectedEinheiten: Einheit[] = [];
 
   constructor(
     private rechnungService: RechnungService,
@@ -39,6 +41,7 @@ export class RechnungenComponent extends WithMessage implements OnInit {
 
   onSelectionChange(einheiten: Einheit[]): void {
     this.selectedEinheitIds = new Set(einheiten.map(e => e.id!));
+    this.selectedEinheiten = einheiten;
   }
 
   /**
@@ -106,10 +109,19 @@ export class RechnungenComponent extends WithMessage implements OnInit {
     this.rechnungService.generateRechnungen(request).subscribe({
       next: (response) => {
         this.generatedRechnungen = response.rechnungen;
-        this.showMessage(
-          `${response.count} ${this.translationService.translate('RECHNUNGEN_GENERIERT')}`,
-          'success'
-        );
+        const erzeugt = `${response.count} ${this.translationService.translate('RECHNUNGEN_GENERIERT')}`;
+        const ohne = this.einheitenOhneRechnung();
+        if (ohne.length > 0) {
+          // Sonst verschwinden uebersprungene Einheiten kommentarlos: eine Ladestation ohne
+          // Positionen im Zeitraum, ein Produzent ohne Grundgebuehr-Tarif oder eine Einheit,
+          // deren Mietverhaeltnis den Zeitraum nicht beruehrt, erzeugen keine Rechnung.
+          this.showMessage(
+            `${erzeugt}. ${this.translationService.translate('KEINE_RECHNUNG_FUER_EINHEITEN')}: ${ohne.join(', ')}`,
+            'warning'
+          );
+        } else {
+          this.showMessage(erzeugt, 'success');
+        }
         this.generating = false;
       },
       error: (error) => {
@@ -142,6 +154,14 @@ export class RechnungenComponent extends WithMessage implements OnInit {
 
   onDownload(rechnung: GeneratedRechnung): void {
     this.rechnungService.downloadRechnung(rechnung.downloadKey, rechnung.filename);
+  }
+
+  /** Namen der gewaehlten Einheiten, fuer die kein Rechnungsdatensatz entstanden ist. */
+  private einheitenOhneRechnung(): string[] {
+    const mitRechnung = new Set(this.generatedRechnungen.map(r => r.einheitId));
+    return this.selectedEinheiten
+      .filter(e => e.id !== undefined && !mitRechnung.has(e.id))
+      .map(e => e.name);
   }
 
   formatBetrag(betrag: number): string {

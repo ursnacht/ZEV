@@ -50,17 +50,25 @@ export class DebitorkontrolleFormComponent implements OnInit {
   private updateEinheitName(): void {
     const m = this.mieter.find(x => x.id === Number(this.formData.mieterId));
     if (m) {
-      const e = this.einheiten.find(x => x.id === m.einheitId);
-      this.selectedEinheitName = e ? e.name : '';
+      this.selectedEinheitName = this.einheitNamen(m);
     } else {
       this.selectedEinheitName = '';
     }
   }
 
   getMieterDisplayName(m: Mieter): string {
-    const e = this.einheiten.find(x => x.id === m.einheitId);
-    return e ? `${m.name} (${e.name})` : m.name;
+    const namen = this.einheitNamen(m);
+    return namen ? `${m.name} (${namen})` : m.name;
   }
+
+  /** Namen aller Einheiten eines Mieters - er kann Wohnung und Ladestation(en) haben. */
+  private einheitNamen(m: Mieter): string {
+    return (m.einheitIds ?? [])
+      .map(id => this.einheiten.find(x => x.id === id)?.name)
+      .filter((name): name is string => !!name)
+      .join(', ');
+  }
+
 
   onSubmit(): void {
     if (this.isFormValid()) {

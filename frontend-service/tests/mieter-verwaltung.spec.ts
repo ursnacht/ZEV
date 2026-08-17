@@ -38,7 +38,12 @@ async function fillMieterForm(page: Page, data: {
     mietende?: string;
 }): Promise<void> {
     if (data.einheitId) {
-        await page.locator('#einheitId').selectOption(data.einheitId);
+        // Seit Specs/Ladestationen.md ist die Zuordnung eine Mehrfachauswahl (Checkboxen)
+        // statt eines Dropdowns - ein Mieter kann Wohnung und Ladestation(en) haben.
+        const checkbox = page.locator(`#einheit-${data.einheitId}`);
+        if (!(await checkbox.isChecked())) {
+            await checkbox.check();
+        }
     }
     await page.locator('#name').fill(data.name);
     await page.locator('#strasse').fill(data.strasse);
@@ -51,17 +56,16 @@ async function fillMieterForm(page: Page, data: {
 }
 
 /**
- * Helper to get the first available consumer einheit ID from the dropdown
+ * Helper to get the first selectable einheit ID from the checkbox list.
+ * Die Checkbox-IDs lauten `einheit-<id>` (mieter-form.component.html).
  */
 async function getFirstEinheitOptionValue(page: Page): Promise<string | null> {
-    const select = page.locator('#einheitId');
-    const options = select.locator('option:not([disabled])');
-    const count = await options.count();
-    if (count > 0) {
-        const value = await options.first().getAttribute('value');
-        return value;
+    const checkboxes = page.locator('.zev-checkbox-group input[type="checkbox"]');
+    if (await checkboxes.count() === 0) {
+        return null;
     }
-    return null;
+    const id = await checkboxes.first().getAttribute('id');
+    return id ? id.replace('einheit-', '') : null;
 }
 
 /**
@@ -200,7 +204,7 @@ test.describe('Mieter Management - Create Mieter', () => {
         const form = page.locator('form');
         await expect(form).toBeVisible();
 
-        await expect(page.locator('#einheitId')).toBeVisible();
+        await expect(page.locator('.zev-checkbox-group input[type="checkbox"]').first()).toBeVisible();
         await expect(page.locator('#name')).toBeVisible();
         await expect(page.locator('#strasse')).toBeVisible();
         await expect(page.locator('#plz')).toBeVisible();

@@ -46,6 +46,7 @@ public class EinheitService {
         if (BILANZ_TYPEN.contains(einheit.getTyp()) && einheitRepository.existsByTyp(einheit.getTyp())) {
             throw new IllegalStateException("EINHEIT_BILANZ_TYP_EXISTIERT");
         }
+        pruefeLadestationMesspunkt(einheit, -1L);
         einheit.setOrgId(organizationContextService.getCurrentOrgId());
         return einheitRepository.save(einheit);
     }
@@ -60,9 +61,32 @@ public class EinheitService {
         if (BILANZ_TYPEN.contains(einheit.getTyp()) && einheitRepository.existsByTypAndIdNot(einheit.getTyp(), id)) {
             throw new IllegalStateException("EINHEIT_BILANZ_TYP_EXISTIERT");
         }
+        pruefeLadestationMesspunkt(einheit, id);
         einheit.setId(id);
         einheit.setOrgId(existingEinheit.get().getOrgId());
         return Optional.of(einheitRepository.save(einheit));
+    }
+
+    /**
+     * Normalisiert einen leeren Messpunkt auf {@code null} und prüft bei Ladestationen die
+     * Eindeutigkeit der RFID. Ohne Eindeutigkeit könnte der spätere Import aus dem Lademanagement
+     * eine Menge nicht eindeutig einer Einheit zuordnen. Leere Eingaben dürfen nicht miteinander
+     * kollidieren, und die Bilanz-Typen teilen sich einen Messpunkt bewusst — die Prüfung greift
+     * deshalb nur für {@code LADESTATION}.
+     *
+     * @param einheit Zu prüfende Einheit
+     * @param excludeId Eigene ID beim Update, {@code -1} beim Anlegen
+     * @throws IllegalStateException wenn die RFID bereits einer anderen Ladestation gehört
+     */
+    private void pruefeLadestationMesspunkt(Einheit einheit, Long excludeId) {
+        if (einheit.getMesspunkt() != null && einheit.getMesspunkt().isBlank()) {
+            einheit.setMesspunkt(null);
+        }
+        if (einheit.getTyp() == EinheitTyp.LADESTATION
+                && einheit.getMesspunkt() != null
+                && einheitRepository.existsLadestationWithMesspunkt(einheit.getMesspunkt(), excludeId)) {
+            throw new IllegalStateException("EINHEIT_MESSPUNKT_EXISTIERT");
+        }
     }
 
     @Transactional

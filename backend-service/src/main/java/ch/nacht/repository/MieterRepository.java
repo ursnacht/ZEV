@@ -11,24 +11,34 @@ import java.util.List;
 
 /**
  * Repository for Mieter entities.
+ *
+ * <p>Der Bezug zur Einheit läuft seit {@code V105} über die Zuordnungstabelle
+ * {@code mieter_einheit} (ein Mieter kann mehreren Einheiten zugeordnet sein). Die Abfragen
+ * verbinden deshalb explizit mit {@code MieterEinheit}; ein Mieter gilt als „Mieter der Einheit",
+ * sobald eine Zuordnung existiert. Der Mietzeitraum bleibt am Mieter und gilt für alle seine
+ * Einheiten.
  */
 @Repository
 public interface MieterRepository extends JpaRepository<Mieter, Long> {
 
     /**
-     * Find all tenants ordered by unit ID and lease start date (descending).
+     * Find all tenants ordered by name and lease start date (descending).
+     * Vorher nach Einheit sortiert — die gibt es am Mieter nicht mehr; die Liste sortiert im
+     * Frontend ohnehin clientseitig.
      *
      * @return List of all tenants
      */
-    List<Mieter> findAllByOrderByEinheitIdAscMietbeginnDesc();
+    List<Mieter> findAllByOrderByNameAscMietbeginnDesc();
 
     /**
-     * Find all tenants for a specific unit ordered by lease start date (descending).
+     * Find all tenants assigned to a specific unit, ordered by lease start date (descending).
      *
      * @param einheitId Unit ID
      * @return List of tenants for the unit
      */
-    List<Mieter> findByEinheitIdOrderByMietbeginnDesc(Long einheitId);
+    @Query("SELECT m FROM Mieter m JOIN MieterEinheit me ON me.mieterId = m.id "
+           + "WHERE me.einheitId = :einheitId ORDER BY m.mietbeginn DESC")
+    List<Mieter> findByEinheitIdOrderByMietbeginnDesc(@Param("einheitId") Long einheitId);
 
     /**
      * Check if overlapping lease periods exist for a unit (open-ended new lease).
@@ -39,9 +49,10 @@ public interface MieterRepository extends JpaRepository<Mieter, Long> {
      * @param excludeId ID to exclude (use -1 for new tenants)
      * @return true if an overlapping tenant exists
      */
-    @Query("SELECT COUNT(m) > 0 FROM Mieter m WHERE m.einheitId = :einheitId " +
-           "AND m.id != :excludeId " +
-           "AND (m.mietende IS NULL OR m.mietende > :mietbeginn)")
+    @Query("SELECT COUNT(m) > 0 FROM Mieter m JOIN MieterEinheit me ON me.mieterId = m.id "
+           + "WHERE me.einheitId = :einheitId "
+           + "AND m.id != :excludeId "
+           + "AND (m.mietende IS NULL OR m.mietende > :mietbeginn)")
     boolean existsOverlappingMieterOpenEnded(
         @Param("einheitId") Long einheitId,
         @Param("mietbeginn") LocalDate mietbeginn,
@@ -58,10 +69,11 @@ public interface MieterRepository extends JpaRepository<Mieter, Long> {
      * @param excludeId ID to exclude (use -1 for new tenants)
      * @return true if an overlapping tenant exists
      */
-    @Query("SELECT COUNT(m) > 0 FROM Mieter m WHERE m.einheitId = :einheitId " +
-           "AND m.id != :excludeId " +
-           "AND (m.mietende IS NULL OR m.mietende > :mietbeginn) " +
-           "AND m.mietbeginn < :mietende")
+    @Query("SELECT COUNT(m) > 0 FROM Mieter m JOIN MieterEinheit me ON me.mieterId = m.id "
+           + "WHERE me.einheitId = :einheitId "
+           + "AND m.id != :excludeId "
+           + "AND (m.mietende IS NULL OR m.mietende > :mietbeginn) "
+           + "AND m.mietbeginn < :mietende")
     boolean existsOverlappingMieterBounded(
         @Param("einheitId") Long einheitId,
         @Param("mietbeginn") LocalDate mietbeginn,
@@ -77,9 +89,10 @@ public interface MieterRepository extends JpaRepository<Mieter, Long> {
      * @param excludeId ID to exclude (use -1 for new tenants)
      * @return true if another tenant without lease end exists
      */
-    @Query("SELECT COUNT(m) > 0 FROM Mieter m WHERE m.einheitId = :einheitId " +
-           "AND m.id != :excludeId " +
-           "AND m.mietende IS NULL")
+    @Query("SELECT COUNT(m) > 0 FROM Mieter m JOIN MieterEinheit me ON me.mieterId = m.id "
+           + "WHERE me.einheitId = :einheitId "
+           + "AND m.id != :excludeId "
+           + "AND m.mietende IS NULL")
     boolean existsOtherMieterWithoutMietende(
         @Param("einheitId") Long einheitId,
         @Param("excludeId") Long excludeId
@@ -94,10 +107,11 @@ public interface MieterRepository extends JpaRepository<Mieter, Long> {
      * @param quartalEnde Quarter end date
      * @return List of tenants active during the quarter
      */
-    @Query("SELECT m FROM Mieter m WHERE m.einheitId = :einheitId " +
-           "AND m.mietbeginn <= :quartalEnde " +
-           "AND (m.mietende IS NULL OR m.mietende >= :quartalBeginn) " +
-           "ORDER BY m.mietbeginn")
+    @Query("SELECT m FROM Mieter m JOIN MieterEinheit me ON me.mieterId = m.id "
+           + "WHERE me.einheitId = :einheitId "
+           + "AND m.mietbeginn <= :quartalEnde "
+           + "AND (m.mietende IS NULL OR m.mietende >= :quartalBeginn) "
+           + "ORDER BY m.mietbeginn")
     List<Mieter> findByEinheitIdAndQuartal(
         @Param("einheitId") Long einheitId,
         @Param("quartalBeginn") LocalDate quartalBeginn,

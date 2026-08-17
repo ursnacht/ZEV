@@ -36,14 +36,15 @@ public class TarifpositionTest {
     }
 
     private Tarifposition gueltigePosition() {
-        Mieter mieter = new Mieter("Max Muster", LocalDate.of(2026, 1, 1), 1L);
-        mieter.setId(1L);
+        Einheit einheit = new Einheit("Ladestation 1", EinheitTyp.LADESTATION);
+        einheit.setId(1L);
+        einheit.setMesspunkt("RFID-001");
 
         Tarif tarif = new Tarif("Ladestrom", TarifTyp.LADESTROM, new BigDecimal("0.35000"),
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
         tarif.setId(10L);
 
-        return new Tarifposition(mieter, tarif, 2026, 3, new BigDecimal("120.500"));
+        return new Tarifposition(einheit, tarif, 2026, 3, new BigDecimal("120.500"));
     }
 
     private Set<ConstraintViolation<Tarifposition>> validate(Tarifposition position) {
@@ -161,7 +162,7 @@ public class TarifpositionTest {
     @Test
     void mieterNull_IsRejected() {
         Tarifposition position = gueltigePosition();
-        position.setMieter(null);
+        position.setEinheit(null);
 
         assertFalse(validate(position).isEmpty());
     }
@@ -220,7 +221,7 @@ public class TarifpositionTest {
         String text = position.toString();
 
         assertTrue(text.contains("id=7"));
-        assertTrue(text.contains("mieter=1"));
+        assertTrue(text.contains("einheit=1"));
         assertTrue(text.contains("tarif=10"));
         assertTrue(text.contains("erfassungsart=MANUELL"));
     }

@@ -12,8 +12,8 @@ export class TarifpositionService {
 
   constructor(private http: HttpClient) {}
 
-  getByMieter(mieterId: number): Observable<Tarifposition[]> {
-    return this.http.get<Tarifposition[]>(this.apiUrl, { params: { mieterId } });
+  getByEinheit(einheitId: number): Observable<Tarifposition[]> {
+    return this.http.get<Tarifposition[]>(this.apiUrl, { params: { einheitId } });
   }
 
   createTarifposition(position: Tarifposition): Observable<Tarifposition> {

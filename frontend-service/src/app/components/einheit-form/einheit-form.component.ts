@@ -26,8 +26,11 @@ export class EinheitFormComponent implements OnInit {
     { value: EinheitTyp.PRODUCER, label: 'PRODUZENT' },
     { value: EinheitTyp.CONSUMER, label: 'KONSUMENT' },
     { value: EinheitTyp.BEZUG, label: 'TYP_BEZUG' },
-    { value: EinheitTyp.RUECKLIEFERUNG, label: 'TYP_RUECKLIEFERUNG' }
+    { value: EinheitTyp.RUECKLIEFERUNG, label: 'TYP_RUECKLIEFERUNG' },
+    { value: EinheitTyp.LADESTATION, label: 'TYP_LADESTATION' }
   ];
+
+  readonly EinheitTyp = EinheitTyp;
 
   ngOnInit(): void {
     if (this.einheit) {

@@ -3,10 +3,10 @@
 
   @if (message) {
     <div class="zev-message" [ngClass]="'zev-message--' + messageType"
-      [class.zev-message--dismissible]="messageType === 'error'"
-      (click)="messageType === 'error' && dismissMessage()">
+      [class.zev-message--dismissible]="messageType === 'error' || messageType === 'warning'"
+      (click)="(messageType === 'error' || messageType === 'warning') && dismissMessage()">
       <span>{{ message }}</span>
-      @if (messageType === 'error') {
+      @if (messageType === 'error' || messageType === 'warning') {
         <span class="zev-message__dismiss">&times;</span>
       }
     </div>

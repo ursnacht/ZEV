@@ -4,7 +4,8 @@ import ch.nacht.AbstractIntegrationTest;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Erfassungsart;
-import ch.nacht.entity.Mieter;
+import ch.nacht.entity.Einheit;
+import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Organisation;
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
@@ -26,7 +27,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Integrationstests für {@link TarifpositionRepository} mit Testcontainers (Spec Ladestromtarif.md).
+ * Integrationstests für {@link TarifpositionRepository} mit Testcontainers (Specs/Ladestationen.md).
  *
  * <p>Prüft die selbst geschriebenen Queries gegen eine echte Datenbank: Sortierung der Liste,
  * die Überschneidungsregel samt {@code menge > 0}-Filter für die Rechnungserzeugung, die
@@ -41,20 +42,17 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
     private TarifpositionRepository tarifpositionRepository;
 
     @Autowired
-    private MieterRepository mieterRepository;
+    private EinheitRepository einheitRepository;
 
     @Autowired
     private TarifRepository tarifRepository;
 
     @Autowired
-    private EinheitRepository einheitRepository;
-
-    @Autowired
     private OrganisationRepository organisationRepository;
 
     private Long TEST_ORG_ID;
-    private Mieter mieterA;
-    private Mieter mieterB;
+    private Einheit ladestationA;
+    private Einheit ladestationB;
     private Tarif ladestromTarif;
     private Tarif ladestromTarif2;
     private Tarif zevTarif;
@@ -62,7 +60,7 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         tarifpositionRepository.deleteAll();
-        mieterRepository.deleteAll();
+        einheitRepository.deleteAll();
         tarifRepository.deleteAll();
         einheitRepository.deleteAll();
 
@@ -76,8 +74,8 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
         einheit.setOrgId(TEST_ORG_ID);
         Long einheitId = einheitRepository.save(einheit).getId();
 
-        mieterA = mieterRepository.save(createMieter("Mieter A", einheitId, LocalDate.of(2026, 1, 1)));
-        mieterB = mieterRepository.save(createMieter("Mieter B", einheitId, LocalDate.of(2027, 1, 1)));
+        ladestationA = einheitRepository.save(createLadestation("Ladestation A", "RFID-A"));
+        ladestationB = einheitRepository.save(createLadestation("Ladestation B", "RFID-B"));
 
         ladestromTarif = tarifRepository.save(createTarif("Ladestrom", TarifTyp.LADESTROM, "0.35000",
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)));
@@ -90,21 +88,16 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
     @AfterEach
     void tearDown() {
         tarifpositionRepository.deleteAll();
-        mieterRepository.deleteAll();
+        einheitRepository.deleteAll();
         tarifRepository.deleteAll();
         einheitRepository.deleteAll();
     }
 
-    private Mieter createMieter(String name, Long einheitId, LocalDate mietbeginn) {
-        Mieter mieter = new Mieter();
-        mieter.setOrgId(TEST_ORG_ID);
-        mieter.setName(name);
-        mieter.setStrasse("Teststrasse 1");
-        mieter.setPlz("8000");
-        mieter.setOrt("Zürich");
-        mieter.setMietbeginn(mietbeginn);
-        mieter.setEinheitId(einheitId);
-        return mieter;
+    private Einheit createLadestation(String name, String rfid) {
+        Einheit einheit = new Einheit(name, EinheitTyp.LADESTATION);
+        einheit.setOrgId(TEST_ORG_ID);
+        einheit.setMesspunkt(rfid);
+        return einheit;
     }
 
     private Tarif createTarif(String bezeichnung, TarifTyp typ, String preis,
@@ -114,8 +107,8 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
         return tarif;
     }
 
-    private Tarifposition savePosition(Mieter mieter, Tarif tarif, int jahr, int quartal, String menge) {
-        Tarifposition position = new Tarifposition(mieter, tarif, jahr, quartal, new BigDecimal(menge));
+    private Tarifposition savePosition(Einheit einheit, Tarif tarif, int jahr, int quartal, String menge) {
+        Tarifposition position = new Tarifposition(einheit, tarif, jahr, quartal, new BigDecimal(menge));
         position.setOrgId(TEST_ORG_ID);
         return tarifpositionRepository.save(position);
     }
@@ -124,7 +117,7 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
 
     @Test
     void shouldSaveAndFindTarifposition() {
-        Tarifposition position = new Tarifposition(mieterA, ladestromTarif, 2026, 3, new BigDecimal("120.500"));
+        Tarifposition position = new Tarifposition(ladestationA, ladestromTarif, 2026, 3, new BigDecimal("120.500"));
         position.setOrgId(TEST_ORG_ID);
         position.setQuellReferenz("LP-01");
         position.setBemerkung("Beleg 42");
@@ -142,7 +135,7 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
 
     @Test
     void shouldKeepThreeDecimalsForMenge() {
-        Tarifposition saved = savePosition(mieterA, ladestromTarif, 2026, 1, "120.567");
+        Tarifposition saved = savePosition(ladestationA, ladestromTarif, 2026, 1, "120.567");
         tarifpositionRepository.flush();
 
         Tarifposition reloaded = tarifpositionRepository.findById(saved.getId()).orElseThrow();
@@ -154,15 +147,15 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
     // TarifpositionTest über den Bean-Validator abgedeckt - hier würde die fehlgeschlagene
     // Flush-Operation den Persistence-Context der übrigen Tests beschädigen.
 
-    // ==================== findByMieterId ====================
+    // ==================== findByEinheitId ====================
 
     @Test
-    void shouldFindByMieterIdOrderedNewestQuarterFirst() {
-        savePosition(mieterA, ladestromTarif, 2026, 1, "10.000");
-        savePosition(mieterA, ladestromTarif, 2026, 4, "40.000");
-        savePosition(mieterA, ladestromTarif, 2026, 2, "20.000");
+    void shouldFindByEinheitIdOrderedNewestQuarterFirst() {
+        savePosition(ladestationA, ladestromTarif, 2026, 1, "10.000");
+        savePosition(ladestationA, ladestromTarif, 2026, 4, "40.000");
+        savePosition(ladestationA, ladestromTarif, 2026, 2, "20.000");
 
-        List<Tarifposition> result = tarifpositionRepository.findByMieterId(mieterA.getId());
+        List<Tarifposition> result = tarifpositionRepository.findByEinheitId(ladestationA.getId());
 
         assertThat(result).hasSize(3);
         assertThat(result.get(0).getQuartal()).isEqualTo(4);
@@ -171,11 +164,11 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void shouldFindByMieterIdOrderedAcrossYears() {
-        savePosition(mieterA, ladestromTarif, 2026, 4, "40.000");
-        savePosition(mieterA, ladestromTarif2, 2027, 1, "10.000");
+    void shouldFindByEinheitIdOrderedAcrossYears() {
+        savePosition(ladestationA, ladestromTarif, 2026, 4, "40.000");
+        savePosition(ladestationA, ladestromTarif2, 2027, 1, "10.000");
 
-        List<Tarifposition> result = tarifpositionRepository.findByMieterId(mieterA.getId());
+        List<Tarifposition> result = tarifpositionRepository.findByEinheitId(ladestationA.getId());
 
         // Neuestes Quartal zuerst: Q1/2027 vor Q4/2026
         assertThat(result).hasSize(2);
@@ -184,30 +177,29 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void shouldFindByMieterIdReturnsOnlyOwnPositions() {
-        savePosition(mieterA, ladestromTarif, 2026, 1, "10.000");
-        savePosition(mieterB, ladestromTarif, 2026, 1, "99.000");
+    void shouldFindByEinheitIdReturnsOnlyOwnPositions() {
+        savePosition(ladestationA, ladestromTarif, 2026, 1, "10.000");
+        savePosition(ladestationB, ladestromTarif, 2026, 1, "99.000");
 
-        List<Tarifposition> result = tarifpositionRepository.findByMieterId(mieterA.getId());
+        List<Tarifposition> result = tarifpositionRepository.findByEinheitId(ladestationA.getId());
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getMenge()).isEqualByComparingTo("10.000");
     }
 
     @Test
-    void shouldFindByMieterIdReturnsEmptyForMieterWithoutPositions() {
-        assertThat(tarifpositionRepository.findByMieterId(mieterB.getId())).isEmpty();
+    void shouldFindByEinheitIdReturnsEmptyForMieterWithoutPositions() {
+        assertThat(tarifpositionRepository.findByEinheitId(ladestationB.getId())).isEmpty();
     }
 
-    // ==================== findByMieterIdAndQuartalOverlapping ====================
+    // ==================== findByEinheitIdsAndQuartalOverlapping ====================
 
     @Test
     void shouldFindOverlappingPositionsForSingleQuarter() {
-        savePosition(mieterA, ladestromTarif, 2026, 1, "10.000");
-        savePosition(mieterA, ladestromTarif, 2026, 2, "20.000");
+        savePosition(ladestationA, ladestromTarif, 2026, 1, "10.000");
+        savePosition(ladestationA, ladestromTarif, 2026, 2, "20.000");
 
-        List<Tarifposition> result = tarifpositionRepository.findByMieterIdAndQuartalOverlapping(
-                mieterA.getId(), 2026, 1, 2026, 1);
+        List<Tarifposition> result = tarifpositionRepository.findByEinheitIdsAndQuartalOverlapping(List.of(ladestationA.getId()), 2026, 1, 2026, 1);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getQuartal()).isEqualTo(1);
@@ -215,12 +207,11 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
 
     @Test
     void shouldFindOverlappingPositionsForHalfYear_ReturnsBothQuarters() {
-        savePosition(mieterA, ladestromTarif, 2026, 1, "10.000");
-        savePosition(mieterA, ladestromTarif, 2026, 2, "20.000");
-        savePosition(mieterA, ladestromTarif, 2026, 3, "30.000");
+        savePosition(ladestationA, ladestromTarif, 2026, 1, "10.000");
+        savePosition(ladestationA, ladestromTarif, 2026, 2, "20.000");
+        savePosition(ladestationA, ladestromTarif, 2026, 3, "30.000");
 
-        List<Tarifposition> result = tarifpositionRepository.findByMieterIdAndQuartalOverlapping(
-                mieterA.getId(), 2026, 1, 2026, 2);
+        List<Tarifposition> result = tarifpositionRepository.findByEinheitIdsAndQuartalOverlapping(List.of(ladestationA.getId()), 2026, 1, 2026, 2);
 
         // Aufsteigend sortiert (aeltestes Quartal zuerst)
         assertThat(result).hasSize(2);
@@ -230,13 +221,12 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
 
     @Test
     void shouldFindOverlappingPositionsAcrossYearBoundary() {
-        savePosition(mieterA, ladestromTarif, 2026, 3, "30.000");
-        savePosition(mieterA, ladestromTarif, 2026, 4, "40.000");
-        savePosition(mieterA, ladestromTarif2, 2027, 1, "10.000");
-        savePosition(mieterA, ladestromTarif2, 2027, 2, "20.000");
+        savePosition(ladestationA, ladestromTarif, 2026, 3, "30.000");
+        savePosition(ladestationA, ladestromTarif, 2026, 4, "40.000");
+        savePosition(ladestationA, ladestromTarif2, 2027, 1, "10.000");
+        savePosition(ladestationA, ladestromTarif2, 2027, 2, "20.000");
 
-        List<Tarifposition> result = tarifpositionRepository.findByMieterIdAndQuartalOverlapping(
-                mieterA.getId(), 2026, 4, 2027, 1);
+        List<Tarifposition> result = tarifpositionRepository.findByEinheitIdsAndQuartalOverlapping(List.of(ladestationA.getId()), 2026, 4, 2027, 1);
 
         // Q4/2026 und Q1/2027 - chronologisch ueber die Jahresgrenze hinweg
         assertThat(result).hasSize(2);
@@ -248,23 +238,21 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
 
     @Test
     void shouldExcludePositionsWithMengeZero() {
-        savePosition(mieterA, ladestromTarif, 2026, 1, "0.000");
+        savePosition(ladestationA, ladestromTarif, 2026, 1, "0.000");
 
-        List<Tarifposition> result = tarifpositionRepository.findByMieterIdAndQuartalOverlapping(
-                mieterA.getId(), 2026, 1, 2026, 1);
+        List<Tarifposition> result = tarifpositionRepository.findByEinheitIdsAndQuartalOverlapping(List.of(ladestationA.getId()), 2026, 1, 2026, 1);
 
         // Menge = 0 bleibt gespeichert, erscheint aber nicht auf der Rechnung
         assertThat(result).isEmpty();
-        assertThat(tarifpositionRepository.findByMieterId(mieterA.getId())).hasSize(1);
+        assertThat(tarifpositionRepository.findByEinheitId(ladestationA.getId())).hasSize(1);
     }
 
     @Test
     void shouldReturnOnlyPositionsOfTheGivenMieter() {
-        savePosition(mieterA, ladestromTarif, 2026, 1, "10.000");
-        savePosition(mieterB, ladestromTarif, 2026, 1, "99.000");
+        savePosition(ladestationA, ladestromTarif, 2026, 1, "10.000");
+        savePosition(ladestationB, ladestromTarif, 2026, 1, "99.000");
 
-        List<Tarifposition> result = tarifpositionRepository.findByMieterIdAndQuartalOverlapping(
-                mieterB.getId(), 2026, 1, 2026, 1);
+        List<Tarifposition> result = tarifpositionRepository.findByEinheitIdsAndQuartalOverlapping(List.of(ladestationB.getId()), 2026, 1, 2026, 1);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getMenge()).isEqualByComparingTo("99.000");
@@ -272,22 +260,21 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
 
     @Test
     void shouldReturnEmptyWhenNoQuarterOverlaps() {
-        savePosition(mieterA, ladestromTarif, 2026, 1, "10.000");
+        savePosition(ladestationA, ladestromTarif, 2026, 1, "10.000");
 
-        List<Tarifposition> result = tarifpositionRepository.findByMieterIdAndQuartalOverlapping(
-                mieterA.getId(), 2026, 3, 2026, 4);
+        List<Tarifposition> result = tarifpositionRepository.findByEinheitIdsAndQuartalOverlapping(List.of(ladestationA.getId()), 2026, 3, 2026, 4);
 
         assertThat(result).isEmpty();
     }
 
-    // ==================== existsByMieterAndQuartalAndTariftyp ====================
+    // ==================== existsByEinheitAndQuartalAndTariftyp ====================
 
     @Test
     void shouldDetectExistingPositionOfSameTariftyp() {
-        savePosition(mieterA, ladestromTarif, 2026, 1, "10.000");
+        savePosition(ladestationA, ladestromTarif, 2026, 1, "10.000");
 
-        boolean exists = tarifpositionRepository.existsByMieterAndQuartalAndTariftyp(
-                mieterA.getId(), 2026, 1, TarifTyp.MANUELL_ERFASST, -1L);
+        boolean exists = tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
+                ladestationA.getId(), 2026, 1, TarifTyp.MANUELL_ERFASST, -1L);
 
         assertThat(exists).isTrue();
     }
@@ -295,10 +282,10 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldDetectExistingPositionEvenWithDifferentLadestromTarif() {
         // Zweiter LADESTROM-Tarif darf die Regel nicht umgehen
-        savePosition(mieterA, ladestromTarif, 2026, 1, "10.000");
+        savePosition(ladestationA, ladestromTarif, 2026, 1, "10.000");
 
-        boolean exists = tarifpositionRepository.existsByMieterAndQuartalAndTariftyp(
-                mieterA.getId(), 2026, 1, TarifTyp.MANUELL_ERFASST, -1L);
+        boolean exists = tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
+                ladestationA.getId(), 2026, 1, TarifTyp.MANUELL_ERFASST, -1L);
 
         assertThat(exists).isTrue();
         assertThat(ladestromTarif2.getTariftyp()).isEqualTo(TarifTyp.LADESTROM);
@@ -307,40 +294,40 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldNotDetectPositionOfOtherTariftyp() {
         // Position auf einem ZEV-Tarif (fachlich nicht erlaubt, hier bewusst direkt persistiert)
-        savePosition(mieterA, zevTarif, 2026, 1, "10.000");
+        savePosition(ladestationA, zevTarif, 2026, 1, "10.000");
 
-        boolean exists = tarifpositionRepository.existsByMieterAndQuartalAndTariftyp(
-                mieterA.getId(), 2026, 1, TarifTyp.MANUELL_ERFASST, -1L);
+        boolean exists = tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
+                ladestationA.getId(), 2026, 1, TarifTyp.MANUELL_ERFASST, -1L);
 
         assertThat(exists).isFalse();
     }
 
     @Test
     void shouldNotDetectPositionOfOtherQuartal() {
-        savePosition(mieterA, ladestromTarif, 2026, 1, "10.000");
+        savePosition(ladestationA, ladestromTarif, 2026, 1, "10.000");
 
-        boolean exists = tarifpositionRepository.existsByMieterAndQuartalAndTariftyp(
-                mieterA.getId(), 2026, 2, TarifTyp.MANUELL_ERFASST, -1L);
+        boolean exists = tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
+                ladestationA.getId(), 2026, 2, TarifTyp.MANUELL_ERFASST, -1L);
 
         assertThat(exists).isFalse();
     }
 
     @Test
     void shouldNotDetectPositionOfOtherMieter() {
-        savePosition(mieterB, ladestromTarif, 2026, 1, "10.000");
+        savePosition(ladestationB, ladestromTarif, 2026, 1, "10.000");
 
-        boolean exists = tarifpositionRepository.existsByMieterAndQuartalAndTariftyp(
-                mieterA.getId(), 2026, 1, TarifTyp.MANUELL_ERFASST, -1L);
+        boolean exists = tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
+                ladestationA.getId(), 2026, 1, TarifTyp.MANUELL_ERFASST, -1L);
 
         assertThat(exists).isFalse();
     }
 
     @Test
     void shouldExcludeSelfWhenCheckingDuplicates() {
-        Tarifposition eigene = savePosition(mieterA, ladestromTarif, 2026, 1, "10.000");
+        Tarifposition eigene = savePosition(ladestationA, ladestromTarif, 2026, 1, "10.000");
 
-        boolean exists = tarifpositionRepository.existsByMieterAndQuartalAndTariftyp(
-                mieterA.getId(), 2026, 1, TarifTyp.MANUELL_ERFASST, eigene.getId());
+        boolean exists = tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
+                ladestationA.getId(), 2026, 1, TarifTyp.MANUELL_ERFASST, eigene.getId());
 
         // Beim Bearbeiten darf die eigene Position nicht als Duplikat gelten
         assertThat(exists).isFalse();
@@ -350,9 +337,9 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
 
     @Test
     void shouldCountPositionsReferencingATarif() {
-        savePosition(mieterA, ladestromTarif, 2026, 1, "10.000");
-        savePosition(mieterB, ladestromTarif, 2026, 1, "20.000");
-        savePosition(mieterA, ladestromTarif2, 2027, 1, "30.000");
+        savePosition(ladestationA, ladestromTarif, 2026, 1, "10.000");
+        savePosition(ladestationB, ladestromTarif, 2026, 1, "20.000");
+        savePosition(ladestationA, ladestromTarif2, 2027, 1, "30.000");
 
         assertThat(tarifpositionRepository.countByTarifId(ladestromTarif.getId())).isEqualTo(2);
         assertThat(tarifpositionRepository.countByTarifId(ladestromTarif2.getId())).isEqualTo(1);

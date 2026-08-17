@@ -13,7 +13,10 @@ import { EinheitTypPipe } from '../../pipes/einheit-typ.pipe';
   styleUrls: ['./einheit-selector.component.css']
 })
 export class EinheitSelectorComponent implements OnInit {
-  /** Wenn true, selektiert "Alle auswählen" nur Konsumenten (z.B. für Rechnungen). */
+  /**
+   * Wenn true, selektiert "Alle auswählen" nur die rechnungsfähigen Einheiten
+   * (Konsumenten und Ladestationen) — z.B. für Rechnungen.
+   */
   @Input() onlyConsumers = false;
   @Output() selectionChange = new EventEmitter<Einheit[]>();
 
@@ -24,7 +27,8 @@ export class EinheitSelectorComponent implements OnInit {
   /** Einheiten, die "Alle auswählen" betreffen (alle bzw. nur Konsumenten). */
   get selectableEinheiten(): Einheit[] {
     return this.onlyConsumers
-      ? this.einheiten.filter(e => e.typ === EinheitTyp.CONSUMER)
+      ? this.einheiten.filter(
+          e => e.typ === EinheitTyp.CONSUMER || e.typ === EinheitTyp.LADESTATION)
       : this.einheiten;
   }
 

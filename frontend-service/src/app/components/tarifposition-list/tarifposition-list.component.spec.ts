@@ -6,11 +6,11 @@ import { of, throwError } from 'rxjs';
 import { TarifpositionListComponent } from './tarifposition-list.component';
 import { TarifpositionService } from '../../services/tarifposition.service';
 import { TarifService } from '../../services/tarif.service';
-import { MieterService } from '../../services/mieter.service';
+import { EinheitService } from '../../services/einheit.service';
 import { TranslationService } from '../../services/translation.service';
 import { Erfassungsart, Tarifposition } from '../../models/tarifposition.model';
 import { Tarif, TarifTyp } from '../../models/tarif.model';
-import { Mieter } from '../../models/mieter.model';
+import { Einheit, EinheitTyp } from '../../models/einheit.model';
 
 const HINWEIS_STORAGE_KEY = 'zev.tarifposition.hinweisAusgeblendet';
 
@@ -19,21 +19,15 @@ describe('TarifpositionListComponent', () => {
   let fixture: ComponentFixture<TarifpositionListComponent>;
   let tarifpositionServiceSpy: SpyObj<TarifpositionService>;
   let tarifServiceSpy: SpyObj<TarifService>;
-  let mieterServiceSpy: SpyObj<MieterService>;
+  let einheitServiceSpy: SpyObj<EinheitService>;
   let translationServiceSpy: SpyObj<TranslationService>;
 
   /** Query-Parameter der Route – je Test vor dem Erzeugen der Komponente setzbar. */
   let queryParams: Record<string, string>;
 
-  const mockMieter: Mieter[] = [
-    {
-      id: 1, name: 'Zwahlen Zoe', strasse: 'Testweg 2', plz: '3000', ort: 'Bern',
-      mietbeginn: '2024-01-01', einheitId: 1
-    },
-    {
-      id: 2, name: 'Anders Anna', strasse: 'Musterstr. 1', plz: '8000', ort: 'Zürich',
-      mietbeginn: '2024-01-01', einheitId: 2
-    }
+  const mockEinheiten: Einheit[] = [
+    { id: 1, name: 'Zwahlen Ladestation', typ: EinheitTyp.LADESTATION, messpunkt: 'RFID-01' },
+    { id: 2, name: 'Anders Ladestation', typ: EinheitTyp.LADESTATION, messpunkt: 'RFID-02' }
   ];
 
   const mockTarife: Tarif[] = [
@@ -53,11 +47,11 @@ describe('TarifpositionListComponent', () => {
 
   const mockPositionen: Tarifposition[] = [
     {
-      id: 10, mieterId: 1, tarifId: 3, tarifBezeichnung: 'Ladestrom 2026', tarifPreis: 0.35,
+      id: 10, einheitId: 1, tarifId: 3, tarifBezeichnung: 'Ladestrom 2026', tarifPreis: 0.35,
       jahr: 2026, quartal: 4, menge: 100, erfassungsart: Erfassungsart.MANUELL, quellReferenz: 'LP-01'
     },
     {
-      id: 11, mieterId: 1, tarifId: 3, tarifBezeichnung: 'Ladestrom 2027', tarifPreis: 0.38,
+      id: 11, einheitId: 1, tarifId: 3, tarifBezeichnung: 'Ladestrom 2027', tarifPreis: 0.38,
       jahr: 2027, quartal: 1, menge: 50, erfassungsart: Erfassungsart.IMPORT, quellReferenz: 'LP-01'
     }
   ];
@@ -76,18 +70,18 @@ describe('TarifpositionListComponent', () => {
     queryParams = {};
 
     tarifpositionServiceSpy = createSpyObj<TarifpositionService>('TarifpositionService', [
-      'getByMieter', 'createTarifposition', 'updateTarifposition', 'deleteTarifposition'
+      'getByEinheit', 'createTarifposition', 'updateTarifposition', 'deleteTarifposition'
     ]);
     tarifServiceSpy = createSpyObj<TarifService>('TarifService', ['getAllTarife']);
-    mieterServiceSpy = createSpyObj<MieterService>('MieterService', ['getAllMieter']);
+    einheitServiceSpy = createSpyObj<EinheitService>('EinheitService', ['getAllEinheiten']);
     translationServiceSpy = createSpyObj<TranslationService>('TranslationService', ['translate']);
 
-    tarifpositionServiceSpy.getByMieter.mockImplementation(() => of(positionenKopie()));
+    tarifpositionServiceSpy.getByEinheit.mockImplementation(() => of(positionenKopie()));
     tarifpositionServiceSpy.createTarifposition.mockReturnValue(of(mockPositionen[0]));
     tarifpositionServiceSpy.updateTarifposition.mockReturnValue(of(mockPositionen[0]));
     tarifpositionServiceSpy.deleteTarifposition.mockReturnValue(of(undefined));
     tarifServiceSpy.getAllTarife.mockReturnValue(of(mockTarife));
-    mieterServiceSpy.getAllMieter.mockReturnValue(of(mockMieter));
+    einheitServiceSpy.getAllEinheiten.mockReturnValue(of(mockEinheiten));
     translationServiceSpy.translate.mockImplementation((key: string) => key);
 
     const routeStub = {
@@ -103,7 +97,7 @@ describe('TarifpositionListComponent', () => {
       providers: [
         { provide: TarifpositionService, useValue: tarifpositionServiceSpy },
         { provide: TarifService, useValue: tarifServiceSpy },
-        { provide: MieterService, useValue: mieterServiceSpy },
+        { provide: EinheitService, useValue: einheitServiceSpy },
         { provide: TranslationService, useValue: translationServiceSpy },
         { provide: ActivatedRoute, useValue: routeStub }
       ]
@@ -122,13 +116,13 @@ describe('TarifpositionListComponent', () => {
 
   describe('initialization', () => {
     it('should load mieter on init', () => {
-      expect(mieterServiceSpy.getAllMieter).toHaveBeenCalled();
-      expect(component.mieterListe.length).toBe(2);
+      expect(einheitServiceSpy.getAllEinheiten).toHaveBeenCalled();
+      expect(component.ladestationen.length).toBe(2);
     });
 
-    it('should sort the mieter list by name', () => {
-      expect(component.mieterListe[0].name).toBe('Anders Anna');
-      expect(component.mieterListe[1].name).toBe('Zwahlen Zoe');
+    it('should sort the ladestationen by name', () => {
+      expect(component.ladestationen[0].name).toBe('Anders Ladestation');
+      expect(component.ladestationen[1].name).toBe('Zwahlen Ladestation');
     });
 
     it('should load tarife on init', () => {
@@ -141,8 +135,8 @@ describe('TarifpositionListComponent', () => {
     });
 
     it('should not preselect a mieter without query parameter', () => {
-      expect(component.selectedMieterId).toBeNull();
-      expect(tarifpositionServiceSpy.getByMieter).not.toHaveBeenCalled();
+      expect(component.selectedEinheitId).toBeNull();
+      expect(tarifpositionServiceSpy.getByEinheit).not.toHaveBeenCalled();
       expect(component.positionen).toEqual([]);
     });
 
@@ -162,10 +156,10 @@ describe('TarifpositionListComponent', () => {
       expect(component.menuItems[2].action).toBe('delete');
     });
 
-    it('should show error message when loading mieter fails', () => {
-      mieterServiceSpy.getAllMieter.mockReturnValue(throwError(() => new Error('Network error')));
-      component.loadMieter();
-      expect(component.message).toBe('FEHLER_LADEN_MIETER');
+    it('should show error message when loading einheiten fails', () => {
+      einheitServiceSpy.getAllEinheiten.mockReturnValue(throwError(() => new Error('Network error')));
+      component.loadLadestationen();
+      expect(component.message).toBe('FEHLER_LADEN_EINHEITEN');
       expect(component.messageType).toBe('error');
     });
 
@@ -178,29 +172,29 @@ describe('TarifpositionListComponent', () => {
   });
 
   describe('mieter preselection via query parameter', () => {
-    it('should preselect the mieter from ?mieterId and load the positions', () => {
-      queryParams['mieterId'] = '1';
+    it('should preselect the mieter from ?einheitId and load the positions', () => {
+      queryParams['einheitId'] = '1';
       createComponent();
 
-      expect(component.selectedMieterId).toBe(1);
-      expect(tarifpositionServiceSpy.getByMieter).toHaveBeenCalledWith(1);
+      expect(component.selectedEinheitId).toBe(1);
+      expect(tarifpositionServiceSpy.getByEinheit).toHaveBeenCalledWith(1);
       expect(component.positionen.length).toBe(2);
     });
 
-    it('should ignore an unknown mieterId', () => {
-      queryParams['mieterId'] = '999';
+    it('should ignore an unknown einheitId', () => {
+      queryParams['einheitId'] = '999';
       createComponent();
 
-      expect(component.selectedMieterId).toBeNull();
-      expect(tarifpositionServiceSpy.getByMieter).not.toHaveBeenCalled();
+      expect(component.selectedEinheitId).toBeNull();
+      expect(tarifpositionServiceSpy.getByEinheit).not.toHaveBeenCalled();
     });
 
-    it('should ignore a non-numeric mieterId', () => {
-      queryParams['mieterId'] = 'abc';
+    it('should ignore a non-numeric einheitId', () => {
+      queryParams['einheitId'] = 'abc';
       createComponent();
 
-      expect(component.selectedMieterId).toBeNull();
-      expect(tarifpositionServiceSpy.getByMieter).not.toHaveBeenCalled();
+      expect(component.selectedEinheitId).toBeNull();
+      expect(tarifpositionServiceSpy.getByEinheit).not.toHaveBeenCalled();
     });
   });
 
@@ -255,25 +249,25 @@ describe('TarifpositionListComponent', () => {
   describe('loadPositionen', () => {
     it('should clear positions and skip the request when no mieter is selected', () => {
       component.positionen = positionenKopie();
-      component.selectedMieterId = null;
+      component.selectedEinheitId = null;
 
       component.loadPositionen();
 
       expect(component.positionen).toEqual([]);
-      expect(tarifpositionServiceSpy.getByMieter).not.toHaveBeenCalled();
+      expect(tarifpositionServiceSpy.getByEinheit).not.toHaveBeenCalled();
     });
 
     it('should load the positions of the selected mieter', () => {
-      component.selectedMieterId = 1;
+      component.selectedEinheitId = 1;
       component.loadPositionen();
 
-      expect(tarifpositionServiceSpy.getByMieter).toHaveBeenCalledWith(1);
+      expect(tarifpositionServiceSpy.getByEinheit).toHaveBeenCalledWith(1);
       expect(component.positionen.length).toBe(2);
     });
 
     it('should show error message on failure', () => {
-      tarifpositionServiceSpy.getByMieter.mockReturnValue(throwError(() => new Error('Network error')));
-      component.selectedMieterId = 1;
+      tarifpositionServiceSpy.getByEinheit.mockReturnValue(throwError(() => new Error('Network error')));
+      component.selectedEinheitId = 1;
 
       component.loadPositionen();
 
@@ -282,16 +276,16 @@ describe('TarifpositionListComponent', () => {
     });
   });
 
-  describe('onMieterChange', () => {
+  describe('onEinheitChange', () => {
     beforeEach(() => {
-      component.selectedMieterId = 1;
+      component.selectedEinheitId = 1;
     });
 
     it('should hide the form and clear the selected position', () => {
       component.showForm = true;
       component.selectedPosition = { ...mockPositionen[0] };
 
-      component.onMieterChange();
+      component.onEinheitChange();
 
       expect(component.showForm).toBe(false);
       expect(component.selectedPosition).toBeNull();
@@ -301,15 +295,15 @@ describe('TarifpositionListComponent', () => {
       component.message = 'FEHLER_LADEN_TARIFPOSITIONEN';
       component.messagePersistent = true;
 
-      component.onMieterChange();
+      component.onEinheitChange();
 
       expect(component.message).toBe('');
       expect(component.messagePersistent).toBe(false);
     });
 
     it('should reload the positions of the new mieter', () => {
-      component.onMieterChange();
-      expect(tarifpositionServiceSpy.getByMieter).toHaveBeenCalledWith(1);
+      component.onEinheitChange();
+      expect(tarifpositionServiceSpy.getByEinheit).toHaveBeenCalledWith(1);
     });
   });
 
@@ -351,7 +345,7 @@ describe('TarifpositionListComponent', () => {
       const original = mockPositionen[0];
       component.onCopy(original);
 
-      expect(component.selectedPosition!.mieterId).toBe(original.mieterId);
+      expect(component.selectedPosition!.einheitId).toBe(original.einheitId);
       expect(component.selectedPosition!.tarifId).toBe(original.tarifId);
       expect(component.selectedPosition!.jahr).toBe(original.jahr);
       expect(component.selectedPosition!.quartal).toBe(original.quartal);
@@ -369,7 +363,7 @@ describe('TarifpositionListComponent', () => {
 
   describe('onDelete', () => {
     beforeEach(() => {
-      component.selectedMieterId = 1;
+      component.selectedEinheitId = 1;
       vi.spyOn(window, 'confirm').mockReturnValue(true);
     });
 
@@ -391,11 +385,11 @@ describe('TarifpositionListComponent', () => {
     });
 
     it('should show a success message and reload', () => {
-      tarifpositionServiceSpy.getByMieter.mockClear();
+      tarifpositionServiceSpy.getByEinheit.mockClear();
       component.onDelete(10);
       expect(component.message).toBe('TARIFPOSITION_GELOESCHT');
       expect(component.messageType).toBe('success');
-      expect(tarifpositionServiceSpy.getByMieter).toHaveBeenCalled();
+      expect(tarifpositionServiceSpy.getByEinheit).toHaveBeenCalled();
     });
 
     it('should not delete when the user cancels', () => {
@@ -455,11 +449,11 @@ describe('TarifpositionListComponent', () => {
 
   describe('onFormSubmit - create', () => {
     const newPosition: Tarifposition = {
-      mieterId: 1, tarifId: 3, jahr: 2026, quartal: 2, menge: 42
+      einheitId: 1, tarifId: 3, jahr: 2026, quartal: 2, menge: 42
     };
 
     beforeEach(() => {
-      component.selectedMieterId = 1;
+      component.selectedEinheitId = 1;
     });
 
     it('should call createTarifposition when the position has no id', () => {
@@ -477,9 +471,9 @@ describe('TarifpositionListComponent', () => {
     });
 
     it('should reload the positions after create', () => {
-      tarifpositionServiceSpy.getByMieter.mockClear();
+      tarifpositionServiceSpy.getByEinheit.mockClear();
       component.onFormSubmit(newPosition);
-      expect(tarifpositionServiceSpy.getByMieter).toHaveBeenCalledWith(1);
+      expect(tarifpositionServiceSpy.getByEinheit).toHaveBeenCalledWith(1);
     });
 
     it('should show the duplicate message from the server and keep the form open', () => {
@@ -507,7 +501,7 @@ describe('TarifpositionListComponent', () => {
     const existingPosition: Tarifposition = { ...mockPositionen[0], menge: 250 };
 
     beforeEach(() => {
-      component.selectedMieterId = 1;
+      component.selectedEinheitId = 1;
     });
 
     it('should call updateTarifposition when the position has an id', () => {
@@ -525,9 +519,9 @@ describe('TarifpositionListComponent', () => {
     });
 
     it('should reload the positions after update', () => {
-      tarifpositionServiceSpy.getByMieter.mockClear();
+      tarifpositionServiceSpy.getByEinheit.mockClear();
       component.onFormSubmit(existingPosition);
-      expect(tarifpositionServiceSpy.getByMieter).toHaveBeenCalledWith(1);
+      expect(tarifpositionServiceSpy.getByEinheit).toHaveBeenCalledWith(1);
     });
 
     it('should show the server error message and keep the form open', () => {
@@ -652,7 +646,7 @@ describe('TarifpositionListComponent', () => {
 
   describe('sort persistence', () => {
     beforeEach(() => {
-      component.selectedMieterId = 1;
+      component.selectedEinheitId = 1;
       vi.spyOn(window, 'confirm').mockReturnValue(true);
     });
 
@@ -669,7 +663,7 @@ describe('TarifpositionListComponent', () => {
       component.sortColumn = 'menge';
       component.sortDirection = 'asc';
 
-      component.onFormSubmit({ mieterId: 1, tarifId: 3, jahr: 2026, quartal: 1, menge: 1 });
+      component.onFormSubmit({ einheitId: 1, tarifId: 3, jahr: 2026, quartal: 1, menge: 1 });
 
       expect(component.sortColumn).toBe('menge');
       expect(component.positionen.map(p => p.menge)).toEqual([50, 100]);
@@ -715,7 +709,7 @@ describe('TarifpositionListComponent', () => {
 
   describe('messages', () => {
     beforeEach(() => {
-      component.selectedMieterId = 1;
+      component.selectedEinheitId = 1;
     });
 
     it('should auto-dismiss a success message after 5 seconds', fakeAsync(() => {
@@ -730,7 +724,7 @@ describe('TarifpositionListComponent', () => {
     }));
 
     it('should keep an error message until it is dismissed', fakeAsync(() => {
-      tarifpositionServiceSpy.getByMieter.mockReturnValue(throwError(() => new Error('Network error')));
+      tarifpositionServiceSpy.getByEinheit.mockReturnValue(throwError(() => new Error('Network error')));
 
       component.loadPositionen();
 

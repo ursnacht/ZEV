@@ -4,11 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { TarifpositionService } from '../../services/tarifposition.service';
 import { TarifService } from '../../services/tarif.service';
-import { MieterService } from '../../services/mieter.service';
+import { EinheitService } from '../../services/einheit.service';
 import { TranslationService } from '../../services/translation.service';
 import { Tarifposition, Erfassungsart } from '../../models/tarifposition.model';
 import { Tarif, TarifTyp, MANUELL_ERFASSTE_TARIFTYPEN } from '../../models/tarif.model';
-import { Mieter } from '../../models/mieter.model';
+import { Einheit, EinheitTyp } from '../../models/einheit.model';
 import { TarifpositionFormComponent } from '../tarifposition-form/tarifposition-form.component';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.component';
@@ -21,10 +21,11 @@ export type TarifpositionSortColumn =
   'tarifBezeichnung' | 'quartal' | 'menge' | 'tarifPreis' | 'betrag' | 'erfassungsart';
 
 /**
- * Erfassung manuell gepflegter Tarifpositionen je Mieter und Quartal (aktuell Ladestrom).
+ * Erfassung manuell gepflegter Tarifpositionen je Einheit und Quartal (aktuell Ladestrom).
  *
- * Eigene Seite statt nur eines Kebab-Eintrags beim Mieter: Die Route /mieter verlangt
- * `mieter:manage`, das ein `zev_user` nicht hat — er käme sonst gar nicht bis zur Erfassung.
+ * Anker ist die **Einheit** vom Typ Ladestation (Specs/Ladestationen.md). Eigene Seite statt nur
+ * eines Kebab-Eintrags in der Einheiten-Verwaltung: Die Route /einheiten verlangt `einheit:write`,
+ * das ein `zev_user` nicht hat — er käme sonst gar nicht bis zur Erfassung.
  */
 @Component({
   selector: 'app-tarifposition-list',
@@ -38,8 +39,8 @@ export class TarifpositionListComponent implements OnInit {
   /** Merker für den weggeklickten Mehrfachverrechnungs-Hinweis (rein lokal, kein Backend). */
   private static readonly HINWEIS_STORAGE_KEY = 'zev.tarifposition.hinweisAusgeblendet';
 
-  mieterListe: Mieter[] = [];
-  selectedMieterId: number | null = null;
+  ladestationen: Einheit[] = [];
+  selectedEinheitId: number | null = null;
   positionen: Tarifposition[] = [];
   tarife: Tarif[] = [];
   selectedPosition: Tarifposition | null = null;
@@ -63,14 +64,14 @@ export class TarifpositionListComponent implements OnInit {
   constructor(
     private tarifpositionService: TarifpositionService,
     private tarifService: TarifService,
-    private mieterService: MieterService,
+    private einheitService: EinheitService,
     private translationService: TranslationService,
     private route: ActivatedRoute
   ) { }
 
   ngOnInit(): void {
     this.hinweisSichtbar = !this.leseHinweisAusgeblendet();
-    this.loadMieter();
+    this.loadLadestationen();
     this.loadTarife();
   }
 
@@ -96,19 +97,21 @@ export class TarifpositionListComponent implements OnInit {
     }
   }
 
-  loadMieter(): void {
-    this.mieterService.getAllMieter().subscribe({
+  loadLadestationen(): void {
+    this.einheitService.getAllEinheiten().subscribe({
       next: (data) => {
-        this.mieterListe = [...data].sort((a, b) => a.name.localeCompare(b.name));
-        // Vorauswahl aus dem Kebab-Sprung der Mieterverwaltung (?mieterId=…)
-        const param = this.route.snapshot.queryParamMap.get('mieterId');
+        this.ladestationen = data
+          .filter(e => e.typ === EinheitTyp.LADESTATION)
+          .sort((a, b) => a.name.localeCompare(b.name));
+        // Vorauswahl aus dem Kebab-Sprung der Einheiten-Verwaltung (?einheitId=…)
+        const param = this.route.snapshot.queryParamMap.get('einheitId');
         const vorauswahl = param ? Number(param) : null;
-        if (vorauswahl && this.mieterListe.some(m => m.id === vorauswahl)) {
-          this.selectedMieterId = vorauswahl;
+        if (vorauswahl && this.ladestationen.some(e => e.id === vorauswahl)) {
+          this.selectedEinheitId = vorauswahl;
           this.loadPositionen();
         }
       },
-      error: () => this.showMessage('FEHLER_LADEN_MIETER', 'error')
+      error: () => this.showMessage('FEHLER_LADEN_EINHEITEN', 'error')
     });
   }
 
@@ -122,11 +125,11 @@ export class TarifpositionListComponent implements OnInit {
   }
 
   loadPositionen(): void {
-    if (!this.selectedMieterId) {
+    if (!this.selectedEinheitId) {
       this.positionen = [];
       return;
     }
-    this.tarifpositionService.getByMieter(this.selectedMieterId).subscribe({
+    this.tarifpositionService.getByEinheit(this.selectedEinheitId).subscribe({
       next: (data) => {
         this.positionen = data;
         this.sortiere();
@@ -135,7 +138,7 @@ export class TarifpositionListComponent implements OnInit {
     });
   }
 
-  onMieterChange(): void {
+  onEinheitChange(): void {
     this.showForm = false;
     this.selectedPosition = null;
     this.dismissMessage();
@@ -271,6 +274,11 @@ export class TarifpositionListComponent implements OnInit {
       default:
         return position[column];
     }
+  }
+
+  /** Messpunkt (RFID) der gewählten Ladestation – belegt die Quell-Referenz vor. */
+  get selectedEinheitMesspunkt(): string {
+    return this.ladestationen.find(e => e.id === this.selectedEinheitId)?.messpunkt ?? '';
   }
 
   berechneBetrag(position: Tarifposition): number {

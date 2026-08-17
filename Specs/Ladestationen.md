@@ -104,6 +104,7 @@
 * [ ] Ein Nutzer ohne Wohnung erhält eine Rechnung, die ausschliesslich seine Ladestrom-Zeile(n) enthält.
 * [ ] Rechnungen von Einheiten ohne Ladestations-Zuordnung sind **unverändert** zu vorher.
 * [ ] Für einen Mieter mit Wohnung **und** Ladestation entsteht **eine** Rechnung (die der Wohnung) — auch wenn beide Einheiten für den Lauf ausgewählt sind.
+* [ ] Wird eine Einheit ausgewählt, für die im Zeitraum keine Rechnung entsteht, nennt eine Meldung diese Einheit namentlich.
 
 ### Berechtigungen
 * [ ] Ohne `einheit:write` lässt sich keine Einheit anlegen oder ändern → `403`.
@@ -138,6 +139,7 @@
 |------|-----------|
 | Keine Ladestations-Einheit erfasst | Seite Tarifpositionen zeigt einen Hinweis statt einer leeren Auswahl |
 | Ladestations-Einheit ohne zugeordneten Mieter | Positionen sind erfassbar, erscheinen aber auf keiner Rechnung — die Ansicht weist darauf hin |
+| Gewählte Einheit ergibt im Zeitraum keine Rechnung | Eine Meldung nennt die übersprungenen Einheiten namentlich. Betrifft die Ladestation ohne Positionen, den Produzenten ohne Grundgebühr-Tarif und die Einheit, deren Mietverhältnis den Zeitraum nicht berührt — bisher verschwanden diese Fälle kommentarlos |
 | Ladestations-Einheit wird gelöscht | **Abgewiesen**, solange ihr ein Mieter zugeordnet ist (Meldung mit Anzahl). Ohne Zuordnung löschbar; die Positionen der Einheit verschwinden mit ihr (`ON DELETE CASCADE`) |
 | Mieter wird gelöscht | **Abgewiesen**, solange an einer zugeordneten Einheit Positionen hängen (Meldung mit Anzahl). Ohne Positionen werden nur die Zuordnungen gelöscht, die Einheiten bleiben bestehen |
 | Letzte Einheit eines Mieters entfernt | Abgewiesen — mindestens eine Zuordnung ist Pflicht |

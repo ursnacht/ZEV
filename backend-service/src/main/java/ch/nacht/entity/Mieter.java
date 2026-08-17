@@ -7,6 +7,8 @@ import jakarta.validation.constraints.Size;
 import org.hibernate.annotations.Filter;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Entity representing a tenant with lease period.
@@ -51,9 +53,15 @@ public class Mieter {
     @Column(name = "mietende")
     private LocalDate mietende;
 
-    @NotNull(message = "Einheit is required")
-    @Column(name = "einheit_id", nullable = false)
-    private Long einheitId;
+    /**
+     * IDs der zugeordneten Einheiten (Wohnung und/oder Ladestation(en)).
+     *
+     * <p><b>Nicht persistiert:</b> Die Zuordnung liegt in {@link MieterEinheit}. Das Feld ist der
+     * Transport zum und vom Client — {@code MieterService} fuellt es beim Lesen und schreibt es
+     * beim Speichern. Wer Mieter an {@code MieterService} vorbei laedt, erhaelt eine leere Liste.
+     */
+    @Transient
+    private List<Long> einheitIds = new ArrayList<>();
 
     public Mieter() {
     }
@@ -61,7 +69,7 @@ public class Mieter {
     public Mieter(String name, LocalDate mietbeginn, Long einheitId) {
         this.name = name;
         this.mietbeginn = mietbeginn;
-        this.einheitId = einheitId;
+        this.einheitIds = new ArrayList<>(List.of(einheitId));
     }
 
     public Long getId() {
@@ -128,18 +136,18 @@ public class Mieter {
         this.mietende = mietende;
     }
 
-    public Long getEinheitId() {
-        return einheitId;
+    public List<Long> getEinheitIds() {
+        return einheitIds;
     }
 
-    public void setEinheitId(Long einheitId) {
-        this.einheitId = einheitId;
+    public void setEinheitIds(List<Long> einheitIds) {
+        this.einheitIds = einheitIds != null ? einheitIds : new ArrayList<>();
     }
 
     @Override
     public String toString() {
         return "Mieter{id=" + id + ", orgId=" + orgId + ", name='" + name + "', strasse='" + strasse +
                "', plz='" + plz + "', ort='" + ort + "', mietbeginn=" + mietbeginn +
-               ", mietende=" + mietende + ", einheitId=" + einheitId + "}";
+               ", mietende=" + mietende + ", einheitIds=" + einheitIds + "}";
     }
 }

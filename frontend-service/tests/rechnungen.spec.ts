@@ -106,7 +106,7 @@ test.describe('Rechnungen - Einheiten Auswahl (FR-3: Produzenten)', () => {
         await expect(selectAllLabel).toBeVisible();
     });
 
-    test('select-all should select ONLY consumers, not producers', async ({ page }) => {
+    test('select-all should select only billable units (consumers and charging stations)', async ({ page }) => {
         await navigateToRechnungen(page);
         await page.waitForTimeout(2000);
 
@@ -123,26 +123,29 @@ test.describe('Rechnungen - Einheiten Auswahl (FR-3: Produzenten)', () => {
         await selectAll.click();
         await page.waitForTimeout(300);
 
-        // Type label is rendered as "[Typ]" and localized. "Select all" selects
-        // ONLY consumers (DE "Konsument"/EN "Consumer"); producers and the balance
-        // meter points Bezug/Rücklieferung (Grid supply/Feed-in) must NOT be selected.
-        const isConsumer = (label: string) => /konsument|consumer/i.test(label);
+        // Type label is rendered as "[Typ]" and localized. "Select all" selects the
+        // BILLABLE units: consumers (DE "Konsument"/EN "Consumer") and charging stations
+        // (DE "Ladestation"/EN "Charging station", Specs/Ladestationen.md - ein Nutzer ohne
+        // Wohnung wird ueber seine Ladestation abgerechnet). Producers and the balance meter
+        // points Bezug/Rücklieferung (Grid supply/Feed-in) must NOT be selected.
+        const isBillable = (label: string) =>
+            /konsument|consumer|ladestation|charging station/i.test(label);
 
-        // Consumers must be checked, all other types must NOT be checked
-        let sawConsumer = false;
+        // Rechnungsfaehige Einheiten muessen angehakt sein, alle anderen nicht
+        let sawBillable = false;
         for (let i = 0; i < itemCount; i++) {
             const item = items.nth(i);
             const labelText = (await item.locator('label').textContent()) ?? '';
             const checkbox = item.locator('input[type="checkbox"]');
-            if (isConsumer(labelText)) {
-                sawConsumer = true;
+            if (isBillable(labelText)) {
+                sawBillable = true;
                 await expect(checkbox).toBeChecked();
             } else {
                 await expect(checkbox).not.toBeChecked();
             }
         }
-        // The test data is expected to contain at least one consumer
-        expect(sawConsumer).toBe(true);
+        // The test data is expected to contain at least one billable unit
+        expect(sawBillable).toBe(true);
 
         // Clicking select-all again deselects the consumers
         await selectAll.click();

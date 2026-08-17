@@ -135,27 +135,27 @@ class ControllerAuthorizationTest {
     }
 
     // ==================== Tarifpositionen: mieter:read vs. rechnungen:manage ====================
-    // Spec Ladestromtarif.md NFR-2: Lesen über mieter:read, Schreiben über rechnungen:manage.
+    // Spec Ladestationen.md NFR-2: Lesen über mieter:read, Schreiben über rechnungen:manage.
 
     @Test
     void getTarifpositionen_withMieterRead_reachesController() throws Exception {
-        when(tarifpositionService.getByMieter(1L)).thenReturn(List.of());
+        when(tarifpositionService.getByEinheit(1L)).thenReturn(List.of());
 
-        mockMvc.perform(get("/api/tarifpositionen?mieterId=1")
+        mockMvc.perform(get("/api/tarifpositionen?einheitId=1")
                         .with(jwt().authorities(new SimpleGrantedAuthority("mieter:read"))))
                 .andExpect(status().isOk());
     }
 
     @Test
     void getTarifpositionen_withoutPermission_forbidden() throws Exception {
-        mockMvc.perform(get("/api/tarifpositionen?mieterId=1")
+        mockMvc.perform(get("/api/tarifpositionen?einheitId=1")
                         .with(jwt().authorities(new SimpleGrantedAuthority("messwerte:read"))))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void getTarifpositionen_unauthenticated_unauthorized() throws Exception {
-        mockMvc.perform(get("/api/tarifpositionen?mieterId=1"))
+        mockMvc.perform(get("/api/tarifpositionen?einheitId=1"))
                 .andExpect(status().isUnauthorized());
     }
 

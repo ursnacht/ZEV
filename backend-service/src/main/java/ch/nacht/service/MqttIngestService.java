@@ -102,7 +102,13 @@ public class MqttIngestService {
             // 3) Einheiten über (org_id, messpunkt) auflösen (Mandanten-Isolation). Mehrere
             //    Treffer sind zulässig: BEZUG/RUECKLIEFERUNG dürfen denselben Bilanzmesspunkt
             //    teilen – die Meldung wird dann je Einheit auf das relevante Register projiziert.
-            List<Einheit> einheiten = einheitRepository.findAllByOrgIdAndMesspunkt(orgId, messpunkt);
+            //    Ladestationen bleiben aussen vor: Ihr `messpunkt` ist eine RFID, keine
+            //    Zaehlerkennung (Specs/Ladestationen.md). Faellt eine RFID zufaellig mit einer
+            //    Zaehlerkennung zusammen, entstuenden sonst Messwerte an einer Einheit, die
+            //    nie an der Verteilung teilnimmt - stille Karteileichen.
+            List<Einheit> einheiten = einheitRepository.findAllByOrgIdAndMesspunkt(orgId, messpunkt).stream()
+                    .filter(e -> e.getTyp() != EinheitTyp.LADESTATION)
+                    .toList();
             if (einheiten.isEmpty()) {
                 log.warn("MQTT: unbekannter Messpunkt (org={}, messpunkt={}) – verworfen", orgId, messpunkt);
                 metrics.recordFailed();

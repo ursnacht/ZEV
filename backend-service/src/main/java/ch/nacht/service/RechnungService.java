@@ -119,6 +119,31 @@ public class RechnungService {
                     } else {
                         log.debug("Skipping producer unit {} - no GRUNDGEBUEHR tariffs found", einheit.getName());
                     }
+                } else if (einheit.getTyp() == EinheitTyp.LADESTATION) {
+                    // Eine Ladestation erzeugt nur dann eine eigene Rechnung, wenn ihr Mieter
+                    // keine Wohnung hat (Specs/Ladestationen.md FR-1.5). Hat er eine, erscheinen
+                    // seine Ladestrom-Positionen auf deren Rechnung - sonst bekaeme er zwei
+                    // Rechnungen mit derselben Zeile.
+                    for (Mieter m : mieterService.getMieterForQuartal(einheitId, von, bis)) {
+                        if (hatWohnung(m)) {
+                            log.debug("Skipping charging unit {} for tenant {} - positions appear "
+                                            + "on the invoice of their consumer unit",
+                                    einheit.getName(), m.getName());
+                            continue;
+                        }
+                        LocalDate effektivVon = m.getMietbeginn().isBefore(von) ? von : m.getMietbeginn();
+                        LocalDate effektivBis = (m.getMietende() == null || m.getMietende().isAfter(bis))
+                                ? bis : m.getMietende();
+                        RechnungDTO rechnung = berechneLadestationRechnung(einheit, m, effektivVon, effektivBis);
+                        if (!rechnung.getTarifZeilen().isEmpty()) {
+                            rechnungen.add(rechnung);
+                            log.debug("Calculated charging invoice for unit {}, tenant {}: {} CHF",
+                                    einheit.getName(), m.getName(), rechnung.getEndBetrag());
+                        } else {
+                            log.debug("Skipping charging unit {} for tenant {} - no positions",
+                                    einheit.getName(), m.getName());
+                        }
+                    }
                 } else {
                     // Bilanz-Typen (BEZUG/RUECKLIEFERUNG) messen den Netzanschluss und
                     // werden bewusst nicht verrechnet.
@@ -249,6 +274,68 @@ public class RechnungService {
     }
 
     /**
+     * Hat der Mieter eine Wohnung? Nur dann erscheinen seine Ladestrom-Positionen dort und die
+     * Ladestation braucht keine eigene Rechnung.
+     *
+     * @param mieter Tenant
+     * @return true if a CONSUMER unit is assigned to the tenant
+     */
+    private boolean hatWohnung(Mieter mieter) {
+        return mieterService.getEinheitIds(mieter.getId()).stream()
+                .map(einheitRepository::findById)
+                .anyMatch(e -> e.map(x -> x.getTyp() == EinheitTyp.CONSUMER).orElse(false));
+    }
+
+    /**
+     * Calculate an invoice for a charging unit whose tenant has no consumer unit.
+     *
+     * <p>Enthaelt <b>ausschliesslich</b> die Tarifpositionen dieser Einheit: Eine Ladestation hat
+     * keine Messwerte (also keine ZEV-/VNB-Zeilen) und traegt keine Grundgebuehr - die gilt je
+     * Wohnungszaehler.
+     *
+     * @param einheit The charging unit
+     * @param mieter The tenant
+     * @param von Start date (inclusive)
+     * @param bis End date (inclusive)
+     * @return Calculated invoice DTO (may have empty tarifZeilen if no positions exist)
+     */
+    private RechnungDTO berechneLadestationRechnung(Einheit einheit, Mieter mieter,
+                                                    LocalDate von, LocalDate bis) {
+        RechnungDTO rechnung = new RechnungDTO();
+        rechnung.setEinheitId(einheit.getId());
+        rechnung.setEinheitName(einheit.getName());
+        rechnung.setMesspunkt(einheit.getMesspunkt());
+        rechnung.setMieterId(mieter.getId());
+        rechnung.setMieterName(mieter.getName());
+        rechnung.setMieterStrasse(mieter.getStrasse());
+        String plzOrt = ((mieter.getPlz() != null ? mieter.getPlz() : "") + " "
+                + (mieter.getOrt() != null ? mieter.getOrt() : "")).trim();
+        rechnung.setMieterPlzOrt(plzOrt.isEmpty() ? null : plzOrt);
+        rechnung.setVon(von);
+        rechnung.setBis(bis);
+        rechnung.setErstellungsdatum(LocalDate.now());
+
+        double total = berechneTarifpositionsZeilen(rechnung, mieter, von, bis);
+        double endBetrag = roundTo5Rappen(total);
+
+        rechnung.setTotalBetrag(total);
+        rechnung.setRundung(endBetrag - total);
+        rechnung.setEndBetrag(endBetrag);
+
+        EinstellungenDTO einstellungen = einstellungenService.getEinstellungenOrThrow();
+        RechnungKonfigurationDTO config = einstellungen.getRechnung();
+        RechnungKonfigurationDTO.StellerDTO steller = config.getSteller();
+
+        rechnung.setZahlungsfrist(config.getZahlungsfrist());
+        rechnung.setIban(config.getIban());
+        rechnung.setStellerName(steller.getName());
+        rechnung.setStellerStrasse(steller.getStrasse());
+        rechnung.setStellerPlzOrt(steller.getPlz() + " " + steller.getOrt());
+
+        return rechnung;
+    }
+
+    /**
      * Calculate GRUNDGEBUEHR tariff lines based on full calendar months.
      * A month is counted only if both its first and last day lie within the effective period.
      *
@@ -278,8 +365,11 @@ public class RechnungService {
             return 0.0;
         }
 
+        // Positionen ALLER Einheiten des Mieters - Wohnung und Ladestation(en) landen damit auf
+        // derselben Rechnung (Specs/Ladestationen.md FR-1.5).
         double total = 0.0;
-        for (Tarifposition position : tarifpositionService.getFuerRechnung(mieter.getId(), von, bis)) {
+        for (Tarifposition position : tarifpositionService.getFuerRechnung(
+                mieterService.getEinheitIds(mieter.getId()), von, bis)) {
             // Same rounding as the ZEV/VNB lines, so an invoice does not mix conventions.
             double menge = Math.round(position.getMenge().doubleValue());
             double preis = position.getTarif().getPreis().doubleValue();

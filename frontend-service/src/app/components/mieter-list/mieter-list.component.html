@@ -77,7 +77,7 @@
           <tbody>
             @for (m of mieter; track m) {
               <tr>
-                <td>{{ getEinheitName(m.einheitId) }}</td>
+                <td>{{ getEinheitNamen(m) }}</td>
                 <td>{{ m.name }}</td>
                 <td>{{ m.strasse }}</td>
                 <td>{{ formatPlzOrt(m) }}</td>

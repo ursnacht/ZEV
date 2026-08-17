@@ -31,30 +31,31 @@ const TARIF_PREIS = '0.50000';
 const TARIF_VON = '2098-01-01';
 const TARIF_BIS = '2098-12-31';
 
-/** Eigener Mieter für die Positions-Tests - hält die Testdaten von den Echtdaten getrennt. */
+/** Eigene Ladestations-Einheit für die Positions-Tests - Anker der Tarifposition. */
+const LADESTATION_NAME = 'E2E Ladestation';
+/** Messpunkt einer Ladestation = RFID (Specs/Ladestationen.md); belegt die Quell-Referenz vor. */
+const LADESTATION_RFID = 'RFID-E2E-SHARED';
+/** Eigener Mieter der Ladestation - ohne Zuordnung erschiene keine Position auf einer Rechnung. */
 const MIETER_NAME = 'E2E Ladestrom Mieter';
-/** Herkunft einer Position - seit dem Wegfall des Mieter-Ladepunkts wird sie von Hand erfasst. */
-const QUELL_REFERENZ = 'LP-E2E-SHARED';
 /**
- * Mietzeit der Testmieter: weit in der Vergangenheit und **befristet**.
- * `MieterService.saveMieter` lässt je Einheit nur einen Mieter ohne Mietende zu und weist
- * überschneidende Mietzeiten ab - alle Einheiten der Basisdaten haben bereits einen aktuellen
- * Mieter. Jeder Testmieter belegt daher ein eigenes, längst abgelaufenes Jahr.
+ * Mietbeginn des Testmieters. Bewusst **ohne Mietende**: Die Ladestation ist eine eigene, neu
+ * angelegte Einheit - dort gibt es keinen konkurrierenden Mieter, und nur ein offenes
+ * Mietverhaeltnis deckt den Rechnungszeitraum (2026) ab.
  */
 const MIETJAHRE = {
     geteilt: '2010'
 };
 
-/** Mieter/Einheit aus den Basisdaten für den Rechnungstest (hat keine eigenen Positionen). */
-const RECHNUNG_MIETER = 'Muriel Steiner';
-const RECHNUNG_EINHEIT = '3. Stock rechts';
+/** Rechnungszeitraum des Tests - muss das Quartal der erfassten Position enthalten. */
 const RECHNUNG_VON = '2026-04-01';
 const RECHNUNG_BIS = '2026-06-30';
+const RECHNUNG_JAHR = '2026';
+const RECHNUNG_QUARTAL = '2';
 
 // Aufräum-Register (pro Test zurückgesetzt)
 let createdTarifNames: string[] = [];
 let createdMieterNames: string[] = [];
-let mieterMitPositionen: string[] = [];
+let einheitenMitPositionen: string[] = [];
 
 // ---------------------------------------------------------------------------
 // Navigation
@@ -72,20 +73,35 @@ async function navigateToMieter(page: Page): Promise<void> {
     await waitForTableWithData(page, 10000);
 }
 
+async function navigateToEinheiten(page: Page): Promise<void> {
+    await navigateViaMenu(page, '/einheiten');
+    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
+    await waitForTableWithData(page, 10000);
+}
+
 async function navigateToTarifpositionen(page: Page): Promise<void> {
     await navigateViaMenu(page, '/tarifpositionen');
     await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
-    await page.locator('#mieterAuswahl').waitFor({ state: 'visible', timeout: 15000 });
+    await page.locator('#einheitAuswahl').waitFor({ state: 'visible', timeout: 15000 });
 }
 
-/** Wählt einen Mieter in der Auswahlliste und wartet, bis die Liste des Mieters steht. */
-async function selectMieter(page: Page, name: string): Promise<void> {
-    await page.locator('#mieterAuswahl').selectOption({ label: name });
-    // Nach der Auswahl erscheint die Erfassen-Schaltfläche (Liste oder Leer-Hinweis darunter)
+/**
+ * Wählt eine Ladestation in der Auswahlliste und wartet, bis deren Liste steht.
+ * Die Beschriftung enthält den Messpunkt in Klammern, deshalb wird über den Options-Text
+ * gesucht statt über ein exaktes Label.
+ */
+async function selectEinheit(page: Page, name: string): Promise<void> {
+    const option = page.locator('#einheitAuswahl option').filter({ hasText: name }).first();
+    const value = await option.getAttribute('value');
+    // Auf die HTTP-Antwort warten statt auf "Tabelle ODER Leer-Hinweis": Der Leer-Hinweis steht
+    // schon vor der Antwort auf der Seite, ein Warten darauf liefe ins Leere und liesse Tests
+    // (und vor allem das Aufräumen) eine noch ungefüllte Liste sehen.
+    await Promise.all([
+        page.waitForResponse(r => r.url().includes('/api/tarifpositionen')
+            && r.request().method() === 'GET' && r.status() === 200, { timeout: 20000 }),
+        page.locator('#einheitAuswahl').selectOption(value ?? { label: name })
+    ]);
     await page.locator('button.zev-button--primary').first().waitFor({ state: 'visible', timeout: 10000 });
-    // Die Positionen werden erst per HTTP nachgeladen. Ohne dieses Warten sähe ein Test (oder
-    // das Aufräumen) eine noch leere Liste und würde vorhandene Positionen übersehen.
-    await expect(page.locator('.zev-table, p.zev-text--muted').first()).toBeVisible({ timeout: 15000 });
 }
 
 /**
@@ -198,30 +214,88 @@ async function ensureLadestromTarif(page: Page): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Einheiten-Helfer
+// ---------------------------------------------------------------------------
+
+/** Legt eine Einheit vom Typ Ladestation an. Erwartet die geöffnete Einheiten-Liste. */
+async function createLadestation(page: Page, name: string, rfid: string): Promise<boolean> {
+    await page.locator('button.zev-button--primary').first().click();
+    await expect(page.locator('form')).toBeVisible();
+
+    await page.locator('#name').fill(name);
+    await page.locator('#typ').selectOption({ label: 'Ladestation' });
+    await page.locator('#messpunkt').fill(rfid);
+
+    await clearMessages(page);
+    await page.locator('button[type="submit"]').click();
+    return waitForFormResult(page, 20000);
+}
+
+/** Stellt die gemeinsam genutzte Ladestation sicher (idempotent, siehe ensureLadestromTarif). */
+async function ensureLadestation(page: Page): Promise<void> {
+    await navigateToEinheiten(page);
+    const row = page.locator(`tr:has-text("${LADESTATION_NAME}")`);
+    if (await row.first().isVisible().catch(() => false)) {
+        return;
+    }
+    if (!await createLadestation(page, LADESTATION_NAME, LADESTATION_RFID)) {
+        throw new Error('Vorbedingung fehlgeschlagen: Ladestation konnte nicht angelegt werden');
+    }
+}
+
+async function deleteEinheitByName(page: Page, name: string): Promise<void> {
+    try {
+        page.removeAllListeners('dialog');
+        await navigateToEinheiten(page);
+        const row = page.locator(`tr:has-text("${name}")`);
+        if (!await row.first().isVisible().catch(() => false)) {
+            return;
+        }
+        page.once('dialog', async dialog => { await dialog.accept(); });
+        await clickKebabMenuItem(page, row.first(), 'delete');
+        await row.first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() =>
+            console.log(`Cleanup: Einheit "${name}" ist nach dem Löschen noch sichtbar`));
+    } catch (error) {
+        console.log(`Cleanup: Fehler beim Löschen der Einheit "${name}": ${error}`);
+        page.removeAllListeners('dialog');
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Mieter-Helfer
 // ---------------------------------------------------------------------------
 
 interface MieterDaten {
     name: string;
-    /** Jahr der (befristeten) Mietzeit, siehe MIETJAHRE. */
+    /** Name der zuzuordnenden Einheit (Teilstring genügt). */
+    einheitName: string;
+    /** Jahr des Mietbeginns. */
     mietjahr: string;
+    /** Ohne Mietende laeuft das Mietverhaeltnis weiter - noetig, damit es den Rechnungszeitraum abdeckt. */
+    befristet?: boolean;
 }
 
-/** Legt einen Mieter an (Einheit = erste wählbare). Erwartet die geöffnete Mieterliste. */
+/**
+ * Legt einen Mieter an. Die Zuordnung ist seit Specs/Ladestationen.md eine Mehrfachauswahl:
+ * angehakt wird die Einheit, deren Beschriftung `daten.einheitName` enthält.
+ */
 async function createMieter(page: Page, daten: MieterDaten): Promise<boolean> {
     await page.locator('button.zev-button--primary').first().click();
     await expect(page.locator('form')).toBeVisible();
 
-    const einheitValue = await page.locator('#einheitId option:not([disabled])').first().getAttribute('value');
-    if (einheitValue) {
-        await page.locator('#einheitId').selectOption(einheitValue);
-    }
+    const checkbox = page.locator('.zev-checkbox-item')
+        .filter({ hasText: daten.einheitName })
+        .locator('input[type="checkbox"]')
+        .first();
+    await checkbox.check();
     await page.locator('#name').fill(daten.name);
     await page.locator('#strasse').fill('Ladestrasse 1');
     await page.locator('#plz').fill('3000');
     await page.locator('#ort').fill('Bern');
     await page.locator('#mietbeginn').fill(`${daten.mietjahr}-01-01`);
-    await page.locator('#mietende').fill(`${daten.mietjahr}-12-31`);
+    if (daten.befristet) {
+        await page.locator('#mietende').fill(`${daten.mietjahr}-12-31`);
+    }
 
     await clearMessages(page);
     await page.locator('button[type="submit"]').click();
@@ -264,6 +338,7 @@ async function ensureTestMieter(page: Page): Promise<void> {
     }
     const ok = await createMieter(page, {
         name: MIETER_NAME,
+        einheitName: LADESTATION_NAME,
         mietjahr: MIETJAHRE.geteilt
     });
     if (!ok) {
@@ -322,17 +397,17 @@ function positionRows(page: Page, tarifName: string = TARIF_NAME): Locator {
 }
 
 /** Löscht alle Positionen eines Mieters, die auf einen Test-Tarif verweisen. */
-async function deletePositionen(page: Page, mieterName: string): Promise<void> {
+async function deletePositionen(page: Page, einheitName: string): Promise<void> {
     try {
         page.removeAllListeners('dialog');
         await navigateToTarifpositionen(page);
         // Der Mieter kann bereits gelöscht sein (Cascade räumt die Positionen dann mit auf)
-        const option = page.locator('#mieterAuswahl option').filter({ hasText: mieterName });
+        const option = page.locator('#einheitAuswahl option').filter({ hasText: einheitName });
         if (await option.count() === 0) {
-            console.log(`Cleanup: Mieter "${mieterName}" nicht mehr in der Auswahl`);
+            console.log(`Cleanup: Einheit "${einheitName}" nicht mehr in der Auswahl`);
             return;
         }
-        await selectMieter(page, mieterName);
+        await selectEinheit(page, einheitName);
 
         const form = page.locator('form');
         if (await form.isVisible().catch(() => false)) {
@@ -351,7 +426,7 @@ async function deletePositionen(page: Page, mieterName: string): Promise<void> {
             await expect(rows).toHaveCount(count - 1, { timeout: 10000 });
         }
     } catch (error) {
-        console.log(`Cleanup: Fehler beim Löschen der Positionen von "${mieterName}": ${error}`);
+        console.log(`Cleanup: Fehler beim Löschen der Positionen von "${einheitName}": ${error}`);
         page.removeAllListeners('dialog');
     }
 }
@@ -366,8 +441,8 @@ function parseBetrag(text: string): number {
 }
 
 /** Erzeugt die Rechnung für genau eine Einheit und liefert den ausgewiesenen Endbetrag. */
-async function generateRechnungBetrag(page: Page, einheitName: string): Promise<number> {
-    await navigateViaMenu(page, '/rechnungen');
+/** Waehlt eine Einheit und den Testzeitraum in der Rechnungsmaske. */
+async function waehleEinheitUndZeitraum(page: Page, einheitName: string): Promise<void> {
     await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
 
     const item = page.locator('.zev-checkbox-item').filter({ hasText: einheitName });
@@ -379,6 +454,11 @@ async function generateRechnungBetrag(page: Page, einheitName: string): Promise<
 
     await page.locator('#dateFrom').fill(RECHNUNG_VON);
     await page.locator('#dateTo').fill(RECHNUNG_BIS);
+}
+
+async function generateRechnungBetrag(page: Page, einheitName: string): Promise<number> {
+    await navigateViaMenu(page, '/rechnungen');
+    await waehleEinheitUndZeitraum(page, einheitName);
 
     await page.locator('button[type="submit"]').click();
 
@@ -406,6 +486,7 @@ test.beforeAll(async ({ browser, browserName }) => {
     const page = await browser.newPage();
     try {
         await ensureLadestromTarif(page);
+        await ensureLadestation(page);
         await ensureTestMieter(page);
     } finally {
         await page.close();
@@ -419,9 +500,11 @@ test.afterAll(async ({ browser, browserName }) => {
     test.setTimeout(150000);
     const page = await browser.newPage();
     try {
-        // Reihenfolge zwingend: Positionen verweisen auf den Tarif (ON DELETE RESTRICT)
-        await deletePositionen(page, MIETER_NAME);
+        // Reihenfolge zwingend: Positionen verweisen auf den Tarif (ON DELETE RESTRICT),
+        // der Mieter belegt die Einheit (Löschschutz), die Einheit trägt die Positionen.
+        await deletePositionen(page, LADESTATION_NAME);
         await deleteMieterByName(page, MIETER_NAME);
+        await deleteEinheitByName(page, LADESTATION_NAME);
         await deleteTarifByName(page, TARIF_NAME);
     } finally {
         await page.close();
@@ -431,14 +514,14 @@ test.afterAll(async ({ browser, browserName }) => {
 test.beforeEach(() => {
     createdTarifNames = [];
     createdMieterNames = [];
-    mieterMitPositionen = [];
+    einheitenMitPositionen = [];
 });
 
 test.afterEach(async ({ page, browserName }) => {
     if (browserName !== 'chromium') {
         return;
     }
-    for (const name of mieterMitPositionen) {
+    for (const name of einheitenMitPositionen) {
         await deletePositionen(page, name);
     }
     for (const name of createdMieterNames) {
@@ -447,7 +530,7 @@ test.afterEach(async ({ page, browserName }) => {
     for (const name of createdTarifNames) {
         await deleteTarifByName(page, name);
     }
-    mieterMitPositionen = [];
+    einheitenMitPositionen = [];
     createdMieterNames = [];
     createdTarifNames = [];
 });
@@ -561,30 +644,30 @@ test.describe('Ladestromtarif - Tarifverwaltung', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Mieterverwaltung: Kebab-Sprung
+// Einheiten-Verwaltung: Kebab-Sprung
 // ---------------------------------------------------------------------------
 
-test.describe('Ladestromtarif - Mieter', () => {
-    test('should jump from the Mieter kebab menu to the Tarifpositionen page with the tenant preselected',
+test.describe('Ladestromtarif - Einheiten', () => {
+    test('should jump from the Einheit kebab menu to the Tarifpositionen page with the unit preselected',
         async ({ page }) => {
-            await navigateToMieter(page);
+            await navigateToEinheiten(page);
 
-            const row = page.locator(`tr:has-text("${MIETER_NAME}")`);
+            const row = page.locator(`tr:has-text("${LADESTATION_NAME}")`);
             await expect(row).toBeVisible({ timeout: 10000 });
 
             await openKebabMenu(page, row);
-            // Reihenfolge: Bearbeiten, Kopieren, Tarifpositionen, Löschen (danger)
-            const tarifpositionen = row.locator('.zev-kebab-menu__item:not(.zev-kebab-menu__item--danger)').nth(2);
+            // Reihenfolge: Bearbeiten, Tarifpositionen, Löschen (danger)
+            const tarifpositionen = row.locator('.zev-kebab-menu__item:not(.zev-kebab-menu__item--danger)').nth(1);
             await expect(tarifpositionen).toContainText(/tarifposition/i);
             await tarifpositionen.click();
 
-            await page.waitForURL(/\/tarifpositionen\?mieterId=\d+/, { timeout: 15000 });
+            await page.waitForURL(/\/tarifpositionen\?einheitId=\d+/, { timeout: 15000 });
 
-            // Der Mieter ist vorausgewählt
-            const auswahl = page.locator('#mieterAuswahl');
+            // Die Einheit ist vorausgewählt
+            const auswahl = page.locator('#einheitAuswahl');
             await expect(auswahl).toBeVisible();
-            await expect.poll(() => selectedLabel(page, '#mieterAuswahl'), { timeout: 10000 })
-                .toBe(MIETER_NAME);
+            await expect.poll(() => selectedLabel(page, '#einheitAuswahl'), { timeout: 10000 })
+                .toContain(LADESTATION_NAME);
         });
 });
 
@@ -604,18 +687,18 @@ test.describe('Ladestromtarif - Tarifpositionen', () => {
 
         // Die Entscheidung wird pro Browser in localStorage gemerkt
         await page.reload({ waitUntil: 'domcontentloaded' });
-        await page.locator('#mieterAuswahl').waitFor({ state: 'visible', timeout: 15000 });
+        await page.locator('#einheitAuswahl').waitFor({ state: 'visible', timeout: 15000 });
         await expect(page.locator('.zev-message--info')).toHaveCount(0);
     });
 
-    test('should require a tenant selection and show a hint instead of an empty table', async ({ page }) => {
+    test('should require a unit selection and show a hint instead of an empty table', async ({ page }) => {
         await navigateToTarifpositionen(page);
 
-        // Ohne Mieter weder Liste noch Erfassen-Schaltfläche
+        // Ohne gewählte Einheit weder Liste noch Erfassen-Schaltfläche
         await expect(page.locator('.zev-table')).toHaveCount(0);
         await expect(page.locator('button.zev-button--primary')).toHaveCount(0);
 
-        await selectMieter(page, MIETER_NAME);
+        await selectEinheit(page, LADESTATION_NAME);
         await expect(page.locator('button.zev-button--primary')).toBeVisible();
         // Keine Positionen -> Hinweistext statt leerem Tabellengerüst
         await expect(page.locator('.zev-table')).toHaveCount(0);
@@ -624,7 +707,7 @@ test.describe('Ladestromtarif - Tarifpositionen', () => {
 
     test('should offer only LADESTROM tariffs and reject a negative quantity', async ({ page }) => {
         await navigateToTarifpositionen(page);
-        await selectMieter(page, MIETER_NAME);
+        await selectEinheit(page, LADESTATION_NAME);
         await openPositionsForm(page);
 
         // Nur manuell erfasste Tariftypen (aktuell LADESTROM) stehen zur Auswahl
@@ -646,8 +729,8 @@ test.describe('Ladestromtarif - Tarifpositionen', () => {
     test('should create positions for several quarters, record the source reference and show the origin',
         async ({ page }) => {
             await navigateToTarifpositionen(page);
-            await selectMieter(page, MIETER_NAME);
-            mieterMitPositionen.push(MIETER_NAME);
+            await selectEinheit(page, LADESTATION_NAME);
+            einheitenMitPositionen.push(LADESTATION_NAME);
 
             await openPositionsForm(page);
 
@@ -656,7 +739,7 @@ test.describe('Ladestromtarif - Tarifpositionen', () => {
                 jahr: '2027',
                 quartal: '1',
                 menge: '123.5',
-                quellReferenz: QUELL_REFERENZ,
+                quellReferenz: LADESTATION_RFID,
                 bemerkung: 'E2E Beleg'
             })).toBe(true);
 
@@ -679,10 +762,10 @@ test.describe('Ladestromtarif - Tarifpositionen', () => {
             await expect(q1).toContainText('61.75');
             // Herkunft: manuell erfasst, mit Quell-Referenz
             await expect(q1).toContainText(/manuell|manual/i);
-            await expect(q1).toContainText(QUELL_REFERENZ);
+            await expect(q1).toContainText(LADESTATION_RFID);
         });
 
-    test('should reject a second position for the same tenant, quarter and tariff type', async ({ page }) => {
+    test('should reject a second position for the same unit, quarter and tariff type', async ({ page }) => {
         // Zweiter LADESTROM-Tarif: die Eindeutigkeit gilt je Tariftyp, nicht je Tarif
         await navigateToTarife(page);
         const zweitTarif = 'E2E Zweittarif';
@@ -694,8 +777,8 @@ test.describe('Ladestromtarif - Tarifpositionen', () => {
         })).toBe(true);
 
         await navigateToTarifpositionen(page);
-        await selectMieter(page, MIETER_NAME);
-        mieterMitPositionen.push(MIETER_NAME);
+        await selectEinheit(page, LADESTATION_NAME);
+        einheitenMitPositionen.push(LADESTATION_NAME);
 
         expect(await createPosition(page, {
             tarif: TARIF_NAME,
@@ -721,8 +804,8 @@ test.describe('Ladestromtarif - Tarifpositionen', () => {
 
     test('should copy a position via the kebab menu and reject an unchanged copy', async ({ page }) => {
         await navigateToTarifpositionen(page);
-        await selectMieter(page, MIETER_NAME);
-        mieterMitPositionen.push(MIETER_NAME);
+        await selectEinheit(page, LADESTATION_NAME);
+        einheitenMitPositionen.push(LADESTATION_NAME);
 
         expect(await createPosition(page, {
             tarif: TARIF_NAME,
@@ -768,8 +851,8 @@ test.describe('Ladestromtarif - Tarifpositionen', () => {
 
     test('should edit a position via the kebab menu', async ({ page }) => {
         await navigateToTarifpositionen(page);
-        await selectMieter(page, MIETER_NAME);
-        mieterMitPositionen.push(MIETER_NAME);
+        await selectEinheit(page, LADESTATION_NAME);
+        einheitenMitPositionen.push(LADESTATION_NAME);
 
         expect(await createPosition(page, {
             tarif: TARIF_NAME,
@@ -798,8 +881,8 @@ test.describe('Ladestromtarif - Tarifpositionen', () => {
 
     test('should delete a position via the kebab menu after confirmation', async ({ page }) => {
         await navigateToTarifpositionen(page);
-        await selectMieter(page, MIETER_NAME);
-        mieterMitPositionen.push(MIETER_NAME);
+        await selectEinheit(page, LADESTATION_NAME);
+        einheitenMitPositionen.push(LADESTATION_NAME);
 
         expect(await createPosition(page, {
             tarif: TARIF_NAME,
@@ -830,8 +913,8 @@ test.describe('Ladestromtarif - Tarifpositionen', () => {
 
     test('should sort every data column and keep the sorting after creating a position', async ({ page }) => {
         await navigateToTarifpositionen(page);
-        await selectMieter(page, MIETER_NAME);
-        mieterMitPositionen.push(MIETER_NAME);
+        await selectEinheit(page, LADESTATION_NAME);
+        einheitenMitPositionen.push(LADESTATION_NAME);
 
         expect(await createPosition(page, {
             tarif: TARIF_NAME, jahr: '2026', quartal: '4', menge: '100'
@@ -893,8 +976,8 @@ test.describe('Ladestromtarif - Tarifpositionen', () => {
 
     test('should allow resizing the column widths', async ({ page }) => {
         await navigateToTarifpositionen(page);
-        await selectMieter(page, MIETER_NAME);
-        mieterMitPositionen.push(MIETER_NAME);
+        await selectEinheit(page, LADESTATION_NAME);
+        einheitenMitPositionen.push(LADESTATION_NAME);
 
         expect(await createPosition(page, {
             tarif: TARIF_NAME, jahr: '2027', quartal: '1', menge: '1'
@@ -921,33 +1004,34 @@ test.describe('Ladestromtarif - Tarifpositionen', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Ladestromtarif - Rechnung', () => {
-    test('should add the position amount to the invoice total, but not for a zero quantity',
+    test('should bill a charging unit whose tenant has no apartment, but not for a zero quantity',
         async ({ page }) => {
             test.setTimeout(240000);
 
-            // Ausgangsbetrag ohne Ladestrom-Position
-            const basis = await generateRechnungBetrag(page, RECHNUNG_EINHEIT);
-
+            // Menge 0 ist speicherbar, erzeugt aber keine Rechnungszeile - und fuer eine
+            // Ladestation damit gar keine Rechnung. Der Hinweis nennt die Einheit namentlich.
             await navigateToTarifpositionen(page);
-            await selectMieter(page, RECHNUNG_MIETER);
-            mieterMitPositionen.push(RECHNUNG_MIETER);
+            await selectEinheit(page, LADESTATION_NAME);
+            einheitenMitPositionen.push(LADESTATION_NAME);
 
-            // Menge 0 ist speicherbar, erzeugt aber keine Rechnungszeile
             expect(await createPosition(page, {
                 tarif: TARIF_NAME,
-                jahr: '2026',
-                quartal: '2',
-                menge: '0',
-                quellReferenz: 'LP-E2E-RECH'
+                jahr: RECHNUNG_JAHR,
+                quartal: RECHNUNG_QUARTAL,
+                menge: '0'
             })).toBe(true);
 
-            expect(await generateRechnungBetrag(page, RECHNUNG_EINHEIT)).toBeCloseTo(basis, 2);
+            await navigateViaMenu(page, '/rechnungen');
+            await waehleEinheitUndZeitraum(page, LADESTATION_NAME);
+            await page.locator('button[type="submit"]').click();
+            const hinweis = page.locator('.zev-message--warning');
+            await expect(hinweis).toBeVisible({ timeout: 60000 });
+            await expect(hinweis).toContainText(LADESTATION_NAME);
 
-            // Menge > 0 -> Betrag fliesst in Total, Rundung und Endbetrag ein.
-            // 100 kWh * 0.50 CHF = 50.00 (Vielfaches von 0.05, die 5-Rappen-Rundung
-            // verschiebt sich dadurch nicht).
+            // Menge > 0 -> der Mieter der Ladestation hat keine Wohnung, also entsteht genau
+            // eine Rechnung mit ausschliesslich dieser Zeile: 100 kWh * 0.50 CHF = 50.00.
             await navigateToTarifpositionen(page);
-            await selectMieter(page, RECHNUNG_MIETER);
+            await selectEinheit(page, LADESTATION_NAME);
             const rows = positionRows(page);
             await expect(rows).toHaveCount(1);
             await clickKebabMenuItem(page, rows.first(), 'edit');
@@ -957,7 +1041,6 @@ test.describe('Ladestromtarif - Rechnung', () => {
             await page.locator('button[type="submit"]').click();
             expect(await waitForFormResult(page, 20000)).toBe(true);
 
-            const mitLadestrom = await generateRechnungBetrag(page, RECHNUNG_EINHEIT);
-            expect(mitLadestrom).toBeCloseTo(basis + 50, 2);
+            expect(await generateRechnungBetrag(page, LADESTATION_NAME)).toBeCloseTo(50, 2);
         });
 });

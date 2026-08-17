@@ -1,7 +1,6 @@
 import { createSpyObj, SpyObj } from '../../../testing/spy';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { fakeAsync, tick } from '../../../testing/fake-async';
-import { Router } from '@angular/router';
 import { MieterListComponent } from './mieter-list.component';
 import { MieterService } from '../../services/mieter.service';
 import { EinheitService } from '../../services/einheit.service';
@@ -24,8 +23,8 @@ describe('MieterListComponent', () => {
   ];
 
   const mockMieter: Mieter[] = [
-    { id: 1, name: 'Max Muster', strasse: 'Musterstr. 1', plz: '8000', ort: 'Zürich', mietbeginn: '2024-01-01', einheitId: 1 },
-    { id: 2, name: 'Anna Test', strasse: 'Testweg 2', plz: '3000', ort: 'Bern', mietbeginn: '2024-06-01', mietende: '2025-05-31', einheitId: 3 }
+    { id: 1, name: 'Max Muster', strasse: 'Musterstr. 1', plz: '8000', ort: 'Zürich', mietbeginn: '2024-01-01', einheitIds: [1] },
+    { id: 2, name: 'Anna Test', strasse: 'Testweg 2', plz: '3000', ort: 'Bern', mietbeginn: '2024-06-01', mietende: '2025-05-31', einheitIds: [3] }
   ];
 
   beforeEach(async () => {
@@ -81,12 +80,13 @@ describe('MieterListComponent', () => {
       expect(component.sortDirection).toBe('asc');
     });
 
-    it('should have menu items for edit, copy, tarifpositionen and delete', () => {
-      expect(component.menuItems.length).toBe(4);
+    it('should have menu items for edit, copy and delete', () => {
+      // Der Eintrag "Tarifpositionen" ist zur Einheiten-Verwaltung gewandert, weil die Position
+      // seit Specs/Ladestationen.md an der Einheit haengt.
+      expect(component.menuItems.length).toBe(3);
       expect(component.menuItems[0].action).toBe('edit');
       expect(component.menuItems[1].action).toBe('copy');
-      expect(component.menuItems[2].action).toBe('tarifpositionen');
-      expect(component.menuItems[3].action).toBe('delete');
+      expect(component.menuItems[2].action).toBe('delete');
     });
   });
 
@@ -162,7 +162,7 @@ describe('MieterListComponent', () => {
       component.onCopy(mieter);
       expect(component.selectedMieter!.name).toBe(mieter.name);
       expect(component.selectedMieter!.strasse).toBe(mieter.strasse);
-      expect(component.selectedMieter!.einheitId).toBe(mieter.einheitId);
+      expect(component.selectedMieter!.einheitIds).toEqual(mieter.einheitIds);
     });
   });
 
@@ -233,22 +233,6 @@ describe('MieterListComponent', () => {
       expect(component.onDelete).toHaveBeenCalledWith(mockMieter[0].id);
     });
 
-    it('should call onTarifpositionen for tarifpositionen action', () => {
-      vi.spyOn(component, 'onTarifpositionen').mockImplementation(() => {});
-      component.onMenuAction('tarifpositionen', mockMieter[0]);
-      expect(component.onTarifpositionen).toHaveBeenCalledWith(mockMieter[0]);
-    });
-  });
-
-  describe('onTarifpositionen', () => {
-    it('should navigate to the tarifpositionen page with the mieter preselected', () => {
-      const navigateSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-
-      component.onTarifpositionen(mockMieter[0]);
-
-      expect(navigateSpy).toHaveBeenCalledWith(['/tarifpositionen'], { queryParams: { mieterId: 1 } });
-      navigateSpy.mockRestore();
-    });
   });
 
   describe('onFormSubmit - create', () => {
@@ -258,7 +242,7 @@ describe('MieterListComponent', () => {
       plz: '4000',
       ort: 'Basel',
       mietbeginn: '2025-01-01',
-      einheitId: 1
+      einheitIds: [1]
     };
 
     beforeEach(() => {
@@ -305,7 +289,7 @@ describe('MieterListComponent', () => {
       plz: '8000',
       ort: 'Zürich',
       mietbeginn: '2024-01-01',
-      einheitId: 1
+      einheitIds: [1]
     };
 
     beforeEach(() => {
@@ -377,17 +361,17 @@ describe('MieterListComponent', () => {
     });
 
     it('should handle missing plz', () => {
-      const mieter: Mieter = { name: 'Test', ort: 'Bern', mietbeginn: '2024-01-01', einheitId: 1 };
+      const mieter: Mieter = { name: 'Test', ort: 'Bern', mietbeginn: '2024-01-01', einheitIds: [1] };
       expect(component.formatPlzOrt(mieter)).toBe('Bern');
     });
 
     it('should handle missing ort', () => {
-      const mieter: Mieter = { name: 'Test', plz: '3000', mietbeginn: '2024-01-01', einheitId: 1 };
+      const mieter: Mieter = { name: 'Test', plz: '3000', mietbeginn: '2024-01-01', einheitIds: [1] };
       expect(component.formatPlzOrt(mieter)).toBe('3000');
     });
 
     it('should handle missing plz and ort', () => {
-      const mieter: Mieter = { name: 'Test', mietbeginn: '2024-01-01', einheitId: 1 };
+      const mieter: Mieter = { name: 'Test', mietbeginn: '2024-01-01', einheitIds: [1] };
       expect(component.formatPlzOrt(mieter)).toBe('');
     });
   });
@@ -403,10 +387,10 @@ describe('MieterListComponent', () => {
   describe('message timeout', () => {
     it('should clear success message after 5 seconds', fakeAsync(() => {
       mieterServiceSpy.createMieter.mockReturnValue(of({
-        id: 3, name: 'Test', mietbeginn: '2024-01-01', einheitId: 1
+        id: 3, name: 'Test', mietbeginn: '2024-01-01', einheitIds: [1]
       }));
 
-      component.onFormSubmit({ name: 'Test', mietbeginn: '2024-01-01', einheitId: 1 });
+      component.onFormSubmit({ name: 'Test', mietbeginn: '2024-01-01', einheitIds: [1] });
 
       expect(component.message).toBeTruthy();
       tick(5000);

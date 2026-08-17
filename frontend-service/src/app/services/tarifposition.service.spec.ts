@@ -10,8 +10,8 @@ describe('TarifpositionService', () => {
 
   const mockPosition: Tarifposition = {
     id: 1,
-    mieterId: 7,
-    mieterName: 'Max Muster',
+    einheitId: 7,
+    einheitName: 'Max Muster',
     tarifId: 3,
     tarifBezeichnung: 'Ladestrom 2026',
     tarifPreis: 0.35,
@@ -27,7 +27,7 @@ describe('TarifpositionService', () => {
     mockPosition,
     {
       id: 2,
-      mieterId: 7,
+      einheitId: 7,
       tarifId: 3,
       tarifBezeichnung: 'Ladestrom 2026',
       tarifPreis: 0.35,
@@ -56,9 +56,9 @@ describe('TarifpositionService', () => {
     expect(service).toBeTruthy();
   });
 
-  describe('getByMieter', () => {
+  describe('getByEinheit', () => {
     it('should return all positions of a mieter', () => {
-      service.getByMieter(7).subscribe(positionen => {
+      service.getByEinheit(7).subscribe(positionen => {
         expect(positionen.length).toBe(2);
         expect(positionen).toEqual(mockPositionen);
       });
@@ -68,16 +68,16 @@ describe('TarifpositionService', () => {
       req.flush(mockPositionen);
     });
 
-    it('should send the mieterId as query parameter', () => {
-      service.getByMieter(7).subscribe();
+    it('should send the einheitId as query parameter', () => {
+      service.getByEinheit(7).subscribe();
 
       const req = httpMock.expectOne(r => r.url === apiUrl);
-      expect(req.request.params.get('mieterId')).toBe('7');
+      expect(req.request.params.get('einheitId')).toBe('7');
       req.flush([]);
     });
 
     it('should return empty array when the mieter has no positions', () => {
-      service.getByMieter(7).subscribe(positionen => {
+      service.getByEinheit(7).subscribe(positionen => {
         expect(positionen).toEqual([]);
       });
 
@@ -89,7 +89,7 @@ describe('TarifpositionService', () => {
   describe('createTarifposition', () => {
     it('should create a new tarifposition', () => {
       const newPosition: Tarifposition = {
-        mieterId: 7,
+        einheitId: 7,
         tarifId: 3,
         jahr: 2026,
         quartal: 1,
@@ -112,7 +112,7 @@ describe('TarifpositionService', () => {
     it('should propagate the server error on duplicate positions', () => {
       let errorStatus = 0;
 
-      service.createTarifposition({ mieterId: 7, tarifId: 3, jahr: 2026, quartal: 3, menge: 1 })
+      service.createTarifposition({ einheitId: 7, tarifId: 3, jahr: 2026, quartal: 3, menge: 1 })
         .subscribe({
           next: () => { throw new Error('should not succeed'); },
           error: (error) => { errorStatus = error.status; }
