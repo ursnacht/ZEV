@@ -27,6 +27,9 @@ Feature: [Feature-Name]
 
 Lies: .claude/commands/7_akzeptanzkriterien-check.md
 Fahre ab Abschnitt "Vorgehen" fort.
+
+Leitplanken: nicht committen/stagen/pushen, Umgebung nicht veraendern (Docker/Keycloak)
+- siehe CLAUDE.md.
 ```
 
 - **Hinweis:** Ersetze `[Feature-Name]` im `prompt` mit dem tatsächlichen Wert aus `$ARGUMENTS` (oder dem abgeleiteten Kontext).

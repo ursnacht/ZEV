@@ -26,6 +26,9 @@ Scope: [all/backend/frontend/e2e] (default: all)
 
 Lies: .claude/commands/6_test-gap-analyse.md
 Fahre ab Abschnitt "Vorgehen" fort.
+
+Leitplanken: nicht committen/stagen/pushen, Umgebung nicht veraendern (Docker/Keycloak)
+- siehe CLAUDE.md.
 ```
 
 - **Hinweis:** Ersetze `[all/backend/frontend/e2e]` im `prompt` mit dem tatsächlichen Wert aus `$ARGUMENTS` (default: `all`).

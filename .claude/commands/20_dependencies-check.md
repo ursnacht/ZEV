@@ -24,6 +24,9 @@ Modul (optional): [Modul]
 
 Lies: .claude/commands/20_dependencies-check.md
 Fahre ab Abschnitt "Vorgehen" fort.
+
+Leitplanken: nicht committen/stagen/pushen, Umgebung nicht veraendern (Docker/Keycloak)
+- siehe CLAUDE.md.
 ```
 
 - **Hinweis:** Ersetze `[Modul]` im `prompt` mit dem tatsächlichen Wert aus `$ARGUMENTS` (oder „alle Module", falls nicht angegeben).

@@ -34,6 +34,8 @@ Lies: .claude/commands/21_vulnerabilities-check.md
 Fahre ab Abschnitt "Vorgehen" fort.
 
 Wichtig: READ-ONLY. KEIN `npm audit fix`, KEIN `npm install`, keine Dateiaenderungen.
+Leitplanken: nicht committen/stagen/pushen, Umgebung nicht veraendern (Docker/Keycloak)
+- siehe CLAUDE.md.
 Du arbeitest unter Windows mit PowerShell (npm via npm.cmd, mvn via mvn.cmd).
 ```
 

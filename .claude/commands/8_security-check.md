@@ -37,6 +37,8 @@ Lies zuerst die Skill owasp-security und dann .claude/commands/8_security-check.
 Fahre ab Abschnitt "Vorgehen" fort.
 
 Wichtig: READ-ONLY. Keine Code-Änderungen, kein Fix. Nur prüfen und berichten.
+Leitplanken: nicht committen/stagen/pushen, Umgebung nicht veraendern (Docker/Keycloak)
+- siehe CLAUDE.md.
 Belege jeden Befund mit Datei:Zeile.
 ```
 

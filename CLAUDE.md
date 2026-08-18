@@ -2,6 +2,22 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Leitplanken für alle Agenten (inkl. Sub-Agenten)
+
+Diese Regeln gelten für **jeden** Agenten in diesem Repository — auch für Sub-Agenten, die über die
+Commands in `.claude/commands/` gestartet werden. Sie sehen die Freigaben des Users nicht und dürfen
+deshalb nicht aus dem Kontext schliessen, dass etwas erlaubt ist.
+
+- **Kein Commit, kein Push, kein Stagen ohne explizite Anweisung des Users.** Sub-Agenten committen,
+  stagen und pushen **grundsätzlich nie** — sie berichten ihr Ergebnis, der Haupt-Agent holt die
+  Freigabe ein. (Ein Sub-Agent hat schon einmal ungefragt auf `main` gepusht.)
+- **Die Umgebung gehört dem User.** Keine Docker-Container bauen, starten oder stoppen
+  (`docker compose up/down/build`), keine Keycloak-Änderungen, keine Realm-Reimporte. Wird ein
+  Neustart oder Rebuild gebraucht: **Befehl nennen, der User führt ihn aus.**
+- **Bereits ausgeführte Flyway-Migrationen nie ändern** — die Checksum-Prüfung bricht sonst beim
+  nächsten Start. Status über den `zev-db`-MCP-Server prüfen; im Zweifel eine neue Migration anlegen.
+- **Secrets bleiben lokal:** `.env` und `.env.*` (z.B. `.env.mqtt.hene`) gehören nicht ins Repository.
+
 ## Project Overview
 
 ZEV (Zusammenschluss zum Eigenverbrauch) is a solar power distribution application for managing fair allocation of solar energy among consumers in a self-consumption community. Multi-module Maven project with Spring Boot backend, Angular frontend, and Keycloak authentication.
