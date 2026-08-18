@@ -332,4 +332,97 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
         assertThat(result.get(0).getName()).isEqualTo("Früherer Mieter");
         assertThat(result.get(1).getName()).isEqualTo("Späterer Mieter");
     }
+
+    // ==================== Ladestationen (Specs/Ladestationen.md) ====================
+
+    /** Ladestations-Einheit mit RFID im Feld messpunkt. */
+    private Long saveLadestation(String name, String rfid) {
+        Einheit einheit = new Einheit(name, EinheitTyp.LADESTATION);
+        einheit.setOrgId(TEST_ORG_ID);
+        einheit.setMesspunkt(rfid);
+        return einheitRepository.save(einheit).getId();
+    }
+
+    private Mieter saveMieterMitEinheiten(String name, LocalDate mietbeginn, LocalDate mietende,
+                                          Long... einheitIds) {
+        Mieter gespeichert = mieterRepository.save(createMieter(name, mietbeginn, mietende));
+        for (Long id : einheitIds) {
+            mieterEinheitRepository.save(new MieterEinheit(TEST_ORG_ID, gespeichert.getId(), id));
+        }
+        return gespeichert;
+    }
+
+    @Test
+    void shouldFindMieterOfLadestationOnly() {
+        // Nutzer ohne Wohnung: nur die Ladestation ist zugeordnet
+        Long ladestationId = saveLadestation("Ladestation A", "RFID-A");
+        saveMieterMitEinheiten("Nutzer ohne Wohnung",
+                LocalDate.of(2026, 1, 1), null, ladestationId);
+
+        List<Mieter> result = mieterRepository.findByEinheitIdAndQuartal(
+                ladestationId, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getName()).isEqualTo("Nutzer ohne Wohnung");
+        // An der Wohnung haengt er nicht
+        assertThat(mieterRepository.findByEinheitIdOrderByMietbeginnDesc(einheitId)).isEmpty();
+    }
+
+    @Test
+    void shouldFindSameMieterForWohnungAndLadestation() {
+        // Ein Mieter mit Wohnung UND Ladestation ist ueber beide Einheiten auffindbar
+        Long ladestationId = saveLadestation("Ladestation A", "RFID-A");
+        Mieter mieter = saveMieterMitEinheiten("Mit Wohnung und Ladestation",
+                LocalDate.of(2026, 1, 1), null, einheitId, ladestationId);
+
+        assertThat(mieterRepository.findByEinheitIdOrderByMietbeginnDesc(einheitId))
+                .extracting(Mieter::getId).containsExactly(mieter.getId());
+        assertThat(mieterRepository.findByEinheitIdOrderByMietbeginnDesc(ladestationId))
+                .extracting(Mieter::getId).containsExactly(mieter.getId());
+    }
+
+    @Test
+    void shouldNotDetectOpenEndedOverlapAcrossDifferentLadestationen() {
+        // Mieterwechsel: der Nachmieter erhaelt eine NEUE RFID und damit eine neue Einheit -
+        // die Regel "hoechstens ein Mieter ohne Mietende" greift je Einheit und schlaegt hier
+        // deshalb nicht zu
+        Long alteStation = saveLadestation("Ladestation alt", "RFID-ALT");
+        Long neueStation = saveLadestation("Ladestation neu", "RFID-NEU");
+        saveMieterMitEinheiten("Vormieter", LocalDate.of(2026, 1, 1), null, alteStation);
+
+        assertThat(mieterRepository.existsOtherMieterWithoutMietende(neueStation, -1L)).isFalse();
+        assertThat(mieterRepository.existsOverlappingMieterOpenEnded(
+                neueStation, LocalDate.of(2026, 2, 1), -1L)).isFalse();
+        // An der alten Station kollidiert ein zweiter offener Mieter weiterhin
+        assertThat(mieterRepository.existsOtherMieterWithoutMietende(alteStation, -1L)).isTrue();
+    }
+
+    @Test
+    void shouldDetectOverlapPerAssignedLadestation() {
+        // Zwei Mieter beanspruchen dieselbe Ladestation mit offenem Mietende -> abgewiesen
+        Long ladestationId = saveLadestation("Ladestation A", "RFID-A");
+        saveMieterMitEinheiten("Erster Nutzer", LocalDate.of(2026, 1, 1), null, ladestationId);
+
+        assertThat(mieterRepository.existsOverlappingMieterOpenEnded(
+                ladestationId, LocalDate.of(2026, 6, 1), -1L)).isTrue();
+    }
+
+    @Test
+    void shouldFindEachMieterOnlyForOwnLadestationAfterMieterwechsel() {
+        // Mieterwechsel im Quartal: jede RFID-Einheit gehoert genau einem Mieter
+        Long alteStation = saveLadestation("Ladestation alt", "RFID-ALT");
+        Long neueStation = saveLadestation("Ladestation neu", "RFID-NEU");
+        saveMieterMitEinheiten("Vormieter",
+                LocalDate.of(2025, 1, 1), LocalDate.of(2026, 2, 15), alteStation);
+        saveMieterMitEinheiten("Nachmieter",
+                LocalDate.of(2026, 2, 16), null, neueStation);
+
+        LocalDate q1Beginn = LocalDate.of(2026, 1, 1);
+        LocalDate q1Ende = LocalDate.of(2026, 3, 31);
+
+        assertThat(mieterRepository.findByEinheitIdAndQuartal(alteStation, q1Beginn, q1Ende))
+                .extracting(Mieter::getName).containsExactly("Vormieter");
+        assertThat(mieterRepository.findByEinheitIdAndQuartal(neueStation, q1Beginn, q1Ende))
+                .extracting(Mieter::getName).containsExactly("Nachmieter");
+    }
 }

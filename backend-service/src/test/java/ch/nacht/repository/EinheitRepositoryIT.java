@@ -130,4 +130,104 @@ class EinheitRepositoryIT extends AbstractIntegrationTest {
         // Then
         assertThat(saved.getId()).isNotNull();
     }
+
+    // ==================== Ladestationen (Specs/Ladestationen.md) ====================
+
+    private Einheit createEinheit(String name, EinheitTyp typ, String messpunkt) {
+        Einheit einheit = createEinheit(name, typ);
+        einheit.setMesspunkt(messpunkt);
+        return einheit;
+    }
+
+    @Test
+    void shouldSaveLadestationWithRfidInMesspunkt() {
+        Einheit saved = einheitRepository.save(
+                createEinheit("Ladestation 1", EinheitTyp.LADESTATION, "RFID-0123456789"));
+
+        assertThat(saved.getTyp()).isEqualTo(EinheitTyp.LADESTATION);
+        assertThat(saved.getMesspunkt()).isEqualTo("RFID-0123456789");
+    }
+
+    @Test
+    void shouldSaveLadestationWithMesspunktOfMaximumLength() {
+        // messpunkt ist VARCHAR(50) - laut Spec genuegt das fuer eine RFID
+        String rfid = "R".repeat(50);
+
+        Einheit saved = einheitRepository.save(
+                createEinheit("Ladestation Max", EinheitTyp.LADESTATION, rfid));
+
+        assertThat(saved.getMesspunkt()).hasSize(50);
+    }
+
+    @Test
+    void shouldDetectOtherLadestationWithSameMesspunkt() {
+        einheitRepository.save(createEinheit("Ladestation 1", EinheitTyp.LADESTATION, "RFID-001"));
+
+        // Beim Anlegen (excludeId = -1) kollidiert die RFID
+        assertThat(einheitRepository.existsLadestationWithMesspunkt("RFID-001", -1L)).isTrue();
+    }
+
+    @Test
+    void shouldNotDetectUnusedMesspunkt() {
+        einheitRepository.save(createEinheit("Ladestation 1", EinheitTyp.LADESTATION, "RFID-001"));
+
+        assertThat(einheitRepository.existsLadestationWithMesspunkt("RFID-002", -1L)).isFalse();
+    }
+
+    @Test
+    void shouldExcludeSelfWhenCheckingLadestationMesspunkt() {
+        Einheit ladestation = einheitRepository.save(
+                createEinheit("Ladestation 1", EinheitTyp.LADESTATION, "RFID-001"));
+
+        // Beim Update darf die eigene RFID nicht mit sich selbst kollidieren
+        assertThat(einheitRepository.existsLadestationWithMesspunkt("RFID-001", ladestation.getId()))
+                .isFalse();
+    }
+
+    @Test
+    void shouldIgnoreMesspunktOfOtherEinheitTypen() {
+        // BEZUG und RUECKLIEFERUNG teilen sich bewusst einen Messpunkt (Register-Projektion),
+        // deshalb ist die Eindeutigkeit auf LADESTATION beschraenkt
+        einheitRepository.save(createEinheit("Bezug", EinheitTyp.BEZUG, "BILANZ-1"));
+        einheitRepository.save(createEinheit("Ruecklieferung", EinheitTyp.RUECKLIEFERUNG, "BILANZ-1"));
+        einheitRepository.save(createEinheit("Wohnung A", EinheitTyp.CONSUMER, "MP-001"));
+
+        assertThat(einheitRepository.existsLadestationWithMesspunkt("BILANZ-1", -1L)).isFalse();
+        assertThat(einheitRepository.existsLadestationWithMesspunkt("MP-001", -1L)).isFalse();
+        // Der Ingest-Pfad bleibt unveraendert: beide Bilanz-Einheiten sind auflösbar
+        assertThat(einheitRepository.findAllByOrgIdAndMesspunkt(TEST_ORG_ID, "BILANZ-1")).hasSize(2);
+    }
+
+    @Test
+    void shouldFindLadestationByOrgIdAndMesspunkt() {
+        // Das Repository filtert Ladestationen NICHT aus - das macht der MqttIngestService,
+        // damit eine RFID nie versehentlich Messwerte erhält
+        einheitRepository.save(createEinheit("Ladestation 1", EinheitTyp.LADESTATION, "RFID-001"));
+
+        List<Einheit> result = einheitRepository.findAllByOrgIdAndMesspunkt(TEST_ORG_ID, "RFID-001");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getTyp()).isEqualTo(EinheitTyp.LADESTATION);
+    }
+
+    @Test
+    void shouldNotCountLadestationAsBilanzTyp() {
+        // LADESTATION ist kein Bilanz-Typ: mehrere Ladestationen je Mandant sind zulaessig
+        einheitRepository.save(createEinheit("Ladestation 1", EinheitTyp.LADESTATION, "RFID-001"));
+        einheitRepository.save(createEinheit("Ladestation 2", EinheitTyp.LADESTATION, "RFID-002"));
+
+        assertThat(einheitRepository.existsByTyp(EinheitTyp.BEZUG)).isFalse();
+        assertThat(einheitRepository.findAllByOrderByNameAsc()).hasSize(2);
+    }
+
+    @Test
+    void shouldSortLadestationenTogetherWithOtherEinheiten() {
+        // Ladestationen werden in den Auswahllisten nicht ausgeblendet (FR-3)
+        einheitRepository.save(createEinheit("Wohnung A", EinheitTyp.CONSUMER, null));
+        einheitRepository.save(createEinheit("Ladestation 1", EinheitTyp.LADESTATION, "RFID-001"));
+
+        assertThat(einheitRepository.findAllByOrderByNameAsc())
+                .extracting(Einheit::getName)
+                .containsExactly("Ladestation 1", "Wohnung A");
+    }
 }

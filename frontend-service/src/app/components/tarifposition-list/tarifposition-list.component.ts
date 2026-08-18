@@ -176,7 +176,7 @@ export class TarifpositionListComponent implements OnInit {
           this.showMessage('TARIFPOSITION_GELOESCHT', 'success');
           this.loadPositionen();
         },
-        error: (error) => this.showMessage(error.error || 'FEHLER_LOESCHEN_TARIFPOSITION', 'error')
+        error: (error) => this.showMessage(this.fehlertext(error, 'FEHLER_LOESCHEN_TARIFPOSITION'), 'error')
       });
     }
   }
@@ -203,7 +203,7 @@ export class TarifpositionListComponent implements OnInit {
           this.showForm = false;
           this.loadPositionen();
         },
-        error: (error) => this.showMessage(error.error || 'FEHLER_AKTUALISIEREN_TARIFPOSITION', 'error')
+        error: (error) => this.showMessage(this.fehlertext(error, 'FEHLER_AKTUALISIEREN_TARIFPOSITION'), 'error')
       });
     } else {
       this.tarifpositionService.createTarifposition(position).subscribe({
@@ -212,7 +212,7 @@ export class TarifpositionListComponent implements OnInit {
           this.showForm = false;
           this.loadPositionen();
         },
-        error: (error) => this.showMessage(error.error || 'FEHLER_ERSTELLEN_TARIFPOSITION', 'error')
+        error: (error) => this.showMessage(this.fehlertext(error, 'FEHLER_ERSTELLEN_TARIFPOSITION'), 'error')
       });
     }
   }
@@ -283,6 +283,25 @@ export class TarifpositionListComponent implements OnInit {
 
   berechneBetrag(position: Tarifposition): number {
     return (position.menge ?? 0) * (position.tarifPreis ?? 0);
+  }
+
+  /**
+   * Fehlertext aus der Server-Antwort. Die Bean-Validation des DTO liefert eine Map
+   * `{ feld: meldung }` — die direkt anzuzeigen ergäbe „[object Object]".
+   */
+  private fehlertext(error: { error?: unknown }, fallback: string): string {
+    const body = error?.error;
+    if (typeof body === 'string' && body.trim()) {
+      return body;
+    }
+    if (body && typeof body === 'object') {
+      const meldungen = Object.values(body as Record<string, unknown>)
+        .filter((v): v is string => typeof v === 'string');
+      if (meldungen.length > 0) {
+        return meldungen.join('; ');
+      }
+    }
+    return fallback;
   }
 
   dismissMessage(): void {

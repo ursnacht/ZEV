@@ -108,8 +108,8 @@ export class MieterListComponent extends WithMessage implements OnInit {
           this.showMessage('MIETER_GELOESCHT', 'success');
           this.loadMieter();
         },
-        error: () => {
-          this.showMessage('FEHLER_LOESCHEN_MIETER', 'error');
+        error: (error) => {
+          this.showMessage(error.error?.error || error.error || 'FEHLER_LOESCHEN_MIETER', 'error');
         }
       });
     }

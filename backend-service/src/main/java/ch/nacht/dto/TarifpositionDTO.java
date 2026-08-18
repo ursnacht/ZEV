@@ -2,6 +2,11 @@ package ch.nacht.dto;
 
 import ch.nacht.entity.Erfassungsart;
 import ch.nacht.entity.Tarifposition;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 
@@ -16,18 +21,30 @@ import java.math.BigDecimal;
 public class TarifpositionDTO {
 
     private Long id;
+    @NotNull(message = "Einheit ist erforderlich")
     private Long einheitId;
     private String einheitName;
     /** Messpunkt der Einheit = RFID; belegt im Formular die Quell-Referenz vor. */
     private String einheitMesspunkt;
+    @NotNull(message = "Tarif ist erforderlich")
     private Long tarifId;
     private String tarifBezeichnung;
     private BigDecimal tarifPreis;
+    @NotNull(message = "Jahr ist erforderlich")
+    @Min(value = 2000, message = "Jahr muss 2000 oder später sein")
+    @Max(value = 2100, message = "Jahr muss 2100 oder früher sein")
     private Integer jahr;
+    @NotNull(message = "Quartal ist erforderlich")
+    @Min(value = 1, message = "Quartal muss zwischen 1 und 4 liegen")
+    @Max(value = 4, message = "Quartal muss zwischen 1 und 4 liegen")
     private Integer quartal;
+    @NotNull(message = "Menge ist erforderlich")
+    @DecimalMin(value = "0", message = "Menge darf nicht negativ sein")
     private BigDecimal menge;
     private Erfassungsart erfassungsart;
+    @Size(max = 64, message = "Quell-Referenz darf höchstens 64 Zeichen haben")
     private String quellReferenz;
+    @Size(max = 200, message = "Bemerkung darf höchstens 200 Zeichen haben")
     private String bemerkung;
 
     public TarifpositionDTO() {

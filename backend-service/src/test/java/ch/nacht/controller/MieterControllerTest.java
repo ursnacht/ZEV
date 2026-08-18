@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -18,10 +19,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -286,5 +290,141 @@ public class MieterControllerTest {
 
         mockMvc.perform(delete("/api/mieter/99"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deleteMieter_MitTarifpositionen_ReturnsBadRequestMitMeldung() throws Exception {
+        // Der Loeschschutz des Service nennt die Anzahl - ohne catch im Controller waere daraus
+        // ein 500 geworden und die Meldung nie beim Benutzer angekommen.
+        when(mieterService.deleteMieter(1L)).thenThrow(new IllegalArgumentException(
+                "Mieter kann nicht gelöscht werden: 2 Tarifposition(en) vorhanden"));
+
+        mockMvc.perform(delete("/api/mieter/1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(containsString("2 Tarifposition")));
+    }
+
+    // ==================== Zuordnung mehrerer Einheiten (Specs/Ladestationen.md) ====================
+
+    @Test
+    void createMieter_MehrereEinheiten_ReichtAlleIdsWeiter() throws Exception {
+        // Wohnung + zwei Ladestationen in einem Request
+        String json = """
+                {
+                    "name": "Mit Wohnung und Ladestationen",
+                    "strasse": "Strasse 1",
+                    "plz": "3000",
+                    "ort": "Bern",
+                    "mietbeginn": "2026-01-01",
+                    "einheitIds": [1, 2, 3]
+                }
+                """;
+
+        when(mieterService.saveMieter(any(Mieter.class))).thenAnswer(invocation -> {
+            Mieter uebergeben = invocation.getArgument(0);
+            uebergeben.setId(7L);
+            return uebergeben;
+        });
+
+        mockMvc.perform(post("/api/mieter")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.einheitIds", hasSize(3)))
+                .andExpect(jsonPath("$.einheitIds[2]", is(3)));
+
+        ArgumentCaptor<Mieter> captor = ArgumentCaptor.forClass(Mieter.class);
+        verify(mieterService).saveMieter(captor.capture());
+        assertEquals(List.of(1L, 2L, 3L), captor.getValue().getEinheitIds());
+    }
+
+    @Test
+    void createMieter_NurLadestation_ReturnsCreated() throws Exception {
+        // Nutzer ohne Wohnung
+        String json = """
+                {
+                    "name": "Nutzer ohne Wohnung",
+                    "strasse": "Ladeweg 7",
+                    "plz": "3000",
+                    "ort": "Bern",
+                    "mietbeginn": "2026-01-01",
+                    "einheitIds": [42]
+                }
+                """;
+
+        when(mieterService.saveMieter(any(Mieter.class))).thenAnswer(invocation -> {
+            Mieter uebergeben = invocation.getArgument(0);
+            uebergeben.setId(9L);
+            return uebergeben;
+        });
+
+        mockMvc.perform(post("/api/mieter")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.einheitIds", hasSize(1)))
+                .andExpect(jsonPath("$.einheitIds[0]", is(42)));
+    }
+
+    @Test
+    void createMieter_LeereEinheitenListe_ReturnsBadRequest() throws Exception {
+        String json = """
+                {
+                    "name": "Ohne Einheit",
+                    "strasse": "Strasse 1",
+                    "plz": "3000",
+                    "ort": "Bern",
+                    "mietbeginn": "2026-01-01",
+                    "einheitIds": []
+                }
+                """;
+
+        when(mieterService.saveMieter(any()))
+                .thenThrow(new IllegalArgumentException("Mindestens eine Einheit ist erforderlich"));
+
+        mockMvc.perform(post("/api/mieter")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void updateMieter_LetzteEinheitEntfernt_ReturnsBadRequest() throws Exception {
+        String json = """
+                {
+                    "name": "Max Muster",
+                    "strasse": "Teststrasse 1",
+                    "plz": "3000",
+                    "ort": "Bern",
+                    "mietbeginn": "2024-01-01",
+                    "einheitIds": []
+                }
+                """;
+
+        when(mieterService.getMieterById(1L)).thenReturn(Optional.of(testMieter));
+        when(mieterService.saveMieter(any(Mieter.class)))
+                .thenThrow(new IllegalArgumentException("Mindestens eine Einheit ist erforderlich"));
+
+        mockMvc.perform(put("/api/mieter/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getAllMieter_LieferteinheitIdsMit() throws Exception {
+        Mieter mitLadestation = new Mieter("Mit Ladestation", LocalDate.of(2026, 1, 1), 1L);
+        mitLadestation.setId(3L);
+        mitLadestation.setStrasse("Strasse 1");
+        mitLadestation.setPlz("3000");
+        mitLadestation.setOrt("Bern");
+        mitLadestation.setEinheitIds(List.of(1L, 900L));
+
+        when(mieterService.getAllMieter()).thenReturn(List.of(mitLadestation));
+
+        mockMvc.perform(get("/api/mieter"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].einheitIds", hasSize(2)))
+                .andExpect(jsonPath("$[0].einheitIds[1]", is(900)));
     }
 }

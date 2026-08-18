@@ -1,6 +1,7 @@
 package ch.nacht.service;
 
 import ch.nacht.entity.Mieter;
+import ch.nacht.entity.MieterEinheit;
 import ch.nacht.repository.MieterEinheitRepository;
 import ch.nacht.repository.MieterRepository;
 import ch.nacht.repository.TarifpositionRepository;
@@ -8,11 +9,13 @@ import ch.nacht.repository.TarifpositionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -342,6 +345,312 @@ public class MieterServiceTest {
         List<Mieter> result = mieterService.getMieterForQuartal(1L, quartalBeginn, quartalEnde);
 
         assertTrue(result.isEmpty());
+    }
+
+    // ==================== Zuordnung Mieter <-> Einheiten (Specs/Ladestationen.md) ====================
+
+    /** Mieter mit Adresse und befristetem Mietzeitraum, dem die angegebenen Einheiten zugeordnet sind. */
+    private Mieter mieterMitEinheiten(String name, Long... einheitIds) {
+        Mieter mieter = new Mieter();
+        mieter.setName(name);
+        mieter.setStrasse("Strasse 1");
+        mieter.setPlz("3000");
+        mieter.setOrt("Bern");
+        mieter.setMietbeginn(LocalDate.of(2026, 1, 1));
+        mieter.setMietende(LocalDate.of(2026, 12, 31));
+        mieter.setEinheitIds(new ArrayList<>(Arrays.asList(einheitIds)));
+        return mieter;
+    }
+
+    @Test
+    void saveMieter_MehrereEinheiten_SpeichertAlleZuordnungen() {
+        // Wohnung (1) + zwei Ladestationen (2, 3) - alles auf einer Rechnung
+        Mieter neu = mieterMitEinheiten("Mit Wohnung und Ladestationen", 1L, 2L, 3L);
+
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(mieterRepository.existsOverlappingMieterBounded(anyLong(), any(), any(), eq(-1L)))
+                .thenReturn(false);
+        when(mieterRepository.save(any(Mieter.class))).thenAnswer(invocation -> {
+            Mieter saved = invocation.getArgument(0);
+            saved.setId(7L);
+            return saved;
+        });
+
+        Mieter result = mieterService.saveMieter(neu);
+
+        assertEquals(List.of(1L, 2L, 3L), result.getEinheitIds());
+        // Zuordnungen werden komplett neu geschrieben, nicht Zeile fuer Zeile abgeglichen
+        verify(mieterEinheitRepository).deleteByMieterId(7L);
+        verify(mieterEinheitRepository).flush();
+
+        ArgumentCaptor<MieterEinheit> captor = ArgumentCaptor.forClass(MieterEinheit.class);
+        verify(mieterEinheitRepository, times(3)).save(captor.capture());
+        assertEquals(List.of(1L, 2L, 3L),
+                captor.getAllValues().stream().map(MieterEinheit::getEinheitId).toList());
+        // org_id serverseitig aus dem Mieter uebernommen
+        assertTrue(captor.getAllValues().stream().allMatch(z -> testOrgId.equals(z.getOrgId())));
+        assertTrue(captor.getAllValues().stream().allMatch(z -> Long.valueOf(7L).equals(z.getMieterId())));
+    }
+
+    @Test
+    void saveMieter_MehrereEinheiten_PruefungFuerJedeEinheit() {
+        Mieter neu = mieterMitEinheiten("Zwei Einheiten", 1L, 2L);
+
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(mieterRepository.existsOverlappingMieterBounded(anyLong(), any(), any(), eq(-1L)))
+                .thenReturn(false);
+        when(mieterRepository.save(any(Mieter.class))).thenAnswer(invocation -> {
+            Mieter saved = invocation.getArgument(0);
+            saved.setId(8L);
+            return saved;
+        });
+
+        mieterService.saveMieter(neu);
+
+        verify(mieterRepository).existsOverlappingMieterBounded(eq(1L), any(), any(), eq(-1L));
+        verify(mieterRepository).existsOverlappingMieterBounded(eq(2L), any(), any(), eq(-1L));
+    }
+
+    @Test
+    void saveMieter_UeberschneidungInZweiterEinheit_ThrowsException() {
+        // Eine Ueberschneidung in EINER zugeordneten Einheit reicht zur Ablehnung
+        Mieter neu = mieterMitEinheiten("Kollision", 1L, 2L);
+
+        when(mieterRepository.existsOverlappingMieterBounded(eq(1L), any(), any(), eq(-1L)))
+                .thenReturn(false);
+        when(mieterRepository.existsOverlappingMieterBounded(eq(2L), any(), any(), eq(-1L)))
+                .thenReturn(true);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> mieterService.saveMieter(neu)
+        );
+
+        assertThat(exception.getMessage(), containsString("überschneidet sich"));
+        verify(mieterRepository, never()).save(any());
+        verify(mieterEinheitRepository, never()).save(any());
+    }
+
+    @Test
+    void saveMieter_ZweiterMieterOhneMietendeAnZweiterEinheit_ThrowsException() {
+        // Regel "hoechstens ein Mieter ohne Mietende" gilt je zugeordneter Einheit
+        Mieter neu = mieterMitEinheiten("Offenes Ende", 1L, 2L);
+        neu.setMietende(null);
+
+        when(mieterRepository.existsOverlappingMieterOpenEnded(anyLong(), any(), eq(-1L)))
+                .thenReturn(false);
+        when(mieterRepository.existsOtherMieterWithoutMietende(eq(1L), eq(-1L))).thenReturn(false);
+        when(mieterRepository.existsOtherMieterWithoutMietende(eq(2L), eq(-1L))).thenReturn(true);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> mieterService.saveMieter(neu)
+        );
+
+        assertThat(exception.getMessage(), containsString("aktueller Mieter ohne Mietende"));
+        verify(mieterRepository, never()).save(any());
+    }
+
+    @Test
+    void saveMieter_NurLadestation_SavesSuccessfully() {
+        // Nutzer ohne Wohnung: nur eine LADESTATION-Einheit zugeordnet
+        Mieter neu = mieterMitEinheiten("Nutzer ohne Wohnung", 42L);
+
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(mieterRepository.existsOverlappingMieterBounded(eq(42L), any(), any(), eq(-1L)))
+                .thenReturn(false);
+        when(mieterRepository.save(any(Mieter.class))).thenAnswer(invocation -> {
+            Mieter saved = invocation.getArgument(0);
+            saved.setId(9L);
+            return saved;
+        });
+
+        Mieter result = mieterService.saveMieter(neu);
+
+        assertEquals(List.of(42L), result.getEinheitIds());
+        verify(mieterEinheitRepository).save(any(MieterEinheit.class));
+    }
+
+    @Test
+    void saveMieter_OhneEinheit_ThrowsException() {
+        Mieter neu = mieterMitEinheiten("Ohne Einheit");
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> mieterService.saveMieter(neu)
+        );
+
+        assertThat(exception.getMessage(), containsString("Mindestens eine Einheit"));
+        verify(mieterRepository, never()).save(any());
+        verify(mieterEinheitRepository, never()).deleteByMieterId(anyLong());
+    }
+
+    @Test
+    void saveMieter_DoppelteEinheitId_SpeichertZuordnungNurEinmal() {
+        Mieter neu = mieterMitEinheiten("Doppelt", 1L, 1L, 2L);
+
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(mieterRepository.existsOverlappingMieterBounded(anyLong(), any(), any(), eq(-1L)))
+                .thenReturn(false);
+        when(mieterRepository.save(any(Mieter.class))).thenAnswer(invocation -> {
+            Mieter saved = invocation.getArgument(0);
+            saved.setId(10L);
+            return saved;
+        });
+
+        Mieter result = mieterService.saveMieter(neu);
+
+        assertEquals(List.of(1L, 2L), result.getEinheitIds());
+        verify(mieterEinheitRepository, times(2)).save(any(MieterEinheit.class));
+    }
+
+    @Test
+    void saveMieter_Update_SchreibtZuordnungenNeu() {
+        // Beim Bearbeiten wird die Zuordnung komplett ersetzt (Ladestation ergaenzt)
+        testMieter.setEinheitIds(new ArrayList<>(List.of(1L, 2L)));
+
+        when(mieterRepository.existsOverlappingMieterBounded(anyLong(), any(), any(), eq(1L)))
+                .thenReturn(false);
+        when(mieterRepository.save(any(Mieter.class))).thenReturn(testMieter);
+
+        Mieter result = mieterService.saveMieter(testMieter);
+
+        assertEquals(List.of(1L, 2L), result.getEinheitIds());
+        verify(mieterEinheitRepository).deleteByMieterId(1L);
+        verify(mieterEinheitRepository, times(2)).save(any(MieterEinheit.class));
+        verify(organizationContextService, never()).getCurrentOrgId();
+    }
+
+    @Test
+    void getAllMieter_FuelltEinheitIdsJeMieter() {
+        Mieter mieter2 = new Mieter("Anna Beispiel", LocalDate.of(2024, 4, 1), 2L);
+        mieter2.setId(2L);
+
+        when(mieterRepository.findAllByOrderByNameAscMietbeginnDesc())
+                .thenReturn(Arrays.asList(testMieter, mieter2));
+        // Eine einzige Abfrage fuer die ganze Liste
+        when(mieterEinheitRepository.findByMieterIdIn(List.of(1L, 2L))).thenReturn(List.of(
+                new MieterEinheit(testOrgId, 1L, 10L),
+                new MieterEinheit(testOrgId, 1L, 11L),
+                new MieterEinheit(testOrgId, 2L, 20L)
+        ));
+
+        List<Mieter> result = mieterService.getAllMieter();
+
+        assertEquals(List.of(10L, 11L), result.get(0).getEinheitIds());
+        assertEquals(List.of(20L), result.get(1).getEinheitIds());
+        verify(mieterEinheitRepository).findByMieterIdIn(List.of(1L, 2L));
+    }
+
+    @Test
+    void getAllMieter_MieterOhneZuordnung_HatLeereEinheitListe() {
+        when(mieterRepository.findAllByOrderByNameAscMietbeginnDesc()).thenReturn(List.of(testMieter));
+        when(mieterEinheitRepository.findByMieterIdIn(List.of(1L))).thenReturn(Collections.emptyList());
+
+        List<Mieter> result = mieterService.getAllMieter();
+
+        assertTrue(result.get(0).getEinheitIds().isEmpty());
+    }
+
+    @Test
+    void getAllMieter_EmptyList_QueriesNoZuordnungen() {
+        when(mieterRepository.findAllByOrderByNameAscMietbeginnDesc()).thenReturn(Collections.emptyList());
+
+        mieterService.getAllMieter();
+
+        verify(mieterEinheitRepository, never()).findByMieterIdIn(any());
+    }
+
+    @Test
+    void getMieterById_FuelltEinheitIds() {
+        when(mieterRepository.findById(1L)).thenReturn(Optional.of(testMieter));
+        when(mieterEinheitRepository.findEinheitIdsByMieterId(1L)).thenReturn(List.of(10L, 11L));
+
+        Optional<Mieter> result = mieterService.getMieterById(1L);
+
+        assertTrue(result.isPresent());
+        assertEquals(List.of(10L, 11L), result.get().getEinheitIds());
+    }
+
+    @Test
+    void getMieterForQuartal_FuelltEinheitIds() {
+        LocalDate quartalBeginn = LocalDate.of(2024, 1, 1);
+        LocalDate quartalEnde = LocalDate.of(2024, 3, 31);
+
+        when(mieterRepository.findByEinheitIdAndQuartal(1L, quartalBeginn, quartalEnde))
+                .thenReturn(List.of(testMieter));
+        when(mieterEinheitRepository.findByMieterIdIn(List.of(1L)))
+                .thenReturn(List.of(new MieterEinheit(testOrgId, 1L, 10L)));
+
+        List<Mieter> result = mieterService.getMieterForQuartal(1L, quartalBeginn, quartalEnde);
+
+        assertEquals(List.of(10L), result.get(0).getEinheitIds());
+    }
+
+    @Test
+    void getEinheitIds_ReturnsZugeordneteEinheiten() {
+        when(mieterEinheitRepository.findEinheitIdsByMieterId(1L)).thenReturn(List.of(10L, 11L));
+
+        List<Long> result = mieterService.getEinheitIds(1L);
+
+        assertEquals(List.of(10L, 11L), result);
+        verify(hibernateFilterService).enableOrgFilter();
+    }
+
+    // ==================== Loeschschutz: Positionen an zugeordneten Einheiten ====================
+
+    @Test
+    void deleteMieter_MitTarifpositionenAnZugeordneterEinheit_ThrowsException() {
+        when(mieterRepository.existsById(1L)).thenReturn(true);
+        when(mieterEinheitRepository.findEinheitIdsByMieterId(1L)).thenReturn(List.of(10L, 11L));
+        when(tarifpositionRepository.countByEinheitId(10L)).thenReturn(0L);
+        when(tarifpositionRepository.countByEinheitId(11L)).thenReturn(3L);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> mieterService.deleteMieter(1L)
+        );
+
+        // Meldung nennt die Anzahl betroffener Positionen (Specs/Ladestationen.md §5)
+        assertThat(exception.getMessage(), containsString("3 Tarifposition(en)"));
+        verify(mieterRepository, never()).deleteById(anyLong());
+    }
+
+    @Test
+    void deleteMieter_SummiertPositionenUeberAlleEinheiten() {
+        when(mieterRepository.existsById(1L)).thenReturn(true);
+        when(mieterEinheitRepository.findEinheitIdsByMieterId(1L)).thenReturn(List.of(10L, 11L));
+        when(tarifpositionRepository.countByEinheitId(10L)).thenReturn(2L);
+        when(tarifpositionRepository.countByEinheitId(11L)).thenReturn(5L);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> mieterService.deleteMieter(1L)
+        );
+
+        assertThat(exception.getMessage(), containsString("7 Tarifposition(en)"));
+    }
+
+    @Test
+    void deleteMieter_OhneTarifpositionen_ReturnsTrue() {
+        when(mieterRepository.existsById(1L)).thenReturn(true);
+        when(mieterEinheitRepository.findEinheitIdsByMieterId(1L)).thenReturn(List.of(10L, 11L));
+        when(tarifpositionRepository.countByEinheitId(10L)).thenReturn(0L);
+        when(tarifpositionRepository.countByEinheitId(11L)).thenReturn(0L);
+
+        boolean result = mieterService.deleteMieter(1L);
+
+        assertTrue(result);
+        verify(mieterRepository).deleteById(1L);
+    }
+
+    @Test
+    void deleteMieter_NotExists_PruefungEntfaellt() {
+        when(mieterRepository.existsById(99L)).thenReturn(false);
+
+        assertFalse(mieterService.deleteMieter(99L));
+
+        verify(tarifpositionRepository, never()).countByEinheitId(anyLong());
     }
 
     @Test

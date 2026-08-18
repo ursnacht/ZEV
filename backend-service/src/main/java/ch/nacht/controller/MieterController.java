@@ -86,14 +86,20 @@ public class MieterController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteMieter(@PathVariable Long id) {
+    public ResponseEntity<?> deleteMieter(@PathVariable Long id) {
         log.info("Deleting mieter with id: {}", id);
-        if (mieterService.deleteMieter(id)) {
-            log.info("Successfully deleted mieter with id: {}", id);
-            return ResponseEntity.noContent().build();
-        } else {
+        try {
+            if (mieterService.deleteMieter(id)) {
+                log.info("Successfully deleted mieter with id: {}", id);
+                return ResponseEntity.noContent().build();
+            }
             log.warn("Cannot delete - mieter not found with id: {}", id);
             return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            // Der Loeschschutz des Service nennt die Anzahl betroffener Positionen - ohne dieses
+            // catch waere daraus ein 500 geworden und die Meldung nie beim Benutzer angekommen.
+            log.warn("Failed to delete mieter {}: {}", id, e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 }

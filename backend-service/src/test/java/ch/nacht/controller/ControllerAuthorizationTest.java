@@ -1,8 +1,13 @@
 package ch.nacht.controller;
 
 import ch.nacht.config.SecurityConfig;
+import ch.nacht.entity.Einheit;
+import ch.nacht.entity.EinheitTyp;
+import ch.nacht.service.EinheitMatchingService;
+import ch.nacht.service.EinheitService;
 import ch.nacht.service.EinstellungenService;
 import ch.nacht.service.FeatureFlagService;
+import ch.nacht.service.MieterService;
 import ch.nacht.service.OrganisationService;
 import ch.nacht.service.OrganizationContextService;
 import ch.nacht.service.TarifpositionService;
@@ -41,7 +46,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Authentifizierung → 401. Deckt insbesondere die Abgrenzung {@code org_admin} (darf Einstellungen,
  * aber keine Feature-Flags) ab.
  */
-@WebMvcTest({EinstellungenController.class, FeatureFlagController.class, TarifpositionController.class})
+@WebMvcTest({EinstellungenController.class, FeatureFlagController.class, TarifpositionController.class,
+        EinheitController.class, MieterController.class})
 @Import(SecurityConfig.class)
 @TestPropertySource(properties = "app.cors.allowed-origins=http://localhost:4200")
 class ControllerAuthorizationTest {
@@ -57,6 +63,15 @@ class ControllerAuthorizationTest {
 
     @MockitoBean
     private TarifpositionService tarifpositionService;
+
+    @MockitoBean
+    private EinheitService einheitService;
+
+    @MockitoBean
+    private EinheitMatchingService einheitMatchingService;
+
+    @MockitoBean
+    private MieterService mieterService;
 
     @MockitoBean
     private OrganizationContextService organizationContextService;
@@ -169,7 +184,7 @@ class ControllerAuthorizationTest {
                         .with(jwt().authorities(new SimpleGrantedAuthority("rechnungen:manage")))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"mieterId\":1,\"tarifId\":1,\"jahr\":2026,\"quartal\":1,\"menge\":10}"))
+                        .content("{\"einheitId\":1,\"tarifId\":1,\"jahr\":2026,\"quartal\":1,\"menge\":10}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -180,7 +195,7 @@ class ControllerAuthorizationTest {
                         .with(jwt().authorities(new SimpleGrantedAuthority("mieter:read")))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"mieterId\":1,\"tarifId\":1,\"jahr\":2026,\"quartal\":1,\"menge\":10}"))
+                        .content("{\"einheitId\":1,\"tarifId\":1,\"jahr\":2026,\"quartal\":1,\"menge\":10}"))
                 .andExpect(status().isForbidden());
     }
 
@@ -202,5 +217,121 @@ class ControllerAuthorizationTest {
                         .with(jwt().authorities(new SimpleGrantedAuthority("rechnungen:manage")))
                         .with(csrf()))
                 .andExpect(status().isNoContent());
+    }
+
+    // ==================== Einheiten (inkl. Ladestationen): einheit:write ====================
+    // Specs/Ladestationen.md NFR-2: Einheiten sind Stammdaten - Typ und messpunkt (RFID)
+    // aendert nur, wer einheit:write besitzt.
+
+    private static final String LADESTATION_JSON = """
+            {"name":"Ladestation 1","typ":"LADESTATION","messpunkt":"RFID-001"}
+            """;
+
+    @Test
+    void createEinheit_withEinheitWrite_reachesController() throws Exception {
+        when(einheitService.createEinheit(any()))
+                .thenReturn(new Einheit("Ladestation 1", EinheitTyp.LADESTATION));
+
+        mockMvc.perform(post("/api/einheit")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("einheit:write")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(LADESTATION_JSON))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void createEinheit_withReadPermissionOnly_forbidden() throws Exception {
+        // zev_user hat einheit:read, aber nicht einheit:write
+        mockMvc.perform(post("/api/einheit")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("einheit:read")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(LADESTATION_JSON))
+                .andExpect(status().isForbidden());
+
+        verify(einheitService, never()).createEinheit(any());
+    }
+
+    @Test
+    void updateEinheit_withoutPermission_forbidden() throws Exception {
+        mockMvc.perform(put("/api/einheit/1")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("mieter:read")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(LADESTATION_JSON))
+                .andExpect(status().isForbidden());
+
+        verify(einheitService, never()).updateEinheit(any(), any());
+    }
+
+    @Test
+    void createEinheit_unauthenticated_unauthorized() throws Exception {
+        mockMvc.perform(post("/api/einheit")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(LADESTATION_JSON))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // ==================== Mieter-Zuordnung: mieter:manage ====================
+
+    private static final String MIETER_JSON = """
+            {"name":"Nutzer ohne Wohnung","strasse":"Ladeweg 7","plz":"3000","ort":"Bern",
+             "mietbeginn":"2026-01-01","einheitIds":[42]}
+            """;
+
+    @Test
+    void createMieter_withMieterManage_reachesController() throws Exception {
+        // Service weist fachlich ab -> 400 belegt, dass der Controller erreicht wurde
+        when(mieterService.saveMieter(any()))
+                .thenThrow(new IllegalArgumentException("Mindestens eine Einheit ist erforderlich"));
+
+        mockMvc.perform(post("/api/mieter")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("mieter:manage")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(MIETER_JSON))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createMieter_withMieterReadOnly_forbidden() throws Exception {
+        // Lesen genuegt fuer die Zuordnung Mieter <-> Einheit nicht
+        mockMvc.perform(post("/api/mieter")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("mieter:read")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(MIETER_JSON))
+                .andExpect(status().isForbidden());
+
+        verify(mieterService, never()).saveMieter(any());
+    }
+
+    @Test
+    void updateMieter_withMieterReadOnly_forbidden() throws Exception {
+        mockMvc.perform(put("/api/mieter/1")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("mieter:read")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(MIETER_JSON))
+                .andExpect(status().isForbidden());
+
+        verify(mieterService, never()).saveMieter(any());
+    }
+
+    @Test
+    void getAllMieter_withMieterRead_reachesController() throws Exception {
+        when(mieterService.getAllMieter()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/mieter")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("mieter:read"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getAllMieter_unauthenticated_unauthorized() throws Exception {
+        mockMvc.perform(get("/api/mieter"))
+                .andExpect(status().isUnauthorized());
     }
 }

@@ -149,7 +149,18 @@ describe('EinheitListComponent', () => {
     it('should show error message on delete failure', () => {
       einheitServiceSpy.deleteEinheit.mockReturnValue(throwError(() => new Error('Delete failed')));
       component.onDelete(1);
-      expect(component.message).toContain('Fehler beim Löschen');
+      expect(component.message).toBe('FEHLER_LOESCHEN_EINHEIT');
+      expect(component.messageType).toBe('error');
+    });
+
+    it('should show the server message when the unit is still assigned to tenants', () => {
+      // Der Loeschschutz liefert die Anzahl im Body - die soll den Benutzer erreichen
+      // (Specs/Ladestationen.md), nicht der generische Fallback.
+      einheitServiceSpy.deleteEinheit.mockReturnValue(throwError(() => ({
+        error: { error: 'Einheit kann nicht gelöscht werden: 2 Mieter zugeordnet' }
+      })));
+      component.onDelete(1);
+      expect(component.message).toContain('2 Mieter zugeordnet');
       expect(component.messageType).toBe('error');
     });
   });

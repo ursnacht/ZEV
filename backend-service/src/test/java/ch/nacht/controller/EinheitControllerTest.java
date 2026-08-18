@@ -17,11 +17,19 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
+import java.util.Optional;
+
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(EinheitController.class)
@@ -68,6 +76,117 @@ public class EinheitControllerTest {
                 .content(objectMapper.writeValueAsString(einheit)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error", is("EINHEIT_BILANZ_TYP_EXISTIERT")));
+    }
+
+    // ========== Ladestationen (Specs/Ladestationen.md) ==========
+
+    /** Ladestation mit RFID im Feld messpunkt. */
+    private Einheit ladestation(Long id, String rfid) {
+        Einheit einheit = new Einheit("Ladestation 1", EinheitTyp.LADESTATION);
+        einheit.setId(id);
+        einheit.setMesspunkt(rfid);
+        return einheit;
+    }
+
+    @Test
+    public void createEinheit_Ladestation_ReturnsCreated() throws Exception {
+        Einheit einheit = ladestation(1L, "RFID-001");
+        when(einheitService.createEinheit(any(Einheit.class))).thenReturn(einheit);
+
+        mockMvc.perform(post("/api/einheit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(einheit)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.typ", is("LADESTATION")))
+                .andExpect(jsonPath("$.messpunkt", is("RFID-001")));
+    }
+
+    @Test
+    public void createEinheit_LadestationMitVergebenerRfid_Returns400MitFehlerKey() throws Exception {
+        Einheit einheit = ladestation(null, "RFID-001");
+        when(einheitService.createEinheit(any(Einheit.class)))
+                .thenThrow(new IllegalStateException("EINHEIT_MESSPUNKT_EXISTIERT"));
+
+        mockMvc.perform(post("/api/einheit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(einheit)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error", is("EINHEIT_MESSPUNKT_EXISTIERT")));
+    }
+
+    @Test
+    public void updateEinheit_LadestationMitVergebenerRfid_Returns400MitFehlerKey() throws Exception {
+        Einheit einheit = ladestation(1L, "RFID-001");
+        when(einheitService.updateEinheit(eq(1L), any(Einheit.class)))
+                .thenThrow(new IllegalStateException("EINHEIT_MESSPUNKT_EXISTIERT"));
+
+        mockMvc.perform(put("/api/einheit/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(einheit)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error", is("EINHEIT_MESSPUNKT_EXISTIERT")));
+    }
+
+    @Test
+    public void updateEinheit_Ladestation_ReturnsOk() throws Exception {
+        Einheit einheit = ladestation(1L, "RFID-002");
+        when(einheitService.updateEinheit(eq(1L), any(Einheit.class))).thenReturn(Optional.of(einheit));
+
+        mockMvc.perform(put("/api/einheit/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(einheit)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.messpunkt", is("RFID-002")));
+    }
+
+    @Test
+    public void updateEinheit_NotFound_Returns404() throws Exception {
+        Einheit einheit = ladestation(99L, "RFID-099");
+        when(einheitService.updateEinheit(eq(99L), any(Einheit.class))).thenReturn(Optional.empty());
+
+        mockMvc.perform(put("/api/einheit/99")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(einheit)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    public void deleteEinheit_Exists_ReturnsNoContent() throws Exception {
+        when(einheitService.deleteEinheit(1L)).thenReturn(true);
+
+        mockMvc.perform(delete("/api/einheit/1"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    public void deleteEinheit_NotFound_Returns404() throws Exception {
+        when(einheitService.deleteEinheit(99L)).thenReturn(false);
+
+        mockMvc.perform(delete("/api/einheit/99"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    public void getAllEinheiten_ReturnsListIncludingLadestation() throws Exception {
+        // Ladestationen werden in den Auswahllisten nicht ausgeblendet (FR-3)
+        Einheit wohnung = new Einheit("Wohnung A", EinheitTyp.CONSUMER);
+        when(einheitService.getAllEinheiten()).thenReturn(List.of(wohnung, ladestation(2L, "RFID-002")));
+
+        mockMvc.perform(get("/api/einheit"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[1].typ", is("LADESTATION")));
+    }
+
+    @Test
+    public void createEinheit_MesspunktZuLang_ReturnsBadRequest() throws Exception {
+        // messpunkt ist VARCHAR(50) - laengere RFIDs werden abgewiesen (FR-2)
+        Einheit einheit = ladestation(null, "R".repeat(51));
+
+        mockMvc.perform(post("/api/einheit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(einheit)))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

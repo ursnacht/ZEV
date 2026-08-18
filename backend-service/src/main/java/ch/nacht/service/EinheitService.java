@@ -3,6 +3,7 @@ package ch.nacht.service;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.repository.EinheitRepository;
+import ch.nacht.repository.MieterEinheitRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,13 +18,16 @@ public class EinheitService {
     private static final Set<EinheitTyp> BILANZ_TYPEN = Set.of(EinheitTyp.BEZUG, EinheitTyp.RUECKLIEFERUNG);
 
     private final EinheitRepository einheitRepository;
+    private final MieterEinheitRepository mieterEinheitRepository;
     private final OrganizationContextService organizationContextService;
     private final HibernateFilterService hibernateFilterService;
 
     public EinheitService(EinheitRepository einheitRepository,
+                          MieterEinheitRepository mieterEinheitRepository,
                           OrganizationContextService organizationContextService,
                           HibernateFilterService hibernateFilterService) {
         this.einheitRepository = einheitRepository;
+        this.mieterEinheitRepository = mieterEinheitRepository;
         this.organizationContextService = organizationContextService;
         this.hibernateFilterService = hibernateFilterService;
     }
@@ -94,6 +98,15 @@ public class EinheitService {
         hibernateFilterService.enableOrgFilter();
         if (!einheitRepository.existsById(id)) {
             return false;
+        }
+        // Ohne diese Pruefung entstuende ein Mieter ohne Einheit - die Regel "mindestens eine
+        // Zuordnung" griffe nur im Mieter-Formular. Der FK weist das Loeschen zwar ohnehin ab
+        // (ON DELETE RESTRICT), aber als DataIntegrityViolationException ohne verwertbare
+        // Meldung (Specs/Ladestationen.md FR-2).
+        long zugeordneteMieter = mieterEinheitRepository.countByEinheitId(id);
+        if (zugeordneteMieter > 0) {
+            throw new IllegalStateException(
+                    "Einheit kann nicht gelöscht werden: " + zugeordneteMieter + " Mieter zugeordnet");
         }
         einheitRepository.deleteById(id);
         return true;

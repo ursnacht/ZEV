@@ -259,6 +259,59 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldFindPositionsOfBothLadestationenOfOneMieter() {
+        // Mieter mit zwei Ladestationen: beide Positionen gehoeren auf dieselbe Rechnung,
+        // jede als eigene Zeile (Specs/Ladestationen.md, AK Rechnung)
+        savePosition(ladestationA, ladestromTarif, 2026, 1, "10.000");
+        savePosition(ladestationB, ladestromTarif, 2026, 1, "20.000");
+
+        List<Tarifposition> result = tarifpositionRepository.findByEinheitIdsAndQuartalOverlapping(
+                List.of(ladestationA.getId(), ladestationB.getId()), 2026, 1, 2026, 1);
+
+        assertThat(result).hasSize(2);
+        assertThat(result).extracting(p -> p.getEinheit().getId())
+                .containsExactlyInAnyOrder(ladestationA.getId(), ladestationB.getId());
+    }
+
+    @Test
+    void shouldAllowSameQuarterForTwoLadestationenOfOneMieter() {
+        // Die Eindeutigkeit gilt je Einheit - zwei Einheiten desselben Mieters duerfen
+        // im selben Quartal je eine Position tragen
+        savePosition(ladestationA, ladestromTarif, 2026, 1, "10.000");
+        savePosition(ladestationB, ladestromTarif, 2026, 1, "20.000");
+
+        assertThat(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
+                ladestationB.getId(), 2026, 1, TarifTyp.MANUELL_ERFASST, -1L)).isTrue();
+        assertThat(tarifpositionRepository.findByEinheitId(ladestationA.getId())).hasSize(1);
+        assertThat(tarifpositionRepository.findByEinheitId(ladestationB.getId())).hasSize(1);
+    }
+
+    @Test
+    void shouldCountPositionsOfEinheit() {
+        // Grundlage des Loeschschutzes beim Mieter (Specs/Ladestationen.md §5)
+        savePosition(ladestationA, ladestromTarif, 2026, 1, "10.000");
+        savePosition(ladestationA, ladestromTarif, 2026, 2, "20.000");
+
+        assertThat(tarifpositionRepository.countByEinheitId(ladestationA.getId())).isEqualTo(2);
+        assertThat(tarifpositionRepository.countByEinheitId(ladestationB.getId())).isZero();
+    }
+
+    @Test
+    void shouldDeletePositionsWhenEinheitIsDeleted() {
+        // ON DELETE CASCADE: mit der Einheit verschwinden ihre Positionen (§5)
+        savePosition(ladestationB, ladestromTarif, 2026, 1, "10.000");
+        savePosition(ladestationA, ladestromTarif, 2026, 1, "20.000");
+
+        tarifpositionRepository.deleteAll(tarifpositionRepository.findByEinheitId(ladestationB.getId()));
+        einheitRepository.delete(ladestationB);
+
+        assertThat(einheitRepository.findById(ladestationB.getId())).isEmpty();
+        assertThat(tarifpositionRepository.countByEinheitId(ladestationB.getId())).isZero();
+        // Die Positionen der anderen Einheit bleiben unberuehrt
+        assertThat(tarifpositionRepository.countByEinheitId(ladestationA.getId())).isEqualTo(1);
+    }
+
+    @Test
     void shouldReturnEmptyWhenNoQuarterOverlaps() {
         savePosition(ladestationA, ladestromTarif, 2026, 1, "10.000");
 

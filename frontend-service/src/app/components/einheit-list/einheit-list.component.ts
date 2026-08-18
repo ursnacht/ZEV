@@ -74,7 +74,9 @@ export class EinheitListComponent extends WithMessage implements OnInit {
           this.loadEinheiten();
         },
         error: (error) => {
-          this.showMessage('Fehler beim Löschen: ' + error.message, 'error');
+          // Der Loeschschutz liefert die Anzahl zugeordneter Mieter im Body - `error.message`
+          // waere nur "Http failure response ...".
+          this.showMessage(error.error?.error || error.error || 'FEHLER_LOESCHEN_EINHEIT', 'error');
         }
       });
     }

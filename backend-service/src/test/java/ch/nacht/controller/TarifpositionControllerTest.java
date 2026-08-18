@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.hasSize;
@@ -238,6 +239,65 @@ public class TarifpositionControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    // Bean-Validation am DTO (Specs/Ladestromtarif.md NFR-2). Ohne sie erreichten ungueltige
+    // Werte den Service und scheiterten erst am Entity-Constraint beim Flush - also 500 statt 400.
+
+    @Test
+    void createTarifposition_NegativeMenge_ReturnsBadRequest() throws Exception {
+        TarifpositionDTO dto = neuesDto();
+        dto.setMenge(new BigDecimal("-1.000"));
+
+        mockMvc.perform(post("/api/tarifpositionen")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.menge").exists());
+
+        verify(tarifpositionService, never()).saveTarifposition(any());
+    }
+
+    @Test
+    void createTarifposition_QuartalAusserhalb_ReturnsBadRequest() throws Exception {
+        TarifpositionDTO dto = neuesDto();
+        dto.setQuartal(5);
+
+        mockMvc.perform(post("/api/tarifpositionen")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.quartal").exists());
+
+        verify(tarifpositionService, never()).saveTarifposition(any());
+    }
+
+    @Test
+    void createTarifposition_JahrAusserhalb_ReturnsBadRequest() throws Exception {
+        TarifpositionDTO dto = neuesDto();
+        dto.setJahr(1999);
+
+        mockMvc.perform(post("/api/tarifpositionen")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.jahr").exists());
+
+        verify(tarifpositionService, never()).saveTarifposition(any());
+    }
+
+    @Test
+    void createTarifposition_OhneEinheit_ReturnsBadRequest() throws Exception {
+        TarifpositionDTO dto = neuesDto();
+        dto.setEinheitId(null);
+
+        mockMvc.perform(post("/api/tarifpositionen")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.einheitId").exists());
+
+        verify(tarifpositionService, never()).saveTarifposition(any());
+    }
+
     @Test
     void createTarifposition_MalformedJson_ReturnsBadRequest() throws Exception {
         mockMvc.perform(post("/api/tarifpositionen")
@@ -328,5 +388,39 @@ public class TarifpositionControllerTest {
 
         mockMvc.perform(delete("/api/tarifpositionen/999"))
                 .andExpect(status().isNotFound());
+    }
+
+    // ==================== Einheiten-Anker (Specs/Ladestationen.md) ====================
+
+    @Test
+    void getByEinheit_LiefertMesspunktFuerQuellReferenzVorbelegung() throws Exception {
+        // Das Formular belegt die Quell-Referenz mit dem messpunkt (RFID) der Einheit vor
+        when(tarifpositionService.getByEinheit(1L)).thenReturn(List.of(testPosition1));
+
+        mockMvc.perform(get("/api/tarifpositionen").param("einheitId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].einheitMesspunkt", is("RFID-001")));
+    }
+
+    @Test
+    void createTarifposition_EinheitNichtVomTypLadestation_ReturnsBadRequest() throws Exception {
+        when(tarifpositionService.saveTarifposition(any(Tarifposition.class)))
+                .thenThrow(new IllegalArgumentException(
+                        "Positionen sind nur für Einheiten vom Typ Ladestation zulässig"));
+
+        mockMvc.perform(post("/api/tarifpositionen")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(neuesDto())))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getByEinheit_UnbekannteEinheit_ReturnsEmptyList() throws Exception {
+        // Ladestation ohne Positionen: leere Liste statt 404
+        when(tarifpositionService.getByEinheit(999L)).thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/tarifpositionen").param("einheitId", "999"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
     }
 }

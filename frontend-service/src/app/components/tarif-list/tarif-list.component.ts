@@ -83,7 +83,7 @@ export class TarifListComponent implements OnInit {
           this.loadTarife();
         },
         error: (error) => {
-          this.showMessage('FEHLER_LOESCHEN_TARIF', 'error');
+          this.showMessage(error.error?.error || error.error || 'FEHLER_LOESCHEN_TARIF', 'error');
         }
       });
     }

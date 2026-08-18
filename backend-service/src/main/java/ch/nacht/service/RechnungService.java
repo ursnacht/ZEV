@@ -21,7 +21,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Year;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Service for calculating and generating invoice data.
@@ -82,6 +84,12 @@ public class RechnungService {
         }
 
         List<RechnungDTO> rechnungen = new ArrayList<>();
+        // Mieter, die bereits eine Ladestations-Rechnung erhalten haben. Ein Nutzer ohne Wohnung
+        // kann mehrere Ladestationen haben; ohne diese Merkliste entstuende je gewaehlter
+        // Ladestation eine Rechnung - und weil `berechneTarifpositionsZeilen` die Positionen
+        // ALLER seiner Einheiten sammelt, traege jede davon saemtliche Zeilen. Das waere
+        // doppelte Verrechnung (Specs/Ladestationen.md: "genau eine Rechnung").
+        Set<Long> ladestationsRechnungErstellt = new HashSet<>();
 
         for (Long einheitId : einheitIds) {
             einheitRepository.findById(einheitId).ifPresent(einheit -> {
@@ -128,6 +136,16 @@ public class RechnungService {
                         if (hatWohnung(m)) {
                             log.debug("Skipping charging unit {} for tenant {} - positions appear "
                                             + "on the invoice of their consumer unit",
+                                    einheit.getName(), m.getName());
+                            continue;
+                        }
+                        // Je Mieter hoechstens eine Ladestations-Rechnung, unabhaengig davon,
+                        // wie viele seiner Ladestationen fuer den Lauf gewaehlt sind. Welche
+                        // Einheit die Rechnung traegt, entscheidet die Auswahlreihenfolge; die
+                        // Zeilen sind in jedem Fall dieselben.
+                        if (!ladestationsRechnungErstellt.add(m.getId())) {
+                            log.debug("Skipping charging unit {} for tenant {} - already billed "
+                                            + "on another charging unit of the same tenant",
                                     einheit.getName(), m.getName());
                             continue;
                         }

@@ -558,4 +558,47 @@ public class MqttIngestServiceTest {
         verify(metrics).recordProcessed();
         verify(metrics, never()).recordFailed();
     }
+
+    // --- Ladestationen bleiben aussen vor (Specs/Ladestationen.md) ------------
+    // Der `messpunkt` einer LADESTATION ist eine RFID, keine Zaehlerkennung. Faellt sie zufaellig
+    // mit einer Zaehlerkennung zusammen, entstuenden ohne Filter Messwerte an einer Einheit, die
+    // nie an der Verteilung teilnimmt.
+
+    /** Ladestations-Einheit, deren RFID mit dem Topic-Messpunkt zusammenfaellt. */
+    private Einheit ladestation(Long id) {
+        Einheit ladestation = new Einheit("Ladestation 1", EinheitTyp.LADESTATION);
+        ladestation.setId(id);
+        ladestation.setOrgId(ORG_ID);
+        ladestation.setMesspunkt(MESSPUNKT);
+        return ladestation;
+    }
+
+    @Test
+    void handle_NurLadestationAmMesspunkt_Discarded() {
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT))
+                .thenReturn(List.of(ladestation(900L)));
+
+        service.handle(TOPIC, payload("2026-01-01T10:07:00+01:00", "123.4500", "10.0000"));
+
+        // Wie ein unbekannter Messpunkt: verworfen, keine Rohdaten
+        verify(metrics).recordFailed();
+        verify(metrics, never()).recordProcessed();
+        verify(rohdatenRepository, never()).save(any());
+        verify(rohdatenRepository, never()).findByEinheitIdAndZeit(anyLong(), any());
+    }
+
+    @Test
+    void handle_LadestationUndConsumerAmMesspunkt_NurConsumerErhaeltRohdaten() {
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT))
+                .thenReturn(List.of(ladestation(900L), einheit));
+        when(rohdatenRepository.findByEinheitIdAndZeit(eq(EINHEIT_ID), any())).thenReturn(Optional.empty());
+        when(rohdatenRepository.save(any(ZaehlerRohdaten.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.handle(TOPIC, payload("2026-01-01T10:07:00+01:00", "123.4500", "10.0000"));
+
+        // Genau ein Rohdatensatz - und zwar der der CONSUMER-Einheit
+        assertEquals(EINHEIT_ID, captureSavedRohdaten().getEinheitId());
+        verify(metrics).recordProcessed();
+        verify(metrics, never()).recordFailed();
+    }
 }

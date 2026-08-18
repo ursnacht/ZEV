@@ -1190,4 +1190,378 @@ public class RechnungServiceTest {
         assertTrue(rechnungen.get(0).getTarifZeilen().stream()
             .anyMatch(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR));
     }
+
+    // ─── Dritter Zweig: eigene Rechnung fuer Ladestationen (Specs/Ladestationen.md FR-1.5) ───
+    // Eine LADESTATION erzeugt nur dann eine eigene Rechnung, wenn ihrem Mieter keine CONSUMER-
+    // Einheit zugeordnet ist ("Nutzer ohne Wohnung"). Hat er eine, erscheinen die Positionen auf
+    // deren Rechnung - sonst bekaeme er zwei Rechnungen mit derselben Zeile.
+
+    /** Mieter mit Adresse, unbefristet ab 2023. */
+    private Mieter mieter(Long id, String name) {
+        Mieter mieter = new Mieter(name, LocalDate.of(2023, 1, 1), 900L);
+        mieter.setId(id);
+        mieter.setStrasse("Ladeweg 7");
+        mieter.setPlz("3000");
+        mieter.setOrt("Bern");
+        return mieter;
+    }
+
+    /** Zweite Ladestation desselben Mieters (eigene RFID, eigene Einheit). */
+    private Einheit ladestationZwei() {
+        Einheit einheit = new Einheit("Ladestation 2", EinheitTyp.LADESTATION);
+        einheit.setId(901L);
+        einheit.setMesspunkt("RFID-901");
+        return einheit;
+    }
+
+    @Test
+    void berechneRechnungen_OhneWohnungZweiLadestationen_ErzeugtNurEineRechnung() {
+        // Regression: Zuvor entstand je gewaehlter Ladestation eine Rechnung - und weil die
+        // Positionen ALLER Einheiten des Mieters gesammelt werden, trug jede davon saemtliche
+        // Zeilen. Der Nutzer waere doppelt belastet worden (Specs/Ladestationen.md: "genau eine
+        // Rechnung").
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Einheit erste = ladestation();
+        Einheit zweite = ladestationZwei();
+        Mieter nutzer = mieter(52L, "Nutzer mit zwei Ladestationen");
+        Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
+
+        when(einheitRepository.findById(900L)).thenReturn(Optional.of(erste));
+        when(einheitRepository.findById(901L)).thenReturn(Optional.of(zweite));
+        when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(List.of(nutzer));
+        when(mieterService.getMieterForQuartal(eq(901L), any(), any())).thenReturn(List.of(nutzer));
+        // Beide Ladestationen gehoeren demselben Mieter, eine Wohnung hat er nicht
+        when(mieterService.getEinheitIds(52L)).thenReturn(List.of(900L, 901L));
+        when(tarifpositionService.getFuerRechnung(eq(List.of(900L, 901L)), any(), any()))
+            .thenReturn(List.of(
+                tarifposition(ladestrom, erste, 2024, 1, "100.000"),
+                tarifposition(ladestrom, zweite, 2024, 1, "50.000")));
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(900L, 901L), von, bis);
+
+        // Genau EINE Rechnung - und darauf beide Ladestrom-Zeilen
+        assertEquals(1, rechnungen.size());
+        RechnungDTO rechnung = rechnungen.get(0);
+        assertEquals(52L, rechnung.getMieterId());
+        assertEquals(2, rechnung.getTarifZeilen().size());
+        // 100 kWh + 50 kWh zu 0.35 = 52.50
+        assertEquals(52.50, rechnung.getTotalBetrag(), 0.001);
+    }
+
+    @Test
+    void berechneRechnungen_LadestationOhneWohnung_ErzeugtEigeneRechnung() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Einheit ladestation = ladestation();
+        Mieter nutzer = mieter(50L, "Nutzer ohne Wohnung");
+        Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
+
+        when(einheitRepository.findById(900L)).thenReturn(Optional.of(ladestation));
+        when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(List.of(nutzer));
+        // Nur die Ladestation ist zugeordnet -> keine Wohnung
+        when(mieterService.getEinheitIds(50L)).thenReturn(List.of(900L));
+        when(tarifpositionService.getFuerRechnung(eq(List.of(900L)), eq(von), eq(bis)))
+            .thenReturn(List.of(tarifposition(ladestrom, ladestation, 2024, 1, "120.000")));
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(900L), von, bis);
+
+        assertEquals(1, rechnungen.size());
+        RechnungDTO rechnung = rechnungen.get(0);
+        assertEquals(900L, rechnung.getEinheitId());
+        assertEquals("Ladestation", rechnung.getEinheitName());
+        assertEquals("RFID-900", rechnung.getMesspunkt());
+        assertEquals(50L, rechnung.getMieterId());
+        assertEquals("Nutzer ohne Wohnung", rechnung.getMieterName());
+        assertEquals("Ladeweg 7", rechnung.getMieterStrasse());
+        assertEquals("3000 Bern", rechnung.getMieterPlzOrt());
+        assertEquals(von, rechnung.getVon());
+        assertEquals(bis, rechnung.getBis());
+
+        assertEquals(1, rechnung.getTarifZeilen().size());
+        TarifZeileDTO zeile = rechnung.getTarifZeilen().get(0);
+        assertEquals(TarifTyp.LADESTROM, zeile.getTyp());
+        assertEquals(120.0, zeile.getMenge(), 0.001);
+        assertEquals(42.0, zeile.getBetrag(), 0.01);
+        assertEquals(42.0, rechnung.getTotalBetrag(), 0.01);
+        assertEquals(42.0, rechnung.getEndBetrag(), 0.01);
+    }
+
+    @Test
+    void berechneRechnungen_LadestationOhneWohnung_HatKeineZevVnbUndGrundgebuehrZeilen() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Einheit ladestation = ladestation();
+        Mieter nutzer = mieter(50L, "Nutzer ohne Wohnung");
+        Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
+
+        when(einheitRepository.findById(900L)).thenReturn(Optional.of(ladestation));
+        when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(List.of(nutzer));
+        when(mieterService.getEinheitIds(50L)).thenReturn(List.of(900L));
+        when(tarifpositionService.getFuerRechnung(anyCollection(), eq(von), eq(bis)))
+            .thenReturn(List.of(tarifposition(ladestrom, ladestation, 2024, 1, "10.000")));
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(900L), von, bis);
+
+        // Ladestationen haben keine Messwerte (kein ZEV/VNB) und tragen keine Grundgebuehr
+        assertTrue(rechnungen.get(0).getTarifZeilen().stream()
+            .allMatch(z -> z.getTyp() == TarifTyp.LADESTROM));
+        verify(tarifService, never()).getTarifeForZeitraum(any(), any(), any());
+        verify(messwerteRepository, never()).sumZevCalculatedByEinheitAndZeitBetween(any(), any(), any());
+        verify(messwerteRepository, never()).sumTotalByEinheitAndZeitBetween(any(), any(), any());
+        // Ohne CONSUMER-Einheit im Lauf entfaellt die Tarifabdeckungspruefung
+        verify(tarifService, never()).validateTarifAbdeckung(any(), any());
+    }
+
+    @Test
+    void berechneRechnungen_LadestationMitWohnung_ErzeugtKeineEigeneRechnung() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Einheit ladestation = ladestation();
+        Mieter mitWohnung = mieter(51L, "Mieter mit Wohnung");
+
+        when(einheitRepository.findById(900L)).thenReturn(Optional.of(ladestation));
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumer));
+        when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(List.of(mitWohnung));
+        // Wohnung + Ladestation -> die Positionen erscheinen auf der Wohnungsrechnung
+        when(mieterService.getEinheitIds(51L)).thenReturn(List.of(1L, 900L));
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(900L), von, bis);
+
+        assertTrue(rechnungen.isEmpty());
+        verify(tarifpositionService, never()).getFuerRechnung(any(), any(), any());
+    }
+
+    @Test
+    void berechneRechnungen_WohnungUndLadestationAusgewaehlt_ErzeugtGenauEineRechnung() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Einheit ladestation = ladestation();
+        Mieter mitWohnung = mieter(51L, "Mieter mit Wohnung");
+        Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
+
+        doNothing().when(tarifService).validateTarifAbdeckung(von, bis);
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumer));
+        when(einheitRepository.findById(900L)).thenReturn(Optional.of(ladestation));
+        when(mieterService.getMieterForQuartal(eq(1L), any(), any())).thenReturn(List.of(mitWohnung));
+        when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(List.of(mitWohnung));
+        when(mieterService.getEinheitIds(51L)).thenReturn(List.of(1L, 900L));
+        when(tarifService.getTarifeForZeitraum(eq(TarifTyp.ZEV), any(), any()))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(tarifService.getTarifeForZeitraum(eq(TarifTyp.VNB), any(), any()))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+        when(tarifService.getTarifeForZeitraum(eq(TarifTyp.GRUNDGEBUEHR), any(), any()))
+            .thenReturn(Collections.emptyList());
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(150.0);
+        when(tarifpositionService.getFuerRechnung(anyCollection(), any(), any()))
+            .thenReturn(List.of(tarifposition(ladestrom, ladestation, 2024, 1, "100.000")));
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(1L, 900L), von, bis);
+
+        // Genau EINE Rechnung - die der Wohnung, mit der Ladestrom-Zeile darauf
+        assertEquals(1, rechnungen.size());
+        assertEquals("Wohnung A", rechnungen.get(0).getEinheitName());
+        assertEquals(1, rechnungen.get(0).getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.LADESTROM).count());
+    }
+
+    @Test
+    void berechneRechnungen_LadestationOhnePositionen_ErzeugtKeineRechnung() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Mieter nutzer = mieter(50L, "Nutzer ohne Wohnung");
+
+        when(einheitRepository.findById(900L)).thenReturn(Optional.of(ladestation()));
+        when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(List.of(nutzer));
+        when(mieterService.getEinheitIds(50L)).thenReturn(List.of(900L));
+        when(tarifpositionService.getFuerRechnung(anyCollection(), any(), any()))
+            .thenReturn(Collections.emptyList());
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(900L), von, bis);
+
+        // Keine leere Rechnung ohne Zeilen (Specs/Ladestationen.md §5)
+        assertTrue(rechnungen.isEmpty());
+    }
+
+    @Test
+    void berechneRechnungen_LadestationOhneMieter_ErzeugtKeineRechnung() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        when(einheitRepository.findById(900L)).thenReturn(Optional.of(ladestation()));
+        when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(Collections.emptyList());
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(900L), von, bis);
+
+        // Positionen sind erfassbar, erscheinen aber auf keiner Rechnung
+        assertTrue(rechnungen.isEmpty());
+        verify(tarifpositionService, never()).getFuerRechnung(any(), any(), any());
+    }
+
+    @Test
+    void berechneRechnungen_LadestationMietendeImZeitraum_KuerztDenEffektivenZeitraum() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Einheit ladestation = ladestation();
+        Mieter nutzer = mieter(50L, "Nutzer ohne Wohnung");
+        nutzer.setMietbeginn(LocalDate.of(2024, 2, 1));
+        nutzer.setMietende(LocalDate.of(2024, 2, 29));
+        Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
+
+        when(einheitRepository.findById(900L)).thenReturn(Optional.of(ladestation));
+        when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(List.of(nutzer));
+        when(mieterService.getEinheitIds(50L)).thenReturn(List.of(900L));
+        when(tarifpositionService.getFuerRechnung(anyCollection(), any(), any()))
+            .thenReturn(List.of(tarifposition(ladestrom, ladestation, 2024, 1, "10.000")));
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(900L), von, bis);
+
+        assertEquals(1, rechnungen.size());
+        assertEquals(LocalDate.of(2024, 2, 1), rechnungen.get(0).getVon());
+        assertEquals(LocalDate.of(2024, 2, 29), rechnungen.get(0).getBis());
+        // Die Position wird trotz Teilzeitraum aufgenommen (Ueberschneidungsregel)
+        verify(tarifpositionService).getFuerRechnung(anyCollection(),
+            eq(LocalDate.of(2024, 2, 1)), eq(LocalDate.of(2024, 2, 29)));
+        // Die Quartalsgrenzen bleiben die Zeilengrenzen
+        assertEquals(LocalDate.of(2024, 1, 1), rechnungen.get(0).getTarifZeilen().get(0).getVon());
+        assertEquals(LocalDate.of(2024, 3, 31), rechnungen.get(0).getTarifZeilen().get(0).getBis());
+    }
+
+    @Test
+    void berechneRechnungen_LadestationRechnung_RundetAuf5Rappen() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Einheit ladestation = ladestation();
+        Mieter nutzer = mieter(50L, "Nutzer ohne Wohnung");
+        Tarif ladestrom = ladestromTarif("Ladestrom", "0.33000");
+
+        when(einheitRepository.findById(900L)).thenReturn(Optional.of(ladestation));
+        when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(List.of(nutzer));
+        when(mieterService.getEinheitIds(50L)).thenReturn(List.of(900L));
+        when(tarifpositionService.getFuerRechnung(anyCollection(), any(), any()))
+            .thenReturn(List.of(tarifposition(ladestrom, ladestation, 2024, 1, "7.000")));
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(900L), von, bis);
+
+        // 7 * 0.33 = 2.31 -> 2.30
+        assertEquals(2.31, rechnungen.get(0).getTotalBetrag(), 0.001);
+        assertEquals(2.30, rechnungen.get(0).getEndBetrag(), 0.001);
+        assertEquals(-0.01, rechnungen.get(0).getRundung(), 0.001);
+    }
+
+    @Test
+    void berechneRechnungen_LadestationRechnung_EnthaeltStellerUndZahlungsfrist() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Einheit ladestation = ladestation();
+        Mieter nutzer = mieter(50L, "Nutzer ohne Wohnung");
+        Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
+
+        when(einheitRepository.findById(900L)).thenReturn(Optional.of(ladestation));
+        when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(List.of(nutzer));
+        when(mieterService.getEinheitIds(50L)).thenReturn(List.of(900L));
+        when(tarifpositionService.getFuerRechnung(anyCollection(), any(), any()))
+            .thenReturn(List.of(tarifposition(ladestrom, ladestation, 2024, 1, "10.000")));
+
+        RechnungDTO rechnung = rechnungService.berechneRechnungen(List.of(900L), von, bis).get(0);
+
+        assertEquals("30 Tage", rechnung.getZahlungsfrist());
+        assertEquals("CH12 3456 7890 1234", rechnung.getIban());
+        assertEquals("Test AG", rechnung.getStellerName());
+        assertEquals("Teststrasse 1", rechnung.getStellerStrasse());
+        assertEquals("3000 Bern", rechnung.getStellerPlzOrt());
+        assertEquals(LocalDate.now(), rechnung.getErstellungsdatum());
+    }
+
+    @Test
+    void berechneRechnungen_MieterMitZweiLadestationen_BeidePositionenAlsEigeneZeile() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Mieter mitWohnung = mieter(51L, "Mieter mit zwei Ladestationen");
+        Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
+
+        Tarifposition ersteStation = tarifposition(ladestrom, ladestation(), 2024, 1, "100.000");
+        ersteStation.setQuellReferenz("RFID-900");
+        Tarifposition zweiteStation = tarifposition(ladestrom, ladestationZwei(), 2024, 1, "200.000");
+        zweiteStation.setQuellReferenz("RFID-901");
+
+        doNothing().when(tarifService).validateTarifAbdeckung(von, bis);
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumer));
+        when(mieterService.getMieterForQuartal(eq(1L), any(), any())).thenReturn(List.of(mitWohnung));
+        when(mieterService.getEinheitIds(51L)).thenReturn(List.of(1L, 900L, 901L));
+        when(tarifService.getTarifeForZeitraum(eq(TarifTyp.ZEV), any(), any()))
+            .thenReturn(Collections.singletonList(zevTarif2024));
+        when(tarifService.getTarifeForZeitraum(eq(TarifTyp.VNB), any(), any()))
+            .thenReturn(Collections.singletonList(vnbTarif2024));
+        when(tarifService.getTarifeForZeitraum(eq(TarifTyp.GRUNDGEBUEHR), any(), any()))
+            .thenReturn(Collections.emptyList());
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(any(), any(), any()))
+            .thenReturn(150.0);
+        // Die Rechnung fragt die Positionen ALLER Einheiten des Mieters ab
+        when(tarifpositionService.getFuerRechnung(eq(List.of(1L, 900L, 901L)), any(), any()))
+            .thenReturn(List.of(ersteStation, zweiteStation));
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(1L), von, bis);
+
+        assertEquals(1, rechnungen.size());
+        List<TarifZeileDTO> ladestromZeilen = rechnungen.get(0).getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.LADESTROM)
+            .toList();
+
+        assertEquals(2, ladestromZeilen.size());
+        assertEquals("Ladestrom (RFID-900)", ladestromZeilen.get(0).getBezeichnung());
+        assertEquals("Ladestrom (RFID-901)", ladestromZeilen.get(1).getBezeichnung());
+        assertEquals(100.0, ladestromZeilen.get(0).getMenge(), 0.001);
+        assertEquals(200.0, ladestromZeilen.get(1).getMenge(), 0.001);
+        // ZEV 20.00 + VNB 17.00 + 35.00 + 70.00
+        assertEquals(142.0, rechnungen.get(0).getTotalBetrag(), 0.01);
+    }
+
+    @Test
+    void berechneRechnungen_BilanzTypen_ErzeugenKeineRechnung() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Einheit bezug = new Einheit("Netzanschluss Bezug", EinheitTyp.BEZUG);
+        bezug.setId(10L);
+        Einheit ruecklieferung = new Einheit("Netzanschluss Ruecklieferung", EinheitTyp.RUECKLIEFERUNG);
+        ruecklieferung.setId(11L);
+
+        when(einheitRepository.findById(10L)).thenReturn(Optional.of(bezug));
+        when(einheitRepository.findById(11L)).thenReturn(Optional.of(ruecklieferung));
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(10L, 11L), von, bis);
+
+        assertTrue(rechnungen.isEmpty());
+        verify(mieterService, never()).getMieterForQuartal(any(), any(), any());
+        verify(tarifpositionService, never()).getFuerRechnung(any(), any(), any());
+    }
+
+    @Test
+    void berechneRechnungen_UnbekannteEinheitId_WirdUebersprungen() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        when(einheitRepository.findById(999L)).thenReturn(Optional.empty());
+
+        List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(999L), von, bis);
+
+        assertTrue(rechnungen.isEmpty());
+        verify(tarifService, never()).validateTarifAbdeckung(any(), any());
+    }
 }

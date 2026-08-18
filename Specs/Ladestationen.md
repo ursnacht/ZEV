@@ -27,7 +27,7 @@
 | **Mieter zu Einheiten: 1:n** | Ein Mieter kann **mehreren** Einheiten zugeordnet sein (Wohnung + Ladestation(en)), damit alles auf **einer** Rechnung erscheint. |
 | **Nutzer ohne Wohnung** | Wird als Mieter-Datensatz geführt, dem **nur** eine `LADESTATION`-Einheit zugeordnet ist. Mietbeginn/Mietende sind dann der Nutzungszeitraum. |
 | **Quell-Referenz** | Wird beim Erfassen aus dem `messpunkt` der gewählten Einheit vorbelegt und bleibt änderbar. |
-| **Rechnungsfähigkeit** | Eine `LADESTATION`-Einheit erzeugt **nur dann** eine eigene Rechnung, wenn ihrem Mieter **keine** `CONSUMER`-Einheit zugeordnet ist (Nutzer ohne Wohnung). Hat der Mieter eine Wohnung, erscheinen seine Ladestrom-Positionen auf **deren** Rechnung — sonst erhielte er zwei Rechnungen mit derselben Zeile. |
+| **Rechnungsfähigkeit** | Eine `LADESTATION`-Einheit erzeugt **nur dann** eine eigene Rechnung, wenn ihrem Mieter **keine** `CONSUMER`-Einheit zugeordnet ist (Nutzer ohne Wohnung). Hat der Mieter eine Wohnung, erscheinen seine Ladestrom-Positionen auf **deren** Rechnung — sonst erhielte er zwei Rechnungen mit derselben Zeile. Je Mieter entsteht **höchstens eine** Ladestations-Rechnung, auch wenn mehrere seiner Ladestationen für den Lauf gewählt sind. |
 | **Keine Sonderbehandlung in der Verteilung** | `LADESTATION`-Einheiten nehmen **nicht** an der Solarverteilung teil, solange ihre Mengen aus dem Lademanagement stammen und nicht als Messwerte erfasst werden (§8). |
 
 ## 2. Funktionale Anforderungen (FR) - Was soll das System tun?
@@ -100,7 +100,7 @@
 ### Rechnung
 * [ ] Eine Rechnung für Mieter M enthält die Positionen **aller** M zugeordneten Einheiten, deren Quartal sich mit dem Zeitraum überschneidet und deren Menge > 0 ist.
 * [ ] **Mieterwechsel im Quartal:** Alter Mieter (alte RFID-Einheit) und neuer Mieter (neue RFID-Einheit) haben je eine Q1-Position → jeder erhält **ausschliesslich seine eigene** Position, obwohl beide Rechnungen Q1 überschneiden.
-* [ ] Ein Mieter mit zwei Ladestations-Einheiten erhält **beide** Positionen als je eigene Zeile.
+* [ ] Ein Mieter mit zwei Ladestations-Einheiten erhält **beide** Positionen als je eigene Zeile — auf **einer** Rechnung, auch wenn beide Einheiten für den Lauf ausgewählt sind.
 * [ ] Ein Nutzer ohne Wohnung erhält eine Rechnung, die ausschliesslich seine Ladestrom-Zeile(n) enthält.
 * [ ] Rechnungen von Einheiten ohne Ladestations-Zuordnung sind **unverändert** zu vorher.
 * [ ] Für einen Mieter mit Wohnung **und** Ladestation entsteht **eine** Rechnung (die der Wohnung) — auch wenn beide Einheiten für den Lauf ausgewählt sind.

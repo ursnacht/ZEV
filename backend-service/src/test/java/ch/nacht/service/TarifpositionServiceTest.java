@@ -601,4 +601,97 @@ public class TarifpositionServiceTest {
 
         assertEquals(0L, tarifpositionService.countByTarif(99L));
     }
+
+    // ==================== Typpruefung LADESTATION (Specs/Ladestationen.md FR-1.3) ====================
+    // Positionen haengen ausschliesslich an Ladestations-Einheiten. Die Pruefung im Service ist
+    // die einzige Absicherung: die DB kennt nur den FK auf `einheit`, nicht deren Typ.
+
+    /** Einheit des angegebenen Typs, wie sie das Repository zurueckgibt. */
+    private Einheit einheitVomTyp(Long id, String name, EinheitTyp typ) {
+        Einheit einheit = new Einheit(name, typ);
+        einheit.setId(id);
+        einheit.setOrgId(testOrgId);
+        return einheit;
+    }
+
+    private void assertTypAbgewiesen(EinheitTyp typ) {
+        Einheit einheit = einheitVomTyp(50L, "Andere Einheit", typ);
+        Tarifposition neu = new Tarifposition(einheit, ladestromTarif, 2026, 1, new BigDecimal("10.000"));
+        when(einheitRepository.findById(50L)).thenReturn(Optional.of(einheit));
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> tarifpositionService.saveTarifposition(neu)
+        );
+
+        assertThat(exception.getMessage(), containsString("nur für Einheiten vom Typ Ladestation"));
+        verify(tarifpositionRepository, never()).save(any());
+        // Der Tarif wird nicht mehr aufgeloest - die Einheit scheitert zuerst
+        verify(tarifRepository, never()).findById(any());
+    }
+
+    @Test
+    void saveTarifposition_EinheitVomTypConsumer_ThrowsException() {
+        assertTypAbgewiesen(EinheitTyp.CONSUMER);
+    }
+
+    @Test
+    void saveTarifposition_EinheitVomTypProducer_ThrowsException() {
+        assertTypAbgewiesen(EinheitTyp.PRODUCER);
+    }
+
+    @Test
+    void saveTarifposition_EinheitVomTypBezug_ThrowsException() {
+        assertTypAbgewiesen(EinheitTyp.BEZUG);
+    }
+
+    @Test
+    void saveTarifposition_EinheitVomTypRuecklieferung_ThrowsException() {
+        assertTypAbgewiesen(EinheitTyp.RUECKLIEFERUNG);
+    }
+
+    @Test
+    void saveTarifposition_EinheitOhneId_ThrowsException() {
+        // Referenz ohne ID ist keine Referenz - sonst wuerde findById(null) durchgereicht
+        Einheit ohneId = new Einheit("Ladestation ohne ID", EinheitTyp.LADESTATION);
+        Tarifposition neu = new Tarifposition(ohneId, ladestromTarif, 2026, 1, new BigDecimal("10.000"));
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> tarifpositionService.saveTarifposition(neu)
+        );
+
+        assertThat(exception.getMessage(), containsString("Einheit ist erforderlich"));
+        verify(einheitRepository, never()).findById(any());
+    }
+
+    // ==================== getFuerRechnung: mehrere Einheiten eines Mieters ====================
+
+    @Test
+    void getFuerRechnung_ZweiLadestationenDesselbenMieters_FragtBeideAb() {
+        // Mieter mit zwei Ladestationen: beide Positionen landen auf derselben Rechnung
+        LocalDate von = LocalDate.of(2026, 1, 1);
+        LocalDate bis = LocalDate.of(2026, 3, 31);
+        Tarifposition zweite = new Tarifposition(testEinheit, ladestromTarif, 2026, 1, new BigDecimal("50.000"));
+        when(tarifpositionRepository.findByEinheitIdsAndQuartalOverlapping(
+                List.of(1L, 2L), 2026, 1, 2026, 1))
+                .thenReturn(List.of(testPosition1, zweite));
+
+        List<Tarifposition> result = tarifpositionService.getFuerRechnung(List.of(1L, 2L), von, bis);
+
+        assertEquals(2, result.size());
+        verify(tarifpositionRepository).findByEinheitIdsAndQuartalOverlapping(
+                List.of(1L, 2L), 2026, 1, 2026, 1);
+    }
+
+    @Test
+    void getFuerRechnung_KeineEinheiten_ReturnsEmptyWithoutQuery() {
+        // Mieter ohne Zuordnung: `IN ()` waere ungueltiges SQL - der Service faengt das ab
+        List<Tarifposition> result = tarifpositionService.getFuerRechnung(
+                List.of(), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertTrue(result.isEmpty());
+        verify(tarifpositionRepository, never()).findByEinheitIdsAndQuartalOverlapping(
+                any(), anyInt(), anyInt(), anyInt(), anyInt());
+    }
 }

@@ -6,6 +6,7 @@ import ch.nacht.exception.TarifLuecke;
 import ch.nacht.exception.TarifLueckePeriode;
 import ch.nacht.exception.TarifLueckenException;
 import ch.nacht.repository.TarifRepository;
+import ch.nacht.repository.TarifpositionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -28,13 +29,16 @@ public class TarifService {
     private static final Logger log = LoggerFactory.getLogger(TarifService.class);
 
     private final TarifRepository tarifRepository;
+    private final TarifpositionRepository tarifpositionRepository;
     private final OrganizationContextService organizationContextService;
     private final HibernateFilterService hibernateFilterService;
 
     public TarifService(TarifRepository tarifRepository,
+                        TarifpositionRepository tarifpositionRepository,
                         OrganizationContextService organizationContextService,
                         HibernateFilterService hibernateFilterService) {
         this.tarifRepository = tarifRepository;
+        this.tarifpositionRepository = tarifpositionRepository;
         this.organizationContextService = organizationContextService;
         this.hibernateFilterService = hibernateFilterService;
     }
@@ -110,6 +114,13 @@ public class TarifService {
     public boolean deleteTarif(Long id) {
         hibernateFilterService.enableOrgFilter();
         if (tarifRepository.existsById(id)) {
+            // Der FK steht auf ON DELETE RESTRICT und wuerde das Loeschen ebenfalls abweisen -
+            // aber als DataIntegrityViolationException ohne Anzahl (Specs/Ladestromtarif.md, §5).
+            long positionen = tarifpositionRepository.countByTarifId(id);
+            if (positionen > 0) {
+                throw new IllegalStateException(
+                        "Tarif kann nicht gelöscht werden: " + positionen + " Tarifposition(en) verweisen darauf");
+            }
             tarifRepository.deleteById(id);
             log.info("Deleted tariff with ID: {}", id);
             return true;

@@ -4,6 +4,7 @@ import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
 import ch.nacht.exception.TarifLueckenException;
 import ch.nacht.repository.TarifRepository;
+import ch.nacht.repository.TarifpositionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +32,9 @@ public class TarifServiceTest {
 
     @Mock
     private TarifRepository tarifRepository;
+
+    @Mock
+    private TarifpositionRepository tarifpositionRepository;
 
     @Mock
     private OrganizationContextService organizationContextService;
@@ -178,8 +182,23 @@ public class TarifServiceTest {
     }
 
     @Test
+    void deleteTarif_MitTarifpositionen_ThrowsException() {
+        // Der FK (ON DELETE RESTRICT) weist das Loeschen ebenfalls ab - aber ohne die von der
+        // Spec geforderte Anzahl (Specs/Ladestromtarif.md, Edge Cases).
+        when(tarifRepository.existsById(1L)).thenReturn(true);
+        when(tarifpositionRepository.countByTarifId(1L)).thenReturn(3L);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> tarifService.deleteTarif(1L));
+
+        assertTrue(ex.getMessage().contains("3"), "Die Meldung nennt die Anzahl der Positionen");
+        verify(tarifRepository, never()).deleteById(any());
+    }
+
+    @Test
     void deleteTarif_Exists_ReturnsTrue() {
         when(tarifRepository.existsById(1L)).thenReturn(true);
+        when(tarifpositionRepository.countByTarifId(1L)).thenReturn(0L);
         doNothing().when(tarifRepository).deleteById(1L);
 
         boolean result = tarifService.deleteTarif(1L);
