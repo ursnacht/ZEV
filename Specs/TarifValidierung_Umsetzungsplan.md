@@ -8,7 +8,7 @@ Es werden zwei Buttons "Quartale validieren" und "Jahre validieren" zur Tarifver
 ### Backend (Änderungen)
 | Datei | Änderung |
 |-------|----------|
-| `TarifController.java` | Neuer Endpunkt `POST /api/tarife/validate` |
+| `TarifController.java` | Neuer Endpunkt `GET /api/tarife/validate` (urspruenglich `POST`, siehe Hinweis unten) |
 | `TarifService.java` | Neue Methode `validateQuartale()` und `validateJahre()` |
 
 ### Frontend (Änderungen)
@@ -31,7 +31,7 @@ Es werden zwei Buttons "Quartale validieren" und "Jahre validieren" zur Tarifver
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
 | [x] | 1. Backend-Service | Neue Methoden `validateQuartale()` und `validateJahre()` im TarifService |
-| [x] | 2. Backend-Controller | Neuer Endpunkt `POST /api/tarife/validate?modus=quartale\|jahre` |
+| [x] | 2. Backend-Controller | Neuer Endpunkt `GET /api/tarife/validate?modus=quartale\|jahre` |
 | [x] | 3. Frontend-Service | Neue Methoden im TarifService für API-Calls |
 | [x] | 4. Frontend-Component | Buttons und Fehleranzeige-Logik in TarifListComponent |
 | [x] | 5. Frontend-Template | Buttons im HTML hinzufügen (bestehende Design-System-Klassen) |
@@ -56,9 +56,21 @@ Es werden zwei Buttons "Quartale validieren" und "Jahre validieren" zur Tarifver
 
 ### Request
 ```
-POST /api/tarife/validate?modus=quartale
-POST /api/tarife/validate?modus=jahre
+GET /api/tarife/validate?modus=quartale
+GET /api/tarife/validate?modus=jahre
 ```
+
+> **Nachtrag 18.08.2026 — von `POST` auf `GET` gewechselt.** Der Aufruf liest nur, `GET` ist
+> die passende Methode. Ausschlaggebend war ein Fehler, der sich nur im Browser zeigte: Angular
+> schickte beim `POST` einen Rumpf-Body (`{}`), den der Controller mangels `@RequestBody` nie
+> las. Über den Reverse-Proxy blieb die Verbindung danach unbrauchbar — Caddy protokollierte
+> „aborting with incomplete response … use of closed network connection", der Browser meldete
+> `ERR_INCOMPLETE_CHUNKED_ENCODING`, und die Oberfläche zeigte statt der Lücken-Liste die
+> generische Meldung „Fehler bei der Validierung". Messung: mit Body 7 von 15 Aufrufen
+> fehlgeschlagen, **ohne** Body 15 von 15 erfolgreich; direkt am Backend (ohne Proxy) und mit
+> `curl` war der Fehler nicht reproduzierbar. Ein `GET` hat keinen Body und ist deshalb nicht
+> betroffen. Die Antwort trägt bereits `Cache-Control: no-cache, no-store`, Zwischenspeicherung
+> ist also kein Thema.
 
 ### Response (Erfolg)
 ```json

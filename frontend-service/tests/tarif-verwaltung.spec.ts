@@ -196,13 +196,9 @@ async function deleteTarifByName(page: Page, name: string): Promise<void> {
  */
 async function runValidation(page: Page, modus: 'quartale' | 'jahre'): Promise<{ valid: boolean }> {
     const muster = modus === 'jahre' ? /jahr/i : /quartal/i;
-    // Kurz warten, bis die Seite steht: Wird direkt nach dem Laden geklickt, bricht der Aufruf
-    // in Chromium gelegentlich ab - der Server antwortet dann mit 200, im UI erscheint aber der
-    // generische Uebertragungsfehler.
-    await page.waitForTimeout(1000);
     const [response] = await Promise.all([
         page.waitForResponse(
-            r => r.url().includes('/api/tarife/validate') && r.request().method() === 'POST',
+            r => r.url().includes('/api/tarife/validate') && r.request().method() === 'GET',
             { timeout: 20000 }),
         page.locator('.zev-button-row button.zev-button--secondary').filter({ hasText: muster }).click()
     ]);
@@ -215,13 +211,10 @@ async function runValidation(page: Page, modus: 'quartale' | 'jahre'): Promise<{
 
     const valid = await success.isVisible().catch(() => false);
     if (!valid) {
-        // BEKANNTER BEFUND (Stand 18.08.2026): Schlaegt die folgende Zusicherung fehl, obwohl der
-        // Server oben mit 200 geantwortet hat, bricht die Antwort auf der Leitung ab -
-        // `net::ERR_INCOMPLETE_CHUNKED_ENCODING` auf /api/tarife/validate. Chromium verwirft die
-        // Antwort dann, Angular landet im error-Zweig und zeigt FEHLER_VALIDIERUNG statt der
-        // Luecken-Liste; Firefox toleriert es. Reproduzierbar in etwa 3 von 5 Aufrufen.
-        // Nicht erneut als Testproblem diagnostizieren - die Ursache liegt in der Auslieferung
-        // der Antwort (Backend/Reverse-Proxy).
+        // Bleibt die Liste leer, steht dort der generische Uebertragungsfehler
+        // (FEHLER_VALIDIERUNG) - und der passt nicht zu einer Antwort mit Status 200. Genau so
+        // fiel der frueher als POST gefuehrte Endpunkt auf: Der ungelesene Request-Body machte
+        // die Proxy-Verbindung unbrauchbar (siehe TarifController.validateTarife).
         // Die Meldung zu Luecken nennt jede Periode einzeln. Bleibt die Liste leer, steht dort
         // der generische Uebertragungsfehler (FEHLER_VALIDIERUNG) - und der passt nicht zu einer
         // Antwort mit Status 200. Der Response-Body wird bewusst nicht gelesen: Navigiert die

@@ -244,7 +244,7 @@ public class TarifControllerTest {
         TarifService.ValidationResult validResult = new TarifService.ValidationResult(true, Collections.emptyList());
         when(tarifService.validateQuartale()).thenReturn(validResult);
 
-        mockMvc.perform(post("/api/tarife/validate?modus=quartale"))
+        mockMvc.perform(get("/api/tarife/validate?modus=quartale"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.valid", is(true)))
             .andExpect(jsonPath("$.luecken", hasSize(0)));
@@ -258,7 +258,7 @@ public class TarifControllerTest {
         TarifService.ValidationResult validResult = new TarifService.ValidationResult(true, Collections.emptyList());
         when(tarifService.validateJahre()).thenReturn(validResult);
 
-        mockMvc.perform(post("/api/tarife/validate?modus=jahre"))
+        mockMvc.perform(get("/api/tarife/validate?modus=jahre"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.valid", is(true)))
             .andExpect(jsonPath("$.luecken", hasSize(0)));
@@ -272,7 +272,7 @@ public class TarifControllerTest {
         TarifService.ValidationResult validResult = new TarifService.ValidationResult(true, Collections.emptyList());
         when(tarifService.validateQuartale()).thenReturn(validResult);
 
-        mockMvc.perform(post("/api/tarife/validate"))
+        mockMvc.perform(get("/api/tarife/validate"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.valid", is(true)));
 
@@ -290,7 +290,7 @@ public class TarifControllerTest {
         );
         when(tarifService.validateQuartale()).thenReturn(invalidResult);
 
-        mockMvc.perform(post("/api/tarife/validate?modus=quartale"))
+        mockMvc.perform(get("/api/tarife/validate?modus=quartale"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.valid", is(false)))
             .andExpect(jsonPath("$.luecken", hasSize(2)))
@@ -306,7 +306,7 @@ public class TarifControllerTest {
         TarifService.ValidationResult noTarifeResult = new TarifService.ValidationResult(true, Collections.emptyList());
         when(tarifService.validateJahre()).thenReturn(noTarifeResult);
 
-        mockMvc.perform(post("/api/tarife/validate?modus=jahre"))
+        mockMvc.perform(get("/api/tarife/validate?modus=jahre"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.valid", is(true)))
             .andExpect(jsonPath("$.luecken", hasSize(0)));

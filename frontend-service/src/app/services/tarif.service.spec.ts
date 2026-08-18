@@ -152,13 +152,16 @@ describe('TarifService', () => {
       luecken: [{ periode: 'Q1/2024', luecken: [{ tarifTyp: 'VNB', datum: '01.01.2024', weitere: false }] }]
     };
 
-    it('should call POST with modus=quartale', () => {
+    it('should call GET with modus=quartale', () => {
       service.validateQuartale().subscribe(result => {
         expect(result).toEqual(validResult);
       });
 
       const req = httpMock.expectOne(`${apiUrl}/validate?modus=quartale`);
-      expect(req.request.method).toBe('POST');
+      // GET, nicht POST: Der Aufruf liest nur, und ein Body brach ueber den Reverse-Proxy
+      // die Verbindung (siehe TarifController.validateTarife)
+      expect(req.request.method).toBe('GET');
+      expect(req.request.body).toBeNull();
       req.flush(validResult);
     });
 
@@ -188,13 +191,14 @@ describe('TarifService', () => {
       ]
     };
 
-    it('should call POST with modus=jahre', () => {
+    it('should call GET with modus=jahre', () => {
       service.validateJahre().subscribe(result => {
         expect(result).toEqual(validResult);
       });
 
       const req = httpMock.expectOne(`${apiUrl}/validate?modus=jahre`);
-      expect(req.request.method).toBe('POST');
+      expect(req.request.method).toBe('GET');
+      expect(req.request.body).toBeNull();
       req.flush(validResult);
     });
 

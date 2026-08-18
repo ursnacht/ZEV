@@ -32,11 +32,13 @@ export class TarifService {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
   }
 
+  // GET, nicht POST: Die Validierung liest nur. Der frühere POST schickte einen Body, den das
+  // Backend nie las - siehe TarifController.validateTarife.
   validateQuartale(): Observable<ValidationResult> {
-    return this.http.post<ValidationResult>(`${this.apiUrl}/validate?modus=quartale`, {});
+    return this.http.get<ValidationResult>(`${this.apiUrl}/validate?modus=quartale`);
   }
 
   validateJahre(): Observable<ValidationResult> {
-    return this.http.post<ValidationResult>(`${this.apiUrl}/validate?modus=jahre`, {});
+    return this.http.get<ValidationResult>(`${this.apiUrl}/validate?modus=jahre`);
   }
 }

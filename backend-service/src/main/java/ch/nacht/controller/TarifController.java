@@ -95,7 +95,18 @@ public class TarifController {
         }
     }
 
-    @PostMapping("/validate")
+    /**
+     * Prüft die Tarifabdeckung. Bewusst {@code GET}: Der Aufruf liest nur und verändert nichts.
+     *
+     * <p>Früher {@code POST} — das kostete einen schwer auffindbaren Fehler: Angular schickte
+     * dabei einen Rumpf-Body ({@code {}}), den diese Methode mangels {@code @RequestBody} nie
+     * las. Über den Reverse-Proxy blieb die Verbindung danach unbrauchbar; Caddy brach die
+     * Antwort mit „aborting with incomplete response" ab und der Browser meldete
+     * {@code ERR_INCOMPLETE_CHUNKED_ENCODING}. In der Oberfläche erschien statt der Lücken-Liste
+     * die generische Meldung „Fehler bei der Validierung", reproduzierbar in etwa der Hälfte
+     * aller Aufrufe. Ein GET hat keinen Body und kann so nicht mehr betroffen sein.</p>
+     */
+    @GetMapping("/validate")
     public ResponseEntity<TarifService.ValidationResult> validateTarife(
             @RequestParam(defaultValue = "quartale") String modus) {
         log.info("Validating tarife with modus: {}", modus);
