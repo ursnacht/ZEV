@@ -7,10 +7,12 @@ import { TarifpositionListComponent } from './tarifposition-list.component';
 import { TarifpositionService } from '../../services/tarifposition.service';
 import { TarifService } from '../../services/tarif.service';
 import { EinheitService } from '../../services/einheit.service';
+import { MieterService } from '../../services/mieter.service';
 import { TranslationService } from '../../services/translation.service';
 import { Erfassungsart, Tarifposition } from '../../models/tarifposition.model';
 import { Tarif, TarifTyp } from '../../models/tarif.model';
 import { Einheit, EinheitTyp } from '../../models/einheit.model';
+import { Mieter } from '../../models/mieter.model';
 
 const HINWEIS_STORAGE_KEY = 'zev.tarifposition.hinweisAusgeblendet';
 
@@ -20,6 +22,7 @@ describe('TarifpositionListComponent', () => {
   let tarifpositionServiceSpy: SpyObj<TarifpositionService>;
   let tarifServiceSpy: SpyObj<TarifService>;
   let einheitServiceSpy: SpyObj<EinheitService>;
+  let mieterServiceSpy: SpyObj<MieterService>;
   let translationServiceSpy: SpyObj<TranslationService>;
 
   /** Query-Parameter der Route – je Test vor dem Erzeugen der Komponente setzbar. */
@@ -28,6 +31,11 @@ describe('TarifpositionListComponent', () => {
   const mockEinheiten: Einheit[] = [
     { id: 1, name: 'Zwahlen Ladestation', typ: EinheitTyp.LADESTATION, messpunkt: 'RFID-01' },
     { id: 2, name: 'Anders Ladestation', typ: EinheitTyp.LADESTATION, messpunkt: 'RFID-02' }
+  ];
+
+  /** Nur Einheit 1 hat einen Mieter – Einheit 2 dient als Ladestation ohne Zuordnung. */
+  const mockMieter: Mieter[] = [
+    { id: 5, name: 'Zwahlen', mietbeginn: '2020-01-01', einheitIds: [1] }
   ];
 
   const mockTarife: Tarif[] = [
@@ -74,6 +82,7 @@ describe('TarifpositionListComponent', () => {
     ]);
     tarifServiceSpy = createSpyObj<TarifService>('TarifService', ['getAllTarife']);
     einheitServiceSpy = createSpyObj<EinheitService>('EinheitService', ['getAllEinheiten']);
+    mieterServiceSpy = createSpyObj<MieterService>('MieterService', ['getAllMieter']);
     translationServiceSpy = createSpyObj<TranslationService>('TranslationService', ['translate']);
 
     tarifpositionServiceSpy.getByEinheit.mockImplementation(() => of(positionenKopie()));
@@ -82,6 +91,7 @@ describe('TarifpositionListComponent', () => {
     tarifpositionServiceSpy.deleteTarifposition.mockReturnValue(of(undefined));
     tarifServiceSpy.getAllTarife.mockReturnValue(of(mockTarife));
     einheitServiceSpy.getAllEinheiten.mockReturnValue(of(mockEinheiten));
+    mieterServiceSpy.getAllMieter.mockReturnValue(of(mockMieter));
     translationServiceSpy.translate.mockImplementation((key: string) => key);
 
     const routeStub = {
@@ -98,6 +108,7 @@ describe('TarifpositionListComponent', () => {
         { provide: TarifpositionService, useValue: tarifpositionServiceSpy },
         { provide: TarifService, useValue: tarifServiceSpy },
         { provide: EinheitService, useValue: einheitServiceSpy },
+        { provide: MieterService, useValue: mieterServiceSpy },
         { provide: TranslationService, useValue: translationServiceSpy },
         { provide: ActivatedRoute, useValue: routeStub }
       ]
@@ -235,6 +246,65 @@ describe('TarifpositionListComponent', () => {
       component.ladestationen = [{ id: 1, name: 'Ohne RFID', typ: EinheitTyp.LADESTATION }];
       component.selectedEinheitId = 1;
       expect(component.selectedEinheitMesspunkt).toBe('');
+    });
+  });
+
+  describe('einheitOhneMieter', () => {
+    // Specs/Ladestationen.md, Edge Case "Ladestations-Einheit ohne zugeordneten Mieter":
+    // Positionen sind erfassbar, erscheinen aber auf keiner Rechnung - die entsteht je Mieter.
+
+    it('should load the mieter assignments on init', () => {
+      expect(mieterServiceSpy.getAllMieter).toHaveBeenCalled();
+    });
+
+    it('should be false when no einheit is selected', () => {
+      component.selectedEinheitId = null;
+      expect(component.einheitOhneMieter).toBe(false);
+    });
+
+    it('should be false for an einheit with an assigned mieter', () => {
+      component.selectedEinheitId = 1;
+      expect(component.einheitOhneMieter).toBe(false);
+    });
+
+    it('should be true for an einheit without any assigned mieter', () => {
+      component.selectedEinheitId = 2;
+      expect(component.einheitOhneMieter).toBe(true);
+    });
+
+    it('should recognise an einheit assigned as second unit of a mieter', () => {
+      // Ein Mieter kann Wohnung UND Ladestation haben - die zweite Zuordnung zaehlt genauso
+      mieterServiceSpy.getAllMieter.mockReturnValue(of([
+        { id: 5, name: 'Zwahlen', mietbeginn: '2020-01-01', einheitIds: [9, 2] }
+      ]));
+      createComponent();
+      component.selectedEinheitId = 2;
+      expect(component.einheitOhneMieter).toBe(false);
+    });
+
+    it('should stay silent when the mieter could not be loaded', () => {
+      // Der Hinweis ist Zusatzinformation: lieber keiner als ein falscher
+      mieterServiceSpy.getAllMieter.mockReturnValue(throwError(() => new Error('403')));
+      createComponent();
+      component.selectedEinheitId = 2;
+      expect(component.einheitOhneMieter).toBe(false);
+      expect(component.message).toBe('');
+    });
+
+    it('should render the hint for an einheit without mieter', () => {
+      // Der Uebersetzungsschluessel existierte, wurde aber nirgends verwendet - deshalb
+      // hier gegen das gerenderte Template pruefen und nicht nur gegen den Getter.
+      component.selectedEinheitId = 2;
+      fixture.detectChanges();
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('TARIFPOSITION_EINHEIT_OHNE_MIETER_HINT');
+    });
+
+    it('should not render the hint for an einheit with mieter', () => {
+      component.selectedEinheitId = 1;
+      fixture.detectChanges();
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).not.toContain('TARIFPOSITION_EINHEIT_OHNE_MIETER_HINT');
     });
   });
 

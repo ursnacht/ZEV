@@ -37,6 +37,13 @@
   </div>
 
   @if (selectedEinheitId) {
+    <!-- Ohne Mieter gibt es keine Rechnung, auf der die Positionen erscheinen könnten -->
+    @if (einheitOhneMieter) {
+      <div class="zev-message zev-message--warning zev-message--statisch">
+        <span>{{ 'TARIFPOSITION_EINHEIT_OHNE_MIETER_HINT' | translate }}</span>
+      </div>
+    }
+
     @if (!showForm) {
       <div>
         <div class="zev-button-row">

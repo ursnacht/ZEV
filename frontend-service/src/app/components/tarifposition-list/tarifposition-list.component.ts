@@ -5,6 +5,7 @@ import { ActivatedRoute } from '@angular/router';
 import { TarifpositionService } from '../../services/tarifposition.service';
 import { TarifService } from '../../services/tarif.service';
 import { EinheitService } from '../../services/einheit.service';
+import { MieterService } from '../../services/mieter.service';
 import { TranslationService } from '../../services/translation.service';
 import { Tarifposition, Erfassungsart } from '../../models/tarifposition.model';
 import { Tarif, TarifTyp, MANUELL_ERFASSTE_TARIFTYPEN } from '../../models/tarif.model';
@@ -41,6 +42,11 @@ export class TarifpositionListComponent implements OnInit {
 
   ladestationen: Einheit[] = [];
   selectedEinheitId: number | null = null;
+  /**
+   * Einheiten, denen mindestens ein Mieter zugeordnet ist. `null` = noch nicht (oder nicht)
+   * ermittelbar; dann erscheint kein Hinweis, statt fälschlich „ohne Mieter" zu behaupten.
+   */
+  private einheitIdsMitMieter: Set<number> | null = null;
   positionen: Tarifposition[] = [];
   tarife: Tarif[] = [];
   selectedPosition: Tarifposition | null = null;
@@ -65,6 +71,7 @@ export class TarifpositionListComponent implements OnInit {
     private tarifpositionService: TarifpositionService,
     private tarifService: TarifService,
     private einheitService: EinheitService,
+    private mieterService: MieterService,
     private translationService: TranslationService,
     private route: ActivatedRoute
   ) { }
@@ -73,6 +80,7 @@ export class TarifpositionListComponent implements OnInit {
     this.hinweisSichtbar = !this.leseHinweisAusgeblendet();
     this.loadLadestationen();
     this.loadTarife();
+    this.loadMieterZuordnungen();
   }
 
   /**
@@ -121,6 +129,25 @@ export class TarifpositionListComponent implements OnInit {
         this.tarife = data.filter(t => MANUELL_ERFASSTE_TARIFTYPEN.includes(t.tariftyp as TarifTyp));
       },
       error: () => this.showMessage('FEHLER_LADEN_TARIFE', 'error')
+    });
+  }
+
+  /**
+   * Lädt die Einheiten-Zuordnungen aller Mieter für den Hinweis „Einheit ohne Mieter".
+   *
+   * Eigener Abruf statt eines Flags an der Einheit: Die Zuordnung liegt in `mieter_einheit`, und
+   * die Einheiten-API müsste sie sonst für jede Liste mitzählen. Ein Fehlschlag bleibt bewusst
+   * still — der Hinweis ist eine Zusatzinformation und darf die Erfassung weder blockieren noch
+   * mit einer Fehlermeldung überdecken.
+   */
+  loadMieterZuordnungen(): void {
+    this.mieterService.getAllMieter().subscribe({
+      next: (mieter) => {
+        this.einheitIdsMitMieter = new Set(mieter.flatMap(m => m.einheitIds ?? []));
+      },
+      error: () => {
+        this.einheitIdsMitMieter = null;
+      }
     });
   }
 
@@ -274,6 +301,17 @@ export class TarifpositionListComponent implements OnInit {
       default:
         return position[column];
     }
+  }
+
+  /**
+   * Wahr, wenn der gewählten Ladestation kein Mieter zugeordnet ist. Positionen sind dann zwar
+   * erfassbar, erscheinen aber auf keiner Rechnung — die entsteht je Mieter (Specs/Ladestationen.md,
+   * Edge Case „Ladestations-Einheit ohne zugeordneten Mieter").
+   */
+  get einheitOhneMieter(): boolean {
+    return this.selectedEinheitId !== null
+      && this.einheitIdsMitMieter !== null
+      && !this.einheitIdsMitMieter.has(this.selectedEinheitId);
   }
 
   /** Messpunkt (RFID) der gewählten Ladestation – belegt die Quell-Referenz vor. */
