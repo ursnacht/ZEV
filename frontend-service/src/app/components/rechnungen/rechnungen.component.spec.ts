@@ -18,8 +18,11 @@ describe('RechnungenComponent', () => {
   const mockConsumer: Einheit = { id: 1, name: 'Wohnung A', typ: EinheitTyp.CONSUMER };
   const mockConsumer2: Einheit = { id: 2, name: 'Wohnung B', typ: EinheitTyp.CONSUMER };
   const mockProducer: Einheit = { id: 3, name: 'Solar Anlage', typ: EinheitTyp.PRODUCER };
+  const mockLadestation: Einheit = {
+    id: 4, name: 'Ladestation 1', typ: EinheitTyp.LADESTATION, messpunkt: 'RFID-04711'
+  };
 
-  const mockEinheiten: Einheit[] = [mockProducer, mockConsumer2, mockConsumer];
+  const mockEinheiten: Einheit[] = [mockProducer, mockConsumer2, mockConsumer, mockLadestation];
 
   const mockRechnung: GeneratedRechnung = {
     einheitId: 1,
@@ -115,6 +118,88 @@ describe('RechnungenComponent', () => {
       component.onSelectionChange([mockConsumer]);
       component.onSelectionChange([]);
       expect(component.selectedEinheitIds.size).toBe(0);
+    });
+
+    it('should accept a ladestation as selectable einheit', () => {
+      component.onSelectionChange([mockLadestation]);
+      expect(component.selectedEinheitIds.has(4)).toBe(true);
+    });
+  });
+
+  describe('einheiten ohne rechnung', () => {
+    beforeEach(() => {
+      component.dateFrom = '2026-01-01';
+      component.dateTo = '2026-03-31';
+    });
+
+    it('should warn with the name of a selected einheit that produced no rechnung', () => {
+      // Bisher verschwanden uebersprungene Einheiten kommentarlos - z.B. eine Ladestation
+      // ohne Positionen im Zeitraum (Specs/Ladestationen.md §5).
+      component.onSelectionChange([mockConsumer, mockLadestation]);
+
+      component.onGenerate();
+
+      expect(component.messageType).toBe('warning');
+      expect(component.message).toContain('KEINE_RECHNUNG_FUER_EINHEITEN');
+      expect(component.message).toContain('Ladestation 1');
+      expect(component.message).not.toContain('Wohnung A');
+    });
+
+    it('should list every skipped einheit by name', () => {
+      component.onSelectionChange([mockConsumer, mockConsumer2, mockLadestation]);
+
+      component.onGenerate();
+
+      expect(component.message).toContain('Wohnung B');
+      expect(component.message).toContain('Ladestation 1');
+    });
+
+    it('should keep the generated count in the warning message', () => {
+      component.onSelectionChange([mockConsumer, mockLadestation]);
+
+      component.onGenerate();
+
+      expect(component.message).toContain('1 RECHNUNGEN_GENERIERT');
+    });
+
+    it('should show a plain success message when every einheit produced a rechnung', () => {
+      component.onSelectionChange([mockConsumer]);
+
+      component.onGenerate();
+
+      expect(component.messageType).toBe('success');
+      expect(component.message).not.toContain('KEINE_RECHNUNG_FUER_EINHEITEN');
+    });
+
+    it('should not warn when the ladestation is billed via the wohnung of its mieter', () => {
+      // Ein Mieter mit Wohnung und Ladestation erhaelt genau eine Rechnung - die der Wohnung;
+      // die Ladestation taucht dann als eigene Rechnung auf, nicht als uebersprungene Einheit.
+      rechnungServiceSpy.generateRechnungen.mockReturnValue(of({
+        rechnungen: [mockRechnung, { ...mockRechnung, einheitId: 4, einheitName: 'Ladestation 1' }],
+        count: 2
+      }));
+      component.onSelectionChange([mockConsumer, mockLadestation]);
+
+      component.onGenerate();
+
+      expect(component.messageType).toBe('success');
+    });
+
+    it('should not auto-dismiss the warning message', fakeAsync(() => {
+      component.onSelectionChange([mockConsumer, mockLadestation]);
+
+      component.onGenerate();
+
+      expect(component.messageType).toBe('warning');
+      tick(5000);
+      expect(component.messageType).toBe('warning');
+      expect(component.message).not.toBe('');
+    }));
+
+    it('should not warn when nothing was selected before generating', () => {
+      component.selectedEinheitIds.add(1);
+      component.onGenerate();
+      expect(component.messageType).toBe('success');
     });
   });
 

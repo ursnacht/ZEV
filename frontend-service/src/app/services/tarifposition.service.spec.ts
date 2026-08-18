@@ -57,7 +57,7 @@ describe('TarifpositionService', () => {
   });
 
   describe('getByEinheit', () => {
-    it('should return all positions of a mieter', () => {
+    it('should return all positions of an einheit', () => {
       service.getByEinheit(7).subscribe(positionen => {
         expect(positionen.length).toBe(2);
         expect(positionen).toEqual(mockPositionen);
@@ -76,12 +76,40 @@ describe('TarifpositionService', () => {
       req.flush([]);
     });
 
-    it('should return empty array when the mieter has no positions', () => {
+    it('should return empty array when the einheit has no positions', () => {
       service.getByEinheit(7).subscribe(positionen => {
         expect(positionen).toEqual([]);
       });
 
       const req = httpMock.expectOne(r => r.url === apiUrl);
+      req.flush([]);
+    });
+  });
+
+  describe('getByEinheit - ladestation', () => {
+    it('should return the read-only einheit fields used for the prefill', () => {
+      // einheitMesspunkt traegt die RFID und belegt im Formular die Quell-Referenz vor
+      // (Specs/Ladestationen.md FR-1.3).
+      const withMesspunkt: Tarifposition = {
+        ...mockPosition,
+        einheitName: 'Ladestation 1',
+        einheitMesspunkt: 'RFID-04711'
+      };
+
+      service.getByEinheit(7).subscribe(positionen => {
+        expect(positionen[0].einheitName).toBe('Ladestation 1');
+        expect(positionen[0].einheitMesspunkt).toBe('RFID-04711');
+      });
+
+      const req = httpMock.expectOne(r => r.url === apiUrl);
+      req.flush([withMesspunkt]);
+    });
+
+    it('should ask for the requested einheit only', () => {
+      service.getByEinheit(42).subscribe();
+
+      const req = httpMock.expectOne(r => r.url === apiUrl);
+      expect(req.request.params.get('einheitId')).toBe('42');
       req.flush([]);
     });
   });

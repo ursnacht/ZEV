@@ -196,6 +196,27 @@ describe('DebitorkontrolleFormComponent', () => {
       const result = component.getMieterDisplayName(mieterWithoutEinheit);
       expect(result).toBe('Unbekannt');
     });
+
+    it('should list wohnung and ladestation of the same mieter', () => {
+      // Ein Mieter kann mehreren Einheiten zugeordnet sein (Specs/Ladestationen.md FR-2).
+      component.einheiten = [
+        ...mockEinheiten,
+        { id: 3, name: 'Ladestation 1', typ: EinheitTyp.LADESTATION, messpunkt: 'RFID-04711' }
+      ];
+      const mieter: Mieter = { ...mockMieter[0], einheitIds: [1, 3] };
+
+      expect(component.getMieterDisplayName(mieter)).toBe('Max Muster (EG links, Ladestation 1)');
+    });
+
+    it('should return only name when no einheit is assigned', () => {
+      const mieter: Mieter = { ...mockMieter[0], einheitIds: [] };
+      expect(component.getMieterDisplayName(mieter)).toBe('Max Muster');
+    });
+
+    it('should tolerate a missing einheitIds array', () => {
+      const mieter = { ...mockMieter[0], einheitIds: undefined } as unknown as Mieter;
+      expect(component.getMieterDisplayName(mieter)).toBe('Max Muster');
+    });
   });
 
   describe('events', () => {

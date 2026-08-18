@@ -14,7 +14,8 @@ describe('MieterFormComponent', () => {
 
   const mockEinheiten: Einheit[] = [
     { id: 1, name: 'Wohnung A', typ: EinheitTyp.CONSUMER },
-    { id: 2, name: 'Wohnung B', typ: EinheitTyp.CONSUMER }
+    { id: 2, name: 'Wohnung B', typ: EinheitTyp.CONSUMER },
+    { id: 3, name: 'Ladestation 1', typ: EinheitTyp.LADESTATION, messpunkt: 'RFID-04711' }
   ];
 
   beforeEach(async () => {
@@ -71,6 +72,41 @@ describe('MieterFormComponent', () => {
       expect(component.formData.mietbeginn).toBe('2024-01-01');
       expect(component.formData.mietende).toBe('2025-12-31');
       expect(component.formData.einheitIds).toEqual([1]);
+    });
+
+    it('should populate the form with several assigned einheiten', () => {
+      // Wohnung + Ladestation an einem Mieter (Specs/Ladestationen.md FR-3).
+      component.mieter = {
+        id: 1, name: 'Max Muster', strasse: 'Musterstr. 1', plz: '8000', ort: 'Zürich',
+        mietbeginn: '2024-01-01', einheitIds: [1, 3]
+      };
+      component.ngOnInit();
+
+      expect(component.formData.einheitIds).toEqual([1, 3]);
+    });
+
+    it('should copy the einheitIds array instead of referencing it', () => {
+      const inputMieter: Mieter = {
+        id: 1, name: 'Max Muster', strasse: 'Musterstr. 1', plz: '8000', ort: 'Zürich',
+        mietbeginn: '2024-01-01', einheitIds: [1]
+      };
+
+      component.mieter = inputMieter;
+      component.ngOnInit();
+      component.toggleEinheit(3);
+
+      expect(inputMieter.einheitIds).toEqual([1]);
+      expect(component.formData.einheitIds).toEqual([1, 3]);
+    });
+
+    it('should fall back to an empty assignment when the mieter has none', () => {
+      component.mieter = {
+        id: 1, name: 'Max Muster', mietbeginn: '2024-01-01',
+        einheitIds: undefined as unknown as number[]
+      };
+      component.ngOnInit();
+
+      expect(component.formData.einheitIds).toEqual([]);
     });
   });
 
@@ -196,6 +232,32 @@ describe('MieterFormComponent', () => {
       };
       expect(component.isFormValid()).toBe(true);
     });
+
+    it('should return true when several einheiten are assigned', () => {
+      component.formData = {
+        name: 'Max Muster',
+        strasse: 'Musterstr. 1',
+        plz: '8000',
+        ort: 'Zürich',
+        mietbeginn: '2024-01-01',
+        einheitIds: [1, 3]
+      };
+      expect(component.isFormValid()).toBe(true);
+    });
+
+    it('should return true when only a ladestation is assigned (nutzer ohne wohnung)', () => {
+      // Ein Nutzer ohne Wohnung wird ausschliesslich ueber seine Ladestation abgerechnet
+      // (Specs/Ladestationen.md, Akzeptanzkriterium "Mieter").
+      component.formData = {
+        name: 'Besucher',
+        strasse: 'Fremdweg 9',
+        plz: '3000',
+        ort: 'Bern',
+        mietbeginn: '2026-01-01',
+        einheitIds: [3]
+      };
+      expect(component.isFormValid()).toBe(true);
+    });
   });
 
   describe('isDateRangeValid', () => {
@@ -294,6 +356,91 @@ describe('MieterFormComponent', () => {
     it('should format einheit name with ID', () => {
       const einheit: Einheit = { id: 1, name: 'Wohnung A', typ: EinheitTyp.CONSUMER };
       expect(component.getEinheitDisplayName(einheit)).toBe('Wohnung A (ID: 1)');
+    });
+
+    it('should format a ladestation the same way', () => {
+      expect(component.getEinheitDisplayName(mockEinheiten[2])).toBe('Ladestation 1 (ID: 3)');
+    });
+  });
+
+  describe('isEinheitSelected', () => {
+    it('should return false when nothing is assigned', () => {
+      expect(component.isEinheitSelected(1)).toBe(false);
+    });
+
+    it('should return true for an assigned einheit', () => {
+      component.formData.einheitIds = [1, 3];
+      expect(component.isEinheitSelected(3)).toBe(true);
+    });
+
+    it('should return false for an unassigned einheit', () => {
+      component.formData.einheitIds = [1];
+      expect(component.isEinheitSelected(3)).toBe(false);
+    });
+
+    it('should return false for an undefined id', () => {
+      component.formData.einheitIds = [1];
+      expect(component.isEinheitSelected(undefined)).toBe(false);
+    });
+  });
+
+  describe('toggleEinheit', () => {
+    it('should add an einheit that is not assigned yet', () => {
+      component.toggleEinheit(1);
+      expect(component.formData.einheitIds).toEqual([1]);
+    });
+
+    it('should assign several einheiten (wohnung plus ladestation)', () => {
+      component.toggleEinheit(1);
+      component.toggleEinheit(3);
+      expect(component.formData.einheitIds).toEqual([1, 3]);
+    });
+
+    it('should remove an already assigned einheit', () => {
+      component.formData.einheitIds = [1, 3];
+      component.toggleEinheit(1);
+      expect(component.formData.einheitIds).toEqual([3]);
+    });
+
+    it('should ignore an undefined id', () => {
+      component.formData.einheitIds = [1];
+      component.toggleEinheit(undefined);
+      expect(component.formData.einheitIds).toEqual([1]);
+    });
+
+    it('should make the form invalid when the last einheit is removed', () => {
+      component.formData = {
+        name: 'Max Muster',
+        strasse: 'Musterstr. 1',
+        plz: '8000',
+        ort: 'Zürich',
+        mietbeginn: '2024-01-01',
+        einheitIds: [1]
+      };
+
+      component.toggleEinheit(1);
+
+      expect(component.formData.einheitIds).toEqual([]);
+      expect(component.isFormValid()).toBe(false);
+    });
+
+    it('should emit all assigned einheiten on submit', () => {
+      const saveSpy = vi.spyOn(component.save, 'emit');
+      component.formData = {
+        name: 'Max Muster',
+        strasse: 'Musterstr. 1',
+        plz: '8000',
+        ort: 'Zürich',
+        mietbeginn: '2024-01-01',
+        einheitIds: []
+      };
+      component.toggleEinheit(1);
+      component.toggleEinheit(3);
+
+      component.onSubmit();
+
+      const emitted = saveSpy.mock.calls[0][0] as Mieter;
+      expect(emitted.einheitIds).toEqual([1, 3]);
     });
   });
 });

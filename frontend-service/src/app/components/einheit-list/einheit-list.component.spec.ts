@@ -1,6 +1,7 @@
 import { createSpyObj, SpyObj } from '../../../testing/spy';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { fakeAsync, tick } from '../../../testing/fake-async';
+import { Router } from '@angular/router';
 import { EinheitListComponent } from './einheit-list.component';
 import { EinheitService } from '../../services/einheit.service';
 import { TranslationService } from '../../services/translation.service';
@@ -12,6 +13,11 @@ describe('EinheitListComponent', () => {
   let fixture: ComponentFixture<EinheitListComponent>;
   let einheitServiceSpy: SpyObj<EinheitService>;
   let translationServiceSpy: SpyObj<TranslationService>;
+  let routerSpy: SpyObj<Router>;
+
+  const mockLadestation: Einheit = {
+    id: 3, name: 'Ladestation 1', typ: EinheitTyp.LADESTATION, messpunkt: 'RFID-04711'
+  };
 
   const mockEinheiten: Einheit[] = [
     { id: 1, name: 'Wohnung A', typ: EinheitTyp.CONSUMER, messpunkt: 'MP-001' },
@@ -23,15 +29,18 @@ describe('EinheitListComponent', () => {
       'getAllEinheiten', 'createEinheit', 'updateEinheit', 'deleteEinheit'
     ]);
     translationServiceSpy = createSpyObj<TranslationService>('TranslationService', ['translate']);
+    routerSpy = createSpyObj<Router>('Router', ['navigate']);
 
     einheitServiceSpy.getAllEinheiten.mockReturnValue(of(mockEinheiten));
     translationServiceSpy.translate.mockImplementation((key: string) => key);
+    routerSpy.navigate.mockResolvedValue(true);
 
     await TestBed.configureTestingModule({
       imports: [EinheitListComponent],
       providers: [
         { provide: EinheitService, useValue: einheitServiceSpy },
-        { provide: TranslationService, useValue: translationServiceSpy }
+        { provide: TranslationService, useValue: translationServiceSpy },
+        { provide: Router, useValue: routerSpy }
       ]
     }).compileComponents();
 
@@ -163,6 +172,30 @@ describe('EinheitListComponent', () => {
       expect(component.message).toContain('2 Mieter zugeordnet');
       expect(component.messageType).toBe('error');
     });
+
+    it('should show a plain string error body as message', () => {
+      einheitServiceSpy.deleteEinheit.mockReturnValue(throwError(() => ({
+        error: 'EINHEIT_HAT_MIETER'
+      })));
+      component.onDelete(1);
+      expect(component.message).toBe('EINHEIT_HAT_MIETER');
+      expect(component.messageType).toBe('error');
+    });
+
+    it('should not reload the einheiten when the delete is rejected', () => {
+      einheitServiceSpy.deleteEinheit.mockReturnValue(throwError(() => ({
+        error: { error: 'Einheit kann nicht gelöscht werden: 2 Mieter zugeordnet' }
+      })));
+      einheitServiceSpy.getAllEinheiten.mockClear();
+      component.onDelete(1);
+      expect(einheitServiceSpy.getAllEinheiten).not.toHaveBeenCalled();
+    });
+
+    it('should delete a ladestation without assigned tenants', () => {
+      component.onDelete(mockLadestation.id);
+      expect(einheitServiceSpy.deleteEinheit).toHaveBeenCalledWith(3);
+      expect(component.message).toBe('EINHEIT_GELOESCHT');
+    });
   });
 
   describe('onMenuAction', () => {
@@ -176,6 +209,34 @@ describe('EinheitListComponent', () => {
       vi.spyOn(component, 'onDelete').mockImplementation(() => {});
       component.onMenuAction('delete', mockEinheiten[0]);
       expect(component.onDelete).toHaveBeenCalledWith(mockEinheiten[0].id);
+    });
+
+    it('should call onTarifpositionen for the tarifpositionen action', () => {
+      vi.spyOn(component, 'onTarifpositionen').mockImplementation(() => {});
+      component.onMenuAction('tarifpositionen', mockLadestation);
+      expect(component.onTarifpositionen).toHaveBeenCalledWith(mockLadestation);
+    });
+
+    it('should ignore an unknown action', () => {
+      vi.spyOn(component, 'onEdit').mockImplementation(() => {});
+      vi.spyOn(component, 'onDelete').mockImplementation(() => {});
+      vi.spyOn(component, 'onTarifpositionen').mockImplementation(() => {});
+
+      component.onMenuAction('unbekannt', mockEinheiten[0]);
+
+      expect(component.onEdit).not.toHaveBeenCalled();
+      expect(component.onDelete).not.toHaveBeenCalled();
+      expect(component.onTarifpositionen).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('onTarifpositionen', () => {
+    it('should navigate to the tarifpositionen page with the einheitId', () => {
+      // Der Kebab-Eintrag ist von der Mieter- in die Einheiten-Verwaltung gewandert, weil die
+      // Position an der Einheit haengt (Specs/Ladestationen.md FR-3).
+      component.onTarifpositionen(mockLadestation);
+      expect(routerSpy.navigate).toHaveBeenCalledWith(
+        ['/tarifpositionen'], { queryParams: { einheitId: 3 } });
     });
   });
 
@@ -218,6 +279,32 @@ describe('EinheitListComponent', () => {
       expect(component.message).toContain('Fehler beim Erstellen');
       expect(component.messageType).toBe('error');
     });
+
+    it('should create a ladestation with the RFID in messpunkt', () => {
+      const ladestation: Einheit = {
+        name: 'Ladestation 2', typ: EinheitTyp.LADESTATION, messpunkt: 'RFID-04712'
+      };
+      einheitServiceSpy.createEinheit.mockReturnValue(of({ ...ladestation, id: 4 }));
+
+      component.onFormSubmit(ladestation);
+
+      expect(einheitServiceSpy.createEinheit).toHaveBeenCalledWith(ladestation);
+      expect(component.message).toBe('EINHEIT_ERSTELLT');
+    });
+
+    it('should translate the server key when the RFID is already used', () => {
+      // Die RFID ist je Mandant eindeutig (Specs/Ladestationen.md FR-2); der Server meldet
+      // den Uebersetzungs-Key im Body.
+      einheitServiceSpy.createEinheit.mockReturnValue(throwError(() => ({
+        error: { error: 'EINHEIT_MESSPUNKT_DUPLIKAT' }
+      })));
+
+      component.onFormSubmit({ name: 'Ladestation 2', typ: EinheitTyp.LADESTATION, messpunkt: 'RFID-04711' });
+
+      expect(translationServiceSpy.translate).toHaveBeenCalledWith('EINHEIT_MESSPUNKT_DUPLIKAT');
+      expect(component.message).toBe('EINHEIT_MESSPUNKT_DUPLIKAT');
+      expect(component.messageType).toBe('error');
+    });
   });
 
   describe('onFormSubmit - update', () => {
@@ -252,6 +339,18 @@ describe('EinheitListComponent', () => {
       einheitServiceSpy.updateEinheit.mockReturnValue(throwError(() => new Error('Update failed')));
       component.onFormSubmit(existingEinheit);
       expect(component.message).toContain('Fehler beim Aktualisieren');
+      expect(component.messageType).toBe('error');
+    });
+
+    it('should translate the server key when the RFID is already used', () => {
+      einheitServiceSpy.updateEinheit.mockReturnValue(throwError(() => ({
+        error: { error: 'EINHEIT_MESSPUNKT_DUPLIKAT' }
+      })));
+
+      component.onFormSubmit({ ...mockLadestation, messpunkt: 'RFID-04712' });
+
+      expect(translationServiceSpy.translate).toHaveBeenCalledWith('EINHEIT_MESSPUNKT_DUPLIKAT');
+      expect(component.message).toBe('EINHEIT_MESSPUNKT_DUPLIKAT');
       expect(component.messageType).toBe('error');
     });
   });
@@ -298,6 +397,31 @@ describe('EinheitListComponent', () => {
       component.onSort('typ');
       expect(component.einheiten[0].typ).toBe(EinheitTyp.PRODUCER);
       expect(component.einheiten[1].typ).toBe(EinheitTyp.CONSUMER);
+    });
+
+    it('should list ladestationen alongside the other types', () => {
+      // Die Einheiten-Verwaltung blendet nichts aus - Ladestationen erscheinen wie jede
+      // andere Einheit (Specs/Ladestationen.md FR-3).
+      einheitServiceSpy.getAllEinheiten.mockReturnValue(of([...mockEinheiten, mockLadestation]));
+      component.loadEinheiten();
+      expect(component.einheiten.length).toBe(3);
+      expect(component.einheiten.some(e => e.typ === EinheitTyp.LADESTATION)).toBe(true);
+    });
+
+    it('should sort by messpunkt so RFIDs are groupable', () => {
+      component.einheiten = [mockLadestation, ...mockEinheiten];
+      component.sortColumn = null;
+      component.onSort('messpunkt');
+      expect(component.einheiten.map(e => e.messpunkt)).toEqual(['MP-001', 'MP-002', 'RFID-04711']);
+    });
+
+    it('should sort by typ with LADESTATION included', () => {
+      component.einheiten = [...mockEinheiten, mockLadestation];
+      component.sortColumn = null;
+      component.onSort('typ');
+      expect(component.einheiten.map(e => e.typ)).toEqual([
+        EinheitTyp.CONSUMER, EinheitTyp.LADESTATION, EinheitTyp.PRODUCER
+      ]);
     });
 
     it('should handle null values in sort', () => {

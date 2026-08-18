@@ -114,6 +114,62 @@ describe('EinheitService', () => {
     });
   });
 
+  describe('createEinheit - ladestation', () => {
+    it('should send the RFID in the messpunkt field', () => {
+      // Die RFID steht im bestehenden Feld messpunkt (Specs/Ladestationen.md FR-2).
+      const ladestation: Einheit = {
+        name: 'Ladestation 1',
+        typ: EinheitTyp.LADESTATION,
+        messpunkt: 'RFID-04711'
+      };
+      const created = { ...ladestation, id: 5 };
+
+      service.createEinheit(ladestation).subscribe(einheit => {
+        expect(einheit.typ).toBe(EinheitTyp.LADESTATION);
+        expect(einheit.messpunkt).toBe('RFID-04711');
+      });
+
+      const req = httpMock.expectOne(apiUrl);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual(ladestation);
+      req.flush(created);
+    });
+
+    it('should propagate the server error when the RFID is already used', () => {
+      let errorStatus = 0;
+
+      service.createEinheit({ name: 'Ladestation 2', typ: EinheitTyp.LADESTATION, messpunkt: 'RFID-04711' })
+        .subscribe({
+          next: () => { throw new Error('should not succeed'); },
+          error: (error) => { errorStatus = error.status; }
+        });
+
+      const req = httpMock.expectOne(apiUrl);
+      req.flush({ error: 'EINHEIT_MESSPUNKT_DUPLIKAT' }, { status: 400, statusText: 'Bad Request' });
+
+      expect(errorStatus).toBe(400);
+    });
+  });
+
+  describe('deleteEinheit - loeschschutz', () => {
+    it('should propagate the server message when tenants are still assigned', () => {
+      let body: { error?: string } | undefined;
+
+      service.deleteEinheit(1).subscribe({
+        next: () => { throw new Error('should not succeed'); },
+        error: (error) => { body = error.error; }
+      });
+
+      const req = httpMock.expectOne(`${apiUrl}/1`);
+      req.flush(
+        { error: 'Einheit kann nicht gelöscht werden: 2 Mieter zugeordnet' },
+        { status: 409, statusText: 'Conflict' }
+      );
+
+      expect(body?.error).toContain('2 Mieter zugeordnet');
+    });
+  });
+
   describe('updateEinheit', () => {
     it('should update an existing einheit', () => {
       const updatedEinheit: Einheit = {

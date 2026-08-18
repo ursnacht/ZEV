@@ -19,7 +19,8 @@ describe('MieterListComponent', () => {
   const mockEinheiten: Einheit[] = [
     { id: 1, name: 'Wohnung A', typ: EinheitTyp.CONSUMER },
     { id: 2, name: 'Solaranlage', typ: EinheitTyp.PRODUCER },
-    { id: 3, name: 'Wohnung B', typ: EinheitTyp.CONSUMER }
+    { id: 3, name: 'Wohnung B', typ: EinheitTyp.CONSUMER },
+    { id: 4, name: 'Ladestation 1', typ: EinheitTyp.LADESTATION, messpunkt: 'RFID-04711' }
   ];
 
   const mockMieter: Mieter[] = [
@@ -66,9 +67,15 @@ describe('MieterListComponent', () => {
       expect(einheitServiceSpy.getAllEinheiten).toHaveBeenCalled();
     });
 
-    it('should filter einheiten to CONSUMER only', () => {
-      expect(component.einheiten.length).toBe(2);
-      expect(component.einheiten.every(e => e.typ === EinheitTyp.CONSUMER)).toBe(true);
+    it('should offer consumers and ladestationen as mietbare einheiten', () => {
+      // Produzenten und die Bilanz-Messpunkte haben keine Mieter; eine Ladestation schon
+      // (Specs/Ladestationen.md FR-3).
+      expect(component.einheiten.length).toBe(3);
+      expect(component.einheiten.map(e => e.id)).toEqual([1, 3, 4]);
+    });
+
+    it('should not offer producers for assignment', () => {
+      expect(component.einheiten.some(e => e.typ === EinheitTyp.PRODUCER)).toBe(false);
     });
 
     it('should not show form initially', () => {
@@ -124,6 +131,37 @@ describe('MieterListComponent', () => {
     });
   });
 
+  describe('getEinheitNamen', () => {
+    it('should list a single assigned einheit', () => {
+      expect(component.getEinheitNamen(mockMieter[0])).toBe('Wohnung A');
+    });
+
+    it('should list wohnung and ladestation of the same mieter', () => {
+      const mieter: Mieter = { ...mockMieter[0], einheitIds: [1, 4] };
+      expect(component.getEinheitNamen(mieter)).toBe('Wohnung A, Ladestation 1');
+    });
+
+    it('should list only the ladestation for a nutzer ohne wohnung', () => {
+      const mieter: Mieter = { ...mockMieter[0], einheitIds: [4] };
+      expect(component.getEinheitNamen(mieter)).toBe('Ladestation 1');
+    });
+
+    it('should return an empty string when nothing is assigned', () => {
+      const mieter: Mieter = { ...mockMieter[0], einheitIds: [] };
+      expect(component.getEinheitNamen(mieter)).toBe('');
+    });
+
+    it('should tolerate a missing einheitIds array', () => {
+      const mieter = { ...mockMieter[0], einheitIds: undefined } as unknown as Mieter;
+      expect(component.getEinheitNamen(mieter)).toBe('');
+    });
+
+    it('should fall back to the id for an unknown einheit', () => {
+      const mieter: Mieter = { ...mockMieter[0], einheitIds: [999] };
+      expect(component.getEinheitNamen(mieter)).toBe('ID: 999');
+    });
+  });
+
   describe('onCreateNew', () => {
     it('should set selectedMieter to null and show form', () => {
       component.selectedMieter = mockMieter[0];
@@ -163,6 +201,12 @@ describe('MieterListComponent', () => {
       expect(component.selectedMieter!.name).toBe(mieter.name);
       expect(component.selectedMieter!.strasse).toBe(mieter.strasse);
       expect(component.selectedMieter!.einheitIds).toEqual(mieter.einheitIds);
+    });
+
+    it('should carry over all assigned einheiten', () => {
+      const mieter: Mieter = { ...mockMieter[0], einheitIds: [1, 4] };
+      component.onCopy(mieter);
+      expect(component.selectedMieter!.einheitIds).toEqual([1, 4]);
     });
   });
 
@@ -211,6 +255,35 @@ describe('MieterListComponent', () => {
       component.onDelete(1);
       expect(component.message).toBe('FEHLER_LOESCHEN_MIETER');
       expect(component.messageType).toBe('error');
+    });
+
+    it('should show the server message when tarifpositionen block the delete', () => {
+      // Der Loeschschutz liefert die Anzahl betroffener Positionen im Body
+      // (Specs/Ladestationen.md FR-2) - sie soll den Benutzer erreichen.
+      mieterServiceSpy.deleteMieter.mockReturnValue(throwError(() => ({
+        error: { error: 'Mieter kann nicht gelöscht werden: 3 Tarifpositionen vorhanden' }
+      })));
+      component.onDelete(1);
+      expect(component.message).toContain('3 Tarifpositionen');
+      expect(component.messageType).toBe('error');
+    });
+
+    it('should show a plain string error body as message', () => {
+      mieterServiceSpy.deleteMieter.mockReturnValue(throwError(() => ({
+        error: 'MIETER_HAT_TARIFPOSITIONEN'
+      })));
+      component.onDelete(1);
+      expect(component.message).toBe('MIETER_HAT_TARIFPOSITIONEN');
+      expect(component.messageType).toBe('error');
+    });
+
+    it('should not reload the mieter when the delete is rejected', () => {
+      mieterServiceSpy.deleteMieter.mockReturnValue(throwError(() => ({
+        error: { error: 'Mieter kann nicht gelöscht werden: 3 Tarifpositionen vorhanden' }
+      })));
+      mieterServiceSpy.getAllMieter.mockClear();
+      component.onDelete(1);
+      expect(mieterServiceSpy.getAllMieter).not.toHaveBeenCalled();
     });
   });
 
@@ -352,6 +425,26 @@ describe('MieterListComponent', () => {
       component.onSort('name');
       expect(component.mieter[0].name).toBe('Anna Test');
       expect(component.mieter[1].name).toBe('Max Muster');
+    });
+
+    it('should sort by the names of the assigned einheiten', () => {
+      component.mieter = [
+        { ...mockMieter[0], name: 'Wohnungsmieter', einheitIds: [1] },
+        { ...mockMieter[1], name: 'Ladestationsnutzer', einheitIds: [4] }
+      ];
+      component.sortColumn = null;
+      component.onSort('einheitId');
+      expect(component.mieter.map(m => m.name)).toEqual(['Ladestationsnutzer', 'Wohnungsmieter']);
+    });
+
+    it('should sort a mieter without assignment last', () => {
+      component.mieter = [
+        { ...mockMieter[0], name: 'Ohne Einheit', einheitIds: [] },
+        { ...mockMieter[1], name: 'Mit Einheit', einheitIds: [1] }
+      ];
+      component.sortColumn = null;
+      component.onSort('einheitId');
+      expect(component.mieter.map(m => m.name)).toEqual(['Mit Einheit', 'Ohne Einheit']);
     });
   });
 

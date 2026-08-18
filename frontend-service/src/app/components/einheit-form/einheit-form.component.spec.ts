@@ -58,6 +58,18 @@ describe('EinheitFormComponent', () => {
       expect(component.einheitTypOptions[1].value).toBe(EinheitTyp.CONSUMER);
       expect(component.einheitTypOptions[2].value).toBe(EinheitTyp.BEZUG);
       expect(component.einheitTypOptions[3].value).toBe(EinheitTyp.RUECKLIEFERUNG);
+      expect(component.einheitTypOptions[4].value).toBe(EinheitTyp.LADESTATION);
+    });
+
+    it('should label the ladestation option with its own translation key', () => {
+      const option = component.einheitTypOptions.find(o => o.value === EinheitTyp.LADESTATION);
+      expect(option?.label).toBe('TYP_LADESTATION');
+    });
+
+    it('should expose the EinheitTyp enum for the template hint', () => {
+      // Der Messpunkt-Hinweis wechselt im Template auf den RFID-Text, sobald der Typ
+      // LADESTATION gewaehlt ist (Specs/Ladestationen.md FR-3).
+      expect(component.EinheitTyp.LADESTATION).toBe(EinheitTyp.LADESTATION);
     });
   });
 
@@ -163,6 +175,63 @@ describe('EinheitFormComponent', () => {
       expect(saveSpy).toHaveBeenCalledWith(expect.objectContaining({
         typ: EinheitTyp.PRODUCER
       }));
+    });
+
+    it('should allow LADESTATION type', () => {
+      component.formData = {
+        name: 'Ladestation 1',
+        typ: EinheitTyp.LADESTATION,
+        messpunkt: 'RFID-04711'
+      };
+
+      const saveSpy = vi.spyOn(component.save, 'emit');
+      component.onSubmit();
+
+      expect(saveSpy).toHaveBeenCalledWith(expect.objectContaining({
+        typ: EinheitTyp.LADESTATION
+      }));
+    });
+
+    it('should emit the RFID in the messpunkt field for LADESTATION', () => {
+      // Die RFID steht im bestehenden Feld messpunkt - kein eigenes Attribut
+      // (Specs/Ladestationen.md FR-2).
+      component.formData = {
+        name: 'Ladestation 1',
+        typ: EinheitTyp.LADESTATION,
+        messpunkt: 'RFID-04711'
+      };
+
+      const saveSpy = vi.spyOn(component.save, 'emit');
+      component.onSubmit();
+
+      expect(saveSpy).toHaveBeenCalledWith(expect.objectContaining({
+        messpunkt: 'RFID-04711'
+      }));
+    });
+
+    it('should allow a LADESTATION without RFID (server rejects it, not the form)', () => {
+      component.formData = {
+        name: 'Ladestation ohne RFID',
+        typ: EinheitTyp.LADESTATION
+      };
+
+      const saveSpy = vi.spyOn(component.save, 'emit');
+      component.onSubmit();
+
+      expect(saveSpy).toHaveBeenCalled();
+    });
+
+    it('should keep the RFID when editing an existing LADESTATION', () => {
+      component.einheit = {
+        id: 9,
+        name: 'Ladestation 1',
+        typ: EinheitTyp.LADESTATION,
+        messpunkt: 'RFID-04711'
+      };
+      component.ngOnInit();
+
+      expect(component.formData.typ).toBe(EinheitTyp.LADESTATION);
+      expect(component.formData.messpunkt).toBe('RFID-04711');
     });
 
     it('should allow messpunkt for PRODUCER type', () => {

@@ -73,7 +73,7 @@ describe('TarifpositionFormComponent', () => {
       expect(component.quartalOptionen).toEqual([1, 2, 3, 4]);
     });
 
-    it('should fall back to einheitId 0 when no mieter is given', () => {
+    it('should fall back to einheitId 0 when no einheit is given', () => {
       const fresh = TestBed.createComponent(TarifpositionFormComponent).componentInstance;
       fresh.tarife = mockTarife;
       fresh.ngOnInit();
@@ -101,6 +101,36 @@ describe('TarifpositionFormComponent', () => {
     it('should leave quellReferenz undefined for a new position', () => {
       component.ngOnInit();
       expect(component.formData.quellReferenz).toBeUndefined();
+    });
+
+    it('should prefill quellReferenz with the messpunkt (RFID) of the einheit', () => {
+      // Die Quell-Referenz wird aus dem messpunkt der gewaehlten Ladestation vorbelegt und
+      // bleibt aenderbar (Specs/Ladestationen.md FR-1.3).
+      component.messpunkt = 'RFID-04711';
+      component.ngOnInit();
+      expect(component.formData.quellReferenz).toBe('RFID-04711');
+    });
+
+    it('should leave quellReferenz undefined when the einheit has no messpunkt', () => {
+      component.messpunkt = '';
+      component.ngOnInit();
+      expect(component.formData.quellReferenz).toBeUndefined();
+    });
+
+    it('should not overwrite the quellReferenz of an existing position', () => {
+      component.messpunkt = 'RFID-04711';
+      component.position = {
+        id: 5, einheitId: 7, tarifId: 3, jahr: aktuellesJahr, quartal: 2, menge: 10,
+        quellReferenz: 'LP-01'
+      };
+      component.ngOnInit();
+      expect(component.formData.quellReferenz).toBe('LP-01');
+    });
+
+    it('should take the einheitId from the input for a new position', () => {
+      component.einheitId = 42;
+      component.ngOnInit();
+      expect(component.formData.einheitId).toBe(42);
     });
   });
 
@@ -169,7 +199,7 @@ describe('TarifpositionFormComponent', () => {
       expect(component.isFormValid()).toBe(true);
     });
 
-    it('should return false when no mieter is set', () => {
+    it('should return false when no einheit is set', () => {
       component.formData = { ...validData, einheitId: 0 };
       expect(component.isFormValid()).toBe(false);
     });

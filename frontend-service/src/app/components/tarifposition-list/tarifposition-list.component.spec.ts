@@ -115,7 +115,7 @@ describe('TarifpositionListComponent', () => {
   });
 
   describe('initialization', () => {
-    it('should load mieter on init', () => {
+    it('should load ladestationen on init', () => {
       expect(einheitServiceSpy.getAllEinheiten).toHaveBeenCalled();
       expect(component.ladestationen.length).toBe(2);
     });
@@ -134,7 +134,7 @@ describe('TarifpositionListComponent', () => {
       expect(component.tarife[0].tariftyp).toBe(TarifTyp.LADESTROM);
     });
 
-    it('should not preselect a mieter without query parameter', () => {
+    it('should not preselect an einheit without query parameter', () => {
       expect(component.selectedEinheitId).toBeNull();
       expect(tarifpositionServiceSpy.getByEinheit).not.toHaveBeenCalled();
       expect(component.positionen).toEqual([]);
@@ -171,8 +171,75 @@ describe('TarifpositionListComponent', () => {
     });
   });
 
-  describe('mieter preselection via query parameter', () => {
-    it('should preselect the mieter from ?einheitId and load the positions', () => {
+  describe('einheiten-auswahl', () => {
+    it('should offer only einheiten of type LADESTATION', () => {
+      // Einzig die Seite Tarifpositionen zeigt ausschliesslich Ladestationen
+      // (Specs/Ladestationen.md FR-3).
+      einheitServiceSpy.getAllEinheiten.mockReturnValue(of([
+        { id: 5, name: 'Wohnung A', typ: EinheitTyp.CONSUMER, messpunkt: 'MP-001' },
+        { id: 6, name: 'Solaranlage', typ: EinheitTyp.PRODUCER },
+        { id: 7, name: 'Bezug', typ: EinheitTyp.BEZUG, messpunkt: 'MP-BEZUG' },
+        { id: 8, name: 'Rücklieferung', typ: EinheitTyp.RUECKLIEFERUNG, messpunkt: 'MP-BEZUG' },
+        ...mockEinheiten
+      ]));
+
+      component.loadLadestationen();
+
+      expect(component.ladestationen.map(e => e.id)).toEqual([2, 1]);
+      expect(component.ladestationen.every(e => e.typ === EinheitTyp.LADESTATION)).toBe(true);
+    });
+
+    it('should leave the list empty when no ladestation exists', () => {
+      einheitServiceSpy.getAllEinheiten.mockReturnValue(of([
+        { id: 5, name: 'Wohnung A', typ: EinheitTyp.CONSUMER }
+      ]));
+
+      component.loadLadestationen();
+
+      expect(component.ladestationen).toEqual([]);
+      expect(component.selectedEinheitId).toBeNull();
+    });
+
+    it('should ignore a query parameter pointing at a non-ladestation', () => {
+      einheitServiceSpy.getAllEinheiten.mockReturnValue(of([
+        { id: 5, name: 'Wohnung A', typ: EinheitTyp.CONSUMER },
+        ...mockEinheiten
+      ]));
+      queryParams['einheitId'] = '5';
+      createComponent();
+
+      expect(component.selectedEinheitId).toBeNull();
+      expect(tarifpositionServiceSpy.getByEinheit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('selectedEinheitMesspunkt', () => {
+    it('should return the RFID of the selected ladestation', () => {
+      // Die Quell-Referenz wird aus dem messpunkt der Einheit vorbelegt
+      // (Specs/Ladestationen.md FR-1.3).
+      component.selectedEinheitId = 1;
+      expect(component.selectedEinheitMesspunkt).toBe('RFID-01');
+    });
+
+    it('should return an empty string when nothing is selected', () => {
+      component.selectedEinheitId = null;
+      expect(component.selectedEinheitMesspunkt).toBe('');
+    });
+
+    it('should return an empty string for an unknown einheit', () => {
+      component.selectedEinheitId = 999;
+      expect(component.selectedEinheitMesspunkt).toBe('');
+    });
+
+    it('should return an empty string when the ladestation has no messpunkt', () => {
+      component.ladestationen = [{ id: 1, name: 'Ohne RFID', typ: EinheitTyp.LADESTATION }];
+      component.selectedEinheitId = 1;
+      expect(component.selectedEinheitMesspunkt).toBe('');
+    });
+  });
+
+  describe('einheit preselection via query parameter', () => {
+    it('should preselect the einheit from ?einheitId and load the positions', () => {
       queryParams['einheitId'] = '1';
       createComponent();
 
@@ -247,7 +314,7 @@ describe('TarifpositionListComponent', () => {
   });
 
   describe('loadPositionen', () => {
-    it('should clear positions and skip the request when no mieter is selected', () => {
+    it('should clear positions and skip the request when no einheit is selected', () => {
       component.positionen = positionenKopie();
       component.selectedEinheitId = null;
 
@@ -257,7 +324,7 @@ describe('TarifpositionListComponent', () => {
       expect(tarifpositionServiceSpy.getByEinheit).not.toHaveBeenCalled();
     });
 
-    it('should load the positions of the selected mieter', () => {
+    it('should load the positions of the selected einheit', () => {
       component.selectedEinheitId = 1;
       component.loadPositionen();
 
@@ -301,7 +368,7 @@ describe('TarifpositionListComponent', () => {
       expect(component.messagePersistent).toBe(false);
     });
 
-    it('should reload the positions of the new mieter', () => {
+    it('should reload the positions of the new einheit', () => {
       component.onEinheitChange();
       expect(tarifpositionServiceSpy.getByEinheit).toHaveBeenCalledWith(1);
     });
@@ -704,6 +771,104 @@ describe('TarifpositionListComponent', () => {
 
     it('should return 0 for a zero menge', () => {
       expect(component.berechneBetrag({ ...mockPositionen[0], menge: 0 })).toBe(0);
+    });
+  });
+
+  describe('fehlertext', () => {
+    const newPosition: Tarifposition = { einheitId: 1, tarifId: 3, jahr: 2026, quartal: 2, menge: 42 };
+
+    beforeEach(() => {
+      component.selectedEinheitId = 1;
+    });
+
+    it('should render the bean-validation map instead of [object Object]', () => {
+      // Die Bean-Validation des DTO liefert `{ feld: meldung }` - direkt angezeigt ergaebe
+      // das "[object Object]".
+      tarifpositionServiceSpy.createTarifposition.mockReturnValue(throwError(() => ({
+        error: { menge: 'muss groesser oder gleich 0 sein', quartal: 'muss zwischen 1 und 4 liegen' }
+      })));
+
+      component.onFormSubmit(newPosition);
+
+      expect(component.message).not.toContain('[object Object]');
+      expect(component.message).toContain('muss groesser oder gleich 0 sein');
+      expect(component.message).toContain('muss zwischen 1 und 4 liegen');
+      expect(component.message).toContain('; ');
+    });
+
+    it('should render a single field message without a separator', () => {
+      tarifpositionServiceSpy.createTarifposition.mockReturnValue(throwError(() => ({
+        error: { menge: 'muss groesser oder gleich 0 sein' }
+      })));
+
+      component.onFormSubmit(newPosition);
+
+      expect(component.message).toBe('muss groesser oder gleich 0 sein');
+    });
+
+    it('should pass through a server message wrapped in an error property', () => {
+      tarifpositionServiceSpy.createTarifposition.mockReturnValue(throwError(() => ({
+        error: { error: 'Tarifposition existiert bereits fuer Q2/2026' }
+      })));
+
+      component.onFormSubmit(newPosition);
+
+      expect(component.message).toBe('Tarifposition existiert bereits fuer Q2/2026');
+    });
+
+    it('should fall back when the body holds no string values', () => {
+      tarifpositionServiceSpy.createTarifposition.mockReturnValue(throwError(() => ({
+        error: { status: 400, details: { feld: 'menge' } }
+      })));
+
+      component.onFormSubmit(newPosition);
+
+      expect(component.message).toBe('FEHLER_ERSTELLEN_TARIFPOSITION');
+    });
+
+    it('should fall back for an empty body object', () => {
+      tarifpositionServiceSpy.createTarifposition.mockReturnValue(throwError(() => ({ error: {} })));
+
+      component.onFormSubmit(newPosition);
+
+      expect(component.message).toBe('FEHLER_ERSTELLEN_TARIFPOSITION');
+    });
+
+    it('should fall back for a blank string body', () => {
+      tarifpositionServiceSpy.createTarifposition.mockReturnValue(throwError(() => ({ error: '   ' })));
+
+      component.onFormSubmit(newPosition);
+
+      expect(component.message).toBe('FEHLER_ERSTELLEN_TARIFPOSITION');
+    });
+
+    it('should fall back when the body is null', () => {
+      tarifpositionServiceSpy.createTarifposition.mockReturnValue(throwError(() => ({ error: null })));
+
+      component.onFormSubmit(newPosition);
+
+      expect(component.message).toBe('FEHLER_ERSTELLEN_TARIFPOSITION');
+    });
+
+    it('should render the validation map on update as well', () => {
+      tarifpositionServiceSpy.updateTarifposition.mockReturnValue(throwError(() => ({
+        error: { menge: 'muss groesser oder gleich 0 sein' }
+      })));
+
+      component.onFormSubmit({ ...mockPositionen[0], menge: -1 });
+
+      expect(component.message).toBe('muss groesser oder gleich 0 sein');
+    });
+
+    it('should render the validation map on delete as well', () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      tarifpositionServiceSpy.deleteTarifposition.mockReturnValue(throwError(() => ({
+        error: { error: 'Position wird noch referenziert' }
+      })));
+
+      component.onDelete(10);
+
+      expect(component.message).toBe('Position wird noch referenziert');
     });
   });
 

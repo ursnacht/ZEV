@@ -112,6 +112,83 @@ describe('MieterService', () => {
     });
   });
 
+  describe('createMieter - mehrere einheiten', () => {
+    it('should send all assigned einheitIds', () => {
+      // Wohnung plus Ladestation an einem Mieter (Specs/Ladestationen.md FR-2).
+      const newMieter: Mieter = {
+        name: 'Max Muster',
+        strasse: 'Musterstr. 1',
+        plz: '8000',
+        ort: 'Zürich',
+        mietbeginn: '2026-01-01',
+        einheitIds: [1, 4]
+      };
+      const created = { ...newMieter, id: 4 };
+
+      service.createMieter(newMieter).subscribe(mieter => {
+        expect(mieter.einheitIds).toEqual([1, 4]);
+      });
+
+      const req = httpMock.expectOne(apiUrl);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body.einheitIds).toEqual([1, 4]);
+      req.flush(created);
+    });
+
+    it('should send a single ladestation for a nutzer ohne wohnung', () => {
+      const newMieter: Mieter = {
+        name: 'Besucher',
+        strasse: 'Fremdweg 9',
+        plz: '3000',
+        ort: 'Bern',
+        mietbeginn: '2026-01-01',
+        einheitIds: [4]
+      };
+
+      service.createMieter(newMieter).subscribe(mieter => {
+        expect(mieter.einheitIds).toEqual([4]);
+      });
+
+      const req = httpMock.expectOne(apiUrl);
+      expect(req.request.body.einheitIds).toEqual([4]);
+      req.flush({ ...newMieter, id: 5 });
+    });
+
+    it('should propagate the server error when no einheit is assigned', () => {
+      let errorStatus = 0;
+
+      service.createMieter({ name: 'Ohne Einheit', mietbeginn: '2026-01-01', einheitIds: [] })
+        .subscribe({
+          next: () => { throw new Error('should not succeed'); },
+          error: (error) => { errorStatus = error.status; }
+        });
+
+      const req = httpMock.expectOne(apiUrl);
+      req.flush({ error: 'MIETER_OHNE_EINHEIT' }, { status: 400, statusText: 'Bad Request' });
+
+      expect(errorStatus).toBe(400);
+    });
+  });
+
+  describe('deleteMieter - loeschschutz', () => {
+    it('should propagate the server message when tarifpositionen exist', () => {
+      let body: { error?: string } | undefined;
+
+      service.deleteMieter(1).subscribe({
+        next: () => { throw new Error('should not succeed'); },
+        error: (error) => { body = error.error; }
+      });
+
+      const req = httpMock.expectOne(`${apiUrl}/1`);
+      req.flush(
+        { error: 'Mieter kann nicht gelöscht werden: 3 Tarifpositionen vorhanden' },
+        { status: 409, statusText: 'Conflict' }
+      );
+
+      expect(body?.error).toContain('3 Tarifpositionen');
+    });
+  });
+
   describe('updateMieter', () => {
     it('should update an existing mieter', () => {
       const updatedMieter: Mieter = {

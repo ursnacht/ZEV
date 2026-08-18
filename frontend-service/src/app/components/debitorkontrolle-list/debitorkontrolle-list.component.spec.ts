@@ -22,7 +22,8 @@ describe('DebitorkontrolleListComponent', () => {
   const mockEinheiten: Einheit[] = [
     { id: 1, name: 'EG links', typ: EinheitTyp.CONSUMER },
     { id: 2, name: 'OG rechts', typ: EinheitTyp.CONSUMER },
-    { id: 3, name: 'Solaranlage', typ: EinheitTyp.PRODUCER }
+    { id: 3, name: 'Solaranlage', typ: EinheitTyp.PRODUCER },
+    { id: 4, name: 'Ladestation 1', typ: EinheitTyp.LADESTATION, messpunkt: 'RFID-04711' }
   ];
 
   const mockMieter: Mieter[] = [
@@ -84,9 +85,11 @@ describe('DebitorkontrolleListComponent', () => {
       expect(mieterServiceSpy.getAllMieter).toHaveBeenCalled();
     });
 
-    it('should filter einheiten to CONSUMER only', () => {
-      expect(component.einheiten.length).toBe(2);
-      expect(component.einheiten.every(e => e.typ === EinheitTyp.CONSUMER)).toBe(true);
+    it('should keep consumers and ladestationen as name lookup', () => {
+      // Ein Nutzer ohne Wohnung wird ueber seine Ladestation abgerechnet und braucht in der
+      // Debitorkontrolle einen Einheitennamen (Specs/Ladestationen.md FR-1.5).
+      expect(component.einheiten.map(e => e.id)).toEqual([1, 2, 4]);
+      expect(component.einheiten.some(e => e.typ === EinheitTyp.PRODUCER)).toBe(false);
     });
 
     it('should not show form initially', () => {
@@ -540,6 +543,26 @@ describe('DebitorkontrolleListComponent', () => {
 
     it('should return empty string for unknown mieter', () => {
       expect(component.getEinheitName(999)).toBe('');
+    });
+
+    it('should list wohnung and ladestation of the same mieter', () => {
+      component.mieter = [{ ...mockMieter[0], einheitIds: [1, 4] }];
+      expect(component.getEinheitName(10)).toBe('EG links, Ladestation 1');
+    });
+
+    it('should return the ladestation name for a nutzer ohne wohnung', () => {
+      component.mieter = [{ ...mockMieter[0], einheitIds: [4] }];
+      expect(component.getEinheitName(10)).toBe('Ladestation 1');
+    });
+
+    it('should return empty string when no einheit is assigned', () => {
+      component.mieter = [{ ...mockMieter[0], einheitIds: [] }];
+      expect(component.getEinheitName(10)).toBe('');
+    });
+
+    it('should skip einheiten that are not in the lookup', () => {
+      component.mieter = [{ ...mockMieter[0], einheitIds: [1, 999] }];
+      expect(component.getEinheitName(10)).toBe('EG links');
     });
   });
 
