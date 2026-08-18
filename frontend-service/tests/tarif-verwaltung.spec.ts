@@ -4,10 +4,46 @@ import { navigateViaMenu, clickKebabMenuItem, waitForFormResult, waitForTableWit
 /**
  * tests / tarif-verwaltung.spec.ts
  * E2E tests for the Tarif (Tariff) Management page
+ *
+ * **Jeder Test bekommt sein eigenes Gueltigkeitsjahr** (siehe `gueltigkeit`).
+ * Vorher legten alle Tests ihre Tarife im selben Zeitraum 2099 an. Innerhalb eines Browsers
+ * ging das gut (die Tests laufen nacheinander und raeumen auf), zwei parallele Browser-Projekte
+ * verletzten aber die Ueberschneidungsregel je Tariftyp. Die Anlage schlug fehl, und die Tests
+ * meldeten wegen `if (isSuccess) { ... }` trotzdem gruen - sichtbar nur als
+ * "Tariff creation failed, skipping ..." im Log. Mit disjunkten Jahren je Test *und* je Projekt
+ * kann sich kein Lauf mehr mit einem anderen ueberschneiden.
  */
 
 // Track created tariffs for cleanup
 let createdTarifNames: string[] = [];
+
+/**
+ * Basisjahr je Browser-Projekt. Die Bereiche sind disjunkt und liegen ausserhalb der echten
+ * Tarife wie auch der Bereiche anderer Suites (ladestationen: 2089, ladestromtarif: 2093-2098).
+ */
+const PROJEKT_BASISJAHR: Record<string, number> = { chromium: 2070, firefox: 2060 };
+
+/**
+ * Gueltigkeitszeitraum fuer einen Test. `slot` ist je Test eindeutig (0-9) und ergibt zusammen
+ * mit dem Basisjahr des Projekts ein Jahr, das kein anderer Test verwendet.
+ */
+function gueltigkeit(slot: number): { von: string; bis: string; jahr: number } {
+    const basis = PROJEKT_BASISJAHR[test.info().project.name] ?? 2050;
+    const jahr = basis + slot;
+    return { von: `${jahr}-01-01`, bis: `${jahr}-12-31`, jahr };
+}
+
+/**
+ * Helper to create a unique test tariff name.
+ * IMPORTANT: bezeichnung is limited to 30 chars in DB (@Column length=30).
+ */
+function generateTestTarifName(prefix: string = 'E2E Test'): string {
+    const name = `${prefix} ${Date.now()}`;
+    if (name.length > 30) {
+        throw new Error(`Tarif-Bezeichnung "${name}" ist laenger als die 30 Zeichen des Felds`);
+    }
+    return name;
+}
 
 /**
  * Helper function to navigate to Tarif management page
@@ -22,19 +58,10 @@ async function navigateToTarife(page: Page): Promise<void> {
 }
 
 /**
- * Helper to create a unique test tariff name.
- * IMPORTANT: bezeichnung is limited to 30 chars in DB (@Column length=30).
- * Max prefix length = 30 - 1 (space) - 13 (timestamp digits) = 16 chars.
- */
-function generateTestTarifName(prefix: string = 'E2E Test'): string {
-    return `${prefix} ${Date.now()}`;
-}
-
-/**
  * Helper to fill the tariff form
  */
 async function fillTarifForm(page: Page, data: {
-    tariftyp: 'ZEV' | 'VNB';
+    tariftyp: 'ZEV' | 'VNB' | 'GRUNDGEBUEHR';
     bezeichnung: string;
     preis: string;
     gueltigVon: string;
@@ -42,44 +69,100 @@ async function fillTarifForm(page: Page, data: {
 }): Promise<void> {
     await page.locator('#tariftyp').selectOption(data.tariftyp);
     await page.locator('#bezeichnung').fill(data.bezeichnung);
+    // Das Feld kuerzt ohne Rueckmeldung - eine Kuerzung soll hier scheitern, nicht spaeter
+    // als "Zeile nicht gefunden"
+    await expect(page.locator('#bezeichnung')).toHaveValue(data.bezeichnung);
     await page.locator('#preis').fill(data.preis);
     await page.locator('#gueltigVon').fill(data.gueltigVon);
     await page.locator('#gueltigBis').fill(data.gueltigBis);
 }
 
 /**
+ * Wartet, bis keine Meldung mehr steht.
+ *
+ * Zwingend vor jedem Absenden: Erfolgsmeldungen blenden sich erst nach 5 Sekunden aus. Eine
+ * noch stehende Meldung der vorherigen Aktion wuerde sonst als Ergebnis der naechsten gewertet -
+ * ein abgewiesenes Speichern saehe dann wie ein erfolgreiches aus.
+ */
+async function clearMessages(page: Page): Promise<void> {
+    const error = page.locator('.zev-message--error');
+    if (await error.isVisible().catch(() => false)) {
+        await error.click();
+        await expect(error).not.toBeVisible({ timeout: 5000 });
+    }
+    const success = page.locator('.zev-message--success');
+    if (await success.isVisible().catch(() => false)) {
+        await expect(success).not.toBeVisible({ timeout: 10000 });
+    }
+}
+
+/**
+ * Sendet das offene Formular ab und besteht auf einer Erfolgsmeldung.
+ *
+ * Ersetzt das fruehere `try { … } catch { return; }` samt `if (isSuccess)`: Ein Fehlschlag
+ * beim Speichern ist ein Testergebnis, kein Grund zum stillen Aussteigen. Die Server-Meldung
+ * wandert in die Fehlermeldung, damit der Grund im Report steht.
+ */
+async function submitAndExpectSuccess(page: Page, was: string): Promise<void> {
+    await clearMessages(page);
+    await page.locator('button[type="submit"]').click();
+    const isSuccess = await waitForFormResult(page, 20000);
+    if (!isSuccess) {
+        const meldung = await page.locator('.zev-message--error').textContent().catch(() => '');
+        throw new Error(`${was} konnte nicht gespeichert werden: ${meldung?.trim()}`);
+    }
+}
+
+/**
+ * Legt einen Tarif an, registriert ihn fuer das Aufraeumen und prueft, dass er in der Liste steht.
+ * Erwartet die geoeffnete Tarif-Liste.
+ */
+async function createTarifOrFail(page: Page, data: {
+    tariftyp: 'ZEV' | 'VNB' | 'GRUNDGEBUEHR';
+    bezeichnung: string;
+    preis: string;
+    gueltigVon: string;
+    gueltigBis: string;
+}): Promise<void> {
+    await page.locator('button.zev-button--primary').first().click();
+    await expect(page.locator('form')).toBeVisible();
+
+    await fillTarifForm(page, data);
+
+    createdTarifNames.push(data.bezeichnung);
+    await submitAndExpectSuccess(page, `Tarif "${data.bezeichnung}"`);
+
+    await waitForTableWithData(page, 10000);
+    await expect(page.locator(`tr:has-text("${data.bezeichnung}")`)).toBeVisible({ timeout: 10000 });
+}
+
+/**
  * Helper to delete a tariff by name
  */
 async function deleteTarifByName(page: Page, name: string): Promise<void> {
-    console.log(`Cleanup: Attempting to delete tariff "${name}"`);
     try {
         page.removeAllListeners('dialog');
 
         await navigateToTarife(page);
 
         // Cancel any open form first
-        const cancelButton = page.locator('button.zev-button--secondary');
-        if (await cancelButton.isVisible().catch(() => false)) {
+        const cancelButton = page.locator('button.zev-button--secondary').first();
+        const form = page.locator('form');
+        if (await form.isVisible().catch(() => false)
+            && await cancelButton.isVisible().catch(() => false)) {
             await cancelButton.click();
             await page.waitForTimeout(300);
         }
 
         await waitForTableWithData(page, 10000);
 
-        const tarifRow = page.locator(`tr:has-text("${name}")`);
-        const isVisible = await tarifRow.isVisible().catch(() => false);
-        console.log(`Cleanup: Tariff row "${name}" visible: ${isVisible}`);
-
-        if (!isVisible) {
-            console.log(`Cleanup: Tariff "${name}" not found (may already be deleted)`);
+        const tarifRow = page.locator(`tr:has-text("${name}")`).first();
+        if (!await tarifRow.isVisible().catch(() => false)) {
             return;
         }
 
         // Set up dialog handler BEFORE clicking, use once() to avoid accumulation
-        page.once('dialog', async dialog => {
-            console.log('Cleanup: Dialog appeared, accepting...');
-            await dialog.accept();
-        });
+        page.once('dialog', async dialog => { await dialog.accept(); });
 
         // Wait for DELETE API response as reliable completion signal
         const deleteResponsePromise = page.waitForResponse(
@@ -90,19 +173,62 @@ async function deleteTarifByName(page: Page, name: string): Promise<void> {
         await clickKebabMenuItem(page, tarifRow, 'delete');
 
         await deleteResponsePromise.catch(() =>
-            console.log(`Cleanup: No DELETE response detected for "${name}"`)
+            console.log(`Cleanup: Keine DELETE-Antwort fuer "${name}"`)
         );
 
-        // Wait for the row to disappear from the DOM
         await tarifRow.waitFor({ state: 'hidden', timeout: 5000 }).catch(() =>
-            console.log(`Cleanup: Row "${name}" still visible after delete`)
+            console.log(`Cleanup: Tarif "${name}" ist nach dem Loeschen noch sichtbar`)
         );
-
-        console.log(`Cleanup: Successfully deleted tariff "${name}"`);
     } catch (error) {
-        console.log(`Cleanup: Error deleting tariff "${name}": ${error}`);
+        console.log(`Cleanup: Fehler beim Loeschen des Tarifs "${name}": ${error}`);
         page.removeAllListeners('dialog');
     }
+}
+
+/**
+ * Loest eine Validierung aus und liefert das Ergebnis des Servers.
+ *
+ * Auf die HTTP-Antwort zu warten statt nur auf die gerenderte Meldung trennt zwei Dinge, die
+ * sich im UI aehnlich sehen: das fachliche Ergebnis (`VALIDIERUNG_FEHLER` samt Luecken-Liste)
+ * und einen echten Uebertragungsfehler (`FEHLER_VALIDIERUNG` aus dem error-Zweig). Ob die
+ * Umgebung gerade Luecken hat, darf der Test nicht vorwegnehmen - ein fehlgeschlagener Aufruf
+ * dagegen ist immer ein Testergebnis.
+ */
+async function runValidation(page: Page, modus: 'quartale' | 'jahre'): Promise<{ valid: boolean }> {
+    const muster = modus === 'jahre' ? /jahr/i : /quartal/i;
+    // Kurz warten, bis die Seite steht: Wird direkt nach dem Laden geklickt, bricht der Aufruf
+    // in Chromium gelegentlich ab - der Server antwortet dann mit 200, im UI erscheint aber der
+    // generische Uebertragungsfehler.
+    await page.waitForTimeout(1000);
+    const [response] = await Promise.all([
+        page.waitForResponse(
+            r => r.url().includes('/api/tarife/validate') && r.request().method() === 'POST',
+            { timeout: 20000 }),
+        page.locator('.zev-button-row button.zev-button--secondary').filter({ hasText: muster }).click()
+    ]);
+
+    expect(response.status(), 'Die Validierung muss serverseitig durchlaufen').toBe(200);
+
+    const success = page.locator('.zev-message--success');
+    const error = page.locator('.zev-message--error');
+    await expect(success.or(error)).toBeVisible({ timeout: 15000 });
+
+    const valid = await success.isVisible().catch(() => false);
+    if (!valid) {
+        // BEKANNTER BEFUND (Stand 18.08.2026): Schlaegt die folgende Zusicherung fehl, obwohl der
+        // Server oben mit 200 geantwortet hat, bricht die Antwort auf der Leitung ab -
+        // `net::ERR_INCOMPLETE_CHUNKED_ENCODING` auf /api/tarife/validate. Chromium verwirft die
+        // Antwort dann, Angular landet im error-Zweig und zeigt FEHLER_VALIDIERUNG statt der
+        // Luecken-Liste; Firefox toleriert es. Reproduzierbar in etwa 3 von 5 Aufrufen.
+        // Nicht erneut als Testproblem diagnostizieren - die Ursache liegt in der Auslieferung
+        // der Antwort (Backend/Reverse-Proxy).
+        // Die Meldung zu Luecken nennt jede Periode einzeln. Bleibt die Liste leer, steht dort
+        // der generische Uebertragungsfehler (FEHLER_VALIDIERUNG) - und der passt nicht zu einer
+        // Antwort mit Status 200. Der Response-Body wird bewusst nicht gelesen: Navigiert die
+        // Seite zwischendurch, ist er nicht mehr abrufbar und der Test scheiterte an sich selbst.
+        await expect(page.locator('.validation-errors li').first()).toBeVisible({ timeout: 5000 });
+    }
+    return { valid };
 }
 
 /**
@@ -129,60 +255,38 @@ test.describe('Tarif Management - Navigation and Display', () => {
     test('should display the tariff management page with table and create button', async ({ page }) => {
         await navigateToTarife(page);
 
-        // Check for page title
         const title = page.locator('.zev-container h1');
         await expect(title).toBeVisible();
 
-        // Check for "Create new tariff" button
         const createButton = page.locator('button.zev-button--primary');
         await expect(createButton).toBeVisible();
 
-        // Check that either the table or empty message is visible
-        const table = page.locator('.zev-table');
-        const emptyMessage = page.locator('p');
-        const hasTable = await table.isVisible().catch(() => false);
-        const hasEmptyMessage = await emptyMessage.isVisible().catch(() => false);
-
-        expect(hasTable || hasEmptyMessage).toBeTruthy();
+        await expect(page.locator('.zev-table')).toBeVisible();
     });
 
     test('should display tariff table with correct columns', async ({ page }) => {
         await navigateToTarife(page);
 
-        // Wait for table to be visible (may need to check if tariffs exist)
-        const table = page.locator('.zev-table');
-        const hasTable = await table.isVisible().catch(() => false);
+        await expect(page.locator('.zev-table')).toBeVisible();
 
-        if (hasTable) {
-            // Check for expected column headers
-            const headers = page.locator('.zev-table th');
-            const headerTexts = await headers.allTextContents();
-
-            // Should have columns for: Tariftyp, Bezeichnung, Preis, Gueltig von, Gueltig bis, Actions
-            expect(headerTexts.length).toBeGreaterThanOrEqual(6);
-        }
+        const headers = page.locator('.zev-table th');
+        // Tariftyp, Bezeichnung, Preis, Gueltig von, Gueltig bis, Actions
+        expect(await headers.count()).toBeGreaterThanOrEqual(6);
     });
 
     test('should display tariff type badges (ZEV/VNB)', async ({ page }) => {
         await navigateToTarife(page);
 
-        // Check if tariff type badges are displayed
-        const zevBadge = page.locator('.tarif-typ-badge--zev');
-        const vnbBadge = page.locator('.tarif-typ-badge--vnb');
-
-        // At least one badge should be visible if tariffs exist
-        const hasZev = await zevBadge.first().isVisible().catch(() => false);
-        const hasVnb = await vnbBadge.first().isVisible().catch(() => false);
-
-        // Check badges if tariffs exist in table
         const tableRows = page.locator('.zev-table tbody tr');
-        const rowCount = await tableRows.count();
+        // Badges lassen sich nur mit Daten pruefen - eine leere Tabelle ist hier ein
+        // Umgebungsfehler und soll auffallen, statt den Test stumm durchzuwinken.
+        expect(await tableRows.count(),
+            'Fuer den Badge-Test wird mindestens ein Tarif benoetigt').toBeGreaterThan(0);
 
-        if (rowCount > 0) {
-            // Each row should have a badge
-            const badges = page.locator('.tarif-typ-badge');
-            await expect(badges.first()).toBeVisible();
-        }
+        // Jede Zeile traegt ein Badge
+        const badges = page.locator('.zev-table tbody .tarif-typ-badge');
+        expect(await badges.count()).toBe(await tableRows.count());
+        await expect(badges.first()).toBeVisible();
     });
 });
 
@@ -190,31 +294,21 @@ test.describe('Tarif Management - Sorting', () => {
     test('should sort tariffs by clicking on column headers', async ({ page }) => {
         await navigateToTarife(page);
 
-        // Wait for table to load
-        const table = page.locator('.zev-table');
-        const hasTable = await table.isVisible().catch(() => false);
+        await expect(page.locator('.zev-table')).toBeVisible();
 
-        if (hasTable) {
-            // Get initial order of first column values
-            const firstColumnCells = page.locator('.zev-table tbody td:first-child');
-            const initialValues = await firstColumnCells.allTextContents();
+        const rows = page.locator('.zev-table tbody tr');
+        expect(await rows.count(),
+            'Fuer den Sortier-Test werden mindestens zwei Tarife benoetigt').toBeGreaterThan(1);
 
-            if (initialValues.length > 1) {
-                // Click on Tariftyp header to sort
-                const tariftypHeader = page.locator('th').filter({ hasText: /Tariftyp/i }).first();
-                await tariftypHeader.click();
+        const tariftypHeader = page.locator('th').filter({ hasText: /Tariftyp/i }).first();
+        await tariftypHeader.click();
 
-                // Check for sort indicator
-                const sortIndicator = page.locator('.zev-table__sort-indicator');
-                await expect(sortIndicator.first()).toBeVisible();
+        const sortIndicator = page.locator('.zev-table__sort-indicator');
+        await expect(sortIndicator.first()).toBeVisible();
 
-                // Click again to reverse sort
-                await tariftypHeader.click();
-
-                // Verify sort indicator is still visible (just direction changed)
-                await expect(sortIndicator.first()).toBeVisible();
-            }
-        }
+        // Erneuter Klick dreht die Richtung um
+        await tariftypHeader.click();
+        await expect(sortIndicator.first()).toBeVisible();
     });
 });
 
@@ -222,22 +316,18 @@ test.describe('Tarif Management - Create Tariff', () => {
     test('should show tariff form when clicking create button', async ({ page }) => {
         await navigateToTarife(page);
 
-        // Click create button
         const createButton = page.locator('button.zev-button--primary').first();
         await createButton.click();
 
-        // Form should now be visible
         const form = page.locator('form');
         await expect(form).toBeVisible();
 
-        // Check for form fields
         await expect(page.locator('#tariftyp')).toBeVisible();
         await expect(page.locator('#bezeichnung')).toBeVisible();
         await expect(page.locator('#preis')).toBeVisible();
         await expect(page.locator('#gueltigVon')).toBeVisible();
         await expect(page.locator('#gueltigBis')).toBeVisible();
 
-        // Check for submit and cancel buttons
         const submitButton = page.locator('button[type="submit"]');
         const cancelButton = page.locator('button.zev-button--secondary');
         await expect(submitButton).toBeVisible();
@@ -247,117 +337,49 @@ test.describe('Tarif Management - Create Tariff', () => {
     test('should create a new ZEV tariff successfully', async ({ page }) => {
         await navigateToTarife(page);
 
-        // Click create button
-        const createButton = page.locator('button.zev-button--primary').first();
-        await createButton.click();
-
-        // Fill in the form
         const testName = generateTestTarifName('ZEV Test');
-        await fillTarifForm(page, {
+        const zeitraum = gueltigkeit(0);
+        await createTarifOrFail(page, {
             tariftyp: 'ZEV',
             bezeichnung: testName,
             preis: '0.19500',
-            gueltigVon: '2099-01-01',
-            gueltigBis: '2099-12-31'
+            gueltigVon: zeitraum.von,
+            gueltigBis: zeitraum.bis
         });
 
-        // Submit the form
-        const submitButton = page.locator('button[type="submit"]');
-        await submitButton.click();
-
-        // Wait for form result
-        let isSuccess = false;
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('Tariff creation failed, skipping verification');
-            return;
-        }
-
-        if (isSuccess) {
-            // Track for cleanup
-            createdTarifNames.push(testName);
-
-            // Wait for table to reload
-            await waitForTableWithData(page, 10000);
-
-            // Verify the new tariff appears in the table
-            const newTarifRow = page.locator(`tr:has-text("${testName}")`);
-            await expect(newTarifRow).toBeVisible({ timeout: 10000 });
-
-            // Verify it has ZEV badge
-            const zevBadge = newTarifRow.locator('.tarif-typ-badge--zev');
-            await expect(zevBadge).toBeVisible();
-        } else {
-            console.log('Tariff creation failed, skipping verification');
-        }
+        const newTarifRow = page.locator(`tr:has-text("${testName}")`).first();
+        await expect(newTarifRow.locator('.tarif-typ-badge--zev')).toBeVisible();
     });
 
     test('should create a new VNB tariff successfully', async ({ page }) => {
         await navigateToTarife(page);
 
-        // Click create button
-        const createButton = page.locator('button.zev-button--primary').first();
-        await createButton.click();
-
-        // Fill in the form
         const testName = generateTestTarifName('VNB Test');
-        await fillTarifForm(page, {
+        const zeitraum = gueltigkeit(1);
+        await createTarifOrFail(page, {
             tariftyp: 'VNB',
             bezeichnung: testName,
             preis: '0.34192',
-            gueltigVon: '2099-01-01',
-            gueltigBis: '2099-12-31'
+            gueltigVon: zeitraum.von,
+            gueltigBis: zeitraum.bis
         });
 
-        // Submit the form
-        const submitButton = page.locator('button[type="submit"]');
-        await submitButton.click();
-
-        // Wait for form result
-        let isSuccess = false;
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('Tariff creation failed, skipping verification');
-            return;
-        }
-
-        if (isSuccess) {
-            // Track for cleanup
-            createdTarifNames.push(testName);
-
-            // Wait for table to reload
-            await waitForTableWithData(page, 10000);
-
-            // Verify the new tariff appears in the table
-            const newTarifRow = page.locator(`tr:has-text("${testName}")`);
-            await expect(newTarifRow).toBeVisible({ timeout: 10000 });
-
-            // Verify it has VNB badge
-            const vnbBadge = newTarifRow.locator('.tarif-typ-badge--vnb');
-            await expect(vnbBadge).toBeVisible();
-        } else {
-            console.log('Tariff creation failed, skipping verification');
-        }
+        const newTarifRow = page.locator(`tr:has-text("${testName}")`).first();
+        await expect(newTarifRow.locator('.tarif-typ-badge--vnb')).toBeVisible();
     });
 
     test('should cancel form and return to list', async ({ page }) => {
         await navigateToTarife(page);
 
-        // Click create button
         const createButton = page.locator('button.zev-button--primary').first();
         await createButton.click();
 
-        // Form should be visible
         const form = page.locator('form');
         await expect(form).toBeVisible();
 
-        // Click cancel button
         const cancelButton = page.locator('button.zev-button--secondary');
         await cancelButton.click();
 
-        // Form should be hidden, list should be visible
         await expect(form).not.toBeVisible();
         const createButtonAgain = page.locator('button.zev-button--primary').first();
         await expect(createButtonAgain).toBeVisible();
@@ -368,18 +390,16 @@ test.describe('Tarif Management - Form Validation', () => {
     test('should show error for empty bezeichnung', async ({ page }) => {
         await navigateToTarife(page);
 
-        // Click create button
         const createButton = page.locator('button.zev-button--primary').first();
         await createButton.click();
 
-        // Fill form with empty bezeichnung
+        const zeitraum = gueltigkeit(9);
         await page.locator('#tariftyp').selectOption('ZEV');
         await page.locator('#bezeichnung').fill('');
         await page.locator('#preis').fill('0.20000');
-        await page.locator('#gueltigVon').fill('2099-01-01');
-        await page.locator('#gueltigBis').fill('2099-12-31');
+        await page.locator('#gueltigVon').fill(zeitraum.von);
+        await page.locator('#gueltigBis').fill(zeitraum.bis);
 
-        // Check that submit button is disabled or error message is shown
         const submitButton = page.locator('button[type="submit"]');
         const isDisabled = await submitButton.isDisabled();
         const errorMessage = page.locator('.zev-form-error');
@@ -391,18 +411,16 @@ test.describe('Tarif Management - Form Validation', () => {
     test('should show error for invalid date range (von > bis)', async ({ page }) => {
         await navigateToTarife(page);
 
-        // Click create button
         const createButton = page.locator('button.zev-button--primary').first();
         await createButton.click();
 
-        // Fill form with invalid date range
+        const zeitraum = gueltigkeit(9);
         await page.locator('#tariftyp').selectOption('ZEV');
         await page.locator('#bezeichnung').fill('Test Invalid Date');
         await page.locator('#preis').fill('0.20000');
-        await page.locator('#gueltigVon').fill('2099-12-31');
-        await page.locator('#gueltigBis').fill('2099-01-01'); // Before von
+        await page.locator('#gueltigVon').fill(zeitraum.bis);
+        await page.locator('#gueltigBis').fill(zeitraum.von); // Before von
 
-        // Check that error message is shown or button is disabled
         const submitButton = page.locator('button[type="submit"]');
         const isDisabled = await submitButton.isDisabled();
         const errorMessage = page.locator('.zev-form-error');
@@ -414,18 +432,16 @@ test.describe('Tarif Management - Form Validation', () => {
     test('should show error for negative price', async ({ page }) => {
         await navigateToTarife(page);
 
-        // Click create button
         const createButton = page.locator('button.zev-button--primary').first();
         await createButton.click();
 
-        // Fill form with negative price
+        const zeitraum = gueltigkeit(9);
         await page.locator('#tariftyp').selectOption('ZEV');
         await page.locator('#bezeichnung').fill('Test Negative Price');
         await page.locator('#preis').fill('-0.10000');
-        await page.locator('#gueltigVon').fill('2099-01-01');
-        await page.locator('#gueltigBis').fill('2099-12-31');
+        await page.locator('#gueltigVon').fill(zeitraum.von);
+        await page.locator('#gueltigBis').fill(zeitraum.bis);
 
-        // Check that error message is shown or button is disabled
         const submitButton = page.locator('button[type="submit"]');
         const isDisabled = await submitButton.isDisabled();
         const errorMessage = page.locator('.zev-form-error');
@@ -439,85 +455,30 @@ test.describe('Tarif Management - Edit Tariff', () => {
     test('should edit an existing tariff', async ({ page }) => {
         await navigateToTarife(page);
 
-        // First create a test tariff
-        let createButton = page.locator('button.zev-button--primary').first();
-        await createButton.click();
-
         const originalName = generateTestTarifName('Edit Test');
-        await fillTarifForm(page, {
+        const zeitraum = gueltigkeit(2);
+        await createTarifOrFail(page, {
             tariftyp: 'ZEV',
             bezeichnung: originalName,
             preis: '0.20000',
-            gueltigVon: '2099-01-01',
-            gueltigBis: '2099-06-30'
+            gueltigVon: zeitraum.von,
+            gueltigBis: zeitraum.bis
         });
 
-        let submitButton = page.locator('button[type="submit"]');
-        await submitButton.click();
-
-        // Wait for form result
-        let isSuccess = false;
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('Tariff creation failed, skipping edit test');
-            return;
-        }
-
-        if (!isSuccess) {
-            console.log('Tariff creation failed, skipping edit test');
-            return;
-        }
-
-        // Track for cleanup
-        createdTarifNames.push(originalName);
-
-        // Wait for table to reload
-        await waitForTableWithData(page, 10000);
-
-        // Find the row and click edit
-        const tarifRow = page.locator(`tr:has-text("${originalName}")`);
-        await expect(tarifRow).toBeVisible({ timeout: 10000 });
-
-        // Use kebab menu for edit
+        const tarifRow = page.locator(`tr:has-text("${originalName}")`).first();
         await clickKebabMenuItem(page, tarifRow, 'edit');
 
-        // Form should now be in edit mode
         await expect(page.locator('form')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#bezeichnung')).toHaveValue(originalName);
 
-        // Verify form is populated with existing values
-        const bezeichnungInput = page.locator('#bezeichnung');
-        await expect(bezeichnungInput).toHaveValue(originalName);
-
-        // Change the price
         await page.locator('#preis').fill('0.21000');
+        await submitAndExpectSuccess(page, `Tarif "${originalName}"`);
 
-        // Save changes
-        submitButton = page.locator('button[type="submit"]');
-        await submitButton.click();
-
-        // Wait for form result after edit
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('Tariff edit failed, skipping verification');
-            return;
-        }
-
-        if (!isSuccess) {
-            console.log('Tariff edit failed, skipping verification');
-            // Cancel form if still visible
-            const cancelButton = page.locator('button.zev-button--secondary');
-            if (await cancelButton.isVisible().catch(() => false)) {
-                await cancelButton.click();
-            }
-            return;
-        }
-
-        // Wait for table to reload
         await waitForTableWithData(page, 10000);
-        const updatedRow = page.locator(`tr:has-text("${originalName}")`);
+        const updatedRow = page.locator(`tr:has-text("${originalName}")`).first();
         await expect(updatedRow).toBeVisible({ timeout: 10000 });
+        // Der geaenderte Preis muss in der Liste ankommen (Schweizer Format mit Punkt)
+        await expect(updatedRow).toContainText('0.21');
     });
 });
 
@@ -525,126 +486,53 @@ test.describe('Tarif Management - Delete Tariff', () => {
     test('should show confirmation dialog when deleting tariff', async ({ page }) => {
         await navigateToTarife(page);
 
-        // First create a test tariff
-        const createButton = page.locator('button.zev-button--primary').first();
-        await createButton.click();
-
         const testName = generateTestTarifName('Delete Test');
-        await fillTarifForm(page, {
+        const zeitraum = gueltigkeit(3);
+        await createTarifOrFail(page, {
             tariftyp: 'ZEV',
             bezeichnung: testName,
             preis: '0.20000',
-            gueltigVon: '2099-01-01',
-            gueltigBis: '2099-12-31'
+            gueltigVon: zeitraum.von,
+            gueltigBis: zeitraum.bis
         });
 
-        const submitButton = page.locator('button[type="submit"]');
-        await submitButton.click();
+        const tarifRow = page.locator(`tr:has-text("${testName}")`).first();
 
-        // Wait for form result
-        let isSuccess = false;
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('Tariff creation failed, skipping delete test');
-            return;
-        }
-
-        if (!isSuccess) {
-            console.log('Tariff creation failed, skipping delete test');
-            return;
-        }
-
-        // Track for cleanup (in case test fails before deletion)
-        createdTarifNames.push(testName);
-
-        // Wait for table to reload
-        await waitForTableWithData(page, 10000);
-
-        // Find the row
-        const tarifRow = page.locator(`tr:has-text("${testName}")`);
-        await expect(tarifRow).toBeVisible({ timeout: 10000 });
-
-        // Set up dialog handler to dismiss
+        // Dialog abweisen - der Tarif muss erhalten bleiben
         let dialogMessage = '';
         page.once('dialog', async dialog => {
             dialogMessage = dialog.message();
-            await dialog.dismiss(); // Cancel deletion
+            await dialog.dismiss();
         });
 
-        // Click delete button via kebab menu
         await clickKebabMenuItem(page, tarifRow, 'delete');
-
         await page.waitForTimeout(500);
 
-        // Verify dialog was shown
         expect(dialogMessage).toBeTruthy();
-
-        // Tariff should still exist
         await expect(tarifRow).toBeVisible();
-
-        // Cleanup will happen in afterEach
     });
 
     test('should delete tariff when confirmed', async ({ page }) => {
         await navigateToTarife(page);
 
-        // First create a test tariff
-        const createButton = page.locator('button.zev-button--primary').first();
-        await createButton.click();
-
         const testName = generateTestTarifName('Delete Confirm');
-        await fillTarifForm(page, {
+        const zeitraum = gueltigkeit(4);
+        await createTarifOrFail(page, {
             tariftyp: 'VNB',
             bezeichnung: testName,
             preis: '0.35000',
-            gueltigVon: '2099-01-01',
-            gueltigBis: '2099-12-31'
+            gueltigVon: zeitraum.von,
+            gueltigBis: zeitraum.bis
         });
 
-        const submitButton = page.locator('button[type="submit"]');
-        await submitButton.click();
+        const tarifRow = page.locator(`tr:has-text("${testName}")`).first();
 
-        // Wait for form result
-        let isSuccess = false;
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('Tariff creation failed, skipping delete test');
-            return;
-        }
-
-        if (!isSuccess) {
-            console.log('Tariff creation failed, skipping delete test');
-            return;
-        }
-
-        // Track for cleanup (in case deletion fails)
-        createdTarifNames.push(testName);
-
-        // Wait for table to reload
-        await waitForTableWithData(page, 10000);
-
-        // Find the row
-        const tarifRow = page.locator(`tr:has-text("${testName}")`);
-        await expect(tarifRow).toBeVisible({ timeout: 10000 });
-
-        // Set up dialog handler BEFORE clicking delete
-        page.once('dialog', async dialog => {
-            await dialog.accept();
-        });
-
-        // Click delete button via kebab menu
+        page.once('dialog', async dialog => { await dialog.accept(); });
         await clickKebabMenuItem(page, tarifRow, 'delete');
 
-        // Wait for deletion - the specific row should disappear
-        try {
-            await expect(tarifRow).not.toBeVisible({ timeout: 10000 });
-            // Remove from tracking since it was successfully deleted
-            createdTarifNames = createdTarifNames.filter(n => n !== testName);
-        } catch {
-            console.log('Tariff deletion may have failed, row still visible');
-        }
+        // Kein try/catch: Bleibt die Zeile stehen, ist das Loeschen fehlgeschlagen
+        await expect(tarifRow).toHaveCount(0, { timeout: 10000 });
+        createdTarifNames = createdTarifNames.filter(n => n !== testName);
     });
 });
 
@@ -652,75 +540,39 @@ test.describe('Tarif Management - Overlapping Validation', () => {
     test('should show error when creating overlapping tariff of same type', async ({ page }) => {
         await navigateToTarife(page);
 
-        // Create first tariff
-        let createButton = page.locator('button.zev-button--primary').first();
-        await createButton.click();
-
-        const testName1 = generateTestTarifName('Overlap Test 1');
-        await fillTarifForm(page, {
+        const zeitraum = gueltigkeit(5);
+        const testName1 = generateTestTarifName('Overlap 1');
+        await createTarifOrFail(page, {
             tariftyp: 'ZEV',
             bezeichnung: testName1,
             preis: '0.20000',
-            gueltigVon: '2098-01-01',
-            gueltigBis: '2098-12-31'
+            gueltigVon: zeitraum.von,
+            gueltigBis: zeitraum.bis
         });
 
-        let submitButton = page.locator('button[type="submit"]');
-        await submitButton.click();
-
-        // Wait for API response - either success message or error message
-        const successMessage = page.locator('.zev-message--success');
-        const errorMessage = page.locator('.zev-message--error');
-        await expect(successMessage.or(errorMessage)).toBeVisible({ timeout: 15000 });
-
-        // Check if first tariff creation was successful
-        let isSuccess = await successMessage.isVisible().catch(() => false);
-        if (!isSuccess) {
-            console.log('First tariff creation failed, skipping overlapping test');
-            return;
-        }
-
-        // Track for cleanup
-        createdTarifNames.push(testName1);
-
-        // Wait for list
-        await page.locator('.zev-table').waitFor({ state: 'visible', timeout: 10000 });
-
-        // Try to create overlapping tariff
-        createButton = page.locator('button.zev-button--primary').first();
-        await createButton.click();
-
-        const testName2 = generateTestTarifName('Overlap Test 2');
+        // Zweiter Tarif desselben Typs, der in den ersten hineinragt -> muss abgewiesen werden
+        const testName2 = generateTestTarifName('Overlap 2');
+        await page.locator('button.zev-button--primary').first().click();
+        await expect(page.locator('form')).toBeVisible();
         await fillTarifForm(page, {
-            tariftyp: 'ZEV', // Same type
+            tariftyp: 'ZEV',
             bezeichnung: testName2,
             preis: '0.21000',
-            gueltigVon: '2098-06-01', // Overlaps with first tariff
-            gueltigBis: '2099-06-30'
+            gueltigVon: `${zeitraum.jahr}-06-01`,
+            gueltigBis: `${zeitraum.jahr + 1}-06-30`
         });
 
-        submitButton = page.locator('button[type="submit"]');
-        await submitButton.click();
-
-        // Wait for API response
-        await expect(successMessage.or(errorMessage)).toBeVisible({ timeout: 15000 });
-
-        // Either error message is shown (overlapping validation), or form stays visible
-        const hasError = await errorMessage.isVisible().catch(() => false);
-        const formStillVisible = await page.locator('form').isVisible().catch(() => false);
-
-        // If second tariff was created despite overlap, track it for cleanup
-        if (!hasError && !formStillVisible) {
+        await clearMessages(page);
+        await page.locator('button[type="submit"]').click();
+        const isSuccess = await waitForFormResult(page, 20000);
+        if (isSuccess) {
+            // Fuer das Aufraeumen registrieren, bevor der Test scheitert
             createdTarifNames.push(testName2);
         }
+        expect(isSuccess,
+            'Ein ueberschneidender Tarif desselben Typs darf nicht gespeichert werden').toBe(false);
 
-        expect(hasError || formStillVisible).toBeTruthy();
-
-        // Clean up: cancel form if still visible
-        if (formStillVisible) {
-            const cancelButton = page.locator('button.zev-button--secondary');
-            await cancelButton.click();
-        }
+        await expect(page.locator('.zev-message--error')).toBeVisible();
     });
 });
 
@@ -728,131 +580,39 @@ test.describe('Tarif Management - Validation Buttons', () => {
     test('should display validation buttons', async ({ page }) => {
         await navigateToTarife(page);
 
-        // Check for validation buttons (secondary buttons)
         const buttons = page.locator('.zev-button-row button.zev-button--secondary');
-        const buttonCount = await buttons.count();
+        expect(await buttons.count()).toBe(2);
 
-        // Should have 2 validation buttons
-        expect(buttonCount).toBe(2);
-
-        // Check button texts
         const buttonTexts = await buttons.allTextContents();
-        const hasQuartaleButton = buttonTexts.some(text => text.toLowerCase().includes('quartal'));
-        const hasJahreButton = buttonTexts.some(text => text.toLowerCase().includes('jahr'));
-
-        expect(hasQuartaleButton).toBeTruthy();
-        expect(hasJahreButton).toBeTruthy();
+        expect(buttonTexts.some(text => text.toLowerCase().includes('quartal'))).toBeTruthy();
+        expect(buttonTexts.some(text => text.toLowerCase().includes('jahr'))).toBeTruthy();
     });
 
-    test('should show success message when validation passes', async ({ page }) => {
+    test('should report the quartale validation result of the server', async ({ page }) => {
+        await navigateToTarife(page);
+        await runValidation(page, 'quartale');
+    });
+
+    test('should report the jahre validation result of the server', async ({ page }) => {
+        await navigateToTarife(page);
+        await runValidation(page, 'jahre');
+    });
+
+    test('should dismiss the validation message when clicked', async ({ page }) => {
         await navigateToTarife(page);
 
-        // Click "Quartale validieren" button
-        const quartaleButton = page.locator('button.zev-button--secondary').filter({ hasText: /quartal/i });
-        await quartaleButton.click();
-
-        // Wait for response - either success or error message
-        const successMessage = page.locator('.zev-message--success');
-        const errorMessage = page.locator('.zev-message--error');
-        await expect(successMessage.or(errorMessage)).toBeVisible({ timeout: 15000 });
-
-        // If success, verify message content
-        const isSuccess = await successMessage.isVisible().catch(() => false);
-        if (isSuccess) {
-            // Success message should be visible
-            await expect(successMessage).toBeVisible();
+        const ergebnis = await runValidation(page, 'jahre');
+        if (ergebnis.valid) {
+            // Erfolgsmeldungen verschwinden nach 5 Sekunden von selbst
+            await expect(page.locator('.zev-message--success')).not.toBeVisible({ timeout: 10000 });
+        } else {
+            // Meldungen zu Luecken bleiben stehen, bis sie weggeklickt werden
+            const errorMessage = page.locator('.zev-message--error');
+            await expect(errorMessage).toBeVisible();
+            await expect(page.locator('.zev-message__dismiss')).toBeVisible();
+            await errorMessage.click();
+            await expect(errorMessage).not.toBeVisible({ timeout: 5000 });
         }
-    });
-
-    test('should show error message with details when validation fails', async ({ page }) => {
-        await navigateToTarife(page);
-
-        // Click "Jahre validieren" button
-        const jahreButton = page.locator('button.zev-button--secondary').filter({ hasText: /jahr/i });
-        await jahreButton.click();
-
-        // Wait for response
-        const successMessage = page.locator('.zev-message--success');
-        const errorMessage = page.locator('.zev-message--error');
-        await expect(successMessage.or(errorMessage)).toBeVisible({ timeout: 15000 });
-
-        // Check if there are validation errors
-        const hasError = await errorMessage.isVisible().catch(() => false);
-        if (hasError) {
-            // Error message should have validation errors list
-            const errorList = page.locator('.validation-errors');
-            const hasErrorList = await errorList.isVisible().catch(() => false);
-
-            // If validation fails, errors should be shown
-            if (hasErrorList) {
-                const errorItems = page.locator('.validation-errors li');
-                const errorCount = await errorItems.count();
-                expect(errorCount).toBeGreaterThan(0);
-            }
-        }
-    });
-
-    test('should dismiss error message when clicked', async ({ page }) => {
-        await navigateToTarife(page);
-
-        // Click validation button
-        const jahreButton = page.locator('button.zev-button--secondary').filter({ hasText: /jahr/i });
-        await jahreButton.click();
-
-        // Wait for response
-        const errorMessage = page.locator('.zev-message--error');
-        const successMessage = page.locator('.zev-message--success');
-        await expect(successMessage.or(errorMessage)).toBeVisible({ timeout: 15000 });
-
-        // If error message is shown, click to dismiss
-        const hasError = await errorMessage.isVisible().catch(() => false);
-        if (hasError) {
-            // Check for dismiss button (×)
-            const dismissButton = page.locator('.zev-message__dismiss');
-            const hasDismiss = await dismissButton.isVisible().catch(() => false);
-
-            if (hasDismiss) {
-                // Click on error message to dismiss
-                await errorMessage.click();
-
-                // Message should disappear
-                await expect(errorMessage).not.toBeVisible({ timeout: 5000 });
-            }
-        }
-    });
-
-    test('should run quartale validation and show result', async ({ page }) => {
-        await navigateToTarife(page);
-
-        // Click "Quartale validieren" button
-        const quartaleButton = page.locator('button.zev-button--secondary').filter({ hasText: /quartal/i });
-        await expect(quartaleButton).toBeVisible();
-        await quartaleButton.click();
-
-        // Wait for message to appear
-        const message = page.locator('.zev-message');
-        await expect(message).toBeVisible({ timeout: 15000 });
-
-        // Message should contain some text
-        const messageText = await message.textContent();
-        expect(messageText).toBeTruthy();
-    });
-
-    test('should run jahre validation and show result', async ({ page }) => {
-        await navigateToTarife(page);
-
-        // Click "Jahre validieren" button
-        const jahreButton = page.locator('button.zev-button--secondary').filter({ hasText: /jahr/i });
-        await expect(jahreButton).toBeVisible();
-        await jahreButton.click();
-
-        // Wait for message to appear
-        const message = page.locator('.zev-message');
-        await expect(message).toBeVisible({ timeout: 15000 });
-
-        // Message should contain some text
-        const messageText = await message.textContent();
-        expect(messageText).toBeTruthy();
     });
 });
 
@@ -865,7 +625,6 @@ test.describe('Tarif Management - Grundgebühr (GRUNDGEBUEHR)', () => {
 
         await expect(page.locator('form')).toBeVisible();
 
-        // GRUNDGEBUEHR must appear as a select option
         const grundgebuehrOption = page.locator('#tariftyp option[value="GRUNDGEBUEHR"]');
         await expect(grundgebuehrOption).toHaveCount(1);
     });
@@ -873,137 +632,65 @@ test.describe('Tarif Management - Grundgebühr (GRUNDGEBUEHR)', () => {
     test('should create a GRUNDGEBUEHR tariff successfully', async ({ page }) => {
         await navigateToTarife(page);
 
-        const createButton = page.locator('button.zev-button--primary').first();
-        await createButton.click();
-
         const testName = generateTestTarifName('GGB Test');
-        createdTarifNames.push(testName);
-        await page.locator('#tariftyp').selectOption('GRUNDGEBUEHR');
-        await page.locator('#bezeichnung').fill(testName);
-        await page.locator('#preis').fill('12.50000');
-        await page.locator('#gueltigVon').fill('2099-01-01');
-        await page.locator('#gueltigBis').fill('2099-12-31');
-
-        const submitButton = page.locator('button[type="submit"]');
-        await submitButton.click();
-
-        let isSuccess = false;
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('GRUNDGEBUEHR tariff creation failed, skipping verification');
-            return;
-        }
-
-        if (isSuccess) {
-            await waitForTableWithData(page, 10000);
-
-            const newRow = page.locator(`tr:has-text("${testName}")`);
-            await expect(newRow).toBeVisible({ timeout: 10000 });
-        } else {
-            console.log('GRUNDGEBUEHR tariff creation failed, skipping verification');
-        }
+        const zeitraum = gueltigkeit(6);
+        await createTarifOrFail(page, {
+            tariftyp: 'GRUNDGEBUEHR',
+            bezeichnung: testName,
+            preis: '12.50000',
+            gueltigVon: zeitraum.von,
+            gueltigBis: zeitraum.bis
+        });
     });
 
     test('should edit a GRUNDGEBUEHR tariff', async ({ page }) => {
         await navigateToTarife(page);
 
-        // Create a GRUNDGEBUEHR tariff first
-        const createButton = page.locator('button.zev-button--primary').first();
-        await createButton.click();
-
         const testName = generateTestTarifName('GGB Edit');
-        createdTarifNames.push(testName);
-        await page.locator('#tariftyp').selectOption('GRUNDGEBUEHR');
-        await page.locator('#bezeichnung').fill(testName);
-        await page.locator('#preis').fill('10.00000');
-        await page.locator('#gueltigVon').fill('2099-01-01');
-        await page.locator('#gueltigBis').fill('2099-12-31');
+        const zeitraum = gueltigkeit(7);
+        await createTarifOrFail(page, {
+            tariftyp: 'GRUNDGEBUEHR',
+            bezeichnung: testName,
+            preis: '10.00000',
+            gueltigVon: zeitraum.von,
+            gueltigBis: zeitraum.bis
+        });
 
-        await page.locator('button[type="submit"]').click();
-
-        let isSuccess = false;
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('GRUNDGEBUEHR tariff creation failed, skipping edit test');
-            return;
-        }
-
-        if (!isSuccess) {
-            console.log('GRUNDGEBUEHR tariff creation failed, skipping edit test');
-            return;
-        }
-        await waitForTableWithData(page, 10000);
-
-        const tarifRow = page.locator(`tr:has-text("${testName}")`);
-        await expect(tarifRow).toBeVisible({ timeout: 10000 });
-
+        const tarifRow = page.locator(`tr:has-text("${testName}")`).first();
         await clickKebabMenuItem(page, tarifRow, 'edit');
 
         await expect(page.locator('form')).toBeVisible({ timeout: 5000 });
         await expect(page.locator('#bezeichnung')).toHaveValue(testName);
-        // Tarif type should be GRUNDGEBUEHR
         await expect(page.locator('#tariftyp')).toHaveValue('GRUNDGEBUEHR');
 
-        // Update price
         await page.locator('#preis').fill('15.00000');
-        await page.locator('button[type="submit"]').click();
+        await submitAndExpectSuccess(page, `Tarif "${testName}"`);
 
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('GRUNDGEBUEHR tariff edit failed');
-        }
-
-        if (isSuccess) {
-            await waitForTableWithData(page, 10000);
-            await expect(page.locator(`tr:has-text("${testName}")`)).toBeVisible({ timeout: 10000 });
-        }
+        await waitForTableWithData(page, 10000);
+        const updatedRow = page.locator(`tr:has-text("${testName}")`).first();
+        await expect(updatedRow).toBeVisible({ timeout: 10000 });
+        await expect(updatedRow).toContainText('15.00');
     });
 
     test('should delete a GRUNDGEBUEHR tariff', async ({ page }) => {
         await navigateToTarife(page);
 
-        // Create a GRUNDGEBUEHR tariff to delete
-        const createButton = page.locator('button.zev-button--primary').first();
-        await createButton.click();
-
         const testName = generateTestTarifName('GGB Delete');
-        createdTarifNames.push(testName);
-        await page.locator('#tariftyp').selectOption('GRUNDGEBUEHR');
-        await page.locator('#bezeichnung').fill(testName);
-        await page.locator('#preis').fill('8.00000');
-        await page.locator('#gueltigVon').fill('2099-01-01');
-        await page.locator('#gueltigBis').fill('2099-12-31');
+        const zeitraum = gueltigkeit(8);
+        await createTarifOrFail(page, {
+            tariftyp: 'GRUNDGEBUEHR',
+            bezeichnung: testName,
+            preis: '8.00000',
+            gueltigVon: zeitraum.von,
+            gueltigBis: zeitraum.bis
+        });
 
-        await page.locator('button[type="submit"]').click();
-
-        let isSuccess = false;
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('GRUNDGEBUEHR tariff creation failed, skipping delete test');
-            return;
-        }
-
-        if (!isSuccess) {
-            console.log('GRUNDGEBUEHR tariff creation failed, skipping delete test');
-            return;
-        }
-        await waitForTableWithData(page, 10000);
-
-        const tarifRow = page.locator(`tr:has-text("${testName}")`);
-        await expect(tarifRow).toBeVisible({ timeout: 10000 });
+        const tarifRow = page.locator(`tr:has-text("${testName}")`).first();
 
         page.once('dialog', async dialog => { await dialog.accept(); });
         await clickKebabMenuItem(page, tarifRow, 'delete');
 
-        try {
-            await expect(tarifRow).not.toBeVisible({ timeout: 10000 });
-            createdTarifNames = createdTarifNames.filter(n => n !== testName);
-        } catch {
-            console.log('GRUNDGEBUEHR tariff deletion may have failed');
-        }
+        await expect(tarifRow).toHaveCount(0, { timeout: 10000 });
+        createdTarifNames = createdTarifNames.filter(n => n !== testName);
     });
 });
