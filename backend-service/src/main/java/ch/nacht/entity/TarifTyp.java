@@ -38,7 +38,36 @@ public enum TarifTyp {
      * Unlike ZEV/VNB the quantity does not come from measurements but from manually
      * captured (later imported) {@link Tarifposition} entries per tenant and quarter.
      */
-    LADESTROM;
+    LADESTROM,
+
+    /**
+     * ZUSATZ - frei konfigurierbare Zusatzleistung (Sauna, Waschküche, Gästezimmer, …).
+     *
+     * <p>Der einzige Typ mit <b>frei wählbarer Mengeneinheit</b> ({@link Mengeneinheit} am Tarif)
+     * und der einzige, der auch an Konsumenten-Einheiten erfassbar ist.
+     *
+     * <p><b>Von der Überschneidungsprüfung ausgenommen:</b> Sauna, Waschküche und Gästezimmer sind
+     * alle vom Typ {@code ZUSATZ} und müssen gleichzeitig gültig sein. Deshalb gilt die
+     * Eindeutigkeit einer Position hier je <b>Tarif</b> statt je Typ
+     * (Specs/Tarifpositionen.md).
+     */
+    ZUSATZ;
+
+    /**
+     * Tariftypen, für die mehrere gleichzeitig gültige Tarife zulässig sind.
+     *
+     * <p>Für alle übrigen weist {@code TarifService.saveTarif} einen zweiten Tarif mit
+     * überlappender Gültigkeit ab — bei ZEV/VNB/Grundgebühr wäre sonst nicht bestimmbar, welcher
+     * Preis gilt. Bei {@code ZUSATZ} wählt der Benutzer den Tarif an der Position ausdrücklich
+     * aus, die Mehrdeutigkeit entsteht dort also gar nicht.
+     */
+    public static final Set<TarifTyp> MEHRFACH_GUELTIG = EnumSet.of(ZUSATZ);
+
+    /** Typen, deren Position je <b>Tarif</b> eindeutig ist statt je Tariftyp. */
+    public static final Set<TarifTyp> EINDEUTIG_JE_TARIF = EnumSet.of(ZUSATZ);
+
+    /** Typen mit frei wählbarer Mengeneinheit am Tarif. */
+    public static final Set<TarifTyp> EIGENE_MENGENEINHEIT = EnumSet.of(ZUSATZ);
 
     /**
      * Tariff types whose quantities are captured manually as {@link Tarifposition} instead of
@@ -51,7 +80,7 @@ public enum TarifTyp {
      * nicht gegen diese Menge als Ganzes. Sonst schlössen sich Positionen verschiedener Typen im
      * selben Quartal gegenseitig aus.
      */
-    public static final Set<TarifTyp> MANUELL_ERFASST = EnumSet.of(LADESTROM);
+    public static final Set<TarifTyp> MANUELL_ERFASST = EnumSet.of(LADESTROM, ZUSATZ);
 
     /**
      * Mengeneinheit, die sich allein aus dem Typ ergibt.

@@ -4,15 +4,32 @@
   <form (ngSubmit)="onSubmit()">
     <div class="zev-form-group">
       <label for="tariftyp">{{ 'TARIFTYP' | translate }}:</label>
-      <select id="tariftyp" class="zev-select" [(ngModel)]="formData.tariftyp" name="tariftyp" required>
-        @for (option of tarifTypOptions; track option) {
-          <option [value]="option.value">
-            {{ option.label }}
+      <select id="tariftyp" class="zev-select" [(ngModel)]="formData.tariftyp" name="tariftyp"
+        (ngModelChange)="onTariftypChange()" required>
+        @for (typ of tarifTypOptions; track typ) {
+          <option [value]="typ">
+            {{ ('TARIFTYP_' + typ) | translate }}
           </option>
         }
       </select>
       <div class="zev-form-hint">{{ 'TARIFTYP_HINT' | translate }}</div>
     </div>
+
+    <!-- Nur Typen mit eigener Mengeneinheit (ZUSATZ); sonst folgt sie aus dem Typ -->
+    @if (brauchtMengeneinheit) {
+      <div class="zev-form-group">
+        <label for="mengeneinheit">{{ 'MENGENEINHEIT' | translate }}:</label>
+        <select id="mengeneinheit" class="zev-select" [(ngModel)]="formData.mengeneinheit"
+          name="mengeneinheit" required>
+          <option [ngValue]="undefined">{{ 'MENGENEINHEIT_WAEHLEN' | translate }}</option>
+          @for (einheit of mengeneinheitOptions; track einheit) {
+            <!-- Der Enum-Wert ist zugleich der Uebersetzungs-Key -->
+            <option [ngValue]="einheit">{{ einheit | translate }}</option>
+          }
+        </select>
+        <div class="zev-form-hint">{{ 'MENGENEINHEIT_HINT' | translate }}</div>
+      </div>
+    }
 
     @if (formData.tariftyp === TarifTyp.GRUNDGEBUEHR) {
       <div class="zev-form-group">
@@ -37,7 +54,8 @@
       </div>
 
       <div class="zev-form-group">
-        <label for="preis">{{ 'PREIS' | translate }} (CHF/kWh):</label>
+        <!-- Bezugsgroesse haengt am Tariftyp bzw. der gewaehlten Mengeneinheit -->
+        <label for="preis">{{ 'PREIS' | translate }} (CHF@if (preisEinheit) {/{{ preisEinheit | translate }}}):</label>
         <input type="number" id="preis" class="zev-input" [(ngModel)]="formData.preis" name="preis"
           required min="0.00001" step="0.00001" placeholder="0.20000" />
           @if (formData.preis <= 0) {

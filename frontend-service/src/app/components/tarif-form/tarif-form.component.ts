@@ -1,6 +1,8 @@
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Tarif, TarifTyp } from '../../models/tarif.model';
+import {
+  Mengeneinheit, Tarif, TarifTyp, TARIFTYPEN_MIT_MENGENEINHEIT, preisEinheitKey
+} from '../../models/tarif.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
 
@@ -26,13 +28,47 @@ export class TarifFormComponent implements OnInit {
   };
 
   readonly TarifTyp = TarifTyp;
+  readonly Mengeneinheit = Mengeneinheit;
 
-  tarifTypOptions = [
-    { value: TarifTyp.ZEV, label: 'ZEV (Solarstrom)' },
-    { value: TarifTyp.VNB, label: 'VNB (Netzstrom)' },
-    { value: TarifTyp.GRUNDGEBUEHR, label: 'Grundgebühr (CHF/Monat/Zähler)' },
-    { value: TarifTyp.LADESTROM, label: 'Ladestrom (CHF/kWh)' }
+  /**
+   * Nur die Werte, keine Beschriftungen: Die Anzeigetexte kommen aus dem TranslationService
+   * (`TARIFTYP_<wert>`), wie in der Tarif-Liste. Frueher standen sie hier hartcodiert und waren
+   * damit die einzigen deutschen Texte im Formular (Specs/generell.md, i18n).
+   */
+  tarifTypOptions: TarifTyp[] = [
+    TarifTyp.ZEV, TarifTyp.VNB, TarifTyp.GRUNDGEBUEHR, TarifTyp.LADESTROM, TarifTyp.ZUSATZ
   ];
+
+  /**
+   * Auswahl der Mengeneinheit - nur bei Tariftypen mit eigener Einheit sichtbar. Die Werte sind
+   * zugleich die Uebersetzungs-Keys (`KWH`, `MONAT`, `STUECK`).
+   */
+  mengeneinheitOptions: Mengeneinheit[] = [
+    Mengeneinheit.KWH, Mengeneinheit.MONAT, Mengeneinheit.STUECK
+  ];
+
+  /** Wahr, wenn der gewaehlte Typ eine eigene Mengeneinheit traegt (aktuell nur ZUSATZ). */
+  get brauchtMengeneinheit(): boolean {
+    return TARIFTYPEN_MIT_MENGENEINHEIT.includes(this.formData.tariftyp);
+  }
+
+  /**
+   * Uebersetzungs-Key der Bezugsgroesse des Preises: "CHF pro kWh/Monat/Stueck". Leer, solange
+   * ein Tarif mit freier Einheit noch keine gewaehlt hat - dann steht nur "CHF" da.
+   */
+  get preisEinheit(): string {
+    return preisEinheitKey(this.formData.tariftyp, this.formData.mengeneinheit);
+  }
+
+  /**
+   * Verwirft die Mengeneinheit, sobald ein Typ ohne eigene Einheit gewaehlt wird - sonst bliebe
+   * ein unsichtbarer Wert im Formular stehen, den der Server ohnehin verwerfen wuerde.
+   */
+  onTariftypChange(): void {
+    if (!this.brauchtMengeneinheit) {
+      this.formData.mengeneinheit = undefined;
+    }
+  }
 
   ngOnInit(): void {
     if (this.tarif) {
@@ -63,7 +99,9 @@ export class TarifFormComponent implements OnInit {
       this.formData.preis > 0 &&
       this.formData.gueltigVon &&
       this.formData.gueltigBis &&
-      this.formData.gueltigVon <= this.formData.gueltigBis
+      this.formData.gueltigVon <= this.formData.gueltigBis &&
+      // Mengeneinheit ist Pflicht, sobald der Typ eine eigene traegt
+      (!this.brauchtMengeneinheit || !!this.formData.mengeneinheit)
     );
   }
 

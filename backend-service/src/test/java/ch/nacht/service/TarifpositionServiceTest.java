@@ -3,6 +3,7 @@ package ch.nacht.service;
 import ch.nacht.entity.Erfassungsart;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
+import ch.nacht.entity.Mengeneinheit;
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
 import ch.nacht.entity.Tarifposition;
@@ -66,6 +67,8 @@ public class TarifpositionServiceTest {
     private Tarif ladestromTarif;
     /** Grundgebuehr ist NICHT erfassbar - Begruendung siehe TarifTyp.GRUNDGEBUEHR. */
     private Tarif grundgebuehrTarif;
+    /** Frei konfigurierbarer Typ: auch an Wohnungen erfassbar, Eindeutigkeit je Tarif. */
+    private Tarif zusatzTarif;
     private Tarifposition testPosition1;
     private Tarifposition testPosition2;
 
@@ -95,6 +98,16 @@ public class TarifpositionServiceTest {
                 LocalDate.of(2026, 12, 31));
         grundgebuehrTarif.setId(21L);
         grundgebuehrTarif.setOrgId(testOrgId);
+
+        zusatzTarif = new Tarif(
+                "Sauna",
+                TarifTyp.ZUSATZ,
+                new BigDecimal("5.00000"),
+                LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 12, 31));
+        zusatzTarif.setId(30L);
+        zusatzTarif.setOrgId(testOrgId);
+        zusatzTarif.setMengeneinheit(Mengeneinheit.STUECK);
 
         testPosition1 = new Tarifposition(testEinheit, ladestromTarif, 2026, 3, new BigDecimal("120.500"));
         testPosition1.setId(1L);
@@ -465,6 +478,46 @@ public class TarifpositionServiceTest {
     }
 
     @Test
+    void saveTarifposition_ZweiZusatzPositionenVerschiedenerTarife_SavesBoth() {
+        // Eindeutigkeit gilt bei ZUSATZ je TARIF, nicht je Typ - sonst waere pro Quartal nur
+        // eine einzige Zusatzposition moeglich, also nicht Sauna UND Waschkueche.
+        Tarifposition neu = new Tarifposition(testEinheit, zusatzTarif, 2026, 1, new BigDecimal("2.000"));
+
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findById(30L)).thenReturn(Optional.of(zusatzTarif));
+        when(tarifpositionRepository.existsByEinheitAndQuartalAndTarif(
+                anyLong(), anyInt(), anyInt(), anyLong(), anyLong())).thenReturn(false);
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(tarifpositionRepository.save(any(Tarifposition.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertNotNull(tarifpositionService.saveTarifposition(neu));
+
+        // Gefragt wird nach dem TARIF, nicht nach dem Typ
+        verify(tarifpositionRepository).existsByEinheitAndQuartalAndTarif(
+                eq(1L), eq(2026), eq(1), eq(30L), eq(-1L));
+        verify(tarifpositionRepository, never()).existsByEinheitAndQuartalAndTariftyp(
+                anyLong(), anyInt(), anyInt(), anySet(), anyLong());
+    }
+
+    @Test
+    void saveTarifposition_ZweitePositionMitDemselbenZusatzTarif_ThrowsException() {
+        Tarifposition neu = new Tarifposition(testEinheit, zusatzTarif, 2026, 1, new BigDecimal("2.000"));
+
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findById(30L)).thenReturn(Optional.of(zusatzTarif));
+        when(tarifpositionRepository.existsByEinheitAndQuartalAndTarif(
+                anyLong(), anyInt(), anyInt(), anyLong(), anyLong())).thenReturn(true);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> tarifpositionService.saveTarifposition(neu)
+        );
+
+        assertThat(exception.getMessage(), containsString("bereits eine Position"));
+        verify(tarifpositionRepository, never()).save(any());
+    }
+
+    @Test
     void saveTarifposition_GrundgebuehrTariftyp_ThrowsException() {
         // Grundgebuehr ist bewusst nicht erfassbar: Je Zeitraum ist nur EIN Grundgebuehr-Tarif
         // gueltig (Ueberschneidungsregel), ein eigener Tarif fuer Ladestationen also gar nicht
@@ -634,15 +687,46 @@ public class TarifpositionServiceTest {
                 () -> tarifpositionService.saveTarifposition(neu)
         );
 
-        assertThat(exception.getMessage(), containsString("nur für Einheiten vom Typ Ladestation"));
+        assertThat(exception.getMessage(), containsString("nur für Einheiten vom Typ"));
         verify(tarifpositionRepository, never()).save(any());
         // Der Tarif wird nicht mehr aufgeloest - die Einheit scheitert zuerst
         verify(tarifRepository, never()).findById(any());
     }
 
     @Test
-    void saveTarifposition_EinheitVomTypConsumer_ThrowsException() {
-        assertTypAbgewiesen(EinheitTyp.CONSUMER);
+    void saveTarifposition_KonsumentMitZusatzTarif_SavesSuccessfully() {
+        // Seit Specs/Tarifpositionen.md sind Positionen auch an Wohnungen erfassbar - aber nur
+        // mit einem ZUSATZ-Tarif.
+        Einheit wohnung = einheitVomTyp(50L, "Wohnung 1", EinheitTyp.CONSUMER);
+        Tarifposition neu = new Tarifposition(wohnung, zusatzTarif, 2026, 1, new BigDecimal("3.000"));
+
+        when(einheitRepository.findById(50L)).thenReturn(Optional.of(wohnung));
+        when(tarifRepository.findById(30L)).thenReturn(Optional.of(zusatzTarif));
+        when(tarifpositionRepository.existsByEinheitAndQuartalAndTarif(
+                anyLong(), anyInt(), anyInt(), anyLong(), anyLong())).thenReturn(false);
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(tarifpositionRepository.save(any(Tarifposition.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertNotNull(tarifpositionService.saveTarifposition(neu));
+        verify(tarifpositionRepository).save(neu);
+    }
+
+    @Test
+    void saveTarifposition_KonsumentMitLadestromTarif_ThrowsException() {
+        // Ladestrom gehoert fachlich an eine Ladestation
+        Einheit wohnung = einheitVomTyp(50L, "Wohnung 1", EinheitTyp.CONSUMER);
+        Tarifposition neu = new Tarifposition(wohnung, ladestromTarif, 2026, 1, new BigDecimal("10.000"));
+
+        when(einheitRepository.findById(50L)).thenReturn(Optional.of(wohnung));
+        when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> tarifpositionService.saveTarifposition(neu)
+        );
+
+        assertThat(exception.getMessage(), containsString("Konsumenten"));
+        verify(tarifpositionRepository, never()).save(any());
     }
 
     @Test

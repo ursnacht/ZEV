@@ -3,7 +3,33 @@ export enum TarifTyp {
   VNB = 'VNB',
   GRUNDGEBUEHR = 'GRUNDGEBUEHR',
   /** Ladestrom: Menge kommt nicht aus Messwerten, sondern aus erfassten Tarifpositionen. */
-  LADESTROM = 'LADESTROM'
+  LADESTROM = 'LADESTROM',
+  /** Frei konfigurierbare Zusatzleistung mit eigener Mengeneinheit (Sauna, Waschküche, …). */
+  ZUSATZ = 'ZUSATZ'
+}
+
+/** Mengeneinheit eines ZUSATZ-Tarifs. Bei allen anderen Typen folgt sie aus dem Typ. */
+export enum Mengeneinheit {
+  KWH = 'KWH',
+  MONAT = 'MONAT',
+  STUECK = 'STUECK'
+}
+
+/** Tariftypen mit frei wählbarer Mengeneinheit am Tarif. */
+export const TARIFTYPEN_MIT_MENGENEINHEIT: TarifTyp[] = [TarifTyp.ZUSATZ];
+
+/**
+ * Übersetzungs-Key der Bezugsgrösse des **Preises** („CHF pro …"), im **Singular**:
+ * `5.00 / Monat`, nicht `5.00 / Monate`.
+ *
+ * Liefert `''`, solange ein Tarif mit freier Einheit noch keine gewählt hat — dann zeigt die
+ * Oberfläche nur „CHF", statt fälschlich kWh zu behaupten.
+ */
+export function preisEinheitKey(typ: TarifTyp | undefined, einheit?: Mengeneinheit): string {
+  if (typ && TARIFTYPEN_MIT_MENGENEINHEIT.includes(typ)) {
+    return einheit ?? '';
+  }
+  return typ === TarifTyp.GRUNDGEBUEHR ? 'MONAT' : 'KWH';
 }
 
 /**
@@ -15,13 +41,30 @@ export enum TarifTyp {
  * für Ladestationen wird stattdessen über einen Tarif mit Mengeneinheit „Monat" abgebildet
  * (Specs/Tarifpositionen.md).
  */
-export const MANUELL_ERFASSTE_TARIFTYPEN: TarifTyp[] = [TarifTyp.LADESTROM];
+export const MANUELL_ERFASSTE_TARIFTYPEN: TarifTyp[] = [TarifTyp.LADESTROM, TarifTyp.ZUSATZ];
 
 /**
- * Übersetzungs-Key der Mengeneinheit eines Tariftyps: Grundgebühr zählt Monate, alles
- * andere kWh. Spiegelt `TarifTyp.mengeneinheit()` im Backend.
+ * Tariftypen, die an einer Einheit des gegebenen Typs erfassbar sind.
+ *
+ * An einer Wohnung ist ausschliesslich ZUSATZ zulässig — Ladestrom gehört fachlich an eine
+ * Ladestation. Spiegelt `TarifpositionService.pruefeTariftypZuEinheit` im Backend; verbindlich
+ * ist dort, hier geht es nur um die Auswahl in der Maske.
  */
-export function mengeneinheitKey(typ: TarifTyp | undefined): string {
+export function erfassbareTariftypenFuer(einheitTyp: string | undefined): TarifTyp[] {
+  return einheitTyp === 'LADESTATION' ? MANUELL_ERFASSTE_TARIFTYPEN : [TarifTyp.ZUSATZ];
+}
+
+/**
+ * Übersetzungs-Key der Mengeneinheit eines Tarifs.
+ *
+ * Bei ZUSATZ steht sie am Tarif, sonst folgt sie aus dem Typ (Grundgebühr zählt Monate, alles
+ * andere kWh). Spiegelt `Tarif.effektiveMengeneinheit()` im Backend.
+ */
+export function mengeneinheitKey(typ: TarifTyp | undefined, einheit?: Mengeneinheit | string): string {
+  if (typ && TARIFTYPEN_MIT_MENGENEINHEIT.includes(typ) && einheit) {
+    return einheit === Mengeneinheit.MONAT ? 'MONATE'
+      : einheit === Mengeneinheit.STUECK ? 'STUECK' : 'KWH';
+  }
   return typ === TarifTyp.GRUNDGEBUEHR ? 'MONATE' : 'KWH';
 }
 
@@ -33,6 +76,7 @@ export interface Tarif {
   gueltigVon: string;  // ISO date format: YYYY-MM-DD
   gueltigBis: string;  // ISO date format: YYYY-MM-DD
   produzentVerrechnen?: boolean;  // Only relevant for GRUNDGEBUEHR: also charge producers
+  mengeneinheit?: Mengeneinheit;  // Pflicht bei ZUSATZ, sonst leer
 }
 
 /** A single tariff coverage gap (language-neutral; the frontend translates it). */

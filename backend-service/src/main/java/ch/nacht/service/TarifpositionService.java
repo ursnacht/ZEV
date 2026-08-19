@@ -19,6 +19,7 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Service for managing manually captured tariff positions (Ladestrom and later further use cases).
@@ -149,14 +150,10 @@ public class TarifpositionService {
             throw new IllegalArgumentException(
                     "Für den Tariftyp " + tarif.getTariftyp() + " können keine Positionen erfasst werden");
         }
+        pruefeTariftypZuEinheit(einheit, tarif);
 
         Long excludeId = tarifposition.getId() != null ? tarifposition.getId() : -1L;
-        if (tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
-                einheit.getId(), tarifposition.getJahr(), tarifposition.getQuartal(),
-                EnumSet.of(tarif.getTariftyp()), excludeId)) {
-            throw new IllegalArgumentException(
-                    "Für diese Einheit und dieses Quartal existiert bereits eine Position dieses Tariftyps");
-        }
+        pruefeEindeutigkeit(einheit, tarif, tarifposition, excludeId);
 
         tarifposition.setEinheit(einheit);
         tarifposition.setTarif(tarif);
@@ -210,17 +207,75 @@ public class TarifpositionService {
         return tarifpositionRepository.countByTarifId(tarifId);
     }
 
+    /**
+     * Einheitentypen, an denen Positionen hängen dürfen. Produzenten fehlen bewusst: Ihre
+     * Rechnung enthält ausschliesslich Grundgebühr-Zeilen und ruft die Positionen gar nicht ab
+     * (Specs/Tarifpositionen.md, Abgrenzung). Bilanz-Typen werden nie verrechnet.
+     */
+    private static final Set<EinheitTyp> ERFASSBARE_EINHEITEN =
+            EnumSet.of(EinheitTyp.LADESTATION, EinheitTyp.CONSUMER);
+
     private Einheit resolveEinheit(Tarifposition tarifposition) {
         if (tarifposition.getEinheit() == null || tarifposition.getEinheit().getId() == null) {
             throw new IllegalArgumentException("Einheit ist erforderlich");
         }
         Einheit einheit = einheitRepository.findById(tarifposition.getEinheit().getId())
                 .orElseThrow(() -> new IllegalArgumentException("Einheit nicht gefunden"));
-        if (einheit.getTyp() != EinheitTyp.LADESTATION) {
+        if (!ERFASSBARE_EINHEITEN.contains(einheit.getTyp())) {
             throw new IllegalArgumentException(
-                    "Positionen sind nur für Einheiten vom Typ Ladestation zulässig");
+                    "Positionen sind nur für Einheiten vom Typ Ladestation oder Konsument zulässig");
         }
         return einheit;
+    }
+
+    /**
+     * Prüft, ob der Tariftyp zum Einheitentyp passt.
+     *
+     * <p>An einer Wohnung ist ausschliesslich {@link TarifTyp#ZUSATZ} zulässig: Ladestrom gehört
+     * fachlich an eine Ladestation. Die Checkbox in der Oberfläche ist nur eine Anzeigehilfe —
+     * verbindlich ist diese Prüfung.
+     *
+     * @param einheit Einheit der Position
+     * @param tarif Gewählter Tarif
+     * @throws IllegalArgumentException wenn die Kombination unzulässig ist
+     */
+    private void pruefeTariftypZuEinheit(Einheit einheit, Tarif tarif) {
+        if (einheit.getTyp() == EinheitTyp.CONSUMER
+                && !TarifTyp.EIGENE_MENGENEINHEIT.contains(tarif.getTariftyp())) {
+            throw new IllegalArgumentException(
+                    "Für Konsumenten sind nur Tarife vom Typ " + TarifTyp.ZUSATZ + " zulässig");
+        }
+    }
+
+    /**
+     * Höchstens eine Position je Einheit und Quartal — die Bezugsgrösse hängt am Typ:
+     *
+     * <ul>
+     *   <li>{@link TarifTyp#LADESTROM}: je <b>Tariftyp</b>. Strenger als der DB-Constraint, weil
+     *       zwei verschiedene Ladestrom-Tarife die Regel sonst unterliefen.</li>
+     *   <li>{@link TarifTyp#ZUSATZ}: je <b>Tarif</b>. Je Typ zu prüfen wäre sinnlos — man könnte
+     *       dann pro Quartal nur eine einzige Zusatzposition erfassen, also nicht Sauna
+     *       <i>und</i> Waschküche.</li>
+     * </ul>
+     *
+     * @throws IllegalArgumentException wenn bereits eine passende Position existiert
+     */
+    private void pruefeEindeutigkeit(Einheit einheit, Tarif tarif, Tarifposition position, Long excludeId) {
+        if (TarifTyp.EINDEUTIG_JE_TARIF.contains(tarif.getTariftyp())) {
+            if (tarifpositionRepository.existsByEinheitAndQuartalAndTarif(
+                    einheit.getId(), position.getJahr(), position.getQuartal(),
+                    tarif.getId(), excludeId)) {
+                throw new IllegalArgumentException(
+                        "Für diese Einheit, dieses Quartal und diesen Tarif existiert bereits eine Position");
+            }
+            return;
+        }
+        if (tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
+                einheit.getId(), position.getJahr(), position.getQuartal(),
+                EnumSet.of(tarif.getTariftyp()), excludeId)) {
+            throw new IllegalArgumentException(
+                    "Für diese Einheit und dieses Quartal existiert bereits eine Position dieses Tariftyps");
+        }
     }
 
     private Tarif resolveTarif(Tarifposition tarifposition) {

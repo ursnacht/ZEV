@@ -19,8 +19,10 @@ export interface Tarifposition {
   einheitMesspunkt?: string;   // nur lesend; RFID, belegt die Quell-Referenz vor
   tarifId: number;
   tarifBezeichnung?: string;  // nur lesend
-  /** nur lesend; bestimmt die Mengeneinheit (kWh bzw. Monate) */
+  /** nur lesend; Tariftyp der Position */
   tarifTyp?: TarifTyp;
+  /** nur lesend; Mengeneinheit der Zeile (KWH / MONAT / STUECK), vom Backend aufgeloest */
+  tarifMengeneinheit?: string;
   tarifPreis?: number;        // nur lesend
   jahr: number;
   quartal: number;            // 1-4

@@ -8,13 +8,16 @@ import { EinheitService } from '../../services/einheit.service';
 import { MieterService } from '../../services/mieter.service';
 import { TranslationService } from '../../services/translation.service';
 import { Tarifposition, Erfassungsart } from '../../models/tarifposition.model';
-import { Tarif, TarifTyp, MANUELL_ERFASSTE_TARIFTYPEN, mengeneinheitKey } from '../../models/tarif.model';
+import {
+  Tarif, TarifTyp, MANUELL_ERFASSTE_TARIFTYPEN, erfassbareTariftypenFuer
+} from '../../models/tarif.model';
 import { Einheit, EinheitTyp } from '../../models/einheit.model';
 import { TarifpositionFormComponent } from '../tarifposition-form/tarifposition-form.component';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.component';
 import { ColumnResizeDirective } from '../../directives/column-resize.directive';
 import { SwissNumberPipe } from '../../pipes/swiss-number.pipe';
+import { EinheitTypPipe } from '../../pipes/einheit-typ.pipe';
 import { IconComponent } from '../icon/icon.component';
 
 /** Sortierbare Spalten der Positionsliste. `betrag` ist berechnet, `quartal` umfasst Jahr + Quartal. */
@@ -32,7 +35,7 @@ export type TarifpositionSortColumn =
   selector: 'app-tarifposition-list',
   standalone: true,
   imports: [CommonModule, FormsModule, TarifpositionFormComponent, TranslatePipe, SwissNumberPipe,
-    KebabMenuComponent, ColumnResizeDirective, IconComponent],
+    EinheitTypPipe, KebabMenuComponent, ColumnResizeDirective, IconComponent],
   templateUrl: './tarifposition-list.component.html',
   styleUrls: ['./tarifposition-list.component.css']
 })
@@ -40,7 +43,19 @@ export class TarifpositionListComponent implements OnInit {
   /** Merker für den weggeklickten Mehrfachverrechnungs-Hinweis (rein lokal, kein Backend). */
   private static readonly HINWEIS_STORAGE_KEY = 'zev.tarifposition.hinweisAusgeblendet';
 
-  ladestationen: Einheit[] = [];
+  /**
+   * Alle erfassbaren Einheiten (Ladestationen und Konsumenten), unabhängig von der Checkbox.
+   * Die angebotene Auswahl leitet sich daraus ab — siehe {@link einheiten}.
+   */
+  private alleEinheiten: Einheit[] = [];
+  /** Aktuell angebotene Einheiten; hängt an der Checkbox „Nur Ladestationen". */
+  einheiten: Einheit[] = [];
+  /**
+   * Normalfall: nur Ladestationen. Abwählen ist die Ausnahme und schaltet die Konsumenten frei
+   * (Specs/Tarifpositionen.md FR-1.3). Bewusst **nicht** persistiert — anders als der
+   * Mehrfachverrechnungs-Hinweis, der eine einmalige Erklärung ist.
+   */
+  nurLadestationen = true;
   selectedEinheitId: number | null = null;
   /**
    * Einheiten, denen mindestens ein Mieter zugeordnet ist. `null` = noch nicht (oder nicht)
@@ -108,19 +123,49 @@ export class TarifpositionListComponent implements OnInit {
   loadLadestationen(): void {
     this.einheitService.getAllEinheiten().subscribe({
       next: (data) => {
-        this.ladestationen = data
-          .filter(e => e.typ === EinheitTyp.LADESTATION)
+        this.alleEinheiten = data
+          .filter(e => e.typ === EinheitTyp.LADESTATION || e.typ === EinheitTyp.CONSUMER)
           .sort((a, b) => a.name.localeCompare(b.name));
-        // Vorauswahl aus dem Kebab-Sprung der Einheiten-Verwaltung (?einheitId=…)
+        this.aktualisiereAuswahl();
+        // Vorauswahl aus dem Kebab-Sprung der Einheiten-Verwaltung (?einheitId=…). Zeigt der
+        // Sprung auf eine Wohnung, wird die Checkbox dafür automatisch abgewählt - sonst
+        // landete der Benutzer auf einer Seite ohne die Einheit, die er angeklickt hat.
         const param = this.route.snapshot.queryParamMap.get('einheitId');
         const vorauswahl = param ? Number(param) : null;
-        if (vorauswahl && this.ladestationen.some(e => e.id === vorauswahl)) {
+        const einheit = this.alleEinheiten.find(e => e.id === vorauswahl);
+        if (einheit) {
+          if (einheit.typ !== EinheitTyp.LADESTATION) {
+            this.nurLadestationen = false;
+            this.aktualisiereAuswahl();
+          }
           this.selectedEinheitId = vorauswahl;
           this.loadPositionen();
         }
       },
       error: () => this.showMessage('FEHLER_LADEN_EINHEITEN', 'error')
     });
+  }
+
+  /** Stellt die angebotene Einheiten-Liste passend zur Checkbox zusammen. */
+  private aktualisiereAuswahl(): void {
+    this.einheiten = this.nurLadestationen
+      ? this.alleEinheiten.filter(e => e.typ === EinheitTyp.LADESTATION)
+      : this.alleEinheiten;
+  }
+
+  /**
+   * Reaktion auf die Checkbox. Ist die gewählte Einheit danach nicht mehr im Angebot (typisch:
+   * Wohnung gewählt, dann wieder auf „nur Ladestationen" gestellt), wird die Auswahl
+   * zurückgesetzt — sonst bliebe eine Einheit selektiert, die die Liste gar nicht mehr zeigt.
+   */
+  onNurLadestationenChange(): void {
+    this.aktualisiereAuswahl();
+    if (this.selectedEinheitId && !this.einheiten.some(e => e.id === this.selectedEinheitId)) {
+      this.selectedEinheitId = null;
+      this.showForm = false;
+      this.selectedPosition = null;
+      this.positionen = [];
+    }
   }
 
   loadTarife(): void {
@@ -130,6 +175,17 @@ export class TarifpositionListComponent implements OnInit {
       },
       error: () => this.showMessage('FEHLER_LADEN_TARIFE', 'error')
     });
+  }
+
+  /**
+   * Tarife, die zur gewählten Einheit passen. An einer Wohnung ist ausschliesslich der frei
+   * konfigurierbare Typ zulässig — Ladestrom gehört fachlich an eine Ladestation. Verbindlich
+   * prüft das der Server; hier geht es nur um die angebotene Auswahl.
+   */
+  get tarifeFuerAuswahl(): Tarif[] {
+    const typ = this.einheiten.find(e => e.id === this.selectedEinheitId)?.typ;
+    const erlaubt = erfassbareTariftypenFuer(typ);
+    return this.tarife.filter(t => erlaubt.includes(t.tariftyp as TarifTyp));
   }
 
   /**
@@ -316,17 +372,24 @@ export class TarifpositionListComponent implements OnInit {
 
   /** Messpunkt (RFID) der gewählten Ladestation – belegt die Quell-Referenz vor. */
   get selectedEinheitMesspunkt(): string {
-    return this.ladestationen.find(e => e.id === this.selectedEinheitId)?.messpunkt ?? '';
+    return this.einheiten.find(e => e.id === this.selectedEinheitId)?.messpunkt ?? '';
   }
 
-  /** Uebersetzungs-Key der Mengeneinheit einer Zeile (kWh bzw. Monate). */
+  /**
+   * Uebersetzungs-Key der Mengeneinheit einer Zeile. Der Wert kommt aufgeloest vom Backend
+   * (`tarifMengeneinheit`) - bei ZUSATZ vom Tarif, sonst aus dem Typ abgeleitet.
+   */
   mengeneinheit(position: Tarifposition): string {
-    return mengeneinheitKey(position.tarifTyp);
+    switch (position.tarifMengeneinheit) {
+      case 'MONAT': return 'MONATE';
+      case 'STUECK': return 'STUECK';
+      default: return 'KWH';
+    }
   }
 
-  /** Monate werden ganzzahlig gezeigt - "3.000 Monate" waere unsinnig. */
+  /** Monate und Stueck werden ganzzahlig gezeigt - "3.000 Monate" waere unsinnig. */
   mengeNachkommastellen(position: Tarifposition): number {
-    return position.tarifTyp === TarifTyp.GRUNDGEBUEHR ? 0 : 3;
+    return position.tarifMengeneinheit === 'KWH' || position.tarifMengeneinheit === undefined ? 3 : 0;
   }
 
   berechneBetrag(position: Tarifposition): number {

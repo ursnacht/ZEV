@@ -47,6 +47,9 @@
    - **gesetzt (Normalfall):** Die Einheiten-Auswahl zeigt ausschliesslich Einheiten vom Typ
      `LADESTATION`; als Tarife stehen `LADESTROM` und `ZUSATZ` zur Wahl.
    - **nicht gesetzt (Ausnahme):** Die Auswahl zeigt zusätzlich die **Konsumenten-Einheiten**.
+   Zeigt ein Sprung aus der Einheiten-Verwaltung (`?einheitId=…`) auf einen **Konsumenten**,
+   wird die Checkbox **automatisch abgewählt** — sonst landete der Benutzer auf einer Seite ohne
+   die Einheit, die er angeklickt hat.
 4. Welche Tarife wählbar sind, richtet sich nach dem **Typ der gewählten Einheit**:
    - `LADESTATION` → `LADESTROM`, `ZUSATZ`
    - `CONSUMER` → **nur** `ZUSATZ`
@@ -88,9 +91,11 @@
   **keine DDL-Änderung an `tarifposition` nötig**.
 * **Keine Änderung an der Tabelle `tarifposition`.** Menge, Erfassungsart, Quell-Referenz und
   Bemerkung bleiben wie sie sind; die Bedeutung steckt weiterhin ausschliesslich im Tarif.
-* **Flyway:** Eine Migration für CHECK-Constraint, neue Spalte und Übersetzungen. Die nächste
-  freie Nummer ist **vor** dem Anlegen über den `zev-db`-MCP-Server zu prüfen (zuletzt vergeben:
-  `V110`).
+* **Flyway:** Umgesetzt in vier Migrationen — `V111` (CHECK-Constraint, Spalte `mengeneinheit`,
+  Übersetzungen), `V112` (Platzhalter der Einheiten-Auswahl), `V113` (Schlüssel-Namensraum
+  korrigiert: `TARIFTYP_*` sind Tariftypen, `TYP_*` Einheitentypen), `V114` (Preis-Hinweis
+  einheitneutral). Die nächste freie Nummer ist **vor** dem Anlegen über den `zev-db`-MCP-Server
+  zu prüfen; eine bereits ausgeführte Migration wird nie nachträglich geändert.
 
 ### FR-3: Layout
 
@@ -100,8 +105,13 @@
     (kWh / Monat / Stück) mit Hinweistext. Umschalten auf einen anderen Typ blendet es wieder aus
     und verwirft den Wert. Vorlage: der bestehende, nur bei `GRUNDGEBUEHR` sichtbare Block
     „Produzent verrechnen" in `tarif-form.component.html`.
-  - Die Tarif-Liste zeigt die Mengeneinheit bei `ZUSATZ`-Tarifen an; bei den übrigen Typen bleibt
-    die Spalte leer (`–`).
+  - **Preis-Label und -Hinweis folgen der Einheit:** `Preis (CHF/kWh)`, `(CHF/Monat)`,
+    `(CHF/Stück)` — und nur `(CHF)`, solange ein Zusatz-Tarif noch keine Einheit hat. Der
+    Hinweistext darunter nennt deshalb nur noch das Zahlenformat statt „pro kWh".
+  - Die Tarif-Liste zeigt die Einheit **beim Preis** je Zeile (`5.00 / Stück`) statt in der
+    Spaltenüberschrift. Die lautete bisher fest „(CHF/kWh)" und war damit schon für die
+    Grundgebühr falsch; eine eigene, bei vier von fünf Typen leere Spalte wäre der schlechtere
+    Tausch.
 * **Tarifpositionen**
   - **Checkbox „Nur Ladestationen"** oberhalb der Einheiten-Auswahl, Design-System-Klassen
     `.zev-checkbox-item` + `.zev-checkbox` (Vorlage: `tarif-form`), mit Hinweistext, der den
@@ -201,7 +211,8 @@
 | `ZUSATZ`-Tarif ohne Mengeneinheit gespeichert (manipulierter Request) | `400` mit verständlicher Meldung, kein Datensatz |
 | Tariftyp von `ZUSATZ` auf einen anderen geändert | Mengeneinheit wird verworfen (`NULL`); bestehende Positionen behalten ihren Tarif und zeigen künftig die abgeleitete Einheit |
 | Kein `ZUSATZ`-Tarif vorhanden, Checkbox abgewählt, Konsument gewählt | Hinweis „kein erfassbarer Tarif vorhanden" statt leerer Auswahl |
-| Keine Konsumenten-Einheit vorhanden | Abwählen der Checkbox ändert die Auswahl nicht; kein Fehler |
+| Keine erfassbare Einheit vorhanden | Hinweistext statt leerer Auswahl, **passend zur Checkbox**: „keine Ladestation erfasst" bzw. „keine erfassbare Einheit erfasst" |
+| Quell-Referenz an einer Wohnung | Wird wie bei der Ladestation aus dem `messpunkt` vorbelegt — dort die RFID, hier die Zählernummer. Bleibt frei änderbar |
 | Konsumenten-Einheit ohne Mieter im Zeitraum | Position ist erfassbar, erscheint aber auf keiner Rechnung — es gilt derselbe Hinweis wie bei der Ladestation ohne Mieter |
 | Mieter mit Wohnung **und** Ladestation, Positionen an beiden | **Eine** Rechnung mit allen Zeilen (bestehende Regel aus `Ladestationen.md`) |
 | Menge < 0 | abgewiesen; Menge = 0 speicherbar, erzeugt keine Rechnungszeile |
@@ -225,7 +236,8 @@
     `service/TarifService.java` (Überschneidungsprüfung ausnehmen, Pflichtfeld prüfen),
     `service/TarifpositionService.java` (zulässige Einheitentypen, Eindeutigkeit je Typ/Tarif),
     `service/RechnungService.java` (Mengeneinheit aus dem Tarif statt aus dem Typ),
-    `dto/TarifpositionDTO.java` (Mengeneinheit mitliefern)
+    `repository/TarifpositionRepository.java` (`existsByEinheitAndQuartalAndTarif` für die
+    Eindeutigkeit je Tarif), `dto/TarifpositionDTO.java` (Mengeneinheit mitliefern)
   - Frontend: `models/tarif.model.ts`, `models/tarifposition.model.ts`,
     `components/tarif-form`, `components/tarif-list`, `components/tarifposition-list`,
     `components/tarifposition-form`

@@ -84,9 +84,16 @@ public class TarifService {
             throw new IllegalArgumentException("Gültig von muss vor oder gleich Gültig bis sein");
         }
 
-        // Check for overlapping tariffs
+        pruefeMengeneinheit(tarif);
+
+        // Check for overlapping tariffs. Typen mit mehreren gleichzeitig gueltigen Tarifen
+        // (ZUSATZ) sind ausgenommen: Sauna, Waschkueche und Gaestezimmer teilen sich den Typ und
+        // muessen nebeneinander bestehen. Mehrdeutig wird dadurch nichts, weil der Tarif an der
+        // Position ausdruecklich gewaehlt wird - anders als bei ZEV/VNB/Grundgebuehr, die die
+        // Rechnung selbst heraussucht.
         Long excludeId = tarif.getId() != null ? tarif.getId() : -1L;
-        if (tarifRepository.existsOverlappingTarif(
+        if (!TarifTyp.MEHRFACH_GUELTIG.contains(tarif.getTariftyp())
+                && tarifRepository.existsOverlappingTarif(
                 tarif.getTariftyp(),
                 tarif.getGueltigVon(),
                 tarif.getGueltigBis(),
@@ -102,6 +109,26 @@ public class TarifService {
         Tarif saved = tarifRepository.save(tarif);
         log.info("Tariff saved with ID: {}", saved.getId());
         return saved;
+    }
+
+    /**
+     * Stellt sicher, dass die Mengeneinheit genau bei den Typen gesetzt ist, die eine eigene
+     * haben. Bei allen anderen wird ein mitgeschickter Wert <b>verworfen</b> statt abgewiesen:
+     * Er entsteht typischerweise beim Umschalten des Typs im Formular und hätte dort keine
+     * Wirkung, bliebe aber als irreführender Datenrest stehen.
+     *
+     * @param tarif Zu prüfender Tarif
+     * @throws IllegalArgumentException wenn ein Typ mit eigener Mengeneinheit keine gesetzt hat
+     */
+    private void pruefeMengeneinheit(Tarif tarif) {
+        if (TarifTyp.EIGENE_MENGENEINHEIT.contains(tarif.getTariftyp())) {
+            if (tarif.getMengeneinheit() == null) {
+                throw new IllegalArgumentException(
+                        "Für den Tariftyp " + tarif.getTariftyp() + " ist die Mengeneinheit erforderlich");
+            }
+        } else {
+            tarif.setMengeneinheit(null);
+        }
     }
 
     /**

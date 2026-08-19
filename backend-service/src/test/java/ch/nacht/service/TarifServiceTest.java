@@ -1,5 +1,6 @@
 package ch.nacht.service;
 
+import ch.nacht.entity.Mengeneinheit;
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
 import ch.nacht.exception.TarifLueckenException;
@@ -142,6 +143,56 @@ public class TarifServiceTest {
 
         assertTrue(exception.getMessage().contains("überschneidet"));
         verify(tarifRepository, never()).save(any());
+    }
+
+    @Test
+    void saveTarif_ZweiUeberlappendeZusatzTarife_SavesBoth() {
+        // Sauna, Waschkueche und Gaestezimmer teilen sich den Typ ZUSATZ und muessen gleichzeitig
+        // gueltig sein - die Ueberschneidungspruefung ist fuer diesen Typ ausgenommen
+        // (Specs/Tarifpositionen.md FR-1.2). Mehrdeutig wird dadurch nichts, weil der Tarif an
+        // der Position ausdruecklich gewaehlt wird.
+        Tarif sauna = new Tarif("Sauna", TarifTyp.ZUSATZ, new BigDecimal("5.00000"),
+            LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        sauna.setMengeneinheit(Mengeneinheit.STUECK);
+
+        when(tarifRepository.save(sauna)).thenReturn(sauna);
+
+        assertNotNull(tarifService.saveTarif(sauna));
+
+        // Die Pruefung wird fuer diesen Typ gar nicht erst angefragt
+        verify(tarifRepository, never()).existsOverlappingTarif(any(), any(), any(), anyLong());
+        verify(tarifRepository).save(sauna);
+    }
+
+    @Test
+    void saveTarif_ZusatzOhneMengeneinheit_ThrowsException() {
+        Tarif ohneEinheit = new Tarif("Sauna", TarifTyp.ZUSATZ, new BigDecimal("5.00000"),
+            LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> tarifService.saveTarif(ohneEinheit)
+        );
+
+        assertTrue(exception.getMessage().contains("Mengeneinheit"));
+        verify(tarifRepository, never()).save(any());
+    }
+
+    @Test
+    void saveTarif_MengeneinheitBeiAnderemTyp_WirdVerworfen() {
+        // Entsteht typischerweise beim Umschalten des Typs im Formular. Der Wert haette keine
+        // Wirkung, bliebe aber als irrefuehrender Datenrest stehen.
+        Tarif zev = new Tarif("ZEV 2026", TarifTyp.ZEV, new BigDecimal("0.20000"),
+            LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        zev.setMengeneinheit(Mengeneinheit.STUECK);
+
+        when(tarifRepository.existsOverlappingTarif(eq(TarifTyp.ZEV), any(), any(), eq(-1L)))
+            .thenReturn(false);
+        when(tarifRepository.save(any(Tarif.class))).thenAnswer(i -> i.getArgument(0));
+
+        Tarif gespeichert = tarifService.saveTarif(zev);
+
+        assertNull(gespeichert.getMengeneinheit());
     }
 
     @Test

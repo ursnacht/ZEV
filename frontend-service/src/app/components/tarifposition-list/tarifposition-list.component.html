@@ -21,17 +21,32 @@
     </div>
   }
 
-  @if (ladestationen.length === 0) {
-    <p class="zev-text--muted">{{ 'KEINE_LADESTATION_HINT' | translate }}</p>
+  <!-- Der Hinweis muss zur Checkbox passen: abgewählt sind auch Wohnungen gemeint -->
+  @if (einheiten.length === 0) {
+    <p class="zev-text--muted">
+      {{ (nurLadestationen ? 'KEINE_LADESTATION_HINT' : 'KEINE_ERFASSBARE_EINHEIT_HINT') | translate }}
+    </p>
   }
+
+  <!-- Normalfall Ladestation; Abwählen schaltet die Wohnungen frei (Ausnahme) -->
+  <div class="zev-form-group">
+    <div class="zev-checkbox-item">
+      <input type="checkbox" id="nurLadestationen" class="zev-checkbox"
+        [(ngModel)]="nurLadestationen" name="nurLadestationen"
+        (ngModelChange)="onNurLadestationenChange()" />
+      <label for="nurLadestationen">{{ 'TARIFPOSITION_NUR_LADESTATIONEN' | translate }}</label>
+    </div>
+    <div class="zev-form-hint">{{ 'TARIFPOSITION_NUR_LADESTATIONEN_HINT' | translate }}</div>
+  </div>
 
   <div class="zev-form-group">
     <label for="einheitAuswahl">{{ 'EINHEIT' | translate }}:</label>
     <select id="einheitAuswahl" class="zev-input" name="einheitAuswahl"
       [(ngModel)]="selectedEinheitId" (ngModelChange)="onEinheitChange()">
       <option [ngValue]="null">{{ 'EINHEIT_WAEHLEN' | translate }}</option>
-      @for (e of ladestationen; track e.id) {
-        <option [ngValue]="e.id">{{ e.name }}{{ e.messpunkt ? ' (' + e.messpunkt + ')' : '' }}</option>
+      @for (e of einheiten; track e.id) {
+        <!-- Bei gemischter Liste muss der Typ erkennbar sein: "Wohnung 1 – Konsument" -->
+        <option [ngValue]="e.id">{{ e.name }}{{ e.messpunkt ? ' (' + e.messpunkt + ')' : '' }}@if (!nurLadestationen) { – {{ e.typ | einheitTyp }}}</option>
       }
     </select>
   </div>
@@ -134,7 +149,7 @@
         [position]="selectedPosition"
         [einheitId]="selectedEinheitId"
         [messpunkt]="selectedEinheitMesspunkt"
-        [tarife]="tarife"
+        [tarife]="tarifeFuerAuswahl"
         (save)="onFormSubmit($event)"
         (cancel)="onFormCancel()">
       </app-tarifposition-form>

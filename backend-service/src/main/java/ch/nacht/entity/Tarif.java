@@ -56,6 +56,28 @@ public class Tarif {
     @Column(name = "produzent_verrechnen", nullable = false)
     private boolean produzentVerrechnen = false;
 
+    /**
+     * Nur für {@link TarifTyp#ZUSATZ}: die Mengeneinheit dieses Tarifs — bei allen übrigen Typen
+     * {@code null}, weil sich deren Einheit aus dem Typ ergibt ({@link TarifTyp#mengeneinheit()}).
+     * Für {@code ZUSATZ} ist das Feld Pflicht; geprüft wird das im {@code TarifService}.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mengeneinheit", length = 10)
+    private Mengeneinheit mengeneinheit;
+
+    /**
+     * Mengeneinheit dieses Tarifs für die Rechnungszeile: bei frei konfigurierbaren Typen der
+     * Wert am Tarif, sonst der aus dem Typ abgeleitete.
+     *
+     * @return {@code "KWH"}, {@code "MONAT"} oder {@code "STUECK"}
+     */
+    public String effektiveMengeneinheit() {
+        if (TarifTyp.EIGENE_MENGENEINHEIT.contains(tariftyp) && mengeneinheit != null) {
+            return mengeneinheit.name();
+        }
+        return tariftyp.mengeneinheit();
+    }
+
     public Tarif() {
     }
 
@@ -129,6 +151,14 @@ public class Tarif {
 
     public void setProduzentVerrechnen(boolean produzentVerrechnen) {
         this.produzentVerrechnen = produzentVerrechnen;
+    }
+
+    public Mengeneinheit getMengeneinheit() {
+        return mengeneinheit;
+    }
+
+    public void setMengeneinheit(Mengeneinheit mengeneinheit) {
+        this.mengeneinheit = mengeneinheit;
     }
 
     @Override

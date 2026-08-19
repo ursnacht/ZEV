@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TarifService } from '../../services/tarif.service';
-import { Tarif, ValidationResult } from '../../models/tarif.model';
+import { Tarif, TarifTyp, ValidationResult, preisEinheitKey } from '../../models/tarif.model';
 import { formatTarifLuecke } from '../../utils/tarif-luecke.util';
 import { TarifFormComponent } from '../tarif-form/tarif-form.component';
 import { TranslatePipe } from '../../pipes/translate.pipe';
@@ -168,6 +168,11 @@ export class TarifListComponent implements OnInit {
 
   formatPreis(preis: number): string {
     return formatSwissNumber(preis, 5);
+  }
+
+  /** Übersetzungs-Key der Preis-Einheit („CHF pro …") dieser Zeile. */
+  preisEinheit(tarif: Tarif): string {
+    return preisEinheitKey(tarif.tariftyp as TarifTyp, tarif.mengeneinheit);
   }
 
   onValidateQuartale(): void {

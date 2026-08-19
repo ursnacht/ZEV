@@ -82,6 +82,30 @@ public interface TarifpositionRepository extends JpaRepository<Tarifposition, Lo
     );
 
     /**
+     * Wie oben, aber je <b>Tarif</b> statt je Tariftyp. Für Typen mit mehreren gleichzeitig
+     * gültigen Tarifen (ZUSATZ): Dort sollen mehrere Positionen desselben Typs nebeneinander
+     * bestehen, solange sie auf verschiedene Tarife zeigen.
+     *
+     * @param einheitId Unit ID
+     * @param jahr Year
+     * @param quartal Quarter
+     * @param tarifId Tariff to check
+     * @param excludeId ID to exclude (use -1 for new positions)
+     * @return true if such a position exists
+     */
+    @Query("SELECT COUNT(p) > 0 FROM Tarifposition p WHERE p.einheit.id = :einheitId "
+            + "AND p.jahr = :jahr AND p.quartal = :quartal "
+            + "AND p.tarif.id = :tarifId "
+            + "AND p.id != :excludeId")
+    boolean existsByEinheitAndQuartalAndTarif(
+            @Param("einheitId") Long einheitId,
+            @Param("jahr") Integer jahr,
+            @Param("quartal") Integer quartal,
+            @Param("tarifId") Long tarifId,
+            @Param("excludeId") Long excludeId
+    );
+
+    /**
      * Count positions referencing a given tariff. Used to reject deletion of a referenced tariff.
      *
      * @param tarifId Tariff ID

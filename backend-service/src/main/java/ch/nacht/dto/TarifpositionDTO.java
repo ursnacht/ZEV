@@ -30,8 +30,10 @@ public class TarifpositionDTO {
     @NotNull(message = "Tarif ist erforderlich")
     private Long tarifId;
     private String tarifBezeichnung;
-    /** Nur lesend: Die Oberflaeche leitet daraus die Mengeneinheit ab (kWh bzw. Monate). */
+    /** Nur lesend: Tariftyp der Position (bestimmt u.a. die Eindeutigkeitsregel). */
     private TarifTyp tarifTyp;
+    /** Nur lesend: Mengeneinheit der Zeile — bei ZUSATZ vom Tarif, sonst aus dem Typ abgeleitet. */
+    private String tarifMengeneinheit;
     private BigDecimal tarifPreis;
     @NotNull(message = "Jahr ist erforderlich")
     @Min(value = 2000, message = "Jahr muss 2000 oder später sein")
@@ -71,6 +73,7 @@ public class TarifpositionDTO {
             dto.setTarifId(position.getTarif().getId());
             dto.setTarifBezeichnung(position.getTarif().getBezeichnung());
             dto.setTarifTyp(position.getTarif().getTariftyp());
+            dto.setTarifMengeneinheit(position.getTarif().effektiveMengeneinheit());
             dto.setTarifPreis(position.getTarif().getPreis());
         }
         dto.setJahr(position.getJahr());
@@ -136,6 +139,14 @@ public class TarifpositionDTO {
 
     public void setTarifTyp(TarifTyp tarifTyp) {
         this.tarifTyp = tarifTyp;
+    }
+
+    public String getTarifMengeneinheit() {
+        return tarifMengeneinheit;
+    }
+
+    public void setTarifMengeneinheit(String tarifMengeneinheit) {
+        this.tarifMengeneinheit = tarifMengeneinheit;
     }
 
     public BigDecimal getTarifPreis() {

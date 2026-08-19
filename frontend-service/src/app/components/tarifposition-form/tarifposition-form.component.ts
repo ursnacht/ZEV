@@ -61,29 +61,35 @@ export class TarifpositionFormComponent implements OnInit {
     }
   }
 
-  /** Tariftyp des gewaehlten Tarifs - bestimmt Mengeneinheit und Hinweistext. */
-  get gewaehlterTariftyp(): TarifTyp | undefined {
-    return this.tarife.find(t => t.id === this.formData.tarifId)?.tariftyp as TarifTyp | undefined;
+  /** Gewaehlter Tarif - traegt Typ und (bei ZUSATZ) die Mengeneinheit. */
+  get gewaehlterTarif(): Tarif | undefined {
+    return this.tarife.find(t => t.id === this.formData.tarifId);
   }
 
-  /** Uebersetzungs-Key der Mengeneinheit: Grundgebuehr zaehlt Monate, Ladestrom kWh. */
+  /**
+   * Uebersetzungs-Key der Mengeneinheit: bei ZUSATZ vom Tarif, sonst aus dem Typ abgeleitet
+   * (Ladestrom kWh).
+   */
   get mengeneinheit(): string {
-    return mengeneinheitKey(this.gewaehlterTariftyp);
+    const tarif = this.gewaehlterTarif;
+    return mengeneinheitKey(tarif?.tariftyp as TarifTyp | undefined, tarif?.mengeneinheit);
   }
 
   /** Hinweis unter dem Mengenfeld, passend zur Mengeneinheit. */
   get mengeHinweis(): string {
-    return this.gewaehlterTariftyp === TarifTyp.GRUNDGEBUEHR
-      ? 'TARIFPOSITION_MENGE_HINT_MONATE'
-      : 'TARIFPOSITION_MENGE_HINT';
+    switch (this.mengeneinheit) {
+      case 'MONATE': return 'TARIFPOSITION_MENGE_HINT_MONATE';
+      case 'STUECK': return 'TARIFPOSITION_MENGE_HINT_STUECK';
+      default: return 'TARIFPOSITION_MENGE_HINT';
+    }
   }
 
   /**
-   * Schrittweite des Mengenfelds. Monate werden ganzzahlig erfasst - ein Spinner, der 0.001
-   * anbietet, waere hier irrefuehrend.
+   * Schrittweite des Mengenfelds. Monate und Stueck werden ganzzahlig erfasst - ein Spinner, der
+   * 0.001 anbietet, waere dort irrefuehrend.
    */
   get mengeSchritt(): number {
-    return this.gewaehlterTariftyp === TarifTyp.GRUNDGEBUEHR ? 1 : 0.001;
+    return this.mengeneinheit === 'KWH' ? 0.001 : 1;
   }
 
   onSubmit(): void {

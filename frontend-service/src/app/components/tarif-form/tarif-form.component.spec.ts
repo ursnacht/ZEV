@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TarifFormComponent } from './tarif-form.component';
-import { Tarif, TarifTyp } from '../../models/tarif.model';
+import { Mengeneinheit, Tarif, TarifTyp } from '../../models/tarif.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
 
@@ -62,16 +62,144 @@ describe('TarifFormComponent', () => {
       expect(component.formData.gueltigBis).toBe('2024-12-31');
     });
 
-    it('should have four tarif type options', () => {
-      expect(component.tarifTypOptions.length).toBe(4);
-      expect(component.tarifTypOptions[0].value).toBe(TarifTyp.ZEV);
-      expect(component.tarifTypOptions[1].value).toBe(TarifTyp.VNB);
-      expect(component.tarifTypOptions[2].value).toBe(TarifTyp.GRUNDGEBUEHR);
-      expect(component.tarifTypOptions[3].value).toBe(TarifTyp.LADESTROM);
+    it('should have five tarif type options', () => {
+      expect(component.tarifTypOptions).toEqual([
+        TarifTyp.ZEV, TarifTyp.VNB, TarifTyp.GRUNDGEBUEHR, TarifTyp.LADESTROM, TarifTyp.ZUSATZ
+      ]);
     });
 
     it('should default produzentVerrechnen to false', () => {
       expect(component.formData.produzentVerrechnen).toBe(false);
+    });
+  });
+
+  describe('mengeneinheit (nur ZUSATZ)', () => {
+    // Nur der frei konfigurierbare Typ traegt eine eigene Mengeneinheit; bei allen anderen
+    // folgt sie aus dem Typ (Specs/Tarifpositionen.md FR-1.1).
+
+    it('should not require a unit for the fixed types', () => {
+      for (const typ of [TarifTyp.ZEV, TarifTyp.VNB, TarifTyp.GRUNDGEBUEHR, TarifTyp.LADESTROM]) {
+        component.formData.tariftyp = typ;
+        expect(component.brauchtMengeneinheit).toBe(false);
+      }
+    });
+
+    it('should require a unit for ZUSATZ', () => {
+      component.formData.tariftyp = TarifTyp.ZUSATZ;
+      expect(component.brauchtMengeneinheit).toBe(true);
+    });
+
+    it('should render the unit dropdown only for ZUSATZ', () => {
+      component.formData.tariftyp = TarifTyp.LADESTROM;
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('#mengeneinheit')).toBeNull();
+
+      component.formData.tariftyp = TarifTyp.ZUSATZ;
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('#mengeneinheit')).not.toBeNull();
+    });
+
+    it('should offer kWh, month and piece', () => {
+      expect(component.mengeneinheitOptions).toEqual([
+        Mengeneinheit.KWH, Mengeneinheit.MONAT, Mengeneinheit.STUECK
+      ]);
+    });
+
+    it('should be invalid while a ZUSATZ tariff has no unit', () => {
+      component.formData = {
+        bezeichnung: 'Sauna', tariftyp: TarifTyp.ZUSATZ, preis: 5,
+        gueltigVon: '2026-01-01', gueltigBis: '2026-12-31'
+      };
+      expect(component.isFormValid()).toBe(false);
+
+      component.formData.mengeneinheit = Mengeneinheit.STUECK;
+      expect(component.isFormValid()).toBe(true);
+    });
+
+    it('should discard the unit when switching to a type without one', () => {
+      // Sonst bliebe ein unsichtbarer Wert im Formular stehen
+      component.formData.tariftyp = TarifTyp.ZUSATZ;
+      component.formData.mengeneinheit = Mengeneinheit.MONAT;
+
+      component.formData.tariftyp = TarifTyp.LADESTROM;
+      component.onTariftypChange();
+
+      expect(component.formData.mengeneinheit).toBeUndefined();
+    });
+
+    it('should keep the unit while staying on ZUSATZ', () => {
+      component.formData.tariftyp = TarifTyp.ZUSATZ;
+      component.formData.mengeneinheit = Mengeneinheit.MONAT;
+      component.onTariftypChange();
+      expect(component.formData.mengeneinheit).toBe(Mengeneinheit.MONAT);
+    });
+  });
+
+  describe('i18n der Auswahllisten', () => {
+    // Die Beschriftungen standen frueher hartcodiert im Component und waren damit die einzigen
+    // deutschen Texte im Formular (Specs/generell.md). Der Mock liefert den Key zurueck - im
+    // gerenderten Markup muss also der Key stehen, nicht ein deutscher Text.
+
+    it('should translate the tariff type options', () => {
+      fixture.detectChanges();
+      const texte = Array.from(
+        fixture.nativeElement.querySelectorAll('#tariftyp option') as NodeListOf<HTMLElement>
+      ).map(o => o.textContent?.trim());
+
+      expect(texte).toEqual([
+        'TARIFTYP_ZEV', 'TARIFTYP_VNB', 'TARIFTYP_GRUNDGEBUEHR',
+        'TARIFTYP_LADESTROM', 'TARIFTYP_ZUSATZ'
+      ]);
+    });
+
+    it('should translate the unit options', () => {
+      component.formData.tariftyp = TarifTyp.ZUSATZ;
+      fixture.detectChanges();
+      const texte = Array.from(
+        fixture.nativeElement.querySelectorAll('#mengeneinheit option') as NodeListOf<HTMLElement>
+      ).map(o => o.textContent?.trim());
+
+      // Erste Option ist der Platzhalter
+      expect(texte).toEqual(['MENGENEINHEIT_WAEHLEN', 'KWH', 'MONAT', 'STUECK']);
+    });
+  });
+
+  describe('Preis-Label', () => {
+    // Die Bezugsgroesse stand frueher fest als "(CHF/kWh)" im Label - schon fuer die
+    // Grundgebuehr falsch (CHF pro Monat).
+
+    const label = () => (fixture.nativeElement.querySelector('label[for="preis"]') as HTMLElement).textContent ?? '';
+
+    it('should name kWh for ZEV, VNB and Ladestrom', () => {
+      for (const typ of [TarifTyp.ZEV, TarifTyp.VNB, TarifTyp.LADESTROM]) {
+        component.formData.tariftyp = typ;
+        expect(component.preisEinheit).toBe('KWH');
+      }
+    });
+
+    it('should name the month for the Grundgebuehr', () => {
+      component.formData.tariftyp = TarifTyp.GRUNDGEBUEHR;
+      expect(component.preisEinheit).toBe('MONAT');
+      fixture.detectChanges();
+      expect(label()).toContain('MONAT');
+      expect(label()).not.toContain('KWH');
+    });
+
+    it('should name the chosen unit for a ZUSATZ tariff', () => {
+      component.formData.tariftyp = TarifTyp.ZUSATZ;
+      component.formData.mengeneinheit = Mengeneinheit.STUECK;
+      fixture.detectChanges();
+      expect(label()).toContain('STUECK');
+    });
+
+    it('should show CHF alone while a ZUSATZ tariff has no unit yet', () => {
+      // Sonst behauptete das Label kWh, obwohl die Einheit noch offen ist
+      component.formData.tariftyp = TarifTyp.ZUSATZ;
+      component.formData.mengeneinheit = undefined;
+      expect(component.preisEinheit).toBe('');
+      fixture.detectChanges();
+      expect(label()).toContain('CHF');
+      expect(label()).not.toContain('KWH');
     });
   });
 

@@ -4,7 +4,7 @@ import { fakeAsync, tick } from '../../../testing/fake-async';
 import { TarifListComponent } from './tarif-list.component';
 import { TarifService } from '../../services/tarif.service';
 import { TranslationService } from '../../services/translation.service';
-import { Tarif, TarifTyp, ValidationResult } from '../../models/tarif.model';
+import { Mengeneinheit, Tarif, TarifTyp, ValidationResult } from '../../models/tarif.model';
 import { of, throwError } from 'rxjs';
 
 describe('TarifListComponent', () => {
@@ -342,6 +342,29 @@ describe('TarifListComponent', () => {
 
     it('should group thousands with an apostrophe (Swiss format)', () => {
       expect(component.formatPreis(1234.5)).toBe('1\'234.50000');
+    });
+  });
+
+  describe('preisEinheit', () => {
+    // Die Spaltenueberschrift sagte fest "(CHF/kWh)" - schon fuer die Grundgebuehr falsch.
+    const tarif = (tariftyp: TarifTyp, mengeneinheit?: Mengeneinheit): Tarif => ({
+      id: 1, bezeichnung: 'Test', tariftyp, preis: 1,
+      gueltigVon: '2026-01-01', gueltigBis: '2026-12-31', mengeneinheit
+    });
+
+    it('should use kWh for ZEV, VNB and Ladestrom', () => {
+      for (const typ of [TarifTyp.ZEV, TarifTyp.VNB, TarifTyp.LADESTROM]) {
+        expect(component.preisEinheit(tarif(typ))).toBe('KWH');
+      }
+    });
+
+    it('should use the month for the Grundgebuehr', () => {
+      expect(component.preisEinheit(tarif(TarifTyp.GRUNDGEBUEHR))).toBe('MONAT');
+    });
+
+    it('should use the unit of a ZUSATZ tariff', () => {
+      expect(component.preisEinheit(tarif(TarifTyp.ZUSATZ, Mengeneinheit.STUECK))).toBe('STUECK');
+      expect(component.preisEinheit(tarif(TarifTyp.ZUSATZ, Mengeneinheit.MONAT))).toBe('MONAT');
     });
   });
 

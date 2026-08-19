@@ -128,12 +128,12 @@ describe('TarifpositionListComponent', () => {
   describe('initialization', () => {
     it('should load ladestationen on init', () => {
       expect(einheitServiceSpy.getAllEinheiten).toHaveBeenCalled();
-      expect(component.ladestationen.length).toBe(2);
+      expect(component.einheiten.length).toBe(2);
     });
 
     it('should sort the ladestationen by name', () => {
-      expect(component.ladestationen[0].name).toBe('Anders Ladestation');
-      expect(component.ladestationen[1].name).toBe('Zwahlen Ladestation');
+      expect(component.einheiten[0].name).toBe('Anders Ladestation');
+      expect(component.einheiten[1].name).toBe('Zwahlen Ladestation');
     });
 
     it('should load tarife on init', () => {
@@ -201,8 +201,8 @@ describe('TarifpositionListComponent', () => {
 
       component.loadLadestationen();
 
-      expect(component.ladestationen.map(e => e.id)).toEqual([2, 1]);
-      expect(component.ladestationen.every(e => e.typ === EinheitTyp.LADESTATION)).toBe(true);
+      expect(component.einheiten.map(e => e.id)).toEqual([2, 1]);
+      expect(component.einheiten.every(e => e.typ === EinheitTyp.LADESTATION)).toBe(true);
     });
 
     it('should leave the list empty when no ladestation exists', () => {
@@ -212,16 +212,32 @@ describe('TarifpositionListComponent', () => {
 
       component.loadLadestationen();
 
-      expect(component.ladestationen).toEqual([]);
+      expect(component.einheiten).toEqual([]);
       expect(component.selectedEinheitId).toBeNull();
     });
 
-    it('should ignore a query parameter pointing at a non-ladestation', () => {
+    it('should follow a query parameter pointing at a consumer and uncheck the filter', () => {
+      // Sonst landete der Benutzer nach dem Kebab-Sprung auf einer Seite ohne die Einheit,
+      // die er angeklickt hat (Specs/Tarifpositionen.md).
       einheitServiceSpy.getAllEinheiten.mockReturnValue(of([
         { id: 5, name: 'Wohnung A', typ: EinheitTyp.CONSUMER },
         ...mockEinheiten
       ]));
       queryParams['einheitId'] = '5';
+      createComponent();
+
+      expect(component.selectedEinheitId).toBe(5);
+      expect(component.nurLadestationen).toBe(false);
+      expect(tarifpositionServiceSpy.getByEinheit).toHaveBeenCalledWith(5);
+    });
+
+    it('should ignore a query parameter pointing at a producer', () => {
+      // An Produzenten sind Positionen nie erfassbar
+      einheitServiceSpy.getAllEinheiten.mockReturnValue(of([
+        { id: 6, name: 'Solaranlage', typ: EinheitTyp.PRODUCER },
+        ...mockEinheiten
+      ]));
+      queryParams['einheitId'] = '6';
       createComponent();
 
       expect(component.selectedEinheitId).toBeNull();
@@ -248,9 +264,126 @@ describe('TarifpositionListComponent', () => {
     });
 
     it('should return an empty string when the ladestation has no messpunkt', () => {
-      component.ladestationen = [{ id: 1, name: 'Ohne RFID', typ: EinheitTyp.LADESTATION }];
+      component.einheiten = [{ id: 1, name: 'Ohne RFID', typ: EinheitTyp.LADESTATION }];
       component.selectedEinheitId = 1;
       expect(component.selectedEinheitMesspunkt).toBe('');
+    });
+  });
+
+  describe('nurLadestationen (Checkbox)', () => {
+    // Specs/Tarifpositionen.md FR-1.3: Normalfall Ladestation, Abwaehlen ist die Ausnahme.
+
+    const mitWohnung = () => {
+      einheitServiceSpy.getAllEinheiten.mockReturnValue(of([
+        { id: 5, name: 'Wohnung A', typ: EinheitTyp.CONSUMER },
+        { id: 6, name: 'Solaranlage', typ: EinheitTyp.PRODUCER },
+        ...mockEinheiten
+      ]));
+      createComponent();
+    };
+
+    it('should be checked by default and offer charging stations only', () => {
+      mitWohnung();
+      expect(component.nurLadestationen).toBe(true);
+      expect(component.einheiten.map(e => e.typ)).toEqual([
+        EinheitTyp.LADESTATION, EinheitTyp.LADESTATION
+      ]);
+    });
+
+    it('should add the consumers when unchecked, but never producers', () => {
+      mitWohnung();
+      component.nurLadestationen = false;
+      component.onNurLadestationenChange();
+
+      const typen = component.einheiten.map(e => e.typ);
+      expect(typen).toContain(EinheitTyp.CONSUMER);
+      expect(typen).toContain(EinheitTyp.LADESTATION);
+      expect(typen).not.toContain(EinheitTyp.PRODUCER);
+    });
+
+    it('should reset a consumer selection when checked again', () => {
+      mitWohnung();
+      component.nurLadestationen = false;
+      component.onNurLadestationenChange();
+      component.selectedEinheitId = 5;
+      component.positionen = positionenKopie();
+
+      component.nurLadestationen = true;
+      component.onNurLadestationenChange();
+
+      expect(component.selectedEinheitId).toBeNull();
+      expect(component.positionen).toEqual([]);
+      expect(component.showForm).toBe(false);
+    });
+
+    it('should keep a charging station selected when checked again', () => {
+      mitWohnung();
+      component.nurLadestationen = false;
+      component.onNurLadestationenChange();
+      component.selectedEinheitId = 1;
+
+      component.nurLadestationen = true;
+      component.onNurLadestationenChange();
+
+      expect(component.selectedEinheitId).toBe(1);
+    });
+  });
+
+  describe('Hinweis bei leerer Einheiten-Auswahl', () => {
+    const ohneEinheiten = () => {
+      einheitServiceSpy.getAllEinheiten.mockReturnValue(of([]));
+      createComponent();
+      fixture.detectChanges();
+    };
+
+    it('should name the charging station while the filter is checked', () => {
+      ohneEinheiten();
+      expect(fixture.nativeElement.textContent).toContain('KEINE_LADESTATION_HINT');
+    });
+
+    it('should name any recordable unit once the filter is unchecked', () => {
+      // Sonst behauptete der Hinweis "keine Ladestation", obwohl auch Wohnungen gemeint sind
+      ohneEinheiten();
+      component.nurLadestationen = false;
+      component.onNurLadestationenChange();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).toContain('KEINE_ERFASSBARE_EINHEIT_HINT');
+      expect(fixture.nativeElement.textContent).not.toContain('KEINE_LADESTATION_HINT');
+    });
+  });
+
+  describe('tarifeFuerAuswahl', () => {
+    const mitZusatzTarif = () => {
+      tarifServiceSpy.getAllTarife.mockReturnValue(of([
+        ...mockTarife,
+        {
+          id: 9, bezeichnung: 'Sauna', tariftyp: TarifTyp.ZUSATZ, preis: 5,
+          gueltigVon: '2026-01-01', gueltigBis: '2026-12-31'
+        }
+      ]));
+      einheitServiceSpy.getAllEinheiten.mockReturnValue(of([
+        { id: 5, name: 'Wohnung A', typ: EinheitTyp.CONSUMER },
+        ...mockEinheiten
+      ]));
+      createComponent();
+      component.nurLadestationen = false;
+      component.onNurLadestationenChange();
+    };
+
+    it('should offer ladestrom and zusatz for a charging station', () => {
+      mitZusatzTarif();
+      component.selectedEinheitId = 1;
+      const typen = component.tarifeFuerAuswahl.map(t => t.tariftyp);
+      expect(typen).toContain(TarifTyp.LADESTROM);
+      expect(typen).toContain(TarifTyp.ZUSATZ);
+    });
+
+    it('should offer only zusatz for a consumer', () => {
+      // Ladestrom gehoert fachlich an eine Ladestation
+      mitZusatzTarif();
+      component.selectedEinheitId = 5;
+      expect(component.tarifeFuerAuswahl.map(t => t.tariftyp)).toEqual([TarifTyp.ZUSATZ]);
     });
   });
 
@@ -259,22 +392,28 @@ describe('TarifpositionListComponent', () => {
     // (Specs/Ladestromtarif.md FR-6).
 
     it('should use kWh for a ladestrom position', () => {
-      expect(component.mengeneinheit({ ...mockPositionen[0], tarifTyp: TarifTyp.LADESTROM })).toBe('KWH');
+      expect(component.mengeneinheit({ ...mockPositionen[0], tarifMengeneinheit: 'KWH' })).toBe('KWH');
     });
 
-    it('should use months for a grundgebuehr position', () => {
-      expect(component.mengeneinheit({ ...mockPositionen[0], tarifTyp: TarifTyp.GRUNDGEBUEHR })).toBe('MONATE');
+    it('should use months for a zusatz position billed per month', () => {
+      expect(component.mengeneinheit({ ...mockPositionen[0], tarifMengeneinheit: 'MONAT' })).toBe('MONATE');
     });
 
-    it('should fall back to kWh when the type is missing', () => {
-      expect(component.mengeneinheit({ ...mockPositionen[0], tarifTyp: undefined })).toBe('KWH');
+    it('should use pieces for a zusatz position billed per piece', () => {
+      expect(component.mengeneinheit({ ...mockPositionen[0], tarifMengeneinheit: 'STUECK' })).toBe('STUECK');
     });
 
-    it('should show months without decimals and kWh with three', () => {
+    it('should fall back to kWh when the unit is missing', () => {
+      expect(component.mengeneinheit({ ...mockPositionen[0], tarifMengeneinheit: undefined })).toBe('KWH');
+    });
+
+    it('should show months and pieces without decimals, kWh with three', () => {
       expect(component.mengeNachkommastellen(
-        { ...mockPositionen[0], tarifTyp: TarifTyp.GRUNDGEBUEHR })).toBe(0);
+        { ...mockPositionen[0], tarifMengeneinheit: 'MONAT' })).toBe(0);
       expect(component.mengeNachkommastellen(
-        { ...mockPositionen[0], tarifTyp: TarifTyp.LADESTROM })).toBe(3);
+        { ...mockPositionen[0], tarifMengeneinheit: 'STUECK' })).toBe(0);
+      expect(component.mengeNachkommastellen(
+        { ...mockPositionen[0], tarifMengeneinheit: 'KWH' })).toBe(3);
     });
   });
 

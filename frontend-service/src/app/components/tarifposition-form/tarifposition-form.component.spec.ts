@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TarifpositionFormComponent } from './tarifposition-form.component';
 import { TranslationService } from '../../services/translation.service';
 import { Erfassungsart, Tarifposition } from '../../models/tarifposition.model';
-import { Tarif, TarifTyp } from '../../models/tarif.model';
+import { Mengeneinheit, Tarif, TarifTyp } from '../../models/tarif.model';
 
 describe('TarifpositionFormComponent', () => {
   let component: TarifpositionFormComponent;
@@ -182,6 +182,62 @@ describe('TarifpositionFormComponent', () => {
       expect(component.formData.menge).toBe(existingPosition.menge);
       expect(component.formData.quellReferenz).toBe('LP-01');
       expect(component.formData.bemerkung).toBe('Beleg 42');
+    });
+  });
+
+  describe('mengeneinheit nach Tarif', () => {
+    // Bei ZUSATZ steht die Einheit am Tarif, sonst folgt sie aus dem Typ
+    // (Specs/Tarifpositionen.md FR-1.5).
+
+    const mitZusatz = (einheit: Mengeneinheit) => {
+      component.tarife = [
+        ...mockTarife,
+        {
+          id: 9, bezeichnung: 'Sauna', tariftyp: TarifTyp.ZUSATZ, preis: 5,
+          gueltigVon: '2026-01-01', gueltigBis: '2026-12-31', mengeneinheit: einheit
+        }
+      ];
+      component.formData.tarifId = 9;
+    };
+
+    it('should label a ladestrom position in kWh', () => {
+      component.formData.tarifId = 3;
+      expect(component.mengeneinheit).toBe('KWH');
+      expect(component.mengeHinweis).toBe('TARIFPOSITION_MENGE_HINT');
+      expect(component.mengeSchritt).toBe(0.001);
+    });
+
+    it('should label a zusatz position in months', () => {
+      mitZusatz(Mengeneinheit.MONAT);
+      expect(component.mengeneinheit).toBe('MONATE');
+      expect(component.mengeHinweis).toBe('TARIFPOSITION_MENGE_HINT_MONATE');
+      expect(component.mengeSchritt).toBe(1);
+    });
+
+    it('should label a zusatz position in pieces', () => {
+      mitZusatz(Mengeneinheit.STUECK);
+      expect(component.mengeneinheit).toBe('STUECK');
+      expect(component.mengeHinweis).toBe('TARIFPOSITION_MENGE_HINT_STUECK');
+      expect(component.mengeSchritt).toBe(1);
+    });
+
+    it('should label a zusatz position in kWh when the tariff says so', () => {
+      mitZusatz(Mengeneinheit.KWH);
+      expect(component.mengeneinheit).toBe('KWH');
+      expect(component.mengeSchritt).toBe(0.001);
+    });
+
+    it('should fall back to kWh when no tariff is selected', () => {
+      component.formData.tarifId = 0;
+      expect(component.mengeneinheit).toBe('KWH');
+    });
+
+    it('should render the unit in the label', () => {
+      mitZusatz(Mengeneinheit.STUECK);
+      fixture.detectChanges();
+      const label = fixture.nativeElement.querySelector('label[for="menge"]') as HTMLElement;
+      expect(label.textContent).toContain('STUECK');
+      expect(label.textContent).not.toContain('KWH');
     });
   });
 
