@@ -23,10 +23,13 @@ public enum TarifTyp {
      * GRUNDGEBUEHR - Monthly fixed fee per electricity meter.
      * Calculated as: number of full calendar months × fixed price per meter.
      *
-     * <p>Zusätzlich manuell erfassbar (siehe {@link #MANUELL_ERFASST}): Eine Ladestation kann
-     * eine eigene Grundgebühr tragen, deren Monate nicht aus dem Rechnungszeitraum folgen. Die
-     * automatische Berechnung bleibt davon unberührt — beide Zeilen erscheinen nebeneinander.
-     * Die Menge einer solchen Position zählt <b>Monate</b>, nicht kWh.
+     * <p><b>Nicht</b> manuell erfassbar. Der Versuch scheiterte an der Überschneidungsregel:
+     * Je Zeitraum ist nur <i>ein</i> Grundgebühr-Tarif gültig, ein eigener Tarif für Ladestationen
+     * mit eigenem Preis also gar nicht anlegbar. Und diese Regel aufzuheben verbietet sich, weil
+     * {@code RechnungService.berechneGrundgebuehrZeilen} jeden gültigen Grundgebühr-Tarif
+     * automatisch auf <i>jede</i> Konsumenten-Rechnung schreibt — ein zweiter Tarif landete damit
+     * bei allen Wohnungen. Eine Grundgebühr für Ladestationen wird über {@link #ZUSATZ} mit
+     * Mengeneinheit <i>Monat</i> abgebildet (Specs/Tarifpositionen.md).
      */
     GRUNDGEBUEHR,
 
@@ -44,15 +47,17 @@ public enum TarifTyp {
      * <p>Deliberately a <b>set</b>: a further use case (Sauna, Waschküche, …) only extends this
      * set — table, service and UI stay unchanged.
      *
-     * <p>{@link #GRUNDGEBUEHR} steht hier <b>zusätzlich</b> zu seiner automatischen Berechnung:
-     * Der Typ ist nicht ausschliesslich manuell, sondern beides. Deshalb prüft der Service die
-     * Eindeutigkeit je Einheit, Quartal und <b>Typ</b> — sonst schlössen sich eine Ladestrom-
-     * und eine Grundgebühr-Position im selben Quartal gegenseitig aus.
+     * <p>Der Service prüft die Eindeutigkeit einer Position je Einheit, Quartal und <b>Typ</b> —
+     * nicht gegen diese Menge als Ganzes. Sonst schlössen sich Positionen verschiedener Typen im
+     * selben Quartal gegenseitig aus.
      */
-    public static final Set<TarifTyp> MANUELL_ERFASST = EnumSet.of(LADESTROM, GRUNDGEBUEHR);
+    public static final Set<TarifTyp> MANUELL_ERFASST = EnumSet.of(LADESTROM);
 
     /**
-     * Mengeneinheit einer manuell erfassten Position dieses Typs.
+     * Mengeneinheit, die sich allein aus dem Typ ergibt.
+     *
+     * <p>{@link #GRUNDGEBUEHR} rechnet Monate, alles Übrige kWh. Für Typen mit <b>frei
+     * wählbarer</b> Einheit ist stattdessen der Wert am Tarif massgebend.
      *
      * @return {@code "MONAT"} für {@link #GRUNDGEBUEHR}, sonst {@code "KWH"}
      */

@@ -28,14 +28,6 @@ describe('TarifpositionFormComponent', () => {
       preis: 0.38,
       gueltigVon: '2027-01-01',
       gueltigBis: '2027-12-31'
-    },
-    {
-      id: 5,
-      bezeichnung: 'Grundgebühr Ladestation',
-      tariftyp: TarifTyp.GRUNDGEBUEHR,
-      preis: 5,
-      gueltigVon: '2026-01-01',
-      gueltigBis: '2026-12-31'
     }
   ];
 
@@ -190,38 +182,6 @@ describe('TarifpositionFormComponent', () => {
       expect(component.formData.menge).toBe(existingPosition.menge);
       expect(component.formData.quellReferenz).toBe('LP-01');
       expect(component.formData.bemerkung).toBe('Beleg 42');
-    });
-  });
-
-  describe('mengeneinheit nach Tariftyp', () => {
-    // Grundgebuehr zaehlt Monate, Ladestrom kWh (Specs/Ladestromtarif.md FR-6)
-
-    it('should label the quantity in kWh for a ladestrom tariff', () => {
-      component.formData.tarifId = 3;
-      expect(component.mengeneinheit).toBe('KWH');
-      expect(component.mengeHinweis).toBe('TARIFPOSITION_MENGE_HINT');
-      expect(component.mengeSchritt).toBe(0.001);
-    });
-
-    it('should label the quantity in months for a grundgebuehr tariff', () => {
-      component.formData.tarifId = 5;
-      expect(component.mengeneinheit).toBe('MONATE');
-      expect(component.mengeHinweis).toBe('TARIFPOSITION_MENGE_HINT_MONATE');
-      // Monate ganzzahlig - ein Spinner mit 0.001 waere hier irrefuehrend
-      expect(component.mengeSchritt).toBe(1);
-    });
-
-    it('should fall back to kWh when no tariff is selected', () => {
-      component.formData.tarifId = 0;
-      expect(component.mengeneinheit).toBe('KWH');
-    });
-
-    it('should render the unit in the label', () => {
-      component.formData.tarifId = 5;
-      fixture.detectChanges();
-      const label = fixture.nativeElement.querySelector('label[for="menge"]') as HTMLElement;
-      expect(label.textContent).toContain('MONATE');
-      expect(label.textContent).not.toContain('kWh');
     });
   });
 

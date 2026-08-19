@@ -64,7 +64,7 @@ public class TarifpositionServiceTest {
     private Long testOrgId;
     private Einheit testEinheit;
     private Tarif ladestromTarif;
-    /** Grundgebuehr ist seit Specs/Ladestromtarif.md FR-6 ebenfalls erfassbar (Menge = Monate). */
+    /** Grundgebuehr ist NICHT erfassbar - Begruendung siehe TarifTyp.GRUNDGEBUEHR. */
     private Tarif grundgebuehrTarif;
     private Tarifposition testPosition1;
     private Tarifposition testPosition2;
@@ -465,63 +465,22 @@ public class TarifpositionServiceTest {
     }
 
     @Test
-    void saveTarifposition_GrundgebuehrTariftyp_SavesSuccessfully() {
-        // Grundgebuehr ist seit Specs/Ladestromtarif.md FR-6 erfassbar - die Menge zaehlt dann
-        // Monate. Die automatische Grundgebuehr-Berechnung bleibt davon unberuehrt.
+    void saveTarifposition_GrundgebuehrTariftyp_ThrowsException() {
+        // Grundgebuehr ist bewusst nicht erfassbar: Je Zeitraum ist nur EIN Grundgebuehr-Tarif
+        // gueltig (Ueberschneidungsregel), ein eigener Tarif fuer Ladestationen also gar nicht
+        // anlegbar - und jeder gueltige wird automatisch auf jede Konsumenten-Rechnung
+        // geschrieben. Der Fall gehoert zu ZUSATZ mit Mengeneinheit Monat.
         Tarifposition neu = new Tarifposition(testEinheit, grundgebuehrTarif, 2026, 1, new BigDecimal("3.000"));
 
         when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
         when(tarifRepository.findById(21L)).thenReturn(Optional.of(grundgebuehrTarif));
-        when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
-                anyLong(), anyInt(), anyInt(), anySet(), anyLong())).thenReturn(false);
-        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
-        when(tarifpositionRepository.save(any(Tarifposition.class))).thenAnswer(i -> i.getArgument(0));
-
-        Tarifposition result = tarifpositionService.saveTarifposition(neu);
-
-        assertEquals(TarifTyp.GRUNDGEBUEHR, result.getTarif().getTariftyp());
-        verify(tarifpositionRepository).save(neu);
-    }
-
-    @Test
-    void saveTarifposition_GrundgebuehrNebenLadestrom_SavesBoth() {
-        // Beide Typen im selben Quartal derselben Einheit: Die Eindeutigkeit gilt je Typ, der
-        // Ladestrom-Bestand darf die Grundgebuehr also nicht blockieren.
-        Tarifposition neu = new Tarifposition(testEinheit, grundgebuehrTarif, 2026, 1, new BigDecimal("3.000"));
-
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
-        when(tarifRepository.findById(21L)).thenReturn(Optional.of(grundgebuehrTarif));
-        when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
-                anyLong(), anyInt(), anyInt(), anySet(), anyLong())).thenReturn(false);
-        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
-        when(tarifpositionRepository.save(any(Tarifposition.class))).thenAnswer(i -> i.getArgument(0));
-
-        assertNotNull(tarifpositionService.saveTarifposition(neu));
-
-        // Gefragt wird ausschliesslich nach GRUNDGEBUEHR - ein Ladestrom-Bestand im selben
-        // Quartal wird gar nicht erst betrachtet und kann die Position damit nicht blockieren.
-        verify(tarifpositionRepository).existsByEinheitAndQuartalAndTariftyp(
-                eq(1L), eq(2026), eq(1), eq(Set.of(TarifTyp.GRUNDGEBUEHR)), eq(-1L));
-        verify(tarifpositionRepository, never()).existsByEinheitAndQuartalAndTariftyp(
-                anyLong(), anyInt(), anyInt(), eq(Set.of(TarifTyp.LADESTROM)), anyLong());
-        verify(tarifpositionRepository).save(neu);
-    }
-
-    @Test
-    void saveTarifposition_ZweiteGrundgebuehrImSelbenQuartal_ThrowsException() {
-        Tarifposition neu = new Tarifposition(testEinheit, grundgebuehrTarif, 2026, 1, new BigDecimal("3.000"));
-
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
-        when(tarifRepository.findById(21L)).thenReturn(Optional.of(grundgebuehrTarif));
-        when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
-                anyLong(), anyInt(), anyInt(), eq(Set.of(TarifTyp.GRUNDGEBUEHR)), anyLong())).thenReturn(true);
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
                 () -> tarifpositionService.saveTarifposition(neu)
         );
 
-        assertThat(exception.getMessage(), containsString("bereits eine Position"));
+        assertThat(exception.getMessage(), containsString("GRUNDGEBUEHR"));
         verify(tarifpositionRepository, never()).save(any());
     }
 

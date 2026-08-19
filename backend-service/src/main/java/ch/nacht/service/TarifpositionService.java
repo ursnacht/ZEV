@@ -131,7 +131,7 @@ public class TarifpositionService {
      * <b>type</b> exists. The latter rule is stricter than the database constraint (which covers
      * the exact tariff only), because two different LADESTROM tariffs would otherwise bypass it.
      * Geprüft wird gegen den Typ <b>dieser</b> Position, nicht gegen alle manuell erfassbaren
-     * Typen: Ladestrom und Grundgebühr sind je Quartal unabhängig voneinander erfassbar.
+     * Typen: Positionen verschiedener Typen sind je Quartal unabhängig voneinander erfassbar.
      *
      * @param tarifposition Position to save
      * @return Saved position

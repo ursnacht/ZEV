@@ -44,10 +44,6 @@ describe('TarifpositionListComponent', () => {
       preis: 0.35, gueltigVon: '2026-01-01', gueltigBis: '2026-12-31'
     },
     {
-      id: 4, bezeichnung: 'Grundgebühr Ladestation', tariftyp: TarifTyp.GRUNDGEBUEHR,
-      preis: 5, gueltigVon: '2026-01-01', gueltigBis: '2026-12-31'
-    },
-    {
       id: 1, bezeichnung: 'ZEV Tarif', tariftyp: TarifTyp.ZEV,
       preis: 0.195, gueltigVon: '2026-01-01', gueltigBis: '2026-12-31'
     },
@@ -145,11 +141,11 @@ describe('TarifpositionListComponent', () => {
     });
 
     it('should only offer manually captured tariff types', () => {
-      // LADESTROM und GRUNDGEBUEHR sind erfassbar (Specs/Ladestromtarif.md FR-6),
-      // ZEV und VNB nicht - deren Mengen kommen aus Messwerten.
+      // Erfassbar ist LADESTROM; ZEV, VNB und GRUNDGEBUEHR nicht - deren Mengen kommen aus
+      // Messwerten bzw. der Laufzeit (Begruendung siehe TarifTyp.GRUNDGEBUEHR).
       const typen = component.tarife.map(t => t.tariftyp);
       expect(typen).toContain(TarifTyp.LADESTROM);
-      expect(typen).toContain(TarifTyp.GRUNDGEBUEHR);
+      expect(typen).not.toContain(TarifTyp.GRUNDGEBUEHR);
       expect(typen).not.toContain(TarifTyp.ZEV);
       expect(typen).not.toContain(TarifTyp.VNB);
     });

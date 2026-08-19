@@ -716,21 +716,11 @@ test.describe('Ladestromtarif - Tarifpositionen', () => {
         const waehlbar = optionen.map(o => o.trim()).filter(o => !/wählen|select/i.test(o));
         expect(waehlbar.length).toBeGreaterThan(0);
         expect(waehlbar).toContain(TARIF_NAME);
-        // "Messgebühr" ist der Grundgebühr-Tarif der Basisdaten - seit FR-6 waehlbar
-        expect(waehlbar.some(o => /Messgebühr/i.test(o))).toBe(true);
-        // ZEV- und VNB-Tarife dagegen nie: ihre Mengen stammen aus Messwerten
-        expect(waehlbar.some(o => /vZEV|Strombezug/i.test(o))).toBe(false);
-
-        // Mengeneinheit folgt dem Tariftyp: Grundgebuehr zaehlt Monate, Ladestrom kWh
-        const mengeLabel = page.locator('label[for="menge"]');
-        await page.locator('#tarifId').selectOption({ label: 'Messgebühr' });
-        await expect(mengeLabel).toContainText('Monate');
-        await expect(mengeLabel).not.toContainText('kWh');
-        await expect(page.locator('#menge')).toHaveAttribute('step', '1');
+        // ZEV-, VNB- und Grundgebuehr-Tarife der Basisdaten duerfen nicht erscheinen
+        expect(waehlbar.some(o => /vZEV|Strombezug|Messgebühr/i.test(o))).toBe(false);
 
         await page.locator('#tarifId').selectOption({ label: TARIF_NAME });
-        await expect(mengeLabel).toContainText('kWh');
-        await expect(page.locator('#menge')).toHaveAttribute('step', '0.001');
+        await expect(page.locator('label[for="menge"]')).toContainText('kWh');
         await page.locator('#menge').fill('-5');
         await expect(page.locator('button[type="submit"]')).toBeDisabled();
 

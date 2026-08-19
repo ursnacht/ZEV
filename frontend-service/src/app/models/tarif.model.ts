@@ -10,10 +10,12 @@ export enum TarifTyp {
  * Tariftypen, deren Menge manuell als Tarifposition erfasst wird.
  * Bewusst eine Liste: ein weiterer Anwendungsfall erweitert nur sie.
  *
- * GRUNDGEBUEHR steht hier **zusätzlich** zu seiner automatischen Berechnung auf der Rechnung:
- * Eine Ladestation kann eine eigene Grundgebühr tragen. Beide Zeilen erscheinen nebeneinander.
+ * GRUNDGEBUEHR gehört bewusst **nicht** dazu: Je Zeitraum ist nur ein Grundgebühr-Tarif gültig,
+ * und jeder gültige wird automatisch auf jede Konsumenten-Rechnung geschrieben. Eine Grundgebühr
+ * für Ladestationen wird stattdessen über einen Tarif mit Mengeneinheit „Monat" abgebildet
+ * (Specs/Tarifpositionen.md).
  */
-export const MANUELL_ERFASSTE_TARIFTYPEN: TarifTyp[] = [TarifTyp.LADESTROM, TarifTyp.GRUNDGEBUEHR];
+export const MANUELL_ERFASSTE_TARIFTYPEN: TarifTyp[] = [TarifTyp.LADESTROM];
 
 /**
  * Übersetzungs-Key der Mengeneinheit eines Tariftyps: Grundgebühr zählt Monate, alles
