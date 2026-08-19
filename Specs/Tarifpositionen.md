@@ -264,14 +264,15 @@
 * **Kein automatischer Import** von `ZUSATZ`-Mengen; die Erfassung bleibt manuell.
 * **Keine Preisstaffelung, keine Rabatte, keine Mengenrabatte** — ein Tarif hat genau einen Preis.
 * **Kein Mehrwertsteuer-Ausweis** je Position.
+* **Keine gebrochenen Mengen auf der Rechnung.** `RechnungService.berechneTarifpositionsZeilen`
+  rundet jede Menge mit `Math.round(...)` auf ganze Zahlen — eingeführt für Ladestrom-kWh, damit
+  eine Rechnung keine gemischten Konventionen zeigt. Für `Monat` und `Stück` ist das ohnehin
+  richtig; für eine `ZUSATZ`-Menge in kWh mit Nachkommastellen ist der Verlust **bewusst in Kauf
+  genommen** (entschieden 19.08.2026). Erfassbar bleiben Nachkommastellen — sie wirken sich nur
+  nicht auf den Rechnungsbetrag aus.
 
 ## 8. Offene Fragen
 
-* **Rundung der Menge:** `RechnungService.berechneTarifpositionsZeilen` rundet die Menge heute mit
-  `Math.round(...)` auf ganze Zahlen — eingeführt für Ladestrom-kWh, damit eine Rechnung keine
-  gemischten Konventionen zeigt. Für `Stück` und `Monat` ist das richtig, für eine `kWh`-Menge mit
-  Nachkommastellen aber verlustbehaftet. *Annahme für die Umsetzung:* Verhalten bleibt
-  unverändert (ganze Zahlen). Zu klären, falls `ZUSATZ` mit gebrochenen Mengen gebraucht wird.
 * **Stellung der Checkbox merken?** *Annahme:* nein — sie steht bei jedem Seitenaufruf wieder auf
   „nur Ladestationen", weil das der Normalfall ist. (Der Mehrfachverrechnungs-Hinweis derselben
   Seite merkt sich sein Wegklicken dagegen in `localStorage`; das ist bewusst anders, weil es dort
