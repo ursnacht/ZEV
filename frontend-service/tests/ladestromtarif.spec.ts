@@ -705,20 +705,32 @@ test.describe('Ladestromtarif - Tarifpositionen', () => {
         await expect(page.locator('p.zev-text--muted')).toBeVisible();
     });
 
-    test('should offer only LADESTROM tariffs and reject a negative quantity', async ({ page }) => {
+    test('should offer only manually captured tariff types and reject a negative quantity',
+        async ({ page }) => {
         await navigateToTarifpositionen(page);
         await selectEinheit(page, LADESTATION_NAME);
         await openPositionsForm(page);
 
-        // Nur manuell erfasste Tariftypen (aktuell LADESTROM) stehen zur Auswahl
+        // Manuell erfassbar sind LADESTROM und GRUNDGEBUEHR (Specs/Ladestromtarif.md FR-6)
         const optionen = await page.locator('#tarifId option').allTextContents();
         const waehlbar = optionen.map(o => o.trim()).filter(o => !/wählen|select/i.test(o));
         expect(waehlbar.length).toBeGreaterThan(0);
         expect(waehlbar).toContain(TARIF_NAME);
-        // Bekannte ZEV-/VNB-/Grundgebühr-Tarife der Basisdaten dürfen nicht erscheinen
-        expect(waehlbar.some(o => /vZEV|Strombezug|Messgebühr/i.test(o))).toBe(false);
+        // "Messgebühr" ist der Grundgebühr-Tarif der Basisdaten - seit FR-6 waehlbar
+        expect(waehlbar.some(o => /Messgebühr/i.test(o))).toBe(true);
+        // ZEV- und VNB-Tarife dagegen nie: ihre Mengen stammen aus Messwerten
+        expect(waehlbar.some(o => /vZEV|Strombezug/i.test(o))).toBe(false);
+
+        // Mengeneinheit folgt dem Tariftyp: Grundgebuehr zaehlt Monate, Ladestrom kWh
+        const mengeLabel = page.locator('label[for="menge"]');
+        await page.locator('#tarifId').selectOption({ label: 'Messgebühr' });
+        await expect(mengeLabel).toContainText('Monate');
+        await expect(mengeLabel).not.toContainText('kWh');
+        await expect(page.locator('#menge')).toHaveAttribute('step', '1');
 
         await page.locator('#tarifId').selectOption({ label: TARIF_NAME });
+        await expect(mengeLabel).toContainText('kWh');
+        await expect(page.locator('#menge')).toHaveAttribute('step', '0.001');
         await page.locator('#menge').fill('-5');
         await expect(page.locator('button[type="submit"]')).toBeDisabled();
 

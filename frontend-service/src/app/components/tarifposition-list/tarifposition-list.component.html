@@ -69,8 +69,10 @@
                     <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
                   }
                 </th>
+                <!-- Ohne feste Einheit in der Ueberschrift: Die Liste mischt Ladestrom (kWh)
+                     und Grundgebuehr (Monate); die Einheit steht deshalb in der Zeile. -->
                 <th class="zev-table__number zev-table__header--sortable" (click)="onSort('menge')">
-                  {{ 'MENGE' | translate }} (kWh)
+                  {{ 'MENGE' | translate }}
                   @if (sortColumn === 'menge') {
                     <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
                   }
@@ -101,7 +103,10 @@
                 <tr>
                   <td>{{ position.tarifBezeichnung }}</td>
                   <td>Q{{ position.quartal }}/{{ position.jahr }}</td>
-                  <td class="zev-table__number">{{ position.menge | swissNumber:3 }}</td>
+                  <td class="zev-table__number">
+                    {{ position.menge | swissNumber:mengeNachkommastellen(position) }}
+                    <span class="zev-text--muted">{{ mengeneinheit(position) | translate }}</span>
+                  </td>
                   <td class="zev-table__number">{{ position.tarifPreis | swissNumber:5 }}</td>
                   <td class="zev-table__number">{{ berechneBetrag(position) | swissNumber:2 }}</td>
                   <td>

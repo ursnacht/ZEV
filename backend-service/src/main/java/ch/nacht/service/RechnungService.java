@@ -401,7 +401,9 @@ public class RechnungService {
                     preis,
                     betrag,
                     position.getTarif().getTariftyp(),
-                    "KWH"
+                    // Grundgebuehr zaehlt Monate, alles andere kWh - sonst stuende auf der
+                    // Rechnung "3 kWh" fuer drei Monate Grundgebuehr.
+                    position.getTarif().getTariftyp().mengeneinheit()
             ));
             total += betrag;
 

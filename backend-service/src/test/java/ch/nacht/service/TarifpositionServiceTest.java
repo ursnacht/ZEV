@@ -64,6 +64,8 @@ public class TarifpositionServiceTest {
     private Long testOrgId;
     private Einheit testEinheit;
     private Tarif ladestromTarif;
+    /** Grundgebuehr ist seit Specs/Ladestromtarif.md FR-6 ebenfalls erfassbar (Menge = Monate). */
+    private Tarif grundgebuehrTarif;
     private Tarifposition testPosition1;
     private Tarifposition testPosition2;
 
@@ -84,6 +86,15 @@ public class TarifpositionServiceTest {
                 LocalDate.of(2026, 12, 31));
         ladestromTarif.setId(10L);
         ladestromTarif.setOrgId(testOrgId);
+
+        grundgebuehrTarif = new Tarif(
+                "Grundgebühr Ladestation",
+                TarifTyp.GRUNDGEBUEHR,
+                new BigDecimal("5.00000"),
+                LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 12, 31));
+        grundgebuehrTarif.setId(21L);
+        grundgebuehrTarif.setOrgId(testOrgId);
 
         testPosition1 = new Tarifposition(testEinheit, ladestromTarif, 2026, 3, new BigDecimal("120.500"));
         testPosition1.setId(1L);
@@ -247,7 +258,10 @@ public class TarifpositionServiceTest {
     }
 
     @Test
-    void saveTarifposition_NewPosition_ChecksOnlyManuellErfasstTypes() {
+    void saveTarifposition_NewPosition_ChecksOnlyOwnTariftyp() {
+        // Geprueft wird gegen den Typ DIESER Position, nicht gegen alle manuell erfassbaren
+        // Typen: sonst schlossen sich eine Ladestrom- und eine Grundgebuehr-Position im selben
+        // Quartal gegenseitig aus (Specs/Ladestromtarif.md FR-6).
         Tarifposition neu = new Tarifposition(testEinheit, ladestromTarif, 2026, 2, new BigDecimal("42.000"));
 
         when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
@@ -263,8 +277,8 @@ public class TarifpositionServiceTest {
         ArgumentCaptor<Set<TarifTyp>> typenCaptor = ArgumentCaptor.forClass(Set.class);
         verify(tarifpositionRepository).existsByEinheitAndQuartalAndTariftyp(
                 eq(1L), eq(2026), eq(2), typenCaptor.capture(), eq(-1L));
-        assertEquals(TarifTyp.MANUELL_ERFASST, typenCaptor.getValue());
-        assertTrue(typenCaptor.getValue().contains(TarifTyp.LADESTROM));
+        assertEquals(Set.of(TarifTyp.LADESTROM), typenCaptor.getValue());
+        assertFalse(typenCaptor.getValue().contains(TarifTyp.GRUNDGEBUEHR));
     }
 
     @Test
@@ -451,26 +465,63 @@ public class TarifpositionServiceTest {
     }
 
     @Test
-    void saveTarifposition_GrundgebuehrTariftyp_ThrowsException() {
-        Tarif grundgebuehr = new Tarif(
-                "Grundgebühr 2026",
-                TarifTyp.GRUNDGEBUEHR,
-                new BigDecimal("5.00000"),
-                LocalDate.of(2026, 1, 1),
-                LocalDate.of(2026, 12, 31));
-        grundgebuehr.setId(21L);
-
-        Tarifposition neu = new Tarifposition(testEinheit, grundgebuehr, 2026, 1, new BigDecimal("10.000"));
+    void saveTarifposition_GrundgebuehrTariftyp_SavesSuccessfully() {
+        // Grundgebuehr ist seit Specs/Ladestromtarif.md FR-6 erfassbar - die Menge zaehlt dann
+        // Monate. Die automatische Grundgebuehr-Berechnung bleibt davon unberuehrt.
+        Tarifposition neu = new Tarifposition(testEinheit, grundgebuehrTarif, 2026, 1, new BigDecimal("3.000"));
 
         when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
-        when(tarifRepository.findById(21L)).thenReturn(Optional.of(grundgebuehr));
+        when(tarifRepository.findById(21L)).thenReturn(Optional.of(grundgebuehrTarif));
+        when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
+                anyLong(), anyInt(), anyInt(), anySet(), anyLong())).thenReturn(false);
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(tarifpositionRepository.save(any(Tarifposition.class))).thenAnswer(i -> i.getArgument(0));
+
+        Tarifposition result = tarifpositionService.saveTarifposition(neu);
+
+        assertEquals(TarifTyp.GRUNDGEBUEHR, result.getTarif().getTariftyp());
+        verify(tarifpositionRepository).save(neu);
+    }
+
+    @Test
+    void saveTarifposition_GrundgebuehrNebenLadestrom_SavesBoth() {
+        // Beide Typen im selben Quartal derselben Einheit: Die Eindeutigkeit gilt je Typ, der
+        // Ladestrom-Bestand darf die Grundgebuehr also nicht blockieren.
+        Tarifposition neu = new Tarifposition(testEinheit, grundgebuehrTarif, 2026, 1, new BigDecimal("3.000"));
+
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findById(21L)).thenReturn(Optional.of(grundgebuehrTarif));
+        when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
+                anyLong(), anyInt(), anyInt(), anySet(), anyLong())).thenReturn(false);
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(tarifpositionRepository.save(any(Tarifposition.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertNotNull(tarifpositionService.saveTarifposition(neu));
+
+        // Gefragt wird ausschliesslich nach GRUNDGEBUEHR - ein Ladestrom-Bestand im selben
+        // Quartal wird gar nicht erst betrachtet und kann die Position damit nicht blockieren.
+        verify(tarifpositionRepository).existsByEinheitAndQuartalAndTariftyp(
+                eq(1L), eq(2026), eq(1), eq(Set.of(TarifTyp.GRUNDGEBUEHR)), eq(-1L));
+        verify(tarifpositionRepository, never()).existsByEinheitAndQuartalAndTariftyp(
+                anyLong(), anyInt(), anyInt(), eq(Set.of(TarifTyp.LADESTROM)), anyLong());
+        verify(tarifpositionRepository).save(neu);
+    }
+
+    @Test
+    void saveTarifposition_ZweiteGrundgebuehrImSelbenQuartal_ThrowsException() {
+        Tarifposition neu = new Tarifposition(testEinheit, grundgebuehrTarif, 2026, 1, new BigDecimal("3.000"));
+
+        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findById(21L)).thenReturn(Optional.of(grundgebuehrTarif));
+        when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
+                anyLong(), anyInt(), anyInt(), eq(Set.of(TarifTyp.GRUNDGEBUEHR)), anyLong())).thenReturn(true);
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
                 () -> tarifpositionService.saveTarifposition(neu)
         );
 
-        assertThat(exception.getMessage(), containsString("GRUNDGEBUEHR"));
+        assertThat(exception.getMessage(), containsString("bereits eine Position"));
         verify(tarifpositionRepository, never()).save(any());
     }
 

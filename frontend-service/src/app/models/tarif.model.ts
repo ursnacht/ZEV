@@ -9,8 +9,19 @@ export enum TarifTyp {
 /**
  * Tariftypen, deren Menge manuell als Tarifposition erfasst wird.
  * Bewusst eine Liste: ein weiterer Anwendungsfall erweitert nur sie.
+ *
+ * GRUNDGEBUEHR steht hier **zusätzlich** zu seiner automatischen Berechnung auf der Rechnung:
+ * Eine Ladestation kann eine eigene Grundgebühr tragen. Beide Zeilen erscheinen nebeneinander.
  */
-export const MANUELL_ERFASSTE_TARIFTYPEN: TarifTyp[] = [TarifTyp.LADESTROM];
+export const MANUELL_ERFASSTE_TARIFTYPEN: TarifTyp[] = [TarifTyp.LADESTROM, TarifTyp.GRUNDGEBUEHR];
+
+/**
+ * Übersetzungs-Key der Mengeneinheit eines Tariftyps: Grundgebühr zählt Monate, alles
+ * andere kWh. Spiegelt `TarifTyp.mengeneinheit()` im Backend.
+ */
+export function mengeneinheitKey(typ: TarifTyp | undefined): string {
+  return typ === TarifTyp.GRUNDGEBUEHR ? 'MONATE' : 'KWH';
+}
 
 export interface Tarif {
   id?: number;

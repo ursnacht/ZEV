@@ -8,7 +8,7 @@ import { EinheitService } from '../../services/einheit.service';
 import { MieterService } from '../../services/mieter.service';
 import { TranslationService } from '../../services/translation.service';
 import { Tarifposition, Erfassungsart } from '../../models/tarifposition.model';
-import { Tarif, TarifTyp, MANUELL_ERFASSTE_TARIFTYPEN } from '../../models/tarif.model';
+import { Tarif, TarifTyp, MANUELL_ERFASSTE_TARIFTYPEN, mengeneinheitKey } from '../../models/tarif.model';
 import { Einheit, EinheitTyp } from '../../models/einheit.model';
 import { TarifpositionFormComponent } from '../tarifposition-form/tarifposition-form.component';
 import { TranslatePipe } from '../../pipes/translate.pipe';
@@ -317,6 +317,16 @@ export class TarifpositionListComponent implements OnInit {
   /** Messpunkt (RFID) der gewählten Ladestation – belegt die Quell-Referenz vor. */
   get selectedEinheitMesspunkt(): string {
     return this.ladestationen.find(e => e.id === this.selectedEinheitId)?.messpunkt ?? '';
+  }
+
+  /** Uebersetzungs-Key der Mengeneinheit einer Zeile (kWh bzw. Monate). */
+  mengeneinheit(position: Tarifposition): string {
+    return mengeneinheitKey(position.tarifTyp);
+  }
+
+  /** Monate werden ganzzahlig gezeigt - "3.000 Monate" waere unsinnig. */
+  mengeNachkommastellen(position: Tarifposition): number {
+    return position.tarifTyp === TarifTyp.GRUNDGEBUEHR ? 0 : 3;
   }
 
   berechneBetrag(position: Tarifposition): number {

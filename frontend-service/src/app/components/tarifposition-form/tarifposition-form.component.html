@@ -11,7 +11,7 @@
         }
       </select>
       @if (tarife.length === 0) {
-        <div class="zev-form-hint">{{ 'KEIN_LADESTROM_TARIF_HINT' | translate }}</div>
+        <div class="zev-form-hint">{{ 'KEIN_ERFASSBARER_TARIF_HINT' | translate }}</div>
       }
     </div>
 
@@ -36,10 +36,11 @@
     </div>
 
     <div class="zev-form-group">
-      <label for="menge">{{ 'MENGE' | translate }} (kWh):</label>
+      <!-- Mengeneinheit haengt am Tariftyp: Ladestrom kWh, Grundgebuehr Monate -->
+      <label for="menge">{{ 'MENGE' | translate }} ({{ mengeneinheit | translate }}):</label>
       <input type="number" id="menge" class="zev-input" [(ngModel)]="formData.menge" name="menge"
-        min="0" step="0.001" required />
-      <div class="zev-form-hint">{{ 'TARIFPOSITION_MENGE_HINT' | translate }}</div>
+        min="0" [step]="mengeSchritt" required />
+      <div class="zev-form-hint">{{ mengeHinweis | translate }}</div>
     </div>
 
     <div class="zev-form-group">

@@ -44,6 +44,10 @@ describe('TarifpositionListComponent', () => {
       preis: 0.35, gueltigVon: '2026-01-01', gueltigBis: '2026-12-31'
     },
     {
+      id: 4, bezeichnung: 'Grundgebühr Ladestation', tariftyp: TarifTyp.GRUNDGEBUEHR,
+      preis: 5, gueltigVon: '2026-01-01', gueltigBis: '2026-12-31'
+    },
+    {
       id: 1, bezeichnung: 'ZEV Tarif', tariftyp: TarifTyp.ZEV,
       preis: 0.195, gueltigVon: '2026-01-01', gueltigBis: '2026-12-31'
     },
@@ -140,9 +144,14 @@ describe('TarifpositionListComponent', () => {
       expect(tarifServiceSpy.getAllTarife).toHaveBeenCalled();
     });
 
-    it('should only offer manually captured tariff types (LADESTROM)', () => {
-      expect(component.tarife.length).toBe(1);
-      expect(component.tarife[0].tariftyp).toBe(TarifTyp.LADESTROM);
+    it('should only offer manually captured tariff types', () => {
+      // LADESTROM und GRUNDGEBUEHR sind erfassbar (Specs/Ladestromtarif.md FR-6),
+      // ZEV und VNB nicht - deren Mengen kommen aus Messwerten.
+      const typen = component.tarife.map(t => t.tariftyp);
+      expect(typen).toContain(TarifTyp.LADESTROM);
+      expect(typen).toContain(TarifTyp.GRUNDGEBUEHR);
+      expect(typen).not.toContain(TarifTyp.ZEV);
+      expect(typen).not.toContain(TarifTyp.VNB);
     });
 
     it('should not preselect an einheit without query parameter', () => {
@@ -246,6 +255,30 @@ describe('TarifpositionListComponent', () => {
       component.ladestationen = [{ id: 1, name: 'Ohne RFID', typ: EinheitTyp.LADESTATION }];
       component.selectedEinheitId = 1;
       expect(component.selectedEinheitMesspunkt).toBe('');
+    });
+  });
+
+  describe('mengeneinheit', () => {
+    // Die Liste mischt beide Typen, die Einheit steht deshalb je Zeile
+    // (Specs/Ladestromtarif.md FR-6).
+
+    it('should use kWh for a ladestrom position', () => {
+      expect(component.mengeneinheit({ ...mockPositionen[0], tarifTyp: TarifTyp.LADESTROM })).toBe('KWH');
+    });
+
+    it('should use months for a grundgebuehr position', () => {
+      expect(component.mengeneinheit({ ...mockPositionen[0], tarifTyp: TarifTyp.GRUNDGEBUEHR })).toBe('MONATE');
+    });
+
+    it('should fall back to kWh when the type is missing', () => {
+      expect(component.mengeneinheit({ ...mockPositionen[0], tarifTyp: undefined })).toBe('KWH');
+    });
+
+    it('should show months without decimals and kWh with three', () => {
+      expect(component.mengeNachkommastellen(
+        { ...mockPositionen[0], tarifTyp: TarifTyp.GRUNDGEBUEHR })).toBe(0);
+      expect(component.mengeNachkommastellen(
+        { ...mockPositionen[0], tarifTyp: TarifTyp.LADESTROM })).toBe(3);
     });
   });
 

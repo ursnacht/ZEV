@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 
@@ -129,6 +130,8 @@ public class TarifpositionService {
      * manually captured type and that no other position for the same unit, quarter and tariff
      * <b>type</b> exists. The latter rule is stricter than the database constraint (which covers
      * the exact tariff only), because two different LADESTROM tariffs would otherwise bypass it.
+     * Geprüft wird gegen den Typ <b>dieser</b> Position, nicht gegen alle manuell erfassbaren
+     * Typen: Ladestrom und Grundgebühr sind je Quartal unabhängig voneinander erfassbar.
      *
      * @param tarifposition Position to save
      * @return Saved position
@@ -150,9 +153,9 @@ public class TarifpositionService {
         Long excludeId = tarifposition.getId() != null ? tarifposition.getId() : -1L;
         if (tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 einheit.getId(), tarifposition.getJahr(), tarifposition.getQuartal(),
-                TarifTyp.MANUELL_ERFASST, excludeId)) {
+                EnumSet.of(tarif.getTariftyp()), excludeId)) {
             throw new IllegalArgumentException(
-                    "Für diese Einheit und dieses Quartal existiert bereits eine Position");
+                    "Für diese Einheit und dieses Quartal existiert bereits eine Position dieses Tariftyps");
         }
 
         tarifposition.setEinheit(einheit);

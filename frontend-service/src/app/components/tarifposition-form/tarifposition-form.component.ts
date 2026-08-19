@@ -2,7 +2,7 @@ import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Tarifposition } from '../../models/tarifposition.model';
-import { Tarif } from '../../models/tarif.model';
+import { Tarif, TarifTyp, mengeneinheitKey } from '../../models/tarif.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
 
@@ -59,6 +59,31 @@ export class TarifpositionFormComponent implements OnInit {
         quellReferenz: this.messpunkt || undefined
       };
     }
+  }
+
+  /** Tariftyp des gewaehlten Tarifs - bestimmt Mengeneinheit und Hinweistext. */
+  get gewaehlterTariftyp(): TarifTyp | undefined {
+    return this.tarife.find(t => t.id === this.formData.tarifId)?.tariftyp as TarifTyp | undefined;
+  }
+
+  /** Uebersetzungs-Key der Mengeneinheit: Grundgebuehr zaehlt Monate, Ladestrom kWh. */
+  get mengeneinheit(): string {
+    return mengeneinheitKey(this.gewaehlterTariftyp);
+  }
+
+  /** Hinweis unter dem Mengenfeld, passend zur Mengeneinheit. */
+  get mengeHinweis(): string {
+    return this.gewaehlterTariftyp === TarifTyp.GRUNDGEBUEHR
+      ? 'TARIFPOSITION_MENGE_HINT_MONATE'
+      : 'TARIFPOSITION_MENGE_HINT';
+  }
+
+  /**
+   * Schrittweite des Mengenfelds. Monate werden ganzzahlig erfasst - ein Spinner, der 0.001
+   * anbietet, waere hier irrefuehrend.
+   */
+  get mengeSchritt(): number {
+    return this.gewaehlterTariftyp === TarifTyp.GRUNDGEBUEHR ? 1 : 0.001;
   }
 
   onSubmit(): void {

@@ -82,6 +82,7 @@ Grundlage: [`Specs/Ladestromtarif.md`](./Ladestromtarif.md).
 | [x] | 12. Formulare ergänzen | `tarif-form`: `LADESTROM` im Typ-Dropdown. (Das ursprünglich hier ergänzte Feld „Ladepunkt" im `mieter-form` ist mit Phase 14 wieder entfallen.) |
 | [x] | 13. Übersetzungen | `V101__Add_Ladestromtarif_Translations.sql` (DE/EN, `ON CONFLICT (key) DO NOTHING`): Menü- und Seitentitel, Spaltenüberschriften, Formularlabels, Erfassungsart-Werte, Fehlermeldungen (Duplikat, negative Menge, unzulässiger Tariftyp, doppelte Ladepunkt-Kennung), Tariftyp `LADESTROM`, Hinweistext zur Mehrfachverrechnung. |
 | [x] | 14. Ladepunkt am Mieter zurücknehmen | `V103__Remove_Mieter_Ladepunkt.sql` plus Entfernen von `Mieter.ladepunkt`, `MieterRepository.existsByLadepunkt`, der Prüfung in `MieterService`, dem Feld im `mieter-form` und der Vorbelegung der Quell-Referenz. **Grund:** Ein Attribut hält genau einen Wert, ein Nutzer kann aber mehrere Ladestationen haben — und ein Ladestations-Nutzer ist nicht zwingend Mieter einer Wohnung. Die Zuordnung löst das Zielbild strukturell (Spec Abschnitt 7). Die Übersetzungs-Keys `LADEPUNKT` und `LADEPUNKT_HINT` bleiben bestehen — sie werden dort wiederverwendet. |
+| [x] | 15. Grundgebühr als erfassbare Position | `TarifTyp.MANUELL_ERFASST` um `GRUNDGEBUEHR` erweitern (Spec FR-6). Eindeutigkeitsprüfung im `TarifpositionService` auf den **Typ dieser Position** einschränken statt gegen die ganze Menge — sonst schlössen sich Ladestrom und Grundgebühr im selben Quartal aus. `TarifTyp.mengeneinheit()` liefert `MONAT`/`KWH`; `RechnungService` setzt sie an der Positionszeile. `TarifpositionDTO` trägt neu `tarifTyp` (nur lesend), damit die Liste die Einheit je Zeile anzeigen kann. Frontend: `MANUELL_ERFASSTE_TARIFTYPEN`, Mengen-Label/-Hinweis/-Schrittweite nach Tariftyp, Einheit je Listenzeile. `V110`: Übersetzungen `TARIFPOSITION_MENGE_HINT_MONATE`, `KEIN_ERFASSBARER_TARIF_HINT` + aktualisierter Spaltenkommentar auf `tarifposition.menge`. **Die automatische Grundgebühr-Berechnung bleibt unverändert** — die erfasste Position tritt als zusätzliche Zeile daneben. |
 
 > **Tests** (`/3_backend-tests`, `/4_frontend-unit-tests`, `/5_e2e-tests`) werden separat erstellt und
 > sind **nicht** Teil dieser Umsetzung. Schwerpunkte: Eindeutigkeit je Tariftyp, Überschneidungsregel
@@ -92,7 +93,7 @@ Grundlage: [`Specs/Ladestromtarif.md`](./Ladestromtarif.md).
 
 ### Backend (massgeblich)
 - **`einheit_id`:** muss existieren, zum Mandanten gehören und vom Typ `LADESTATION` sein → sonst `400`. *(Bis `V106` war es `mieter_id`.)*
-- **`tarif_id`:** muss existieren **und** einen Typ aus der Menge der manuell erfassten Typen haben (aktuell nur `LADESTROM`) → sonst `400`.
+- **`tarif_id`:** muss existieren **und** einen Typ aus der Menge der manuell erfassten Typen haben (`LADESTROM`, `GRUNDGEBUEHR`) → sonst `400`.
 - **`menge`:** `≥ 0`; `< 0` → `400`. `= 0` ist gültig, erzeugt aber keine Rechnungszeile.
 - **`quartal`:** `1..4`; **`jahr`:** plausibel (2000–2100).
 - **Eindeutigkeit:** höchstens eine Position je (`org_id`, `einheit_id`, `jahr`, `quartal`, **Tariftyp**) – im Service geprüft, da der Typ am Tarif hängt; DB-UNIQUE über `tarif_id` als Netz gegen exakte Duplikate.

@@ -871,6 +871,51 @@ public class RechnungServiceTest {
     }
 
     @Test
+    void berechneRechnung_GrundgebuehrPosition_UsesMonatAndKeepsAutomaticLine() {
+        // Specs/Ladestromtarif.md FR-6: Eine erfasste Grundgebuehr zaehlt MONATE und tritt
+        // ZUSAETZLICH neben die automatisch berechnete Zeile - sie ersetzt sie nicht.
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+
+        Mieter mieter = mieterMitMesswerten(von, bis);
+
+        Tarif automatisch = new Tarif("Messgebühr", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31));
+        automatisch.setId(50L);
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(List.of(automatisch));
+
+        Tarif erfasst = new Tarif("Grundgebühr Ladestation", TarifTyp.GRUNDGEBUEHR,
+            new BigDecimal("8.00000"), LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31));
+        erfasst.setId(51L);
+        when(tarifpositionService.getFuerRechnung(anyCollection(), eq(von), eq(bis)))
+            .thenReturn(List.of(tarifposition(erfasst, ladestation(), 2024, 1, "2.000")));
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
+
+        List<TarifZeileDTO> grundgebuehrZeilen = rechnung.getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR)
+            .toList();
+
+        // Beide Zeilen: die automatische (3 Monate * 5.00) und die erfasste (2 Monate * 8.00)
+        assertEquals(2, grundgebuehrZeilen.size());
+
+        TarifZeileDTO ausPosition = grundgebuehrZeilen.stream()
+            .filter(z -> "Grundgebühr Ladestation".equals(z.getBezeichnung()))
+            .findFirst().orElseThrow();
+        assertEquals(2.0, ausPosition.getMenge(), 0.001);
+        assertEquals(16.0, ausPosition.getBetrag(), 0.01); // 2 * 8.00
+        // MONAT statt KWH - sonst stuende "2 kWh" fuer zwei Monate Grundgebuehr
+        assertEquals("MONAT", ausPosition.getMengeneinheit());
+
+        TarifZeileDTO automatischeZeile = grundgebuehrZeilen.stream()
+            .filter(z -> "Messgebühr".equals(z.getBezeichnung()))
+            .findFirst().orElseThrow();
+        assertEquals(3.0, automatischeZeile.getMenge(), 0.001); // Jan-Maerz, unveraendert
+        assertEquals("MONAT", automatischeZeile.getMengeneinheit());
+    }
+
+    @Test
     void berechneRechnung_TarifpositionQ3_UsesQuartalBoundsAsPeriod() {
         LocalDate von = LocalDate.of(2024, 7, 1);
         LocalDate bis = LocalDate.of(2024, 9, 30);

@@ -64,13 +64,13 @@
 * **Herkunft je Position:** `erfassungsart` unterscheidet manuell erfasste von importierten Mengen, `quell_referenz` haelt fest, woher eine importierte Menge stammt. Damit ist spaeter belegbar, warum eine Menge auf der Rechnung steht — bei manuell erfassten Betraegen, die direkt Geld bewegen, ist das der eigentliche Zweck.
 * **Höchstens ein gültiger `LADESTROM`-Tarif je Zeitraum:** Diese Regel gilt **automatisch, ohne neuen Code** — `TarifService.saveTarif` prüft bereits typbezogen auf Überschneidung (`existsOverlappingTarif(tariftyp, …)`) und weist überlappende Tarife für **jeden** Typ ab. Mit dem neuen Enum-Wert greift die Prüfung ohne Zutun auch für `LADESTROM`. Damit ist der Tarif für ein Quartal eindeutig bestimmbar — Voraussetzung für den späteren automatischen Import. Das zugehörige Akzeptanzkriterium dient der **Regressionsabsicherung**, nicht der Neuentwicklung.
 * **`TarifTyp`** wird um den Wert `LADESTROM` erweitert. Die Spalte `tarif.tariftyp` ist zwar `VARCHAR(20)`/`EnumType.STRING` (keine Typänderung nötig), trägt aber den CHECK-Constraint `tarif_tariftyp_check`, der die erlaubten Werte **explizit aufzählt** (zuletzt gesetzt in `V50`). Er **muss** um `LADESTROM` erweitert werden, sonst scheitert das Anlegen eines Ladestromtarifs mit `DataIntegrityViolationException`.
-* **Zulässige Tariftypen für Positionen:** Die Prüfung erfolgt gegen eine **Menge manuell erfasster Typen** (aktuell `{ LADESTROM }`), nicht gegen einen einzelnen Wert. Ein weiterer Anwendungsfall erweitert nur diese Menge — Tabelle, Service und UI bleiben unverändert. `ZEV`, `VNB` und `GRUNDGEBUEHR` sind ausgeschlossen, da sie aus Messwerten bzw. der Laufzeit berechnet werden.
+* **Zulässige Tariftypen für Positionen:** Die Prüfung erfolgt gegen eine **Menge manuell erfasster Typen** (`{ LADESTROM, GRUNDGEBUEHR }`), nicht gegen einen einzelnen Wert. Ein weiterer Anwendungsfall erweitert nur diese Menge — Tabelle, Service und UI bleiben unverändert. `ZEV` und `VNB` sind ausgeschlossen, da ihre Mengen aus Messwerten stammen. `GRUNDGEBUEHR` ist **zusätzlich** erfassbar (FR-6): Der Typ wird weiterhin automatisch aus der Laufzeit berechnet; eine erfasste Position tritt als eigene Zeile daneben.
 * Rechnungen bleiben **unpersistiert**; die Tarifpositionen sind die einzige neue dauerhafte Datenhaltung.
 
 ### FR-3: Layout
 * **Tarifverwaltung:** Der Typ `LADESTROM` erscheint im bestehenden Typ-Dropdown; bei überlappender Gültigkeit erscheint eine verständliche Fehlermeldung. Sonst keine Änderung an der Maske.
 * **Tarifpositionen** (neue, generische Ansicht, erreichbar über das Kebab-Menü der **Einheit**):
-  - **Liste** (Design-System-`table`): Tarif-Bezeichnung, Jahr/Quartal, Menge (rechtsbündig `.zev-table__number`; Mengeneinheit aus dem Tarif, aktuell durchgehend kWh), Preis, Betrag, Kebab-Menü mit *Bearbeiten* / *Kopieren* / *Löschen*.
+  - **Liste** (Design-System-`table`): Tarif-Bezeichnung, Jahr/Quartal, Menge (rechtsbündig `.zev-table__number`; Mengeneinheit **je Zeile** aus dem Tariftyp — kWh bei Ladestrom, Monate bei Grundgebühr), Preis, Betrag, Kebab-Menü mit *Bearbeiten* / *Kopieren* / *Löschen*.
   - **Kopieren** (analog Tarifverwaltung): öffnet das Formular mit allen Werten der Position, aber **ohne ID** — gespeichert wird eine neue Position. Jahr und Quartal werden **nicht** automatisch weitergeschaltet; da je Einheit, Quartal und Tariftyp nur **eine** Position zulässig ist (FR-1.3), muss der Zeitraum bewusst gewählt werden. Eine unverändert gespeicherte Kopie wird mit der Duplikat-Meldung abgewiesen — das ist die gewollte Absicherung, kein Fehler.
   - Die Liste verhält sich wie die übrigen Verwaltungstabellen (Tarife, Einheiten, Mieter): **sortierbar** über alle Datenspalten (`.zev-table__header--sortable` + `.zev-table__sort-indicator`) und mit **veränderbarer Spaltenbreite** (`appColumnResize`). Die Spalte Quartal sortiert nach Jahr **und** Quartal zusammen, die Spalte Betrag nach dem berechneten Wert. Eine gewählte Sortierung bleibt nach Erfassen, Ändern und Löschen erhalten.
   - Die Liste weist die **Herkunft** aus (manuell/importiert); importierte Positionen sind als solche erkennbar.
@@ -78,10 +78,31 @@
     Bewusst **nicht** die `QuarterSelectorComponent`: Sie arbeitet mit Datumsbereichen (`@Input selectedVon/selectedBis`, `@Output {von, bis}`), die Position speichert aber `jahr` + `quartal` — eine Hin- und Rueckrechnung waere unnoetiger Umweg. Die Quell-Referenz wird frei erfasst. Vorlagen: `tarif-form` / `tarif-list`.
   - Leere Liste → Hinweis „keine Positionen erfasst" (kein leeres Tabellengerüst).
   - **Hinweis** in der Ansicht: Positionen werden bei **jeder** Rechnungserstellung erneut aufgenommen — es gibt keinen „bereits verrechnet"-Status. Gegenmassnahme ist organisatorisch (Rechnungen je Zeitraum nur einmal erstellen), nicht technisch. Der Hinweis steht **im Textfluss** (nicht als Overlay, das sonst mit den Erfolgs-/Fehlermeldungen kollidiert) und ist **wegklickbar**; die Entscheidung wird pro Browser in `localStorage` gemerkt, weil er einmalig erklärt und nicht bei jedem Seitenaufruf erneut weggeklickt werden soll.
-* **Rechnung (Web + PDF):** Die Ladestrom-Zeilen erscheinen **nach** den ZEV-/VNB-Zeilen und **vor** der Grundgebühr, mit `mengeneinheit = "kWh"`. Keine strukturelle Änderung am Rechnungslayout — es kommen nur Zeilen dazu.
+* **Rechnung (Web + PDF):** Die Positionszeilen erscheinen **nach** den ZEV-/VNB-Zeilen und **vor** der automatisch berechneten Grundgebühr. Die `mengeneinheit` folgt dem Tariftyp: `"KWH"` bei Ladestrom, `"MONAT"` bei einer erfassten Grundgebühr — sonst stünde dort „3 kWh" für drei Monate. Keine strukturelle Änderung am Rechnungslayout — es kommen nur Zeilen dazu.
   - Die **Quell-Referenz** wird in das bestehende Feld `bezeichnung` eingebettet (`Ladestrom (LP-01)`), **nicht** als eigene Spalte: `rechnung.jrxml` kennt nur `bezeichnung/von/bis/menge/mengeneinheit/preis/betrag`, eine neue Spalte hiesse Template- und Layoutänderung für eine Angabe, die nur eine Zeilenart betrifft. Das Template hängt den Zeitraum bereits selbst in Klammern an, die Zeile lautet also `Ladestrom (LP-01) (01.07.2026 - 30.09.2026)`.
 * **Zahlenformatierung** nach `Specs/generell.md`: Dezimalpunkt, Hochkomma als Tausendertrennzeichen (`1'234.567`), `–` bei Fehlwerten — in Liste, Formular **und** PDF gleich.
 * Alle Texte via `TranslationService`/`TranslatePipe`, keine Hardcodings.
+
+### FR-6: Grundgebühr als erfassbare Position
+
+Eine Ladestation kann eine **eigene Grundgebühr** tragen, deren Monate nicht aus dem
+Rechnungszeitraum folgen (z.B. eine anteilige Gebühr für die Ladeinfrastruktur). Deshalb ist
+`GRUNDGEBUEHR` — neben `LADESTROM` — als Tariftyp einer Tarifposition zugelassen.
+
+* **Zusätzlich, nicht ersetzend:** Die automatische Berechnung der Grundgebühr (volle
+  Kalendermonate × Preis, `RechnungService.berechneGrundgebuehrZeilen`) bleibt **unverändert**.
+  Eine erfasste Position erscheint als **weitere** Zeile daneben. Das ist bewusst so gewählt:
+  Die beiden Zeilen haben unterschiedliche Bezugsgrössen (Wohnung bzw. Ladestation) und sollen
+  auf der Rechnung getrennt sichtbar bleiben.
+* **Anker bleibt die Ladestation.** Erfassbar sind Positionen weiterhin ausschliesslich an
+  Einheiten vom Typ `LADESTATION`; an der Einheiten-Auswahl der Maske ändert sich nichts.
+* **Menge = Anzahl Monate.** Beschriftung und Hinweis im Formular richten sich nach dem
+  gewählten Tarif; die Liste führt die Einheit je Zeile mit, weil sie beide Typen mischt.
+  Monate werden ganzzahlig angezeigt und schrittweise erfasst (`step="1"`).
+* **Eindeutigkeit je Typ.** Je Einheit und Quartal ist höchstens **eine Position je Tariftyp**
+  zulässig — eine Ladestrom- und eine Grundgebühr-Position im selben Quartal schliessen sich
+  also **nicht** gegenseitig aus. (Vorher prüfte der Service gegen die gesamte Menge der manuell
+  erfassbaren Typen; mit nur einem Typ darin war das gleichbedeutend.)
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
@@ -96,7 +117,10 @@
 * [ ] Eine Kopie, die ohne Änderung von Jahr/Quartal gespeichert wird, wird mit der Duplikat-Meldung abgewiesen (kein zweiter Datensatz).
 * [ ] Eine zweite Position für dieselbe Einheit, dasselbe Quartal und denselben **Tariftyp** wird **abgewiesen** (Meldung, kein Datensatz) — auch dann, wenn ein anderer `LADESTROM`-Tarif gewählt wird.
 * [ ] Menge < 0 wird abgewiesen; Menge = 0 ist speicherbar, erzeugt aber **keine** Rechnungszeile (FR-1.5).
-* [ ] Als Tarif sind ausschliesslich `LADESTROM`-Tarife wählbar.
+* [ ] Ein Tarif vom Typ `GRUNDGEBUEHR` ist in der Tarif-Auswahl der Position wählbar; Beschriftung und Hinweis des Mengenfelds nennen dann **Monate** statt kWh.
+* [ ] Für dieselbe Einheit und dasselbe Quartal lassen sich **eine Ladestrom- und eine Grundgebühr-Position nebeneinander** erfassen; eine **zweite** Position desselben Typs wird abgewiesen.
+* [ ] Auf der Rechnung erscheint die erfasste Grundgebühr als **eigene Zeile mit Mengeneinheit „Monat"** — **zusätzlich** zur automatisch berechneten Grundgebühr-Zeile, die unverändert bleibt.
+* [ ] Als Tarif sind ausschliesslich Tarife eines **manuell erfassbaren** Typs wählbar (`LADESTROM`, `GRUNDGEBUEHR`) — `ZEV`- und `VNB`-Tarife erscheinen nicht in der Auswahl.
 * [ ] Positionen sind mandantengetrennt: Ein Mandant sieht ausschliesslich seine eigenen (`org_id`).
 * [ ] Manuell erfasste Positionen tragen `erfassungsart = MANUELL`; die Quell-Referenz ist frei erfassbar und optional.
 * [ ] Die Liste weist die Herkunft je Position aus (manuell/importiert).

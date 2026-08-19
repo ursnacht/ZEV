@@ -1,6 +1,7 @@
 package ch.nacht.dto;
 
 import ch.nacht.entity.Erfassungsart;
+import ch.nacht.entity.TarifTyp;
 import ch.nacht.entity.Tarifposition;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
@@ -29,6 +30,8 @@ public class TarifpositionDTO {
     @NotNull(message = "Tarif ist erforderlich")
     private Long tarifId;
     private String tarifBezeichnung;
+    /** Nur lesend: Die Oberflaeche leitet daraus die Mengeneinheit ab (kWh bzw. Monate). */
+    private TarifTyp tarifTyp;
     private BigDecimal tarifPreis;
     @NotNull(message = "Jahr ist erforderlich")
     @Min(value = 2000, message = "Jahr muss 2000 oder später sein")
@@ -67,6 +70,7 @@ public class TarifpositionDTO {
         if (position.getTarif() != null) {
             dto.setTarifId(position.getTarif().getId());
             dto.setTarifBezeichnung(position.getTarif().getBezeichnung());
+            dto.setTarifTyp(position.getTarif().getTariftyp());
             dto.setTarifPreis(position.getTarif().getPreis());
         }
         dto.setJahr(position.getJahr());
@@ -124,6 +128,14 @@ public class TarifpositionDTO {
 
     public void setTarifBezeichnung(String tarifBezeichnung) {
         this.tarifBezeichnung = tarifBezeichnung;
+    }
+
+    public TarifTyp getTarifTyp() {
+        return tarifTyp;
+    }
+
+    public void setTarifTyp(TarifTyp tarifTyp) {
+        this.tarifTyp = tarifTyp;
     }
 
     public BigDecimal getTarifPreis() {

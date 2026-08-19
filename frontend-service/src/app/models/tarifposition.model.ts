@@ -1,3 +1,5 @@
+import { TarifTyp } from './tarif.model';
+
 /** Herkunft einer Tarifposition. */
 export enum Erfassungsart {
   MANUELL = 'MANUELL',
@@ -17,6 +19,8 @@ export interface Tarifposition {
   einheitMesspunkt?: string;   // nur lesend; RFID, belegt die Quell-Referenz vor
   tarifId: number;
   tarifBezeichnung?: string;  // nur lesend
+  /** nur lesend; bestimmt die Mengeneinheit (kWh bzw. Monate) */
+  tarifTyp?: TarifTyp;
   tarifPreis?: number;        // nur lesend
   jahr: number;
   quartal: number;            // 1-4
