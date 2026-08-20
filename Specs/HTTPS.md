@@ -188,11 +188,20 @@ automatisch, Keycloak leitet Schema und Port daraus ab.
 > Wert war bisher allerdings in **keiner** Compose-Datei durchgereicht und liess sich per `.env`
 > gar nicht setzen; das ist jetzt in allen drei Dateien ergänzt (Default unverändert).
 >
-> **Sauberere Alternative, noch nicht umgesetzt:** `server.forward-headers-strategy: framework`
-> im Backend. Dann rekonstruiert Spring die externe URL aus `X-Forwarded-Proto`/`-Host`,
-> erkennt den Aufruf korrekt als same-origin, und CORS entfällt vollständig — die Origin müsste
-> beim Hostnamenwechsel nirgends mehr nachgezogen werden. Die Einstellung wirkt über CORS
-> hinaus (erzeugte Links, Redirects) und ist deshalb separat zu bewerten.
+> **Umgesetzt:** `server.forward-headers-strategy: framework` im Backend
+> (`application.yml`). Spring rekonstruiert die externe URL damit aus
+> `X-Forwarded-Proto`/`-Host`, erkennt den Aufruf korrekt als same-origin, und CORS entfällt —
+> die Proxy-Origin muss beim Hostnamenwechsel nirgends mehr nachgezogen werden. Der Eintrag in
+> `APP_CORS_ALLOWED_ORIGINS` wird dadurch entbehrlich; `http://localhost:4200` bleibt nötig,
+> weil der Angular-Dev-Server über einen anderen Port läuft und damit echt cross-origin ist.
+>
+> Die Einstellung ist hier ungewöhnlich risikoarm: Die Anwendung baut **nirgends** absolute
+> URLs aus dem Request (`ServletUriComponentsBuilder`, `ResponseEntity.created(...)`,
+> `getRequestURL()` — kein einziger Treffer), Host-Header-Poisoning geht also ins Leere. Der
+> Filter glaubt den `X-Forwarded-*`-Headern zwar ungeprüft und Port 8090 ist am Host
+> veröffentlicht, aber ein gefälschter `Origin` nützt nichts: Spring stuft die Anfrage dann als
+> same-origin ein und setzt **kein** `Access-Control-Allow-Origin` — der Browser blockiert die
+> Antwort weiterhin. Die Authentisierung läuft zudem über Bearer-Token, nicht über Cookies.
 
 ### Realm
 

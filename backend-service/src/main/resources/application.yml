@@ -1,5 +1,23 @@
 server:
   port: 8090
+  # Hinter dem Reverse-Proxy (caddy) endet TLS am Proxy; intern spricht das Backend HTTP.
+  # Ohne diese Einstellung rekonstruiert Spring die Anfrage deshalb als http://host:8443,
+  # waehrend der Browser "Origin: https://host:8443" sendet - derselbe Aufruf gilt dann als
+  # CORS-Anfrage und wird ohne passenden Eintrag in app.cors.allowed-origins mit
+  # "Invalid CORS request" (403) abgewiesen. Betroffen sind nur NICHT-GET-Aufrufe, weil der
+  # Browser bei gleicher Herkunft sonst gar keinen Origin-Header sendet (Specs/HTTPS.md).
+  #
+  # 'framework' registriert Springs ForwardedHeaderFilter: Schema, Host und Port werden aus
+  # X-Forwarded-* uebernommen, der Aufruf wird korrekt als same-origin erkannt und CORS
+  # entfaellt. Die Proxy-Origin muss damit beim Hostnamenwechsel nirgends nachgezogen werden.
+  #
+  # Vertrauensfrage: Der Filter glaubt den X-Forwarded-Headern ungeprueft, und Port 8090 ist
+  # am Host veroeffentlicht. Der Schaden bleibt hier klein, weil die Anwendung keine absoluten
+  # URLs aus dem Request baut (kein Host-Header-Poisoning moeglich) und die Authentisierung
+  # ueber Bearer-Token statt Cookies laeuft. Ein gefaelschter Origin bringt zudem nichts:
+  # Spring stuft die Anfrage dann als same-origin ein und setzt KEIN
+  # Access-Control-Allow-Origin - der Browser blockiert die Antwort weiterhin.
+  forward-headers-strategy: framework
 
 # Application-specific configuration
 app:
