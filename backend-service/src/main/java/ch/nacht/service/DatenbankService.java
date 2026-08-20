@@ -12,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Generische, read-only Datenbank-Ansicht (nur zev_admin, Permission datenbank:read).
@@ -35,6 +37,15 @@ public class DatenbankService {
     private static final int STATEMENT_TIMEOUT_MS = 5000;
 
     private static final String ORG_ID_SPALTE = "org_id";
+    private static final String ID_SPALTE = "id";
+
+    /**
+     * Trennt eine {@code ORDER BY}-Klausel vom Bedingungsteil des Filters. Der Standard-Filter
+     * bringt eine mit (siehe {@link #getStandardFilter(String)}), und der Anwender darf eine
+     * eintippen — beides muss <b>hinter</b> das {@code WHERE}, sonst entsteht Unsinn wie
+     * {@code WHERE ORDER BY id DESC}.
+     */
+    private static final Pattern ORDER_BY = Pattern.compile("\\bORDER\\s+BY\\b", Pattern.CASE_INSENSITIVE);
 
     private final JdbcTemplate jdbcTemplate;
     private final WhereClauseValidator whereClauseValidator;
@@ -60,9 +71,19 @@ public class DatenbankService {
     }
 
     /**
-     * Liefert den Standard-Filter (WHERE-Klausel) für eine Tabelle: Hat die Tabelle eine
-     * {@code org_id}-Spalte, wird als Default die Organisation des eingeloggten Benutzers
-     * vorgeschlagen ({@code org_id = <orgId>}); andernfalls ein leerer String.
+     * Liefert den Standard-Filter für eine Tabelle. Er besteht aus bis zu zwei Teilen:
+     * <ul>
+     *   <li>Hat die Tabelle eine {@code org_id}-Spalte, wird die Organisation des eingeloggten
+     *       Benutzers vorgeschlagen ({@code org_id = <orgId>}).</li>
+     *   <li>Hat die Tabelle eine {@code id}-Spalte, wird {@code ORDER BY id DESC} angehängt.</li>
+     * </ul>
+     * Trifft beides nicht zu, bleibt der Filter leer.
+     *
+     * <p>Die Standardsortierung ist kein Schönheitsmerkmal: Ohne {@code ORDER BY} ist die
+     * Zeilenreihenfolge in Postgres <b>undefiniert</b>. In der Praxis liefert der Seq-Scan die
+     * ältesten Zeilen zuerst — bei {@code zaehler_rohdaten} sah man auf Seite 1 monatealte
+     * Daten und hielt eine seither ergänzte Spalte für kaputt. Zusätzlich können beim Blättern
+     * über {@code OFFSET} Zeilen doppelt erscheinen oder ausfallen.
      *
      * <p>Der Tabellenname wird gegen die Katalog-Whitelist geprüft (injektionssicher);
      * die {@code org_id} des Benutzers stammt aus dem Request-Kontext (keine Benutzereingabe).
@@ -72,11 +93,20 @@ public class DatenbankService {
         if (tabelle == null || !getTabellen().contains(tabelle)) {
             throw new IllegalArgumentException("DATENBANK_TABELLE_UNGUELTIG");
         }
+        List<String> spalten = getSpalten(tabelle);
+        StringBuilder filter = new StringBuilder();
+
         Long orgId = organizationContextService.getCurrentOrgId();
-        if (orgId != null && getSpalten(tabelle).contains(ORG_ID_SPALTE)) {
-            return ORG_ID_SPALTE + " = " + orgId;
+        if (orgId != null && spalten.contains(ORG_ID_SPALTE)) {
+            filter.append(ORG_ID_SPALTE).append(" = ").append(orgId);
         }
-        return "";
+        if (spalten.contains(ID_SPALTE)) {
+            if (!filter.isEmpty()) {
+                filter.append(" ");
+            }
+            filter.append("ORDER BY ").append(ID_SPALTE).append(" DESC");
+        }
+        return filter.toString();
     }
 
     /**
@@ -121,11 +151,26 @@ public class DatenbankService {
             orderBySql = " ORDER BY \"" + sortSpalte + "\" " + (desc ? "DESC" : "ASC");
         }
 
+        // 7) Filter in Bedingung und (optionale) ORDER BY-Klausel zerlegen. Der Filter ist ein
+        //    einziges Eingabefeld; die Sortierung daraus muss hinter das WHERE, sonst entsteht
+        //    " WHERE ORDER BY id DESC". Eine per Klick gewaehlte Sortierspalte hat Vorrang.
+        String bedingung = where;
+        String filterOrderBySql = "";
+        if (where != null && !where.isBlank()) {
+            Matcher orderBy = ORDER_BY.matcher(where);
+            if (orderBy.find()) {
+                bedingung = where.substring(0, orderBy.start()).trim();
+                filterOrderBySql = " " + where.substring(orderBy.start()).trim();
+            }
+        }
+
         String cols = String.join(", ", spalten.stream().map(c -> "\"" + c + "\"").toList());
-        String whereSql = (where == null || where.isBlank()) ? "" : " WHERE " + where;
+        String whereSql = (bedingung == null || bedingung.isBlank()) ? "" : " WHERE " + bedingung;
         // Tabellenname/Spalten/Sortierspalte stammen aus dem Katalog -> injektionssicher.
+        // Die ORDER BY-Klausel aus dem Filter ist dagegen freier Text und nur ueber den
+        // WhereClauseValidator abgesichert - wie der Bedingungsteil, in dem sie bisher stand.
         String sql = "SELECT " + cols + " FROM " + SCHEMA + ".\"" + tabelle + "\"" + whereSql
-                + orderBySql + " LIMIT ? OFFSET ?";
+                + (orderBySql.isEmpty() ? filterOrderBySql : orderBySql) + " LIMIT ? OFFSET ?";
 
         // size+1 lesen, um hatMehr ohne separaten COUNT zu bestimmen
         List<List<Object>> zeilen;

@@ -26,6 +26,14 @@
 * Ein **erneuter** Tabellenwechsel setzt den Standard-Filter neu (überschreibt eine vorherige, ggf. angepasste Eingabe) und verwirft das bisherige Ergebnis.
 * Die interne `org_id` (BIGINT) ist **nicht** im JWT enthalten, sondern wird serverseitig aus dem Organisations-Kontext des Requests ermittelt; das Frontend ruft sie über einen Endpunkt ab (FR-3). Der Tabellenname wird dabei gegen die Whitelist geprüft (injektionssicher).
 
+### FR-1c: Standardsortierung `ORDER BY id DESC` (Nachtrag)
+* Analog zur `org_id`-Prüfung wird bei der **Auswahl einer Tabelle** geprüft, ob sie eine `id`-Spalte besitzt. Ist das der Fall, wird dem Standard-Filter **`ORDER BY id DESC` angehängt** — bei einer Tabelle mit beiden Spalten also `org_id = <orgId> ORDER BY id DESC`, bei einer Tabelle nur mit `id` entsprechend nur `ORDER BY id DESC`.
+* **Begründung:** Ohne `ORDER BY` ist die Zeilenreihenfolge in PostgreSQL **undefiniert**; in der Praxis liefert der Seq-Scan die ältesten Zeilen zuerst. Auf `zaehler_rohdaten` zeigte Seite 1 dadurch monatealte Daten, was eine seither ergänzte Spalte (`seriennummer`) als kaputt erscheinen liess. Zusätzlich können beim Blättern über `OFFSET` ohne Sortierung Zeilen doppelt erscheinen oder ausfallen.
+* Die Sortierklausel steht **sichtbar im Filter-Feld** und ist damit — wie der Bedingungsteil — änder- und löschbar.
+* **Vorrang bei Spalten-Klick:** Wählt der Admin per Klick auf eine Spaltenüberschrift eine Sortierung (FR-1 Punkt 7), **gewinnt diese Auswahl**. Die Sortierklausel wird dabei aus dem Filter-Feld entfernt, damit nicht zwei `ORDER BY` im erzeugten SQL landen.
+* Serverseitig wird der Filter in **Bedingungsteil und `ORDER BY`-Klausel zerlegt**: Die Bedingung kommt hinter `WHERE`, die Sortierung dahinter. Besteht der Filter **nur** aus der Sortierung, entfällt das `WHERE` ganz (`WHERE ORDER BY id DESC` wäre ein Syntaxfehler).
+* Die `ORDER BY`-Klausel aus dem Filter ist freier Text und — anders als eine per Klick gewählte `sortSpalte` — **nicht** gegen die Katalog-Whitelist geprüft. Sie unterliegt derselben Prüfung wie der übrige Filter (`WhereClauseValidator`: keine `;`, keine Kommentare, keine DML-/DDL-Schlüsselwörter).
+
 ### FR-1b: Filter-Historie im Browser (Nachtrag)
 * Nach jeder **erfolgreich ausgeführten** Abfrage wird die verwendete (nicht-leere) WHERE-Klausel in eine **lokale Filter-Historie** aufgenommen. Abgewiesene/fehlerhafte Filter (`400`) werden **nicht** gespeichert – die Historie enthält damit nur gültige Filter.
 * Die Historie wird **pro Tabelle** geführt und ausschliesslich **lokal im Browser** gehalten (`localStorage`, Key `zev-datenbank-filter-historie`, JSON `{ "<tabelle>": ["<filter>", …] }`). Es werden **maximal 20 Einträge je Tabelle** gespeichert, **neuester zuerst**; beim Überschreiten fällt der älteste Eintrag weg.
@@ -86,8 +94,11 @@ Neuer Controller unter `/api/datenbank`, klassenweit `@PreAuthorize("hasAuthorit
 * [ ] Klick auf eine Spaltenüberschrift sortiert **serverseitig** nach dieser Spalte (über alle Seiten); erneuter Klick kehrt die Richtung um; ein Indikator (▲/▼) zeigt die aktive Sortierung.
 * [ ] Enter im Filter-Eingabefeld löst „Anzeigen" aus (wenn eine Tabelle gewählt ist und keine Abfrage läuft).
 * [ ] Eine ungültige/nicht existierende `sortSpalte` wird **abgewiesen** (`400`, kein SQL); `sortRichtung` nur `ASC`/`DESC`.
-* [ ] Wird eine Tabelle **mit** `org_id`-Spalte gewählt, ist das Filter-Feld mit `org_id = <orgId des eingeloggten Benutzers>` vorbefüllt.
-* [ ] Wird eine Tabelle **ohne** `org_id`-Spalte gewählt (z.B. `translation`), bleibt das Filter-Feld leer.
+* [ ] Wird eine Tabelle **mit** `org_id`- und `id`-Spalte gewählt, ist das Filter-Feld mit `org_id = <orgId des eingeloggten Benutzers> ORDER BY id DESC` vorbefüllt.
+* [ ] Wird eine Tabelle **ohne** `org_id`-Spalte, aber **mit** `id` gewählt, steht nur `ORDER BY id DESC` im Filter-Feld — und die Abfrage läuft ohne `WHERE`.
+* [ ] Wird eine Tabelle **ohne** `org_id`- und **ohne** `id`-Spalte gewählt, bleibt das Filter-Feld leer.
+* [ ] Auf einer Tabelle mit `id` zeigt Seite 1 ohne weiteres Zutun die **jüngsten** Zeilen (höchste `id` zuerst).
+* [ ] Klick auf eine Spaltenüberschrift bei vorbefülltem Standard-Filter sortiert nach dieser Spalte (**kein** Fehler durch ein zweites `ORDER BY`); die Sortierklausel verschwindet dabei aus dem Filter-Feld, der Bedingungsteil bleibt stehen.
 * [ ] Der vorbefüllte Filter kann geändert/gelöscht werden; ohne `org_id`-Filter werden weiterhin Zeilen aller Mandanten angezeigt.
 * [ ] `GET /api/datenbank/standard-filter` mit einem nicht in der Whitelist enthaltenen Tabellennamen → `400`, kein SQL; Zugriff ohne `datenbank:read` → `403`.
 * [ ] Bei nicht-leerem Filter-Feld ist ein Löschen-Button (×) sichtbar; Klick leert das Feld; bei leerem Feld ist der Button ausgeblendet.

@@ -121,28 +121,48 @@ public class DatenbankServiceTest {
     // ==================== getStandardFilter ====================
 
     @Test
-    void getStandardFilter_TabelleMitOrgId_ReturnsOrgFilter() {
+    void getStandardFilter_TabelleMitOrgIdUndId_ReturnsOrgFilterUndSortierung() {
         when(organizationContextService.getCurrentOrgId()).thenReturn(42L);
 
-        assertEquals("org_id = 42", datenbankService.getStandardFilter("einheit"));
+        assertEquals("org_id = 42 ORDER BY id DESC", datenbankService.getStandardFilter("einheit"));
     }
 
     @Test
-    void getStandardFilter_TabelleOhneOrgId_ReturnsEmpty() {
+    void getStandardFilter_TabelleOhneOrgId_ReturnsNurSortierung() {
+        // z.B. organisation: eigene id, aber keine org_id
         when(organizationContextService.getCurrentOrgId()).thenReturn(42L);
         when(jdbcTemplate.queryForList(contains("information_schema.columns"), eq(String.class),
                 eq("zev"), eq("tarif"))).thenReturn(List.of("id", "bezeichnung"));
 
-        assertEquals("", datenbankService.getStandardFilter("tarif"));
+        assertEquals("ORDER BY id DESC", datenbankService.getStandardFilter("tarif"));
     }
 
     @Test
-    void getStandardFilter_OhneOrgKontext_ReturnsEmpty() {
-        // Ohne Mandanten-Kontext darf kein Filter vorgeschlagen werden - "org_id = null"
-        // waere eine syntaktisch gueltige, fachlich sinnlose Klausel
+    void getStandardFilter_TabelleOhneId_ReturnsNurOrgFilter() {
+        when(organizationContextService.getCurrentOrgId()).thenReturn(42L);
+        when(jdbcTemplate.queryForList(contains("information_schema.columns"), eq(String.class),
+                eq("zev"), eq("mieter"))).thenReturn(List.of("mieter_id", "org_id"));
+
+        assertEquals("org_id = 42", datenbankService.getStandardFilter("mieter"));
+    }
+
+    @Test
+    void getStandardFilter_TabelleOhneOrgIdUndOhneId_ReturnsEmpty() {
+        // z.B. flyway_schema_history: weder Mandant noch id
+        when(organizationContextService.getCurrentOrgId()).thenReturn(42L);
+        when(jdbcTemplate.queryForList(contains("information_schema.columns"), eq(String.class),
+                eq("zev"), eq("debitor"))).thenReturn(List.of("installed_rank", "version"));
+
+        assertEquals("", datenbankService.getStandardFilter("debitor"));
+    }
+
+    @Test
+    void getStandardFilter_OhneOrgKontext_ReturnsNurSortierung() {
+        // Ohne Mandanten-Kontext darf kein Org-Filter vorgeschlagen werden - "org_id = null"
+        // waere eine syntaktisch gueltige, fachlich sinnlose Klausel. Die Sortierung bleibt.
         when(organizationContextService.getCurrentOrgId()).thenReturn(null);
 
-        assertEquals("", datenbankService.getStandardFilter("einheit"));
+        assertEquals("ORDER BY id DESC", datenbankService.getStandardFilter("einheit"));
     }
 
     @ParameterizedTest
@@ -235,6 +255,70 @@ public class DatenbankServiceTest {
         datenbankService.abfrage(request("einheit"));
 
         assertFalse(erzeugtesSql().contains("WHERE"));
+    }
+
+    // ==================== abfrage: ORDER BY im Filter ====================
+
+    @Test
+    void abfrage_StandardFilter_SortierungLandetHinterDemWhere() {
+        // Der Standard-Filter kommt als EIN Eingabefeld zurueck. Wuerde er unzerlegt hinter
+        // WHERE gehaengt, entstuende "WHERE org_id = 42 ORDER BY id DESC" - hier zufaellig
+        // gueltig, aber nur, weil ORDER BY am Ende steht. Die Zerlegung macht es explizit.
+        DatenbankAbfrageRequestDTO request = request("einheit");
+        request.setWhere("org_id = 42 ORDER BY id DESC");
+
+        datenbankService.abfrage(request);
+
+        assertEquals("SELECT \"id\", \"name\", \"org_id\" FROM zev.\"einheit\""
+                + " WHERE org_id = 42 ORDER BY id DESC LIMIT ? OFFSET ?", erzeugtesSql());
+    }
+
+    @Test
+    void abfrage_NurSortierungImFilter_ErzeugtKeinLeeresWhere() {
+        // Tabellen ohne org_id bekommen einen Filter, der NUR aus der Sortierung besteht.
+        // " WHERE ORDER BY id DESC" waere ein Syntaxfehler.
+        DatenbankAbfrageRequestDTO request = request("einheit");
+        request.setWhere("ORDER BY id DESC");
+
+        datenbankService.abfrage(request);
+
+        String sql = erzeugtesSql();
+        assertFalse(sql.contains("WHERE"), sql);
+        assertEquals("SELECT \"id\", \"name\", \"org_id\" FROM zev.\"einheit\""
+                + " ORDER BY id DESC LIMIT ? OFFSET ?", sql);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "order by id desc", "Order  By id desc", "ORDER\tBY id DESC" })
+    void abfrage_SortierungImFilter_WirdUnabhaengigVonSchreibweiseErkannt(String where) {
+        // Nur am reinen Sortierfilter sichtbar: Wird die Klausel nicht erkannt, steht
+        // " WHERE order by id desc" im SQL. Gross-/Kleinschreibung und die Menge an
+        // Leerraum zwischen ORDER und BY duerfen dabei keine Rolle spielen.
+        DatenbankAbfrageRequestDTO request = request("einheit");
+        request.setWhere(where);
+
+        datenbankService.abfrage(request);
+
+        assertFalse(erzeugtesSql().contains("WHERE"), erzeugtesSql());
+        assertTrue(erzeugtesSql().contains("\"einheit\" " + where.trim() + " LIMIT"), erzeugtesSql());
+    }
+
+    @Test
+    void abfrage_GewaehlteSortierspalte_SchlaegtSortierungAusDemFilter() {
+        // Klickt der Anwender eine Spaltenueberschrift, gewinnt seine Auswahl. Sonst stuenden
+        // zwei ORDER BY im SQL - genau der Syntaxfehler, den die Zerlegung verhindern soll.
+        DatenbankAbfrageRequestDTO request = request("einheit");
+        request.setWhere("org_id = 42 ORDER BY id DESC");
+        request.setSortSpalte("name");
+        request.setSortRichtung("ASC");
+
+        datenbankService.abfrage(request);
+
+        String sql = erzeugtesSql();
+        assertEquals("SELECT \"id\", \"name\", \"org_id\" FROM zev.\"einheit\""
+                + " WHERE org_id = 42 ORDER BY \"name\" ASC LIMIT ? OFFSET ?", sql);
+        // Nur ein einziges ORDER BY
+        assertEquals(sql.indexOf("ORDER BY"), sql.lastIndexOf("ORDER BY"));
     }
 
     // ==================== abfrage: SQL-Aufbau ====================

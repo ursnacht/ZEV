@@ -52,7 +52,8 @@ export class DatenbankAnsichtComponent extends WithMessage implements OnInit {
   /**
    * Bei Tabellenwechsel: bisheriges Ergebnis verwerfen und den Standard-Filter setzen.
    * Hat die Tabelle eine {@code org_id}-Spalte, wird als Default die Organisation des
-   * eingeloggten Benutzers vorgeschlagen; andernfalls bleibt der Filter leer.
+   * eingeloggten Benutzers vorgeschlagen; hat sie eine {@code id}-Spalte, kommt
+   * {@code ORDER BY id DESC} dazu. Andernfalls bleibt der Filter leer.
    * Zusätzlich wird die lokale Filter-Historie der neuen Tabelle geladen.
    */
   onTabelleChange(): void {
@@ -83,6 +84,11 @@ export class DatenbankAnsichtComponent extends WithMessage implements OnInit {
   }
 
   onSort(spalte: string): void {
+    // Der Standard-Filter bringt eine ORDER BY-Klausel mit. Bliebe sie stehen, haengte das
+    // Backend die geklickte Sortierung als ZWEITES ORDER BY an - ein Syntaxfehler, der als
+    // DATENBANK_ABFRAGE_FEHLER in der Oberflaeche landet. Die explizite Auswahl gewinnt.
+    this.whereClause = this.ohneOrderBy(this.whereClause);
+
     if (this.sortSpalte === spalte) {
       // gleiche Spalte -> Richtung umkehren
       this.sortRichtung = this.sortRichtung === 'ASC' ? 'DESC' : 'ASC';
@@ -92,6 +98,11 @@ export class DatenbankAnsichtComponent extends WithMessage implements OnInit {
     }
     this.page = 0;
     this.abfrage();
+  }
+
+  /** Entfernt eine ORDER BY-Klausel samt allem, was ihr folgt, aus dem Filtertext. */
+  private ohneOrderBy(filter: string): string {
+    return (filter ?? '').replace(/\s*\border\s+by\b[\s\S]*$/i, '').trim();
   }
 
   onVorherigeSeite(): void {
