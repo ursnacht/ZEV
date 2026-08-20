@@ -9,7 +9,7 @@ import { TranslationService } from '../../services/translation.service';
 import { Debitor } from '../../models/debitor.model';
 import { Einheit, EinheitTyp } from '../../models/einheit.model';
 import { Mieter } from '../../models/mieter.model';
-import { of, throwError } from 'rxjs';
+import { of, throwError, Subject } from 'rxjs';
 
 describe('DebitorkontrolleListComponent', () => {
   let component: DebitorkontrolleListComponent;
@@ -159,6 +159,39 @@ describe('DebitorkontrolleListComponent', () => {
     it('should update debitoren array on success', () => {
       component.debitoren = [];
       component.loadDebitoren();
+      expect(component.debitoren).toEqual(expect.arrayContaining(mockDebitoren));
+    });
+
+    it('should discard a response whose period is no longer the selected one', () => {
+      // Beide Datumsfelder loesen einzeln ein Nachladen aus. Wer schnell erst "von" und dann
+      // "bis" aendert, schickt zwischendurch eine Abfrage ueber den gemischten - meist viel
+      // groesseren - Zeitraum los. Traf deren Antwort spaeter ein, zeigte die Liste Eintraege
+      // ausserhalb des eingestellten Zeitraums (im E2E-Lauf: 36 Zeilen im Jahr 1900).
+      const subject = new Subject<Debitor[]>();
+      debitorServiceSpy.getDebitoren.mockReturnValue(subject.asObservable());
+
+      component.dateFrom = '1900-01-01';
+      component.dateTo = '2091-05-11';
+      component.debitoren = [];
+      component.loadDebitoren();
+
+      // Bevor die Antwort eintrifft, waehlt der Benutzer das Bis-Datum
+      component.dateTo = '1900-03-31';
+      subject.next(mockDebitoren);
+
+      expect(component.debitoren).toEqual([]);
+    });
+
+    it('should apply a response that still matches the selected period', () => {
+      const subject = new Subject<Debitor[]>();
+      debitorServiceSpy.getDebitoren.mockReturnValue(subject.asObservable());
+
+      component.dateFrom = '1900-01-01';
+      component.dateTo = '1900-03-31';
+      component.debitoren = [];
+      component.loadDebitoren();
+      subject.next(mockDebitoren);
+
       expect(component.debitoren).toEqual(expect.arrayContaining(mockDebitoren));
     });
 

@@ -127,8 +127,20 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
   loadDebitoren(): void {
     if (!this.dateFrom || !this.dateTo) return;
     this.selectedIds.clear();
-    this.debitorService.getDebitoren(this.dateFrom, this.dateTo).subscribe({
-      next: (data) => { this.debitoren = data; this.applySorting(); },
+    const von = this.dateFrom;
+    const bis = this.dateTo;
+    this.debitorService.getDebitoren(von, bis).subscribe({
+      next: (data) => {
+        // Überholte Antwort verwerfen. Beide Datumsfelder lösen einzeln ein Nachladen aus; wer
+        // schnell erst „von" und dann „bis" ändert, schickt zwischendurch eine Abfrage über den
+        // gemischten Zeitraum los. Trifft deren – meist grössere – Antwort später ein, zeigte die
+        // Liste anschliessend Einträge ausserhalb des eingestellten Zeitraums.
+        if (von !== this.dateFrom || bis !== this.dateTo) {
+          return;
+        }
+        this.debitoren = data;
+        this.applySorting();
+      },
       error: () => {
         this.showMessage('FEHLER_LADEN_DEBITOREN', 'error');
       }

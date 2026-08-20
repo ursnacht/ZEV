@@ -1,13 +1,63 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Locator, Page } from '@playwright/test';
 import { getPreviousQuarter, navigateViaMenu, clickKebabMenuItem, waitForFormResult, waitForTableWithData } from './helpers';
 
 /**
  * tests / debitorkontrolle.spec.ts
  * E2E tests for Debitorkontrolle (Debtor Control) page
+ *
+ * **Jeder Test bekommt seinen eigenen Monat, jedes Browser-Projekt sein eigenes Jahr.**
+ * Vorher verwendeten alle Tests feste 2099er-Daten. Ein Debitor ist über
+ * (`mieter_id`, `datum_von`, `org_id`) eindeutig und wird per Upsert geschrieben — Chromium und
+ * Firefox schrieben also auf denselben Datensatz und löschten ihn einander unter den Füssen weg.
+ * Das war der Grund, weshalb praktisch jeder Test hier mit `try { … } catch { return; }` und
+ * `if (isSuccess) { … }` abgesichert war und bei jedem Fehlschlag **stumm grün** meldete — auf
+ * einer Maske, die Geldbeträge und Zahlungsstatus führt.
+ *
+ * Mit disjunkten Zeiträumen kann sich kein Lauf mehr mit einem anderen überschneiden, und jeder
+ * Fehlschlag darf den Test ehrlich rot machen.
  */
 
-// Track created debitoren for cleanup — identified by their datumVon value (far-future test dates)
+// Track created debitoren for cleanup — identified by their datumVon value
 let createdDebitorDates: string[] = [];
+
+/**
+ * Basisjahr je Browser-Projekt. Die Bereiche sind disjunkt; zusammen mit dem je Test eigenen
+ * Monat ist jeder Datensatz eindeutig einem Test in einem Projekt zugeordnet.
+ */
+const PROJEKT_JAHR: Record<string, number> = { chromium: 2091, firefox: 2092 };
+
+function jahr(): number {
+    return PROJEKT_JAHR[test.info().project.name] ?? 2093;
+}
+
+/**
+ * Zeitfenster eines Tests — **je Test eindeutig und überschneidungsfrei**.
+ *
+ * Zwei Fenster je Monat (01.–11. und 15.–25.), damit 24 Tests in ein Jahr passen. Playwright
+ * lässt die Tests einer Datei parallel laufen (`fullyParallel`, 4 Worker); teilten sich zwei
+ * Tests ein Fenster, sähe der eine die Zeilen des anderen — und ein Aufräumen mitten im Lauf
+ * zöge dem anderen die Zeile unter den Füssen weg.
+ *
+ * @param slot Eindeutige Nummer 1..24
+ */
+function zeitraum(slot: number): { von: string; bis: string } {
+    const j = jahr();
+    const mm = String(Math.ceil(slot / 2)).padStart(2, '0');
+    const start = slot % 2 === 1 ? 1 : 15;
+    const pad = (t: number) => String(t).padStart(2, '0');
+    return { von: `${j}-${mm}-${pad(start)}`, bis: `${j}-${mm}-${pad(start + 10)}` };
+}
+
+/**
+ * Zeitraum in der Vergangenheit — nötig, wo „Heute"/„Gestern" als Zahldatum gesetzt wird: Das
+ * Backend weist ein Zahldatum vor `datumBis` ab.
+ */
+function vergangenerZeitraum(): { von: string; bis: string } {
+    // 2002/2003 statt 2000/2001: Auf 2000-01-01 liegt ein Rest aus einem früheren Lauf der alten
+    // Fassung dieser Suite, und mit gesetztem Zahldatum weist der Upsert eine Neuanlage ab.
+    const j = jahr() - 89; // chromium 2002, firefox 2003
+    return { von: `${j}-01-01`, bis: `${j}-03-31` };
+}
 
 /**
  * Navigate to the Debitorkontrolle page
@@ -23,31 +73,51 @@ async function navigateToDebitorkontrolle(page: Page): Promise<void> {
 async function setDateRange(page: Page, von: string, bis: string): Promise<void> {
     const dateFrom = page.locator('#dateFrom');
     const dateTo = page.locator('#dateTo');
+
+    // Steht der Zeitraum bereits, löst ein erneutes `change` kein Nachladen aus - das Warten
+    // liefe in den Timeout. Die Liste ist dann ohnehin aktuell: Nach dem Speichern lädt die
+    // Komponente selbst mit genau diesem Zeitraum neu.
+    if (await dateFrom.inputValue() === von && await dateTo.inputValue() === bis) {
+        return;
+    }
+
+    // Die Felder haengen an (ngModelChange), nicht an (change): Schon `fill` loest das Nachladen
+    // aus, ein zusaetzliches dispatchEvent('change') bewirkt nichts. Die Warte-Registrierung muss
+    // deshalb **vor** dem Ausfuellen stehen - sonst ist die Antwort schon da, bevor gewartet wird,
+    // und der Test laeuft in den Timeout.
+    //
+    // Gewartet wird auf die Antwort zu **genau diesem** Zeitraum (von/bis stehen als Query-
+    // Parameter, siehe DebitorService.getDebitoren). Damit wird weder der Zwischenstand nach dem
+    // Fuellen des ersten Felds noch das Nachladen nach einem Speichern faelschlich als das
+    // erwartete Ergebnis gewertet.
+    const antwort = page.waitForResponse(
+        (res) => res.url().includes('/api/debitoren')
+            && res.request().method() === 'GET'
+            && res.url().includes(`von=${von}`)
+            && res.url().includes(`bis=${bis}`),
+        { timeout: 15000 }
+    );
     await dateFrom.fill(von);
-    await dateFrom.dispatchEvent('change');
     await dateTo.fill(bis);
-    // Auf das konkrete Nachladen warten statt auf 'networkidle': Die Datumsänderung löst ein
-    // GET /api/debitoren aus; darauf zu warten ist deterministisch und browser-unabhängig.
-    await Promise.all([
-        page.waitForResponse(
-            (res) => res.url().includes('/api/debitoren') && res.request().method() === 'GET',
-            { timeout: 15000 }
-        ),
-        dateTo.dispatchEvent('change')
-    ]);
+    await antwort;
 }
 
 /**
- * Get the first selectable mieter option value from the form's dropdown
+ * Erste wählbare Mieter-Option des Formulars.
+ *
+ * Wirft, wenn keine existiert: Ohne Mieter ist diese Maske nicht bedienbar, das ist ein
+ * Umgebungsfehler und kein Grund, den Test stumm zu überspringen.
  */
-async function getFirstMieterOptionValue(page: Page): Promise<string | null> {
-    const select = page.locator('#mieterId');
-    const options = select.locator('option:not([disabled])');
-    const count = await options.count();
-    if (count > 0) {
-        return await options.first().getAttribute('value');
+async function mieterIdOrFail(page: Page): Promise<string> {
+    const options = page.locator('#mieterId').locator('option:not([disabled])');
+    if (await options.count() === 0) {
+        throw new Error('Kein Mieter vorhanden - ohne Mieter lässt sich kein Debitor erfassen');
     }
-    return null;
+    const value = await options.first().getAttribute('value');
+    if (!value) {
+        throw new Error('Mieter-Option ohne Wert');
+    }
+    return value;
 }
 
 /**
@@ -82,11 +152,90 @@ async function openCreateForm(page: Page): Promise<void> {
 }
 
 /**
- * Delete a debitor row that contains the given datumVon date text
+ * Wartet, bis keine Meldung mehr steht.
+ *
+ * Zwingend vor jedem Absenden: Erfolgsmeldungen blenden sich erst nach 5 Sekunden aus. Eine noch
+ * stehende Meldung der vorherigen Aktion würde sonst als Ergebnis der nächsten gewertet — ein
+ * abgewiesener Speicherversuch sähe dann wie ein erfolgreicher aus.
+ */
+async function clearMessages(page: Page): Promise<void> {
+    const error = page.locator('.zev-message--error');
+    if (await error.isVisible().catch(() => false)) {
+        await error.click();
+        await expect(error).not.toBeVisible({ timeout: 5000 });
+    }
+    const success = page.locator('.zev-message--success');
+    if (await success.isVisible().catch(() => false)) {
+        await expect(success).not.toBeVisible({ timeout: 10000 });
+    }
+}
+
+/**
+ * Sendet das offene Formular ab und besteht auf einer Erfolgsmeldung.
+ *
+ * Ersetzt das frühere `try { … } catch { return; }` samt `if (isSuccess)`: Ein Fehlschlag beim
+ * Speichern ist ein Testergebnis, kein Grund zum stillen Aussteigen. Die Server-Meldung wandert
+ * in die Fehlermeldung, damit der Grund im Report steht.
+ */
+async function submitAndExpectSuccess(page: Page, was: string): Promise<void> {
+    await clearMessages(page);
+    await page.locator('button[type="submit"]').click();
+    const isSuccess = await waitForFormResult(page, 20000);
+    if (!isSuccess) {
+        const meldung = await page.locator('.zev-message--error').textContent().catch(() => '');
+        throw new Error(`${was} konnte nicht gespeichert werden: ${meldung?.trim()}`);
+    }
+}
+
+/**
+ * Legt einen Debitor an, registriert ihn fürs Aufräumen und stellt den Zeitraum darauf ein.
+ * Erwartet die geöffnete Debitorkontrolle. Wirft, wenn das Anlegen misslingt.
+ *
+ * @returns Die Zeile des angelegten Debitors
+ */
+async function createDebitorOrFail(page: Page, daten: {
+    von: string; bis: string; betrag: string; zahldatum?: string;
+}): Promise<Locator> {
+    await openCreateForm(page);
+    const mieterId = await mieterIdOrFail(page);
+    await fillDebitorForm(page, {
+        mieterId,
+        betrag: daten.betrag,
+        datumVon: daten.von,
+        datumBis: daten.bis,
+        zahldatum: daten.zahldatum
+    });
+
+    createdDebitorDates.push(daten.von);
+    await submitAndExpectSuccess(page, `Debitor ${formatToSwiss(daten.von)}`);
+
+    await setDateRange(page, daten.von, daten.bis);
+    await waitForTableWithData(page, 10000);
+
+    const row = page.locator(`tr:has-text("${formatToSwiss(daten.von)}")`).first();
+    await expect(row).toBeVisible({ timeout: 10000 });
+    return row;
+}
+
+/**
+ * Klickt „Löschen" im Kebab-Menü einer Zeile.
+ *
+ * Nicht der gemeinsame `clickKebabMenuItem`-Helper: Eine bezahlte Zeile hat **zwei** Einträge
+ * mit `--danger` („Zahldatum löschen" und „Löschen"), der Helper träfe beide und scheiterte an
+ * Playwrights strict mode. „Löschen" ist der letzte Eintrag des Menüs.
+ */
+async function clickDeleteInKebab(page: Page, row: Locator): Promise<void> {
+    await row.locator('.zev-kebab-button').click();
+    await row.locator('.zev-kebab-menu--open').waitFor({ state: 'visible', timeout: 2000 });
+    await row.locator('.zev-kebab-menu__item--danger').last().click();
+}
+
+/**
+ * Delete a debitor row that contains the given datumVon date text (nur Aufräumen — hier darf
+ * nachsichtig gearbeitet werden, ein Fehlschlag soll den Test nicht überschreiben).
  */
 async function deleteDebitorByDate(page: Page, datumVon: string): Promise<void> {
     const swissDate = formatToSwiss(datumVon);
-    console.log(`Cleanup: Attempting to delete debitor with datumVon "${swissDate}"`);
     try {
         page.removeAllListeners('dialog');
         await navigateToDebitorkontrolle(page);
@@ -94,22 +243,16 @@ async function deleteDebitorByDate(page: Page, datumVon: string): Promise<void> 
         const year = datumVon.substring(0, 4);
         await setDateRange(page, `${year}-01-01`, `${year}-12-31`);
 
-        // Wait a moment for load
-        await page.waitForTimeout(1000);
-
         const row = page.locator(`tr:has-text("${swissDate}")`).first();
-        if (await row.isVisible().catch(() => false)) {
-            page.on('dialog', async dialog => { await dialog.accept(); });
-            await row.locator('.zev-kebab-button').click();
-            await page.waitForTimeout(300);
-            await row.locator('.zev-kebab-menu__item--danger').click();
-            await page.waitForTimeout(1500);
-            page.removeAllListeners('dialog');
-        } else {
-            console.log(`Cleanup: Debitor with datumVon "${swissDate}" not found`);
+        if (!await row.isVisible().catch(() => false)) {
+            return;
         }
+        page.once('dialog', async dialog => { await dialog.accept(); });
+        await clickDeleteInKebab(page, row);
+        await row.waitFor({ state: 'hidden', timeout: 10000 }).catch(() =>
+            console.log(`Cleanup: Debitor "${swissDate}" ist nach dem Löschen noch sichtbar`));
     } catch (error) {
-        console.log(`Cleanup: Error during cleanup: ${error}`);
+        console.log(`Cleanup: Fehler beim Löschen von "${swissDate}": ${error}`);
         page.removeAllListeners('dialog');
     }
 }
@@ -170,17 +313,16 @@ test.describe('Debitorkontrolle - Navigation and Display', () => {
         await expect(activeButton).toHaveText(getPreviousQuarter().label);
     });
 
-    test('should show correct table columns when data is present', async ({ page }) => {
+    test('should show correct table columns', async ({ page }) => {
+        // Eigenen Debitor anlegen statt auf vorhandene Daten hoffen - sonst lief der Test
+        // ohne jede Zusicherung durch, wenn der Zeitraum leer war.
         await navigateToDebitorkontrolle(page);
+        const z = zeitraum(1);
+        await createDebitorOrFail(page, { von: z.von, bis: z.bis, betrag: '150.00' });
 
-        const hasData = await waitForTableWithData(page, 5000);
-
-        if (hasData) {
-            const headers = page.locator('.zev-table th');
-            const headerCount = await headers.count();
-            // Mieter, Betrag, Datum von, Datum bis, Zahldatum, Status, Actions
-            expect(headerCount).toBeGreaterThanOrEqual(7);
-        }
+        const headers = page.locator('.zev-table th');
+        // Auswahl, Mieter, Betrag, Datum von, Datum bis, Zahldatum, Status, Actions
+        expect(await headers.count()).toBeGreaterThanOrEqual(7);
     });
 
     test('should show empty state message when no debitoren for period', async ({ page }) => {
@@ -203,15 +345,10 @@ test.describe('Debitorkontrolle - Sorting', () => {
 
     test('should toggle sort indicator when clicking column header', async ({ page }) => {
         await navigateToDebitorkontrolle(page);
+        const z = zeitraum(2);
+        await createDebitorOrFail(page, { von: z.von, bis: z.bis, betrag: '10.00' });
 
-        const hasData = await waitForTableWithData(page, 5000);
-        if (!hasData) {
-            console.log('No data for sorting test, skipping');
-            return;
-        }
-
-        // Mieter column header (already sorted by default)
-        const mieterHeader = page.locator('.zev-table th').first();
+        const mieterHeader = page.locator('.zev-table th').filter({ hasText: /Mieter/i }).first();
         const sortIndicator = page.locator('.zev-table__sort-indicator');
         await expect(sortIndicator.first()).toBeVisible();
 
@@ -222,12 +359,8 @@ test.describe('Debitorkontrolle - Sorting', () => {
 
     test('should show sort indicator after clicking Betrag column', async ({ page }) => {
         await navigateToDebitorkontrolle(page);
-
-        const hasData = await waitForTableWithData(page, 5000);
-        if (!hasData) {
-            console.log('No data for sorting test, skipping');
-            return;
-        }
+        const z = zeitraum(3);
+        await createDebitorOrFail(page, { von: z.von, bis: z.bis, betrag: '10.00' });
 
         const betragHeader = page.locator('th').filter({ hasText: /CHF/i }).first();
         await betragHeader.click();
@@ -272,111 +405,36 @@ test.describe('Debitorkontrolle - Create Debitor', () => {
 
     test('should create a new debitor successfully', async ({ page }) => {
         await navigateToDebitorkontrolle(page);
-        await openCreateForm(page);
+        const z = zeitraum(4);
 
-        const mieterId = await getFirstMieterOptionValue(page);
-        if (!mieterId) {
-            console.log('No mieter available, skipping create test');
-            return;
-        }
+        const row = await createDebitorOrFail(page, { von: z.von, bis: z.bis, betrag: '150.00' });
 
-        const testDate = '2099-01-01';
-        const testDateBis = '2099-03-31';
-
-        await fillDebitorForm(page, {
-            mieterId,
-            betrag: '150.00',
-            datumVon: testDate,
-            datumBis: testDateBis
-        });
-
-        await page.locator('button[type="submit"]').click();
-
-        let isSuccess = false;
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('Debitor creation failed, skipping verification');
-            return;
-        }
-
-        if (isSuccess) {
-            createdDebitorDates.push(testDate);
-
-            // Set date range to show the created entry
-            await setDateRange(page, testDate, testDateBis);
-            await waitForTableWithData(page, 10000);
-
-            const newRow = page.locator(`tr:has-text("${formatToSwiss(testDate)}")`).first();
-            await expect(newRow).toBeVisible({ timeout: 10000 });
-            await expect(newRow).toContainText('150.00');
-        }
+        await expect(row).toContainText('150.00');
     });
 
     test('should populate Einheit field when Mieter is selected', async ({ page }) => {
         await navigateToDebitorkontrolle(page);
         await openCreateForm(page);
 
-        const mieterId = await getFirstMieterOptionValue(page);
-        if (!mieterId) {
-            console.log('No mieter available, skipping test');
-            return;
-        }
-
+        const mieterId = await mieterIdOrFail(page);
         await page.locator('#mieterId').selectOption(mieterId);
-        await page.waitForTimeout(300);
 
-        // Einheit field is read-only and should be populated
-        const einheitInput = page.locator('input[readonly]');
-        const einheitValue = await einheitInput.inputValue();
-        // Could be empty if no einheit assigned; just verify the field is rendered
+        // Jeder Mieter hat mindestens eine Einheit (Specs/Ladestationen.md) - das Feld muss also
+        // gefüllt sein. Frueher prüfte dieser Test nur, dass das Feld ueberhaupt sichtbar ist,
+        // und hielt damit nicht, was sein Name verspricht.
+        const einheitInput = page.locator('input[readonly]').first();
         await expect(einheitInput).toBeVisible();
-        console.log(`Einheit name populated: "${einheitValue}"`);
+        await expect(einheitInput).not.toHaveValue('');
     });
 
     test('should show status "Offen" for new debitor without zahldatum', async ({ page }) => {
         await navigateToDebitorkontrolle(page);
-        await openCreateForm(page);
+        const z = zeitraum(5);
 
-        const mieterId = await getFirstMieterOptionValue(page);
-        if (!mieterId) {
-            console.log('No mieter available, skipping test');
-            return;
-        }
+        // Ohne Zahldatum -> Status "Offen"
+        const row = await createDebitorOrFail(page, { von: z.von, bis: z.bis, betrag: '99.00' });
 
-        const testDate = '2099-02-01';
-        const testDateBis = '2099-02-28';
-
-        await fillDebitorForm(page, {
-            mieterId,
-            betrag: '99.00',
-            datumVon: testDate,
-            datumBis: testDateBis
-            // zahldatum not set → status = Offen
-        });
-
-        await page.locator('button[type="submit"]').click();
-
-        let isSuccess = false;
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('Debitor creation failed, skipping status test');
-            return;
-        }
-
-        if (isSuccess) {
-            createdDebitorDates.push(testDate);
-
-            await setDateRange(page, testDate, testDateBis);
-            await waitForTableWithData(page, 10000);
-
-            const row = page.locator(`tr:has-text("${formatToSwiss(testDate)}")`).first();
-            await expect(row).toBeVisible({ timeout: 10000 });
-
-            const statusBadge = row.locator('.zev-status--warning');
-            await expect(statusBadge).toBeVisible();
-        }
+        await expect(row.locator('.zev-status--warning')).toBeVisible();
     });
 
 });
@@ -407,50 +465,35 @@ test.describe('Debitorkontrolle - Form Validation', () => {
         await page.locator('#betrag').fill('0');
         await page.locator('#betrag').blur();
 
-        const errorMessage = page.locator('.zev-form-error').filter({ hasText: /betrag/i });
-        const submitDisabled = await page.locator('button[type="submit"]').isDisabled();
-
-        // Either error shown or submit disabled
-        expect(submitDisabled).toBeTruthy();
+        await expect(page.locator('button[type="submit"]')).toBeDisabled();
     });
 
     test('should show error when datumVon is after datumBis', async ({ page }) => {
         await navigateToDebitorkontrolle(page);
         await openCreateForm(page);
 
-        const mieterId = await getFirstMieterOptionValue(page);
-        if (mieterId) await page.locator('#mieterId').selectOption(mieterId);
-
+        await page.locator('#mieterId').selectOption(await mieterIdOrFail(page));
         await page.locator('#betrag').fill('100');
         await page.locator('#datumVon').fill('2025-12-31');
         await page.locator('#datumBis').fill('2025-01-01');
 
         // Multiple .zev-form-error elements may be visible; use first() to avoid strict-mode violation
-        const errorMessage = page.locator('.zev-form-error').first();
-        await expect(errorMessage).toBeVisible();
-
-        const submitButton = page.locator('button[type="submit"]');
-        await expect(submitButton).toBeDisabled();
+        await expect(page.locator('.zev-form-error').first()).toBeVisible();
+        await expect(page.locator('button[type="submit"]')).toBeDisabled();
     });
 
     test('should show error when zahldatum is before datumBis', async ({ page }) => {
         await navigateToDebitorkontrolle(page);
         await openCreateForm(page);
 
-        const mieterId = await getFirstMieterOptionValue(page);
-        if (mieterId) await page.locator('#mieterId').selectOption(mieterId);
-
+        await page.locator('#mieterId').selectOption(await mieterIdOrFail(page));
         await page.locator('#betrag').fill('100');
         await page.locator('#datumVon').fill('2025-01-01');
         await page.locator('#datumBis').fill('2025-03-31');
         await page.locator('#zahldatum').fill('2025-02-01'); // Before datumBis
 
-        // Multiple .zev-form-error elements may be visible; use first() to avoid strict-mode violation
-        const errorMessage = page.locator('.zev-form-error').first();
-        await expect(errorMessage).toBeVisible();
-
-        const submitButton = page.locator('button[type="submit"]');
-        await expect(submitButton).toBeDisabled();
+        await expect(page.locator('.zev-form-error').first()).toBeVisible();
+        await expect(page.locator('button[type="submit"]')).toBeDisabled();
     });
 
 });
@@ -463,130 +506,38 @@ test.describe('Debitorkontrolle - Edit Debitor', () => {
 
     test('should edit a debitor and set zahldatum (status changes to Bezahlt)', async ({ page }) => {
         await navigateToDebitorkontrolle(page);
-        await openCreateForm(page);
+        const z = zeitraum(6);
+        const row = await createDebitorOrFail(page, { von: z.von, bis: z.bis, betrag: '200.00' });
 
-        const mieterId = await getFirstMieterOptionValue(page);
-        if (!mieterId) {
-            console.log('No mieter available, skipping edit test');
-            return;
-        }
-
-        const testDate = '2099-03-01';
-        const testDateBis = '2099-03-31';
-
-        await fillDebitorForm(page, {
-            mieterId,
-            betrag: '200.00',
-            datumVon: testDate,
-            datumBis: testDateBis
-        });
-
-        await page.locator('button[type="submit"]').click();
-
-        let isSuccess = false;
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('Debitor creation failed, skipping edit test');
-            return;
-        }
-
-        if (!isSuccess) {
-            console.log('Debitor creation failed, skipping edit test');
-            return;
-        }
-
-        createdDebitorDates.push(testDate);
-
-        await setDateRange(page, testDate, testDateBis);
-        await waitForTableWithData(page, 10000);
-
-        const row = page.locator(`tr:has-text("${formatToSwiss(testDate)}")`).first();
-        await expect(row).toBeVisible({ timeout: 10000 });
-
-        // Edit via kebab menu
         await clickKebabMenuItem(page, row, 'edit');
         await expect(page.locator('form')).toBeVisible({ timeout: 5000 });
 
-        // Set zahldatum
-        await page.locator('#zahldatum').fill('2099-04-05');
+        const zahldatum = `${jahr()}-12-20`; // nach datumBis des eigenen Fensters
+        await page.locator('#zahldatum').fill(zahldatum);
+        await submitAndExpectSuccess(page, `Debitor ${formatToSwiss(z.von)}`);
 
-        const submitButton = page.locator('button[type="submit"]');
-        await submitButton.click();
+        await setDateRange(page, z.von, z.bis);
+        await waitForTableWithData(page, 10000);
 
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('Debitor edit failed, skipping status verification');
-            return;
-        }
-
-        if (isSuccess) {
-            await setDateRange(page, testDate, testDateBis);
-            await waitForTableWithData(page, 10000);
-
-            const updatedRow = page.locator(`tr:has-text("${formatToSwiss(testDate)}")`).first();
-            await expect(updatedRow).toBeVisible({ timeout: 10000 });
-
-            // Status should now be "Bezahlt" (success badge)
-            const statusBadge = updatedRow.locator('.zev-status--success');
-            await expect(statusBadge).toBeVisible();
-
-            // Zahldatum should be shown
-            await expect(updatedRow).toContainText('05.04.2099');
-        }
+        const updatedRow = page.locator(`tr:has-text("${formatToSwiss(z.von)}")`).first();
+        await expect(updatedRow).toBeVisible({ timeout: 10000 });
+        // Status ist jetzt "Bezahlt"
+        await expect(updatedRow.locator('.zev-status--success')).toBeVisible();
+        await expect(updatedRow).toContainText(formatToSwiss(zahldatum));
     });
 
     test('should pre-fill form when editing an existing debitor', async ({ page }) => {
         await navigateToDebitorkontrolle(page);
-        await openCreateForm(page);
-
-        const mieterId = await getFirstMieterOptionValue(page);
-        if (!mieterId) {
-            console.log('No mieter available, skipping prefill test');
-            return;
-        }
-
-        const testDate = '2099-04-01';
-        const testDateBis = '2099-04-30';
-
-        await fillDebitorForm(page, {
-            mieterId,
-            betrag: '75.50',
-            datumVon: testDate,
-            datumBis: testDateBis
-        });
-
-        await page.locator('button[type="submit"]').click();
-
-        let isSuccess = false;
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('Debitor creation failed, skipping prefill test');
-            return;
-        }
-
-        if (!isSuccess) {
-            console.log('Debitor creation failed');
-            return;
-        }
-
-        createdDebitorDates.push(testDate);
-
-        await setDateRange(page, testDate, testDateBis);
-        await waitForTableWithData(page, 10000);
-
-        const row = page.locator(`tr:has-text("${formatToSwiss(testDate)}")`).first();
-        await expect(row).toBeVisible({ timeout: 10000 });
+        const z = zeitraum(7);
+        const row = await createDebitorOrFail(page, { von: z.von, bis: z.bis, betrag: '75.50' });
 
         await clickKebabMenuItem(page, row, 'edit');
         await expect(page.locator('form')).toBeVisible({ timeout: 5000 });
 
-        // Form should be pre-filled
-        const betragInput = page.locator('#betrag');
-        const betragValue = await betragInput.inputValue();
-        expect(parseFloat(betragValue)).toBeCloseTo(75.50, 1);
+        // Formular ist mit den Werten der Zeile vorbelegt
+        expect(parseFloat(await page.locator('#betrag').inputValue())).toBeCloseTo(75.50, 1);
+        await expect(page.locator('#datumVon')).toHaveValue(z.von);
+        await expect(page.locator('#datumBis')).toHaveValue(z.bis);
     });
 
 });
@@ -600,71 +551,43 @@ test.describe('Debitorkontrolle - Kebab quick actions for Zahldatum', () => {
     /**
      * Open the kebab menu of a row and click the item with the given visible label.
      */
-    async function clickQuickAction(page: Page, row: ReturnType<Page['locator']>, label: string): Promise<void> {
+    /**
+     * Bewusst **ohne** Warten auf die HTTP-Antwort: Ob die Liste danach neu lädt, ist ein
+     * Implementierungsdetail — und ein Warten darauf lief je nach Timing in den Timeout. Der
+     * Aufrufer prüft ohnehin das sichtbare Ergebnis (Status-Abzeichen), und diese Zusicherung
+     * pollt von sich aus.
+     */
+    async function clickQuickAction(page: Page, row: Locator, label: string | RegExp): Promise<void> {
         await row.locator('.zev-kebab-button').click();
         await row.locator('.zev-kebab-menu--open').waitFor({ state: 'visible', timeout: 2000 });
-        // Die Quick-Action schreibt (PUT/POST) und die Liste lädt anschliessend neu; auf das
-        // GET danach warten statt auf 'networkidle' (unzuverlässig, Timeout wurde verschluckt).
-        await Promise.all([
-            page.waitForResponse(
-                (res) => res.url().includes('/api/debitoren') && res.request().method() === 'GET',
-                { timeout: 15000 }
-            ),
-            row.locator('.zev-kebab-menu__item', { hasText: label }).click()
-        ]);
+        await row.locator('.zev-kebab-menu__item', { hasText: label }).click();
     }
 
-    test('should set Zahldatum via "Heute"/"Gestern" and clear it via "Zahldatum löschen"', async ({ page }) => {
+    /**
+     * Der Eintrag heisst „Datum löschen" (Übersetzung ZAHLDATUM_LOESCHEN), nicht
+     * „Zahldatum löschen" — der alte Test suchte den falschen Text und wäre daran gescheitert,
+     * wenn er nicht vorher schon still ausgestiegen wäre. Als Muster ohne Umlaut, weil ein „ö"
+     * aus anderer Quelle anders kodiert sein kann als das im DOM.
+     */
+    const DATUM_LOESCHEN = /Datum l.schen/;
+
+    test('should set Zahldatum via "Heute" and clear it via "Zahldatum löschen"', async ({ page }) => {
         await navigateToDebitorkontrolle(page);
-        await openCreateForm(page);
+        // Vergangener Zeitraum: Das Backend weist ein Zahldatum vor datumBis ab
+        const z = vergangenerZeitraum();
+        const row = await createDebitorOrFail(page, { von: z.von, bis: z.bis, betrag: '120.00' });
 
-        const mieterId = await getFirstMieterOptionValue(page);
-        if (!mieterId) {
-            console.log('No mieter available, skipping quick-action test');
-            return;
-        }
-
-        // Use a past period so today/yesterday are >= datumBis (backend rejects zahldatum < datumBis)
-        const testDate = '2000-01-01';
-        const testDateBis = '2000-03-31';
-
-        await fillDebitorForm(page, {
-            mieterId,
-            betrag: '120.00',
-            datumVon: testDate,
-            datumBis: testDateBis
-        });
-        await page.locator('button[type="submit"]').click();
-
-        let isSuccess = false;
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('Debitor creation failed, skipping quick-action test');
-            return;
-        }
-        if (!isSuccess) {
-            console.log('Debitor creation failed');
-            return;
-        }
-        createdDebitorDates.push(testDate);
-
-        await setDateRange(page, testDate, testDateBis);
-        await waitForTableWithData(page, 10000);
-
-        const row = page.locator(`tr:has-text("${formatToSwiss(testDate)}")`).first();
-        await expect(row).toBeVisible({ timeout: 10000 });
-        // New entry starts "Offen"
+        // Neuer Eintrag startet "Offen"
         await expect(row.locator('.zev-status--warning')).toBeVisible();
 
-        // "Heute" → status becomes "Bezahlt"
+        // "Heute" → Status wird "Bezahlt"
         await clickQuickAction(page, row, 'Heute');
-        const paidRow = page.locator(`tr:has-text("${formatToSwiss(testDate)}")`).first();
+        const paidRow = page.locator(`tr:has-text("${formatToSwiss(z.von)}")`).first();
         await expect(paidRow.locator('.zev-status--success')).toBeVisible({ timeout: 10000 });
 
-        // "Zahldatum löschen" → status back to "Offen"
-        await clickQuickAction(page, paidRow, 'Zahldatum löschen');
-        const clearedRow = page.locator(`tr:has-text("${formatToSwiss(testDate)}")`).first();
+        // "Datum löschen" → zurück auf "Offen"
+        await clickQuickAction(page, paidRow, DATUM_LOESCHEN);
+        const clearedRow = page.locator(`tr:has-text("${formatToSwiss(z.von)}")`).first();
         await expect(clearedRow.locator('.zev-status--warning')).toBeVisible({ timeout: 10000 });
     });
 
@@ -678,55 +601,17 @@ test.describe('Debitorkontrolle - Delete Debitor', () => {
 
     test('should show confirmation dialog before deleting', async ({ page }) => {
         await navigateToDebitorkontrolle(page);
-        await openCreateForm(page);
+        const z = zeitraum(8);
+        const row = await createDebitorOrFail(page, { von: z.von, bis: z.bis, betrag: '50.00' });
 
-        const mieterId = await getFirstMieterOptionValue(page);
-        if (!mieterId) {
-            console.log('No mieter available, skipping delete dialog test');
-            return;
-        }
-
-        const testDate = '2099-05-01';
-        const testDateBis = '2099-05-31';
-
-        await fillDebitorForm(page, {
-            mieterId,
-            betrag: '50.00',
-            datumVon: testDate,
-            datumBis: testDateBis
-        });
-
-        await page.locator('button[type="submit"]').click();
-
-        let isSuccess = false;
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('Debitor creation failed, skipping delete dialog test');
-            return;
-        }
-
-        if (!isSuccess) {
-            console.log('Debitor creation failed');
-            return;
-        }
-
-        createdDebitorDates.push(testDate);
-
-        await setDateRange(page, testDate, testDateBis);
-        await waitForTableWithData(page, 10000);
-
-        const row = page.locator(`tr:has-text("${formatToSwiss(testDate)}")`).first();
-        await expect(row).toBeVisible({ timeout: 10000 });
-
-        // Dismiss the dialog → row should still be visible
+        // Dialog abweisen → Zeile bleibt bestehen
         let dialogMessage = '';
         page.once('dialog', async dialog => {
             dialogMessage = dialog.message();
             await dialog.dismiss();
         });
 
-        await clickKebabMenuItem(page, row, 'delete');
+        await clickDeleteInKebab(page, row);
         await page.waitForTimeout(500);
 
         expect(dialogMessage).toBeTruthy();
@@ -735,57 +620,15 @@ test.describe('Debitorkontrolle - Delete Debitor', () => {
 
     test('should delete debitor when confirmed', async ({ page }) => {
         await navigateToDebitorkontrolle(page);
-        await openCreateForm(page);
-
-        const mieterId = await getFirstMieterOptionValue(page);
-        if (!mieterId) {
-            console.log('No mieter available, skipping delete test');
-            return;
-        }
-
-        const testDate = '2099-06-01';
-        const testDateBis = '2099-06-30';
-
-        await fillDebitorForm(page, {
-            mieterId,
-            betrag: '33.33',
-            datumVon: testDate,
-            datumBis: testDateBis
-        });
-
-        await page.locator('button[type="submit"]').click();
-
-        let isSuccess = false;
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('Debitor creation failed, skipping delete test');
-            return;
-        }
-
-        if (!isSuccess) {
-            console.log('Debitor creation failed');
-            return;
-        }
-
-        createdDebitorDates.push(testDate);
-
-        await setDateRange(page, testDate, testDateBis);
-        await waitForTableWithData(page, 10000);
-
-        const row = page.locator(`tr:has-text("${formatToSwiss(testDate)}")`).first();
-        await expect(row).toBeVisible({ timeout: 10000 });
+        const z = zeitraum(9);
+        const row = await createDebitorOrFail(page, { von: z.von, bis: z.bis, betrag: '33.33' });
 
         page.once('dialog', async dialog => { await dialog.accept(); });
+        await clickDeleteInKebab(page, row);
 
-        await clickKebabMenuItem(page, row, 'delete');
-
-        try {
-            await expect(page.locator(`tr:has-text("${formatToSwiss(testDate)}")`)).not.toBeVisible({ timeout: 10000 });
-            createdDebitorDates = createdDebitorDates.filter(d => d !== testDate);
-        } catch {
-            console.log('Row still visible after delete attempt');
-        }
+        // Kein try/catch: Bleibt die Zeile stehen, ist das Löschen fehlgeschlagen
+        await expect(page.locator(`tr:has-text("${formatToSwiss(z.von)}")`)).toHaveCount(0, { timeout: 10000 });
+        createdDebitorDates = createdDebitorDates.filter(d => d !== z.von);
     });
 
 });
@@ -798,23 +641,24 @@ test.describe('Debitorkontrolle - Date Filter', () => {
 
     test('should filter list by date range', async ({ page }) => {
         await navigateToDebitorkontrolle(page);
+        const z = zeitraum(10);
+        await createDebitorOrFail(page, { von: z.von, bis: z.bis, betrag: '42.00' });
 
-        // Set a range that should have no data
+        // Eigener Zeitraum: die Zeile ist da
+        await expect(page.locator(`tr:has-text("${formatToSwiss(z.von)}")`)).toBeVisible();
+
+        // Zeitraum ohne Daten: Leer-Hinweis, und die Tabelle ist leer. Über die Tabellenzeilen
+        // geprüft statt über den Datumstext - beim Umschalten stehen Leer-Hinweis und alte
+        // Tabelle kurz gleichzeitig im DOM.
+        // Geprüft wird die leere Liste, nicht der Leer-Hinweis: Dessen Erscheinen deckt der
+        // eigene Test „should show empty state message …" ab, und beim Umschalten aus einer
+        // gefüllten Liste heraus stand er nicht zuverlässig zum Prüfzeitpunkt.
         await setDateRange(page, '1900-01-01', '1900-03-31');
+        await expect(page.locator('.zev-table tbody tr')).toHaveCount(0, { timeout: 10000 });
 
-        const emptyState = page.locator('.zev-empty-state');
-        await expect(emptyState).toBeVisible({ timeout: 10000 });
-
-        // Now set current year range
-        const currentYear = new Date().getFullYear();
-        await setDateRange(page, `${currentYear}-01-01`, `${currentYear}-12-31`);
-
-        // After changing range, table or empty state should be visible
-        const table = page.locator('.zev-table');
-        const hasTable = await table.isVisible({ timeout: 8000 }).catch(() => false);
-        const hasEmpty = await emptyState.isVisible({ timeout: 3000 }).catch(() => false);
-
-        expect(hasTable || hasEmpty).toBeTruthy();
+        // Zurück auf den eigenen Zeitraum: die Zeile erscheint wieder
+        await setDateRange(page, z.von, z.bis);
+        await expect(page.locator(`tr:has-text("${formatToSwiss(z.von)}")`)).toBeVisible({ timeout: 10000 });
     });
 
 });
@@ -825,27 +669,6 @@ test.describe('Debitorkontrolle - Date Filter', () => {
 
 test.describe('Debitorkontrolle - Checkbox and Bulk Delete', () => {
 
-    /**
-     * Create a debitor and return whether it succeeded
-     */
-    async function createTestDebitor(page: Page, datumVon: string, datumBis: string, betrag: string = '10.00'): Promise<boolean> {
-        await openCreateForm(page);
-        const mieterId = await getFirstMieterOptionValue(page);
-        if (!mieterId) {
-            console.log('No mieter available, skipping debitor creation');
-            return false;
-        }
-        await fillDebitorForm(page, { mieterId, betrag, datumVon, datumBis });
-        await page.locator('button[type="submit"]').click();
-        let success = false;
-        try {
-            success = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('Debitor creation failed');
-        }
-        return success;
-    }
-
     test('should not show "Auswahl löschen" button when nothing is selected', async ({ page }) => {
         await navigateToDebitorkontrolle(page);
 
@@ -855,25 +678,12 @@ test.describe('Debitorkontrolle - Checkbox and Bulk Delete', () => {
 
     test('should show "Auswahl löschen (N)" button when a row is checked', async ({ page }) => {
         await navigateToDebitorkontrolle(page);
+        const z = zeitraum(11);
+        await createDebitorOrFail(page, { von: z.von, bis: z.bis, betrag: '10.00' });
 
-        const date1 = '2099-07-01';
-        const date1Bis = '2099-07-31';
-
-        const success = await createTestDebitor(page, date1, date1Bis);
-        if (!success) {
-            console.log('Could not create debitor, skipping checkbox visibility test');
-            return;
-        }
-        createdDebitorDates.push(date1);
-
-        await setDateRange(page, date1, date1Bis);
-        await waitForTableWithData(page, 10000);
-
-        // Check the first row checkbox
         const firstRowCheckbox = page.locator('.zev-table tbody tr').first().locator('input[type="checkbox"]');
         await firstRowCheckbox.click();
 
-        // The "Auswahl löschen" button should now appear
         const deleteSelectedButton = page.locator('button.zev-button--danger');
         await expect(deleteSelectedButton).toBeVisible();
         await expect(deleteSelectedButton).toContainText('1');
@@ -881,19 +691,8 @@ test.describe('Debitorkontrolle - Checkbox and Bulk Delete', () => {
 
     test('should hide "Auswahl löschen" button when selection is cleared', async ({ page }) => {
         await navigateToDebitorkontrolle(page);
-
-        const date1 = '2099-08-01';
-        const date1Bis = '2099-08-31';
-
-        const success = await createTestDebitor(page, date1, date1Bis);
-        if (!success) {
-            console.log('Could not create debitor, skipping checkbox hide test');
-            return;
-        }
-        createdDebitorDates.push(date1);
-
-        await setDateRange(page, date1, date1Bis);
-        await waitForTableWithData(page, 10000);
+        const z = zeitraum(12);
+        await createDebitorOrFail(page, { von: z.von, bis: z.bis, betrag: '10.00' });
 
         const firstRowCheckbox = page.locator('.zev-table tbody tr').first().locator('input[type="checkbox"]');
 
@@ -908,27 +707,22 @@ test.describe('Debitorkontrolle - Checkbox and Bulk Delete', () => {
 
     test('should select all rows via header checkbox and show correct count', async ({ page }) => {
         await navigateToDebitorkontrolle(page);
+        // Zwei Debitoren im selben Fenster: verschiedene datum_von, damit der Upsert zwei
+        // Zeilen anlegt statt eine zu überschreiben.
+        const z = zeitraum(13);
+        const von2 = z.von.replace(/-(\d\d)$/, (_, d) => `-${String(Number(d) + 1).padStart(2, '0')}`);
 
-        const date1 = '2099-09-01';
-        const date1Bis = '2099-09-30';
+        await createDebitorOrFail(page, { von: z.von, bis: z.bis, betrag: '11.00' });
+        await createDebitorOrFail(page, { von: von2, bis: z.bis, betrag: '12.00' });
 
-        const success = await createTestDebitor(page, date1, date1Bis);
-        if (!success) {
-            console.log('Could not create debitor, skipping header checkbox test');
-            return;
-        }
-        createdDebitorDates.push(date1);
-
-        await setDateRange(page, date1, date1Bis);
+        await setDateRange(page, z.von, z.bis);
         await waitForTableWithData(page, 10000);
-
         const rowCount = await page.locator('.zev-table tbody tr').count();
+        expect(rowCount).toBeGreaterThanOrEqual(2);
 
         // Click header checkbox to select all
-        const headerCheckbox = page.locator('.zev-table thead input[type="checkbox"]');
-        await headerCheckbox.click();
+        await page.locator('.zev-table thead input[type="checkbox"]').click();
 
-        // "Auswahl löschen (N)" should show N = rowCount
         const deleteSelectedButton = page.locator('button.zev-button--danger');
         await expect(deleteSelectedButton).toBeVisible();
         await expect(deleteSelectedButton).toContainText(`${rowCount}`);
@@ -936,66 +730,34 @@ test.describe('Debitorkontrolle - Checkbox and Bulk Delete', () => {
 
     test('should reset selection when date range changes', async ({ page }) => {
         await navigateToDebitorkontrolle(page);
+        const z = zeitraum(14);
+        await createDebitorOrFail(page, { von: z.von, bis: z.bis, betrag: '10.00' });
 
-        const date1 = '2099-10-01';
-        const date1Bis = '2099-10-31';
-
-        const success = await createTestDebitor(page, date1, date1Bis);
-        if (!success) {
-            console.log('Could not create debitor, skipping selection reset test');
-            return;
-        }
-        createdDebitorDates.push(date1);
-
-        await setDateRange(page, date1, date1Bis);
-        await waitForTableWithData(page, 10000);
-
-        // Check a row
         const firstRowCheckbox = page.locator('.zev-table tbody tr').first().locator('input[type="checkbox"]');
         await firstRowCheckbox.click();
         await expect(page.locator('button.zev-button--danger')).toBeVisible();
 
         // Change date range (triggers list reload → selection reset)
         await setDateRange(page, '1900-01-01', '1900-03-31');
-        await page.waitForTimeout(500);
 
-        // Selection button should no longer be visible (empty list or cleared selection)
         await expect(page.locator('button.zev-button--danger')).not.toBeVisible();
     });
 
     test('should bulk delete selected rows via "Auswahl löschen" button', async ({ page }) => {
         await navigateToDebitorkontrolle(page);
-
-        const date1 = '2099-11-01';
-        const date1Bis = '2099-11-30';
-
-        const success = await createTestDebitor(page, date1, date1Bis);
-        if (!success) {
-            console.log('Could not create debitor, skipping bulk delete test');
-            return;
-        }
-        createdDebitorDates.push(date1);
-
-        await setDateRange(page, date1, date1Bis);
-        await waitForTableWithData(page, 10000);
+        const z = zeitraum(15);
+        await createDebitorOrFail(page, { von: z.von, bis: z.bis, betrag: '10.00' });
 
         // Select the row
-        const firstRowCheckbox = page.locator('.zev-table tbody tr').first().locator('input[type="checkbox"]');
-        await firstRowCheckbox.click();
+        await page.locator('.zev-table tbody tr').first().locator('input[type="checkbox"]').click();
 
         // Accept the confirmation dialog and click "Auswahl löschen"
         page.once('dialog', async dialog => { await dialog.accept(); });
         await page.locator('button.zev-button--danger').click();
-        await page.waitForTimeout(1500);
-        page.removeAllListeners('dialog');
 
-        // Row should be gone; remove from cleanup since it's already deleted
-        const rowStillVisible = await page.locator(`tr:has-text("${formatToSwiss(date1)}")`).isVisible().catch(() => false);
-        if (!rowStillVisible) {
-            createdDebitorDates = createdDebitorDates.filter(d => d !== date1);
-        }
-
-        expect(rowStillVisible).toBe(false);
+        // Kein Ausweichen: Die Zeile muss verschwinden
+        await expect(page.locator(`tr:has-text("${formatToSwiss(z.von)}")`)).toHaveCount(0, { timeout: 10000 });
+        createdDebitorDates = createdDebitorDates.filter(d => d !== z.von);
     });
 
 });
