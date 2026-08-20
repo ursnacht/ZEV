@@ -6,6 +6,11 @@ app:
   cors:
     # Comma-separated list of allowed browser origins for the REST API (/api/**).
     # Override in production via env var APP_CORS_ALLOWED_ORIGINS (e.g. https://zev.example.ch).
+    #
+    # Die Proxy-Origin steht hier NICHT: Hinter caddy ist der Aufruf same-origin, Spring
+    # erkennt das am uebereinstimmenden Host-Header und prueft CORS gar nicht erst.
+    # Bei TLS-Terminierung am Proxy gilt das nicht mehr (Origin https://..., rekonstruierte
+    # Anfrage http://...) - dann muss die https-Origin ueber APP_CORS_ALLOWED_ORIGINS dazu.
     allowed-origins: "http://localhost:4200,http://prometheus:9090,http://localhost:8081"
 
 spring:

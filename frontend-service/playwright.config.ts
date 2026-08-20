@@ -21,6 +21,11 @@ export default defineConfig({
          * Default ist der Container-Stack hinter dem Reverse-Proxy (caddy, eine Origin).
          * Gegen den Angular-Dev-Server testen: E2E_BASE_URL=http://localhost:4200 setzen. */
         baseURL: process.env['E2E_BASE_URL'] ?? 'http://localhost:8000',
+        /* Beim HTTPS-Betrieb (Specs/HTTPS.md, Zertifikatsweg A) stellt Caddy das Zertifikat
+         * aus seiner internen CA aus. Playwright startet jeden Browser mit einem frischen
+         * Profil und kennt den Zertifikatspeicher des Systems nicht - ohne diese Zeile
+         * scheiterte die gesamte Suite am Zertifikat. Ohne Wirkung im HTTP-Betrieb. */
+        ignoreHTTPSErrors: true,
         /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
         trace: 'on-first-retry',
         /* Use a fresh browser context for each test to avoid session conflicts */

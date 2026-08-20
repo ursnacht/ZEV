@@ -1,0 +1,44 @@
+# HTTPS-Variante des Reverse-Proxys (Zertifikatsweg A: Caddys interne CA).
+# Siehe Specs/HTTPS.md. Aktivierung ueber CADDY_CONFIG in der .env:
+#
+#   CADDY_CONFIG=./caddy/Caddyfile.https
+#
+# Der HTTP-Caddyfile (caddy/Caddyfile) bleibt der Default und unveraendert - der Wechsel
+# ist damit eine Zeile in der .env und jederzeit zurueckdrehbar.
+#
+# Anders als der HTTP-Caddyfile traegt diese Datei einen HOSTNAMEN als Site-Adresse; das
+# verlangt TLS. Folge: Der Zugriff ueber die reine IP (https://192.168.x.y:8443) funktioniert
+# NICHT mehr - Caddy beantwortet nur noch den konfigurierten Namen.
+
+# Alte HTTP-Adresse -> HTTPS. Bewusst als EIGENE Site und nicht ueber Caddys automatische
+# Weiterleitung: Die kennt nur ihren eigenen Listener-Port (443) und wuerde auf
+# https://localhost/ zeigen. Von aussen ist der Port aber 8443 (443 ist auf dem NAS von DSM
+# belegt, lokal halten wir es gleich) - die Weiterleitung liefe also ins Leere.
+http://localhost {
+	redir https://localhost:8443{uri} permanent
+}
+
+https://localhost {
+	# Zertifikat aus Caddys interner CA. Fuer localhost tut Caddy das ohnehin von selbst;
+	# die Direktive steht hier, damit der gewaehlte Weg im Konfigurat sichtbar ist.
+	# Das Root-Zertifikat muss in den Zertifikatspeicher importiert werden, siehe Specs/HTTPS.md.
+	tls internal
+
+	# Backend-API: KEIN Prefix-Stripping (das Backend erwartet /api/...)
+	handle /api/* {
+		reverse_proxy backend-service:8090
+	}
+
+	# Keycloak unter /auth
+	# Voraussetzung: Container mit KC_HTTP_RELATIVE_PATH=/auth und KC_PROXY_HEADERS=xforwarded.
+	# Caddy setzt X-Forwarded-Proto: https automatisch - Keycloak baut Issuer und Redirects
+	# daraus, ohne dass hier etwas zu konfigurieren waere.
+	handle /auth/* {
+		reverse_proxy keycloak:9000
+	}
+
+	# Alles andere -> Angular-Frontend
+	handle {
+		reverse_proxy frontend-service:8080
+	}
+}

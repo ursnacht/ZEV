@@ -29,3 +29,8 @@ zev-images-*.tar.gz
 
 # Aus Specs generierte PDFs (jederzeit aus der .md neu erzeugbar)
 /Specs/*.pdf
+
+# Root-Zertifikat von Caddys interner CA (Specs/HTTPS.md, Schritt 3). Es entsteht je
+# Umgebung neu und wird bei jedem Verlust des Volumes caddy-data neu erzeugt - deshalb
+# jederzeit aus dem Container holbar und nicht versionierbar.
+caddy-root.crt

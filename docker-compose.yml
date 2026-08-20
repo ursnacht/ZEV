@@ -37,9 +37,12 @@ services:
       KC_HTTP_MANAGEMENT_PORT: 9001
       KC_HEALTH_ENABLED: true
       # Hinter dem Reverse-Proxy (caddy): Keycloak liegt unter /auth einer gemeinsamen Origin.
-      # KC_HOSTNAME als VOLLE URL inkl. Schema und Port. Mit oder ohne /auth am Ende - beides
-      # ergibt denselben Issuer (auf dem NAS verifiziert), Keycloak verdoppelt den relativen
-      # Pfad nicht. Ergebnis-Issuer: http://localhost:8000/auth/realms/zev
+      # KC_HOSTNAME als VOLLE URL inkl. Schema, Port UND Pfad /auth.
+      # Das /auth ist zwingend: Fehlt es, schreibt Keycloak seine URLs ohne den Pfad aus
+      # (Issuer .../realms/zev statt .../auth/realms/zev) - KC_HTTP_RELATIVE_PATH wird NICHT
+      # zusaetzlich angehaengt. Der Proxy routet nur /auth/* zu Keycloak, der Login endet
+      # dann im 404. Beim Wechsel auf HTTPS lokal genau so beobachtet (siehe Specs/HTTPS.md).
+      # Ergebnis-Issuer: http://localhost:8000/auth/realms/zev
       # Der Issuer MUSS zeichengleich mit BACKEND_JWT_ISSUER_URI sein.
       KC_HTTP_RELATIVE_PATH: /auth
       KC_HOSTNAME: ${KC_HOSTNAME:-http://localhost:8000/auth}
@@ -96,6 +99,19 @@ services:
       # JWK-Set wird serverseitig geladen -> interner Docker-Name bleibt korrekt.
       # Containerinterner Aufruf (geht NICHT ueber caddy) - nur der Pfad /auth kommt dazu.
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:9000/auth/realms/zev/protocol/openid-connect/certs
+      # Erlaubte Browser-Origins fuer /api/**. Hinter dem Proxy ist der Aufruf same-origin,
+      # CORS spielt also keine Rolle - solange Schema, Host UND Port uebereinstimmen. Bei
+      # TLS-Terminierung am Proxy tun sie das nicht: Der Browser sendet
+      # "Origin: https://host:8443", das Backend rekonstruiert die Anfrage aber als
+      # http://host:8443 (der Host-Header stimmt, das Schema nicht - X-Forwarded-Proto wird
+      # nicht ausgewertet). Damit gilt der Aufruf als CORS-Anfrage.
+      # Sichtbar wird das nur bei NICHT-GET-Aufrufen: Bei gleicher Herkunft sendet der
+      # Browser den Origin-Header ausschliesslich fuer POST/PUT/DELETE - z.B. POST
+      # /api/datenbank/abfrage und POST /api/rechnungen/generate, die sonst mit
+      # "Invalid CORS request" (403) enden.
+      # Im HTTP-Betrieb passt alles zusammen; beim Wechsel auf HTTPS hier die https-Origin
+      # eintragen (siehe Specs/HTTPS.md).
+      - APP_CORS_ALLOWED_ORIGINS=${APP_CORS_ALLOWED_ORIGINS:-http://localhost:4200,http://prometheus:9090,http://localhost:8081}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       # Basic Auth fuer /actuator/** (SBA-Details); Default nur fuer lokale Entwicklung
       - ACTUATOR_USER=${ACTUATOR_USER:-actuator}
@@ -196,7 +212,8 @@ services:
       - zev-network
     restart: unless-stopped
 
-  # Reverse-Proxy: ein Einstiegspunkt fuer alles (http://localhost:8000).
+  # Reverse-Proxy: ein Einstiegspunkt fuer alles (http://localhost:8000, mit CADDY_CONFIG
+  # umgestellt auf https://localhost:8443).
   # Spiegelt das NAS-Setup - siehe Specs/NAS-Einheitlicher-Hostname_Umsetzungsplan.md.
   # Der Angular-Dev-Server (ng serve) laeuft weiterhin separat auf :4200 und nutzt
   # denselben Keycloak unter :8000/auth (ein Issuer fuer beide Betriebsarten).
@@ -205,8 +222,17 @@ services:
     container_name: caddy
     ports:
       - "8000:80"
+      # HTTPS (Zertifikatsweg A, siehe Specs/HTTPS.md). 8443 statt 443, weil 443 auf dem NAS
+      # von DSM belegt ist; lokal halten wir denselben Port. Im HTTP-Betrieb lauscht in Caddy
+      # niemand auf 443 - die Veroeffentlichung ist dann wirkungslos, aber harmlos.
+      - "8443:443"
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # HTTP ist der Default. Fuer HTTPS in der .env auf ./caddy/Caddyfile.https umstellen -
+      # der Wechsel ist damit eine Zeile und jederzeit zurueckdrehbar.
+      - ${CADDY_CONFIG:-./caddy/Caddyfile}:/etc/caddy/Caddyfile:ro
+      # Enthaelt die interne CA (pki/authorities/local/root.crt) - muss ein benanntes Volume
+      # bleiben, sonst erzeugt Caddy bei jedem Neustart eine neue CA und alle Clients
+      # muessten das Root-Zertifikat erneut importieren.
       - caddy-data:/data
       - caddy-config:/config
     depends_on:
