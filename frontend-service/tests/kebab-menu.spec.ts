@@ -1,4 +1,4 @@
-import { test as baseTest, expect, Page } from '@playwright/test';
+import { test as baseTest, expect, Locator, Page } from '@playwright/test';
 import { navigateViaMenu, openKebabMenu, closeKebabMenu, closeKebabMenuWithEsc, clickKebabMenuItem, waitForFormResult, waitForTableWithData } from './helpers';
 
 /**
@@ -101,15 +101,103 @@ async function navigateToEinheiten(page: Page): Promise<void> {
 }
 
 /**
- * Helper to create a unique test tariff name
- * Note: bezeichnung field has max 30 characters, so we use short timestamps
+ * Helper to create a unique test tariff name.
+ *
+ * Die Bezeichnung ist auf 30 Zeichen begrenzt. Frueher wurde stillschweigend mit `.slice(0, 30)`
+ * gekuerzt - ein zu langer Praefix machte die Zeile damit unauffindbar, ohne dass es auffiel.
+ * Jetzt wirft der Helfer stattdessen.
  */
-function generateTestName(prefix: string = 'E2E'): string {
-    // Use last 8 digits of timestamp for uniqueness (fits in 30 char limit)
-    const shortTimestamp = Date.now().toString().slice(-8);
-    const name = `${prefix} ${shortTimestamp}`;
-    // Ensure max 30 characters (DB limit)
-    return name.slice(0, 30);
+function generateTestName(prefix: string): string {
+    const name = `${prefix} ${RUN_ID}`;
+    if (name.length > 30) {
+        throw new Error(`Tarif-Bezeichnung "${name}" ist laenger als die 30 Zeichen des Felds`);
+    }
+    return name;
+}
+
+/** Laufkennung je Worker-Prozess. */
+const RUN_ID = Date.now().toString().slice(-6);
+
+/**
+ * Basisjahr je Browser-Projekt. Zusammen mit dem Versatz je Test ergibt sich fuer jeden
+ * angelegten Tarif ein eigenes Gueltigkeitsjahr.
+ *
+ * Ohne das legten zwei Tests denselben ZEV-Tarif fuer 2099 an - die Ueberschneidungspruefung
+ * wies den zweiten ab, und beide Tests stiegen wegen `if (!isSuccess) return;` still aus.
+ * Die Bereiche liegen ausserhalb der uebrigen Suites (tarif-verwaltung 2060-2079,
+ * tarifpositionen 2085, ladestationen 2089, ladestromtarif 2093-2098).
+ */
+const PROJEKT_BASISJAHR: Record<string, number> = { chromium: 2050, firefox: 2055 };
+
+function gueltigkeit(versatz: number): { von: string; bis: string } {
+    const jahr = (PROJEKT_BASISJAHR[test.info().project.name] ?? 2040) + versatz;
+    return { von: `${jahr}-01-01`, bis: `${jahr}-12-31` };
+}
+
+/**
+ * Erste Tabellenzeile - mit Zusicherung statt `if (rowCount > 0)`.
+ *
+ * Die Listen dieses Mandanten sind nie leer; eine leere Tabelle waere ein Umgebungsfehler und
+ * soll auffallen, statt den Test ohne jede Pruefung durchlaufen zu lassen.
+ */
+async function ersteZeileOrFail(page: Page): Promise<Locator> {
+    await expect(page.locator('.zev-table')).toBeVisible();
+    const zeilen = page.locator('.zev-table tbody tr');
+    expect(await zeilen.count(),
+        'Fuer diesen Test wird mindestens eine Tabellenzeile benoetigt').toBeGreaterThan(0);
+    return zeilen.first();
+}
+
+/**
+ * Wartet, bis keine Meldung mehr steht. Erfolgsmeldungen blenden sich erst nach 5 Sekunden aus
+ * und wuerden sonst als Ergebnis der naechsten Aktion gewertet.
+ */
+async function clearMessages(page: Page): Promise<void> {
+    const error = page.locator('.zev-message--error');
+    if (await error.isVisible().catch(() => false)) {
+        await error.click();
+        await expect(error).not.toBeVisible({ timeout: 5000 });
+    }
+    const success = page.locator('.zev-message--success');
+    if (await success.isVisible().catch(() => false)) {
+        await expect(success).not.toBeVisible({ timeout: 10000 });
+    }
+}
+
+/**
+ * Legt einen Tarif an und besteht auf dem Erfolg. Ersetzt das fruehere
+ * `try { … } catch { return; }` samt `if (!isSuccess) return;`.
+ */
+async function createTarifOrFail(page: Page, tracker: TarifTracker, daten: {
+    tariftyp: 'ZEV' | 'VNB';
+    bezeichnung: string;
+    preis: string;
+    versatz: number;
+}): Promise<Locator> {
+    await page.locator('button.zev-button--primary').first().click();
+    await expect(page.locator('form')).toBeVisible();
+
+    const z = gueltigkeit(daten.versatz);
+    await fillTarifForm(page, {
+        tariftyp: daten.tariftyp,
+        bezeichnung: daten.bezeichnung,
+        preis: daten.preis,
+        gueltigVon: z.von,
+        gueltigBis: z.bis
+    });
+
+    tracker.add(daten.bezeichnung);
+    await clearMessages(page);
+    await page.locator('button[type="submit"]').click();
+    if (!await waitForFormResult(page, 20000)) {
+        const meldung = await page.locator('.zev-message--error').textContent().catch(() => '');
+        throw new Error(`Tarif "${daten.bezeichnung}" konnte nicht angelegt werden: ${meldung?.trim()}`);
+    }
+
+    await waitForTableWithData(page, 10000);
+    const row = page.locator(`tr:has-text("${daten.bezeichnung}")`).first();
+    await expect(row).toBeVisible({ timeout: 10000 });
+    return row;
 }
 
 /**
@@ -133,81 +221,33 @@ test.describe('Kebab Menu - Basic Functionality', () => {
     test('should display kebab menu button in table rows', async ({ page }) => {
         await navigateToTarife(page);
 
-        // Wait for table to be visible
-        const table = page.locator('.zev-table');
-        const hasTable = await table.isVisible().catch(() => false);
+        const firstRow = await ersteZeileOrFail(page);
+        const kebabButton = firstRow.locator('.zev-kebab-button');
+        await expect(kebabButton).toBeVisible();
 
-        if (hasTable) {
-            // Check for kebab buttons in table rows
-            const tableRows = page.locator('.zev-table tbody tr');
-            const rowCount = await tableRows.count();
-
-            if (rowCount > 0) {
-                const firstRow = tableRows.first();
-                const kebabButton = firstRow.locator('.zev-kebab-button');
-                await expect(kebabButton).toBeVisible();
-
-                // Verify kebab button has three dots
-                const dots = kebabButton.locator('.zev-kebab-button__dot');
-                await expect(dots).toHaveCount(3);
-            }
-        }
+        // Verify kebab button has three dots
+        await expect(kebabButton.locator('.zev-kebab-button__dot')).toHaveCount(3);
     });
 
     test('should open menu when clicking kebab button', async ({ page }) => {
         await navigateToTarife(page);
 
-        const table = page.locator('.zev-table');
-        const hasTable = await table.isVisible().catch(() => false);
+        const firstRow = await ersteZeileOrFail(page);
+        await openKebabMenu(page, firstRow);
 
-        if (hasTable) {
-            const tableRows = page.locator('.zev-table tbody tr');
-            const rowCount = await tableRows.count();
-
-            if (rowCount > 0) {
-                const firstRow = tableRows.first();
-
-                // Open kebab menu
-                await openKebabMenu(page, firstRow);
-
-                // Verify menu is visible
-                const menu = firstRow.locator('.zev-kebab-menu--open');
-                await expect(menu).toBeVisible();
-
-                // Verify menu contains items
-                const menuItems = firstRow.locator('.zev-kebab-menu__item');
-                const itemCount = await menuItems.count();
-                expect(itemCount).toBeGreaterThan(0);
-            }
-        }
+        await expect(firstRow.locator('.zev-kebab-menu--open')).toBeVisible();
+        expect(await firstRow.locator('.zev-kebab-menu__item').count()).toBeGreaterThan(0);
     });
 
     test('should display edit and delete options in menu', async ({ page }) => {
         await navigateToTarife(page);
 
-        const table = page.locator('.zev-table');
-        const hasTable = await table.isVisible().catch(() => false);
+        const firstRow = await ersteZeileOrFail(page);
+        await openKebabMenu(page, firstRow);
 
-        if (hasTable) {
-            const tableRows = page.locator('.zev-table tbody tr');
-            const rowCount = await tableRows.count();
-
-            if (rowCount > 0) {
-                const firstRow = tableRows.first();
-
-                // Open kebab menu
-                await openKebabMenu(page, firstRow);
-
-                // Verify menu has at least 2 items (edit and delete)
-                const menuItems = firstRow.locator('.zev-kebab-menu__item');
-                const itemCount = await menuItems.count();
-                expect(itemCount).toBeGreaterThanOrEqual(2);
-
-                // Verify delete item has danger styling
-                const dangerItem = firstRow.locator('.zev-kebab-menu__item--danger');
-                await expect(dangerItem).toBeVisible();
-            }
-        }
+        // Mindestens Bearbeiten und Loeschen
+        expect(await firstRow.locator('.zev-kebab-menu__item').count()).toBeGreaterThanOrEqual(2);
+        await expect(firstRow.locator('.zev-kebab-menu__item--danger')).toBeVisible();
     });
 });
 
@@ -215,105 +255,65 @@ test.describe('Kebab Menu - Close Behavior', () => {
     test('should close menu when clicking outside', async ({ page }) => {
         await navigateToTarife(page);
 
-        const table = page.locator('.zev-table');
-        const hasTable = await table.isVisible().catch(() => false);
+        const firstRow = await ersteZeileOrFail(page);
+        await openKebabMenu(page, firstRow);
 
-        if (hasTable) {
-            const tableRows = page.locator('.zev-table tbody tr');
-            const rowCount = await tableRows.count();
+        const menu = firstRow.locator('.zev-kebab-menu--open');
+        await expect(menu).toBeVisible();
 
-            if (rowCount > 0) {
-                const firstRow = tableRows.first();
-
-                // Open kebab menu
-                await openKebabMenu(page, firstRow);
-
-                // Verify menu is visible
-                const menu = firstRow.locator('.zev-kebab-menu--open');
-                await expect(menu).toBeVisible();
-
-                // Click outside to close
-                await closeKebabMenu(page);
-
-                // Verify menu is closed
-                await expect(menu).not.toBeVisible();
-            }
-        }
+        await closeKebabMenu(page);
+        await expect(menu).not.toBeVisible();
     });
 
     test('should close menu when pressing ESC key', async ({ page }) => {
         await navigateToTarife(page);
 
-        const table = page.locator('.zev-table');
-        const hasTable = await table.isVisible().catch(() => false);
+        const firstRow = await ersteZeileOrFail(page);
+        await openKebabMenu(page, firstRow);
 
-        if (hasTable) {
-            const tableRows = page.locator('.zev-table tbody tr');
-            const rowCount = await tableRows.count();
+        const menu = firstRow.locator('.zev-kebab-menu--open');
+        await expect(menu).toBeVisible();
 
-            if (rowCount > 0) {
-                const firstRow = tableRows.first();
-
-                // Open kebab menu
-                await openKebabMenu(page, firstRow);
-
-                // Verify menu is visible
-                const menu = firstRow.locator('.zev-kebab-menu--open');
-                await expect(menu).toBeVisible();
-
-                // Press ESC to close
-                await closeKebabMenuWithEsc(page);
-
-                // Verify menu is closed
-                await expect(menu).not.toBeVisible();
-            }
-        }
+        await closeKebabMenuWithEsc(page);
+        await expect(menu).not.toBeVisible();
     });
 
     test('should close first menu when opening another', async ({ page }) => {
         await navigateToTarife(page);
 
-        const table = page.locator('.zev-table');
-        const hasTable = await table.isVisible().catch(() => false);
+        await expect(page.locator('.zev-table')).toBeVisible();
+        const tableRows = page.locator('.zev-table tbody tr');
+        expect(await tableRows.count(),
+            'Fuer diesen Test werden mindestens zwei Tabellenzeilen benoetigt').toBeGreaterThanOrEqual(2);
 
-        if (hasTable) {
-            const tableRows = page.locator('.zev-table tbody tr');
-            const rowCount = await tableRows.count();
+        const firstRow = tableRows.nth(0);
+        const secondRow = tableRows.nth(1);
 
-            if (rowCount >= 2) {
-                const firstRow = tableRows.nth(0);
-                const secondRow = tableRows.nth(1);
+        // Open first kebab menu
+        const firstKebabButton = firstRow.locator('.zev-kebab-button');
+        await firstKebabButton.click();
+        const firstMenu = firstRow.locator('.zev-kebab-menu--open');
+        await expect(firstMenu).toBeVisible();
 
-                // Open first kebab menu
-                const firstKebabButton = firstRow.locator('.zev-kebab-button');
-                await firstKebabButton.click();
-                const firstMenu = firstRow.locator('.zev-kebab-menu--open');
-                await expect(firstMenu).toBeVisible();
+        // Close first menu with ESC to avoid overlay blocking second button
+        await page.keyboard.press('Escape');
+        await expect(firstMenu).not.toBeVisible();
 
-                // Close first menu with ESC to avoid overlay blocking second button
-                await page.keyboard.press('Escape');
-                await expect(firstMenu).not.toBeVisible();
+        // Open second kebab menu
+        const secondKebabButton = secondRow.locator('.zev-kebab-button');
+        await secondKebabButton.click();
+        const secondMenu = secondRow.locator('.zev-kebab-menu--open');
+        await expect(secondMenu).toBeVisible();
 
-                // Open second kebab menu
-                const secondKebabButton = secondRow.locator('.zev-kebab-button');
-                await secondKebabButton.click();
-                const secondMenu = secondRow.locator('.zev-kebab-menu--open');
-                await expect(secondMenu).toBeVisible();
+        // Re-open first menu to verify only one can be open (use force since menus may overlap)
+        await firstKebabButton.click({ force: true });
+        await page.waitForTimeout(200);
 
-                // Re-open first menu to verify only one can be open (use force since menus may overlap)
-                await firstKebabButton.click({ force: true });
-                await page.waitForTimeout(200);
+        // First menu should now be open
+        await expect(firstMenu).toBeVisible();
 
-                // First menu should now be open
-                await expect(firstMenu).toBeVisible();
-
-                // Second menu should now be closed
-                await expect(secondMenu).not.toBeVisible();
-            } else {
-                // Skip test if not enough rows
-                console.log('Skipping test: need at least 2 rows');
-            }
-        }
+        // Second menu should now be closed
+        await expect(secondMenu).not.toBeVisible();
     });
 });
 
@@ -321,45 +321,10 @@ test.describe('Kebab Menu - Edit Action', () => {
     test('should open edit form when clicking edit in kebab menu', async ({ page, tarifTracker }) => {
         await navigateToTarife(page);
 
-        // First create a test tariff
-        const createButton = page.locator('button.zev-button--primary').first();
-        await createButton.click();
-
-        const testName = generateTestName('Kebab Edit Test');
-        await fillTarifForm(page, {
-            tariftyp: 'ZEV',
-            bezeichnung: testName,
-            preis: '0.20000',
-            gueltigVon: '2099-01-01',
-            gueltigBis: '2099-12-31'
+        const testName = generateTestName('Kebab Edit');
+        const tarifRow = await createTarifOrFail(page, tarifTracker, {
+            tariftyp: 'ZEV', bezeichnung: testName, preis: '0.20000', versatz: 0
         });
-
-        const submitButton = page.locator('button[type="submit"]');
-        await submitButton.click();
-
-        // Wait for form result
-        let isSuccess = false;
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('Tariff creation failed, skipping test');
-            return;
-        }
-
-        if (!isSuccess) {
-            console.log('Tariff creation failed, skipping test');
-            return;
-        }
-
-        // Track for cleanup
-        tarifTracker.add(testName);
-
-        // Wait for table to reload
-        await waitForTableWithData(page, 10000);
-
-        // Find the row and click edit via kebab menu
-        const tarifRow = page.locator(`tr:has-text("${testName}")`);
-        await expect(tarifRow).toBeVisible({ timeout: 10000 });
 
         await clickKebabMenuItem(page, tarifRow, 'edit');
 
@@ -380,45 +345,10 @@ test.describe('Kebab Menu - Delete Action', () => {
     test('should show confirmation dialog when clicking delete in kebab menu', async ({ page, tarifTracker }) => {
         await navigateToTarife(page);
 
-        // First create a test tariff
-        const createButton = page.locator('button.zev-button--primary').first();
-        await createButton.click();
-
-        const testName = generateTestName('Kebab Delete Test');
-        await fillTarifForm(page, {
-            tariftyp: 'VNB',
-            bezeichnung: testName,
-            preis: '0.25000',
-            gueltigVon: '2099-01-01',
-            gueltigBis: '2099-12-31'
+        const testName = generateTestName('Kebab DelDlg');
+        const tarifRow = await createTarifOrFail(page, tarifTracker, {
+            tariftyp: 'VNB', bezeichnung: testName, preis: '0.25000', versatz: 1
         });
-
-        const submitButton = page.locator('button[type="submit"]');
-        await submitButton.click();
-
-        // Wait for form result
-        let isSuccess = false;
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('Tariff creation failed, skipping test');
-            return;
-        }
-
-        if (!isSuccess) {
-            console.log('Tariff creation failed, skipping test');
-            return;
-        }
-
-        // Track for cleanup
-        tarifTracker.add(testName);
-
-        // Wait for table to reload
-        await waitForTableWithData(page, 10000);
-
-        // Find the row
-        const tarifRow = page.locator(`tr:has-text("${testName}")`);
-        await expect(tarifRow).toBeVisible({ timeout: 10000 });
 
         // Set up dialog handler to capture and dismiss
         let dialogMessage = '';
@@ -444,45 +374,10 @@ test.describe('Kebab Menu - Delete Action', () => {
     test('should delete item when confirming in kebab menu', async ({ page, tarifTracker }) => {
         await navigateToTarife(page);
 
-        // First create a test tariff
-        const createButton = page.locator('button.zev-button--primary').first();
-        await createButton.click();
-
-        const testName = generateTestName('Kebab Delete Confirm');
-        await fillTarifForm(page, {
-            tariftyp: 'ZEV',
-            bezeichnung: testName,
-            preis: '0.30000',
-            gueltigVon: '2099-01-01',
-            gueltigBis: '2099-12-31'
+        const testName = generateTestName('Kebab DelOk');
+        const tarifRow = await createTarifOrFail(page, tarifTracker, {
+            tariftyp: 'ZEV', bezeichnung: testName, preis: '0.30000', versatz: 2
         });
-
-        const submitButton = page.locator('button[type="submit"]');
-        await submitButton.click();
-
-        // Wait for form result
-        let isSuccess = false;
-        try {
-            isSuccess = await waitForFormResult(page, 20000);
-        } catch {
-            console.log('Tariff creation failed, skipping test');
-            return;
-        }
-
-        if (!isSuccess) {
-            console.log('Tariff creation failed, skipping test');
-            return;
-        }
-
-        // Track for cleanup (in case deletion fails)
-        tarifTracker.add(testName);
-
-        // Wait for table to reload
-        await waitForTableWithData(page, 10000);
-
-        // Find the row
-        const tarifRow = page.locator(`tr:has-text("${testName}")`);
-        await expect(tarifRow).toBeVisible({ timeout: 10000 });
 
         // Set up dialog handler to accept
         page.once('dialog', async dialog => {
@@ -492,14 +387,9 @@ test.describe('Kebab Menu - Delete Action', () => {
         // Click delete via kebab menu
         await clickKebabMenuItem(page, tarifRow, 'delete');
 
-        // Wait for deletion - row should disappear
-        try {
-            await expect(tarifRow).not.toBeVisible({ timeout: 10000 });
-            // Remove from tracking since it was successfully deleted
-            tarifTracker.remove(testName);
-        } catch {
-            console.log('Deletion may have failed, row still visible');
-        }
+        // Kein try/catch: Bleibt die Zeile stehen, ist das Loeschen fehlgeschlagen
+        await expect(page.locator(`tr:has-text("${testName}")`)).toHaveCount(0, { timeout: 10000 });
+        tarifTracker.remove(testName);
     });
 });
 
@@ -507,18 +397,7 @@ test.describe('Kebab Menu - Multiple Components', () => {
     test('should have kebab menu in Einheiten list', async ({ page }) => {
         await navigateToEinheiten(page);
 
-        const table = page.locator('.zev-table');
-        const hasTable = await table.isVisible().catch(() => false);
-
-        if (hasTable) {
-            const tableRows = page.locator('.zev-table tbody tr');
-            const rowCount = await tableRows.count();
-
-            if (rowCount > 0) {
-                const firstRow = tableRows.first();
-                const kebabButton = firstRow.locator('.zev-kebab-button');
-                await expect(kebabButton).toBeVisible();
-            }
-        }
+        const firstRow = await ersteZeileOrFail(page);
+        await expect(firstRow.locator('.zev-kebab-button')).toBeVisible();
     });
 });
