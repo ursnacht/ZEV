@@ -274,6 +274,15 @@
 
 ## 8. Offene Fragen
 
+* **Keine Prüfung, ob der Tarif im Quartal der Position gültig ist.**
+  `TarifpositionService.saveTarifposition` prüft Einheitentyp, zulässigen Tariftyp und
+  Eindeutigkeit — nicht aber, ob die Gültigkeit des Tarifs das gewählte Quartal überhaupt
+  berührt. Eine Position für Q3/2026 mit einem erst 2030 gültigen Tarif ist damit erfassbar.
+  Auf der Rechnung fällt das nicht auf: `RechnungService.zeitraumDerPositionszeile` weist in
+  diesem Fall das Quartal aus, weil ein umgekehrter Zeitraum („30.09. – 01.07.") nach einem
+  Fehler aussähe. *Entscheid 20.08.2026: vorerst so belassen* — die Kombination entsteht nur
+  durch bewusste Fehlbedienung. Die Prüfung beim Speichern (`400` bei fehlender Überschneidung)
+  wäre der saubere Weg und würde die Rückfallregel zur reinen Absicherung machen.
 * **Stellung der Checkbox merken?** *Annahme:* nein — sie steht bei jedem Seitenaufruf wieder auf
   „nur Ladestationen", weil das der Normalfall ist. (Der Mehrfachverrechnungs-Hinweis derselben
   Seite merkt sich sein Wegklicken dagegen in `localStorage`; das ist bewusst anders, weil es dort
