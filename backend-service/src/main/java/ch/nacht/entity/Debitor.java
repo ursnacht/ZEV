@@ -10,9 +10,17 @@ import java.time.LocalDate;
 
 /**
  * Entity representing a debitor entry for invoice tracking.
+ *
+ * <p>Der Unique-Constraint ist Teil des Vertrags dieser Entity und nicht bloss ein Index:
+ * {@code DebitorRepository.upsert} verlaesst sich mit {@code ON CONFLICT (mieter_id, datum_von,
+ * org_id)} darauf. Er stammt aus {@code V55__Create_Debitor_Table.sql} und wird hier gespiegelt,
+ * damit ein aus dem Mapping erzeugtes Schema (Tests mit {@code ddl-auto=create-drop}) dieselbe
+ * Zusicherung traegt wie die produktive Datenbank.
  */
 @Entity
-@Table(name = "debitor", schema = "zev")
+@Table(name = "debitor", schema = "zev", uniqueConstraints = {
+    @UniqueConstraint(name = "uq_debitor_mieter_von_org", columnNames = {"mieter_id", "datum_von", "org_id"})
+})
 @Filter(name = "orgFilter", condition = "org_id = :orgId")
 public class Debitor {
 

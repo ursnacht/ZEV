@@ -1,0 +1,359 @@
+package ch.nacht.repository;
+
+import ch.nacht.AbstractIntegrationTest;
+import ch.nacht.entity.Debitor;
+import ch.nacht.entity.Mieter;
+import ch.nacht.entity.Organisation;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.test.context.ActiveProfiles;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Integrationstests für {@link DebitorRepository} mit Testcontainers.
+ *
+ * <p>Beide Abfragen dieses Repositories sind von Hand geschrieben und liessen sich bisher nur
+ * über die Oberfläche prüfen:
+ * <ul>
+ *   <li>{@code findByDatumVonBetween} filtert ausschliesslich über {@code datum_von} — ein
+ *       Eintrag, dessen Zeitraum in den Filter hineinragt, aber davor beginnt, erscheint
+ *       <b>nicht</b>. Diese Kante bestimmt, was die Debitorenkontrolle anzeigt.</li>
+ *   <li>{@code upsert} ist natives SQL mit {@code ON CONFLICT}. Seine {@code WHERE
+ *       zahldatum IS NULL}-Klausel ist der Schutz davor, dass ein erneuter Rechnungslauf einen
+ *       bereits bezahlten Eintrag überschreibt — der teuerste denkbare Fehler dieser Tabelle.
+ *       Der Ausdruck ist für Hibernate undurchsichtig; nur eine echte Postgres-Instanz zeigt,
+ *       ob er greift.</li>
+ * </ul>
+ *
+ * <p>Der Org-Filter ist hier bewusst nicht aktiv ({@code @DataJpaTest} kennt keinen
+ * {@code HibernateFilterService}). Die Abfragen liefern deshalb mandantenübergreifend — das
+ * Einschalten des Filters ist Aufgabe des Service und dort getestet.
+ */
+@DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@ActiveProfiles("test")
+class DebitorRepositoryIT extends AbstractIntegrationTest {
+
+    @Autowired
+    private DebitorRepository debitorRepository;
+
+    @Autowired
+    private MieterRepository mieterRepository;
+
+    @Autowired
+    private OrganisationRepository organisationRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    private Long TEST_ORG_ID;
+    private Long ANDERE_ORG_ID;
+    private Long mieterAId;
+    private Long mieterBId;
+
+    @BeforeEach
+    void setUp() {
+        angleichAnFlywaySchema();
+        debitorRepository.deleteAll();
+        mieterRepository.deleteAll();
+
+        TEST_ORG_ID = saveOrganisation("Debitor Test Organisation",
+                UUID.fromString("b7c5e4a1-3d29-4f18-9a6b-2c8d0e1f3a5b"));
+        ANDERE_ORG_ID = saveOrganisation("Debitor Fremd Organisation",
+                UUID.fromString("c8d6f5b2-4e3a-5029-8b7c-3d9e1f2a4b6c"));
+
+        mieterAId = saveMieter("Mieter A").getId();
+        mieterBId = saveMieter("Mieter B").getId();
+    }
+
+    @AfterEach
+    void tearDown() {
+        debitorRepository.deleteAll();
+        mieterRepository.deleteAll();
+    }
+
+    /**
+     * Ergänzt am Mapping-Schema die eine Eigenschaft, die {@code upsert} braucht und die nur in
+     * {@code V55__Create_Debitor_Table.sql} steht: den Spalten-Default auf {@code debitor_seq}.
+     *
+     * <p>Die Integrationstests laufen mit {@code ddl-auto=create-drop}, das Schema entsteht also
+     * aus dem Mapping und nicht aus Flyway. Hibernate vergibt die ID selbst und legt deshalb
+     * keinen Default an — das native INSERT der Upsert-Abfrage liefert aber keine ID mit und
+     * liefe ohne diesen Angleich in eine NOT-NULL-Verletzung. Produktiv existiert der Default
+     * seit V55; die Abfrage hängt also an einer Zusicherung des Schemas, nicht der Entity.
+     *
+     * <p>DDL ist in Postgres transaktional: Die Änderung verschwindet mit dem Rollback des Tests.
+     */
+    private void angleichAnFlywaySchema() {
+        entityManager.createNativeQuery(
+                "ALTER TABLE zev.debitor ALTER COLUMN id SET DEFAULT nextval('zev.debitor_seq')")
+                .executeUpdate();
+    }
+
+    private Long saveOrganisation(String name, UUID keycloakOrgId) {
+        Organisation org = new Organisation();
+        org.setKeycloakOrgId(keycloakOrgId);
+        org.setName(name);
+        org.setErstelltAm(LocalDateTime.now());
+        return organisationRepository.save(org).getId();
+    }
+
+    private Mieter saveMieter(String name) {
+        Mieter mieter = new Mieter();
+        mieter.setOrgId(TEST_ORG_ID);
+        mieter.setName(name);
+        mieter.setStrasse("Teststrasse 1");
+        mieter.setPlz("8000");
+        mieter.setOrt("Zürich");
+        mieter.setMietbeginn(LocalDate.of(2020, 1, 1));
+        return mieterRepository.save(mieter);
+    }
+
+    private Debitor saveDebitor(Long mieterId, String betrag, LocalDate von, LocalDate bis, LocalDate zahldatum) {
+        Debitor debitor = new Debitor();
+        debitor.setOrgId(TEST_ORG_ID);
+        debitor.setMieterId(mieterId);
+        debitor.setBetrag(new BigDecimal(betrag));
+        debitor.setDatumVon(von);
+        debitor.setDatumBis(bis);
+        debitor.setZahldatum(zahldatum);
+        return debitorRepository.save(debitor);
+    }
+
+    /**
+     * Schreibt Anstehendes in die Datenbank und leert den Persistence-Context.
+     * Ohne das sähe die native Upsert-Abfrage die noch nicht geschriebenen Zeilen nicht — und
+     * das anschliessende Lesen läge auf dem Stand vor dem Upsert.
+     */
+    private void syncMitDatenbank() {
+        entityManager.flush();
+        entityManager.clear();
+    }
+
+    // ==================== findByDatumVonBetween ====================
+
+    @Test
+    void shouldFindDebitorenWithinRange() {
+        saveDebitor(mieterAId, "100.00", LocalDate.of(2026, 2, 15), LocalDate.of(2026, 3, 31), null);
+
+        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getBetrag()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void shouldIncludeBothRangeBoundaries() {
+        // Beide Grenzen sind einschliessend - sonst fiele der erste bzw. letzte Tag des
+        // gewaehlten Zeitraums aus der Debitorenkontrolle heraus
+        saveDebitor(mieterAId, "10.00", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31), null);
+        saveDebitor(mieterBId, "20.00", LocalDate.of(2026, 3, 31), LocalDate.of(2026, 4, 30), null);
+
+        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(result).hasSize(2);
+    }
+
+    @Test
+    void shouldExcludeDebitorenOutsideRange() {
+        saveDebitor(mieterAId, "10.00", LocalDate.of(2025, 12, 31), LocalDate.of(2026, 1, 31), null);
+        saveDebitor(mieterBId, "20.00", LocalDate.of(2026, 4, 1), LocalDate.of(2026, 4, 30), null);
+
+        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void shouldFilterOnDatumVonOnly_NotOnOverlap() {
+        // Ein Eintrag vom 01.12.2025 bis 28.02.2026 ragt in den Filter hinein, beginnt aber
+        // davor - er erscheint bewusst NICHT. Der Filter ist ein Stichtagsfilter auf datum_von,
+        // keine Ueberschneidungspruefung.
+        saveDebitor(mieterAId, "10.00", LocalDate.of(2025, 12, 1), LocalDate.of(2026, 2, 28), null);
+
+        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void shouldOrderByDatumVonThenMieterId() {
+        saveDebitor(mieterBId, "30.00", LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31), null);
+        saveDebitor(mieterBId, "10.00", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31), null);
+        saveDebitor(mieterAId, "20.00", LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31), null);
+
+        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(result).extracting(Debitor::getBetrag)
+                .usingElementComparator(BigDecimal::compareTo)
+                .containsExactly(new BigDecimal("10.00"), new BigDecimal("20.00"), new BigDecimal("30.00"));
+        // Bei gleichem Datum entscheidet die Mieter-ID: Mieter A vor Mieter B
+        assertThat(result.get(1).getMieterId()).isEqualTo(mieterAId);
+        assertThat(result.get(2).getMieterId()).isEqualTo(mieterBId);
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenNothingMatches() {
+        assertThat(debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31))).isEmpty();
+    }
+
+    @Test
+    void shouldKeepZahldatumAndTwoDecimals() {
+        saveDebitor(mieterAId, "1234.55", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31),
+                LocalDate.of(2026, 4, 15));
+        syncMitDatenbank();
+
+        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getBetrag()).isEqualByComparingTo("1234.55");
+        assertThat(result.get(0).getZahldatum()).isEqualTo(LocalDate.of(2026, 4, 15));
+    }
+
+    // ==================== upsert ====================
+
+    @Test
+    void shouldInsertNewDebitorViaUpsert() {
+        debitorRepository.upsert(mieterAId, new BigDecimal("250.00"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID);
+        syncMitDatenbank();
+
+        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getMieterId()).isEqualTo(mieterAId);
+        assertThat(result.get(0).getBetrag()).isEqualByComparingTo("250.00");
+        assertThat(result.get(0).getDatumBis()).isEqualTo(LocalDate.of(2026, 3, 31));
+        // Ein neu erzeugter Eintrag ist offen
+        assertThat(result.get(0).getZahldatum()).isNull();
+    }
+
+    @Test
+    void shouldUpdateBetragAndDatumBisOnConflictWhenUnpaid() {
+        // Zweiter Rechnungslauf fuer denselben Zeitraum: Der offene Eintrag wird nachgefuehrt,
+        // statt dass ein zweiter entsteht
+        saveDebitor(mieterAId, "100.00", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 2, 28), null);
+        syncMitDatenbank();
+
+        debitorRepository.upsert(mieterAId, new BigDecimal("175.50"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID);
+        syncMitDatenbank();
+
+        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getBetrag()).isEqualByComparingTo("175.50");
+        assertThat(result.get(0).getDatumBis()).isEqualTo(LocalDate.of(2026, 3, 31));
+    }
+
+    @Test
+    void shouldNotOverwriteAlreadyPaidDebitor() {
+        // Der eigentliche Schutz: Ist der Eintrag bezahlt, laesst ein erneuter Rechnungslauf
+        // ihn unveraendert - weder Betrag noch Zeitraum noch Zahldatum duerfen kippen
+        saveDebitor(mieterAId, "100.00", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31),
+                LocalDate.of(2026, 4, 10));
+        syncMitDatenbank();
+
+        debitorRepository.upsert(mieterAId, new BigDecimal("999.00"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 30), TEST_ORG_ID);
+        syncMitDatenbank();
+
+        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getBetrag()).isEqualByComparingTo("100.00");
+        assertThat(result.get(0).getDatumBis()).isEqualTo(LocalDate.of(2026, 3, 31));
+        assertThat(result.get(0).getZahldatum()).isEqualTo(LocalDate.of(2026, 4, 10));
+    }
+
+    @Test
+    void shouldCreateSeparateEntriesForDifferentPeriods() {
+        // Der Schluessel enthaelt datum_von: Ein neues Quartal ergibt einen neuen Eintrag
+        debitorRepository.upsert(mieterAId, new BigDecimal("100.00"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID);
+        debitorRepository.upsert(mieterAId, new BigDecimal("200.00"),
+                LocalDate.of(2026, 4, 1), LocalDate.of(2026, 6, 30), TEST_ORG_ID);
+        syncMitDatenbank();
+
+        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+
+        assertThat(result).hasSize(2);
+        assertThat(result).extracting(Debitor::getDatumVon)
+                .containsExactly(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 4, 1));
+    }
+
+    @Test
+    void shouldCreateSeparateEntriesForDifferentMieter() {
+        debitorRepository.upsert(mieterAId, new BigDecimal("100.00"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID);
+        debitorRepository.upsert(mieterBId, new BigDecimal("200.00"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID);
+        syncMitDatenbank();
+
+        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(result).hasSize(2);
+        assertThat(result).extracting(Debitor::getMieterId)
+                .containsExactly(mieterAId, mieterBId);
+    }
+
+    @Test
+    void shouldKeepEntriesOfDifferentOrganisationsApart() {
+        // org_id gehoert zum Schluessel: Derselbe Mieter und Zeitraum in einem anderen Mandanten
+        // ergibt einen eigenen Eintrag statt eines Konflikts
+        debitorRepository.upsert(mieterAId, new BigDecimal("100.00"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID);
+        debitorRepository.upsert(mieterAId, new BigDecimal("200.00"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), ANDERE_ORG_ID);
+        syncMitDatenbank();
+
+        // Ohne aktiven Org-Filter sind beide sichtbar - das Trennen ist Aufgabe des Service
+        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(result).hasSize(2);
+        assertThat(result).extracting(Debitor::getOrgId)
+                .containsExactlyInAnyOrder(TEST_ORG_ID, ANDERE_ORG_ID);
+    }
+
+    @Test
+    void shouldUpsertRepeatedlyWithoutCreatingDuplicates() {
+        // Mehrere Laeufe hintereinander duerfen die Tabelle nicht aufblaehen
+        for (int lauf = 1; lauf <= 3; lauf++) {
+            debitorRepository.upsert(mieterAId, new BigDecimal(lauf * 100 + ".00"),
+                    LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID);
+            syncMitDatenbank();
+        }
+
+        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getBetrag()).isEqualByComparingTo("300.00");
+    }
+}
