@@ -54,13 +54,13 @@ unverändert `ng build`).
 | [x] | 3. Entwicklungs-Build | `npx ng build --configuration=development` → fehlerfrei, 3.07 MB. |
 | [x] | 4. Produktions-Build | `npm run build` → fehlerfrei, 921 kB (222 kB übertragen), Budgets eingehalten, `outputHashing` aktiv. |
 | [x] | 5. Unit-Tests | `npm test` → 45 Dateien, **1146 Tests grün**; die Builder-Warnung erscheint nicht mehr (`grep -c` → 0). |
-| [ ] | 6. E2E-Tests | Offen — setzt einen Rebuild des Frontend-Images voraus (siehe unten). |
+| [x] | 6. E2E-Tests | Nach Rebuild des Frontend-Images gegen `https://localhost:8443`: **401 passed, 33 skipped, keine Flakes** (8.2 min). |
 
-### Phase 6: was noch aussteht
+### Phase 6: Vorgehen
 
-Die E2E-Suite läuft gegen den **Container-Stack**, nicht gegen das lokal erzeugte `dist/`. Das
-Frontend-Image stammt noch aus einem Build mit dem alten Builder — ein E2E-Lauf jetzt würde
-über die Migration nichts aussagen. Zuerst ist das Image neu zu bauen:
+Die E2E-Suite läuft gegen den **Container-Stack**, nicht gegen das lokal erzeugte `dist/`. Ein
+Lauf vor dem Rebuild hätte über die Migration nichts ausgesagt, weil das Frontend-Image noch
+aus einem Build mit dem alten Builder stammte. Deshalb zuerst das Image neu bauen:
 
 ```bash
 docker compose up -d --build frontend-service
