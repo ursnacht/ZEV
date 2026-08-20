@@ -871,6 +871,57 @@ public class RechnungServiceTest {
     }
 
     @Test
+    void berechneRechnung_TarifpositionMitSpaeterGueltigemTarif_KuerztDenZeitraum() {
+        // Die Positionszeile schneidet ihr Quartal mit der Tarifgueltigkeit - wie die ZEV-/VNB-
+        // und Grundgebuehr-Zeilen auch. Ein Tarif, der erst Mitte Quartal beginnt, darf nicht
+        // ueber das ganze Quartal ausgewiesen werden.
+        LocalDate von = LocalDate.of(2024, 7, 1);
+        LocalDate bis = LocalDate.of(2024, 9, 30);
+
+        Mieter mieter = mieterMitMesswerten(von, bis);
+        Tarif ladestrom = new Tarif("Ladestrom", TarifTyp.LADESTROM, new BigDecimal("0.35000"),
+            LocalDate.of(2024, 8, 15), LocalDate.of(2024, 12, 31));
+        ladestrom.setId(99L);
+        when(tarifpositionService.getFuerRechnung(anyCollection(), eq(von), eq(bis)))
+            .thenReturn(List.of(tarifposition(ladestrom, ladestation(), 2024, 3, "10.000")));
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
+
+        TarifZeileDTO zeile = rechnung.getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.LADESTROM)
+            .findFirst().orElseThrow();
+
+        assertEquals(LocalDate.of(2024, 8, 15), zeile.getVon());
+        assertEquals(LocalDate.of(2024, 9, 30), zeile.getBis());
+        // Die Menge bleibt ungekuerzt - sie gehoert zum ganzen Quartal
+        assertEquals(10.0, zeile.getMenge(), 0.001);
+    }
+
+    @Test
+    void berechneRechnung_TarifpositionOhneUeberschneidung_BehaeltDasQuartal() {
+        // Erfassbar ist diese Kombination heute noch (keine Pruefung beim Speichern). Ein
+        // umgekehrter Zeitraum "30.09. - 01.07." saehe auf der Rechnung nach einem Fehler aus.
+        LocalDate von = LocalDate.of(2024, 7, 1);
+        LocalDate bis = LocalDate.of(2024, 9, 30);
+
+        Mieter mieter = mieterMitMesswerten(von, bis);
+        Tarif ladestrom = new Tarif("Ladestrom", TarifTyp.LADESTROM, new BigDecimal("0.35000"),
+            LocalDate.of(2030, 1, 1), LocalDate.of(2030, 12, 31));
+        ladestrom.setId(99L);
+        when(tarifpositionService.getFuerRechnung(anyCollection(), eq(von), eq(bis)))
+            .thenReturn(List.of(tarifposition(ladestrom, ladestation(), 2024, 3, "10.000")));
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
+
+        TarifZeileDTO zeile = rechnung.getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.LADESTROM)
+            .findFirst().orElseThrow();
+
+        assertEquals(LocalDate.of(2024, 7, 1), zeile.getVon());
+        assertEquals(LocalDate.of(2024, 9, 30), zeile.getBis());
+    }
+
+    @Test
     void berechneRechnung_TarifpositionQ3_UsesQuartalBoundsAsPeriod() {
         LocalDate von = LocalDate.of(2024, 7, 1);
         LocalDate bis = LocalDate.of(2024, 9, 30);

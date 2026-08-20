@@ -393,10 +393,12 @@ public class RechnungService {
             double preis = position.getTarif().getPreis().doubleValue();
             double betrag = menge * preis;
 
+            LocalDate[] zeitraum = zeitraumDerPositionszeile(position);
+
             rechnung.addTarifZeile(new TarifZeileDTO(
                     bezeichnungMitQuellReferenz(position),
-                    TarifpositionService.quartalBeginn(position.getJahr(), position.getQuartal()),
-                    TarifpositionService.quartalEnde(position.getJahr(), position.getQuartal()),
+                    zeitraum[0],
+                    zeitraum[1],
                     menge,
                     preis,
                     betrag,
@@ -411,6 +413,40 @@ public class RechnungService {
                     position.getQuartal(), position.getJahr(), menge, preis, betrag);
         }
         return total;
+    }
+
+    /**
+     * Zeitraum der Positionszeile: das Quartal der Position, <b>eingeschränkt auf die Gültigkeit
+     * des Tarifs</b>.
+     *
+     * <p>Damit rechnet die Positionszeile wie die ZEV-/VNB- und Grundgebühr-Zeilen, die ihren
+     * Zeitraum ebenfalls mit der Tarifgültigkeit schneiden. Ein Tarif, der erst Mitte Quartal
+     * beginnt, erscheint also nicht mehr über das ganze Quartal.
+     *
+     * <p>Bewusst <b>nicht</b> zusätzlich mit dem Rechnungszeitraum geschnitten: Die erfasste
+     * Menge gehört zum ganzen Quartal und wird nicht anteilig aufgeteilt — zieht ein Mieter
+     * Mitte Quartal aus, erhält er trotzdem seine volle Menge (Specs/Ladestromtarif.md FR-1.5).
+     *
+     * <p>Überschneiden sich Quartal und Gültigkeit gar nicht, bleibt es beim Quartal: Ein
+     * umgekehrter Zeitraum („30.09. – 01.07.") sähe auf der Rechnung nach einem Fehler aus. Diese
+     * Kombination lässt sich derzeit erfassen — die Prüfung beim Speichern fehlt noch.
+     *
+     * @param position Tarifposition
+     * @return Zweielementiges Feld {@code [von, bis]}
+     */
+    private LocalDate[] zeitraumDerPositionszeile(Tarifposition position) {
+        LocalDate quartalVon = TarifpositionService.quartalBeginn(position.getJahr(), position.getQuartal());
+        LocalDate quartalBis = TarifpositionService.quartalEnde(position.getJahr(), position.getQuartal());
+        LocalDate gueltigVon = position.getTarif().getGueltigVon();
+        LocalDate gueltigBis = position.getTarif().getGueltigBis();
+
+        if (gueltigBis.isBefore(quartalVon) || gueltigVon.isAfter(quartalBis)) {
+            return new LocalDate[] { quartalVon, quartalBis };
+        }
+        return new LocalDate[] {
+                gueltigVon.isAfter(quartalVon) ? gueltigVon : quartalVon,
+                gueltigBis.isBefore(quartalBis) ? gueltigBis : quartalBis
+        };
     }
 
     /**

@@ -59,9 +59,10 @@
 5. Er erfasst die Position wie bisher: Tarif, Jahr + Quartal, Menge. **Beschriftung und Hinweis
    des Mengenfelds nennen die Einheit des gewählten Tarifs** (kWh / Monate / Stück).
 6. Bei der **Rechnungserzeugung** erscheinen `ZUSATZ`-Positionen wie die übrigen Positionen als
-   eigene Zeilen — mit der am Tarif hinterlegten Mengeneinheit. Für Konsumenten-Einheiten greift
-   dabei der bestehende Weg: Die Positionen **aller** Einheiten eines Mieters landen auf dessen
-   Rechnung.
+   eigene Zeilen — mit der am Tarif hinterlegten Mengeneinheit und dem Quartal der Position,
+   **eingeschränkt auf die Gültigkeit des Tarifs** (`Ladestromtarif.md`, FR-3). Für
+   Konsumenten-Einheiten greift dabei der bestehende Weg: Die Positionen **aller** Einheiten
+   eines Mieters landen auf dessen Rechnung.
 
 ### FR-2: Persistierung
 
@@ -91,10 +92,10 @@
   **keine DDL-Änderung an `tarifposition` nötig**.
 * **Keine Änderung an der Tabelle `tarifposition`.** Menge, Erfassungsart, Quell-Referenz und
   Bemerkung bleiben wie sie sind; die Bedeutung steckt weiterhin ausschliesslich im Tarif.
-* **Flyway:** Umgesetzt in vier Migrationen — `V111` (CHECK-Constraint, Spalte `mengeneinheit`,
+* **Flyway:** Umgesetzt in fünf Migrationen — `V111` (CHECK-Constraint, Spalte `mengeneinheit`,
   Übersetzungen), `V112` (Platzhalter der Einheiten-Auswahl), `V113` (Schlüssel-Namensraum
   korrigiert: `TARIFTYP_*` sind Tariftypen, `TYP_*` Einheitentypen), `V114` (Preis-Hinweis
-  einheitneutral). Die nächste freie Nummer ist **vor** dem Anlegen über den `zev-db`-MCP-Server
+  einheitneutral), `V115` (Hinweis bei leerer Einheiten-Auswahl). Die nächste freie Nummer ist **vor** dem Anlegen über den `zev-db`-MCP-Server
   zu prüfen; eine bereits ausgeführte Migration wird nie nachträglich geändert.
 
 ### FR-3: Layout
