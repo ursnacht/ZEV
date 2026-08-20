@@ -128,7 +128,7 @@ services:
       # iss-Claim muss dem Host entsprechen, über den der BROWSER Keycloak erreicht.
       # Für NAS: BACKEND_JWT_ISSUER_URI in .env.mqtt auf http://nasnafam.synology.me:9000/realms/zev setzen
       # (gleicher Variablenname wie der Platzhalter in application.yml).
-      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=${BACKEND_JWT_ISSUER_URI:-http://localhost:8000/auth/realms/zev}
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=${BACKEND_JWT_ISSUER_URI:-http://localhost:9000/auth/realms/zev}
       # JWK-Set wird serverseitig geladen -> interner Docker-Name bleibt korrekt.
       # Containerinterner Aufruf (geht NICHT ueber caddy) - nur der Pfad /auth kommt dazu.
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:9000/auth/realms/zev/protocol/openid-connect/certs
@@ -195,7 +195,7 @@ services:
       # Leer = relative /api-Aufrufe auf derselben Origin (ueber caddy). Achtung: ${VAR:-default}
       # wuerde auch bei LEEREM Wert den Default setzen - daher hier ohne Default.
       - FRONTEND_API_BASE_URL=${FRONTEND_API_BASE_URL}
-      - FRONTEND_KEYCLOAK_URL=${FRONTEND_KEYCLOAK_URL:-http://localhost:8000/auth}
+      - FRONTEND_KEYCLOAK_URL=${FRONTEND_KEYCLOAK_URL:?FRONTEND_KEYCLOAK_URL muss gesetzt sein}
       - FRONTEND_KEYCLOAK_REALM=${FRONTEND_KEYCLOAK_REALM:-zev}
       - FRONTEND_KEYCLOAK_CLIENT_ID=${FRONTEND_KEYCLOAK_CLIENT_ID:-zev-frontend}
       # Basic Auth fuer /actuator/** (SBA-Details); Default nur fuer lokale Entwicklung
