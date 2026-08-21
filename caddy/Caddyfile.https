@@ -9,19 +9,24 @@
 # Anders als der HTTP-Caddyfile traegt diese Datei einen HOSTNAMEN als Site-Adresse; das
 # verlangt TLS. Folge: Der Zugriff ueber die reine IP (https://192.168.x.y:8443) funktioniert
 # NICHT mehr - Caddy beantwortet nur noch den konfigurierten Namen.
+#
+# Der Name kommt aus ZEV_PUBLIC_HOST (Default localhost) und wird vom caddy-Service als
+# Umgebungsvariable hereingegeben. Auf dem NAS ist das ZEV_PUBLIC_HOST=nafam.zev - ohne diese
+# Parametrisierung wuerde Caddy dort nur "localhost" beantworten und die Anwendung waere
+# ueber ihren eigenen Hostnamen nicht erreichbar.
 
 # Alte HTTP-Adresse -> HTTPS. Bewusst als EIGENE Site und nicht ueber Caddys automatische
 # Weiterleitung: Die kennt nur ihren eigenen Listener-Port (443) und wuerde auf
-# https://localhost/ zeigen. Von aussen ist der Port aber 8443 (443 ist auf dem NAS von DSM
+# https://<host>/ zeigen. Von aussen ist der Port aber 8443 (443 ist auf dem NAS von DSM
 # belegt, lokal halten wir es gleich) - die Weiterleitung liefe also ins Leere.
-http://localhost {
-	redir https://localhost:8443{uri} permanent
+http://{$ZEV_PUBLIC_HOST:localhost} {
+	redir https://{$ZEV_PUBLIC_HOST:localhost}:8443{uri} permanent
 }
 
-https://localhost {
-	# Zertifikat aus Caddys interner CA. Fuer localhost tut Caddy das ohnehin von selbst;
-	# die Direktive steht hier, damit der gewaehlte Weg im Konfigurat sichtbar ist.
-	# Das Root-Zertifikat muss in den Zertifikatspeicher importiert werden, siehe Specs/HTTPS.md.
+https://{$ZEV_PUBLIC_HOST:localhost} {
+	# Zertifikat aus Caddys interner CA - funktioniert fuer jeden Namen, auch fuer rein
+	# interne wie nafam.zev, fuer die es kein oeffentlich vertrauenswuerdiges Zertifikat gibt.
+	# Das Root-Zertifikat muss auf JEDEM Client importiert werden, siehe Specs/HTTPS.md.
 	tls internal
 
 	# Backend-API: KEIN Prefix-Stripping (das Backend erwartet /api/...)

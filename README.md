@@ -43,21 +43,72 @@ cd backend-service
 mvn flyway:migrate
 ```
 
-## Run Application
+## Erstinstallation
+
+Die Anwendung läuft hinter einem **Caddy-Reverse-Proxy als eine Origin** (`/` → Frontend,
+`/api` → Backend, `/auth` → Keycloak) und standardmässig über **HTTPS** mit einem Zertifikat aus
+Caddys interner CA. Details und Hintergründe: [`Specs/HTTPS.md`](./Specs/HTTPS.md).
 
 ```bash
-docker-compose up --build
+# 1. Umgebung anlegen und ANTHROPIC_API_KEY setzen (für die KI-gestützte
+#    Einheiten-Zuordnung beim CSV-Upload; die übrigen Defaults genügen lokal)
+cp .env.example .env
+
+# 2. Stack starten
+docker compose up -d --build
+
+# 3. Root-Zertifikat der internen CA holen und importieren.
+#    Erst jetzt möglich: Caddy erzeugt die CA beim ersten Start.
+docker cp caddy:/data/caddy/pki/authorities/local/root.crt caddy-root.crt
+certutil -addstore -f ROOT caddy-root.crt        # Windows, als Administrator
+
+# 4. Anwendung öffnen
+#    https://localhost:8443
 ```
 
-Access:
-- Frontend: http://localhost:4200
-- Backend API: http://localhost:8090
-- Admin Service: http://localhost:8081
-- Keycloak: http://localhost:9000 (admin/admin)
-- Prometheus: http://localhost:9090
-- Grafana: http://localhost:3000 (admin/admin)
+Ohne Schritt 3 weist der Browser die Anwendung mit einer Zertifikatswarnung ab. **Firefox**
+benutzt einen eigenen Zertifikatspeicher: entweder `security.enterprise_roots.enabled` in
+`about:config` auf `true` setzen oder `caddy-root.crt` unter *Einstellungen → Datenschutz →
+Zertifikate anzeigen → Importieren* eintragen.
 
-**Environment:** `.env.example` nach `.env` kopieren und `ANTHROPIC_API_KEY` setzen (für die KI-gestützte Einheiten-Zuordnung beim CSV-Upload).
+Ein **Realm-Reimport oder Nacharbeiten in Keycloak ist bei einer Neuinstallation nicht nötig:**
+Keycloak startet mit `--import-realm`, und der Import bildet `redirectUris`/`webOrigins` aus
+`ZEV_FRONTEND_URL` — bei leerer Datenbank also direkt mit den HTTPS-Adressen. Nur beim Umstellen
+einer **bestehenden** Installation müssen die Adressen von Hand ergänzt werden (siehe
+`Specs/HTTPS.md`, Abschnitt 4).
+
+### Zugänge
+
+| Zugang | URL | Bemerkung |
+|--------|-----|-----------|
+| **Anwendung** | https://localhost:8443 | der reguläre Weg (über Caddy) |
+| Anwendung (HTTP) | http://localhost:8000 | leitet auf HTTPS weiter |
+| Keycloak | http://localhost:9000/auth | direkt, ohne Proxy (admin/admin) |
+| Backend API | http://localhost:8090 | direkt; regulär über `https://localhost:8443/api` |
+| Admin Service | http://localhost:8081 | Spring Boot Admin (sba/sba) |
+| Prometheus | http://localhost:9090 | |
+| Grafana | http://localhost:3000 | admin/admin |
+
+> **Nicht über `http://localhost:4200` arbeiten.** Der Port liefert zwar das Frontend, aber
+> `FRONTEND_API_BASE_URL` ist leer — das Frontend ruft also relativ `/api` auf, und
+> `frontend-service` bedient diesen Pfad nicht. Jeder API-Aufruf scheitert dort. Für die
+> Entwicklung gegen `ng serve` siehe `frontend-service/src/assets/config.json`.
+
+### Zurück auf HTTP
+
+Alle Zeilen des HTTPS-Blocks in der `.env` auskommentieren und den Stack neu starten. Dann
+greifen die Defaults aus `docker-compose.yml` und der HTTP-Caddyfile; die Anwendung läuft unter
+`http://localhost:8000`.
+
+## Regulärer Start (nach der Erstinstallation)
+
+```bash
+docker compose up -d              # bzw. --build nach Code-Änderungen
+```
+
+Das Root-Zertifikat bleibt im Volume `caddy-data` erhalten — der Import aus Schritt 3 ist also
+einmalig. Nur wenn das Volume gelöscht wird (`docker compose down -v`), erzeugt Caddy eine neue
+CA und der Import ist zu wiederholen.
 
 ### Test-Benutzer (Keycloak)
 

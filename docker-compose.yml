@@ -226,6 +226,11 @@ services:
       # von DSM belegt ist; lokal halten wir denselben Port. Im HTTP-Betrieb lauscht in Caddy
       # niemand auf 443 - die Veroeffentlichung ist dann wirkungslos, aber harmlos.
       - "8443:443"
+    environment:
+      # Site-Adresse fuer caddy/Caddyfile.https. Ohne diesen Wert beantwortet Caddy im
+      # HTTPS-Betrieb nur "localhost" - unter dem eigenen Hostnamen waere die Anwendung
+      # dann nicht erreichbar. Im HTTP-Betrieb (Default-Caddyfile) ohne Wirkung.
+      - ZEV_PUBLIC_HOST=${ZEV_PUBLIC_HOST:-localhost}
     volumes:
       # HTTP ist der Default. Fuer HTTPS in der .env auf ./caddy/Caddyfile.https umstellen -
       # der Wechsel ist damit eine Zeile und jederzeit zurueckdrehbar.

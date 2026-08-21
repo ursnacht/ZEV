@@ -169,9 +169,15 @@ Issuer/Redirects mit dem internen Host/Port. Im `keycloak`-Service:
 > Falls Keycloak im `start`-Modus über die Hostname-Konfiguration meckert, zusätzlich
 > `KC_HOSTNAME_STRICT: "false"` setzen.
 
-**Realm-Reimport:** `redirectUris`/`webOrigins` werden aus `${ZEV_FRONTEND_URL}` gebildet
-(`keycloak/realms/zev-realm.json`). Nach Änderung von `ZEV_FRONTEND_URL` muss der Realm neu
-importiert werden (bzw. die Werte im laufenden Realm über die Admin-Konsole anpassen).
+**Keycloak-Client:** `redirectUris`/`webOrigins` werden aus `${ZEV_FRONTEND_URL}` gebildet
+(`keycloak/realms/zev-realm.json`) — aber **nur beim Import**. Bei einem bereits importierten
+Realm ändert die Variable nichts mehr.
+
+Für eine **bestehende** Installation deshalb nicht neu importieren (das überschreibt Benutzer
+und Organisationen), sondern beim Client `zev-frontend` in der Admin-Konsole die neuen Adressen
+zu *Valid redirect URIs* und *Web origins* hinzufügen — und zwar **vor** dem Umstellen, solange
+der alte Zugriffsweg noch funktioniert. Die alten Einträge stehen lassen, damit der Rückweg
+offen bleibt.
 
 ---
 
@@ -239,8 +245,9 @@ zur Vermeidung von Mixed-Content ist HTTPS empfohlen.
 - **Synology-Proxy (Variante 2):** *Systemsteuerung → Sicherheit → Zertifikat* → Let's Encrypt
   (DDNS/Port 80/443), Zertifikat den Hostnamen zuweisen, „HTTP→HTTPS-Weiterleitung" aktivieren.
 
-Danach **alle** `http://`-Werte aus Schritt 3/4 auf `https://…` umstellen (inkl. `KC_HOSTNAME`
-und `ZEV_FRONTEND_URL` → Realm-Reimport). Der Token-`iss` muss dann die HTTPS-URL sein.
+Reihenfolge: **zuerst** im noch laufenden HTTP-Betrieb die `https://…`-Adressen beim Client
+`zev-frontend` ergänzen (Schritt 3), **danach** alle `http://`-Werte aus Schritt 3/4 auf
+`https://…` umstellen — inklusive `KC_HOSTNAME`. Der Token-`iss` muss dann die HTTPS-URL sein.
 
 ---
 
@@ -265,7 +272,7 @@ Jeweils **einmal über VPN** und **einmal aus dem LAN** prüfen:
 | Seite lädt nur über VPN, LAN „not reachable" | Name löst nicht auf bzw. auf eine im aktuellen Netz nicht erreichbare IP | Schritt 1 (Route ins LAN pushen / Split-DNS / hosts) |
 | `CORS … No 'Access-Control-Allow-Origin'` | Origin ≠ `APP_CORS_ALLOWED_ORIGINS`; oder bei Variante 2 Origin fehlt | Hostname in `APP_CORS_ALLOWED_ORIGINS`; bei Variante 1 sollte es same-origin sein |
 | `401` auf allen API-Calls | Token-`iss` ≠ `BACKEND_JWT_ISSUER_URI` | Issuer exakt auf die vom Browser genutzte Keycloak-URL setzen |
-| Login-Redirect scheitert („Invalid redirect_uri") | `redirectUris`/`webOrigins` passen nicht zum Hostnamen | `ZEV_FRONTEND_URL` setzen + Realm-Reimport |
+| Login-Redirect scheitert („Invalid redirect_uri") | `redirectUris`/`webOrigins` passen nicht zum Hostnamen | Beim Client `zev-frontend` in der Admin-Konsole ergänzen (Schritt 3) — ein Reimport wirkt bei bestehendem Realm nicht |
 | Keycloak-Links zeigen internen Host/Port | `KC_PROXY_HEADERS`/`KC_HOSTNAME` fehlen | Schritt 3; Proxy sendet `X-Forwarded-*` |
 | `config.json` zeigt noch die IP | alte `.env`/Container | `.env` anpassen, `frontend-service` neu erstellen |
 | Keycloak `/auth`-Pfad 404 | `KC_HTTP_RELATIVE_PATH` bzw. JWK-Set-URI ohne `/auth` | beide auf `/auth` (Schritt 3/4) |

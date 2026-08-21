@@ -1,8 +1,11 @@
 # HTTPS für die ZEV-Anwendung
 
 Analyse des Ist-Zustands und der Schritte, die für den Wechsel von HTTP auf HTTPS nötig sind —
-lokal (Abschnitt 5, vorbereitet) und auf dem NAS (Abschnitt 6, offen).
-Stand: 20.08.2026, Zertifikatsweg **A** (Caddys interne CA) entschieden.
+**lokal umgesetzt** (Abschnitt 5), auf dem **NAS offen** (Abschnitt 6).
+Zertifikatsweg **A** (Caddys interne CA). Stand: 21.08.2026.
+
+Die Abschnitte 1 bis 4 beschreiben weiterhin den Weg für das NAS; die dort beschriebene
+Ausgangslage (`:80`, HTTP-Defaults) gilt für die NAS-Installation, nicht mehr für die lokale.
 
 > **Kein Feature, sondern eine Betriebsänderung.** Dieses Dokument folgt deshalb nicht dem
 > Template `Specs/SPEC.md`, sondern der Struktur der Deployment-Pläne
@@ -32,7 +35,7 @@ Alle browserseitigen Werte sind zur Laufzeit über Environment-Variablen gesetzt
 `FrontendConfigController` liefert `/assets/config.json` aus `frontend.config.*`
 (`frontend-service/src/main/resources/application.yml:26-32`), Issuer und Redirects kommen
 ebenfalls aus dem Environment. Der Wechsel ist damit **reine Konfiguration**: Caddyfile,
-`.env`, Realm-Reimport. Die eingecheckte `frontend-service/src/assets/config.json` ist nur
+`.env`, Keycloak-Client. Die eingecheckte `frontend-service/src/assets/config.json` ist nur
 der Fallback für den Angular-Dev-Server und für den Container-Betrieb ohne Belang.
 
 ---
@@ -206,9 +209,20 @@ automatisch, Keycloak leitet Schema und Port daraus ab.
 ### Realm
 
 `redirectUris` und `webOrigins` werden aus `${ZEV_FRONTEND_URL}` gebildet
-(`keycloak/realms/zev-realm.json:14-23`). Nach der Änderung ist ein **Realm-Reimport**
-nötig — oder die Werte werden in der Admin-Konsole von Hand angepasst. Ohne diesen Schritt
-scheitert der Login mit „Invalid redirect_uri".
+(`keycloak/realms/zev-realm.json:14-23`) — aber **nur beim Import**. Bei einem bereits
+importierten Realm ändert die Variable nichts mehr; ein Reimport ist bei laufendem Betrieb
+weder nötig noch erwünscht (er überschreibt Benutzer und Organisationen).
+
+**Der Weg für eine bestehende Installation** ist deshalb die Admin-Konsole, und zwar
+**vor** dem Umstellen, solange der alte Zugriffsweg noch funktioniert:
+
+1. Client `zev-frontend` öffnen
+2. *Valid redirect URIs* um `https://<host>:8443/*` ergänzen
+3. *Web origins* um `https://<host>:8443` ergänzen
+4. Die alten `http://`-Einträge **stehen lassen** — damit bleibt der Rückweg offen, ohne
+   Keycloak nochmals anzufassen
+
+Ohne diesen Schritt scheitert der Login mit „Invalid redirect_uri".
 
 Die zusätzlich hart eingetragenen `http://localhost:8000/*`-Einträge betreffen die lokale
 Entwicklung und können bleiben.
@@ -218,10 +232,16 @@ Unter HTTPS ist die Bedingung ohnehin erfüllt — kein Handlungsbedarf.
 
 ---
 
-## 5. Lokale Umstellung (vorbereitet)
+## 5. Lokale Umstellung (umgesetzt, Standardbetrieb)
 
-Die lokale Umstellung ist im Repository **vorbereitet, aber nicht aktiv**. Der Stack läuft
-unverändert auf `http://localhost:8000`; der Wechsel ist ein Block in der `.env`.
+Lokal läuft der Stack über **`https://localhost:8443`**; `http://localhost:8000` leitet dorthin
+weiter. `.env.example` trägt die HTTPS-Werte aktiv — wer das Repository frisch aufsetzt,
+bekommt HTTPS als Standard und muss dafür **einmalig das Root-Zertifikat importieren**
+(Schritt 3–5 unten), sonst weist der Browser die Anwendung ab.
+
+Verifiziert durch die vollständige E2E-Suite gegen `https://localhost:8443`: 401 passed,
+33 skipped, keine Flakes. Der Rückweg auf HTTP ist das Auskommentieren des `.env`-Blocks —
+dann greifen die Defaults aus `docker-compose.yml` und der HTTP-Caddyfile.
 
 ### Was dafür im Repository liegt
 
@@ -255,7 +275,9 @@ docker cp caddy:/data/caddy/pki/authorities/local/root.crt caddy-root.crt
 # 4. Import in den Windows-Zertifikatspeicher (Administrator-Konsole)
 certutil -addstore -f ROOT caddy-root.crt
 
-# 5. Realm neu importieren (redirectUris/webOrigins haengen an ZEV_FRONTEND_URL)
+# 5. Keycloak-Client zev-frontend: Valid redirect URIs + Web origins auf die neue
+#    Origin ergaenzen (Admin-Konsole). Nur bei einem NEUEN Realm entstehen sie
+#    automatisch aus ZEV_FRONTEND_URL - siehe Abschnitt 4.
 
 # 6. Issuer gegenpruefen - MUSS zeichengleich zu BACKEND_JWT_ISSUER_URI sein
 curl -sk https://localhost:8443/auth/realms/zev/.well-known/openid-configuration \
@@ -301,9 +323,9 @@ funktionsfähig bleibt.
 | [ ] | 2. Zertifikat bereitstellen | Weg A: nichts (Caddy erzeugt es beim Start). Weg B: DSM-Zertifikat anfordern und den PEM-Pfad festlegen. Weg C: eigenes Caddy-Image bauen. |
 | [ ] | 3. Caddy **additiv** auf HTTPS | Site-Adresse + `tls`-Direktive, Port `8443:443` ergänzen, `8000:80` **behalten**. Danach ist die App über beide Wege erreichbar — kein Aussperren möglich. |
 | [ ] | 4. Erreichbarkeit prüfen | `https://nafam.zev:8443/` liefert die index.html; das Zertifikat wird als vertrauenswürdig angezeigt (bei Weg A erst nach Import der Root-CA). |
-| [ ] | 5. Root-CA verteilen (nur Weg A) | Caddys Root-Zertifikat aus dem Volume `caddy-data` holen und auf allen Clients importieren. |
-| [ ] | 6. `.env` umstellen | Alle Werte aus Abschnitt 4 **gemeinsam** — eine halbe Umstellung bricht die Anmeldung. |
-| [ ] | 7. Realm-Reimport | `redirectUris`/`webOrigins` auf die neue Origin. |
+| [ ] | 5. Keycloak-Client ergänzen | **Noch im laufenden HTTP-Betrieb:** beim Client `zev-frontend` die neuen `https://…:8443`-Adressen zu *Valid redirect URIs* und *Web origins* hinzufügen, die alten `http://`-Einträge stehen lassen. Kein Realm-Reimport — der wirkt bei bestehendem Realm nicht und würde Benutzer/Organisationen überschreiben (Abschnitt 4). |
+| [ ] | 6. Root-CA verteilen (nur Weg A) | Caddys Root-Zertifikat aus dem Volume `caddy-data` holen und auf allen Clients importieren. |
+| [ ] | 7. `.env` umstellen | Alle Werte aus Abschnitt 4 **gemeinsam** — eine halbe Umstellung bricht die Anmeldung. |
 | [ ] | 8. Neustart und Verifikation | Abschnitt 6. |
 | [ ] | 9. HTTP abklemmen (optional) | Erst wenn alles läuft: Weiterleitung behalten, aber sicherstellen, dass kein Client mehr direkt auf `:8000` konfiguriert ist. |
 
