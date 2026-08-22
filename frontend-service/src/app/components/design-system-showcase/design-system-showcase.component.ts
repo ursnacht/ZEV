@@ -15,6 +15,9 @@ import { ICONS } from '../icon/icons';
 export class DesignSystemShowcaseComponent {
   // Icon names for showcase
   iconNames: string[] = Object.keys(ICONS);
+
+  /** Aufklapp-Zustand des Untermenue-Beispiels in der Navigations-Sektion. */
+  showcaseSubmenuOpen = true;
   collapsibleOpen = false;
   quarterDateFrom = '';
   quarterDateTo = '';

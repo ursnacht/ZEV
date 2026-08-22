@@ -11,11 +11,12 @@ import { TranslationService } from '../../services/translation.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
 import { FeatureFlagDirective } from '../../directives/feature-flag.directive';
+import { PermissionDirective } from '../../directives/permission.directive';
 
 @Component({
   selector: 'app-navigation',
   standalone: true,
-  imports: [RouterModule, TranslatePipe, IconComponent, FeatureFlagDirective],
+  imports: [RouterModule, TranslatePipe, IconComponent, FeatureFlagDirective, PermissionDirective],
   templateUrl: './navigation.component.html',
   styleUrls: ['./navigation.component.css']
 })
@@ -34,6 +35,9 @@ export class NavigationComponent implements OnInit, OnDestroy {
 
   isMenuOpen = false;
   isCompact = false;
+
+  /** Aufklapp-Zustand des Nebenkosten-Untermenues. */
+  isNebenkostenOpen = false;
 
   @HostListener('window:scroll')
   onWindowScroll(): void {
@@ -71,6 +75,11 @@ export class NavigationComponent implements OnInit, OnDestroy {
   private checkAndOpenMenuForStartseite(url: string): void {
     if (url === '/' || url === '/startseite') {
       this.isMenuOpen = true;
+    }
+    // Steht man auf einer Nebenkosten-Seite, ist das Untermenue aufgeklappt - sonst waere der
+    // aktive Eintrag nicht sichtbar (Specs/Nebenkosten/Nebenkosten.md, FR-3).
+    if (url.startsWith('/nebenkosten')) {
+      this.isNebenkostenOpen = true;
     }
   }
 
@@ -133,5 +142,13 @@ export class NavigationComponent implements OnInit, OnDestroy {
 
   closeMenu() {
     this.isMenuOpen = false;
+  }
+
+  /**
+   * Klappt das Nebenkosten-Untermenue auf/zu. Der Elterneintrag navigiert bewusst nicht
+   * (Specs/Nebenkosten/Nebenkosten.md, FR-3) - deshalb ein Button und kein Link.
+   */
+  toggleNebenkosten(): void {
+    this.isNebenkostenOpen = !this.isNebenkostenOpen;
   }
 }

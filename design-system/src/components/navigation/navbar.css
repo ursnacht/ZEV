@@ -151,6 +151,56 @@ a.zev-navbar__link:hover {
   text-decoration: none;
 }
 
+/* --- Untermenue -----------------------------------------------------------
+   Ein Menueeintrag, der Untereintraege traegt und sie auf Klick auf-/zuklappt.
+   Der Elterneintrag ist ein <button>, kein Link: Er navigiert nicht.
+
+   Das Muster (--open-Modifier + transform-Transition am Indikator) ist von
+   .zev-collapsible uebernommen; dessen Klassen selbst passen hier nicht, weil sie
+   ein umrandetes Inhaltspanel mit hellem Header beschreiben.                     */
+
+.zev-navbar__submenu-toggle {
+  justify-content: space-between;
+}
+
+/* Haelt Icon und Beschriftung zusammen, waehrend der Indikator rechts steht. */
+.zev-navbar__submenu-label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+/* Indikator: chevron-down, im geoeffneten Zustand um 180 Grad gedreht. */
+.zev-navbar__submenu-icon {
+  transition: transform var(--transition-fast) ease-in-out;
+  flex-shrink: 0;
+}
+
+.zev-navbar__submenu-toggle--open .zev-navbar__submenu-icon {
+  transform: rotate(180deg);
+}
+
+.zev-navbar__submenu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height var(--transition-fast) ease-in-out;
+}
+
+.zev-navbar__submenu--open {
+  /* Grosszuegig bemessen: reicht fuer die absehbare Zahl an Untereintraegen und
+     erlaubt die Animation, die mit height:auto nicht moeglich waere. */
+  max-height: 20rem;
+}
+
+/* Untereintraege eingerueckt, damit die Hierarchie ohne Linien erkennbar ist. */
+.zev-navbar__submenu .zev-navbar__link {
+  padding-left: var(--spacing-xl);
+  font-size: 0.85rem;
+}
+
 .zev-navbar__user {
   display: flex;
   align-items: center;

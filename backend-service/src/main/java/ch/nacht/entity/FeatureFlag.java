@@ -13,7 +13,13 @@ import java.util.Optional;
 public enum FeatureFlag {
 
     /** Steuert die Sichtbarkeit/Verfügbarkeit des Messdatenuploads (CSV-Upload). */
-    MESSWERTE_UPLOAD(true, "FEATURE_FLAG_MESSWERTE_UPLOAD");
+    MESSWERTE_UPLOAD(true, "FEATURE_FLAG_MESSWERTE_UPLOAD"),
+
+    /**
+     * Steuert die Sichtbarkeit des Bereichs Nebenkostenabrechnung (Specs/Nebenkosten/).
+     * Default {@code false}: Der Bereich ist im Aufbau und wird erst je Mandant freigeschaltet.
+     */
+    NEBENKOSTENABRECHNUNG(false, "FEATURE_FLAG_NEBENKOSTENABRECHNUNG");
 
     private final boolean defaultEnabled;
     private final String beschreibungKey;

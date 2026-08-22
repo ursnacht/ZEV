@@ -37,6 +37,7 @@ Stand: 2026-07-09
 | `mieter:manage`         | ❌  | ✅        | ✅        |
 | `rechnungen:manage`     | ✅  | ✅        | ✅        |
 | `debitoren:manage`      | ✅  | ✅        | ✅        |
+| `nebenkosten:manage`    | ✅  | ✅        | ✅        |
 | `translations:manage`   | ❌  | ✅        | ❌        |
 | `featureflags:manage`   | ❌  | ✅        | ❌        |
 | `datenbank:read`        | ❌  | ✅        | ❌        |

@@ -50,18 +50,18 @@ verwirren könnte.
 
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
-| [ ] | 1. Feature-Flag (Backend) | Enum-Wert in `FeatureFlag.java` ergänzen. Danach erscheint der Flag in der Verwaltung unter `/einstellungen` — noch ohne Wirkung. |
-| [ ] | 2. Übersetzungen | `V116__Add_Nebenkosten_Translations.sql` mit `NEBENKOSTEN`, `NK_TARIFPOSITIONEN`, `NK_ABRECHNUNG`, `NK_NOCH_NICHT_VERFUEGBAR`, `FEATURE_FLAG_NEBENKOSTENABRECHNUNG` — je **deutsch und englisch**, Abschluss mit `ON CONFLICT (key) DO NOTHING`. |
-| [ ] | 3. Keycloak-Rolle (Realm-JSON) | `nebenkosten:manage` als Realm-Rolle in `zev-realm.json` und in die `composite`-Listen der vorgesehenen Fachrollen. Wirkt nur bei Neuinstallation; fuer die laufende Instanz siehe Phase 13. |
-| [ ] | 4. Berechtigungsmatrix | `Specs/Berechtigungen.md` um `nebenkosten:manage` ergänzen. |
-| [ ] | 5. Permission-Prüflogik extrahieren | Die Rollenauswertung aus `auth.guard.ts:30-40` in `utils/permissions.ts` als `hasAnyPermission(rollen, permissions)` herausziehen; der Guard ruft sie auf. **Kein Verhaltenswechsel** — die bestehenden Guard-Tests müssen unverändert grün bleiben. |
-| [ ] | 6. Direktive `*appPermission` | Nach dem Vorbild von `directives/feature-flag.directive.ts` (Signal + `effect`), Rollenquelle `inject(Keycloak)` → `realmAccess?.roles` und `resourceAccess`, Prüfung über `hasAnyPermission` aus Phase 5. |
-| [ ] | 7. Icon `chevron-down` | Eine Zeile in `icons.ts`: `'chevron-down': '<polyline points="6 9 12 15 18 9"></polyline>'` (Feather, MIT — passt zum bestehenden `chevron-right`). Der Showcase listet Icons über `Object.keys(ICONS)` und zeigt es damit automatisch. |
-| [ ] | 8. Design System: Untermenü | Klassen für Elterneintrag, aufklappbare Liste und Zustand in `navigation.css`; die Optik des Auf-/Zuklappens über die bestehenden `.zev-collapsible`-Klassen. Der Indikator nutzt `chevron-down` und wird im geöffneten Zustand per CSS um 180° gedreht (erlaubt eine Übergangsanimation mit einem einzigen Icon). `npm run build` im Design System. |
-| [ ] | 9. Gerüstseiten | Zwei Komponenten mit `zev-container`, `<h1>` samt `app-icon` und `zev-message--info`. Kein Service, kein HTTP-Aufruf. |
-| [ ] | 10. Routing | Zwei Routen mit `[AuthGuard, FeatureFlagGuard]` und `data: { permissions: ['nebenkosten:manage'], featureFlag: 'NEBENKOSTENABRECHNUNG' }`, dazu `{ path: 'nebenkosten', redirectTo: '/nebenkosten/abrechnung', pathMatch: 'full' }`. |
-| [ ] | 11. Navigation | Menüpunkt „Nebenkosten" mit `*appFeature` **und** `*appPermission`, Untereinträge, Aufklapp-Zustand in der Komponente, aufgeklappt wenn eine NK-Route aktiv ist. |
-| [ ] | 12. Design-System-Showcase | Untermenü-Variante im Showcase ergänzen. |
+| [x] | 1. Feature-Flag (Backend) | Enum-Wert in `FeatureFlag.java` ergänzen. Danach erscheint der Flag in der Verwaltung unter `/einstellungen` — noch ohne Wirkung. |
+| [x] | 2. Übersetzungen | `V116__Add_Nebenkosten_Translations.sql` mit `NEBENKOSTEN`, `NK_TARIFPOSITIONEN`, `NK_ABRECHNUNG`, `NK_NOCH_NICHT_VERFUEGBAR`, `FEATURE_FLAG_NEBENKOSTENABRECHNUNG` — je **deutsch und englisch**, Abschluss mit `ON CONFLICT (key) DO NOTHING`. |
+| [x] | 3. Keycloak-Rolle (Realm-JSON) | `nebenkosten:manage` als Realm-Rolle in `zev-realm.json` und in die `composite`-Listen der vorgesehenen Fachrollen. Wirkt nur bei Neuinstallation; fuer die laufende Instanz siehe Phase 13. |
+| [x] | 4. Berechtigungsmatrix | `Specs/Berechtigungen.md` um `nebenkosten:manage` ergänzen. |
+| [x] | 5. Permission-Prüflogik extrahieren | Die Rollenauswertung aus `auth.guard.ts:30-40` in `utils/permissions.ts` als `hasAnyPermission(rollen, permissions)` herausziehen; der Guard ruft sie auf. **Kein Verhaltenswechsel** — die bestehenden Guard-Tests müssen unverändert grün bleiben. |
+| [x] | 6. Direktive `*appPermission` | Nach dem Vorbild von `directives/feature-flag.directive.ts` (Signal + `effect`), Rollenquelle `inject(Keycloak)` → `realmAccess?.roles` und `resourceAccess`, Prüfung über `hasAnyPermission` aus Phase 5. |
+| [x] | 7. Icon `chevron-down` | Eine Zeile in `icons.ts`: `'chevron-down': '<polyline points="6 9 12 15 18 9"></polyline>'` (Feather, MIT — passt zum bestehenden `chevron-right`). Der Showcase listet Icons über `Object.keys(ICONS)` und zeigt es damit automatisch. |
+| [x] | 8. Design System: Untermenü | Klassen für Elterneintrag, aufklappbare Liste und Zustand in `navigation.css`; die Optik des Auf-/Zuklappens über die bestehenden `.zev-collapsible`-Klassen. Der Indikator nutzt `chevron-down` und wird im geöffneten Zustand per CSS um 180° gedreht (erlaubt eine Übergangsanimation mit einem einzigen Icon). `npm run build` im Design System. |
+| [x] | 9. Gerüstseiten | Zwei Komponenten mit `zev-container`, `<h1>` samt `app-icon` und `zev-message--info`. Kein Service, kein HTTP-Aufruf. |
+| [x] | 10. Routing | Zwei Routen mit `[AuthGuard, FeatureFlagGuard]` und `data: { permissions: ['nebenkosten:manage'], featureFlag: 'NEBENKOSTENABRECHNUNG' }`, dazu `{ path: 'nebenkosten', redirectTo: '/nebenkosten/abrechnung', pathMatch: 'full' }`. |
+| [x] | 11. Navigation | Menüpunkt „Nebenkosten" mit `*appFeature` **und** `*appPermission`, Untereinträge, Aufklapp-Zustand in der Komponente, aufgeklappt wenn eine NK-Route aktiv ist. |
+| [x] | 12. Design-System-Showcase | Untermenü-Variante im Showcase ergänzen. |
 | [ ] | 13. Keycloak (Betreiber) | **Kein Code.** Rolle `nebenkosten:manage` in der laufenden Instanz anlegen, den Fachrollen zuweisen, neu anmelden. **Vorher sind die Akzeptanzkriterien nicht prüfbar.** |
 
 ### Validierung nach den Phasen

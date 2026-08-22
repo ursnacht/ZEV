@@ -1,6 +1,7 @@
 import { ActivatedRouteSnapshot, CanActivateFn, Router, RouterStateSnapshot, UrlTree } from '@angular/router';
 import { inject } from '@angular/core';
 import { AuthGuardData, createAuthGuard } from 'keycloak-angular';
+import { hasAnyPermission } from '../utils/permissions';
 
 // Exportiert für Unit-Tests (die Guard-Logik unabhängig vom keycloak-angular-Wrapper prüfbar).
 export const isAccessAllowed = async (
@@ -17,29 +18,13 @@ export const isAccessAllowed = async (
         return false;
     }
 
-    // Erforderliche Permissions aus den Route-Daten lesen.
-    const requiredPermissions = route.data['permissions'];
+    // Erforderliche Permissions aus den Route-Daten lesen. Die Auswertung der Rollen liegt in
+    // utils/permissions.ts, damit die Permission-Direktive im Template exakt gleich prüft.
+    // Keine Permission gefordert -> Zugriff für jeden authentifizierten User erlaubt;
+    // sonst genügt EINE der geforderten Permissions.
+    const requiredPermissions = route.data['permissions'] as string[] | undefined;
 
-    // Keine Permission gefordert -> Zugriff für jeden authentifizierten User erlaubt.
-    if (!requiredPermissions || requiredPermissions.length === 0) {
-        return true;
-    }
-
-    // Prüft, ob der User eine Permission besitzt. Permissions sind Keycloak-Rollen, die von den
-    // Fachrollen (Composite Roles) gebündelt werden und daher in den effektiven Realm-/Resource-Rollen erscheinen.
-    const hasPermission = (permission: string): boolean => {
-        // Realm-Rollen prüfen
-        if (grantedRoles.realmRoles.includes(permission)) {
-            return true;
-        }
-        // Resource-Rollen prüfen
-        return Object.values(grantedRoles.resourceRoles).some((roles) => roles.includes(permission));
-    };
-
-    // Zugriff wird gewährt, sobald der User EINE der geforderten Permissions besitzt.
-    const hasAnyRequiredPermission = requiredPermissions.some((permission: string) => hasPermission(permission));
-
-    if (hasAnyRequiredPermission) {
+    if (hasAnyPermission(grantedRoles, requiredPermissions ?? [])) {
         return true;
     }
 

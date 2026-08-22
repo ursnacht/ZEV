@@ -130,6 +130,10 @@
                 "description": "Rechnungen generieren und herunterladen"
             },
             {
+                "name": "nebenkosten:manage",
+                "description": "Nebenkostenabrechnung verwalten"
+            },
+            {
                 "name": "einstellungen:write",
                 "description": "Einstellungen (Rechnungsangaben) bearbeiten"
             },
@@ -172,6 +176,7 @@
                         "mieter:read",
                         "rechnungen:manage",
                         "debitoren:manage",
+                        "nebenkosten:manage",
                         "systemmeldungen:read"
                     ]
                 }

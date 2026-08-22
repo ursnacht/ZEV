@@ -18,6 +18,8 @@ import { SystemmeldungenComponent } from './components/systemmeldungen/systemmel
 
 import { AuthGuard } from './guards/auth.guard';
 import { FeatureFlagGuard } from './guards/feature-flag.guard';
+import { NebenkostenTarifpositionenComponent } from './components/nebenkosten-tarifpositionen/nebenkosten-tarifpositionen.component';
+import { NebenkostenAbrechnungComponent } from './components/nebenkosten-abrechnung/nebenkosten-abrechnung.component';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/startseite', pathMatch: 'full' },
@@ -33,6 +35,12 @@ export const routes: Routes = [
   { path: 'tarife', component: TarifListComponent, canActivate: [AuthGuard], data: { permissions: ['tarife:manage'] } },
   { path: 'mieter', component: MieterListComponent, canActivate: [AuthGuard], data: { permissions: ['mieter:manage'] } },
   { path: 'tarifpositionen', component: TarifpositionListComponent, canActivate: [AuthGuard], data: { permissions: ['rechnungen:manage'] } },
+  // Nebenkostenabrechnung (Specs/Nebenkosten/). Der Elterneintrag im Menue ist nur Aufklapper;
+  // /nebenkosten wird trotzdem beantwortet, weil die URL getippt und verlinkt wird - es gibt
+  // keine Wildcard-Route, ein unbekannter Pfad ergaebe einen Router-Fehler.
+  { path: 'nebenkosten', redirectTo: '/nebenkosten/abrechnung', pathMatch: 'full' },
+  { path: 'nebenkosten/tarifpositionen', component: NebenkostenTarifpositionenComponent, canActivate: [AuthGuard, FeatureFlagGuard], data: { permissions: ['nebenkosten:manage'], featureFlag: 'NEBENKOSTENABRECHNUNG' } },
+  { path: 'nebenkosten/abrechnung', component: NebenkostenAbrechnungComponent, canActivate: [AuthGuard, FeatureFlagGuard], data: { permissions: ['nebenkosten:manage'], featureFlag: 'NEBENKOSTENABRECHNUNG' } },
   { path: 'design-system', component: DesignSystemShowcaseComponent, canActivate: [AuthGuard] },
   { path: 'einstellungen', component: EinstellungenComponent, canActivate: [AuthGuard], data: { permissions: ['einstellungen:write'] } },
   { path: 'translations', component: TranslationEditorComponent, canActivate: [AuthGuard], data: { permissions: ['translations:manage'] } },

@@ -53,6 +53,9 @@ export const ICONS: Record<string, string> = {
 
   'chevron-right': '<polyline points="9 18 15 12 9 6"></polyline>',
 
+  // Aufklapp-Indikator fuer Untermenues; im geoeffneten Zustand per CSS um 180 Grad gedreht.
+  'chevron-down': '<polyline points="6 9 12 15 18 9"></polyline>',
+
   'calculator': '<rect x="4" y="2" width="16" height="20" rx="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="8" y1="10" x2="8" y2="10.01"></line><line x1="12" y1="10" x2="12" y2="10.01"></line><line x1="16" y1="10" x2="16" y2="10.01"></line><line x1="8" y1="14" x2="8" y2="14.01"></line><line x1="12" y1="14" x2="12" y2="14.01"></line><line x1="16" y1="14" x2="16" y2="14.01"></line><line x1="8" y1="18" x2="8" y2="18.01"></line><line x1="12" y1="18" x2="12" y2="18.01"></line><line x1="16" y1="18" x2="16" y2="18.01"></line>',
 
   // Additional useful icons

@@ -344,6 +344,22 @@
           <li><a href="#" class="zev-navbar__link">Link 1</a></li>
           <li><a href="#" class="zev-navbar__link zev-navbar__link--active">Active Link</a></li>
           <li><a href="#" class="zev-navbar__link">Link 3</a></li>
+          <li>
+            <button type="button"
+              class="zev-navbar__link zev-navbar__submenu-toggle"
+              [class.zev-navbar__submenu-toggle--open]="showcaseSubmenuOpen"
+              (click)="showcaseSubmenuOpen = !showcaseSubmenuOpen">
+              <span class="zev-navbar__submenu-label">
+                <app-icon name="calculator"></app-icon>
+                Mit Untermenü
+              </span>
+              <app-icon name="chevron-down" class="zev-navbar__submenu-icon"></app-icon>
+            </button>
+            <ul class="zev-navbar__submenu" [class.zev-navbar__submenu--open]="showcaseSubmenuOpen">
+              <li><a href="#" class="zev-navbar__link">Untereintrag 1</a></li>
+              <li><a href="#" class="zev-navbar__link zev-navbar__link--active">Untereintrag 2 (aktiv)</a></li>
+            </ul>
+          </li>
         </ul>
       </div>
     </nav>

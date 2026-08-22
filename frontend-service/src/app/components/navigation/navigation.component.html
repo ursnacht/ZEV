@@ -65,6 +65,37 @@
           {{ 'DEBITORKONTROLLE' | translate }}
         </a>
       </li>
+      <ng-container *appFeature="'NEBENKOSTENABRECHNUNG'">
+          <li *appPermission="'nebenkosten:manage'">
+            <button type="button"
+              class="zev-navbar__link zev-navbar__submenu-toggle"
+              [class.zev-navbar__submenu-toggle--open]="isNebenkostenOpen"
+              [attr.aria-expanded]="isNebenkostenOpen"
+              (click)="toggleNebenkosten()">
+              <span class="zev-navbar__submenu-label">
+                <app-icon name="calculator"></app-icon>
+                {{ 'NEBENKOSTEN' | translate }}
+              </span>
+              <app-icon name="chevron-down" class="zev-navbar__submenu-icon"></app-icon>
+            </button>
+            <ul class="zev-navbar__submenu" [class.zev-navbar__submenu--open]="isNebenkostenOpen">
+              <li>
+                <a routerLink="/nebenkosten/tarifpositionen" routerLinkActive="zev-navbar__link--active"
+                  class="zev-navbar__link" (click)="closeMenu()">
+                  <app-icon name="tag"></app-icon>
+                  {{ 'NK_TARIFPOSITIONEN' | translate }}
+                </a>
+              </li>
+              <li>
+                <a routerLink="/nebenkosten/abrechnung" routerLinkActive="zev-navbar__link--active"
+                  class="zev-navbar__link" (click)="closeMenu()">
+                  <app-icon name="file-text"></app-icon>
+                  {{ 'NK_ABRECHNUNG' | translate }}
+                </a>
+              </li>
+            </ul>
+          </li>
+      </ng-container>
       <li *appFeature="'MESSWERTE_UPLOAD'">
         <a routerLink="/upload" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
          (click)="closeMenu()">
