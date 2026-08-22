@@ -423,6 +423,10 @@ Service sichtbar und folgt dem bestehenden Muster des Org-Filters.
    Zeilen nach FR-3, der Akonto-Block und der Saldo.
 
 * Beträge werden bei jeder Eingabe **sofort neu gerechnet** (clientseitig), ohne Speichern.
+  Diese Rechnung ist eine **Vorschau**: Massgebend ist das Backend. **Nach dem Speichern laedt
+  die Maske die Antwort des Servers und zeigt dessen Werte an**, nicht die selbst gerechneten.
+  Weicht die Vorschau ab, wird das im selben Moment sichtbar statt monatelang unbemerkt zu
+  bleiben - die Regeln existieren zwangslaeufig zweimal (Java und TypeScript).
 * **Speichern**-Schaltfläche am Ende der Maske.
 * Ist die Abrechnung `abgerechnet`, sind **alle** Eingabefelder gesperrt und ein Hinweis erklärt
   warum; nur das Flag selbst bleibt bedienbar.
@@ -485,6 +489,8 @@ Die Liste ist der Mindestumfang; beim Umsetzen ergänzte Schlüssel folgen derse
 * [ ] Ist die Anzahl Wohnungen kleiner als die tatsächliche Belegung (`Σ Tage(i) > Nenner`),
       wird das Speichern mit einer Meldung abgewiesen, die beide Werte nennt.
 * [ ] Eine Änderung der Anzahl Wohnungen ändert alle Umlagebeträge sofort, ohne Speichern.
+* [ ] Nach dem Speichern zeigt die Maske die vom **Server** gelieferten Betraege, nicht die
+      clientseitig gerechnete Vorschau.
 * [ ] Steht eine Wohnung zeitweise leer, bleibt ihr Anteil **unverteilt**; die übrigen Mieter
       zahlen dadurch **nicht** mehr.
 * [ ] Der unverteilte Leerstandsanteil wird je Umlageposition ausgewiesen.
