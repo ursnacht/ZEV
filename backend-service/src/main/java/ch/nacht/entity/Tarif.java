@@ -69,7 +69,7 @@ public class Tarif {
      * Mengeneinheit dieses Tarifs für die Rechnungszeile: bei frei konfigurierbaren Typen der
      * Wert am Tarif, sonst der aus dem Typ abgeleitete.
      *
-     * @return {@code "KWH"}, {@code "MONAT"} oder {@code "STUECK"}
+     * @return Name eines {@link Mengeneinheit}-Werts, z.B. {@code "KWH"} oder {@code "STUECK"}
      */
     public String effektiveMengeneinheit() {
         if (TarifTyp.EIGENE_MENGENEINHEIT.contains(tariftyp) && mengeneinheit != null) {

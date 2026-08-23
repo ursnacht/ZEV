@@ -32,6 +32,26 @@ public interface EinheitRepository extends JpaRepository<Einheit, Long> {
     boolean existsByTypAndIdNot(EinheitTyp typ, Long id);
 
     /**
+     * Anzahl Einheiten eines Typs, die als Wohnung an der Nebenkostenabrechnung teilnehmen
+     * (orgFilter muss aktiv sein).
+     *
+     * <p>Belegt dort die „Anzahl Wohnungen" vor ({@code CONSUMER}). Massgebend ist allein das
+     * Kennzeichen {@code nebenkostenRelevant} — nicht die Mieterzuordnung: Ein Messpunkt wie
+     * Allgemeinstrom kann durchaus einem Mieter zugeordnet sein, nämlich dem Eigentümer.
+     *
+     * <p>Bewusst <b>ohne</b> Zeitraum: Eine Wohnung, die im Abrechnungszeitraum leer stand, ist
+     * trotzdem eine Wohnung und gehört in den Nenner — genau darauf beruht der Leerstandsanteil
+     * (FR-2).
+     *
+     * <p>Der Wert bleibt ein <b>Vorschlag</b>: Der Nenner wird an der Abrechnung erfasst und ist
+     * überschreibbar.
+     *
+     * @param typ Einheitentyp
+     * @return Anzahl teilnehmender Einheiten dieses Typs
+     */
+    long countByTypAndNebenkostenRelevantTrue(EinheitTyp typ);
+
+    /**
      * Prüft, ob eine <b>andere</b> Ladestations-Einheit dieselbe RFID (`messpunkt`) trägt.
      * Nur für {@code LADESTATION}: Die Bilanz-Typen dürfen sich einen Messpunkt teilen, deshalb
      * ist die Eindeutigkeit auf diesen Typ eingeschränkt (orgFilter muss aktiv sein).

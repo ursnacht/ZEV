@@ -1,7 +1,87 @@
 <div class="zev-container">
   <h1><app-icon name="file-text" size="lg"></app-icon> {{ 'NK_ABRECHNUNG' | translate }}</h1>
 
-  <div class="zev-message zev-message--info">
-    <span>{{ 'NK_NOCH_NICHT_VERFUEGBAR' | translate }}</span>
-  </div>
+  @if (message) {
+    <div class="zev-message" [ngClass]="'zev-message--' + messageType"
+      [class.zev-message--dismissible]="messagePersistent" (click)="messagePersistent && dismissMessage()">
+      <span>{{ message | translate }}</span>
+      @if (messagePersistent) {
+        <span class="zev-message__dismiss">&times;</span>
+      }
+    </div>
+  }
+
+  @if (!showForm) {
+    <div>
+      <!-- Vor der Tabelle wie auf den uebrigen Seiten (Tarife, Einheiten, Mieter): Die Stelle,
+           an der die Schaltflaeche erwartet wird, haengt nicht an der Laenge der Liste. -->
+      <div class="zev-button-row">
+        <button class="zev-button zev-button--primary" (click)="onCreateNew()">
+          <app-icon name="plus"></app-icon>
+          {{ 'NK_NEUE_ABRECHNUNG' | translate }}
+        </button>
+      </div>
+
+      @if (abrechnungen.length > 0) {
+        <table class="zev-table" appColumnResize>
+          <thead>
+            <tr>
+              <th class="zev-table__header--sortable" (click)="onSort('bezeichnung')">
+                {{ 'BEZEICHNUNG' | translate }}
+                @if (sortColumn === 'bezeichnung') {
+                  <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+                }
+              </th>
+              <th class="zev-table__header--sortable" (click)="onSort('datumVon')">
+                {{ 'NK_DATUM_VON' | translate }}
+                @if (sortColumn === 'datumVon') {
+                  <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+                }
+              </th>
+              <th class="zev-table__header--sortable" (click)="onSort('datumBis')">
+                {{ 'NK_DATUM_BIS' | translate }}
+                @if (sortColumn === 'datumBis') {
+                  <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+                }
+              </th>
+              <th>{{ 'NK_ABGERECHNET' | translate }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (abrechnung of abrechnungen; track abrechnung.id) {
+              <tr>
+                <td>{{ abrechnung.bezeichnung }}</td>
+                <td>{{ abrechnung.datumVon | swissDate }}</td>
+                <td>{{ abrechnung.datumBis | swissDate }}</td>
+                <td>
+                  <!-- Direkt bedienbar: Abschliessen ist der haeufigste Vorgang und soll nicht
+                       den Umweg ueber die Maske brauchen. -->
+                  <input type="checkbox" class="zev-checkbox" [checked]="abrechnung.abgerechnet"
+                    (change)="onToggleAbgerechnet(abrechnung, $event)"
+                    [attr.aria-label]="'NK_ABGERECHNET' | translate" />
+                </td>
+                <td>
+                  <app-kebab-menu
+                    [items]="menuItems"
+                    (itemClick)="onMenuAction($event, abrechnung)">
+                  </app-kebab-menu>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      } @else {
+        <p>{{ 'NK_KEINE_ABRECHNUNGEN' | translate }}</p>
+      }
+    </div>
+  }
+
+  @if (showForm) {
+    <app-nebenkosten-abrechnung-form
+      [abrechnungId]="selectedId"
+      (saved)="onFormSaved()"
+      (closed)="onFormClose()">
+    </app-nebenkosten-abrechnung-form>
+  }
 </div>

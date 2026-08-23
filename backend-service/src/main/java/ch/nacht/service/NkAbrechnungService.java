@@ -1,0 +1,596 @@
+package ch.nacht.service;
+
+import ch.nacht.dto.NkAbrechnungDetailDTO;
+import ch.nacht.dto.NkAkontoDTO;
+import ch.nacht.dto.NkMieterBasisDTO;
+import ch.nacht.dto.NkPositionDTO;
+import ch.nacht.dto.NkVerbrauchDTO;
+import ch.nacht.dto.NkZusatzDTO;
+import ch.nacht.entity.Einheit;
+import ch.nacht.entity.EinheitTyp;
+import ch.nacht.entity.FeatureFlag;
+import ch.nacht.entity.Mieter;
+import ch.nacht.entity.MieterEinheit;
+import ch.nacht.entity.NkAbrechnung;
+import ch.nacht.entity.NkAkonto;
+import ch.nacht.entity.NkPosition;
+import ch.nacht.entity.NkPositionsart;
+import ch.nacht.entity.NkVerbrauch;
+import ch.nacht.entity.NkZusatz;
+import ch.nacht.exception.FeatureDisabledException;
+import ch.nacht.repository.EinheitRepository;
+import ch.nacht.repository.MieterEinheitRepository;
+import ch.nacht.repository.MieterRepository;
+import ch.nacht.repository.NkAbrechnungRepository;
+import ch.nacht.repository.NkAkontoRepository;
+import ch.nacht.repository.NkPositionRepository;
+import ch.nacht.repository.NkVerbrauchRepository;
+import ch.nacht.repository.NkZusatzRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * Verwaltung der Nebenkostenabrechnungen (Specs/Nebenkosten/Abrechnung.md).
+ *
+ * <p>Jede öffentliche Methode beginnt mit {@link #pruefeFeatureFlag()} <b>und</b>
+ * {@code enableOrgFilter()}. Der Flag-Aufruf ist bewusst explizit und nicht als Aspect gelöst: Er
+ * steht damit im Code sichtbar neben dem Org-Filter und folgt dessen Muster. Der Preis ist
+ * bekannt — wird er in einer neuen Methode vergessen, ist sie ungeschützt; ein Architekturtest
+ * sichert das ab.
+ *
+ * <p>Gerechnet wird nirgends: Das macht {@link NkBerechnungService}, der ohne Datenbank auskommt.
+ * Dieser Service lädt, prüft und speichert.
+ */
+@Service
+public class NkAbrechnungService {
+
+    private static final Logger log = LoggerFactory.getLogger(NkAbrechnungService.class);
+
+    private final NkAbrechnungRepository abrechnungRepository;
+    private final NkPositionRepository positionRepository;
+    private final NkVerbrauchRepository verbrauchRepository;
+    private final NkZusatzRepository zusatzRepository;
+    private final NkAkontoRepository akontoRepository;
+    private final MieterRepository mieterRepository;
+    private final MieterEinheitRepository mieterEinheitRepository;
+    private final EinheitRepository einheitRepository;
+    private final NkBerechnungService berechnungService;
+    private final FeatureFlagService featureFlagService;
+    private final OrganizationContextService organizationContextService;
+    private final HibernateFilterService hibernateFilterService;
+
+    public NkAbrechnungService(NkAbrechnungRepository abrechnungRepository,
+                               NkPositionRepository positionRepository,
+                               NkVerbrauchRepository verbrauchRepository,
+                               NkZusatzRepository zusatzRepository,
+                               NkAkontoRepository akontoRepository,
+                               MieterRepository mieterRepository,
+                               MieterEinheitRepository mieterEinheitRepository,
+                               EinheitRepository einheitRepository,
+                               NkBerechnungService berechnungService,
+                               FeatureFlagService featureFlagService,
+                               OrganizationContextService organizationContextService,
+                               HibernateFilterService hibernateFilterService) {
+        this.abrechnungRepository = abrechnungRepository;
+        this.positionRepository = positionRepository;
+        this.verbrauchRepository = verbrauchRepository;
+        this.zusatzRepository = zusatzRepository;
+        this.akontoRepository = akontoRepository;
+        this.mieterRepository = mieterRepository;
+        this.mieterEinheitRepository = mieterEinheitRepository;
+        this.einheitRepository = einheitRepository;
+        this.berechnungService = berechnungService;
+        this.featureFlagService = featureFlagService;
+        this.organizationContextService = organizationContextService;
+        this.hibernateFilterService = hibernateFilterService;
+    }
+
+    /**
+     * Alle Abrechnungen, neuste zuerst.
+     *
+     * @return Liste der Abrechnungen
+     */
+    @Transactional(readOnly = true)
+    public List<NkAbrechnung> getAllAbrechnungen() {
+        pruefeFeatureFlag();
+        hibernateFilterService.enableOrgFilter();
+        return abrechnungRepository.findAllByOrderByDatumVonDesc();
+    }
+
+    /**
+     * Eine Abrechnung samt Positionen, Mieterblöcken und berechneten Beträgen.
+     *
+     * @param id ID der Abrechnung
+     * @return Die zusammengesetzte Antwort, falls die Abrechnung existiert
+     */
+    @Transactional(readOnly = true)
+    public Optional<NkAbrechnungDetailDTO> getAbrechnungDetail(Long id) {
+        pruefeFeatureFlag();
+        hibernateFilterService.enableOrgFilter();
+        return abrechnungRepository.findById(id).map(this::baueDetail);
+    }
+
+    /**
+     * Vorlage für eine neue Abrechnung: leere Listen und die vorgeschlagene Anzahl Wohnungen.
+     *
+     * <p>Eigener Endpunkt, weil die Maske die Zahl schon <b>vor</b> dem ersten Speichern braucht —
+     * ohne sie müsste der Benutzer den Nenner der Umlage raten.
+     *
+     * @return Vorlage ohne ID
+     */
+    @Transactional(readOnly = true)
+    public NkAbrechnungDetailDTO getVorlage() {
+        pruefeFeatureFlag();
+        hibernateFilterService.enableOrgFilter();
+
+        NkAbrechnungDetailDTO detail = new NkAbrechnungDetailDTO();
+        detail.setAbrechnung(new NkAbrechnung());
+        detail.setAnzahlWohnungenVorschlag(vorschlagAnzahlWohnungen());
+        return detail;
+    }
+
+    /**
+     * Legt eine Abrechnung an.
+     *
+     * @param abrechnung Die neue Abrechnung
+     * @return Die gespeicherte Abrechnung
+     * @throws IllegalArgumentException bei ungültigem Zeitraum oder ungültiger Anzahl Wohnungen
+     */
+    @Transactional
+    public NkAbrechnung createAbrechnung(NkAbrechnung abrechnung) {
+        pruefeFeatureFlag();
+        hibernateFilterService.enableOrgFilter();
+        log.info("Creating Nebenkostenabrechnung: {}", abrechnung);
+
+        pruefeKopf(abrechnung);
+        abrechnung.setId(null);
+        abrechnung.setOrgId(organizationContextService.getCurrentOrgId());
+        return abrechnungRepository.save(abrechnung);
+    }
+
+    /**
+     * Speichert Kopf, Positionen, Mengen, Zusatzpositionen und Akonto einer Abrechnung.
+     *
+     * <p>Positionen und Zeilen werden <b>ersetzt</b>, nicht abgeglichen: Die Maske schickt immer
+     * den vollständigen Stand, und die Reihenfolge ergibt sich aus der Listenposition (Drag &amp;
+     * Drop). Ein Abgleich je Zeile brächte nur die Frage mit, was mit fehlenden Zeilen geschieht.
+     *
+     * @param id ID der Abrechnung
+     * @param detail Der vollständige neue Stand
+     * @return Der neu geladene und berechnete Stand
+     * @throws IllegalArgumentException bei Validierungsfehlern oder abgeschlossener Abrechnung
+     */
+    @Transactional
+    public Optional<NkAbrechnungDetailDTO> saveAbrechnung(Long id, NkAbrechnungDetailDTO detail) {
+        pruefeFeatureFlag();
+        hibernateFilterService.enableOrgFilter();
+
+        Optional<NkAbrechnung> vorhanden = abrechnungRepository.findById(id);
+        if (vorhanden.isEmpty()) {
+            log.warn("Nebenkostenabrechnung {} not found", id);
+            return Optional.empty();
+        }
+
+        NkAbrechnung abrechnung = vorhanden.get();
+        pruefeNichtAbgerechnet(abrechnung);
+
+        NkAbrechnung neu = detail.getAbrechnung();
+        if (neu != null) {
+            pruefeKopf(neu);
+            abrechnung.setBezeichnung(neu.getBezeichnung());
+            abrechnung.setDatumVon(neu.getDatumVon());
+            abrechnung.setDatumBis(neu.getDatumBis());
+            abrechnung.setAnzahlWohnungen(neu.getAnzahlWohnungen());
+        }
+
+        List<NkMieterBasisDTO> mieter = ladeMieter(abrechnung);
+        pruefeNenner(abrechnung, mieter);
+        pruefePositionen(detail.getPositionen());
+
+        Long orgId = organizationContextService.getCurrentOrgId();
+        ersetzePositionen(abrechnung, detail.getPositionen(), orgId);
+        ersetzeZusaetze(abrechnung, detail.getZusaetze(), orgId);
+        ersetzeAkonto(abrechnung, detail.getAkonto(), orgId);
+
+        abrechnungRepository.save(abrechnung);
+        log.info("Saved Nebenkostenabrechnung {} with {} positions", id, detail.getPositionen().size());
+
+        return Optional.of(baueDetail(abrechnung));
+    }
+
+    /**
+     * Setzt oder löst das Flag „abgerechnet".
+     *
+     * <p>Der einzige Schreibzugriff, der auf einer abgeschlossenen Abrechnung erlaubt ist — sonst
+     * liesse sie sich nie wieder öffnen.
+     *
+     * @param id ID der Abrechnung
+     * @param abgerechnet Neuer Wert
+     * @return Die geänderte Abrechnung, falls vorhanden
+     */
+    @Transactional
+    public Optional<NkAbrechnung> setAbgerechnet(Long id, boolean abgerechnet) {
+        pruefeFeatureFlag();
+        hibernateFilterService.enableOrgFilter();
+
+        return abrechnungRepository.findById(id).map(abrechnung -> {
+            abrechnung.setAbgerechnet(abgerechnet);
+            log.info("Nebenkostenabrechnung {} abgerechnet={}", id, abgerechnet);
+            return abrechnungRepository.save(abrechnung);
+        });
+    }
+
+    /**
+     * Löscht eine Abrechnung samt Positionen, Mengen, Zusatzpositionen und Akonto
+     * (Fremdschlüssel {@code ON DELETE CASCADE}).
+     *
+     * @param id ID der Abrechnung
+     * @return true, wenn gelöscht
+     */
+    @Transactional
+    public boolean deleteAbrechnung(Long id) {
+        pruefeFeatureFlag();
+        hibernateFilterService.enableOrgFilter();
+
+        if (!abrechnungRepository.existsById(id)) {
+            log.warn("Nebenkostenabrechnung {} not found for deletion", id);
+            return false;
+        }
+        abrechnungRepository.deleteById(id);
+        log.info("Deleted Nebenkostenabrechnung {}", id);
+        return true;
+    }
+
+    // ===================== Zusammensetzen =====================
+
+    private NkAbrechnungDetailDTO baueDetail(NkAbrechnung abrechnung) {
+        List<NkPosition> positionen = positionRepository.findByAbrechnungIdOrderByReihenfolge(abrechnung.getId());
+        List<NkVerbrauch> verbraeuche = verbrauchRepository.findByAbrechnungId(abrechnung.getId());
+        List<NkZusatz> zusaetze = zusatzRepository.findByAbrechnungIdOrderByMieterIdAscReihenfolgeAsc(abrechnung.getId());
+        List<NkAkonto> akonto = akontoRepository.findByAbrechnungId(abrechnung.getId());
+        List<NkMieterBasisDTO> mieter = ladeMieter(abrechnung);
+
+        NkAbrechnungDetailDTO detail = new NkAbrechnungDetailDTO();
+        detail.setAbrechnung(abrechnung);
+        detail.setPositionen(zuPositionsDTOs(positionen, verbraeuche));
+        detail.setZusaetze(zuZusatzDTOs(zusaetze));
+        detail.setAkonto(zuAkontoDTOs(akonto));
+        detail.setAnzahlWohnungenVorschlag(vorschlagAnzahlWohnungen());
+        detail.setBerechnung(berechnungService.berechne(
+                abrechnung, positionen, verbraeuche, zusaetze, akonto, mieter));
+        return detail;
+    }
+
+    private List<NkPositionDTO> zuPositionsDTOs(List<NkPosition> positionen, List<NkVerbrauch> verbraeuche) {
+        Map<Long, List<NkVerbrauchDTO>> mengen = new HashMap<>();
+        for (NkVerbrauch v : verbraeuche) {
+            mengen.computeIfAbsent(v.getPositionId(), k -> new ArrayList<>())
+                    .add(new NkVerbrauchDTO(v.getMieterId(), v.getMenge()));
+        }
+
+        List<NkPositionDTO> dtos = new ArrayList<>();
+        for (NkPosition p : positionen) {
+            NkPositionDTO dto = new NkPositionDTO();
+            dto.setId(p.getId());
+            dto.setArt(p.getArt());
+            dto.setBezeichnung(p.getBezeichnung());
+            dto.setReihenfolge(p.getReihenfolge());
+            dto.setEinheit(p.getEinheit());
+            dto.setTotalbetrag(p.getTotalbetrag());
+            dto.setGesamtmenge(p.getGesamtmenge());
+            dto.setBetragProEinheit(p.getBetragProEinheit());
+            dto.setProzentsatz(p.getProzentsatz());
+            dto.setVerbraeuche(mengen.getOrDefault(p.getId(), new ArrayList<>()));
+            dtos.add(dto);
+        }
+        return dtos;
+    }
+
+    private List<NkZusatzDTO> zuZusatzDTOs(List<NkZusatz> zusaetze) {
+        List<NkZusatzDTO> dtos = new ArrayList<>();
+        for (NkZusatz z : zusaetze) {
+            NkZusatzDTO dto = new NkZusatzDTO();
+            dto.setId(z.getId());
+            dto.setMieterId(z.getMieterId());
+            dto.setReihenfolge(z.getReihenfolge());
+            dto.setBezeichnung(z.getBezeichnung());
+            dto.setEinheit(z.getEinheit());
+            dto.setMenge(z.getMenge());
+            dto.setBetragProEinheit(z.getBetragProEinheit());
+            dtos.add(dto);
+        }
+        return dtos;
+    }
+
+    private List<NkAkontoDTO> zuAkontoDTOs(List<NkAkonto> akonto) {
+        List<NkAkontoDTO> dtos = new ArrayList<>();
+        for (NkAkonto a : akonto) {
+            NkAkontoDTO dto = new NkAkontoDTO();
+            dto.setId(a.getId());
+            dto.setMieterId(a.getMieterId());
+            dto.setAnzahlMonate(a.getAnzahlMonate());
+            dto.setBetragProMonat(a.getBetragProMonat());
+            dto.setKorrektur(a.getKorrektur());
+            dtos.add(dto);
+        }
+        return dtos;
+    }
+
+    /**
+     * Die abzurechnenden Mieter samt der Zahl ihrer Wohnungen.
+     *
+     * <p>Gezählt werden nur {@code CONSUMER}-Einheiten <b>mit gesetztem Kennzeichen</b>
+     * {@code nebenkostenRelevant} — <b>dieselbe Regel wie beim Nenner</b> (FR-2). Eine Ladestation
+     * gehört nicht dazu und würde den Anteil ihres Mieters verdoppeln, ein Messpunkt wie
+     * Allgemeinstrom ebenso.
+     *
+     * <p>Zähler und Nenner müssen zwingend dieselbe Regel verwenden. Weichen sie ab, überschreitet
+     * die Summe der Miettage den Nenner und das Speichern wird abgewiesen — oder, schlimmer, die
+     * Abrechnung geht durch und verteilt Anteile an Messpunkte, die keine Wohnung sind.
+     */
+    private List<NkMieterBasisDTO> ladeMieter(NkAbrechnung abrechnung) {
+        List<Mieter> mieter = mieterRepository.findByZeitraumOverlapping(
+                abrechnung.getDatumVon(), abrechnung.getDatumBis());
+        if (mieter.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> mieterIds = mieter.stream().map(Mieter::getId).toList();
+        List<MieterEinheit> zuordnungen = mieterEinheitRepository.findByMieterIdIn(mieterIds);
+
+        Set<Long> einheitIds = new HashSet<>();
+        for (MieterEinheit z : zuordnungen) {
+            einheitIds.add(z.getEinheitId());
+        }
+        Set<Long> wohnungen = new HashSet<>();
+        for (Einheit e : einheitRepository.findAllById(einheitIds)) {
+            if (e.getTyp() == EinheitTyp.CONSUMER && e.isNebenkostenRelevant()) {
+                wohnungen.add(e.getId());
+            }
+        }
+
+        Map<Long, Integer> anzahlJeMieter = new HashMap<>();
+        for (MieterEinheit z : zuordnungen) {
+            if (wohnungen.contains(z.getEinheitId())) {
+                anzahlJeMieter.merge(z.getMieterId(), 1, Integer::sum);
+            }
+        }
+
+        List<NkMieterBasisDTO> basis = new ArrayList<>();
+        for (Mieter m : mieter) {
+            basis.add(new NkMieterBasisDTO(m.getId(), m.getName(), m.getMietbeginn(), m.getMietende(),
+                    anzahlJeMieter.getOrDefault(m.getId(), 0), m.getAkontoProMonat()));
+        }
+        return basis;
+    }
+
+    /**
+     * Zahl der Wohnungen des Mandanten; {@code null}, wenn es keine gibt (FR-2).
+     *
+     * <p>Gezählt werden nur {@code CONSUMER}-Einheiten mit gesetztem Kennzeichen
+     * {@code nebenkostenRelevant}. Unter den Verbrauchern stehen auch Messpunkte, die keine
+     * Wohnung sind (Allgemeinstrom, Eigenverbrauch der PV-Anlage); sie zählten sonst in den
+     * Nenner und liessen bei jeder Umlage einen Anteil unverteilt, als stünde eine Wohnung leer.
+     */
+    private Integer vorschlagAnzahlWohnungen() {
+        long anzahl = einheitRepository.countByTypAndNebenkostenRelevantTrue(EinheitTyp.CONSUMER);
+        return anzahl > 0 ? (int) anzahl : null;
+    }
+
+    // ===================== Schreiben =====================
+
+    private void ersetzePositionen(NkAbrechnung abrechnung, List<NkPositionDTO> dtos, Long orgId) {
+        for (NkPosition alt : positionRepository.findByAbrechnungIdOrderByReihenfolge(abrechnung.getId())) {
+            verbrauchRepository.deleteByPositionId(alt.getId());
+        }
+        positionRepository.deleteByAbrechnungId(abrechnung.getId());
+        positionRepository.flush();
+
+        int reihenfolge = 1;
+        for (NkPositionDTO dto : dtos) {
+            NkPosition position = new NkPosition();
+            position.setOrgId(orgId);
+            position.setAbrechnungId(abrechnung.getId());
+            position.setArt(dto.getArt());
+            position.setBezeichnung(dto.getBezeichnung());
+            // Die Reihenfolge kommt aus der Listenposition, nicht aus dem Rumpf: Sie bestimmt das
+            // Ergebnis der Zuschlagskaskade und muss zu dem passen, was die Maske zeigt.
+            position.setReihenfolge(reihenfolge++);
+            position.setEinheit(dto.getEinheit());
+            position.setTotalbetrag(dto.getTotalbetrag());
+            position.setGesamtmenge(dto.getGesamtmenge());
+            position.setBetragProEinheit(dto.getBetragProEinheit());
+            position.setProzentsatz(dto.getProzentsatz());
+            NkPosition gespeichert = positionRepository.save(position);
+
+            // VERBRAUCH speichert die Menge je Mieter, ANTEIL den Prozentsatz - beide in
+            // derselben Zeile, unterschieden allein durch die Art der Position.
+            if (dto.getArt() == NkPositionsart.VERBRAUCH || dto.getArt() == NkPositionsart.ANTEIL) {
+                for (NkVerbrauchDTO v : dto.getVerbraeuche()) {
+                    if (v.getMieterId() == null || v.getMenge() == null) {
+                        continue;
+                    }
+                    NkVerbrauch verbrauch = new NkVerbrauch(gespeichert.getId(), v.getMieterId(), v.getMenge());
+                    verbrauch.setOrgId(orgId);
+                    verbrauchRepository.save(verbrauch);
+                }
+            }
+        }
+    }
+
+    private void ersetzeZusaetze(NkAbrechnung abrechnung, List<NkZusatzDTO> dtos, Long orgId) {
+        zusatzRepository.deleteByAbrechnungId(abrechnung.getId());
+        zusatzRepository.flush();
+
+        // Die Reihenfolge wird je Mieter neu vergeben - sie ist je Abrechnung UND Mieter eindeutig.
+        Map<Long, Integer> naechste = new HashMap<>();
+        for (NkZusatzDTO dto : dtos) {
+            if (dto.getMieterId() == null) {
+                throw new IllegalArgumentException("Zusatzposition ohne Mieter");
+            }
+            NkZusatz zusatz = new NkZusatz();
+            zusatz.setOrgId(orgId);
+            zusatz.setAbrechnungId(abrechnung.getId());
+            zusatz.setMieterId(dto.getMieterId());
+            zusatz.setReihenfolge(dto.getReihenfolge() != null
+                    ? dto.getReihenfolge()
+                    : naechste.merge(dto.getMieterId(), 1, Integer::sum));
+            zusatz.setBezeichnung(dto.getBezeichnung());
+            zusatz.setEinheit(dto.getEinheit());
+            zusatz.setMenge(dto.getMenge());
+            zusatz.setBetragProEinheit(dto.getBetragProEinheit());
+            zusatzRepository.save(zusatz);
+        }
+    }
+
+    private void ersetzeAkonto(NkAbrechnung abrechnung, List<NkAkontoDTO> dtos, Long orgId) {
+        akontoRepository.deleteByAbrechnungId(abrechnung.getId());
+        akontoRepository.flush();
+
+        for (NkAkontoDTO dto : dtos) {
+            if (dto.getMieterId() == null) {
+                throw new IllegalArgumentException("Akonto ohne Mieter");
+            }
+            NkAkonto akonto = new NkAkonto();
+            akonto.setOrgId(orgId);
+            akonto.setAbrechnungId(abrechnung.getId());
+            akonto.setMieterId(dto.getMieterId());
+            akonto.setAnzahlMonate(dto.getAnzahlMonate() != null ? dto.getAnzahlMonate() : BigDecimal.ZERO);
+            akonto.setBetragProMonat(dto.getBetragProMonat() != null ? dto.getBetragProMonat() : BigDecimal.ZERO);
+            akonto.setKorrektur(dto.getKorrektur() != null ? dto.getKorrektur() : BigDecimal.ZERO);
+            akontoRepository.save(akonto);
+        }
+    }
+
+    // ===================== Prüfungen =====================
+
+    /**
+     * Wirft, wenn der Feature-Flag {@code NEBENKOSTENABRECHNUNG} für den Mandanten aus ist.
+     *
+     * <p>Ohne diese Prüfung wäre der Flag reine Kosmetik: Das Menü bliebe verborgen, die API aber
+     * über jeden HTTP-Client erreichbar.
+     */
+    private void pruefeFeatureFlag() {
+        Long orgId = organizationContextService.getCurrentOrgId();
+        if (!featureFlagService.isEnabled(orgId, FeatureFlag.NEBENKOSTENABRECHNUNG)) {
+            log.warn("Nebenkostenabrechnung rejected - feature disabled for org: {}", orgId);
+            throw new FeatureDisabledException("FEATURE_FLAG_DEAKTIVIERT");
+        }
+    }
+
+    private void pruefeKopf(NkAbrechnung abrechnung) {
+        if (abrechnung.getDatumVon() == null || abrechnung.getDatumBis() == null) {
+            throw new IllegalArgumentException("NK_FEHLER_ZEITRAUM_PFLICHT");
+        }
+        if (abrechnung.getDatumVon().isAfter(abrechnung.getDatumBis())) {
+            throw new IllegalArgumentException("NK_FEHLER_ZEITRAUM");
+        }
+        if (abrechnung.getAnzahlWohnungen() == null || abrechnung.getAnzahlWohnungen() < 1) {
+            throw new IllegalArgumentException("NK_FEHLER_ANZAHL_WOHNUNGEN");
+        }
+    }
+
+    private void pruefeNichtAbgerechnet(NkAbrechnung abrechnung) {
+        if (abrechnung.isAbgerechnet()) {
+            throw new IllegalArgumentException("NK_FEHLER_ABGERECHNET");
+        }
+    }
+
+    /**
+     * Prüft {@code Σ Tage(i) <= Nenner} (FR-2).
+     *
+     * <p>Ist die Anzahl Wohnungen zu klein erfasst, überstiege die Summe der verteilten Beträge den
+     * Totalbetrag — die Mieter zahlten gemeinsam mehr als angefallen ist. Der umgekehrte Fall ist
+     * zulässig und genau der Leerstand.
+     */
+    private void pruefeNenner(NkAbrechnung abrechnung, List<NkMieterBasisDTO> mieter) {
+        long tageImZeitraum = berechnungService.tageImZeitraum(
+                abrechnung.getDatumVon(), abrechnung.getDatumBis());
+        long nenner = (long) abrechnung.getAnzahlWohnungen() * tageImZeitraum;
+
+        long summeTage = 0;
+        for (NkMieterBasisDTO m : mieter) {
+            summeTage += berechnungService.miettageImZeitraum(
+                    m, abrechnung.getDatumVon(), abrechnung.getDatumBis()) * m.getAnzahlWohnungen();
+        }
+
+        if (summeTage > nenner) {
+            // Als Klartext und nicht als Uebersetzungs-Key: Die Meldung muss beide Zahlen nennen,
+            // und ein Key mit angehaengten Werten liesse sich im Frontend nicht mehr aufloesen.
+            throw new IllegalArgumentException(
+                    "Die Anzahl Wohnungen ist zu klein erfasst: Die Mieter belegen " + summeTage
+                            + " Miettage, der Nenner erlaubt aber nur " + nenner + ".");
+        }
+    }
+
+    /**
+     * Art-abhängige Pflichtfelder (FR-2). Dieselbe Regel steht als CHECK-Constraint in der
+     * Datenbank; hier steht sie, damit statt eines Constraint-Fehlers eine lesbare Meldung kommt.
+     */
+    private void pruefePositionen(List<NkPositionDTO> positionen) {
+        for (NkPositionDTO p : positionen) {
+            if (p.getArt() == null) {
+                throw new IllegalArgumentException("NK_FEHLER_POSITION_ART");
+            }
+            if (p.getBezeichnung() == null || p.getBezeichnung().isBlank()) {
+                throw new IllegalArgumentException("NK_FEHLER_POSITION_BEZEICHNUNG");
+            }
+            switch (p.getArt()) {
+                case UMLAGE -> {
+                    if (p.getTotalbetrag() == null || p.getEinheit() == null) {
+                        throw new IllegalArgumentException("NK_FEHLER_POSITION_UMLAGE");
+                    }
+                    p.setBetragProEinheit(null);
+                    p.setProzentsatz(null);
+                }
+                case VERBRAUCH -> {
+                    if (p.getBetragProEinheit() == null || p.getEinheit() == null) {
+                        throw new IllegalArgumentException("NK_FEHLER_POSITION_VERBRAUCH");
+                    }
+                    p.setTotalbetrag(null);
+                    p.setGesamtmenge(null);
+                    p.setProzentsatz(null);
+                }
+                case ANTEIL -> {
+                    if (p.getTotalbetrag() == null) {
+                        throw new IllegalArgumentException("NK_FEHLER_POSITION_ANTEIL");
+                    }
+                    // Der Prozentsatz steht je Mieter, die Einheit ist immer Prozent - beides
+                    // gehoert nicht an die Position und wird geleert.
+                    p.setGesamtmenge(null);
+                    p.setBetragProEinheit(null);
+                    p.setProzentsatz(null);
+                    p.setEinheit(null);
+                }
+                case ZUSCHLAG -> {
+                    if (p.getProzentsatz() == null) {
+                        throw new IllegalArgumentException("NK_FEHLER_POSITION_ZUSCHLAG");
+                    }
+                    if (p.getProzentsatz().signum() < 0
+                            || p.getProzentsatz().compareTo(BigDecimal.valueOf(100)) > 0) {
+                        throw new IllegalArgumentException("NK_FEHLER_PROZENTSATZ");
+                    }
+                    // Nicht zutreffende Felder werden geleert statt abgewiesen: Wer die Art einer
+                    // Zeile wechselt, schickt sonst Reste der alten Art mit und liefe in den
+                    // CHECK-Constraint, ohne dass die Maske etwas Falsches zeigte.
+                    p.setTotalbetrag(null);
+                    p.setGesamtmenge(null);
+                    p.setBetragProEinheit(null);
+                    p.setEinheit(null);
+                }
+                default -> throw new IllegalArgumentException("NK_FEHLER_POSITION_ART");
+            }
+        }
+    }
+}

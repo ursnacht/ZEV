@@ -1,7 +1,10 @@
 <div class="zev-container">
   <h1><app-icon name="tag" size="lg"></app-icon> {{ 'NK_TARIFPOSITIONEN' | translate }}</h1>
 
-  <div class="zev-message zev-message--info">
+  <!-- `--statisch`, damit der Hinweis im Textfluss steht statt als Overlay ueber dem
+       Seitenanfang. Bewusst ohne Schliesskreuz: Er ist der einzige Inhalt dieser Geruestseite -
+       weggeklickt bliebe eine leere Seite ohne Erklaerung zurueck. -->
+  <div class="zev-message zev-message--info zev-message--statisch">
     <span>{{ 'NK_NOCH_NICHT_VERFUEGBAR' | translate }}</span>
   </div>
 </div>

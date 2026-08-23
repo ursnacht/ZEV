@@ -1,0 +1,464 @@
+<div class="form-container">
+  <h2>{{ abrechnungId ? ('NK_ABRECHNUNG_BEARBEITEN' | translate) : ('NK_NEUE_ABRECHNUNG' | translate) }}</h2>
+
+  <!-- Fehler bleibt stehen, bis er weggeklickt wird; das Kreuz macht das sichtbar. Erfolg
+       verschwindet nach 5 Sekunden von selbst (Projektkonvention). -->
+  @if (message) {
+    <div class="zev-message zev-message--dismissible" [ngClass]="'zev-message--' + messageType"
+      (click)="dismissMessage()">
+      <span>{{ message | translate }}</span>
+      <span class="zev-message__dismiss">&times;</span>
+    </div>
+  }
+
+  <!-- Wegklickbar und im Textfluss (--statisch): Ohne das laege der Hinweis als Overlay ueber
+       dem Seitenanfang und kollidierte mit den kurzlebigen Erfolgs- und Fehlermeldungen. -->
+  @if (gesperrt && hinweisAbgerechnetSichtbar) {
+    <div class="zev-message zev-message--info zev-message--statisch zev-message--dismissible"
+      (click)="dismissHinweisAbgerechnet()">
+      <span>{{ 'NK_HINWEIS_ABGERECHNET' | translate }}</span>
+      <span class="zev-message__dismiss">&times;</span>
+    </div>
+  }
+
+  <!-- ==================== 1. Angaben zur Abrechnung ==================== -->
+  <div class="zev-panel">
+    <h3 class="zev-panel__title">{{ 'NK_ANGABEN' | translate }}</h3>
+    <div class="zev-panel__content">
+      <div class="zev-form-group">
+        <label for="bezeichnung">{{ 'BEZEICHNUNG' | translate }}:</label>
+        <input type="text" id="bezeichnung" class="zev-input" [(ngModel)]="kopf.bezeichnung"
+          name="bezeichnung" maxlength="150" [disabled]="gesperrt"
+          [placeholder]="'NK_BEZEICHNUNG_PLACEHOLDER' | translate" />
+        @if (speichernVersucht && !kopf.bezeichnung.trim()) {
+          <div class="zev-form-error">{{ 'BEZEICHNUNG_IST_ERFORDERLICH' | translate }}</div>
+        }
+      </div>
+
+      <div class="zev-form-row">
+        <div class="zev-form-group">
+          <label for="datumVon">{{ 'NK_DATUM_VON' | translate }}:</label>
+          <input type="date" id="datumVon" class="zev-input" [(ngModel)]="kopf.datumVon"
+            name="datumVon" [disabled]="gesperrt" />
+        </div>
+        <div class="zev-form-group">
+          <label for="datumBis">{{ 'NK_DATUM_BIS' | translate }}:</label>
+          <input type="date" id="datumBis" class="zev-input" [(ngModel)]="kopf.datumBis"
+            name="datumBis" [disabled]="gesperrt" />
+        </div>
+      </div>
+
+      @if (speichernVersucht && !istZeitraumGueltig()) {
+        <div class="zev-form-error">{{ 'NK_FEHLER_ZEITRAUM' | translate }}</div>
+      }
+
+      <div class="zev-form-group">
+        <label for="anzahlWohnungen">{{ 'NK_ANZAHL_WOHNUNGEN' | translate }}:</label>
+        <input type="number" id="anzahlWohnungen" class="zev-input" [(ngModel)]="kopf.anzahlWohnungen"
+          name="anzahlWohnungen" min="1" step="1" [disabled]="gesperrt" (ngModelChange)="rechne()" />
+        <!-- Der Hinweis nennt die Wirkung: ohne ihn ist nicht erkennbar, dass diese Zahl
+             daraeber entscheidet, wie viel bei Leerstand unverteilt bleibt. -->
+        <div class="zev-form-hint">{{ 'NK_ANZAHL_WOHNUNGEN_HINT' | translate }}</div>
+        @if (speichernVersucht && (kopf.anzahlWohnungen === null || kopf.anzahlWohnungen < 1)) {
+          <div class="zev-form-error">{{ 'NK_FEHLER_ANZAHL_WOHNUNGEN' | translate }}</div>
+        }
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 2. Allgemeine Positionen ==================== -->
+  <div class="zev-panel">
+    <h3 class="zev-panel__title">{{ 'NK_ALLGEMEINE_POSITIONEN' | translate }}</h3>
+    <div class="zev-panel__content">
+      @if (positionen.length > 0) {
+        <table class="zev-table nk-positionen">
+          <thead>
+            <tr>
+              <th class="nk-positionen__griff-spalte"></th>
+              <th>{{ 'NK_ART' | translate }}</th>
+              <th>{{ 'BEZEICHNUNG' | translate }}</th>
+              <th>{{ 'NK_WERTE' | translate }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody cdkDropList (cdkDropListDropped)="onDrop($event)" [cdkDropListDisabled]="gesperrt">
+            @for (position of positionen; track position; let i = $index) {
+              <tr cdkDrag [cdkDragDisabled]="gesperrt">
+                <td class="nk-positionen__griff" cdkDragHandle
+                  [attr.aria-label]="'NK_VERSCHIEBEN' | translate">
+                  <div class="nk-positionen__feld nk-positionen__feld--ohne-titel
+                              nk-positionen__feld--symbol">
+                    <app-icon name="menu"></app-icon>
+                  </div>
+                </td>
+                <td>
+                  <!-- Die Spaltenueberschrift benennt das Feld; die leere Titelzeile haelt nur
+                       den Platz frei, damit alle Eingaben auf derselben Linie beginnen. -->
+                  <div class="nk-positionen__feld nk-positionen__feld--ohne-titel">
+                    <select class="zev-select" [(ngModel)]="position.art" [name]="'art' + i"
+                      (ngModelChange)="onArtChange(position)" [disabled]="gesperrt">
+                      @for (art of positionsarten; track art) {
+                        <option [ngValue]="art">{{ ('NK_ART_' + art) | translate }}</option>
+                      }
+                    </select>
+                  </div>
+                </td>
+                <td>
+                  <div class="nk-positionen__feld nk-positionen__feld--ohne-titel">
+                    <input type="text" class="zev-input" [(ngModel)]="position.bezeichnung"
+                      [name]="'bezeichnung' + i" maxlength="150" [disabled]="gesperrt"
+                      (ngModelChange)="rechne()" />
+                  </div>
+                </td>
+                <td>
+                  <!-- Nicht zutreffende Felder werden ausgeblendet, nicht bloss gesperrt:
+                       Eine leere gesperrte Eingabe sieht aus wie ein vergessener Wert. -->
+                  <div class="nk-positionen__werte">
+                    @if (position.art === Positionsart.UMLAGE) {
+                      <label class="nk-positionen__feld">{{ 'NK_TOTALBETRAG' | translate }}
+                        <input type="number" class="zev-input" [(ngModel)]="position.totalbetrag"
+                          [name]="'total' + i" min="0" step="0.01" [disabled]="gesperrt"
+                          (ngModelChange)="rechne()" />
+                      </label>
+                      <label class="nk-positionen__feld">{{ 'NK_GESAMTMENGE' | translate }}
+                        <input type="number" class="zev-input" [(ngModel)]="position.gesamtmenge"
+                          [name]="'menge' + i" min="0" step="0.001" [disabled]="gesperrt"
+                          (ngModelChange)="rechne()" />
+                      </label>
+                      <label class="nk-positionen__feld">{{ 'MENGENEINHEIT' | translate }}
+                        <select class="zev-select" [(ngModel)]="position.einheit"
+                          [name]="'einheit' + i" [disabled]="gesperrt">
+                          @for (einheit of mengeneinheiten; track einheit) {
+                            <option [ngValue]="einheit">{{ einheit | translate }}</option>
+                          }
+                        </select>
+                      </label>
+                    }
+                    @if (position.art === Positionsart.VERBRAUCH) {
+                      <label class="nk-positionen__feld">{{ 'NK_BETRAG_PRO_EINHEIT' | translate }}
+                        <input type="number" class="zev-input" [(ngModel)]="position.betragProEinheit"
+                          [name]="'proEinheit' + i" min="0" step="0.0001" [disabled]="gesperrt"
+                          (ngModelChange)="rechne()" />
+                      </label>
+                      <label class="nk-positionen__feld">{{ 'MENGENEINHEIT' | translate }}
+                        <select class="zev-select" [(ngModel)]="position.einheit"
+                          [name]="'einheit' + i" [disabled]="gesperrt">
+                          @for (einheit of mengeneinheiten; track einheit) {
+                            <option [ngValue]="einheit">{{ einheit | translate }}</option>
+                          }
+                        </select>
+                      </label>
+                    }
+                    @if (position.art === Positionsart.ANTEIL) {
+                      <label class="nk-positionen__feld">{{ 'NK_TOTALBETRAG' | translate }}
+                        <input type="number" class="zev-input" [(ngModel)]="position.totalbetrag"
+                          [name]="'anteilTotal' + i" min="0" step="0.01" [disabled]="gesperrt"
+                          (ngModelChange)="rechne()" />
+                      </label>
+                    }
+                    @if (position.art === Positionsart.ZUSCHLAG) {
+                      <label class="nk-positionen__feld">{{ 'NK_PROZENTSATZ' | translate }}
+                        <input type="number" class="zev-input" [(ngModel)]="position.prozentsatz"
+                          [name]="'prozent' + i" min="0" max="100" step="0.01" [disabled]="gesperrt"
+                          (ngModelChange)="rechne()" />
+                      </label>
+                    }
+                  </div>
+
+                  <!-- Hinweise stehen UNTER der Feldzeile, nicht darin: In der Zeile brachen sie
+                       um und schoben die Unterkante der Zelle nach unten - die Felder der uebrigen
+                       Spalten richteten sich dann an ihnen statt an den Eingaben aus. -->
+                  @if (position.art === Positionsart.ANTEIL) {
+                    <div class="zev-text--muted nk-positionen__hinweis">
+                      {{ 'NK_ANTEIL_HINT' | translate }}
+                    </div>
+                  }
+                  @if (position.art === Positionsart.ZUSCHLAG) {
+                    <!-- Beim Verschieben sonst nicht erkennbar, worauf der Zuschlag rechnet -->
+                    <div class="zev-text--muted nk-positionen__hinweis">
+                      {{ 'NK_BEMESSUNGSGRUNDLAGE' | translate }}: {{ bemessungsgrundlage(i) }}
+                    </div>
+                  }
+                </td>
+                <td>
+                  @if (!gesperrt) {
+                    <div class="nk-positionen__feld nk-positionen__feld--ohne-titel">
+                      <button type="button" class="zev-button zev-button--icon"
+                        (click)="onPositionEntfernen(i)"
+                        [attr.aria-label]="'LOESCHEN' | translate">
+                        <app-icon name="trash-2"></app-icon>
+                      </button>
+                    </div>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      } @else {
+        <p>{{ 'NK_KEINE_POSITIONEN' | translate }}</p>
+      }
+
+      @if (!gesperrt) {
+        <div class="zev-button-row">
+          <button type="button" class="zev-button zev-button--secondary" (click)="onPositionHinzufuegen()">
+            <app-icon name="plus"></app-icon>
+            {{ 'NK_POSITION_HINZUFUEGEN' | translate }}
+          </button>
+          <!-- Zweiter Weg zum Speichern, dieselbe Aktion wie unten: Bei dreissig Mieterbloecken
+               liegt das Ende der Maske mehrere Bildschirmseiten entfernt. -->
+          <button type="button" class="zev-button zev-button--primary" (click)="onSpeichern()">
+            <app-icon name="check"></app-icon>
+            {{ 'SPEICHERN' | translate }}
+          </button>
+        </div>
+      }
+
+      <!-- Kontrollzahlen: Leerstandsanteil und Rundungsdifferenz getrennt, weil sie
+           verschiedene Ursachen haben und sonst nicht erklaerbar waeren. -->
+      @if (berechnung && berechnung.umlagen.length > 0) {
+        <table class="zev-table nk-kontrolle">
+          <thead>
+            <tr>
+              <th>{{ 'NK_UMLAGE' | translate }}</th>
+              <th class="number">{{ 'NK_TOTALBETRAG' | translate }}</th>
+              <th class="number">{{ 'NK_SUMME_VERTEILT' | translate }}</th>
+              <th class="number">{{ 'NK_NICHT_VERTEILT' | translate }}</th>
+              <th class="number">{{ 'NK_RUNDUNGSDIFFERENZ' | translate }}</th>
+              <th class="number">{{ 'NK_SUMME_PROZENT' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (info of berechnung.umlagen; track info.positionId) {
+              <tr>
+                <td>{{ info.bezeichnung }}</td>
+                <td class="number">{{ betrag(info.totalbetrag) }}</td>
+                <td class="number">{{ betrag(info.summeVerteilt) }}</td>
+                <td class="number">{{ betrag(info.nichtVerteilt) }}</td>
+                <td class="number">{{ betrag(info.rundungsdifferenz) }}</td>
+                <td class="number">
+                  @if (info.art === Positionsart.ANTEIL) {
+                    <!-- Kontrollzahl: Die Summe der Anteile sollte 100% ergeben. Abweichungen
+                         werden markiert, aber nicht abgewiesen - eine halb erfasste Abrechnung
+                         muss zwischenspeicherbar bleiben. -->
+                    <span [class.zev-text--danger]="!summeProzentStimmt(info)"
+                      [title]="(summeProzentStimmt(info) ? '' : 'NK_SUMME_PROZENT_ABWEICHUNG') | translate">
+                      {{ menge(info.summeProzent) }}%
+                    </span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  </div>
+
+  <!-- ==================== 3. Mieterbloecke ==================== -->
+  @if (hatMieterbloecke && berechnung) {
+    @for (block of berechnung.mieter; track block.mieterId) {
+      <!-- Beim Oeffnen der Maske alle geschlossen: Bei dreissig Mietern waere sie sonst mehrere
+           Bildschirmseiten lang. Die Kopfzeile zeigt deshalb den Saldo mit an - sonst waere die
+           geschlossene Ansicht eine reine Namensliste. -->
+      <div class="zev-collapsible">
+        <button type="button" class="zev-collapsible__header" (click)="toggleMieter(block.mieterId)">
+          <span class="nk-mieterkopf">
+            <span class="nk-mieterkopf__name">{{ block.name }}</span>
+            <span class="zev-text--muted">{{ block.tage }} {{ 'NK_TAGE' | translate }}</span>
+          </span>
+          <span class="nk-mieterkopf__saldo">
+            {{ (block.saldo >= 0 ? 'NK_NACHZAHLUNG' : 'NK_GUTHABEN') | translate }}:
+            {{ betrag(block.saldo >= 0 ? block.saldo : -block.saldo) }} CHF
+          </span>
+          <span class="zev-collapsible__icon">{{ istMieterOffen(block.mieterId) ? '▼' : '▶' }}</span>
+        </button>
+        @if (istMieterOffen(block.mieterId)) {
+        <div class="zev-collapsible__content">
+          @if (block.ohneWohnung && hinweisOhneWohnungSichtbar(block.mieterId)) {
+            <div class="zev-message zev-message--info zev-message--statisch zev-message--dismissible"
+              (click)="dismissHinweisOhneWohnung(block.mieterId)">
+              <span>{{ 'NK_HINWEIS_OHNE_WOHNUNG' | translate }}</span>
+              <span class="zev-message__dismiss">&times;</span>
+            </div>
+          }
+
+          <table class="zev-table nk-mieterzeilen">
+            <thead>
+              <tr>
+                <th>{{ 'BEZEICHNUNG' | translate }}</th>
+                <th class="number">{{ 'MENGE' | translate }}</th>
+                <th>{{ 'MENGENEINHEIT' | translate }}</th>
+                <th class="number">{{ 'NK_BETRAG' | translate }} (CHF)</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (zeile of block.zeilen; track $index) {
+                <tr>
+                  <td>{{ zeile.bezeichnung }}</td>
+                  <td class="number">
+                    @if (istEingebbareZeile(zeile) && positionZuZeile(zeile); as position) {
+                      <!-- `ngModel` wie im ganzen uebrigen Formular, nicht [value]/(change):
+                           So wird schon beim Tippen neu gerechnet statt erst beim Verlassen des
+                           Feldes, und die Menge kommt aus der Position statt aus der berechneten
+                           Zeile - die wird bei jeder Neuberechnung ersetzt. -->
+                      <input type="number" class="zev-input" min="0" step="0.001"
+                        [ngModel]="mengeFuer(position, block.mieterId)"
+                        (ngModelChange)="onMengeChange(position, block.mieterId, $event)"
+                        [name]="'menge-' + block.mieterId + '-' + zeile.reihenfolge" />
+                    } @else {
+                      {{ zeile.art === Positionsart.ANTEIL ? menge(zeile.prozentsatz) : menge(zeile.menge) }}
+                    }
+                  </td>
+                  <!-- Bei ANTEIL ist die Bezugsgroesse immer Prozent; die Position traegt keine
+                       Mengeneinheit, sonst muesste sie bei jeder Zeile erfasst werden. -->
+                  <td>{{ zeile.art === Positionsart.ANTEIL ? '%' : (zeile.einheit ? (zeile.einheit | translate) : '') }}</td>
+                  <td class="number">{{ betrag(zeile.betrag) }}</td>
+                  <td>
+                    @if (zeile.art === Positionsart.UMLAGE && umlageInfoFuer(zeile); as info) {
+                      <span class="zev-text--muted">
+                        {{ 'NK_NICHT_VERTEILT' | translate }}: {{ betrag(info.nichtVerteilt) }}
+                      </span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+
+          <!-- Zusatzzeilen: frei erfassbar, je Zeile entfernbar -->
+          @if (zusaetzeFuer(block.mieterId).length > 0) {
+            <table class="zev-table nk-zusatz">
+              <thead>
+                <tr>
+                  <th>{{ 'NK_ZUSATZPOSITION' | translate }}</th>
+                  <th>{{ 'MENGENEINHEIT' | translate }}</th>
+                  <th class="number">{{ 'MENGE' | translate }}</th>
+                  <th class="number">{{ 'NK_BETRAG_PRO_EINHEIT' | translate }}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (zusatz of zusaetzeFuer(block.mieterId); track zusatz) {
+                  <tr>
+                    <td>
+                      <input type="text" class="zev-input" [(ngModel)]="zusatz.bezeichnung"
+                        [name]="'zbez' + block.mieterId + $index" maxlength="150"
+                        [disabled]="gesperrt" (ngModelChange)="rechne()" />
+                    </td>
+                    <td>
+                      <select class="zev-select" [(ngModel)]="zusatz.einheit"
+                        [name]="'zeinheit' + block.mieterId + $index" [disabled]="gesperrt">
+                        @for (einheit of mengeneinheiten; track einheit) {
+                          <option [ngValue]="einheit">{{ einheit | translate }}</option>
+                        }
+                      </select>
+                    </td>
+                    <td class="number">
+                      <input type="number" class="zev-input" [(ngModel)]="zusatz.menge"
+                        [name]="'zmenge' + block.mieterId + $index" min="0" step="0.001"
+                        [disabled]="gesperrt" (ngModelChange)="rechne()" />
+                    </td>
+                    <td class="number">
+                      <input type="number" class="zev-input" [(ngModel)]="zusatz.betragProEinheit"
+                        [name]="'zpreis' + block.mieterId + $index" min="0" step="0.0001"
+                        [disabled]="gesperrt" (ngModelChange)="rechne()" />
+                    </td>
+                    <td>
+                      @if (!gesperrt) {
+                        <button type="button" class="zev-button zev-button--icon"
+                          (click)="onZusatzEntfernen(zusatz)"
+                          [attr.aria-label]="'LOESCHEN' | translate">
+                          <app-icon name="trash-2"></app-icon>
+                        </button>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+
+          @if (!gesperrt) {
+            <div class="zev-button-row">
+              <button type="button" class="zev-button zev-button--secondary"
+                (click)="onZusatzHinzufuegen(block.mieterId)">
+                <app-icon name="plus"></app-icon>
+                {{ 'NK_POSITION_HINZUFUEGEN' | translate }}
+              </button>
+            </div>
+          }
+
+          <div class="nk-total">
+            <span>{{ 'NK_KOSTENTOTAL' | translate }}</span>
+            <span class="number">{{ betrag(block.kostentotal) }} CHF</span>
+          </div>
+
+          <!-- Akonto -->
+          <div class="zev-form-row nk-akonto">
+            <div class="zev-form-group">
+              <label>{{ 'NK_ANZAHL_MONATE' | translate }}</label>
+              <input type="number" class="zev-input" min="0" step="0.01"
+                [(ngModel)]="akontoFuer(block.mieterId).anzahlMonate"
+                [name]="'monate' + block.mieterId" [disabled]="gesperrt" (ngModelChange)="rechne()" />
+            </div>
+            <div class="zev-form-group">
+              <label>{{ 'NK_BETRAG_PRO_MONAT' | translate }}</label>
+              <input type="number" class="zev-input" min="0" step="0.01"
+                [(ngModel)]="akontoFuer(block.mieterId).betragProMonat"
+                [name]="'proMonat' + block.mieterId" [disabled]="gesperrt" (ngModelChange)="rechne()" />
+            </div>
+            <div class="zev-form-group">
+              <label>{{ 'NK_KORREKTUR' | translate }}</label>
+              <input type="number" class="zev-input" step="0.01"
+                [(ngModel)]="akontoFuer(block.mieterId).korrektur"
+                [name]="'korrektur' + block.mieterId" [disabled]="gesperrt" (ngModelChange)="rechne()" />
+            </div>
+          </div>
+
+          <div class="nk-total">
+            <span>{{ 'NK_AKONTO_TOTAL' | translate }}</span>
+            <span class="number">{{ betrag(block.akontoTotal) }} CHF</span>
+          </div>
+
+          <!-- Vorzeichen allein genuegt nicht: Nachzahlung und Guthaben werden benannt. -->
+          <div class="nk-total nk-total--saldo">
+            <span>
+              {{ (block.saldo >= 0 ? 'NK_NACHZAHLUNG' : 'NK_GUTHABEN') | translate }}
+            </span>
+            <span class="number">{{ betrag(block.saldo >= 0 ? block.saldo : -block.saldo) }} CHF</span>
+          </div>
+        </div>
+        }
+      </div>
+    }
+  } @else if (hinweisErstSpeichernSichtbar) {
+    <!-- Einmalige Erklaerung: bleibt nach dem Wegklicken auch beim naechsten Aufruf verborgen. -->
+    <div class="zev-message zev-message--info zev-message--statisch zev-message--dismissible"
+      (click)="dismissHinweisErstSpeichern()">
+      <span>{{ 'NK_HINWEIS_ERST_SPEICHERN' | translate }}</span>
+      <span class="zev-message__dismiss">&times;</span>
+    </div>
+  }
+
+  <div class="zev-form-actions zev-form-actions--equal">
+    <!-- Bewusst NICHT ueber [disabled] gesperrt: Eine graue Schaltflaeche sagt nicht, was fehlt.
+         Der Klick loest die Pruefung aus und benennt den Grund. -->
+    <button type="button" class="zev-button zev-button--primary" [disabled]="gesperrt"
+      (click)="onSpeichern()">
+      <app-icon name="check"></app-icon>
+      {{ 'SPEICHERN' | translate }}
+    </button>
+    <button type="button" class="zev-button zev-button--secondary" (click)="onAbbrechen()">
+      <app-icon name="x"></app-icon>
+      {{ 'ABBRECHEN' | translate }}
+    </button>
+    <!-- Eigener Weg zurueck: Nach dem Speichern bleibt die Maske offen, und "Abbrechen" ist
+         dann das falsche Wort fuer "ich bin fertig". -->
+    <button type="button" class="zev-button zev-button--secondary" (click)="onZurueckZurUebersicht()">
+      <app-icon name="chevron-left"></app-icon>
+      {{ 'NK_ZURUECK_UEBERSICHT' | translate }}
+    </button>
+  </div>
+</div>

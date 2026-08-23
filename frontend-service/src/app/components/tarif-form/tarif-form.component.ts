@@ -42,6 +42,9 @@ export class TarifFormComponent implements OnInit {
   /**
    * Auswahl der Mengeneinheit - nur bei Tariftypen mit eigener Einheit sichtbar. Die Werte sind
    * zugleich die Uebersetzungs-Keys (`KWH`, `MONAT`, `STUECK`).
+   *
+   * `M3` und `CHF` fehlen hier absichtlich: Sie gehoeren zur Nebenkostenabrechnung. Ein Preis
+   * "CHF pro Fr." waere keine sinnvolle Angabe, und Kubikmeter misst dieses System nicht.
    */
   mengeneinheitOptions: Mengeneinheit[] = [
     Mengeneinheit.KWH, Mengeneinheit.MONAT, Mengeneinheit.STUECK

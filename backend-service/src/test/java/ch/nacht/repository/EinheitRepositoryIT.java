@@ -3,6 +3,7 @@ package ch.nacht.repository;
 import ch.nacht.AbstractIntegrationTest;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
+import ch.nacht.entity.MieterEinheit;
 import ch.nacht.entity.Organisation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,10 +33,14 @@ class EinheitRepositoryIT extends AbstractIntegrationTest {
     @Autowired
     private OrganisationRepository organisationRepository;
 
+    @Autowired
+    private MieterEinheitRepository mieterEinheitRepository;
+
     private Long TEST_ORG_ID;
 
     @BeforeEach
     void setUp() {
+        mieterEinheitRepository.deleteAll();
         einheitRepository.deleteAll();
         Organisation org = new Organisation();
         org.setKeycloakOrgId(UUID.fromString("c2c9ba74-de18-4491-9489-8185629edd93"));
@@ -229,5 +234,68 @@ class EinheitRepositoryIT extends AbstractIntegrationTest {
         assertThat(einheitRepository.findAllByOrderByNameAsc())
                 .extracting(Einheit::getName)
                 .containsExactly("Ladestation 1", "Wohnung A");
+    }
+
+    // ============ Anzahl Wohnungen (Specs/Nebenkosten/Abrechnung.md, FR-2) ============
+
+    @Test
+    void shouldCountOnlyConsumerEinheitenMarkedAsWohnung() {
+        // Vorbelegung der "Anzahl Wohnungen": Eine Ladestation ist keine Wohnung und wuerde den
+        // Nenner der Umlage verfaelschen.
+        einheitRepository.save(createEinheit("Wohnung A", EinheitTyp.CONSUMER));
+        einheitRepository.save(createEinheit("Wohnung B", EinheitTyp.CONSUMER));
+        einheitRepository.save(createEinheit("Ladestation 1", EinheitTyp.LADESTATION, "RFID-001"));
+        einheitRepository.save(createEinheit("Produktion", EinheitTyp.PRODUCER));
+
+        assertThat(einheitRepository.countByTypAndNebenkostenRelevantTrue(EinheitTyp.CONSUMER))
+                .isEqualTo(2);
+    }
+
+    @Test
+    void shouldNotCountConsumerEinheitWithoutKennzeichen() {
+        // Allgemeinstrom und PV-Eigenverbrauch sind Verbraucher, aber keine Wohnungen. Zaehlten
+        // sie mit, bliebe bei jeder Umlage ein Anteil unverteilt, als stuende eine Wohnung leer.
+        einheitRepository.save(createEinheit("Wohnung A", EinheitTyp.CONSUMER));
+        Einheit allgemein = createEinheit("Allgemeinstrom", EinheitTyp.CONSUMER);
+        allgemein.setNebenkostenRelevant(false);
+        einheitRepository.save(allgemein);
+
+        assertThat(einheitRepository.countByTypAndNebenkostenRelevantTrue(EinheitTyp.CONSUMER))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void shouldCountVacantWohnungAsWell() {
+        // Eine Wohnung ohne Mieter bleibt eine Wohnung: Genau darauf beruht der Leerstandsanteil.
+        // Deshalb haengt das Zaehlen am Kennzeichen und nicht an der Mieterzuordnung.
+        Einheit vermietet = einheitRepository.save(createEinheit("Wohnung A", EinheitTyp.CONSUMER));
+        einheitRepository.save(createEinheit("Wohnung B", EinheitTyp.CONSUMER));
+
+        ordneMieterZu(1L, vermietet.getId());
+
+        assertThat(einheitRepository.countByTypAndNebenkostenRelevantTrue(EinheitTyp.CONSUMER))
+                .isEqualTo(2);
+    }
+
+    @Test
+    void shouldDefaultNebenkostenRelevantToTrue() {
+        // Eine neu angelegte Wohnung nimmt teil; die Ausnahme wird abgewaehlt, nicht die Regel.
+        Einheit gespeichert = einheitRepository.save(createEinheit("Wohnung A", EinheitTyp.CONSUMER));
+
+        assertThat(gespeichert.isNebenkostenRelevant()).isTrue();
+    }
+
+    @Test
+    void shouldCountZeroWhenNoConsumerEinheitenExist() {
+        // Dann bleibt das Feld in der Maske leer statt auf 0 zu stehen - eine 0 verstiesse gegen
+        // den CHECK-Constraint der Abrechnung.
+        einheitRepository.save(createEinheit("Produktion", EinheitTyp.PRODUCER));
+
+        assertThat(einheitRepository.countByTypAndNebenkostenRelevantTrue(EinheitTyp.CONSUMER))
+                .isZero();
+    }
+
+    private void ordneMieterZu(Long mieterId, Long einheitId) {
+        mieterEinheitRepository.save(new MieterEinheit(TEST_ORG_ID, mieterId, einheitId));
     }
 }

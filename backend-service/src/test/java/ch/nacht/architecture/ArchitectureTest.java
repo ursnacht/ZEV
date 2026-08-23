@@ -3,6 +3,7 @@ package ch.nacht.architecture;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchCondition;
@@ -403,6 +404,44 @@ class ArchitectureTest {
                 .and().haveSimpleNameNotContaining("Translation")
                 .and().haveSimpleNameNotContaining("Organisation")
                 .should(haveOrgIdField);
+
+            rule.check(importedClasses);
+        }
+
+        /**
+         * Die Nebenkostenabrechnung haengt an einem Feature-Flag. Geprueft wird er per explizitem
+         * Aufruf am Anfang jeder Service-Methode (Specs/Nebenkosten/Abrechnung.md, FR-6) - kein
+         * Aspect, keine eigene Annotation.
+         *
+         * <p>Der Preis dieses Entscheids ist, dass eine neue Methode den Aufruf vergessen kann und
+         * dann ungeschuetzt ist: Das Menue bliebe verborgen, die API aber ueber jeden HTTP-Client
+         * erreichbar. Diese Regel faengt genau das ab.
+         */
+        @Test
+        @DisplayName("Jede oeffentliche Methode der NK-Services prueft den Feature-Flag")
+        void nebenkostenServicesMustCheckFeatureFlag() {
+            ArchCondition<JavaClass> checkFeatureFlag =
+                new ArchCondition<>("in jeder oeffentlichen Methode pruefeFeatureFlag() aufrufen") {
+                    @Override
+                    public void check(JavaClass service, ConditionEvents events) {
+                        for (JavaMethod method : service.getMethods()) {
+                            if (!method.getModifiers().contains(JavaModifier.PUBLIC)) {
+                                continue;
+                            }
+                            boolean prueft = method.getMethodCallsFromSelf().stream()
+                                .anyMatch(call -> call.getTarget().getName().equals("pruefeFeatureFlag"));
+                            if (!prueft) {
+                                events.add(SimpleConditionEvent.violated(method,
+                                    method.getFullName() + " prueft den Feature-Flag nicht"));
+                            }
+                        }
+                    }
+                };
+
+            ArchRule rule = classes()
+                .that().resideInAPackage("..service..")
+                .and().haveSimpleNameStartingWith("NkAbrechnung")
+                .should(checkFeatureFlag);
 
             rule.check(importedClasses);
         }

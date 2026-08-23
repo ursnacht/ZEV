@@ -19,7 +19,9 @@ export class EinheitFormComponent implements OnInit {
 
   formData: Einheit = {
     name: '',
-    typ: EinheitTyp.CONSUMER
+    typ: EinheitTyp.CONSUMER,
+    // Eine neue Wohnung nimmt an der Nebenkostenabrechnung teil; die Ausnahme wird abgewaehlt.
+    nebenkostenRelevant: true
   };
 
   einheitTypOptions = [
@@ -35,6 +37,8 @@ export class EinheitFormComponent implements OnInit {
   ngOnInit(): void {
     if (this.einheit) {
       this.formData = { ...this.einheit };
+      // Bestandsdaten vor V123 tragen das Feld nicht - dann gilt der Standard "ist eine Wohnung".
+      this.formData.nebenkostenRelevant = this.einheit.nebenkostenRelevant ?? true;
     }
   }
 

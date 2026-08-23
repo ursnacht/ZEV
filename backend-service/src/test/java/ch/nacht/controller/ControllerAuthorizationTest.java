@@ -8,6 +8,7 @@ import ch.nacht.service.EinheitService;
 import ch.nacht.service.EinstellungenService;
 import ch.nacht.service.FeatureFlagService;
 import ch.nacht.service.MieterService;
+import ch.nacht.service.NkAbrechnungService;
 import ch.nacht.service.OrganisationService;
 import ch.nacht.service.OrganizationContextService;
 import ch.nacht.service.TarifpositionService;
@@ -47,7 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * aber keine Feature-Flags) ab.
  */
 @WebMvcTest({EinstellungenController.class, FeatureFlagController.class, TarifpositionController.class,
-        EinheitController.class, MieterController.class})
+        EinheitController.class, MieterController.class, NkAbrechnungController.class})
 @Import(SecurityConfig.class)
 @TestPropertySource(properties = "app.cors.allowed-origins=http://localhost:4200")
 class ControllerAuthorizationTest {
@@ -72,6 +73,9 @@ class ControllerAuthorizationTest {
 
     @MockitoBean
     private MieterService mieterService;
+
+    @MockitoBean
+    private NkAbrechnungService nkAbrechnungService;
 
     @MockitoBean
     private OrganizationContextService organizationContextService;
@@ -333,5 +337,59 @@ class ControllerAuthorizationTest {
     void getAllMieter_unauthenticated_unauthorized() throws Exception {
         mockMvc.perform(get("/api/mieter"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    // ==================== Nebenkostenabrechnung: nebenkosten:manage ====================
+    // Specs/Nebenkosten/Abrechnung.md NFR-2: @PreAuthorize auf Klassenebene - die Permission gilt
+    // fuer jeden Endpunkt des Controllers, lesend wie schreibend.
+
+    @Test
+    void getAbrechnungen_withNebenkostenManage_reachesController() throws Exception {
+        when(nkAbrechnungService.getAllAbrechnungen()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/nebenkosten/abrechnungen")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("nebenkosten:manage"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getAbrechnungen_withoutPermission_forbidden() throws Exception {
+        // Lesen ist hier nicht getrennt: Wer die Abrechnung nicht verwalten darf, sieht sie nicht.
+        mockMvc.perform(get("/api/nebenkosten/abrechnungen")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("mieter:read"))))
+                .andExpect(status().isForbidden());
+
+        verify(nkAbrechnungService, never()).getAllAbrechnungen();
+    }
+
+    @Test
+    void getAbrechnungen_unauthenticated_unauthorized() throws Exception {
+        mockMvc.perform(get("/api/nebenkosten/abrechnungen"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void createAbrechnung_withoutPermission_forbidden() throws Exception {
+        mockMvc.perform(post("/api/nebenkosten/abrechnungen")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("einstellungen:write")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"bezeichnung":"NK 2026","datumVon":"2026-01-01",
+                                 "datumBis":"2026-12-31","anzahlWohnungen":9}
+                                """))
+                .andExpect(status().isForbidden());
+
+        verify(nkAbrechnungService, never()).createAbrechnung(any());
+    }
+
+    @Test
+    void deleteAbrechnung_withoutPermission_forbidden() throws Exception {
+        mockMvc.perform(delete("/api/nebenkosten/abrechnungen/1")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("mieter:manage")))
+                        .with(csrf()))
+                .andExpect(status().isForbidden());
+
+        verify(nkAbrechnungService, never()).deleteAbrechnung(any());
     }
 }

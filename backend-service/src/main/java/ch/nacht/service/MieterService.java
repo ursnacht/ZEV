@@ -4,6 +4,9 @@ import ch.nacht.entity.Mieter;
 import ch.nacht.entity.MieterEinheit;
 import ch.nacht.repository.MieterEinheitRepository;
 import ch.nacht.repository.MieterRepository;
+import ch.nacht.repository.NkAkontoRepository;
+import ch.nacht.repository.NkVerbrauchRepository;
+import ch.nacht.repository.NkZusatzRepository;
 import ch.nacht.repository.TarifpositionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,17 +37,26 @@ public class MieterService {
     private final MieterRepository mieterRepository;
     private final MieterEinheitRepository mieterEinheitRepository;
     private final TarifpositionRepository tarifpositionRepository;
+    private final NkVerbrauchRepository nkVerbrauchRepository;
+    private final NkZusatzRepository nkZusatzRepository;
+    private final NkAkontoRepository nkAkontoRepository;
     private final OrganizationContextService organizationContextService;
     private final HibernateFilterService hibernateFilterService;
 
     public MieterService(MieterRepository mieterRepository,
                          MieterEinheitRepository mieterEinheitRepository,
                          TarifpositionRepository tarifpositionRepository,
+                         NkVerbrauchRepository nkVerbrauchRepository,
+                         NkZusatzRepository nkZusatzRepository,
+                         NkAkontoRepository nkAkontoRepository,
                          OrganizationContextService organizationContextService,
                          HibernateFilterService hibernateFilterService) {
         this.mieterRepository = mieterRepository;
         this.mieterEinheitRepository = mieterEinheitRepository;
         this.tarifpositionRepository = tarifpositionRepository;
+        this.nkVerbrauchRepository = nkVerbrauchRepository;
+        this.nkZusatzRepository = nkZusatzRepository;
+        this.nkAkontoRepository = nkAkontoRepository;
         this.organizationContextService = organizationContextService;
         this.hibernateFilterService = hibernateFilterService;
     }
@@ -144,9 +156,14 @@ public class MieterService {
      * gehoeren zwar der Einheit, verlieren mit dem Mieter aber ihren Rechnungsempfaenger und
      * blieben unbemerkt liegen (Specs/Ladestationen.md, §5).
      *
+     * <p>Ebenso abgewiesen, wenn der Mieter in einer Nebenkostenabrechnung vorkommt
+     * (Specs/Nebenkosten/Abrechnung.md, FR-5). Die Fremdschluessel stehen dort auf
+     * {@code ON DELETE RESTRICT}; ohne diese Pruefung erschiene statt einer verstaendlichen
+     * Meldung ein Datenbankfehler.
+     *
      * @param id Tenant ID
      * @return true if deleted, false if not found
-     * @throws IllegalArgumentException if positions still reference an assigned unit
+     * @throws IllegalArgumentException if positions or a billing period still reference the tenant
      */
     @Transactional
     public boolean deleteMieter(Long id) {
@@ -162,6 +179,14 @@ public class MieterService {
         if (positionen > 0) {
             throw new IllegalArgumentException(
                     "Mieter kann nicht gelöscht werden: " + positionen + " Tarifposition(en) vorhanden");
+        }
+
+        long nebenkosten = nkVerbrauchRepository.countByMieterId(id)
+                + nkZusatzRepository.countByMieterId(id)
+                + nkAkontoRepository.countByMieterId(id);
+        if (nebenkosten > 0) {
+            throw new IllegalArgumentException(
+                    "Mieter kann nicht gelöscht werden: er kommt in einer Nebenkostenabrechnung vor");
         }
 
         mieterRepository.deleteById(id);

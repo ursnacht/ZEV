@@ -67,6 +67,30 @@
   padding: var(--spacing-xs) var(--spacing-md);
 }
 
+/**
+ * Nur-Icon-Schaltflaeche fuer Aktionen innerhalb einer Tabellenzeile (Zeile entfernen).
+ *
+ * Bewusst ohne Flaeche: Eine farbige Schaltflaeche je Zeile zoege den Blick auf das Loeschen
+ * statt auf die Daten. Die Bedeutung traegt das Symbol, benannt wird sie ueber `aria-label`.
+ */
+.zev-button--icon {
+  padding: var(--spacing-xs);
+  background-color: transparent;
+  color: var(--color-gray-600);
+  line-height: 1;
+}
+
+.zev-button--icon:hover {
+  background-color: var(--color-gray-100);
+  color: var(--color-danger);
+}
+
+.zev-button--icon:disabled {
+  background-color: transparent;
+  color: var(--color-gray-300);
+  padding: var(--spacing-xs);
+}
+
 /* Button Row (toolbar of buttons, e.g. above a table) */
 .zev-button-row {
   display: flex;

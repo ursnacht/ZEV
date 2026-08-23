@@ -50,13 +50,43 @@ Umsetzung; über sein Entfernen wird separat entschieden.
    Liste oder in der Maske. Damit ist sie **schreibgeschützt**.
 7. Das Zurücksetzen des Flags gibt sie wieder frei und wird **rückgefragt**.
 
-### FR-2: Die drei Positionsarten
+### FR-2: Die vier Positionsarten
 
 | Art | Zweck | Erfasst wird | Je Mieter |
 |---|---|---|---|
 | **UMLAGE** | Gesamtkosten nach Schlüssel verteilt (Allgemeinstrom, Regenwasser) | Bezeichnung, Totalbetrag, Gesamtmenge *(optional)*, Einheit | **berechnet**, schreibgeschützt |
-| **VERBRAUCH** | gemessene Menge je Mieter (Warmwasser, Heizung) | Bezeichnung, Einheit, Betrag pro Einheit | **Menge eingeben**, Betrag berechnet |
+| **VERBRAUCH** | gemessene Menge je Mieter (Warmwasser) | Bezeichnung, Einheit, Betrag pro Einheit | **Menge eingeben**, Betrag berechnet |
+| **ANTEIL** | Gesamtkosten nach einem von aussen vorgegebenen Schlüssel (Heizkosten) | Bezeichnung, **Totalbetrag** | **Prozentsatz eingeben**, Betrag berechnet |
 | **ZUSCHLAG** | Prozent auf die Summe (Verwaltungskosten) | Bezeichnung, Prozentsatz | **berechnet**, schreibgeschützt |
+
+**Berechnung bei ANTEIL:**
+
+```
+Betrag je Mieter i = Totalbetrag x Prozentsatz(i) / 100
+```
+
+Für Kosten, deren Verteilschlüssel **von aussen** kommt — etwa aus der Abrechnung eines
+Wärmezählerdienstes. Weder eine zeitanteilige Umlage noch eine Menge mal Preis bilden das ab: Der
+Schlüssel ist bereits das Ergebnis einer fremden Rechnung und wird nur noch angewandt.
+
+**Abgrenzung zu den benachbarten Arten**, damit die Auswahl eindeutig bleibt:
+
+* **gegen ZUSCHLAG:** Dort steht **ein** Prozentsatz an der Position und rechnet auf die Summe der
+  Zeilen davor. Hier trägt **jeder Mieter seinen eigenen**, bezogen auf den Totalbetrag.
+* **gegen UMLAGE:** Dort ergibt sich der Schlüssel aus den Miettagen, ein Leerstand lässt einen
+  Anteil unverteilt. Hier ist der Schlüssel vorgegeben und von den Miettagen **unabhängig**.
+
+**Die Summe der Prozentsätze sollte 100% ergeben.** Sie wird als **Kontrollzahl** neben der
+Position ausgewiesen und bei Abweichung hervorgehoben — aber **nicht erzwungen** (Entscheid):
+Wer neun Mieter erfasst, muss zwischenspeichern können, ohne dass die Summe schon stimmt. Dieselbe
+Überlegung wie bei der nicht erfassten Verbrauchsmenge (Abschnitt 5).
+
+Was zu 100% fehlt, erscheint als **nicht verteilt** — dieselbe Spalte wie der Leerstandsanteil der
+Umlage, nur mit anderer Ursache.
+
+**Der Prozentsatz je Mieter steht in `zev.nk_verbrauch.menge`** — derselben Zeile wie eine erfasste
+Verbrauchsmenge. Es ist genau ein Wert je Position und Mieter; die Bedeutung ergibt sich aus der
+Art der Position. Eine zweite Spalte hätte bei jeder Zeile eine davon leer gelassen.
 
 **Verteilung bei UMLAGE (Entscheid):** **zeitanteilig**, wobei der Nenner die **theoretisch
 mögliche** Mietdauer aller Wohnungen ist — nicht die tatsächliche.
@@ -66,21 +96,57 @@ Anzahl Wohnungen = erfasstes Feld der Abrechnung (Entscheid, siehe unten)
 Tage im Zeitraum = datum_bis - datum_von + 1
 
 Nenner   = Anzahl Wohnungen x Tage im Zeitraum
-Tage(i)  = Σ über die Einheiten des Mieters i: Tage, an denen er sie im Zeitraum gemietet hat
+Tage(i)  = Σ über die Wohnungen des Mieters i: Tage, an denen er sie im Zeitraum gemietet hat
 
 Betrag je Mieter i = Totalbetrag x Tage(i) / Nenner
 Menge  je Mieter i = Gesamtmenge x Tage(i) / Nenner    (nur wenn Gesamtmenge erfasst ist)
 ```
 
 **Die Anzahl Wohnungen wird erfasst, nicht abgeleitet (Entscheid).** Sie steht als Feld in den
-Angaben zur Abrechnung (FR-7). Vorbelegt wird sie mit der Zahl der `CONSUMER`-Einheiten des
-Mandanten — das ist ein **Vorschlag**, kein Zwang: Eine Wohnung, die nicht an der
-Nebenkostenabrechnung teilnimmt, oder eine Liegenschaft, die nicht deckungsgleich mit dem
+Angaben zur Abrechnung (FR-7). Vorbelegt wird sie mit der Zahl der `CONSUMER`-Einheiten, die als
+**Wohnung gekennzeichnet** sind — das ist ein **Vorschlag**, kein Zwang: Eine Wohnung, die nicht
+an der Nebenkostenabrechnung teilnimmt, oder eine Liegenschaft, die nicht deckungsgleich mit dem
 Mandanten ist, lässt sich so abbilden.
 
-Gibt es **keine** `CONSUMER`-Einheiten, bleibt das Feld **leer** (Entscheid) — nicht `0`. Eine
-vorgeschlagene `0` verstiesse gegen den eigenen CHECK-Constraint und liesse jede neue Abrechnung
-sofort in eine Fehlermeldung laufen, ohne dass der Benutzer etwas falsch gemacht hätte.
+**Ein Kennzeichen an der Einheit entscheidet (Entscheid).** `zev.einheit` trägt das Feld
+`nebenkosten_relevant`; gezählt werden nur `CONSUMER`-Einheiten, bei denen es gesetzt ist.
+
+Unter den Verbrauchern stehen auch Messpunkte, die keine Wohnung sind — Allgemeinstrom,
+Eigenverbrauch der PV-Anlage. Zählten sie mit, wäre der Nenner zu gross und bei **jeder** Umlage
+bliebe ein Anteil unverteilt, als stünde eine Wohnung leer. Der Fehler wäre still: Die Zahlen
+sähen plausibel aus, nur die Summe stimmte nicht mit dem Beleg des Lieferanten überein.
+
+**Warum ein eigenes Feld und nicht die Mieterzuordnung?** Die naheliegende Regel „nur Verbraucher
+mit Mieter" trägt nicht: Solche Messpunkte sind in der Praxis dem **Eigentümer** als Mieter
+zugeordnet, damit ihr Stromverbrauch verrechnet wird — sie kämen also durch. Umgekehrt ist eine
+leer stehende Wohnung ohne aktuelle Zuordnung sehr wohl eine Wohnung; genau darauf beruht der
+Leerstandsanteil. Die Zuordnung beantwortet die Frage schlicht nicht.
+
+Das Kennzeichen ist bei einer neuen Einheit **gesetzt**: Die Ausnahme wird abgewählt, nicht die
+Regel. In der Einheiten-Maske erscheint es nur beim Typ `CONSUMER` — bei den übrigen Typen stellt
+sich die Frage nicht.
+
+> **Startbelegung der Migration:** Gesetzt wird das Kennzeichen für jeden `CONSUMER`, der je einem
+> Mieter zugeordnet war; alles andere wird abgewählt. Das ist eine einmalige Annäherung aus dem,
+> was bekannt ist — ab dann ist allein das Kennzeichen massgebend. Ein Verbraucher, der einem
+> Mieter zugeordnet und trotzdem keine Wohnung ist, muss einmalig von Hand abgewählt werden.
+
+**Zähler und Nenner verwenden zwingend dieselbe Regel.** Auch `Tage(i)` zählt nur Einheiten mit
+gesetztem Kennzeichen — nicht alle `CONSUMER`-Einheiten des Mieters.
+
+Diese Symmetrie ist keine Feinheit, sondern die Bedingung dafür, dass die Rechnung aufgeht. Als
+der Nenner das Kennzeichen auswertete und der Zähler noch nicht, stieg die Summe der Miettage über
+den Nenner, und **jedes** Speichern wurde abgewiesen. Wäre die Prüfung `Σ Tage(i) <= Nenner` nicht
+da gewesen, hätte der Eigentümer für seinen Allgemeinstrom-Messpunkt still einen Wohnungsanteil an
+jeder Umlage erhalten.
+
+Ein Mieter, dem nach dieser Regel keine Wohnung bleibt, erscheint mit **0 Tagen** und dem Hinweis
+„keine Wohnung zugeordnet" — er trägt keinen Umlageanteil, seine Verbrauchs- und Zusatzpositionen
+und sein Akonto rechnen aber normal weiter.
+
+Gibt es **keine** so gekennzeichneten `CONSUMER`-Einheiten, bleibt das Feld **leer** (Entscheid) — nicht
+`0`. Eine vorgeschlagene `0` verstiesse gegen den eigenen CHECK-Constraint und liesse jede neue
+Abrechnung sofort in eine Fehlermeldung laufen, ohne dass der Benutzer etwas falsch gemacht hätte.
 
 Damit bleibt die Abrechnung von den Einheiten **unabhängig** — passend zum Entscheid in
 Abschnitt 1, dass eine Abrechnung ihre Zahlen selbst trägt.
@@ -212,8 +278,17 @@ Fünf neue Tabellen, alle mit `org_id` (serverseitig gesetzt, nie aus dem Reques
 `@Filter(orgFilter)`.
 
 **Mengeneinheit erweitern (Entscheid).** Das bestehende Enum `ch.nacht.entity.Mengeneinheit`
-kennt `KWH`, `MONAT`, `STUECK`. Es wird um **`M3`** ergaenzt und von den NK-Tabellen mitbenutzt,
-statt ein zweites Einheiten-Enum einzufuehren.
+kennt `KWH`, `MONAT`, `STUECK`. Es wird um **`M3`** und **`CHF`** ergaenzt und von den NK-Tabellen
+mitbenutzt, statt ein zweites Einheiten-Enum einzufuehren.
+
+**`CHF` („Fr.") ist die Einheit einer Umlage, deren verteilte Grösse selbst ein Betrag ist** —
+Grünabfuhr, Versicherungsprämie, Hauswartpauschale. Die Mengenspalte des Mieters trägt dann
+denselben Wert wie die Betragsspalte. Das ist gewollt: Es macht sichtbar, dass hier ein Betrag
+und keine gemessene Menge verteilt wird, und die Zeile bleibt gegen den Beleg des Lieferanten
+prüfbar.
+
+`CHF` und `M3` stehen **nur** in der Nebenkostenabrechnung zur Auswahl, nicht am Tarif: Ein Preis
+„CHF pro Fr." wäre keine sinnvolle Angabe.
 
 > **Achtung, DDL:** `ck_tarif_mengeneinheit` auf `zev.tarif` zaehlt die erlaubten Werte auf
 > (`KWH`, `MONAT`, `STUECK`). Der Constraint ist in derselben Migration anzupassen, sonst
@@ -222,18 +297,25 @@ statt ein zweites Einheiten-Enum einzufuehren.
 > aber nicht ausgeschlossen - die Einschraenkung waere Willkuer ohne Nutzen.
 
 > **Achtung, Frontend:** Es gibt ein **zweites** Enum `Mengeneinheit` in
-> `frontend-service/src/app/models/tarif.model.ts` (Zeile 12) und zwei Ableitungsfunktionen mit
-> `else`-Zweig auf kWh:
-> * `mengeneinheitKey()` (Zeile 63-65) endet mit `… : 'KWH'`
-> * `preisEinheitKey()` (Zeile 28-33) ebenso
+> `frontend-service/src/app/models/tarif.model.ts`. Kritisch ist dort `mengeneinheitKey()`:
+> Die Funktion endete auf einem `else`-Zweig `'KWH'`, ein unbekannter Wert wäre also
+> stillschweigend als **Kilowattstunden** beschriftet worden — kein Compiler-Fehler, keine
+> Ausnahme, nur eine falsche Einheit neben einer richtigen Zahl.
 >
-> Ein unbekannter Wert fällt damit stillschweigend auf **„kWh"** zurück — `M3` würde also
-> als Kilowattstunden beschriftet. Kein Compiler-Fehler, keine Ausnahme: Die Zahl stimmt, die
-> Einheit daneben ist falsch. Beide Funktionen und das Enum sind mitzuziehen, dazu der
-> Übersetzungsschlüssel der neuen Einheit.
+> `preisEinheitKey()` ist davon **nicht** betroffen: Sie gibt den Enum-Wert direkt als
+> Übersetzungsschlüssel zurück und trägt einen neuen Wert von selbst mit.
+>
+> Mitzuziehen sind also: das Enum, `mengeneinheitKey()` und der Übersetzungsschlüssel der
+> neuen Einheit.
 >
 > Das ist der Preis des Entscheids „Enum erweitern statt zweites einführen": **alle** bestehenden
 > Auswertungen müssen mit.
+
+> **Achtung, drei CHECK-Constraints:** Die erlaubten Werte sind an **drei** Stellen aufgezählt —
+> `ck_tarif_mengeneinheit`, `ck_nk_position_einheit` und `ck_nk_zusatz_einheit`. Eine neue Einheit
+> muss alle drei anfassen, sonst schlägt das Speichern genau dort fehl, wo sie gebraucht wird.
+> Bereits ausgeführte Migrationen bleiben unverändert; die Constraints werden in einer neuen
+> Migration ersetzt.
 
 **`zev.nk_abrechnung`**
 
@@ -254,14 +336,14 @@ statt ein zweites Einheiten-Enum einzufuehren.
 |---|---|---|---|
 | `id`, `org_id` | BIGINT | ✅ | |
 | `abrechnung_id` | BIGINT | ✅ | FK, `ON DELETE CASCADE` |
-| `art` | VARCHAR(20) | ✅ | `UMLAGE` \| `VERBRAUCH` \| `ZUSCHLAG`, CHECK-Constraint |
+| `art` | VARCHAR(20) | ✅ | `UMLAGE` \| `VERBRAUCH` \| `ANTEIL` \| `ZUSCHLAG`, CHECK-Constraint |
 | `bezeichnung` | VARCHAR(150) | ✅ | |
 | `reihenfolge` | INTEGER | ✅ | Anzeigereihenfolge |
-| `einheit` | VARCHAR(20) | ❌ | `M3` \| `KWH` \| `STUECK`; bei `ZUSCHLAG` leer |
-| `totalbetrag` | NUMERIC(12,2) | ❌ | nur `UMLAGE` |
+| `einheit` | VARCHAR(20) | ❌ | `M3` \| `CHF` \| `KWH` \| `STUECK`; bei `ZUSCHLAG` und `ANTEIL` leer |
+| `totalbetrag` | NUMERIC(12,2) | ❌ | `UMLAGE` und `ANTEIL` |
 | `gesamtmenge` | NUMERIC(12,3) | ❌ | nur `UMLAGE`, optional |
 | `betrag_pro_einheit` | NUMERIC(12,4) | ❌ | nur `VERBRAUCH` |
-| `prozentsatz` | NUMERIC(5,2) | ❌ | nur `ZUSCHLAG` |
+| `prozentsatz` | NUMERIC(5,2) | ❌ | nur `ZUSCHLAG`; bei `ANTEIL` steht er je Mieter in `nk_verbrauch.menge` |
 
 `UNIQUE (abrechnung_id, reihenfolge, org_id)` — die Reihenfolge bestimmt das Ergebnis der
 Zuschlagskaskade (FR-2); zwei Positionen mit derselben Nummer machten sie nicht-deterministisch.
@@ -398,20 +480,36 @@ Service sichtbar und folgt dem bestehenden Muster des Org-Filters.
   erscheint eine Rückfrage („Abrechnung wieder zur Bearbeitung freigeben?"), beim Aktivieren
   nicht.
 * Kebab-Menü: **Bearbeiten** und **Löschen**; Löschen mit Rückfrage.
-* **Unterhalb** der Tabelle die Schaltfläche „Neue Abrechnung erstellen"
-  (`zev-button--primary`).
+* **Oberhalb** der Tabelle die Schaltfläche „Neue Abrechnung erstellen"
+  (`zev-button--primary`), in einer `zev-button-row` — wie auf allen übrigen Listenseiten
+  (Tarife, Einheiten, Mieter). Die Stelle, an der die Schaltfläche erwartet wird, soll nicht von
+  der Länge der Liste abhängen.
 * Leerstate: „Keine Abrechnungen erfasst".
 
 **Bearbeitungsmaske** — drei Bereiche untereinander:
 
 1. **Angaben zur Abrechnung** — Bezeichnung, Datum von/bis, **Anzahl Wohnungen** und Flag
-   „abgerechnet". Die Anzahl Wohnungen ist mit der Zahl der `CONSUMER`-Einheiten vorbelegt und
-   überschreibbar; ein Hinweis nennt ihre Wirkung („bildet den Nenner der Umlage").
+   „abgerechnet". Die Anzahl Wohnungen ist mit der Zahl der als Wohnung gekennzeichneten
+   `CONSUMER`-Einheiten vorbelegt und überschreibbar; ein Hinweis nennt ihre Wirkung („bildet den
+   Nenner der Umlage").
 2. **Allgemeine Positionen** — Tabelle mit Auswahl der Art je Zeile. Die Eingabefelder richten
    sich nach der Art: Bei `UMLAGE` erscheinen Totalbetrag, Gesamtmenge und Einheit, bei
-   `VERBRAUCH` Einheit und Betrag pro Einheit, bei `ZUSCHLAG` nur der Prozentsatz. Nicht
+   `VERBRAUCH` Einheit und Betrag pro Einheit, bei `ANTEIL` nur der Totalbetrag, bei `ZUSCHLAG`
+   nur der Prozentsatz. Nicht
    zutreffende Felder werden **ausgeblendet**, nicht bloss gesperrt. Zeilen lassen sich
    hinzufügen und entfernen.
+   * **Alle Eingabefelder einer Zeile liegen auf einer Linie** — unabhängig davon, ob über oder
+     unter dem Feld Text steht. In dieser Tabelle stehen beschriftete Felder (Totalbetrag,
+     Prozentsatz) neben unbeschrifteten (Art, Bezeichnung), und unter manchen steht zusätzlich
+     ein Hinweis.
+
+     Umgesetzt ist das über einen **einheitlichen Feldaufbau**: Jedes Feld besteht aus einer
+     Titelzeile und der Eingabe darunter; wo keine Beschriftung nötig ist, hält eine leere
+     Titelzeile den Platz frei. Hinweise stehen **ausserhalb** dieser Zeile.
+
+     Weder Zentrieren noch Ausrichten an der Unterkante genügt: Beim Zentrieren schweben die
+     unbeschrifteten Felder, an der Unterkante richten sie sich am Hinweistext aus statt an den
+     Eingaben.
    * **Ordnen per Drag & Drop** (Entscheid): Die Zeilen werden mit der Maus verschoben; die
      `reihenfolge` ergibt sich aus der Position in der Liste und wird beim Speichern neu
      durchnummeriert. Ein Anfasser-Symbol macht die Zeile als verschiebbar erkennbar.
@@ -427,10 +525,80 @@ Service sichtbar und folgt dem bestehenden Muster des Org-Filters.
   die Maske die Antwort des Servers und zeigt dessen Werte an**, nicht die selbst gerechneten.
   Weicht die Vorschau ab, wird das im selben Moment sichtbar statt monatelang unbemerkt zu
   bleiben - die Regeln existieren zwangslaeufig zweimal (Java und TypeScript).
-* **Speichern**-Schaltfläche am Ende der Maske.
+* Am Ende der Maske drei Schaltflächen: **Speichern**, **Abbrechen** und
+  **Zurück zur Übersicht**.
+
+  **Speichern** erscheint zusätzlich **oben bei den allgemeinen Positionen**, neben „Position
+  hinzufügen". Bei dreissig Mieterblöcken (NFR-1) liegt das Ende der Maske mehrere
+  Bildschirmseiten entfernt; wer am Kopf der Abrechnung arbeitet, soll dafür nicht ans Ende
+  scrollen müssen. Beide lösen dieselbe Aktion aus.
+
+  Speichern lässt die Maske offen, damit die vom Server gelieferten Zahlen geprüft werden können.
+  Danach ist „Abbrechen" das falsche Wort für „ich bin fertig" — deshalb der eigene Weg zurück.
+  Beide führen heute zur Liste; die Maske hält keinen Zustand, der beim Verlassen verlorenginge,
+  weil Gespeichertes gespeichert ist. Getrennt sind sie, weil sie verschiedene **Absichten**
+  benennen.
 * Ist die Abrechnung `abgerechnet`, sind **alle** Eingabefelder gesperrt und ein Hinweis erklärt
   warum; nur das Flag selbst bleibt bedienbar.
 * Alle Texte über `TranslationService`; Zahlenformat nach `Specs/generell.md`.
+
+**Die Mieterblöcke sind sofort nach dem Laden bedienbar.** Mengen, Zusatzzeilen und Akonto lassen
+sich eingeben, ohne dass zuvor irgendetwas verändert werden müsste.
+
+Das ist kein selbstverständlicher Punkt, sondern die Lehre aus einem Fehler: Die Maske entscheidet
+anhand der Herkunft einer Zeile, ob sie bearbeitbar ist. Solange diese Prüfung auf `undefined`
+statt auf `null` verglich, galt **jede** Zeile aus der Serverantwort als schreibgeschützt — Jackson
+schickt nicht gesetzte Felder als `null` mit, und `null !== undefined`. Bedienbar wurde die Maske
+erst, wenn eine beliebige Eingabe die clientseitige Vorschau neu aufbaute.
+
+**Verbindlich deshalb:** Antworten des Backends liefern nicht gesetzte Felder als `null`. Prüfungen
+darauf verwenden `== null` / `!= null`, nie `=== undefined`. Das gilt gleichermassen für die
+Zuordnung einer Zeile zu ihren Kontrollzahlen, die über die **Datenbank-ID** läuft und nicht über
+die Reihenfolge.
+
+**Eingabefelder binden über `ngModel`.** Die Mengenfelder der Verbrauchszeilen hingen zeitweise an
+`[value]` mit `(change)`: Damit wurde erst beim Verlassen des Feldes gerechnet, während FR-7 die
+Neuberechnung **bei jeder Eingabe** verlangt. Ausserdem las die Anzeige aus der berechneten Zeile,
+die bei jeder Neuberechnung ersetzt wird, statt aus der Position, in der die Menge tatsächlich
+steht. Beides bindet jetzt wie im übrigen Formular an das Modell.
+
+Diese Regeln sind durch Unit-Tests der Maske abgesichert, die die Antwort **serverförmig**
+nachbilden — mit `null` in den nicht gesetzten Feldern. Ein Test mit `undefined` hätte den Fehler
+nicht gefunden.
+
+**Die Mieterblöcke sind aufklappbar und beim Öffnen der Maske alle geschlossen.** Verwendet wird
+`zev-collapsible` aus dem Design System.
+
+Bei dreissig Mietern (NFR-1) und je einem Dutzend Zeilen ist die aufgeklappte Maske mehrere
+Bildschirmseiten lang; die Angaben zur Abrechnung und die allgemeinen Positionen — der Teil, den
+man beim Erfassen zuerst braucht — verschwinden dann nach oben aus dem Blick.
+
+Damit die geschlossene Liste trotzdem aussagekräftig bleibt, zeigt die **Kopfzeile jedes Blocks**
+den Namen, die Miettage und den **Saldo** als Nachzahlung oder Guthaben. Ohne den Saldo wäre die
+geschlossene Ansicht eine reine Namensliste, und man müsste jeden Block einzeln öffnen, um das
+Ergebnis zu sehen.
+
+Der Aufklappzustand gilt nur für die geöffnete Maske und wird nicht gespeichert.
+
+**Hinweismeldungen sind wegklickbar und stehen im Textfluss.** Jede Meldung der Maske
+(`zev-message--info`) trägt ein Schliesskreuz und die Klasse `zev-message--statisch`.
+
+Ohne `--statisch` ist eine Meldung im Design System ein **Overlay** (`position: fixed`, oben
+mittig). Drei dauerhafte Hinweise übereinander verdecken damit den Seitenanfang und kollidieren
+mit den kurzlebigen Erfolgs- und Fehlermeldungen, die denselben Platz belegen. Ein dauerhafter
+Hinweis gehört dorthin, wo er gilt — beim Mieterblock, beim gesperrten Formular.
+
+Wie lange eine Meldung weg bleibt, richtet sich danach, was sie sagt:
+
+| Hinweis | Charakter | Bleibt weg |
+|---|---|---|
+| „Mieterblöcke erscheinen nach dem Speichern" | einmalige Erklärung | **dauerhaft** je Browser (`localStorage`) |
+| „Abrechnung ist abgeschlossen" | beschreibt den Zustand **dieser** Abrechnung | für die geöffnete Maske |
+| „Mieter ohne Wohnung" | beschreibt den Zustand **dieses** Mieters | für die geöffnete Maske, je Mieter einzeln |
+
+Zustandsabhängige Hinweise dauerhaft auszublenden wäre falsch: Sie erklären, warum ein Feld
+gesperrt ist oder ein Betrag fehlt, und müssen beim nächsten betroffenen Datensatz wieder
+erscheinen.
 
 **Benötigte Übersetzungsschlüssel** (Migration ab V117, je deutsch **und** englisch):
 
@@ -439,7 +607,7 @@ Service sichtbar und folgt dem bestehenden Muster des Org-Filters.
 | Seite und Liste | `NK_ABRECHNUNGEN`, `NK_ABRECHNUNG_NEU`, `NK_KEINE_ABRECHNUNGEN`, `NK_ABGERECHNET` |
 | Angaben zur Abrechnung | `NK_ANZAHL_WOHNUNGEN`, `NK_ANZAHL_WOHNUNGEN_HINT`, `NK_FEHLER_ANZAHL_WOHNUNGEN_ZU_KLEIN` |
 | Rückfragen | `NK_ABGERECHNET_ZURUECKSETZEN_FRAGE`, `NK_ABRECHNUNG_LOESCHEN_FRAGE` |
-| Positionsarten | `NK_ART_UMLAGE`, `NK_ART_VERBRAUCH`, `NK_ART_ZUSCHLAG` |
+| Positionsarten | `NK_ART_UMLAGE`, `NK_ART_VERBRAUCH`, `NK_ART_ANTEIL`, `NK_ART_ZUSCHLAG` |
 | Positionsfelder | `NK_TOTALBETRAG`, `NK_GESAMTMENGE`, `NK_BETRAG_PRO_EINHEIT`, `NK_PROZENTSATZ`, `NK_REIHENFOLGE` |
 | Mieterblock | `NK_POSITION_HINZUFUEGEN`, `NK_KOSTENTOTAL`, `NK_KEINE_MIETER`, `NK_MIETER_OHNE_EINHEIT` |
 | Akonto und Saldo | `NK_AKONTO`, `NK_AKONTO_PRO_MONAT`, `NK_ANZAHL_MONATE`, `NK_KORREKTUR`, `NK_AKONTO_TOTAL`, `NK_NACHZAHLUNG`, `NK_GUTHABEN` |
@@ -481,9 +649,15 @@ Die Liste ist der Mindestumfang; beim Umsetzen ergänzte Schlüssel folgen derse
 * [ ] Der Nenner ist `Anzahl Wohnungen × Tage im Zeitraum` — **nicht** die Summe der
       tatsächlichen Miettage.
 * [ ] Die Anzahl Wohnungen ist in den Angaben zur Abrechnung erfassbar und mit der Zahl der
-      `CONSUMER`-Einheiten vorbelegt.
+      `CONSUMER`-Einheiten vorbelegt, die als Wohnung gekennzeichnet sind.
+* [ ] Ein Verbraucher mit abgewähltem Kennzeichen (Allgemeinstrom, PV-Eigenverbrauch) wird nicht
+      mitgezählt — auch dann nicht, wenn er einem Mieter zugeordnet ist.
+* [ ] Eine Wohnung **ohne** aktuellen Mieter zählt mit; sonst gäbe es keinen Leerstandsanteil.
+* [ ] Eine neu angelegte Einheit ist als Wohnung gekennzeichnet.
+* [ ] Das Kennzeichen erscheint in der Einheiten-Maske nur beim Typ `CONSUMER`.
 * [ ] Eine Anzahl Wohnungen von `0` oder weniger wird abgewiesen.
-* [ ] Hat der Mandant keine `CONSUMER`-Einheiten, ist das Feld **leer** vorbelegt, nicht `0`.
+* [ ] Hat der Mandant keine als Wohnung gekennzeichneten `CONSUMER`-Einheiten, ist das Feld **leer** vorbelegt,
+      nicht `0`.
 * [ ] Ein Mieter ohne zugeordnete Einheit erhaelt keinen Umlageanteil und wird in der Maske
       mit einem Hinweis gekennzeichnet; das Speichern bleibt moeglich.
 * [ ] Ist die Anzahl Wohnungen kleiner als die tatsächliche Belegung (`Σ Tage(i) > Nenner`),
@@ -499,6 +673,11 @@ Die Liste ist der Mindestumfang; beim Umsetzen ergänzte Schlüssel folgen derse
 * [ ] Rundungsdifferenz und Leerstandsanteil werden **getrennt** ausgewiesen und nicht vermischt.
 * [ ] Eine Position mit art-fremden Feldern wird von der Datenbank abgewiesen (CHECK-Constraint),
       nicht nur vom Service.
+* [ ] Die Mengeneinheit **`Fr.`** steht in der Abrechnung zur Auswahl und lässt sich speichern —
+      an einer allgemeinen Position wie an einer Zusatzposition.
+* [ ] Eine Umlage mit Einheit `Fr.` und erfasster Gesamtmenge zeigt beim Mieter denselben Wert in
+      der Mengen- und in der Betragsspalte.
+* [ ] `Fr.` erscheint **nicht** in der Einheitenauswahl eines ZUSATZ-Tarifs.
 
 **Je Mieter**
 * [ ] Abgerechnet werden genau die Mieter, deren Mietverhältnis den Zeitraum berührt.
@@ -519,6 +698,91 @@ Die Liste ist der Mindestumfang; beim Umsetzen ergänzte Schlüssel folgen derse
 * [ ] `Akonto total = A × B + K`; ein negativer Korrekturbetrag ist zulässig.
 * [ ] Der Saldo ist als **Nachzahlung** oder **Guthaben** benannt, nicht nur als Vorzeichen.
 
+**Bedienbarkeit direkt nach dem Laden**
+* [ ] Die Mengenfelder der Verbrauchszeilen sind **unmittelbar** nach dem Öffnen einer
+      gespeicherten Abrechnung eingebbar — ohne dass zuvor eine Position hinzugefügt oder sonst
+      etwas verändert werden muss.
+* [ ] Der unverteilte Leerstandsanteil erscheint schon beim ersten Anzeigen neben der
+      Umlagezeile, nicht erst nach der ersten Eingabe.
+* [ ] Eine Zeile aus einer allgemeinen Position wird **nicht** als Zusatzzeile behandelt, obwohl
+      die Serverantwort ihr `zusatzId`-Feld als `null` mitschickt.
+* [ ] Eine Verbrauchsposition ohne bisher erfasste Menge zeigt ein **leeres, bedienbares** Feld.
+* [ ] Der Betrag der Zeile ändert sich schon **beim Tippen**, nicht erst beim Verlassen des Feldes.
+* [ ] Wird das Mengenfeld geleert, gilt die Menge als nicht erfasst (`null`), nicht als `0`.
+* [ ] Ein **Neuladen** von `/nebenkosten/abrechnung` zeigt die Anwendung, nicht die
+      Whitelabel-Fehlerseite — dasselbe gilt für Lesezeichen und geteilte Links.
+* [ ] Eine Datei unterhalb eines Verzeichnisses (`/assets/…`) wird weiterhin als Datei
+      ausgeliefert und ergibt bei einem Tippfehler ein `404`, nicht die `index.html`.
+
+**Fehlermeldungen**
+* [ ] Eine frisch geöffnete Maske zeigt **keine** Feldfehler, solange nicht gespeichert wurde.
+* [ ] Nach einem Klick auf Speichern mit unvollständigen Angaben erscheinen die Feldfehler **und**
+      eine Meldung, dass nicht gespeichert wurde.
+* [ ] Bei unvollständigen Angaben wird **kein** Request abgeschickt.
+* [ ] Jede Meldung trägt ein Schliesskreuz und verschwindet beim Anklicken; Erfolgsmeldungen
+      zusätzlich nach fünf Sekunden von selbst.
+* [ ] Die Speichern-Schaltfläche ist bei unvollständigen Angaben **nicht** gesperrt — eine graue
+      Schaltfläche sagt nicht, was fehlt.
+
+**Darstellung der Positionstabelle**
+* [ ] In einer Positionszeile liegen alle Eingabefelder auf derselben Höhe — auch dort, wo über
+      dem Feld keine Beschriftung steht.
+* [ ] Das gilt auch, wenn **unter** einem Feld ein Hinweis steht (Anteil, Zuschlag): Der Hinweis
+      verschiebt die übrigen Felder der Zeile nicht.
+* [ ] Das gilt für jede Positionsart, also auch nach einem Wechsel der Art in derselben Zeile.
+* [ ] Anfasser und Löschen-Schaltfläche liegen auf derselben Linie wie die Eingabefelder.
+
+**Positionsart ANTEIL**
+* [ ] „Anteil (%)" steht in der Auswahl der Positionsart zur Verfügung.
+* [ ] An der Position ist nur der **Totalbetrag** erfassbar — keine Einheit, kein Prozentsatz.
+* [ ] Je Mieter ist ein **Prozentsatz** eingebbar; der Betrag ist `Totalbetrag × Prozentsatz / 100`.
+* [ ] Die Summe der Prozentsätze wird als Kontrollzahl ausgewiesen und bei ≠ 100% hervorgehoben.
+* [ ] Eine Abrechnung mit einer Anteilssumme ≠ 100% lässt sich trotzdem **speichern**.
+* [ ] Was zu 100% fehlt, erscheint als „nicht verteilt".
+* [ ] Der Betrag ist **unabhängig von den Miettagen** — ein Leerstand verändert ihn nicht.
+* [ ] Eine Anteilszeile zählt in die Bemessungsgrundlage eines nachfolgenden Zuschlags.
+* [ ] Der Wechsel der Art auf `ANTEIL` leert Einheit, Gesamtmenge, Betrag pro Einheit und
+      Prozentsatz der Position.
+
+**Zähler und Nenner**
+* [ ] Ein Verbraucher mit abgewähltem Kennzeichen zählt weder in den Nenner **noch** in die
+      Miettage seines Mieters.
+* [ ] Ein Mieter, dem nur solche Einheiten zugeordnet sind, erscheint mit 0 Tagen und Hinweis.
+* [ ] Nach dem Abwählen einer Einheit lässt sich eine bestehende Abrechnung weiterhin speichern —
+      die Summe der Miettage sinkt mit dem Nenner.
+
+**Schaltflächen**
+* [ ] „Neue Abrechnung erstellen" steht **oberhalb** der Tabelle — auch bei leerer Liste.
+* [ ] Die Maske bietet **Speichern**, **Abbrechen** und **Zurück zur Übersicht**.
+* [ ] Bei den allgemeinen Positionen steht neben „Position hinzufügen" ein zweites **Speichern**,
+      das dasselbe tut wie das am Ende der Maske.
+* [ ] Bei abgeschlossener Abrechnung erscheint dieses zweite Speichern **nicht** — dort fehlt auch
+      „Position hinzufügen".
+* [ ] „Zurück zur Übersicht" führt zur Liste, ohne zu speichern und ohne Rückfrage.
+* [ ] Bei abgeschlossener Abrechnung ist nur **Speichern** gesperrt; beide Wege zurück bleiben
+      bedienbar.
+
+**Mieterblöcke aufklappen**
+* [ ] Beim Öffnen der Maske sind **alle** Mieterblöcke geschlossen.
+* [ ] Ein Klick auf die Kopfzeile öffnet den Block, ein weiterer schliesst ihn.
+* [ ] Die Kopfzeile zeigt auch im geschlossenen Zustand Name, Miettage und den Saldo als
+      Nachzahlung oder Guthaben.
+* [ ] Mehrere Blöcke lassen sich gleichzeitig offen halten.
+* [ ] Eine Eingabe in einem offenen Block verändert den Saldo in der Kopfzeile eines anderen
+      Blocks nicht — die Blöcke rechnen unabhängig voneinander.
+* [ ] Werte eines geschlossenen Blocks gehen beim Speichern **nicht** verloren.
+
+**Hinweismeldungen**
+* [ ] Jede Hinweismeldung der Maske trägt ein Schliesskreuz und verschwindet beim Anklicken.
+* [ ] Keine Hinweismeldung liegt als Overlay über dem Seitenanfang; sie steht dort, wo sie gilt
+      (`zev-message--statisch`).
+* [ ] Der Hinweis „Mieterblöcke erscheinen nach dem Speichern" bleibt nach dem Wegklicken auch
+      beim nächsten Aufruf verborgen.
+* [ ] Der Sperrhinweis erscheint beim Öffnen einer anderen abgeschlossenen Abrechnung wieder,
+      auch wenn er zuvor weggeklickt wurde.
+* [ ] Der Hinweis „Mieter ohne Wohnung" lässt sich je Mieter einzeln wegklicken; die übrigen
+      bleiben stehen.
+
 **Sperre**
 * [ ] Bei gesetztem „abgerechnet" sind alle Eingabefelder der Maske gesperrt.
 * [ ] `PUT` und `DELETE` auf eine abgerechnete Abrechnung werden mit einer verständlichen
@@ -529,8 +793,8 @@ Die Liste ist der Mindestumfang; beim Umsetzen ergänzte Schlüssel folgen derse
 * [ ] Alle sichtbaren Texte stammen aus dem `TranslationService`; keine fest verdrahteten Strings.
 * [ ] Jeder neue Schluessel hat einen deutschen **und** einen englischen Text.
 * [ ] Die Uebersetzungsmigration ist wiederholbar (`ON CONFLICT (key) DO NOTHING`).
-* [ ] Die drei Positionsarten erscheinen uebersetzt (`NK_ART_UMLAGE`, `NK_ART_VERBRAUCH`,
-      `NK_ART_ZUSCHLAG`), nicht als technische Enum-Namen.
+* [ ] Die vier Positionsarten erscheinen uebersetzt (`NK_ART_UMLAGE`, `NK_ART_VERBRAUCH`,
+      `NK_ART_ANTEIL`, `NK_ART_ZUSCHLAG`), nicht als technische Enum-Namen.
 * [ ] Saldo-Beschriftungen unterscheiden **Nachzahlung** und **Guthaben** in beiden Sprachen.
 
 **Sicherheit und Mandantenfähigkeit**
@@ -561,7 +825,26 @@ Die Liste ist der Mindestumfang; beim Umsetzen ergänzte Schlüssel folgen derse
 * Additiv: fünf neue Tabellen, ein neues nullable Feld an `zev.mieter`. Bestehende Abrechnung,
   Tarife und Rechnungen bleiben unberührt.
 * `mieter.akonto_pro_monat` ist nullable — Bestandsdaten bleiben gültig, keine Migration nötig.
+* **`zev.einheit` erhält eine neue Spalte** `nebenkosten_relevant` (FR-2). Sie ist `NOT NULL` mit
+  Default `TRUE`; die Migration wählt sie für alles ab, was nicht ein je vermieteter `CONSUMER`
+  ist. Die Einheiten-Maske zeigt sie nur bei diesem Typ. Andere Auswertungen der Einheit sind
+  nicht betroffen — das Feld wird ausschliesslich für den Vorschlag der Anzahl Wohnungen gelesen.
 * Die Gerüstseite aus `Nebenkosten.md` wird ersetzt.
+
+### Betroffen: Auslieferung des Frontends bei verschachtelten Routen
+
+Die Nebenkosten sind der erste Bereich mit **zweistufigen** Routen
+(`/nebenkosten/abrechnung`). Dabei kam ein Fehler ans Licht, der alle künftigen verschachtelten
+Routen gleichermassen betrifft:
+
+`SpaRedirectController` im `frontend-service` leitete nur **einstufige** Pfade auf die
+`index.html` um (`/{path:[^.]*}`). Ein Neuladen von `/nebenkosten/abrechnung` — oder jeder
+Aufruf über Lesezeichen, Verlauf oder einen geteilten Link — landete deshalb auf der
+Whitelabel-Fehlerseite von Spring Boot statt in der Anwendung.
+
+Die Umleitung deckt nun bis zu **drei** Ebenen ab. Jedes Segment muss punktfrei bleiben: Sonst
+fingen die Muster auch `/assets/logo.png` ab und lieferten HTML statt eines Bildes — beziehungsweise
+verdeckten einen Tippfehler im Dateinamen mit einer scheinbar funktionierenden Seite.
 
 ## 5. Edge Cases & Fehlerbehandlung
 
@@ -570,7 +853,7 @@ Die Liste ist der Mindestumfang; beim Umsetzen ergänzte Schlüssel folgen derse
   rechnen. Zulaessig, aber fast immer ein Datenfehler: Die Maske zeigt bei diesem Mieter
   einen Hinweis, dass ihm keine Einheit zugeordnet ist (Entscheid). Das Speichern wird
   nicht verhindert - die Zuordnung nachzutragen ist Sache der Mieterverwaltung.
-* **Keine CONSUMER-Einheiten vorhanden:** Das Feld Anzahl Wohnungen bleibt leer statt `0`
+* **Keine als Wohnung gekennzeichneten CONSUMER-Einheiten vorhanden:** Das Feld Anzahl Wohnungen bleibt leer statt `0`
   (FR-2). Das Speichern verlangt eine Eingabe > 0; die Meldung nennt das Feld.
 * **Anzahl Wohnungen zu klein erfasst:** Ist `Σ Tage(i) > Nenner`, wuerden die Mieter zusammen
   mehr als den Totalbetrag tragen. Das Speichern wird abgewiesen (FR-2), die Maske nennt die
@@ -621,8 +904,8 @@ Die Liste ist der Mindestumfang; beim Umsetzen ergänzte Schlüssel folgen derse
 * `Mengeneinheit` (Backend-Enum) — neuer Wert `M3`; Flyway-Migration für
   `ck_tarif_mengeneinheit` (FR-5).
 * `frontend-service/src/app/models/tarif.model.ts` — Enum `Mengeneinheit` um `M3` erweitern
-  **und** `mengeneinheitKey()` sowie `preisEinheitKey()` anpassen; beide fallen sonst auf `'KWH'`
-  zurück und beschriften Kubikmeter als Kilowattstunden (FR-5).
+  **und** `mengeneinheitKey()` anpassen; die Funktion fiele sonst auf `'KWH'` zurück und
+  beschriftete Kubikmeter als Kilowattstunden. `preisEinheitKey()` ist nicht betroffen (FR-5).
 * Ersetzt: `nebenkosten-abrechnung.component` (bisher Gerüst).
 * Neue Flyway-Migrationen ab **V117**: fünf Tabellen, `mieter.akonto_pro_monat`, Übersetzungen.
 

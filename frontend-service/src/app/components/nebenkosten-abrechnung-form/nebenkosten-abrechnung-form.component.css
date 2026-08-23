@@ -1,0 +1,126 @@
+/* Nur komponentenspezifisches: Panels, Tabellen, Formularfelder und Meldungen kommen
+   vollstaendig aus dem Design System. */
+
+/**
+ * Ausrichtung der Positionszeile: alle Eingaben auf einer Linie.
+ *
+ * In dieser Tabelle stehen Felder MIT Beschriftung (Totalbetrag, Prozentsatz) neben Feldern OHNE
+ * (Art, Bezeichnung), und unter manchen steht zusaetzlich ein Hinweis. Weder Zentrieren
+ * (Browser-Default) noch Ausrichten an der Unterkante loest das: Beim Zentrieren schweben die
+ * unbeschrifteten Felder, an der Unterkante richten sie sich am Hinweistext aus statt an den
+ * Eingaben.
+ *
+ * Deshalb hat JEDES Feld denselben Aufbau - Titelzeile, darunter die Eingabe - und die Zellen
+ * sind oben ausgerichtet. Wo keine Beschriftung noetig ist, haelt eine leere Titelzeile den Platz
+ * frei. Hinweise stehen ausserhalb dieser Zeile und koennen sie damit nicht mehr verschieben.
+ *
+ * Bewusst hier und nicht im Design System: `.zev-table td { vertical-align: top }` traefe jede
+ * Tabelle der Anwendung. Der Fall - beschriftete und unbeschriftete Felder in derselben Zeile -
+ * kommt bisher nur hier vor.
+ */
+.nk-positionen td {
+  vertical-align: top;
+}
+
+/* Ein Feld: Titelzeile oben, Eingabe darunter. */
+.nk-positionen__feld {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: var(--font-size-sm);
+}
+
+/* Leere Titelzeile - haelt genau die Hoehe einer echten Beschriftung frei. Als Pseudo-Element
+   und nicht als leeres Markup, damit Screenreader nichts Sinnloses vorlesen. */
+.nk-positionen__feld--ohne-titel::before {
+  content: "\00a0";
+}
+
+/* Symbole sind niedriger als ein Eingabefeld und laegen sonst an dessen Oberkante. Der Versatz
+   ist der Innenabstand des Feldes - damit sitzt das Symbol auf dessen Textzeile. */
+.nk-positionen__feld--symbol {
+  padding-top: var(--spacing-sm);
+}
+
+/* Hinweis unter der Feldzeile */
+.nk-positionen__hinweis {
+  margin-top: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+}
+
+/* Anfasser der Positionstabelle - macht die Zeile als verschiebbar erkennbar */
+.nk-positionen__griff-spalte {
+  width: 2.5rem;
+}
+
+.nk-positionen__griff {
+  cursor: grab;
+  color: var(--color-gray-500);
+  text-align: center;
+}
+
+.nk-positionen__griff:active {
+  cursor: grabbing;
+}
+
+/* Die art-abhaengigen Felder stehen nebeneinander und brechen auf schmalen Schirmen um.
+   `flex-start`, weil alle Felder oben mit ihrer Titelzeile beginnen. */
+.nk-positionen__werte {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  align-items: flex-start;
+}
+
+/* Waehrend des Ziehens: die Vorschau des Angular CDK an die Tabelle angleichen */
+.cdk-drag-preview {
+  box-shadow: var(--shadow-md);
+  background-color: var(--color-white);
+  opacity: 0.9;
+}
+
+.cdk-drag-placeholder {
+  opacity: 0.4;
+}
+
+.cdk-drop-list-dragging .cdk-drag:not(.cdk-drag-placeholder) {
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+/* Kopfzeile eines Mieterblocks: Name und Miettage links, Saldo daneben.
+   Der Saldo steht bewusst schon in der Kopfzeile - sonst waere die geschlossene Liste eine
+   reine Namensliste und man muesste jeden Block oeffnen, um das Ergebnis zu sehen. */
+.nk-mieterkopf {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.nk-mieterkopf__name {
+  font-weight: var(--font-weight-semibold);
+}
+
+.nk-mieterkopf__saldo {
+  margin-left: auto;
+  padding-right: var(--spacing-md);
+  white-space: nowrap;
+}
+
+/* Zeilen mit einem Total: rechtsbuendig und abgesetzt */
+.nk-total {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-sm) 0;
+  font-weight: var(--font-weight-semibold);
+}
+
+.nk-total--saldo {
+  border-top: 1px solid var(--color-gray-300);
+  font-size: var(--font-size-lg);
+}
+
+.nk-akonto {
+  margin-top: var(--spacing-md);
+}

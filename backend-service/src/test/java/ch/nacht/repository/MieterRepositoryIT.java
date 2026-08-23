@@ -425,4 +425,59 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
         assertThat(mieterRepository.findByEinheitIdAndQuartal(neueStation, q1Beginn, q1Ende))
                 .extracting(Mieter::getName).containsExactly("Nachmieter");
     }
+
+    // ==== Mieter eines Abrechnungszeitraums (Specs/Nebenkosten/Abrechnung.md, FR-3) ====
+    // Abgerechnet wird, wessen Mietverhaeltnis den Zeitraum beruehrt - anders als bei den
+    // Rechnungen ohne Bezug auf eine einzelne Einheit.
+
+    @Test
+    void shouldFindMieterWhoseLeaseTouchesThePeriod() {
+        LocalDate von = LocalDate.of(2026, 1, 1);
+        LocalDate bis = LocalDate.of(2026, 12, 31);
+
+        saveMieterMitEinheit("Ganzjaehrig", LocalDate.of(2020, 1, 1), null);
+        saveMieterMitEinheit("Zieht ein", LocalDate.of(2026, 7, 1), null);
+        saveMieterMitEinheit("Zieht aus", LocalDate.of(2025, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(mieterRepository.findByZeitraumOverlapping(von, bis))
+                .extracting(Mieter::getName)
+                .containsExactly("Ganzjaehrig", "Zieht aus", "Zieht ein");
+    }
+
+    @Test
+    void shouldNotFindMieterOutsideThePeriod() {
+        LocalDate von = LocalDate.of(2026, 1, 1);
+        LocalDate bis = LocalDate.of(2026, 12, 31);
+
+        saveMieterMitEinheit("Vor dem Zeitraum", LocalDate.of(2024, 1, 1), LocalDate.of(2025, 12, 31));
+        saveMieterMitEinheit("Nach dem Zeitraum", LocalDate.of(2027, 1, 1), null);
+
+        assertThat(mieterRepository.findByZeitraumOverlapping(von, bis)).isEmpty();
+    }
+
+    @Test
+    void shouldIncludeMieterTouchingOnlyTheEdgeOfThePeriod() {
+        // Ein einziger gemeinsamer Tag genuegt - beide Grenzen sind eingeschlossen.
+        LocalDate von = LocalDate.of(2026, 1, 1);
+        LocalDate bis = LocalDate.of(2026, 12, 31);
+
+        saveMieterMitEinheit("Bis zum ersten Tag", LocalDate.of(2025, 1, 1), von);
+        saveMieterMitEinheit("Ab dem letzten Tag", bis, null);
+
+        assertThat(mieterRepository.findByZeitraumOverlapping(von, bis)).hasSize(2);
+    }
+
+    @Test
+    void shouldStoreAkontoProMonatAsOptionalStammdatum() {
+        // Bestandsmieter haben keinen Wert; das Feld ist nullable (FR-4).
+        Mieter ohneAkonto = mieterRepository.save(
+                createMieter("Ohne Akonto", LocalDate.of(2026, 1, 1), null));
+
+        Mieter mitAkonto = createMieter("Mit Akonto", LocalDate.of(2026, 1, 1), null);
+        mitAkonto.setAkontoProMonat(new java.math.BigDecimal("150.00"));
+        Mieter gespeichert = mieterRepository.save(mitAkonto);
+
+        assertThat(ohneAkonto.getAkontoProMonat()).isNull();
+        assertThat(gespeichert.getAkontoProMonat()).isEqualByComparingTo("150.00");
+    }
 }

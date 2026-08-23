@@ -12,7 +12,14 @@ export enum TarifTyp {
 export enum Mengeneinheit {
   KWH = 'KWH',
   MONAT = 'MONAT',
-  STUECK = 'STUECK'
+  STUECK = 'STUECK',
+  /** Kubikmeter — für die Nebenkostenabrechnung (Wasser, Abwasser). */
+  M3 = 'M3',
+  /**
+   * Betrag in Franken — für Umlagen, deren verteilte Grösse selbst ein Betrag ist
+   * (Grünabfuhr, Versicherungsprämie). Nicht an einem ZUSATZ-Tarif wählbar.
+   */
+  CHF = 'CHF'
 }
 
 /** Tariftypen mit frei wählbarer Mengeneinheit am Tarif. */
@@ -62,11 +69,22 @@ export function erfassbareTariftypenFuer(einheitTyp: string | undefined): TarifT
  */
 export function mengeneinheitKey(typ: TarifTyp | undefined, einheit?: Mengeneinheit | string): string {
   if (typ && TARIFTYPEN_MIT_MENGENEINHEIT.includes(typ) && einheit) {
-    return einheit === Mengeneinheit.MONAT ? 'MONATE'
-      : einheit === Mengeneinheit.STUECK ? 'STUECK' : 'KWH';
+    // Bewusst eine vollstaendige Zuordnung statt eines else-Zweigs auf 'KWH': Ein unbekannter
+    // Wert wurde sonst stillschweigend als Kilowattstunden beschriftet — die Zahl stimmt, die
+    // Einheit daneben nicht. Ein neuer Enum-Wert muss hier eingetragen werden.
+    return MENGENEINHEIT_KEYS[einheit as Mengeneinheit] ?? String(einheit);
   }
   return typ === TarifTyp.GRUNDGEBUEHR ? 'MONATE' : 'KWH';
 }
+
+/** Übersetzungs-Key je Mengeneinheit. `MONAT` heisst in der Anzeige „Monate". */
+const MENGENEINHEIT_KEYS: Record<Mengeneinheit, string> = {
+  [Mengeneinheit.KWH]: 'KWH',
+  [Mengeneinheit.MONAT]: 'MONATE',
+  [Mengeneinheit.STUECK]: 'STUECK',
+  [Mengeneinheit.M3]: 'M3',
+  [Mengeneinheit.CHF]: 'CHF'
+};
 
 export interface Tarif {
   id?: number;

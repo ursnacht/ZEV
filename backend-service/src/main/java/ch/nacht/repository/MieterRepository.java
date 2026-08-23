@@ -99,6 +99,26 @@ public interface MieterRepository extends JpaRepository<Mieter, Long> {
     );
 
     /**
+     * Find all tenants whose lease period overlaps the given period, regardless of unit
+     * (Specs/Nebenkosten/Abrechnung.md, FR-1). These are the tenants a billing period covers.
+     *
+     * <p>Deliberately <b>without</b> a join on {@code MieterEinheit}: a tenant without a unit
+     * still appears in the billing period — with zero days and a note — instead of vanishing
+     * silently. Only the days determine the amount, and those come from the units.
+     *
+     * @param von Period start
+     * @param bis Period end
+     * @return Tenants active during the period, by name
+     */
+    @Query("SELECT m FROM Mieter m WHERE m.mietbeginn <= :bis "
+           + "AND (m.mietende IS NULL OR m.mietende >= :von) "
+           + "ORDER BY m.name, m.mietbeginn")
+    List<Mieter> findByZeitraumOverlapping(
+        @Param("von") LocalDate von,
+        @Param("bis") LocalDate bis
+    );
+
+    /**
      * Find tenants for a unit within a quarter (for invoice generation).
      * Returns tenants whose lease period overlaps with the given quarter.
      *

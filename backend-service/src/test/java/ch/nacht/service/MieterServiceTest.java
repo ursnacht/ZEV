@@ -4,6 +4,9 @@ import ch.nacht.entity.Mieter;
 import ch.nacht.entity.MieterEinheit;
 import ch.nacht.repository.MieterEinheitRepository;
 import ch.nacht.repository.MieterRepository;
+import ch.nacht.repository.NkAkontoRepository;
+import ch.nacht.repository.NkVerbrauchRepository;
+import ch.nacht.repository.NkZusatzRepository;
 import ch.nacht.repository.TarifpositionRepository;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +42,15 @@ public class MieterServiceTest {
 
     @Mock
     private TarifpositionRepository tarifpositionRepository;
+
+    @Mock
+    private NkVerbrauchRepository nkVerbrauchRepository;
+
+    @Mock
+    private NkZusatzRepository nkZusatzRepository;
+
+    @Mock
+    private NkAkontoRepository nkAkontoRepository;
 
     @Mock
     private OrganizationContextService organizationContextService;
@@ -651,6 +663,75 @@ public class MieterServiceTest {
         assertFalse(mieterService.deleteMieter(99L));
 
         verify(tarifpositionRepository, never()).countByEinheitId(anyLong());
+    }
+
+    // ==================== Loeschschutz: Mieter in einer Nebenkostenabrechnung ====================
+    // Specs/Nebenkosten/Abrechnung.md FR-5: Die Fremdschluessel stehen auf ON DELETE RESTRICT.
+    // Ohne die Pruefung hier saehe der Benutzer eine DataIntegrityViolationException statt einer
+    // verstaendlichen Meldung.
+
+    @Test
+    void deleteMieter_MitVerbrauchsmengeInAbrechnung_ThrowsException() {
+        when(mieterRepository.existsById(1L)).thenReturn(true);
+        when(mieterEinheitRepository.findEinheitIdsByMieterId(1L)).thenReturn(List.of());
+        when(nkVerbrauchRepository.countByMieterId(1L)).thenReturn(2L);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> mieterService.deleteMieter(1L)
+        );
+
+        assertThat(exception.getMessage(), containsString("Nebenkostenabrechnung"));
+        verify(mieterRepository, never()).deleteById(anyLong());
+    }
+
+    @Test
+    void deleteMieter_MitZusatzpositionInAbrechnung_ThrowsException() {
+        when(mieterRepository.existsById(1L)).thenReturn(true);
+        when(mieterEinheitRepository.findEinheitIdsByMieterId(1L)).thenReturn(List.of());
+        when(nkVerbrauchRepository.countByMieterId(1L)).thenReturn(0L);
+        when(nkZusatzRepository.countByMieterId(1L)).thenReturn(1L);
+
+        assertThrows(IllegalArgumentException.class, () -> mieterService.deleteMieter(1L));
+
+        verify(mieterRepository, never()).deleteById(anyLong());
+    }
+
+    @Test
+    void deleteMieter_MitAkontoInAbrechnung_ThrowsException() {
+        when(mieterRepository.existsById(1L)).thenReturn(true);
+        when(mieterEinheitRepository.findEinheitIdsByMieterId(1L)).thenReturn(List.of());
+        when(nkVerbrauchRepository.countByMieterId(1L)).thenReturn(0L);
+        when(nkZusatzRepository.countByMieterId(1L)).thenReturn(0L);
+        when(nkAkontoRepository.countByMieterId(1L)).thenReturn(1L);
+
+        assertThrows(IllegalArgumentException.class, () -> mieterService.deleteMieter(1L));
+
+        verify(mieterRepository, never()).deleteById(anyLong());
+    }
+
+    @Test
+    void deleteMieter_OhneNebenkostenBezug_ReturnsTrue() {
+        when(mieterRepository.existsById(1L)).thenReturn(true);
+        when(mieterEinheitRepository.findEinheitIdsByMieterId(1L)).thenReturn(List.of());
+        when(nkVerbrauchRepository.countByMieterId(1L)).thenReturn(0L);
+        when(nkZusatzRepository.countByMieterId(1L)).thenReturn(0L);
+        when(nkAkontoRepository.countByMieterId(1L)).thenReturn(0L);
+
+        assertTrue(mieterService.deleteMieter(1L));
+
+        verify(mieterRepository).deleteById(1L);
+    }
+
+    @Test
+    void deleteMieter_NotExists_NebenkostenPruefungEntfaellt() {
+        when(mieterRepository.existsById(99L)).thenReturn(false);
+
+        assertFalse(mieterService.deleteMieter(99L));
+
+        verify(nkVerbrauchRepository, never()).countByMieterId(anyLong());
+        verify(nkZusatzRepository, never()).countByMieterId(anyLong());
+        verify(nkAkontoRepository, never()).countByMieterId(anyLong());
     }
 
     @Test

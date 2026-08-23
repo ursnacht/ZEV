@@ -3,9 +3,11 @@ package ch.nacht.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import org.hibernate.annotations.Filter;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,6 +54,17 @@ public class Mieter {
 
     @Column(name = "mietende")
     private LocalDate mietende;
+
+    /**
+     * Monatliche Akonto-Zahlung für Nebenkosten (Specs/Nebenkosten/Abrechnung.md, FR-4).
+     *
+     * <p>Stammdatum und blosser <b>Vorschlag</b>: In der Abrechnung ist der Betrag je Mieter
+     * überschreibbar, weil eine Änderung hier rückwirkend nichts an bereits geflossenen Zahlungen
+     * ändert. Bewusst optional — Bestandsmieter haben keinen Wert, das Feld bleibt dann leer.
+     */
+    @PositiveOrZero(message = "Akonto pro Monat must not be negative")
+    @Column(name = "akonto_pro_monat", precision = 10, scale = 2)
+    private BigDecimal akontoProMonat;
 
     /**
      * IDs der zugeordneten Einheiten (Wohnung und/oder Ladestation(en)).
@@ -136,6 +149,14 @@ public class Mieter {
         this.mietende = mietende;
     }
 
+    public BigDecimal getAkontoProMonat() {
+        return akontoProMonat;
+    }
+
+    public void setAkontoProMonat(BigDecimal akontoProMonat) {
+        this.akontoProMonat = akontoProMonat;
+    }
+
     public List<Long> getEinheitIds() {
         return einheitIds;
     }
@@ -148,6 +169,7 @@ public class Mieter {
     public String toString() {
         return "Mieter{id=" + id + ", orgId=" + orgId + ", name='" + name + "', strasse='" + strasse +
                "', plz='" + plz + "', ort='" + ort + "', mietbeginn=" + mietbeginn +
-               ", mietende=" + mietende + ", einheitIds=" + einheitIds + "}";
+               ", mietende=" + mietende + ", akontoProMonat=" + akontoProMonat +
+               ", einheitIds=" + einheitIds + "}";
     }
 }

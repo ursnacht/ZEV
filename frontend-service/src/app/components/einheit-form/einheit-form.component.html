@@ -33,6 +33,19 @@
       </div>
     </div>
 
+    <!-- Nur bei Verbrauchern: Bei allen anderen Typen stellt sich die Frage nicht, und eine
+         gesperrte Checkbox waere blosses Rauschen. -->
+    @if (formData.typ === EinheitTyp.CONSUMER) {
+      <div class="zev-form-group">
+        <div class="zev-checkbox-item">
+          <input type="checkbox" id="nebenkostenRelevant" class="zev-checkbox"
+            [(ngModel)]="formData.nebenkostenRelevant" name="nebenkostenRelevant" />
+          <label for="nebenkostenRelevant">{{ 'EINHEIT_NEBENKOSTEN_RELEVANT' | translate }}</label>
+        </div>
+        <div class="zev-form-hint">{{ 'EINHEIT_NEBENKOSTEN_RELEVANT_HINT' | translate }}</div>
+      </div>
+    }
+
     <div class="zev-form-actions zev-form-actions--equal">
       <button type="submit" class="zev-button zev-button--primary" [disabled]="!formData.name.trim()">
         <app-icon name="check"></app-icon>

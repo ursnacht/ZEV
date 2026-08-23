@@ -33,6 +33,21 @@ public class Einheit {
     @Column(name = "messpunkt", length = 50)
     private String messpunkt;
 
+    /**
+     * Zählt diese Einheit als Wohnung in der Nebenkostenabrechnung?
+     * (Specs/Nebenkosten/Abrechnung.md, FR-2)
+     *
+     * <p>Nur bei {@link EinheitTyp#CONSUMER} ausgewertet. Unter den Verbrauchern stehen auch
+     * Messpunkte, die keine Wohnung sind — Allgemeinstrom, Eigenverbrauch der PV-Anlage. Sie
+     * zählten sonst in den Nenner der Umlage, und bei <b>jeder</b> Position bliebe ein Anteil
+     * unverteilt, als stünde eine Wohnung leer.
+     *
+     * <p>Bewusst ein eigenes Feld und nicht aus der Mieterzuordnung abgeleitet: Ein solcher
+     * Messpunkt kann durchaus einem Mieter zugeordnet sein — dem Eigentümer.
+     */
+    @Column(name = "nebenkosten_relevant", nullable = false)
+    private boolean nebenkostenRelevant = true;
+
     public Einheit() {
     }
 
@@ -73,6 +88,14 @@ public class Einheit {
         this.messpunkt = messpunkt;
     }
 
+    public boolean isNebenkostenRelevant() {
+        return nebenkostenRelevant;
+    }
+
+    public void setNebenkostenRelevant(boolean nebenkostenRelevant) {
+        this.nebenkostenRelevant = nebenkostenRelevant;
+    }
+
     public Long getOrgId() {
         return orgId;
     }
@@ -83,6 +106,7 @@ public class Einheit {
 
     @Override
     public String toString() {
-        return "Einheit{id=" + id + ", orgId=" + orgId + ", name='" + name + "', typ=" + typ + ", messpunkt='" + messpunkt + "'}";
+        return "Einheit{id=" + id + ", orgId=" + orgId + ", name='" + name + "', typ=" + typ
+                + ", messpunkt='" + messpunkt + "', nebenkostenRelevant=" + nebenkostenRelevant + "}";
     }
 }
