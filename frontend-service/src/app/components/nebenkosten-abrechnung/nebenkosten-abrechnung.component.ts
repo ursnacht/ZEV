@@ -128,8 +128,14 @@ export class NebenkostenAbrechnungComponent implements OnInit {
     });
   }
 
+  /**
+   * Die Maske hat gespeichert und bleibt offen.
+   *
+   * <p>Bewusst **ohne** eigene Meldung: Die Maske zeigt bereits eine, und beide lägen als
+   * fixierte Elemente an derselben Stelle übereinander. Die Liste wird nur neu geladen, damit die
+   * Zeile stimmt, wenn der Benutzer zurückkehrt.
+   */
   onFormSaved(): void {
-    this.showMessage('NK_ABRECHNUNG_GESPEICHERT', 'success');
     this.loadAbrechnungen();
   }
 

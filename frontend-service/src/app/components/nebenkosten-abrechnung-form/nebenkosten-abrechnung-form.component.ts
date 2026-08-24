@@ -240,6 +240,19 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
     this.rechne();
   }
 
+  /**
+   * Stabile Identität einer erfassbaren Zeile (Position wie Zusatzzeile).
+   *
+   * `track zeile` - also Identität - warf NG0956: `uebernehme()` ersetzt die Listen nach dem
+   * Laden und nach dem Speichern durch frische Objekte vom Server, womit Angular jede Zeile
+   * samt Eingabefeldern verwirft und neu aufbaut (Fokus und Cursor gehen verloren). Gespeicherte
+   * Zeilen tragen ihre ID; noch nicht gespeicherte behelfen sich mit dem Index - sie hängen am
+   * Ende der Liste und erhalten ihre ID beim Speichern.
+   */
+  trackZeile(index: number, zeile: { id?: number }): string {
+    return zeile.id != null ? `id-${zeile.id}` : `neu-${index}`;
+  }
+
   /** Die Bemessungsgrundlage einer Zuschlagszeile: alles, was in der Liste darüber steht. */
   bemessungsgrundlage(index: number): string {
     const davor = this.positionen.slice(0, index).map(p => p.bezeichnung).filter(b => !!b);
@@ -467,7 +480,16 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
   }
 
   private uebernehme(detail: NkAbrechnungDetail): void {
-    this.kopf = { ...detail.abrechnung };
+    this.kopf = {
+      ...detail.abrechnung,
+      // Die Vorlage einer NEUEN Abrechnung ist ein leeres Objekt vom Server: Bezeichnung und
+      // Daten kommen als `null`, nicht als leerer String. Ohne diese Normalisierung wirft der
+      // erste Klick auf Speichern in `istGueltig()` bei `bezeichnung.trim()` - der Benutzer
+      // saehe weder Feldfehler noch Meldung, die Schaltflaeche bliebe scheinbar wirkungslos.
+      bezeichnung: detail.abrechnung.bezeichnung ?? '',
+      datumVon: detail.abrechnung.datumVon ?? '',
+      datumBis: detail.abrechnung.datumBis ?? ''
+    };
     this.positionen = detail.positionen ?? [];
     this.zusaetze = detail.zusaetze ?? [];
     this.akonto = detail.akonto ?? [];

@@ -1,7 +1,10 @@
 <div class="zev-container">
   <h1><app-icon name="file-text" size="lg"></app-icon> {{ 'NK_ABRECHNUNG' | translate }}</h1>
 
-  @if (message) {
+  <!-- Nur bei geschlossener Maske: Meldungen sind fixiert positioniert und lägen sonst exakt auf
+       der Meldung der Maske. Zwei Meldungen an derselben Stelle sind nicht nur unschön - sie
+       verdecken einander, und die untere ist nicht mehr wegklickbar. -->
+  @if (message && !showForm) {
     <div class="zev-message" [ngClass]="'zev-message--' + messageType"
       [class.zev-message--dismissible]="messagePersistent" (click)="messagePersistent && dismissMessage()">
       <span>{{ message | translate }}</span>

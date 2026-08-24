@@ -82,7 +82,7 @@
             </tr>
           </thead>
           <tbody cdkDropList (cdkDropListDropped)="onDrop($event)" [cdkDropListDisabled]="gesperrt">
-            @for (position of positionen; track position; let i = $index) {
+            @for (position of positionen; track trackZeile($index, position); let i = $index) {
               <tr cdkDrag [cdkDragDisabled]="gesperrt">
                 <td class="nk-positionen__griff" cdkDragHandle
                   [attr.aria-label]="'NK_VERSCHIEBEN' | translate">
@@ -340,7 +340,7 @@
                 </tr>
               </thead>
               <tbody>
-                @for (zusatz of zusaetzeFuer(block.mieterId); track zusatz) {
+                @for (zusatz of zusaetzeFuer(block.mieterId); track trackZeile($index, zusatz)) {
                   <tr>
                     <td>
                       <input type="text" class="zev-input" [(ngModel)]="zusatz.bezeichnung"

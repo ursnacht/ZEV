@@ -392,6 +392,28 @@ describe('NebenkostenAbrechnungFormComponent', () => {
       expect(component.messageType).toBe('error');
     });
 
+    it('should report the errors of a completely untouched template', () => {
+      // Die Vorlage einer neuen Abrechnung kommt serverfoermig: bezeichnung, datumVon und
+      // datumBis sind `null`, nicht ''. Ohne Normalisierung wirft `bezeichnung.trim()` und der
+      // Klick auf Speichern bliebe ohne jede sichtbare Wirkung.
+      const vorlage = {
+        abrechnung: {
+          id: null, bezeichnung: null, datumVon: null, datumBis: null,
+          anzahlWohnungen: null, abgerechnet: false
+        },
+        positionen: [], zusaetze: [], akonto: [], berechnung: null,
+        anzahlWohnungenVorschlag: null
+      };
+      nebenkostenServiceSpy.getVorlage.mockReturnValue(of(vorlage as any));
+      component.abrechnungId = null;
+      component.ngOnInit();
+
+      expect(() => component.onSpeichern()).not.toThrow();
+      expect(component.message).toBe('NK_FEHLER_EINGABEN');
+      expect(component.istGueltig()).toBe(false);
+      expect(nebenkostenServiceSpy.createAbrechnung).not.toHaveBeenCalled();
+    });
+
     it('should not send a request when the input is invalid', () => {
       component.kopf.bezeichnung = '';
 
