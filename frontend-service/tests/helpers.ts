@@ -135,6 +135,40 @@ export async function openHamburgerMenu(page: Page): Promise<void> {
 }
 
 /**
+ * Klappt das Untermenü auf, in dem der Eintrag liegt (z.B. Nebenkosten).
+ *
+ * Zwingend VOR dem Klick auf den Eintrag: Ein eingeklapptes Untermenü ist
+ * `max-height: 0` mit `overflow: hidden` — der Eintrag behält damit eine Bounding-Box und gilt
+ * für Playwright als sichtbar. Der Klick geht auf seine Mitte, die weggeschnitten ist, und trifft
+ * die Umschalt-Schaltfläche darüber: Das Menü klappt auf, navigiert wird aber nicht. Der Test
+ * scheitert dann erst später beim Warten auf die URL, und die Meldung nennt nur das Symptom.
+ *
+ * Tut nichts, wenn der Eintrag nicht in einem Untermenü liegt oder es bereits offen ist.
+ */
+async function oeffneUntermenue(page: Page, href: string): Promise<void> {
+    const submenu = page.locator(`.zev-navbar__submenu:has(a[href="${href}"])`).first();
+    if (await submenu.count() === 0) {
+        return;
+    }
+    const istOffen = await submenu.evaluate(
+        el => el.classList.contains('zev-navbar__submenu--open')).catch(() => true);
+    if (istOffen) {
+        return;
+    }
+
+    await page.locator(`li:has(a[href="${href}"]) .zev-navbar__submenu-toggle`).first().click();
+    // Auf die Klasse warten, nicht auf eine feste Zeit: Die Aufklapp-Animation laeuft ueber
+    // max-height und ist je nach Umgebung verschieden schnell.
+    await submenu.locator('xpath=.').waitFor({ state: 'visible', timeout: 5000 });
+    for (let i = 0; i < 25; i++) {
+        if (await submenu.evaluate(el => el.classList.contains('zev-navbar__submenu--open'))) {
+            break;
+        }
+        await page.waitForTimeout(100);
+    }
+}
+
+/**
  * Navigate to a specific page via hamburger menu
  */
 export async function navigateViaMenu(page: Page, href: string): Promise<void> {
@@ -142,6 +176,7 @@ export async function navigateViaMenu(page: Page, href: string): Promise<void> {
     await openHamburgerMenu(page);
     const menuLink = page.locator(`a[href="${href}"]`);
     await menuLink.waitFor({ state: 'visible', timeout: 5000 });
+    await oeffneUntermenue(page, href);
     // Das Hamburger-Menü kann bei vielen Einträgen scrollen -> Eintrag zuerst in den
     // Sichtbereich bringen. Falls das Overlay in headless zeitweise nicht klickbar ist
     // (z.B. Cold-Start-Layout), sauber auf direkte Navigation zurückfallen.
@@ -225,8 +260,12 @@ export async function closeKebabMenuWithEsc(page: Page): Promise<void> {
  * Returns true if success, false if error, throws if timeout
  */
 export async function waitForFormResult(page: Page, timeout: number = 15000): Promise<boolean> {
-    const successMessage = page.locator('.zev-message--success');
-    const errorMessage = page.locator('.zev-message--error');
+    // `.first()`, weil `isVisible()` auf einem mehrdeutigen Locator eine Strict-Mode-Verletzung
+    // wirft - die das `catch` unten stillschweigend als "nicht sichtbar" wertet. Aus zwei
+    // gleichzeitigen Meldungen wuerde so "gar keine Meldung", und der Test liefe in den Timeout
+    // statt den eigentlichen Befund zu nennen.
+    const successMessage = page.locator('.zev-message--success').first();
+    const errorMessage = page.locator('.zev-message--error').first();
 
     const startTime = Date.now();
     while (Date.now() - startTime < timeout) {

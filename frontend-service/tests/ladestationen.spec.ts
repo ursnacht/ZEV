@@ -529,9 +529,11 @@ test.describe('Ladestationen - Einheiten-Verwaltung', () => {
             // Der neue Typ steht im bestehenden Dropdown
             await expect(page.locator('#typ option[value="LADESTATION"]')).toHaveCount(1);
 
-            // Der Hinweis zum Messpunkt wechselt für Ladestationen auf die RFID
+            // Der Hinweis zum Messpunkt wechselt für Ladestationen auf die RFID.
+            // Bewusst auf die Messpunkt-Gruppe eingeschränkt: Verbraucher zeigen einen
+            // zweiten Hinweis (Nebenkosten-Relevanz), sonst greift Playwrights Strict Mode.
             await page.locator('#typ').selectOption('CONSUMER');
-            const hint = page.locator('.zev-form-hint');
+            const hint = page.locator('.zev-form-group:has(#messpunkt) .zev-form-hint');
             await expect(hint).not.toContainText('RFID');
             await page.locator('#typ').selectOption('LADESTATION');
             await expect(hint).toContainText('RFID');
