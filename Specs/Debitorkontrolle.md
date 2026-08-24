@@ -41,6 +41,7 @@
 * Nach erfolgreicher PDF-Generierung einer Rechnung mit Mieter erstellt das System automatisch einen Debitor-Eintrag.
 * **Nur Rechnungen mit Mieter** werden als Debitor erfasst. Rechnungen für Produzenten oder leerstehende Einheiten (kein Mieter) werden ignoriert.
 * Die Felder werden aus der generierten Rechnung übernommen: `mieter_id`, `betrag`, `datum_von`, `datum_bis`.
+  * Der `betrag` wird **unverändert** übernommen: Seit dem 24.08.2026 führt auch die Rechnungsgenerierung ihre Beträge als `BigDecimal`, und `RechnungService.roundTo5Rappen` liefert bereits zwei Nachkommastellen — es wird nicht mehr umgerechnet oder nachgerundet (`Specs/RechnungenGenerieren.md`, Abschnitt 2).
 * Das `zahldatum` bleibt initial leer.
 * Wird für denselben `(mieter_id, datum_von, org_id)` ein Eintrag erneut generiert, wird der bestehende Eintrag aktualisiert (Upsert), sofern `zahldatum` noch nicht gesetzt ist.
 * Die Erstellung erfolgt innerhalb derselben Transaktion wie die Rechnungsgenerierung; schlägt die Generierung fehl, wird kein Eintrag erstellt.

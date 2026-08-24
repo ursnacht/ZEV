@@ -1,11 +1,17 @@
 package ch.nacht.dto;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * DTO for a single invoice containing all data needed for PDF generation.
+ *
+ * <p><b>Betraege sind {@link BigDecimal}</b> und nie {@code double} - dieselbe Zusicherung wie in
+ * {@code Debitor} und in der Nebenkostenabrechnung. Der Endbetrag wandert unveraendert in die
+ * Debitorenkontrolle und in den Einzahlungsschein; eine Umrechnung an der Grenze gibt es nicht
+ * mehr.
  */
 public class RechnungDTO {
 
@@ -27,9 +33,9 @@ public class RechnungDTO {
     private List<TarifZeileDTO> tarifZeilen = new ArrayList<>();
 
     // Totals
-    private double totalBetrag;     // CHF (before rounding)
-    private double rundung;         // CHF (rounding to 5 Rappen)
-    private double endBetrag;       // CHF (final amount to pay)
+    private BigDecimal totalBetrag = BigDecimal.ZERO;  // CHF (before rounding)
+    private BigDecimal rundung = BigDecimal.ZERO;      // CHF (rounding to 5 Rappen)
+    private BigDecimal endBetrag = BigDecimal.ZERO;    // CHF (final amount to pay)
 
     // Invoice configuration
     private String zahlungsfrist;
@@ -130,27 +136,27 @@ public class RechnungDTO {
         this.tarifZeilen.add(zeile);
     }
 
-    public double getTotalBetrag() {
+    public BigDecimal getTotalBetrag() {
         return totalBetrag;
     }
 
-    public void setTotalBetrag(double totalBetrag) {
+    public void setTotalBetrag(BigDecimal totalBetrag) {
         this.totalBetrag = totalBetrag;
     }
 
-    public double getRundung() {
+    public BigDecimal getRundung() {
         return rundung;
     }
 
-    public void setRundung(double rundung) {
+    public void setRundung(BigDecimal rundung) {
         this.rundung = rundung;
     }
 
-    public double getEndBetrag() {
+    public BigDecimal getEndBetrag() {
         return endBetrag;
     }
 
-    public void setEndBetrag(double endBetrag) {
+    public void setEndBetrag(BigDecimal endBetrag) {
         this.endBetrag = endBetrag;
     }
 

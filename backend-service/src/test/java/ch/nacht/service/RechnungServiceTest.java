@@ -132,21 +132,21 @@ public class RechnungServiceTest {
         TarifZeileDTO zevZeile = zeilen.stream()
             .filter(z -> z.getTyp() == TarifTyp.ZEV)
             .findFirst().orElseThrow();
-        assertEquals(100.0, zevZeile.getMenge());
-        assertEquals(0.20000, zevZeile.getPreis(), 0.00001);
-        assertEquals(20.0, zevZeile.getBetrag(), 0.01);
+        assertBetrag("100.0", zevZeile.getMenge());
+        assertBetrag("0.20000", zevZeile.getPreis());
+        assertBetrag("20.0", zevZeile.getBetrag());
 
         // VNB line: 50 kWh * 0.34 = 17.00
         TarifZeileDTO vnbZeile = zeilen.stream()
             .filter(z -> z.getTyp() == TarifTyp.VNB)
             .findFirst().orElseThrow();
-        assertEquals(50.0, vnbZeile.getMenge());
-        assertEquals(0.34000, vnbZeile.getPreis(), 0.00001);
-        assertEquals(17.0, vnbZeile.getBetrag(), 0.01);
+        assertBetrag("50.0", vnbZeile.getMenge());
+        assertBetrag("0.34000", vnbZeile.getPreis());
+        assertBetrag("17.0", vnbZeile.getBetrag());
 
         // Total: 20 + 17 = 37.00
-        assertEquals(37.0, rechnung.getTotalBetrag(), 0.01);
-        assertEquals(37.0, rechnung.getEndBetrag(), 0.01);
+        assertBetrag("37.0", rechnung.getTotalBetrag());
+        assertBetrag("37.0", rechnung.getEndBetrag());
     }
 
     @Test
@@ -255,8 +255,8 @@ public class RechnungServiceTest {
         RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
 
         // 123 * 0.20 = 24.60, 77 * 0.34 = 26.18, Total = 50.78, rounded to 50.80
-        assertEquals(50.80, rechnung.getEndBetrag(), 0.001);
-        assertEquals(0.02, rechnung.getRundung(), 0.001);
+        assertBetrag("50.80", rechnung.getEndBetrag());
+        assertBetrag("0.02", rechnung.getRundung());
     }
 
     @Test
@@ -278,8 +278,8 @@ public class RechnungServiceTest {
 
         RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
 
-        assertEquals(0.0, rechnung.getTotalBetrag());
-        assertEquals(0.0, rechnung.getEndBetrag());
+        assertBetrag("0.0", rechnung.getTotalBetrag());
+        assertBetrag("0.0", rechnung.getEndBetrag());
     }
 
     @Test
@@ -438,13 +438,13 @@ public class RechnungServiceTest {
 
     @Test
     void roundTo5Rappen_RoundsCorrectly() {
-        assertEquals(10.00, RechnungService.roundTo5Rappen(10.00));
-        assertEquals(10.00, RechnungService.roundTo5Rappen(10.02));
-        assertEquals(10.05, RechnungService.roundTo5Rappen(10.03));
-        assertEquals(10.05, RechnungService.roundTo5Rappen(10.05));
-        assertEquals(10.05, RechnungService.roundTo5Rappen(10.07));
-        assertEquals(10.10, RechnungService.roundTo5Rappen(10.08));
-        assertEquals(10.10, RechnungService.roundTo5Rappen(10.10));
+        assertBetrag("10.00", RechnungService.roundTo5Rappen(new BigDecimal("10.00")));
+        assertBetrag("10.00", RechnungService.roundTo5Rappen(new BigDecimal("10.02")));
+        assertBetrag("10.05", RechnungService.roundTo5Rappen(new BigDecimal("10.03")));
+        assertBetrag("10.05", RechnungService.roundTo5Rappen(new BigDecimal("10.05")));
+        assertBetrag("10.05", RechnungService.roundTo5Rappen(new BigDecimal("10.07")));
+        assertBetrag("10.10", RechnungService.roundTo5Rappen(new BigDecimal("10.08")));
+        assertBetrag("10.10", RechnungService.roundTo5Rappen(new BigDecimal("10.10")));
     }
 
     // ─── GRUNDGEBUEHR: zaehleVolleMonate (indirekt via berechneRechnung) ─────────
@@ -476,9 +476,9 @@ public class RechnungServiceTest {
             .filter(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR)
             .findFirst().orElseThrow();
 
-        assertEquals(3.0, grundgebuehrZeile.getMenge(), 0.001); // 3 volle Monate: Jan, Feb, Mär
-        assertEquals(5.0, grundgebuehrZeile.getPreis(), 0.00001);
-        assertEquals(15.0, grundgebuehrZeile.getBetrag(), 0.01);
+        assertBetrag("3.0", grundgebuehrZeile.getMenge()); // 3 volle Monate: Jan, Feb, Mär
+        assertBetrag("5.0", grundgebuehrZeile.getPreis());
+        assertBetrag("15.0", grundgebuehrZeile.getBetrag());
     }
 
     @Test
@@ -509,8 +509,8 @@ public class RechnungServiceTest {
             .filter(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR)
             .findFirst().orElseThrow();
 
-        assertEquals(2.0, grundgebuehrZeile.getMenge(), 0.001); // Nur Feb + Mär
-        assertEquals(10.0, grundgebuehrZeile.getBetrag(), 0.01);
+        assertBetrag("2.0", grundgebuehrZeile.getMenge()); // Nur Feb + Mär
+        assertBetrag("10.0", grundgebuehrZeile.getBetrag());
     }
 
     @Test
@@ -541,7 +541,7 @@ public class RechnungServiceTest {
             .filter(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR)
             .findFirst().orElseThrow();
 
-        assertEquals(2.0, grundgebuehrZeile.getMenge(), 0.001); // Nur Jan + Feb
+        assertBetrag("2.0", grundgebuehrZeile.getMenge()); // Nur Jan + Feb
     }
 
     @Test
@@ -622,8 +622,8 @@ public class RechnungServiceTest {
 
         RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
 
-        assertEquals(47.0, rechnung.getTotalBetrag(), 0.01);
-        assertEquals(47.0, rechnung.getEndBetrag(), 0.01);
+        assertBetrag("47.0", rechnung.getTotalBetrag());
+        assertBetrag("47.0", rechnung.getEndBetrag());
         assertEquals(3, rechnung.getTarifZeilen().size());
     }
 
@@ -711,8 +711,8 @@ public class RechnungServiceTest {
         // 3 Monate * 5.00 = 15.00
         assertEquals(1, rechnung.getTarifZeilen().size());
         assertEquals(TarifTyp.GRUNDGEBUEHR, rechnung.getTarifZeilen().get(0).getTyp());
-        assertEquals(3.0, rechnung.getTarifZeilen().get(0).getMenge(), 0.001);
-        assertEquals(15.0, rechnung.getEndBetrag(), 0.01);
+        assertBetrag("3.0", rechnung.getTarifZeilen().get(0).getMenge());
+        assertBetrag("15.0", rechnung.getEndBetrag());
     }
 
     @Test
@@ -864,9 +864,9 @@ public class RechnungServiceTest {
         // Quartalsgrenzen als Von/Bis, nicht der Rechnungszeitraum
         assertEquals(LocalDate.of(2024, 1, 1), zeile.getVon());
         assertEquals(LocalDate.of(2024, 3, 31), zeile.getBis());
-        assertEquals(120.0, zeile.getMenge(), 0.001);
-        assertEquals(0.35, zeile.getPreis(), 0.00001);
-        assertEquals(42.0, zeile.getBetrag(), 0.01); // 120 * 0.35
+        assertBetrag("120.0", zeile.getMenge());
+        assertBetrag("0.35", zeile.getPreis());
+        assertBetrag("42.0", zeile.getBetrag()); // 120 * 0.35
         assertEquals("KWH", zeile.getMengeneinheit());
     }
 
@@ -894,7 +894,7 @@ public class RechnungServiceTest {
         assertEquals(LocalDate.of(2024, 8, 15), zeile.getVon());
         assertEquals(LocalDate.of(2024, 9, 30), zeile.getBis());
         // Die Menge bleibt ungekuerzt - sie gehoert zum ganzen Quartal
-        assertEquals(10.0, zeile.getMenge(), 0.001);
+        assertBetrag("10.0", zeile.getMenge());
     }
 
     @Test
@@ -958,8 +958,8 @@ public class RechnungServiceTest {
             .filter(z -> z.getTyp() == TarifTyp.LADESTROM)
             .findFirst().orElseThrow();
 
-        assertEquals(121.0, zeile.getMenge(), 0.001);
-        assertEquals(42.35, zeile.getBetrag(), 0.01);
+        assertBetrag("121.0", zeile.getMenge());
+        assertBetrag("42.35", zeile.getBetrag());
     }
 
     @Test
@@ -975,9 +975,9 @@ public class RechnungServiceTest {
         RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, mieter, von, bis);
 
         // ZEV 100 * 0.20 = 20.00, VNB 50 * 0.34 = 17.00, Ladestrom 7 * 0.33 = 2.31 → 39.31
-        assertEquals(39.31, rechnung.getTotalBetrag(), 0.001);
-        assertEquals(39.30, rechnung.getEndBetrag(), 0.001);
-        assertEquals(-0.01, rechnung.getRundung(), 0.001);
+        assertBetrag("39.31", rechnung.getTotalBetrag());
+        assertBetrag("39.30", rechnung.getEndBetrag());
+        assertBetrag("-0.01", rechnung.getRundung());
     }
 
     @Test
@@ -1063,7 +1063,7 @@ public class RechnungServiceTest {
         assertEquals(LocalDate.of(2024, 4, 1), ladestromZeilen.get(1).getVon());
         assertEquals(LocalDate.of(2024, 6, 30), ladestromZeilen.get(1).getBis());
         // 100 * 0.35 + 200 * 0.35 = 105.00, dazu ZEV 20.00 + VNB 17.00
-        assertEquals(142.0, rechnung.getTotalBetrag(), 0.01);
+        assertBetrag("142.0", rechnung.getTotalBetrag());
     }
 
     @Test
@@ -1078,7 +1078,7 @@ public class RechnungServiceTest {
 
         // Nur ZEV + VNB wie bisher - keine leere Zeile, kein Fehler
         assertEquals(2, rechnung.getTarifZeilen().size());
-        assertEquals(37.0, rechnung.getTotalBetrag(), 0.01);
+        assertBetrag("37.0", rechnung.getTotalBetrag());
     }
 
     @Test
@@ -1173,8 +1173,8 @@ public class RechnungServiceTest {
             .filter(z -> z.getTyp() == TarifTyp.LADESTROM)
             .findFirst().orElseThrow();
 
-        assertEquals(100.0, zeileA.getMenge(), 0.001);
-        assertEquals(200.0, zeileB.getMenge(), 0.001);
+        assertBetrag("100.0", zeileA.getMenge());
+        assertBetrag("200.0", zeileB.getMenge());
         // Je Rechnung genau eine Ladestrom-Zeile - keine fremde Position
         assertEquals(1, rechnungen.get(0).getTarifZeilen().stream()
             .filter(z -> z.getTyp() == TarifTyp.LADESTROM).count());
@@ -1298,7 +1298,7 @@ public class RechnungServiceTest {
         assertEquals(52L, rechnung.getMieterId());
         assertEquals(2, rechnung.getTarifZeilen().size());
         // 100 kWh + 50 kWh zu 0.35 = 52.50
-        assertEquals(52.50, rechnung.getTotalBetrag(), 0.001);
+        assertBetrag("52.50", rechnung.getTotalBetrag());
     }
 
     @Test
@@ -1334,10 +1334,10 @@ public class RechnungServiceTest {
         assertEquals(1, rechnung.getTarifZeilen().size());
         TarifZeileDTO zeile = rechnung.getTarifZeilen().get(0);
         assertEquals(TarifTyp.LADESTROM, zeile.getTyp());
-        assertEquals(120.0, zeile.getMenge(), 0.001);
-        assertEquals(42.0, zeile.getBetrag(), 0.01);
-        assertEquals(42.0, rechnung.getTotalBetrag(), 0.01);
-        assertEquals(42.0, rechnung.getEndBetrag(), 0.01);
+        assertBetrag("120.0", zeile.getMenge());
+        assertBetrag("42.0", zeile.getBetrag());
+        assertBetrag("42.0", rechnung.getTotalBetrag());
+        assertBetrag("42.0", rechnung.getEndBetrag());
     }
 
     @Test
@@ -1506,9 +1506,9 @@ public class RechnungServiceTest {
         List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(900L), von, bis);
 
         // 7 * 0.33 = 2.31 -> 2.30
-        assertEquals(2.31, rechnungen.get(0).getTotalBetrag(), 0.001);
-        assertEquals(2.30, rechnungen.get(0).getEndBetrag(), 0.001);
-        assertEquals(-0.01, rechnungen.get(0).getRundung(), 0.001);
+        assertBetrag("2.31", rechnungen.get(0).getTotalBetrag());
+        assertBetrag("2.30", rechnungen.get(0).getEndBetrag());
+        assertBetrag("-0.01", rechnungen.get(0).getRundung());
     }
 
     @Test
@@ -1577,10 +1577,10 @@ public class RechnungServiceTest {
         assertEquals(2, ladestromZeilen.size());
         assertEquals("Ladestrom (RFID-900)", ladestromZeilen.get(0).getBezeichnung());
         assertEquals("Ladestrom (RFID-901)", ladestromZeilen.get(1).getBezeichnung());
-        assertEquals(100.0, ladestromZeilen.get(0).getMenge(), 0.001);
-        assertEquals(200.0, ladestromZeilen.get(1).getMenge(), 0.001);
+        assertBetrag("100.0", ladestromZeilen.get(0).getMenge());
+        assertBetrag("200.0", ladestromZeilen.get(1).getMenge());
         // ZEV 20.00 + VNB 17.00 + 35.00 + 70.00
-        assertEquals(142.0, rechnungen.get(0).getTotalBetrag(), 0.01);
+        assertBetrag("142.0", rechnungen.get(0).getTotalBetrag());
     }
 
     @Test
@@ -1614,5 +1614,24 @@ public class RechnungServiceTest {
 
         assertTrue(rechnungen.isEmpty());
         verify(tarifService, never()).validateTarifAbdeckung(any(), any());
+    }
+
+    /**
+     * Wertgleicher Vergleich eines Betrags oder einer Menge.
+     *
+     * <p>{@link BigDecimal#equals} vergleicht auch die Skalierung - {@code 37.0} ist dort nicht
+     * gleich {@code 37.00000} -, deshalb wird ueber {@link BigDecimal#compareTo} geprueft.
+     *
+     * <p>Eine Toleranz braucht es nicht mehr: Seit die Rechnung mit {@link BigDecimal} rechnet,
+     * ist jeder Zeilenbetrag das exakte Produkt aus ganzzahliger Menge und Tarifpreis
+     * ({@code NUMERIC(10,5)}), und Summen davon sind ebenso exakt. Die frueheren Deltas von
+     * 0.01 fingen allein die Unschaerfe der {@code double}-Rechnung auf.
+     *
+     * @param erwartet Erwarteter Wert als Dezimalliteral
+     * @param tatsaechlich Gelieferter Wert
+     */
+    private static void assertBetrag(String erwartet, BigDecimal tatsaechlich) {
+        assertEquals(0, new BigDecimal(erwartet).compareTo(tatsaechlich),
+                () -> "erwartet " + erwartet + ", war " + tatsaechlich);
     }
 }

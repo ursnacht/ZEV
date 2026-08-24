@@ -20,7 +20,6 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -105,7 +104,9 @@ public class RechnungController {
                 // Persist debitor entry before storing PDF: if upsert fails, no PDF is stored.
                 // 0-Rechnungen (z.B. kein Verbrauch im Zeitraum): PDF wird erzeugt, aber keine
                 // Forderung angelegt (debitor.betrag hat CHECK > 0).
-                BigDecimal betrag = BigDecimal.valueOf(rechnung.getEndBetrag()).setScale(2, RoundingMode.HALF_UP);
+                // Der Endbetrag ist bereits auf 5 Rappen gerundet und traegt zwei Nachkommastellen
+                // (RechnungService.roundTo5Rappen) - er passt unveraendert in debitor.betrag.
+                BigDecimal betrag = rechnung.getEndBetrag();
                 if (rechnung.getMieterId() != null && betrag.compareTo(BigDecimal.ZERO) > 0) {
                     debitorService.upsertFromRechnung(
                             rechnung.getMieterId(),

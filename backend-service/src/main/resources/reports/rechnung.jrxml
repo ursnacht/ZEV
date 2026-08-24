@@ -13,9 +13,9 @@
     <field name="bezeichnung" class="java.lang.String"/>
     <field name="von" class="java.time.LocalDate"/>
     <field name="bis" class="java.time.LocalDate"/>
-    <field name="menge" class="java.lang.Double"/>
-    <field name="preis" class="java.lang.Double"/>
-    <field name="betrag" class="java.lang.Double"/>
+    <field name="menge" class="java.math.BigDecimal"/>
+    <field name="preis" class="java.math.BigDecimal"/>
+    <field name="betrag" class="java.math.BigDecimal"/>
     <field name="mengeneinheit" class="java.lang.String"/>
 
     <!-- Variables -->
@@ -329,11 +329,11 @@
         <!-- Rounding row (conditional) -->
         <element kind="textField" uuid="11111111-1111-1111-1111-11111111112e" x="0" y="23" width="480" height="18" fontSize="9.0" vTextAlign="Middle">
             <expression><![CDATA[$P{TRANSLATIONS}.get("RUNDUNG") + ":"]]></expression>
-            <printWhenExpression><![CDATA[Math.abs($P{RECHNUNG}.getRundung()) > 0.001]]></printWhenExpression>
+            <printWhenExpression><![CDATA[$P{RECHNUNG}.getRundung().signum() != 0]]></printWhenExpression>
         </element>
         <element kind="textField" uuid="11111111-1111-1111-1111-11111111112f" x="480" y="23" width="75" height="18" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
             <expression><![CDATA[ch.nacht.util.PdfNumberFormat.chf($P{RECHNUNG}.getRundung())]]></expression>
-            <printWhenExpression><![CDATA[Math.abs($P{RECHNUNG}.getRundung()) > 0.001]]></printWhenExpression>
+            <printWhenExpression><![CDATA[$P{RECHNUNG}.getRundung().signum() != 0]]></printWhenExpression>
         </element>
 
         <!-- Final total row -->

@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
+import java.math.BigDecimal;
+
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -79,7 +81,7 @@ public class RechnungPdfServiceTest {
             "12345.67,    '12 345.67'",
             "1234567.89,  '1 234 567.89'"
     })
-    void formatBetragQrBill_FormatiertMitLeerzeichenUndZweiNachkommastellen(double betrag, String erwartet) {
+    void formatBetragQrBill_FormatiertMitLeerzeichenUndZweiNachkommastellen(BigDecimal betrag, String erwartet) {
         assertThat(RechnungPdfService.formatBetragQrBill(betrag), is(erwartet));
     }
 
@@ -88,7 +90,7 @@ public class RechnungPdfServiceTest {
         // Entscheidend für den QR-Zahlteil: ein gewöhnliches Leerzeichen (U+0020). Ein geschütztes
         // Leerzeichen (U+00A0) sieht identisch aus, wird von Lesegeräten aber nicht akzeptiert -
         // deshalb wird hier das Zeichen selbst geprüft und nicht nur die Zeichenkette verglichen.
-        String formatiert = RechnungPdfService.formatBetragQrBill(1234.50);
+        String formatiert = RechnungPdfService.formatBetragQrBill(new BigDecimal("1234.50"));
 
         assertEquals(' ', formatiert.charAt(1),
                 "Tausendertrenner muss ein normales Leerzeichen sein, kein geschütztes");
@@ -97,7 +99,7 @@ public class RechnungPdfServiceTest {
 
     @Test
     void formatBetragQrBill_DezimaltrennerIstEinPunkt() {
-        String formatiert = RechnungPdfService.formatBetragQrBill(7.25);
+        String formatiert = RechnungPdfService.formatBetragQrBill(new BigDecimal("7.25"));
 
         assertEquals('.', formatiert.charAt(1),
                 "Dezimaltrenner muss ein Punkt sein - ein Komma wäre im QR-Zahlteil unzulässig");
@@ -107,14 +109,15 @@ public class RechnungPdfServiceTest {
     void formatBetragQrBill_MehrAlsZweiNachkommastellen_WirdGerundet() {
         // Rechnungsbetraege sind auf 5 Rappen gerundet; ein laengerer Wert darf den Zahlteil
         // trotzdem nicht sprengen.
-        assertThat(RechnungPdfService.formatBetragQrBill(10.999), is("11.00"));
-        assertThat(RechnungPdfService.formatBetragQrBill(10.001), is("10.00"));
+        assertThat(RechnungPdfService.formatBetragQrBill(new BigDecimal("10.999")), is("11.00"));
+        assertThat(RechnungPdfService.formatBetragQrBill(new BigDecimal("10.001")), is("10.00"));
     }
 
     @Test
     void formatBetragQrBill_Null_FormatiertAlsNullKommaNull() {
         // Eine Rechnung ueber 0.00 ist fachlich moeglich (alle Mengen null) und darf kein
         // leeres Betragsfeld ergeben
-        assertThat(RechnungPdfService.formatBetragQrBill(0.0), is("0.00"));
+        assertThat(RechnungPdfService.formatBetragQrBill(BigDecimal.ZERO), is("0.00"));
     }
+
 }

@@ -421,9 +421,16 @@ Beträge erübrigt sich damit.
 
 ### Geldtyp und Rundung
 
-**Alle Betraege als `BigDecimal`**, nie als `double`. Der benachbarte `RechnungService` rechnet
-mit `double` (Zeilen 231, 275, 337) - dieses Muster darf hier **nicht** uebernommen werden, weil
-die Vorgabe unten sonst nicht einzuhalten ist.
+**Alle Betraege als `BigDecimal`**, nie als `double`.
+
+> **Nachtrag vom 24.08.2026 — die Ausnahme ist aufgehoben.** Hier stand, der benachbarte
+> `RechnungService` rechne mit `double` und dieses Muster duerfe in der Nebenkostenabrechnung
+> nicht uebernommen werden. Umgekehrt entschieden: Statt die Abweichung zu dulden, wurde die
+> **Rechnungsgenerierung auf `BigDecimal` gezogen** (`Specs/RechnungenGenerieren.md`,
+> Abschnitt 2). Damit gilt der Geldtyp `BigDecimal` einheitlich fuer Nebenkostenabrechnung,
+> Quartalsrechnung und Debitorenkontrolle; die Nebenkostenabrechnung ist nicht mehr der
+> Sonderfall, sondern die Regel. An dieser Spec aendert das nichts — die Vorgabe war schon
+> vorher `BigDecimal`.
 
 **Auf 1 Rappen, je Zeile** (Entscheid): `setScale(2, RoundingMode.HALF_UP)` je Zeilenbetrag. Jeder Zeilenbetrag wird einzeln kaufmännisch auf zwei
 Nachkommastellen gerundet; Summen entstehen aus den bereits gerundeten Zeilen.
@@ -939,7 +946,7 @@ Keine. Alle Punkte sind entschieden und in den Abschnitten 2 bis 7 eingearbeitet
 | Zusatzposition | `Menge x Betrag pro Einheit` wie Verbrauch | FR-3 |
 | Akonto-Monate | anteilig je Kalendermonat, 2 Nachkommastellen | FR-4 |
 | Rundung | 1 Rappen je Zeile, Differenz bleibt stehen | FR-5 |
-| Geldtyp | `BigDecimal`, `RoundingMode.HALF_UP` | FR-5 |
+| Geldtyp | `BigDecimal`, `RoundingMode.HALF_UP` — seit 24.08.2026 auch in der Quartalsrechnung | FR-5 |
 | Loeschschutz Mieter | `ON DELETE RESTRICT` + Pruefung im Service | FR-5 |
 | Mengeneinheit | bestehendes Enum um `M3` erweitern | FR-5 |
 | Feature-Flag im Backend | expliziter Aufruf je Service-Methode | FR-6 |

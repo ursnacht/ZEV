@@ -17,6 +17,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Year;
@@ -27,11 +29,23 @@ import java.util.Set;
 
 /**
  * Service for calculating and generating invoice data.
+ *
+ * <p><b>Geld ist durchgehend {@link BigDecimal}</b>, nie {@code double}: dieselbe Zusicherung wie
+ * in {@code Debitor} und in der Nebenkostenabrechnung ({@code NkBerechnungService}). Der Endbetrag
+ * wandert unveraendert in die Debitorenkontrolle - eine Umrechnung an der Grenze gibt es nicht
+ * mehr.
+ *
+ * <p>Gerundet wird <b>nur der Endbetrag</b>, auf 5 Rappen (Einzahlungsschein). Die Zeilenbetraege
+ * bleiben das exakte Produkt {@code menge x preis}; die Differenz zum Endbetrag steht als
+ * {@code rundung} auf der Rechnung.
  */
 @Service
 public class RechnungService {
 
     private static final Logger log = LoggerFactory.getLogger(RechnungService.class);
+
+    /** Kleinste Muenze der Rechnung - der Endbetrag ist immer ein Vielfaches davon. */
+    private static final BigDecimal FUENF_RAPPEN = new BigDecimal("0.05");
 
     private final EinheitRepository einheitRepository;
     private final MesswerteRepository messwerteRepository;
@@ -211,26 +225,26 @@ public class RechnungService {
         List<Tarif> zevTarife = tarifService.getTarifeForZeitraum(TarifTyp.ZEV, von, bis);
         List<Tarif> vnbTarife = tarifService.getTarifeForZeitraum(TarifTyp.VNB, von, bis);
 
-        double totalBetrag = 0.0;
+        BigDecimal totalBetrag = BigDecimal.ZERO;
 
         // Calculate ZEV tariff lines (based on zevCalculated measurements)
-        totalBetrag += berechneTarifZeilen(rechnung, einheit, von, bis, zevTarife, TarifTyp.ZEV);
+        totalBetrag = totalBetrag.add(berechneTarifZeilen(rechnung, einheit, von, bis, zevTarife, TarifTyp.ZEV));
 
         // Calculate VNB tariff lines (based on total - zevCalculated measurements)
-        totalBetrag += berechneTarifZeilen(rechnung, einheit, von, bis, vnbTarife, TarifTyp.VNB);
+        totalBetrag = totalBetrag.add(berechneTarifZeilen(rechnung, einheit, von, bis, vnbTarife, TarifTyp.VNB));
 
         // Manually captured positions (Ladestrom etc.) - after ZEV/VNB, before GRUNDGEBUEHR
-        totalBetrag += berechneTarifpositionsZeilen(rechnung, mieter, von, bis);
+        totalBetrag = totalBetrag.add(berechneTarifpositionsZeilen(rechnung, mieter, von, bis));
 
         // Calculate GRUNDGEBUEHR lines (optional - no error if no tariff found)
         List<Tarif> grundgebuehrTarife = tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis);
         if (!grundgebuehrTarife.isEmpty()) {
-            totalBetrag += berechneGrundgebuehrZeilen(rechnung, von, bis, grundgebuehrTarife);
+            totalBetrag = totalBetrag.add(berechneGrundgebuehrZeilen(rechnung, von, bis, grundgebuehrTarife));
         }
 
         // Calculate totals with rounding to 5 Rappen
-        double endBetrag = roundTo5Rappen(totalBetrag);
-        double rundung = endBetrag - totalBetrag;
+        BigDecimal endBetrag = roundTo5Rappen(totalBetrag);
+        BigDecimal rundung = endBetrag.subtract(totalBetrag);
 
         rechnung.setTotalBetrag(totalBetrag);
         rechnung.setRundung(rundung);
@@ -271,11 +285,11 @@ public class RechnungService {
         List<Tarif> tarife = tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis).stream()
                 .filter(Tarif::isProduzentVerrechnen)
                 .toList();
-        double total = berechneGrundgebuehrZeilen(rechnung, von, bis, tarife);
-        double endBetrag = roundTo5Rappen(total);
+        BigDecimal total = berechneGrundgebuehrZeilen(rechnung, von, bis, tarife);
+        BigDecimal endBetrag = roundTo5Rappen(total);
 
         rechnung.setTotalBetrag(total);
-        rechnung.setRundung(endBetrag - total);
+        rechnung.setRundung(endBetrag.subtract(total));
         rechnung.setEndBetrag(endBetrag);
 
         EinstellungenDTO einstellungen = einstellungenService.getEinstellungenOrThrow();
@@ -333,11 +347,11 @@ public class RechnungService {
         rechnung.setBis(bis);
         rechnung.setErstellungsdatum(LocalDate.now());
 
-        double total = berechneTarifpositionsZeilen(rechnung, mieter, von, bis);
-        double endBetrag = roundTo5Rappen(total);
+        BigDecimal total = berechneTarifpositionsZeilen(rechnung, mieter, von, bis);
+        BigDecimal endBetrag = roundTo5Rappen(total);
 
         rechnung.setTotalBetrag(total);
-        rechnung.setRundung(endBetrag - total);
+        rechnung.setRundung(endBetrag.subtract(total));
         rechnung.setEndBetrag(endBetrag);
 
         EinstellungenDTO einstellungen = einstellungenService.getEinstellungenOrThrow();
@@ -377,21 +391,21 @@ public class RechnungService {
      * @param bis Period end (inclusive)
      * @return Sum of the added line amounts
      */
-    private double berechneTarifpositionsZeilen(RechnungDTO rechnung, Mieter mieter,
-                                                LocalDate von, LocalDate bis) {
+    private BigDecimal berechneTarifpositionsZeilen(RechnungDTO rechnung, Mieter mieter,
+                                                    LocalDate von, LocalDate bis) {
         if (mieter == null) {
-            return 0.0;
+            return BigDecimal.ZERO;
         }
 
         // Positionen ALLER Einheiten des Mieters - Wohnung und Ladestation(en) landen damit auf
         // derselben Rechnung (Specs/Ladestationen.md FR-1.5).
-        double total = 0.0;
+        BigDecimal total = BigDecimal.ZERO;
         for (Tarifposition position : tarifpositionService.getFuerRechnung(
                 mieterService.getEinheitIds(mieter.getId()), von, bis)) {
             // Same rounding as the ZEV/VNB lines, so an invoice does not mix conventions.
-            double menge = Math.round(position.getMenge().doubleValue());
-            double preis = position.getTarif().getPreis().doubleValue();
-            double betrag = menge * preis;
+            BigDecimal menge = position.getMenge().setScale(0, RoundingMode.HALF_UP);
+            BigDecimal preis = position.getTarif().getPreis();
+            BigDecimal betrag = menge.multiply(preis);
 
             LocalDate[] zeitraum = zeitraumDerPositionszeile(position);
 
@@ -407,7 +421,7 @@ public class RechnungService {
                     // sonst stuende auf der Rechnung "3 kWh" fuer drei Monate Gaestezimmer.
                     position.getTarif().effektiveMengeneinheit()
             ));
-            total += betrag;
+            total = total.add(betrag);
 
             log.debug("Tarifposition line (Q{}/{}): {} * {} = {} CHF",
                     position.getQuartal(), position.getJahr(), menge, preis, betrag);
@@ -469,9 +483,9 @@ public class RechnungService {
         return bezeichnung + " (" + quellReferenz.trim() + ")";
     }
 
-    private double berechneGrundgebuehrZeilen(RechnungDTO rechnung, LocalDate von, LocalDate bis,
-                                               List<Tarif> tarife) {
-        double total = 0.0;
+    private BigDecimal berechneGrundgebuehrZeilen(RechnungDTO rechnung, LocalDate von, LocalDate bis,
+                                                  List<Tarif> tarife) {
+        BigDecimal total = BigDecimal.ZERO;
 
         for (Tarif tarif : tarife) {
             LocalDate effVon = tarif.getGueltigVon().isBefore(von) ? von : tarif.getGueltigVon();
@@ -482,20 +496,20 @@ public class RechnungService {
                 continue;
             }
 
-            double preis = tarif.getPreis().doubleValue();
-            double betrag = monate * preis;
+            BigDecimal preis = tarif.getPreis();
+            BigDecimal betrag = BigDecimal.valueOf(monate).multiply(preis);
 
             rechnung.addTarifZeile(new TarifZeileDTO(
                     tarif.getBezeichnung(),
                     effVon,
                     effBis,
-                    monate,
+                    BigDecimal.valueOf(monate),
                     preis,
                     betrag,
                     TarifTyp.GRUNDGEBUEHR,
                     "MONAT"
             ));
-            total += betrag;
+            total = total.add(betrag);
 
             log.debug("GRUNDGEBUEHR line ({} to {}): {} Monate * {} = {} CHF",
                     effVon, effBis, monate, preis, betrag);
@@ -539,13 +553,13 @@ public class RechnungService {
      * @param typ Tariff type (ZEV or VNB)
      * @return Total amount for all lines of this type
      */
-    private double berechneTarifZeilen(RechnungDTO rechnung, Einheit einheit, LocalDate von, LocalDate bis,
-                                       List<Tarif> tarife, TarifTyp typ) {
-        double totalBetrag = 0.0;
+    private BigDecimal berechneTarifZeilen(RechnungDTO rechnung, Einheit einheit, LocalDate von, LocalDate bis,
+                                           List<Tarif> tarife, TarifTyp typ) {
+        BigDecimal totalBetrag = BigDecimal.ZERO;
 
         if (tarife.isEmpty()) {
             log.warn("No {} tariffs found for period {} to {}", typ, von, bis);
-            return 0.0;
+            return BigDecimal.ZERO;
         }
 
         for (Tarif tarif : tarife) {
@@ -571,9 +585,11 @@ public class RechnungService {
                 mengeRaw = Math.max(0, total - zev);
             }
 
-            double menge = Math.round(mengeRaw);
-            double preis = tarif.getPreis().doubleValue();
-            double betrag = menge * preis;
+            // Die Messwerte liegen als Double in der Datenbank; auf ganze kWh gerundet ist die
+            // Menge exakt darstellbar und wird ab hier als BigDecimal weitergerechnet.
+            BigDecimal menge = BigDecimal.valueOf(Math.round(mengeRaw));
+            BigDecimal preis = tarif.getPreis();
+            BigDecimal betrag = menge.multiply(preis);
 
             TarifZeileDTO zeile = new TarifZeileDTO(
                 tarif.getBezeichnung(),
@@ -586,7 +602,7 @@ public class RechnungService {
                 "KWH"
             );
             rechnung.addTarifZeile(zeile);
-            totalBetrag += betrag;
+            totalBetrag = totalBetrag.add(betrag);
 
             log.debug("{} line ({} to {}): {} kWh * {} = {} CHF",
                 typ, effectiveVon, effectiveBis, menge, preis, betrag);
@@ -598,10 +614,17 @@ public class RechnungService {
     /**
      * Round amount to nearest 5 Rappen (0.05 CHF).
      *
+     * <p>Gerechnet wird {@code round(amount / 0.05) * 0.05} mit {@link RoundingMode#HALF_UP} -
+     * kaufmaennisch und von Null weg, also symmetrisch fuer negative Betraege. Das Ergebnis traegt
+     * immer zwei Nachkommastellen und ist damit unmittelbar als {@code debitor.betrag}
+     * ({@code NUMERIC(10,2)}) und als Betrag des Einzahlungsscheins verwendbar.
+     *
      * @param amount Amount in CHF
-     * @return Rounded amount
+     * @return Rounded amount, scale 2
      */
-    public static double roundTo5Rappen(double amount) {
-        return Math.round(amount * 20.0) / 20.0;
+    public static BigDecimal roundTo5Rappen(BigDecimal amount) {
+        return amount.divide(FUENF_RAPPEN, 0, RoundingMode.HALF_UP)
+                .multiply(FUENF_RAPPEN)
+                .setScale(2, RoundingMode.HALF_UP);
     }
 }

@@ -404,3 +404,58 @@ Beim Generieren von Rechnungen mit fehlenden/lückenhaften Tarifen wurde "Intern
 - **Frontend**: keine Änderung nötig – `rechnungen.component.ts` zeigt bereits `error.error?.error` an.
 - **Tests**: `RechnungControllerTest.generateRechnungen_TarifValidationFails_ReturnsBadRequest` prüft 400 und dass `$.error` exakt die Lücken-Meldung enthält. (Hinweis: `@WebMvcTest` hat keinen Transaction-Manager, daher trat dort die `UnexpectedRollbackException` nie auf – der Bug war nur produktiv sichtbar.)
 - **Keine neuen Texte/Migrationen**: die Meldung ist backend-generiert (kein Translation-Key); `FEHLER_BEIM_GENERIEREN` existiert bereits.
+
+### Geldtyp: Beträge als `BigDecimal` statt `double` (Backend, PDF)
+
+Die Rechnungsgenerierung rechnete mit `double`, die Debitorenkontrolle und die
+Nebenkostenabrechnung dagegen mit `BigDecimal`. Der Übergang zur Forderung musste deshalb
+konvertieren. Umgestellt wurde die Rechnungsgenerierung — nicht die beiden anderen
+(Entscheid vom 24.08.2026; hebt die als Ausnahme festgehaltene Abweichung in
+`Specs/Nebenkosten/Abrechnung.md`, Abschnitt „Geldtyp und Rundung", auf).
+
+- **`TarifZeileDTO`**: `menge`, `preis`, `betrag` → `BigDecimal`. `preis` kommt jetzt unverändert
+  aus `Tarif.preis` (`NUMERIC(10,5)`) statt über `doubleValue()`; `betrag` ist das exakte Produkt
+  `menge.multiply(preis)`.
+- **`RechnungDTO`**: `totalBetrag`, `rundung`, `endBetrag` → `BigDecimal`, vorbelegt mit
+  `BigDecimal.ZERO` (die Primitiven waren implizit `0.0`; `null` würde im PDF und im QR-Code
+  scheitern).
+- **`RechnungService`**: Summen über `add()` statt `+=`. `roundTo5Rappen(BigDecimal)` rechnet
+  `amount.divide(0.05, 0, HALF_UP).multiply(0.05).setScale(2, HALF_UP)` — kaufmännisch und von
+  Null weg, damit symmetrisch für negative Beträge (das frühere `Math.round(x * 20.0) / 20.0`
+  rundete `-0.5` gegen `+∞`). Das Ergebnis trägt zwei Nachkommastellen.
+- **Unverändert `double`**: `mengeRaw`, `total`, `zev` in `berechneTarifZeilen` — das sind
+  kWh-Summen, die `MesswerteRepository` als `Double` liefert und die direkt danach auf ganze kWh
+  gerundet werden (`BigDecimal.valueOf(Math.round(mengeRaw))`).
+- **`RechnungController`**: `BigDecimal.valueOf(rechnung.getEndBetrag()).setScale(2, HALF_UP)`
+  entfällt — der Endbetrag geht direkt an `DebitorService.upsertFromRechnung`. Import
+  `java.math.RoundingMode` dort nicht mehr nötig.
+- **`RechnungPdfService`**: `bill.setAmount(rechnung.getEndBetrag())` ohne Umrechnung;
+  `formatBetragQrBill` nimmt `BigDecimal`.
+- **`reports/rechnung.jrxml`**: Felder `menge`, `preis`, `betrag` als `java.math.BigDecimal`.
+  `PdfNumberFormat` nimmt `Number` und bleibt unberührt. Die bedingte Rundungszeile prüft
+  `$P{RECHNUNG}.getRundung().signum() != 0` statt `Math.abs(...) > 0.001` — `Math.abs` hat keine
+  `BigDecimal`-Überladung, und die Schwelle war ohnehin nur ein Behelf gegen die Unschärfe von
+  `double`.
+- **Keine Migration, keine neuen Texte, kein Frontend**: Die Entities (`Tarif`, `Tarifposition`,
+  `Debitor`) waren schon `BigDecimal`/`NUMERIC`, und `BigDecimal` serialisiert wie `double` als
+  JSON-Zahl — `rechnung.service.ts` (`endBetrag: number`) bleibt gültig.
+
+**Tests**
+- **`RechnungServiceTest`**: neuer Helfer `assertBetrag(String, BigDecimal)` (Vergleich über
+  `compareTo`, weil `BigDecimal.equals` auch die Skalierung vergleicht). Die 53 Erwartungswerte
+  stimmen **exakt** — die vorher nötigen Toleranzen von 0.01 fingen allein die
+  `double`-Unschärfe auf. Vier Assertions waren zweiargumentig
+  (`assertEquals(100.0, zeile.getMenge())`); sie hätten nach der Umstellung stillschweigend
+  fehlgeschlagen, weil `assertEquals(Object, Object)` einen `Double` nie einem `BigDecimal`
+  gleich findet.
+- **`JasperTemplateCompileTest`**: neuer Test `testRechnungTemplateFuelltBetraegeAlsBigDecimal`
+  füllt das Template mit einer echten `RechnungDTO` und exportiert ein PDF. Grund: Das Template
+  kompiliert auch mit Feldtypen, die nicht zur Bean passen — der `ClassCastException` kommt erst
+  beim Füllen und trat bei dieser Umstellung genau so auf. Der Test kompiliert aus dem `.jrxml`
+  und **nicht** über `RechnungPdfService`, weil dieser `/reports/rechnung.jasper` lädt, das der
+  `jasperreports-maven-plugin` erst in der Phase `prepare-package` erzeugt — bei `mvn test` läge
+  dort das Binary des vorherigen Laufs.
+- **`RechnungPdfServiceTest`**, **`RechnungControllerTest`**: Betragsliterale als
+  `new BigDecimal("…")`; der `@CsvSource`-Parameter von `formatBetragQrBill` ist `BigDecimal`
+  (JUnit konvertiert implizit).
+

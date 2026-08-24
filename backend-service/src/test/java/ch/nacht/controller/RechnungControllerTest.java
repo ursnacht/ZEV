@@ -76,7 +76,7 @@ public class RechnungControllerTest {
         testRechnung.setMieterName("Max Muster");
         testRechnung.setVon(LocalDate.of(2024, 1, 1));
         testRechnung.setBis(LocalDate.of(2024, 3, 31));
-        testRechnung.setEndBetrag(125.50);
+        testRechnung.setEndBetrag(new BigDecimal("125.50"));
     }
 
     // ==================== POST /api/rechnungen/generate ====================
@@ -122,7 +122,7 @@ public class RechnungControllerTest {
     void generateRechnungen_NullRechnung_KeinDebitorAberPdf() throws Exception {
         // 0-Rechnung (z.B. kein Verbrauch im Zeitraum): PDF wird erzeugt,
         // aber kein Debitor-Eintrag (debitor.betrag hat CHECK > 0)
-        testRechnung.setEndBetrag(0.0);
+        testRechnung.setEndBetrag(BigDecimal.ZERO);
         when(rechnungService.berechneRechnungen(anyList(), any(), any()))
             .thenReturn(List.of(testRechnung));
         when(rechnungPdfService.generatePdf(any(RechnungDTO.class), anyString()))
@@ -280,7 +280,7 @@ public class RechnungControllerTest {
         rechnungOhneMieter.setEinheitId(2L);
         rechnungOhneMieter.setEinheitName("Gewerbe EG");
         rechnungOhneMieter.setMieterId(null);
-        rechnungOhneMieter.setEndBetrag(80.00);
+        rechnungOhneMieter.setEndBetrag(new BigDecimal("80.00"));
 
         when(rechnungService.berechneRechnungen(anyList(), any(), any()))
             .thenReturn(List.of(rechnungOhneMieter));

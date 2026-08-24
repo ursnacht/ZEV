@@ -36,6 +36,21 @@
     * Es wird kein HTTP 500 mehr zurückgegeben, wenn die Validierung fehlschlägt (der `@Transactional`-Endpunkt rollt sauber zurück; die `TarifLueckenException` wird zentral in `GlobalExceptionHandler` auf 400 abgebildet).
     * Die Meldung stammt aus derselben Quelle (`validateTarifAbdeckung`) wie die Validierung in der Tarifverwaltung – identischer Wortlaut.
     * **Mehrsprachigkeit:** Das Backend liefert die Lücken **strukturiert** (`{ error: "FEHLER_TARIF_LUECKEN", luecken: [{ tarifTyp, datum, weitere }] }`); das Frontend setzt die Meldung aus Translation-Keys zusammen (`FEHLER_TARIF_LUECKEN`, `TARIF_LUECKE_ZEV`/`TARIF_LUECKE_VNB`, `TARIF_LUECKE_WEITERE`). Datum (`dd.MM.yyyy`) und Tarif-Typ-Code sind sprachneutral. Keine hartcodierten deutschen Texte mehr.
+* Als Entwickler möchte ich, dass die Rechnungsgenerierung **denselben Geldtyp** verwendet wie die Debitorenkontrolle und die Nebenkostenabrechnung, damit ein Betrag auf seinem Weg von der Berechnung über das PDF bis in die Forderung nicht umgerechnet werden muss (Entscheid vom 24.08.2026).
+  * **Ausgangslage:** `RechnungDTO` und `TarifZeileDTO` führten Menge, Preis und Betrag als `double`, `Debitor` und die Nebenkostenabrechnung dagegen als `BigDecimal`. `Specs/Nebenkosten/Abrechnung.md` hielt die Abweichung ausdrücklich als Ausnahme fest ("dieses Muster darf hier nicht übernommen werden"). Der Übergang zur Forderung musste deshalb konvertieren, und `double` kann Rappenbeträge nicht exakt darstellen.
+  * **Akzeptanzkriterien:**
+    * `RechnungDTO.totalBetrag`, `rundung` und `endBetrag` sowie `TarifZeileDTO.menge`, `preis` und `betrag` sind `BigDecimal`. Kein Geldbetrag der Rechnungsgenerierung ist mehr `double`.
+    * `RechnungService.roundTo5Rappen` nimmt und liefert `BigDecimal` und rundet mit `RoundingMode.HALF_UP` (kaufmännisch, von Null weg — damit symmetrisch für negative Beträge). Das Ergebnis trägt **zwei Nachkommastellen** und passt damit unverändert in `debitor.betrag` (`NUMERIC(10,2)`).
+    * Der Endbetrag wandert **ohne Umrechnung** in die Debitorenkontrolle: `RechnungController` übergibt `rechnung.getEndBetrag()` direkt an `DebitorService.upsertFromRechnung`; das frühere `BigDecimal.valueOf(...).setScale(2, HALF_UP)` entfällt.
+    * `tarif.preis` (`NUMERIC(10,5)`) wird **unverändert** in die Tarifzeile übernommen, nicht mehr über `doubleValue()`. Der Zeilenbetrag ist das exakte Produkt `menge x preis`.
+    * **Die Rundungsregel bleibt unverändert:** gerundet wird ausschliesslich der Endbetrag, und zwar auf 5 Rappen (Einzahlungsschein). Zeilenbeträge bleiben ungerundet, die Differenz steht weiterhin als `rundung` auf der Rechnung.
+    * Die auf der Rechnung ausgewiesenen Beträge sind unverändert — der Umbau ist rein technisch und ändert kein Ergebnis. Nachweis: die Erwartungswerte in `RechnungServiceTest` stimmen **exakt**, ohne die früher nötigen Toleranzen von 0.01.
+    * Nur die kWh-Summen aus `MesswerteRepository` bleiben `double` — sie kommen so aus der Datenbank und werden unmittelbar auf ganze kWh gerundet, bevor sie als `BigDecimal` weiterlaufen.
+  * **Akzeptanzkriterien PDF:**
+    * `reports/rechnung.jrxml` deklariert `menge`, `preis` und `betrag` als `java.math.BigDecimal`; die Feldtypen passen zur Bean, mit der das Template gefüllt wird.
+    * Die bedingte Rundungszeile prüft `getRundung().signum() != 0` statt `Math.abs(...) > 0.001`. Die Schwelle war nur nötig, weil `double` die Null nicht exakt trifft.
+    * Der Betrag des Einzahlungsscheins wird ohne Umrechnung gesetzt (`bill.setAmount(rechnung.getEndBetrag())`).
+    * **Ein Test füllt das Template und exportiert ein PDF**, nicht nur kompilieren: Ein Template kompiliert auch mit Feldtypen, die nicht zur Bean passen — der Fehler kommt erst beim Füllen. Der Test kompiliert dazu aus dem `.jrxml` und nicht aus `rechnung.jasper`, weil dieses Binary erst in der Maven-Phase `prepare-package` entsteht und bei `mvn test` vom vorherigen Lauf stammt.
 * **0-Rechnungen (Endbetrag 0.00 CHF, z.B. kein Verbrauch im Zeitraum):** Das PDF wird erzeugt (Beleg für den Mieter), aber es wird **kein Debitor-Eintrag** angelegt (keine Forderung; `debitor.betrag` hat den Constraint `> 0`, siehe `Specs/Debitorkontrolle.md`). Die übrigen Rechnungen des Laufs sind davon nicht betroffen.
 
 ## 3. Technische Spezifikationen (Technical Specs)
@@ -68,6 +83,7 @@
   * Empfangsschein, Zahlteil mit QR-Code (Adresstyp "S" verwenden)
 
 ## 4. Nicht-funktionale Anforderungen
+* **Geldtyp:** Beträge sind durchgehend `BigDecimal`, nie `double` — dieselbe Zusicherung wie in `Specs/Debitorkontrolle.md` und `Specs/Nebenkosten/Abrechnung.md`. Gerundet wird nur der Endbetrag, auf 5 Rappen mit `RoundingMode.HALF_UP`.
 * Die generierten Rechnungen werden nur temporär und nicht in der Datenbank gespeichert
 * Alle neuen Texte mehrsprachig und mit flyway in DB-Tabelle translation aufnehmen
 * Sicherheit: Rolle zev_admin notwendig

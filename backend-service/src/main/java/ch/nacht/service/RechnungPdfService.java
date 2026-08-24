@@ -15,6 +15,7 @@ import jakarta.annotation.PostConstruct;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.HashMap;
@@ -106,7 +107,7 @@ public class RechnungPdfService {
         try {
             Bill bill = new Bill();
             bill.setVersion(Bill.Version.V2_0);
-            bill.setAmount(java.math.BigDecimal.valueOf(rechnung.getEndBetrag()));
+            bill.setAmount(rechnung.getEndBetrag());
             bill.setCurrency("CHF");
 
             // Creditor (invoice issuer)
@@ -183,7 +184,7 @@ public class RechnungPdfService {
     /**
      * Format amount with space as thousands separator: 1 234.50
      */
-    public static String formatBetragQrBill(double value) {
+    public static String formatBetragQrBill(BigDecimal value) {
         DecimalFormat df = new DecimalFormat("#,##0.00");
         DecimalFormatSymbols symbols = new DecimalFormatSymbols();
         symbols.setGroupingSeparator(' ');
