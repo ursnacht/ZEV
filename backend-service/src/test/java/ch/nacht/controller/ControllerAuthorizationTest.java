@@ -9,6 +9,7 @@ import ch.nacht.service.EinstellungenService;
 import ch.nacht.service.FeatureFlagService;
 import ch.nacht.service.MieterService;
 import ch.nacht.service.NkAbrechnungService;
+import ch.nacht.service.SystemmeldungService;
 import ch.nacht.service.OrganisationService;
 import ch.nacht.service.OrganizationContextService;
 import ch.nacht.service.TarifpositionService;
@@ -24,10 +25,14 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import org.springframework.data.domain.SliceImpl;
+
 import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -48,7 +53,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * aber keine Feature-Flags) ab.
  */
 @WebMvcTest({EinstellungenController.class, FeatureFlagController.class, TarifpositionController.class,
-        EinheitController.class, MieterController.class, NkAbrechnungController.class})
+        EinheitController.class, MieterController.class, NkAbrechnungController.class,
+        SystemmeldungController.class})
 @Import(SecurityConfig.class)
 @TestPropertySource(properties = "app.cors.allowed-origins=http://localhost:4200")
 class ControllerAuthorizationTest {
@@ -76,6 +82,9 @@ class ControllerAuthorizationTest {
 
     @MockitoBean
     private NkAbrechnungService nkAbrechnungService;
+
+    @MockitoBean
+    private SystemmeldungService systemmeldungService;
 
     @MockitoBean
     private OrganizationContextService organizationContextService;
@@ -391,5 +400,101 @@ class ControllerAuthorizationTest {
                 .andExpect(status().isForbidden());
 
         verify(nkAbrechnungService, never()).deleteAbrechnung(any());
+    }
+
+    // ==================== Systemmeldungen: read gegen manage ====================
+    // Specs/Systemmeldungen.md FR-1.7: Wer nur systemmeldungen:read besitzt, sieht die Liste,
+    // darf aber nichts umschalten und nichts loeschen.
+
+    @Test
+    void getSystemmeldungen_withSystemmeldungenRead_reachesController() throws Exception {
+        when(systemmeldungService.getSeite(any(), any(), any(), anyInt(), anyInt(), any(), any()))
+                .thenReturn(new SliceImpl<>(List.of()));
+
+        mockMvc.perform(get("/api/systemmeldungen")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("systemmeldungen:read"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getSystemmeldungen_withoutPermission_forbidden() throws Exception {
+        mockMvc.perform(get("/api/systemmeldungen")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("mieter:read"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getSystemmeldungen_withoutAuthentication_unauthorized() throws Exception {
+        mockMvc.perform(get("/api/systemmeldungen"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void setErledigt_withReadOnly_forbidden() throws Exception {
+        // Der Kern von FR-1.7: Lesen genuegt zum Umschalten nicht.
+        mockMvc.perform(put("/api/systemmeldungen/1/erledigt")
+                        .param("erledigt", "true")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("systemmeldungen:read")))
+                        .with(csrf()))
+                .andExpect(status().isForbidden());
+
+        verify(systemmeldungService, never()).setErledigt(any(), anyBoolean());
+    }
+
+    @Test
+    void setErledigt_withSystemmeldungenManage_reachesController() throws Exception {
+        when(systemmeldungService.setErledigt(1L, true))
+                .thenThrow(new IllegalArgumentException("SYSTEMMELDUNG_NICHT_GEFUNDEN"));
+
+        // 404 belegt, dass der Controller erreicht wurde - die Autorisierung hat also gegriffen.
+        mockMvc.perform(put("/api/systemmeldungen/1/erledigt")
+                        .param("erledigt", "true")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("systemmeldungen:manage")))
+                        .with(csrf()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deleteSystemmeldung_withReadOnly_forbidden() throws Exception {
+        mockMvc.perform(delete("/api/systemmeldungen/1")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("systemmeldungen:read")))
+                        .with(csrf()))
+                .andExpect(status().isForbidden());
+
+        verify(systemmeldungService, never()).delete(any());
+    }
+
+    @Test
+    void deleteSystemmeldung_withSystemmeldungenManage_reachesController() throws Exception {
+        when(systemmeldungService.delete(1L)).thenReturn(true);
+
+        mockMvc.perform(delete("/api/systemmeldungen/1")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("systemmeldungen:manage")))
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
+    }
+
+    /**
+     * Das Aufraeumen loescht alle erledigten Meldungen des Mandanten auf einen Schlag und ist
+     * nicht umkehrbar - {@code systemmeldungen:read} darf das keinesfalls koennen.
+     */
+    @Test
+    void deleteErledigte_withReadOnly_forbidden() throws Exception {
+        mockMvc.perform(delete("/api/systemmeldungen/erledigt")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("systemmeldungen:read")))
+                        .with(csrf()))
+                .andExpect(status().isForbidden());
+
+        verify(systemmeldungService, never()).loescheAlleErledigten();
+    }
+
+    @Test
+    void deleteErledigte_withSystemmeldungenManage_reachesController() throws Exception {
+        when(systemmeldungService.loescheAlleErledigten()).thenReturn(3);
+
+        mockMvc.perform(delete("/api/systemmeldungen/erledigt")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("systemmeldungen:manage")))
+                        .with(csrf()))
+                .andExpect(status().isOk());
     }
 }
