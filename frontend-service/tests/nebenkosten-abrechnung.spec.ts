@@ -136,20 +136,50 @@ async function oeffneErstenMieterblock(page: Page) {
     return inhalt;
 }
 
-/** Löscht eine Abrechnung über das Kebab-Menü. */
-async function loescheAbrechnung(page: Page, bezeichnung: string): Promise<void> {
+/**
+ * Führt die Liste frisch auf und wartet, bis sie geladen ist.
+ *
+ * Bewusst `goto` statt Menü-Klick: Endet ein Test in der offenen Maske, führt ein Klick auf den
+ * Menüeintrag der Route, auf der man schon steht, zu keiner Neu-Montage — die Maske bliebe offen
+ * und die Liste unsichtbar. Und es wird auf die **Zeilen** gewartet, nicht bloss auf die
+ * Überschrift: Die Liste lädt serverseitig nach.
+ */
+async function oeffneListeFrisch(page: Page): Promise<void> {
+    await page.goto(ROUTE, { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.zev-container h1')).toBeVisible({ timeout: 20000 });
+    await expect(page.locator('table.zev-table, .zev-empty-state').first())
+        .toBeVisible({ timeout: 20000 });
+}
+
+/**
+ * Löscht eine Abrechnung über das Kebab-Menü. Liefert `true`, wenn danach keine Zeile mehr steht.
+ *
+ * <p>Hier lag der Grund für die Rückstände in der Datenbank: Die Existenzprüfung lief über
+ * `zeile.isVisible()` — und das fragt **ohne zu warten**. Die Zeile erscheint aber erst mit der
+ * Antwort der Listen-Abfrage, weshalb die Prüfung „nicht vorhanden" meldete und die Funktion
+ * stillschweigend zurückkehrte. Jeder anlegende Test hinterliess so seine Abrechnung, ohne dass
+ * es auffiel. Jetzt wird über `toHaveCount` gewartet.
+ */
+async function loescheAbrechnung(page: Page, bezeichnung: string): Promise<boolean> {
+    page.removeAllListeners('dialog');
     try {
-        page.removeAllListeners('dialog');
-        await navigateToListe(page);
+        await oeffneListeFrisch(page);
         const zeile = page.locator(`tr:has-text("${bezeichnung}")`);
-        if (!await zeile.isVisible().catch(() => false)) {
-            return;
+
+        // Wartende Prüfung: Steht die Zeile nach dem Zeitfenster nicht da, ist sie wirklich weg.
+        const vorhanden = await zeile.first().waitFor({ state: 'visible', timeout: 10000 })
+            .then(() => true).catch(() => false);
+        if (!vorhanden) {
+            return true;
         }
+
         page.on('dialog', async dialog => { await dialog.accept(); });
-        await clickKebabMenuItem(page, zeile, 'delete');
-        await expect(zeile).not.toBeVisible({ timeout: 10000 });
+        await clickKebabMenuItem(page, zeile.first(), 'delete');
+        await expect(zeile).toHaveCount(0, { timeout: 10000 });
+        return true;
     } catch (error) {
-        console.log(`Cleanup: "${bezeichnung}" konnte nicht geloescht werden: ${error}`);
+        console.error(`CLEANUP FEHLGESCHLAGEN: "${bezeichnung}" - ${error}`);
+        return false;
     } finally {
         page.removeAllListeners('dialog');
     }
@@ -159,11 +189,28 @@ test.beforeEach(() => {
     angelegteBezeichnungen = [];
 });
 
+/**
+ * Räumt die angelegten Abrechnungen ab — und **scheitert sichtbar**, wenn das nicht gelingt.
+ *
+ * <p>Vorher wurde jeder Fehlschlag nur auf die Konsole geschrieben; die Suite blieb grün, während
+ * die Datenbank volllief. Ein Rückstand ist ein Befund und gehört gemeldet. Ein zweiter Versuch
+ * davor, weil ein einzelnes Löschen an einer stehenden Meldung scheitern kann.
+ */
 test.afterEach(async ({ page }) => {
+    const gescheitert: string[] = [];
     for (const bezeichnung of angelegteBezeichnungen) {
-        await loescheAbrechnung(page, bezeichnung);
+        let erfolg = await loescheAbrechnung(page, bezeichnung);
+        if (!erfolg) {
+            erfolg = await loescheAbrechnung(page, bezeichnung);
+        }
+        if (!erfolg) {
+            gescheitert.push(bezeichnung);
+        }
     }
     angelegteBezeichnungen = [];
+
+    expect(gescheitert,
+        `Testdaten blieben in der Datenbank zurueck: ${gescheitert.join(', ')}`).toEqual([]);
 });
 
 // ---------------------------------------------------------------------------
@@ -253,7 +300,11 @@ test.describe('Nebenkostenabrechnung - Maske', () => {
     test('should reject a period that ends before it starts', async ({ page }) => {
         await navigateToListe(page);
         await oeffneNeueAbrechnung(page);
-        await page.locator('#bezeichnung').fill(neueBezeichnung('Zeitraum'));
+        // Registriert, obwohl der Server ablehnen MUSS: Sollte die Ablehnung je ausfallen, wird
+        // die Abrechnung aufgeraeumt statt unbemerkt liegen zu bleiben.
+        const bezeichnung = neueBezeichnung('Zeitraum');
+        angelegteBezeichnungen.push(bezeichnung);
+        await page.locator('#bezeichnung').fill(bezeichnung);
         await page.locator('#datumVon').fill(DATUM_BIS);
         await page.locator('#datumBis').fill(DATUM_VON);
         await page.locator('#anzahlWohnungen').fill(ANZAHL_WOHNUNGEN);
