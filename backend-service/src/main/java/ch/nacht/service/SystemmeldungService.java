@@ -111,7 +111,7 @@ public class SystemmeldungService {
     @Transactional
     public Systemmeldung setErledigt(Long id, boolean erledigt) {
         hibernateFilterService.enableOrgFilter();
-        Systemmeldung meldung = systemmeldungRepository.findById(id)
+        Systemmeldung meldung = systemmeldungRepository.findFirstById(id)
                 .orElseThrow(() -> new IllegalArgumentException("SYSTEMMELDUNG_NICHT_GEFUNDEN"));
 
         if (erledigt) {

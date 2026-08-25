@@ -63,7 +63,7 @@ public class TarifService {
     @Transactional(readOnly = true)
     public Optional<Tarif> getTarifById(Long id) {
         hibernateFilterService.enableOrgFilter();
-        return tarifRepository.findById(id);
+        return tarifRepository.findFirstById(id);
     }
 
     /**

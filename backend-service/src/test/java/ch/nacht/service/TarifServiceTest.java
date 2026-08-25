@@ -84,7 +84,7 @@ public class TarifServiceTest {
 
     @Test
     void getTarifById_Found_ReturnsTarif() {
-        when(tarifRepository.findById(1L)).thenReturn(Optional.of(zevTarif2024));
+        when(tarifRepository.findFirstById(1L)).thenReturn(Optional.of(zevTarif2024));
 
         Optional<Tarif> result = tarifService.getTarifById(1L);
 
@@ -94,7 +94,7 @@ public class TarifServiceTest {
 
     @Test
     void getTarifById_NotFound_ReturnsEmpty() {
-        when(tarifRepository.findById(999L)).thenReturn(Optional.empty());
+        when(tarifRepository.findFirstById(999L)).thenReturn(Optional.empty());
 
         Optional<Tarif> result = tarifService.getTarifById(999L);
 

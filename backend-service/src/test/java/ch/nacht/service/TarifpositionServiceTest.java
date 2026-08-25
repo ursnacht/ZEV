@@ -147,7 +147,7 @@ public class TarifpositionServiceTest {
 
     @Test
     void getTarifpositionById_Found_ReturnsTarifposition() {
-        when(tarifpositionRepository.findById(1L)).thenReturn(Optional.of(testPosition1));
+        when(tarifpositionRepository.findFirstById(1L)).thenReturn(Optional.of(testPosition1));
 
         Optional<Tarifposition> result = tarifpositionService.getTarifpositionById(1L);
 
@@ -158,7 +158,7 @@ public class TarifpositionServiceTest {
 
     @Test
     void getTarifpositionById_NotFound_ReturnsEmpty() {
-        when(tarifpositionRepository.findById(99L)).thenReturn(Optional.empty());
+        when(tarifpositionRepository.findFirstById(99L)).thenReturn(Optional.empty());
 
         Optional<Tarifposition> result = tarifpositionService.getTarifpositionById(99L);
 
@@ -248,8 +248,8 @@ public class TarifpositionServiceTest {
     void saveTarifposition_ValidNewPosition_SavesSuccessfully() {
         Tarifposition neu = new Tarifposition(testEinheit, ladestromTarif, 2026, 2, new BigDecimal("42.000"));
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
-        when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findFirstById(10L)).thenReturn(Optional.of(ladestromTarif));
         when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 eq(1L), eq(2026), eq(2), anySet(), eq(-1L))).thenReturn(false);
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
@@ -277,8 +277,8 @@ public class TarifpositionServiceTest {
         // Quartal gegenseitig aus (Specs/Ladestromtarif.md FR-6).
         Tarifposition neu = new Tarifposition(testEinheit, ladestromTarif, 2026, 2, new BigDecimal("42.000"));
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
-        when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findFirstById(10L)).thenReturn(Optional.of(ladestromTarif));
         when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 anyLong(), anyInt(), anyInt(), anySet(), anyLong())).thenReturn(false);
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
@@ -299,8 +299,8 @@ public class TarifpositionServiceTest {
         // Menge = 0 ist speicherbar (erzeugt spaeter keine Rechnungszeile)
         Tarifposition neu = new Tarifposition(testEinheit, ladestromTarif, 2026, 2, BigDecimal.ZERO);
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
-        when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findFirstById(10L)).thenReturn(Optional.of(ladestromTarif));
         when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 anyLong(), anyInt(), anyInt(), anySet(), anyLong())).thenReturn(false);
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
@@ -317,8 +317,8 @@ public class TarifpositionServiceTest {
         Tarifposition neu = new Tarifposition(testEinheit, ladestromTarif, 2026, 2, new BigDecimal("10.000"));
         neu.setErfassungsart(null);
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
-        when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findFirstById(10L)).thenReturn(Optional.of(ladestromTarif));
         when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 anyLong(), anyInt(), anyInt(), anySet(), anyLong())).thenReturn(false);
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
@@ -335,8 +335,8 @@ public class TarifpositionServiceTest {
         neu.setErfassungsart(Erfassungsart.IMPORT);
         neu.setQuellReferenz("LP-01");
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
-        when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findFirstById(10L)).thenReturn(Optional.of(ladestromTarif));
         when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 anyLong(), anyInt(), anyInt(), anySet(), anyLong())).thenReturn(false);
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
@@ -354,11 +354,11 @@ public class TarifpositionServiceTest {
         geaendert.setId(1L);
         // orgId bewusst nicht gesetzt - das DTO traegt sie nicht
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
-        when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findFirstById(10L)).thenReturn(Optional.of(ladestromTarif));
         when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 eq(1L), eq(2026), eq(3), anySet(), eq(1L))).thenReturn(false);
-        when(tarifpositionRepository.findById(1L)).thenReturn(Optional.of(testPosition1));
+        when(tarifpositionRepository.findFirstById(1L)).thenReturn(Optional.of(testPosition1));
         when(tarifpositionRepository.save(any(Tarifposition.class))).thenAnswer(i -> i.getArgument(0));
 
         Tarifposition result = tarifpositionService.saveTarifposition(geaendert);
@@ -373,11 +373,11 @@ public class TarifpositionServiceTest {
         Tarifposition geaendert = new Tarifposition(testEinheit, ladestromTarif, 2026, 3, new BigDecimal("150.000"));
         geaendert.setId(1L);
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
-        when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findFirstById(10L)).thenReturn(Optional.of(ladestromTarif));
         when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 anyLong(), anyInt(), anyInt(), anySet(), anyLong())).thenReturn(false);
-        when(tarifpositionRepository.findById(1L)).thenReturn(Optional.of(testPosition1));
+        when(tarifpositionRepository.findFirstById(1L)).thenReturn(Optional.of(testPosition1));
         when(tarifpositionRepository.save(any(Tarifposition.class))).thenAnswer(i -> i.getArgument(0));
 
         tarifpositionService.saveTarifposition(geaendert);
@@ -391,11 +391,11 @@ public class TarifpositionServiceTest {
         Tarifposition geaendert = new Tarifposition(testEinheit, ladestromTarif, 2026, 3, new BigDecimal("150.000"));
         geaendert.setId(99L);
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
-        when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findFirstById(10L)).thenReturn(Optional.of(ladestromTarif));
         when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 anyLong(), anyInt(), anyInt(), anySet(), anyLong())).thenReturn(false);
-        when(tarifpositionRepository.findById(99L)).thenReturn(Optional.empty());
+        when(tarifpositionRepository.findFirstById(99L)).thenReturn(Optional.empty());
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
@@ -410,8 +410,8 @@ public class TarifpositionServiceTest {
     void saveTarifposition_DuplicateForSameQuartalAndTariftyp_ThrowsException() {
         Tarifposition duplikat = new Tarifposition(testEinheit, ladestromTarif, 2026, 3, new BigDecimal("50.000"));
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
-        when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findFirstById(10L)).thenReturn(Optional.of(ladestromTarif));
         when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 eq(1L), eq(2026), eq(3), anySet(), eq(-1L))).thenReturn(true);
 
@@ -439,8 +439,8 @@ public class TarifpositionServiceTest {
 
         Tarifposition duplikat = new Tarifposition(testEinheit, andererLadestromTarif, 2026, 3, new BigDecimal("50.000"));
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
-        when(tarifRepository.findById(11L)).thenReturn(Optional.of(andererLadestromTarif));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findFirstById(11L)).thenReturn(Optional.of(andererLadestromTarif));
         when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 eq(1L), eq(2026), eq(3), anySet(), eq(-1L))).thenReturn(true);
 
@@ -465,8 +465,8 @@ public class TarifpositionServiceTest {
 
         Tarifposition neu = new Tarifposition(testEinheit, zevTarif, 2026, 1, new BigDecimal("10.000"));
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
-        when(tarifRepository.findById(20L)).thenReturn(Optional.of(zevTarif));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findFirstById(20L)).thenReturn(Optional.of(zevTarif));
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
@@ -483,8 +483,8 @@ public class TarifpositionServiceTest {
         // eine einzige Zusatzposition moeglich, also nicht Sauna UND Waschkueche.
         Tarifposition neu = new Tarifposition(testEinheit, zusatzTarif, 2026, 1, new BigDecimal("2.000"));
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
-        when(tarifRepository.findById(30L)).thenReturn(Optional.of(zusatzTarif));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findFirstById(30L)).thenReturn(Optional.of(zusatzTarif));
         when(tarifpositionRepository.existsByEinheitAndQuartalAndTarif(
                 anyLong(), anyInt(), anyInt(), anyLong(), anyLong())).thenReturn(false);
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
@@ -503,8 +503,8 @@ public class TarifpositionServiceTest {
     void saveTarifposition_ZweitePositionMitDemselbenZusatzTarif_ThrowsException() {
         Tarifposition neu = new Tarifposition(testEinheit, zusatzTarif, 2026, 1, new BigDecimal("2.000"));
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
-        when(tarifRepository.findById(30L)).thenReturn(Optional.of(zusatzTarif));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findFirstById(30L)).thenReturn(Optional.of(zusatzTarif));
         when(tarifpositionRepository.existsByEinheitAndQuartalAndTarif(
                 anyLong(), anyInt(), anyInt(), anyLong(), anyLong())).thenReturn(true);
 
@@ -525,8 +525,8 @@ public class TarifpositionServiceTest {
         // geschrieben. Der Fall gehoert zu ZUSATZ mit Mengeneinheit Monat.
         Tarifposition neu = new Tarifposition(testEinheit, grundgebuehrTarif, 2026, 1, new BigDecimal("3.000"));
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
-        when(tarifRepository.findById(21L)).thenReturn(Optional.of(grundgebuehrTarif));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findFirstById(21L)).thenReturn(Optional.of(grundgebuehrTarif));
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
@@ -556,7 +556,7 @@ public class TarifpositionServiceTest {
         unbekannt.setId(99L);
         Tarifposition neu = new Tarifposition(unbekannt, ladestromTarif, 2026, 1, new BigDecimal("10.000"));
 
-        when(einheitRepository.findById(99L)).thenReturn(Optional.empty());
+        when(einheitRepository.findFirstById(99L)).thenReturn(Optional.empty());
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
@@ -571,7 +571,7 @@ public class TarifpositionServiceTest {
     void saveTarifposition_TarifMissing_ThrowsException() {
         Tarifposition ohneTarif = new Tarifposition(testEinheit, null, 2026, 1, new BigDecimal("10.000"));
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(testEinheit));
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
@@ -588,8 +588,8 @@ public class TarifpositionServiceTest {
         unbekannt.setId(99L);
         Tarifposition neu = new Tarifposition(testEinheit, unbekannt, 2026, 1, new BigDecimal("10.000"));
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
-        when(tarifRepository.findById(99L)).thenReturn(Optional.empty());
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findFirstById(99L)).thenReturn(Optional.empty());
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
@@ -609,8 +609,8 @@ public class TarifpositionServiceTest {
         tarifNurId.setId(10L);
         Tarifposition neu = new Tarifposition(nurId, tarifNurId, 2026, 2, new BigDecimal("10.000"));
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(testEinheit));
-        when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(testEinheit));
+        when(tarifRepository.findFirstById(10L)).thenReturn(Optional.of(ladestromTarif));
         when(tarifpositionRepository.existsByEinheitAndQuartalAndTariftyp(
                 anyLong(), anyInt(), anyInt(), anySet(), anyLong())).thenReturn(false);
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
@@ -627,7 +627,7 @@ public class TarifpositionServiceTest {
 
     @Test
     void deleteTarifposition_Exists_ReturnsTrue() {
-        when(tarifpositionRepository.findById(1L)).thenReturn(Optional.of(testPosition1));
+        when(tarifpositionRepository.findFirstById(1L)).thenReturn(Optional.of(testPosition1));
 
         boolean result = tarifpositionService.deleteTarifposition(1L);
 
@@ -638,7 +638,7 @@ public class TarifpositionServiceTest {
 
     @Test
     void deleteTarifposition_NotExists_ReturnsFalse() {
-        when(tarifpositionRepository.findById(99L)).thenReturn(Optional.empty());
+        when(tarifpositionRepository.findFirstById(99L)).thenReturn(Optional.empty());
 
         boolean result = tarifpositionService.deleteTarifposition(99L);
 
@@ -680,7 +680,7 @@ public class TarifpositionServiceTest {
     private void assertTypAbgewiesen(EinheitTyp typ) {
         Einheit einheit = einheitVomTyp(50L, "Andere Einheit", typ);
         Tarifposition neu = new Tarifposition(einheit, ladestromTarif, 2026, 1, new BigDecimal("10.000"));
-        when(einheitRepository.findById(50L)).thenReturn(Optional.of(einheit));
+        when(einheitRepository.findFirstById(50L)).thenReturn(Optional.of(einheit));
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
@@ -700,8 +700,8 @@ public class TarifpositionServiceTest {
         Einheit wohnung = einheitVomTyp(50L, "Wohnung 1", EinheitTyp.CONSUMER);
         Tarifposition neu = new Tarifposition(wohnung, zusatzTarif, 2026, 1, new BigDecimal("3.000"));
 
-        when(einheitRepository.findById(50L)).thenReturn(Optional.of(wohnung));
-        when(tarifRepository.findById(30L)).thenReturn(Optional.of(zusatzTarif));
+        when(einheitRepository.findFirstById(50L)).thenReturn(Optional.of(wohnung));
+        when(tarifRepository.findFirstById(30L)).thenReturn(Optional.of(zusatzTarif));
         when(tarifpositionRepository.existsByEinheitAndQuartalAndTarif(
                 anyLong(), anyInt(), anyInt(), anyLong(), anyLong())).thenReturn(false);
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
@@ -717,8 +717,8 @@ public class TarifpositionServiceTest {
         Einheit wohnung = einheitVomTyp(50L, "Wohnung 1", EinheitTyp.CONSUMER);
         Tarifposition neu = new Tarifposition(wohnung, ladestromTarif, 2026, 1, new BigDecimal("10.000"));
 
-        when(einheitRepository.findById(50L)).thenReturn(Optional.of(wohnung));
-        when(tarifRepository.findById(10L)).thenReturn(Optional.of(ladestromTarif));
+        when(einheitRepository.findFirstById(50L)).thenReturn(Optional.of(wohnung));
+        when(tarifRepository.findFirstById(10L)).thenReturn(Optional.of(ladestromTarif));
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,

@@ -72,7 +72,7 @@ public class DebitorService {
     @Transactional(readOnly = true)
     public Optional<DebitorDTO> getDebitorById(Long id) {
         hibernateFilterService.enableOrgFilter();
-        return debitorRepository.findById(id).map(this::toDTO);
+        return debitorRepository.findFirstById(id).map(this::toDTO);
     }
 
     /**
@@ -107,7 +107,7 @@ public class DebitorService {
     @Transactional
     public DebitorDTO update(Long id, DebitorDTO dto) {
         hibernateFilterService.enableOrgFilter();
-        Debitor debitor = debitorRepository.findById(id)
+        Debitor debitor = debitorRepository.findFirstById(id)
                 .orElseThrow(() -> new NoSuchElementException("Debitor not found: " + id));
         validate(dto);
         debitor.setMieterId(dto.getMieterId());
@@ -180,12 +180,12 @@ public class DebitorService {
         dto.setDatumVon(d.getDatumVon());
         dto.setDatumBis(d.getDatumBis());
         dto.setZahldatum(d.getZahldatum());
-        mieterRepository.findById(d.getMieterId()).ifPresent(m -> {
+        mieterRepository.findFirstById(d.getMieterId()).ifPresent(m -> {
             dto.setMieterName(m.getName());
             // Ein Mieter kann mehreren Einheiten zugeordnet sein (Wohnung + Ladestation(en)) -
             // fuer die Debitorenanzeige werden alle Namen genannt.
             String einheiten = mieterEinheitRepository.findEinheitIdsByMieterId(m.getId()).stream()
-                    .map(einheitRepository::findById)
+                    .map(einheitRepository::findFirstById)
                     .filter(Optional::isPresent)
                     .map(e -> e.get().getName())
                     .collect(Collectors.joining(", "));

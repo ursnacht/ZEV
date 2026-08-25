@@ -22,6 +22,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.persistence.Entity;
 
+import java.util.Set;
+
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
@@ -442,6 +444,63 @@ class ArchitectureTest {
                 .that().resideInAPackage("..service..")
                 .and().haveSimpleNameStartingWith("NkAbrechnung")
                 .should(checkFeatureFlag);
+
+            rule.check(importedClasses);
+        }
+
+        /**
+         * Repositories mandantenweiter Entities werden nie ueber {@code findById} gelesen.
+         *
+         * <p><b>Warum:</b> Hibernate wendet {@code @Filter} auf Abfragen an, <b>nicht</b> auf das
+         * Laden ueber den Primaerschluessel. {@code findById} liefert deshalb auch Datensaetze
+         * fremder Mandanten, obwohl der Filter eingeschaltet ist — empirisch belegt in
+         * {@code NkAbrechnungRepositoryIT.findByIdUmgehtDenMandantenfilter_bekannteLuecke}. Eine
+         * von aussen kommende ID darf daher nur ueber eine abgeleitete Abfrage geladen werden
+         * ({@code findFirstById}), die der Filter erfasst. Broken Access Control ueber
+         * Mandantengrenzen, OWASP A01.
+         *
+         * <p><b>Deny by default:</b> Ausgenommen sind nur die drei Repositories, deren Entity
+         * bewusst <b>keinen</b> {@code @Filter} traegt — ein neu hinzukommendes Repository ist
+         * automatisch erfasst.
+         */
+        @Test
+        @DisplayName("Services lesen mandantenweite Entities nie ueber findById")
+        void servicesMustNotUseFindByIdOnFilteredRepositories() {
+            // Entities ohne @Filter: global bzw. nicht mandantenspezifisch.
+            Set<String> ungefiltert = Set.of(
+                "OrganisationRepository", "TranslationRepository", "MetrikRepository");
+
+            // Der Aggregations-Job laeuft bewusst mandantenuebergreifend ueber alle
+            // unverarbeiteten Rohdaten und schaltet den Filter gar nicht ein; die einheitId
+            // stammt dort aus dem Repository und nicht von einem Aufrufer.
+            Set<String> ausnahmen = Set.of("ZaehlerAggregationService");
+
+            ArchCondition<JavaClass> keinFindById =
+                new ArchCondition<>("mandantenweite Entities nicht ueber findById laden") {
+                    @Override
+                    public void check(JavaClass service, ConditionEvents events) {
+                        if (ausnahmen.contains(service.getSimpleName())) {
+                            return;
+                        }
+                        for (JavaMethod method : service.getMethods()) {
+                            method.getMethodCallsFromSelf().stream()
+                                .filter(call -> call.getTarget().getName().equals("findById"))
+                                .filter(call -> call.getTargetOwner().getSimpleName()
+                                    .endsWith("Repository"))
+                                .filter(call -> !ungefiltert.contains(
+                                    call.getTargetOwner().getSimpleName()))
+                                .forEach(call -> events.add(SimpleConditionEvent.violated(method,
+                                    method.getFullName() + " liest "
+                                        + call.getTargetOwner().getSimpleName()
+                                        + " ueber findById — der Mandantenfilter greift dort nicht."
+                                        + " Stattdessen findFirstById verwenden.")));
+                        }
+                    }
+                };
+
+            ArchRule rule = classes()
+                .that().resideInAPackage("..service..")
+                .should(keinFindById);
 
             rule.check(importedClasses);
         }

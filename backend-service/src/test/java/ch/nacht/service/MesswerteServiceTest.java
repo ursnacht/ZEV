@@ -428,7 +428,7 @@ public class MesswerteServiceTest {
         String csvContent = "Time,Total,ZEV\n00:00,1.5,0.8\n00:15,2.0,1.2\n";
         MockMultipartFile file = new MockMultipartFile("file", "test.csv", "text/csv", csvContent.getBytes());
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumerEinheit));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumerEinheit));
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
         when(messwerteRepository.findByEinheitAndZeitBetween(any(), any(), any()))
             .thenReturn(Collections.emptyList());
@@ -447,7 +447,7 @@ public class MesswerteServiceTest {
         String csvContent = "Time,Total,ZEV\n00:00,1.5,0.8\n";
         MockMultipartFile file = new MockMultipartFile("file", "test.csv", "text/csv", csvContent.getBytes());
 
-        when(einheitRepository.findById(999L)).thenReturn(Optional.empty());
+        when(einheitRepository.findFirstById(999L)).thenReturn(Optional.empty());
 
         RuntimeException exception = assertThrows(
             RuntimeException.class,
@@ -462,7 +462,7 @@ public class MesswerteServiceTest {
         String csvContent = "Time;Total;ZEV\n00:00;3.5;1.8\n";
         MockMultipartFile file = new MockMultipartFile("file", "test.csv", "text/csv", csvContent.getBytes());
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumerEinheit));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumerEinheit));
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
         when(messwerteRepository.findByEinheitAndZeitBetween(any(), any(), any()))
             .thenReturn(Collections.emptyList());
@@ -482,7 +482,7 @@ public class MesswerteServiceTest {
             LocalDateTime.of(2024, 1, 15, 0, 0), 1.0, 0.5, consumerEinheit);
         List<Messwerte> existingData = List.of(existingMesswert);
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumerEinheit));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumerEinheit));
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
         when(messwerteRepository.findByEinheitAndZeitBetween(any(), any(), any()))
             .thenReturn(existingData);
@@ -498,7 +498,7 @@ public class MesswerteServiceTest {
         String csvContent = "Time,Total,ZEV\n00:00,1.5,0.8\ninvalid_line\n00:15,2.0,1.2\n";
         MockMultipartFile file = new MockMultipartFile("file", "test.csv", "text/csv", csvContent.getBytes());
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumerEinheit));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumerEinheit));
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
         when(messwerteRepository.findByEinheitAndZeitBetween(any(), any(), any()))
             .thenReturn(Collections.emptyList());
@@ -513,7 +513,7 @@ public class MesswerteServiceTest {
         String csvContent = "Time,Total,ZEV\n00:00,1.5,0.8\n";
         MockMultipartFile file = new MockMultipartFile("file", "test.csv", "text/csv", csvContent.getBytes());
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumerEinheit));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumerEinheit));
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
         when(messwerteRepository.findByEinheitAndZeitBetween(any(), any(), any()))
             .thenReturn(Collections.emptyList());
@@ -534,7 +534,7 @@ public class MesswerteServiceTest {
         String csvContent = "Time,Total,ZEV\n00:00,1.0,0.5\n00:15,2.0,1.0\n00:30,3.0,1.5\n";
         MockMultipartFile file = new MockMultipartFile("file", "test.csv", "text/csv", csvContent.getBytes());
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumerEinheit));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumerEinheit));
         when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
         when(messwerteRepository.findByEinheitAndZeitBetween(any(), any(), any()))
             .thenReturn(Collections.emptyList());
@@ -562,7 +562,7 @@ public class MesswerteServiceTest {
 
         Messwerte messwert = new Messwerte(zeit, 5.0, 2.5, consumerEinheit);
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumerEinheit));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumerEinheit));
         when(messwerteRepository.findByEinheitAndZeitBetween(eq(consumerEinheit), any(), any()))
             .thenReturn(List.of(messwert));
 
@@ -578,7 +578,7 @@ public class MesswerteServiceTest {
 
     @Test
     void getMesswerteByEinheit_EinheitNotFound_ThrowsException() {
-        when(einheitRepository.findById(999L)).thenReturn(Optional.empty());
+        when(einheitRepository.findFirstById(999L)).thenReturn(Optional.empty());
 
         assertThrows(
             RuntimeException.class,
@@ -593,7 +593,7 @@ public class MesswerteServiceTest {
 
         Messwerte messwert = new Messwerte(LocalDateTime.of(2024, 1, 15, 12, 0), null, null, consumerEinheit);
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumerEinheit));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumerEinheit));
         when(messwerteRepository.findByEinheitAndZeitBetween(eq(consumerEinheit), any(), any()))
             .thenReturn(List.of(messwert));
 
@@ -605,7 +605,7 @@ public class MesswerteServiceTest {
 
     @Test
     void getMesswerteByEinheit_EmptyResult_ReturnsEmptyList() {
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumerEinheit));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumerEinheit));
         when(messwerteRepository.findByEinheitAndZeitBetween(eq(consumerEinheit), any(), any()))
             .thenReturn(Collections.emptyList());
 

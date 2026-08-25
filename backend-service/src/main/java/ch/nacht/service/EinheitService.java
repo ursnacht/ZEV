@@ -41,7 +41,7 @@ public class EinheitService {
     @Transactional(readOnly = true)
     public Optional<Einheit> getEinheitById(Long id) {
         hibernateFilterService.enableOrgFilter();
-        return einheitRepository.findById(id);
+        return einheitRepository.findFirstById(id);
     }
 
     @Transactional
@@ -58,7 +58,7 @@ public class EinheitService {
     @Transactional
     public Optional<Einheit> updateEinheit(Long id, Einheit einheit) {
         hibernateFilterService.enableOrgFilter();
-        Optional<Einheit> existingEinheit = einheitRepository.findById(id);
+        Optional<Einheit> existingEinheit = einheitRepository.findFirstById(id);
         if (existingEinheit.isEmpty()) {
             return Optional.empty();
         }

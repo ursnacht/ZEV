@@ -108,7 +108,7 @@ public class MieterServiceTest {
 
     @Test
     void getMieterById_Found_ReturnsMieter() {
-        when(mieterRepository.findById(1L)).thenReturn(Optional.of(testMieter));
+        when(mieterRepository.findFirstById(1L)).thenReturn(Optional.of(testMieter));
 
         Optional<Mieter> result = mieterService.getMieterById(1L);
 
@@ -119,7 +119,7 @@ public class MieterServiceTest {
 
     @Test
     void getMieterById_NotFound_ReturnsEmpty() {
-        when(mieterRepository.findById(99L)).thenReturn(Optional.empty());
+        when(mieterRepository.findFirstById(99L)).thenReturn(Optional.empty());
 
         Optional<Mieter> result = mieterService.getMieterById(99L);
 
@@ -575,7 +575,7 @@ public class MieterServiceTest {
 
     @Test
     void getMieterById_FuelltEinheitIds() {
-        when(mieterRepository.findById(1L)).thenReturn(Optional.of(testMieter));
+        when(mieterRepository.findFirstById(1L)).thenReturn(Optional.of(testMieter));
         when(mieterEinheitRepository.findEinheitIdsByMieterId(1L)).thenReturn(List.of(10L, 11L));
 
         Optional<Mieter> result = mieterService.getMieterById(1L);

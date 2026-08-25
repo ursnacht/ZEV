@@ -91,7 +91,7 @@ public class EinheitServiceTest {
 
     @Test
     void getEinheitById_Found_ReturnsEinheit() {
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumerEinheit));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumerEinheit));
 
         Optional<Einheit> result = einheitService.getEinheitById(1L);
 
@@ -103,7 +103,7 @@ public class EinheitServiceTest {
 
     @Test
     void getEinheitById_NotFound_ReturnsEmpty() {
-        when(einheitRepository.findById(999L)).thenReturn(Optional.empty());
+        when(einheitRepository.findFirstById(999L)).thenReturn(Optional.empty());
 
         Optional<Einheit> result = einheitService.getEinheitById(999L);
 
@@ -145,7 +145,7 @@ public class EinheitServiceTest {
     @Test
     void updateEinheit_Found_UpdatesSuccessfully() {
         Einheit updatedData = new Einheit("Wohnung A Updated", EinheitTyp.CONSUMER);
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumerEinheit));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumerEinheit));
         when(einheitRepository.save(updatedData)).thenReturn(updatedData);
 
         Optional<Einheit> result = einheitService.updateEinheit(1L, updatedData);
@@ -160,7 +160,7 @@ public class EinheitServiceTest {
     @Test
     void updateEinheit_NotFound_ReturnsEmpty() {
         Einheit updatedData = new Einheit("Wohnung X", EinheitTyp.CONSUMER);
-        when(einheitRepository.findById(999L)).thenReturn(Optional.empty());
+        when(einheitRepository.findFirstById(999L)).thenReturn(Optional.empty());
 
         Optional<Einheit> result = einheitService.updateEinheit(999L, updatedData);
 
@@ -175,7 +175,7 @@ public class EinheitServiceTest {
         Einheit updatedData = new Einheit("Wohnung A Updated", EinheitTyp.PRODUCER);
         updatedData.setOrgId(99L); // different orgId should be overwritten
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumerEinheit));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumerEinheit));
         when(einheitRepository.save(updatedData)).thenReturn(updatedData);
 
         einheitService.updateEinheit(1L, updatedData);
@@ -188,7 +188,7 @@ public class EinheitServiceTest {
         Einheit updatedData = new Einheit("Wohnung A Updated", EinheitTyp.CONSUMER);
         updatedData.setId(999L); // should be overwritten by path id
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumerEinheit));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumerEinheit));
         when(einheitRepository.save(updatedData)).thenReturn(updatedData);
 
         einheitService.updateEinheit(1L, updatedData);
@@ -338,7 +338,7 @@ public class EinheitServiceTest {
         bestehend.setOrgId(testOrgId);
         Einheit geaendert = ladestation("Ladestation 1 neu", "RFID-001");
 
-        when(einheitRepository.findById(5L)).thenReturn(Optional.of(bestehend));
+        when(einheitRepository.findFirstById(5L)).thenReturn(Optional.of(bestehend));
         // Eigene ID ausgeschlossen -> die eigene RFID kollidiert nicht mit sich selbst
         when(einheitRepository.existsLadestationWithMesspunkt("RFID-001", 5L)).thenReturn(false);
         when(einheitRepository.save(geaendert)).thenReturn(geaendert);
@@ -358,7 +358,7 @@ public class EinheitServiceTest {
         bestehend.setOrgId(testOrgId);
         Einheit geaendert = ladestation("Ladestation 1", "RFID-002");
 
-        when(einheitRepository.findById(5L)).thenReturn(Optional.of(bestehend));
+        when(einheitRepository.findFirstById(5L)).thenReturn(Optional.of(bestehend));
         when(einheitRepository.existsLadestationWithMesspunkt("RFID-002", 5L)).thenReturn(true);
 
         IllegalStateException exception = assertThrows(
@@ -377,7 +377,7 @@ public class EinheitServiceTest {
         bestehend.setOrgId(testOrgId);
         Einheit geaendert = ladestation("Ladestation 1", "");
 
-        when(einheitRepository.findById(5L)).thenReturn(Optional.of(bestehend));
+        when(einheitRepository.findFirstById(5L)).thenReturn(Optional.of(bestehend));
         when(einheitRepository.save(geaendert)).thenReturn(geaendert);
 
         einheitService.updateEinheit(5L, geaendert);
@@ -390,7 +390,7 @@ public class EinheitServiceTest {
     void updateEinheit_TypwechselZuLadestationMitVergebenerRfid_ThrowsException() {
         Einheit geaendert = ladestation("Wohnung A", "RFID-001");
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumerEinheit));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumerEinheit));
         when(einheitRepository.existsLadestationWithMesspunkt("RFID-001", 1L)).thenReturn(true);
 
         assertThrows(IllegalStateException.class, () -> einheitService.updateEinheit(1L, geaendert));

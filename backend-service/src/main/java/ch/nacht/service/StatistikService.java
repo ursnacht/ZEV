@@ -465,16 +465,17 @@ public class StatistikService {
      * {@code sprache} übersetzt; das Monatstotal im Titel wird aus derselben Rundungsbasis (Summe der
      * auf 3 NKS gerundeten Intervallwerte) gebildet, sodass Header == Summe der Zeilen.
      *
-     * <p>Sicherheit: Da {@code findById} den {@code orgFilter} nicht anwendet, wird die {@code org_id}
-     * der Einheit <b>explizit</b> geprüft (keine Cross-Tenant-Exporte).
+     * <p>Sicherheit: Geladen wird über {@code findFirstById} — eine abgeleitete und damit
+     * gefilterte Abfrage. Die zusätzliche explizite Prüfung der {@code org_id} bleibt als zweite
+     * Verteidigungslinie stehen: Sie greift auch dann, wenn der Filter nicht eingeschaltet wäre.
      */
     @Transactional(readOnly = true)
     public byte[] exportMesswerteCsv(Long einheitId, LocalDate von, LocalDate bis, String sprache) {
         hibernateFilterService.enableOrgFilter();
 
-        Einheit einheit = einheitRepository.findById(einheitId)
+        Einheit einheit = einheitRepository.findFirstById(einheitId)
                 .orElseThrow(() -> new IllegalArgumentException("EINHEIT_NICHT_GEFUNDEN"));
-        // Org-Check (findById umgeht den orgFilter)
+        // Zweite Verteidigungslinie, unabhaengig vom Mandantenfilter
         if (!Objects.equals(einheit.getOrgId(), organizationContextService.getCurrentOrgId())) {
             throw new IllegalArgumentException("EINHEIT_NICHT_GEFUNDEN");
         }

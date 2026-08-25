@@ -81,7 +81,7 @@ public class MieterService {
     @Transactional(readOnly = true)
     public Optional<Mieter> getMieterById(Long id) {
         hibernateFilterService.enableOrgFilter();
-        return mieterRepository.findById(id).map(this::ladeEinheiten);
+        return mieterRepository.findFirstById(id).map(this::ladeEinheiten);
     }
 
     /**

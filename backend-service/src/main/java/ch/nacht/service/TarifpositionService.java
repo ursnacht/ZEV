@@ -121,7 +121,7 @@ public class TarifpositionService {
     @Transactional(readOnly = true)
     public Optional<Tarifposition> getTarifpositionById(Long id) {
         hibernateFilterService.enableOrgFilter();
-        return tarifpositionRepository.findById(id);
+        return tarifpositionRepository.findFirstById(id);
     }
 
     /**
@@ -161,12 +161,15 @@ public class TarifpositionService {
             tarifposition.setErfassungsart(Erfassungsart.MANUELL);
         }
         // Beim Update traegt das DTO keine org_id (anders als bei Entities, die direkt als JSON
-        // durchgereicht werden) - sie wird aus dem bestehenden Datensatz uebernommen. `findById`
-        // laeuft unter dem orgFilter, ein fremder Mandant kommt hier also gar nicht an.
+        // durchgereicht werden) - sie wird aus dem bestehenden Datensatz uebernommen.
+        // `findFirstById` ist gefiltert, ein fremder Mandant kommt hier also gar nicht an.
+        // Frueher stand hier `findById` mit derselben Begruendung - die war falsch: Der Filter
+        // greift nicht auf Primaerschluessel-Loads, womit ein fremder Datensatz seine org_id an
+        // den eingehenden weitergab.
         if (tarifposition.getId() == null) {
             tarifposition.setOrgId(organizationContextService.getCurrentOrgId());
         } else {
-            Tarifposition bestehend = tarifpositionRepository.findById(tarifposition.getId())
+            Tarifposition bestehend = tarifpositionRepository.findFirstById(tarifposition.getId())
                     .orElseThrow(() -> new IllegalArgumentException("Tarifposition nicht gefunden"));
             tarifposition.setOrgId(bestehend.getOrgId());
         }
@@ -185,7 +188,7 @@ public class TarifpositionService {
     @Transactional
     public boolean deleteTarifposition(Long id) {
         hibernateFilterService.enableOrgFilter();
-        Optional<Tarifposition> vorhanden = tarifpositionRepository.findById(id);
+        Optional<Tarifposition> vorhanden = tarifpositionRepository.findFirstById(id);
         if (vorhanden.isEmpty()) {
             log.warn("Tariff position not found for deletion: {}", id);
             return false;
@@ -219,7 +222,7 @@ public class TarifpositionService {
         if (tarifposition.getEinheit() == null || tarifposition.getEinheit().getId() == null) {
             throw new IllegalArgumentException("Einheit ist erforderlich");
         }
-        Einheit einheit = einheitRepository.findById(tarifposition.getEinheit().getId())
+        Einheit einheit = einheitRepository.findFirstById(tarifposition.getEinheit().getId())
                 .orElseThrow(() -> new IllegalArgumentException("Einheit nicht gefunden"));
         if (!ERFASSBARE_EINHEITEN.contains(einheit.getTyp())) {
             throw new IllegalArgumentException(
@@ -282,7 +285,7 @@ public class TarifpositionService {
         if (tarifposition.getTarif() == null || tarifposition.getTarif().getId() == null) {
             throw new IllegalArgumentException("Tarif ist erforderlich");
         }
-        return tarifRepository.findById(tarifposition.getTarif().getId())
+        return tarifRepository.findFirstById(tarifposition.getTarif().getId())
                 .orElseThrow(() -> new IllegalArgumentException("Tarif nicht gefunden"));
     }
 }

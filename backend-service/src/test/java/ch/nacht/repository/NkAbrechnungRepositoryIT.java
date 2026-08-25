@@ -9,6 +9,7 @@ import ch.nacht.entity.NkPositionsart;
 import ch.nacht.entity.NkVerbrauch;
 import ch.nacht.entity.NkZusatz;
 import ch.nacht.entity.Organisation;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,7 +61,13 @@ class NkAbrechnungRepositoryIT extends AbstractIntegrationTest {
     @Autowired
     private OrganisationRepository organisationRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
     private Long TEST_ORG_ID;
+
+    /** Zweiter Mandant — nur als Gegenprobe des Mandantenfilters. */
+    private Long FREMD_ORG_ID;
 
     @BeforeEach
     void setUp() {
@@ -75,6 +82,12 @@ class NkAbrechnungRepositoryIT extends AbstractIntegrationTest {
         org.setName("Nebenkosten Test Organisation");
         org.setErstelltAm(LocalDateTime.now());
         TEST_ORG_ID = organisationRepository.save(org).getId();
+
+        Organisation fremd = new Organisation();
+        fremd.setKeycloakOrgId(UUID.fromString("3d2b9e14-7c58-4f6a-8b03-5e91af27c6d2"));
+        fremd.setName("Fremde Organisation");
+        fremd.setErstelltAm(LocalDateTime.now());
+        FREMD_ORG_ID = organisationRepository.save(fremd).getId();
     }
 
     // ==================== NkAbrechnung ====================
@@ -321,6 +334,82 @@ class NkAbrechnungRepositoryIT extends AbstractIntegrationTest {
 
     private NkAbrechnung abrechnung() {
         return abrechnungRepository.save(createAbrechnung("NK 2025", LocalDate.of(2025, 1, 1)));
+    }
+
+    // ==================== Mandantenfilter ====================
+
+    /**
+     * Ohne eingeschalteten Filter sieht die Abfrage <b>alle</b> Mandanten.
+     *
+     * <p>Das ist kein Fehler, sondern die Voraussetzung des Verfahrens: Der Filter ist ein
+     * Sitzungszustand, den im Betrieb {@code HibernateFilterService.enableOrgFilter()} zu Beginn
+     * jeder Service-Methode setzt. Dieser Test haelt fest, dass die Trennung tatsaechlich vom
+     * Filter kommt und nicht zufaellig von den Testdaten — sonst waere der Test darunter wertlos.
+     */
+    @Test
+    void shouldSeeAllOrgsWhenOrgFilterDisabled() {
+        abrechnungRepository.saveAndFlush(createAbrechnung("Eigene", LocalDate.of(2025, 1, 1)));
+        abrechnungRepository.saveAndFlush(
+                abrechnungFuerOrg(FREMD_ORG_ID, "Fremde", LocalDate.of(2025, 1, 1)));
+        entityManager.clear();
+
+        assertThat(abrechnungRepository.findAllByOrderByDatumVonDesc()).hasSize(2);
+    }
+
+    @Test
+    void shouldNotSeeAbrechnungOfOtherOrgWhenOrgFilterEnabled() {
+        NkAbrechnung eigene = abrechnungRepository.saveAndFlush(
+                createAbrechnung("Eigene", LocalDate.of(2025, 1, 1)));
+        NkAbrechnung fremde = abrechnungRepository.saveAndFlush(
+                abrechnungFuerOrg(FREMD_ORG_ID, "Fremde", LocalDate.of(2024, 1, 1)));
+        entityManager.clear();
+
+        aktiviereOrgFilter(entityManager, TEST_ORG_ID);
+
+        assertThat(abrechnungRepository.findAllByOrderByDatumVonDesc())
+                .extracting(NkAbrechnung::getBezeichnung)
+                .containsExactly("Eigene");
+        assertThat(abrechnungRepository.findAll()).hasSize(1);
+
+        // findFirstById ist der Weg, den die Services verwenden: eine abgeleitete Abfrage, die
+        // der Filter erfasst. Das ist die Zusicherung, auf der die Mandantentrennung beim Zugriff
+        // ueber eine von aussen kommende ID beruht.
+        assertThat(abrechnungRepository.findFirstById(eigene.getId())).isPresent();
+        assertThat(abrechnungRepository.findFirstById(fremde.getId())).isEmpty();
+    }
+
+    /**
+     * <b>Dokumentiert eine Luecke, kein gewuenschtes Verhalten:</b> {@code findById} umgeht den
+     * Mandantenfilter.
+     *
+     * <p>Hibernate wendet {@code @Filter} auf Abfragen an, <b>nicht</b> auf das direkte Laden
+     * ueber den Primaerschluessel ({@code EntityManager.find}, und damit auch Spring Datas
+     * {@code findById}). Der eingeschaltete Filter schuetzt hier also nicht.
+     *
+     * <p>Dieser Test haelt den Ist-Zustand fest, damit er nicht unbemerkt bleibt: Er ist die
+     * Begruendung dafuer, dass die Services {@code findFirstById} verwenden und eine
+     * ArchUnit-Regel ({@code ArchitectureTest.SecurityRules}) den Rueckfall auf
+     * {@code findById} verhindert. Sollte Hibernate das Verhalten je aendern, schlaegt dieser
+     * Test fehl — dann ist die Regel neu zu bewerten, nicht der Test anzupassen.
+     */
+    @Test
+    void findByIdUmgehtDenMandantenfilter_bekannteLuecke() {
+        NkAbrechnung fremde = abrechnungRepository.saveAndFlush(
+                abrechnungFuerOrg(FREMD_ORG_ID, "Fremde", LocalDate.of(2024, 1, 1)));
+        entityManager.clear();
+
+        aktiviereOrgFilter(entityManager, TEST_ORG_ID);
+
+        assertThat(abrechnungRepository.findAllByOrderByDatumVonDesc()).isEmpty();
+        assertThat(abrechnungRepository.findById(fremde.getId()))
+                .as("findById umgeht den Filter — siehe Javadoc dieses Tests")
+                .isPresent();
+    }
+
+    private NkAbrechnung abrechnungFuerOrg(Long orgId, String bezeichnung, LocalDate von) {
+        NkAbrechnung abrechnung = createAbrechnung(bezeichnung, von);
+        abrechnung.setOrgId(orgId);
+        return abrechnung;
     }
 
     private NkAbrechnung createAbrechnung(String bezeichnung, LocalDate von) {

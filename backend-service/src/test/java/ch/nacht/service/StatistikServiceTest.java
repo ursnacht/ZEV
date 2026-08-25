@@ -714,7 +714,7 @@ public class StatistikServiceTest {
     @Test
     void exportMesswerteCsv_Consumer_ReturnsHeaderWithTranslatedTitlesAndTotalsAndOneRowPerInterval() {
         consumer1.setOrgId(1L);
-        when(einheitRepository.findById(2L)).thenReturn(Optional.of(consumer1));
+        when(einheitRepository.findFirstById(2L)).thenReturn(Optional.of(consumer1));
         stubExportTitel();
 
         Messwerte m1 = new Messwerte(LocalDateTime.of(2024, 1, 1, 0, 0), 1.5, 1.0, consumer1);
@@ -741,7 +741,7 @@ public class StatistikServiceTest {
         // Drei Intervalle mit 0.0005 → je gerundet auf 0.001; Summe der GERUNDETEN Werte = 0.003
         // (Summe der Rohwerte 0.0015 gerundet wäre 0.002 → beweist: Header aus Rundungsbasis der Zeilen).
         consumer1.setOrgId(1L);
-        when(einheitRepository.findById(2L)).thenReturn(Optional.of(consumer1));
+        when(einheitRepository.findFirstById(2L)).thenReturn(Optional.of(consumer1));
         stubExportTitel();
 
         Messwerte m1 = new Messwerte(LocalDateTime.of(2024, 1, 1, 0, 0), 0.0005, 0.0004, consumer1);
@@ -764,7 +764,7 @@ public class StatistikServiceTest {
     @Test
     void exportMesswerteCsv_RoundsToThreeDecimalsHalfUp() {
         consumer1.setOrgId(1L);
-        when(einheitRepository.findById(2L)).thenReturn(Optional.of(consumer1));
+        when(einheitRepository.findFirstById(2L)).thenReturn(Optional.of(consumer1));
         stubExportTitel();
 
         // 1.2345 → 1.235 (HALF_UP), 0.1234 → 0.123
@@ -781,7 +781,7 @@ public class StatistikServiceTest {
     @Test
     void exportMesswerteCsv_EnglishLanguage_UsesEnglishTitles() {
         consumer1.setOrgId(1L);
-        when(einheitRepository.findById(2L)).thenReturn(Optional.of(consumer1));
+        when(einheitRepository.findFirstById(2L)).thenReturn(Optional.of(consumer1));
         stubExportTitel();
 
         Messwerte m1 = new Messwerte(LocalDateTime.of(2024, 1, 1, 0, 0), 1.0, 0.5, consumer1);
@@ -797,7 +797,7 @@ public class StatistikServiceTest {
     @Test
     void exportMesswerteCsv_EmptyMesswerte_ReturnsHeaderOnlyWithZeroTotals() {
         consumer1.setOrgId(1L);
-        when(einheitRepository.findById(2L)).thenReturn(Optional.of(consumer1));
+        when(einheitRepository.findFirstById(2L)).thenReturn(Optional.of(consumer1));
         stubExportTitel();
         when(messwerteRepository.findByEinheitAndZeitBetween(eq(consumer1), any(), any()))
                 .thenReturn(new java.util.ArrayList<>());
@@ -817,7 +817,7 @@ public class StatistikServiceTest {
     void exportMesswerteCsv_ForeignOrg_ThrowsIllegalArgumentException_NoExport() {
         // Einheit gehört zu fremder Org (99L); aktueller Kontext = 1L (aus setUp)
         consumer1.setOrgId(99L);
-        when(einheitRepository.findById(2L)).thenReturn(Optional.of(consumer1));
+        when(einheitRepository.findFirstById(2L)).thenReturn(Optional.of(consumer1));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> statistikService.exportMesswerteCsv(2L, exportVon, exportBis, "de"));
@@ -830,7 +830,7 @@ public class StatistikServiceTest {
 
     @Test
     void exportMesswerteCsv_EinheitNotFound_ThrowsIllegalArgumentException() {
-        when(einheitRepository.findById(99L)).thenReturn(Optional.empty());
+        when(einheitRepository.findFirstById(99L)).thenReturn(Optional.empty());
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> statistikService.exportMesswerteCsv(99L, exportVon, exportBis, "de"));
@@ -845,7 +845,7 @@ public class StatistikServiceTest {
         Einheit einheit = new Einheit("Nicht-Consumer", typ);
         einheit.setId(2L);
         einheit.setOrgId(1L);
-        when(einheitRepository.findById(2L)).thenReturn(Optional.of(einheit));
+        when(einheitRepository.findFirstById(2L)).thenReturn(Optional.of(einheit));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> statistikService.exportMesswerteCsv(2L, exportVon, exportBis, "de"));

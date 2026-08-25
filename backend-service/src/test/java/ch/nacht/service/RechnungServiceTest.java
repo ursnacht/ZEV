@@ -287,7 +287,7 @@ public class RechnungServiceTest {
         LocalDate von = LocalDate.of(2024, 1, 1);
         LocalDate bis = LocalDate.of(2024, 1, 31);
 
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumer));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumer));
         doThrow(new TarifLueckenException(List.of(new TarifLuecke("ZEV", "01.01.2024", false))))
             .when(tarifService).validateTarifAbdeckung(von, bis);
 
@@ -309,8 +309,8 @@ public class RechnungServiceTest {
         producer.setId(2L);
 
         doNothing().when(tarifService).validateTarifAbdeckung(von, bis);
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumer));
-        when(einheitRepository.findById(2L)).thenReturn(Optional.of(producer));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumer));
+        when(einheitRepository.findFirstById(2L)).thenReturn(Optional.of(producer));
         when(mieterService.getMieterForQuartal(eq(1L), any(), any())).thenReturn(Collections.emptyList());
 
         when(tarifService.getTarifeForZeitraum(eq(TarifTyp.ZEV), any(), any()))
@@ -345,7 +345,7 @@ public class RechnungServiceTest {
         mieter2.setId(2L);
 
         doNothing().when(tarifService).validateTarifAbdeckung(von, bis);
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumer));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumer));
         when(mieterService.getMieterForQuartal(eq(1L), any(), any()))
             .thenReturn(Arrays.asList(mieter1, mieter2));
 
@@ -378,7 +378,7 @@ public class RechnungServiceTest {
         LocalDate bis = LocalDate.of(2024, 1, 31);
 
         doNothing().when(tarifService).validateTarifAbdeckung(von, bis);
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumer));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumer));
         when(mieterService.getMieterForQuartal(eq(1L), any(), any())).thenReturn(Collections.emptyList());
 
         when(tarifService.getTarifeForZeitraum(any(), any(), any()))
@@ -697,7 +697,7 @@ public class RechnungServiceTest {
         );
         grundgebuehr.setProduzentVerrechnen(true);
 
-        when(einheitRepository.findById(2L)).thenReturn(Optional.of(producer));
+        when(einheitRepository.findFirstById(2L)).thenReturn(Optional.of(producer));
         when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
             .thenReturn(Collections.singletonList(grundgebuehr));
 
@@ -723,7 +723,7 @@ public class RechnungServiceTest {
         Einheit producer = new Einheit("Solaranlage", EinheitTyp.PRODUCER);
         producer.setId(2L);
 
-        when(einheitRepository.findById(2L)).thenReturn(Optional.of(producer));
+        when(einheitRepository.findFirstById(2L)).thenReturn(Optional.of(producer));
         when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
             .thenReturn(Collections.emptyList());
 
@@ -741,7 +741,7 @@ public class RechnungServiceTest {
         Einheit producer = new Einheit("Solaranlage", EinheitTyp.PRODUCER);
         producer.setId(2L);
 
-        when(einheitRepository.findById(2L)).thenReturn(Optional.of(producer));
+        when(einheitRepository.findFirstById(2L)).thenReturn(Optional.of(producer));
         when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
             .thenReturn(Collections.emptyList());
 
@@ -765,7 +765,7 @@ public class RechnungServiceTest {
         );
         grundgebuehr.setProduzentVerrechnen(true);
 
-        when(einheitRepository.findById(2L)).thenReturn(Optional.of(producer));
+        when(einheitRepository.findFirstById(2L)).thenReturn(Optional.of(producer));
         when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
             .thenReturn(Collections.singletonList(grundgebuehr));
 
@@ -791,7 +791,7 @@ public class RechnungServiceTest {
         );
         // produzentVerrechnen defaults to false → producer must NOT be charged
 
-        when(einheitRepository.findById(2L)).thenReturn(Optional.of(producer));
+        when(einheitRepository.findFirstById(2L)).thenReturn(Optional.of(producer));
         when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
             .thenReturn(Collections.singletonList(grundgebuehr));
 
@@ -1143,7 +1143,7 @@ public class RechnungServiceTest {
         Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
 
         doNothing().when(tarifService).validateTarifAbdeckung(von, bis);
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumer));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumer));
         when(mieterService.getMieterForQuartal(eq(1L), any(), any()))
             .thenReturn(Arrays.asList(mieterA, mieterB));
         when(tarifService.getTarifeForZeitraum(any(), any(), any()))
@@ -1196,7 +1196,7 @@ public class RechnungServiceTest {
         );
         grundgebuehr.setProduzentVerrechnen(true);
 
-        when(einheitRepository.findById(2L)).thenReturn(Optional.of(producer));
+        when(einheitRepository.findFirstById(2L)).thenReturn(Optional.of(producer));
         when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
             .thenReturn(Collections.singletonList(grundgebuehr));
 
@@ -1214,7 +1214,7 @@ public class RechnungServiceTest {
         LocalDate bis = LocalDate.of(2024, 3, 31);
 
         doNothing().when(tarifService).validateTarifAbdeckung(von, bis);
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumer));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumer));
         when(mieterService.getMieterForQuartal(eq(1L), any(), any())).thenReturn(Collections.emptyList());
 
         when(tarifService.getTarifeForZeitraum(eq(TarifTyp.ZEV), any(), any()))
@@ -1279,8 +1279,8 @@ public class RechnungServiceTest {
         Mieter nutzer = mieter(52L, "Nutzer mit zwei Ladestationen");
         Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
 
-        when(einheitRepository.findById(900L)).thenReturn(Optional.of(erste));
-        when(einheitRepository.findById(901L)).thenReturn(Optional.of(zweite));
+        when(einheitRepository.findFirstById(900L)).thenReturn(Optional.of(erste));
+        when(einheitRepository.findFirstById(901L)).thenReturn(Optional.of(zweite));
         when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(List.of(nutzer));
         when(mieterService.getMieterForQuartal(eq(901L), any(), any())).thenReturn(List.of(nutzer));
         // Beide Ladestationen gehoeren demselben Mieter, eine Wohnung hat er nicht
@@ -1310,7 +1310,7 @@ public class RechnungServiceTest {
         Mieter nutzer = mieter(50L, "Nutzer ohne Wohnung");
         Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
 
-        when(einheitRepository.findById(900L)).thenReturn(Optional.of(ladestation));
+        when(einheitRepository.findFirstById(900L)).thenReturn(Optional.of(ladestation));
         when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(List.of(nutzer));
         // Nur die Ladestation ist zugeordnet -> keine Wohnung
         when(mieterService.getEinheitIds(50L)).thenReturn(List.of(900L));
@@ -1349,7 +1349,7 @@ public class RechnungServiceTest {
         Mieter nutzer = mieter(50L, "Nutzer ohne Wohnung");
         Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
 
-        when(einheitRepository.findById(900L)).thenReturn(Optional.of(ladestation));
+        when(einheitRepository.findFirstById(900L)).thenReturn(Optional.of(ladestation));
         when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(List.of(nutzer));
         when(mieterService.getEinheitIds(50L)).thenReturn(List.of(900L));
         when(tarifpositionService.getFuerRechnung(anyCollection(), eq(von), eq(bis)))
@@ -1375,8 +1375,8 @@ public class RechnungServiceTest {
         Einheit ladestation = ladestation();
         Mieter mitWohnung = mieter(51L, "Mieter mit Wohnung");
 
-        when(einheitRepository.findById(900L)).thenReturn(Optional.of(ladestation));
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumer));
+        when(einheitRepository.findFirstById(900L)).thenReturn(Optional.of(ladestation));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumer));
         when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(List.of(mitWohnung));
         // Wohnung + Ladestation -> die Positionen erscheinen auf der Wohnungsrechnung
         when(mieterService.getEinheitIds(51L)).thenReturn(List.of(1L, 900L));
@@ -1397,8 +1397,8 @@ public class RechnungServiceTest {
         Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
 
         doNothing().when(tarifService).validateTarifAbdeckung(von, bis);
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumer));
-        when(einheitRepository.findById(900L)).thenReturn(Optional.of(ladestation));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumer));
+        when(einheitRepository.findFirstById(900L)).thenReturn(Optional.of(ladestation));
         when(mieterService.getMieterForQuartal(eq(1L), any(), any())).thenReturn(List.of(mitWohnung));
         when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(List.of(mitWohnung));
         when(mieterService.getEinheitIds(51L)).thenReturn(List.of(1L, 900L));
@@ -1431,7 +1431,7 @@ public class RechnungServiceTest {
 
         Mieter nutzer = mieter(50L, "Nutzer ohne Wohnung");
 
-        when(einheitRepository.findById(900L)).thenReturn(Optional.of(ladestation()));
+        when(einheitRepository.findFirstById(900L)).thenReturn(Optional.of(ladestation()));
         when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(List.of(nutzer));
         when(mieterService.getEinheitIds(50L)).thenReturn(List.of(900L));
         when(tarifpositionService.getFuerRechnung(anyCollection(), any(), any()))
@@ -1448,7 +1448,7 @@ public class RechnungServiceTest {
         LocalDate von = LocalDate.of(2024, 1, 1);
         LocalDate bis = LocalDate.of(2024, 3, 31);
 
-        when(einheitRepository.findById(900L)).thenReturn(Optional.of(ladestation()));
+        when(einheitRepository.findFirstById(900L)).thenReturn(Optional.of(ladestation()));
         when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(Collections.emptyList());
 
         List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(900L), von, bis);
@@ -1469,7 +1469,7 @@ public class RechnungServiceTest {
         nutzer.setMietende(LocalDate.of(2024, 2, 29));
         Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
 
-        when(einheitRepository.findById(900L)).thenReturn(Optional.of(ladestation));
+        when(einheitRepository.findFirstById(900L)).thenReturn(Optional.of(ladestation));
         when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(List.of(nutzer));
         when(mieterService.getEinheitIds(50L)).thenReturn(List.of(900L));
         when(tarifpositionService.getFuerRechnung(anyCollection(), any(), any()))
@@ -1497,7 +1497,7 @@ public class RechnungServiceTest {
         Mieter nutzer = mieter(50L, "Nutzer ohne Wohnung");
         Tarif ladestrom = ladestromTarif("Ladestrom", "0.33000");
 
-        when(einheitRepository.findById(900L)).thenReturn(Optional.of(ladestation));
+        when(einheitRepository.findFirstById(900L)).thenReturn(Optional.of(ladestation));
         when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(List.of(nutzer));
         when(mieterService.getEinheitIds(50L)).thenReturn(List.of(900L));
         when(tarifpositionService.getFuerRechnung(anyCollection(), any(), any()))
@@ -1520,7 +1520,7 @@ public class RechnungServiceTest {
         Mieter nutzer = mieter(50L, "Nutzer ohne Wohnung");
         Tarif ladestrom = ladestromTarif("Ladestrom", "0.35000");
 
-        when(einheitRepository.findById(900L)).thenReturn(Optional.of(ladestation));
+        when(einheitRepository.findFirstById(900L)).thenReturn(Optional.of(ladestation));
         when(mieterService.getMieterForQuartal(eq(900L), any(), any())).thenReturn(List.of(nutzer));
         when(mieterService.getEinheitIds(50L)).thenReturn(List.of(900L));
         when(tarifpositionService.getFuerRechnung(anyCollection(), any(), any()))
@@ -1550,7 +1550,7 @@ public class RechnungServiceTest {
         zweiteStation.setQuellReferenz("RFID-901");
 
         doNothing().when(tarifService).validateTarifAbdeckung(von, bis);
-        when(einheitRepository.findById(1L)).thenReturn(Optional.of(consumer));
+        when(einheitRepository.findFirstById(1L)).thenReturn(Optional.of(consumer));
         when(mieterService.getMieterForQuartal(eq(1L), any(), any())).thenReturn(List.of(mitWohnung));
         when(mieterService.getEinheitIds(51L)).thenReturn(List.of(1L, 900L, 901L));
         when(tarifService.getTarifeForZeitraum(eq(TarifTyp.ZEV), any(), any()))
@@ -1593,8 +1593,8 @@ public class RechnungServiceTest {
         Einheit ruecklieferung = new Einheit("Netzanschluss Ruecklieferung", EinheitTyp.RUECKLIEFERUNG);
         ruecklieferung.setId(11L);
 
-        when(einheitRepository.findById(10L)).thenReturn(Optional.of(bezug));
-        when(einheitRepository.findById(11L)).thenReturn(Optional.of(ruecklieferung));
+        when(einheitRepository.findFirstById(10L)).thenReturn(Optional.of(bezug));
+        when(einheitRepository.findFirstById(11L)).thenReturn(Optional.of(ruecklieferung));
 
         List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(10L, 11L), von, bis);
 
@@ -1608,7 +1608,7 @@ public class RechnungServiceTest {
         LocalDate von = LocalDate.of(2024, 1, 1);
         LocalDate bis = LocalDate.of(2024, 3, 31);
 
-        when(einheitRepository.findById(999L)).thenReturn(Optional.empty());
+        when(einheitRepository.findFirstById(999L)).thenReturn(Optional.empty());
 
         List<RechnungDTO> rechnungen = rechnungService.berechneRechnungen(List.of(999L), von, bis);
 

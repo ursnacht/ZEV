@@ -95,9 +95,9 @@ public class DebitorServiceTest {
     void getDebitoren_ReturnsDTOList() {
         when(debitorRepository.findByDatumVonBetween(VON, BIS))
                 .thenReturn(List.of(testDebitor1));
-        when(mieterRepository.findById(10L)).thenReturn(Optional.of(testMieter));
+        when(mieterRepository.findFirstById(10L)).thenReturn(Optional.of(testMieter));
         when(mieterEinheitRepository.findEinheitIdsByMieterId(10L)).thenReturn(List.of(5L));
-        when(einheitRepository.findById(5L)).thenReturn(Optional.of(testEinheit));
+        when(einheitRepository.findFirstById(5L)).thenReturn(Optional.of(testEinheit));
 
         List<DebitorDTO> result = debitorService.getDebitoren(VON, BIS);
 
@@ -121,7 +121,7 @@ public class DebitorServiceTest {
     @Test
     void getDebitoren_MieterNotFound_EinheitNameIsNull() {
         when(debitorRepository.findByDatumVonBetween(VON, BIS)).thenReturn(List.of(testDebitor1));
-        when(mieterRepository.findById(10L)).thenReturn(Optional.empty());
+        when(mieterRepository.findFirstById(10L)).thenReturn(Optional.empty());
 
         List<DebitorDTO> result = debitorService.getDebitoren(VON, BIS);
 
@@ -133,9 +133,9 @@ public class DebitorServiceTest {
     @Test
     void getDebitoren_EinheitNotFound_EinheitNameIsNull() {
         when(debitorRepository.findByDatumVonBetween(VON, BIS)).thenReturn(List.of(testDebitor1));
-        when(mieterRepository.findById(10L)).thenReturn(Optional.of(testMieter));
+        when(mieterRepository.findFirstById(10L)).thenReturn(Optional.of(testMieter));
         when(mieterEinheitRepository.findEinheitIdsByMieterId(10L)).thenReturn(List.of(5L));
-        when(einheitRepository.findById(5L)).thenReturn(Optional.empty());
+        when(einheitRepository.findFirstById(5L)).thenReturn(Optional.empty());
 
         List<DebitorDTO> result = debitorService.getDebitoren(VON, BIS);
 
@@ -148,10 +148,10 @@ public class DebitorServiceTest {
 
     @Test
     void getDebitorById_Found_ReturnsDTO() {
-        when(debitorRepository.findById(1L)).thenReturn(Optional.of(testDebitor1));
-        when(mieterRepository.findById(10L)).thenReturn(Optional.of(testMieter));
+        when(debitorRepository.findFirstById(1L)).thenReturn(Optional.of(testDebitor1));
+        when(mieterRepository.findFirstById(10L)).thenReturn(Optional.of(testMieter));
         when(mieterEinheitRepository.findEinheitIdsByMieterId(10L)).thenReturn(List.of(5L));
-        when(einheitRepository.findById(5L)).thenReturn(Optional.of(testEinheit));
+        when(einheitRepository.findFirstById(5L)).thenReturn(Optional.of(testEinheit));
 
         Optional<DebitorDTO> result = debitorService.getDebitorById(1L);
 
@@ -163,7 +163,7 @@ public class DebitorServiceTest {
 
     @Test
     void getDebitorById_NotFound_ReturnsEmpty() {
-        when(debitorRepository.findById(99L)).thenReturn(Optional.empty());
+        when(debitorRepository.findFirstById(99L)).thenReturn(Optional.empty());
 
         Optional<DebitorDTO> result = debitorService.getDebitorById(99L);
 
@@ -178,9 +178,9 @@ public class DebitorServiceTest {
         DebitorDTO dto = buildValidDTO();
         when(organizationContextService.getCurrentOrgId()).thenReturn(ORG_ID);
         when(debitorRepository.save(any())).thenReturn(testDebitor1);
-        when(mieterRepository.findById(10L)).thenReturn(Optional.of(testMieter));
+        when(mieterRepository.findFirstById(10L)).thenReturn(Optional.of(testMieter));
         when(mieterEinheitRepository.findEinheitIdsByMieterId(10L)).thenReturn(List.of(5L));
-        when(einheitRepository.findById(5L)).thenReturn(Optional.of(testEinheit));
+        when(einheitRepository.findFirstById(5L)).thenReturn(Optional.of(testEinheit));
 
         DebitorDTO result = debitorService.create(dto);
 
@@ -198,7 +198,7 @@ public class DebitorServiceTest {
         dto.setZahldatum(BIS.plusDays(1)); // zahldatum > datumBis → valid
         when(organizationContextService.getCurrentOrgId()).thenReturn(ORG_ID);
         when(debitorRepository.save(any())).thenReturn(testDebitor1);
-        when(mieterRepository.findById(any())).thenReturn(Optional.empty());
+        when(mieterRepository.findFirstById(any())).thenReturn(Optional.empty());
 
         assertDoesNotThrow(() -> debitorService.create(dto));
     }
@@ -209,7 +209,7 @@ public class DebitorServiceTest {
         dto.setZahldatum(BIS); // zahldatum == datumBis → valid (not before)
         when(organizationContextService.getCurrentOrgId()).thenReturn(ORG_ID);
         when(debitorRepository.save(any())).thenReturn(testDebitor1);
-        when(mieterRepository.findById(any())).thenReturn(Optional.empty());
+        when(mieterRepository.findFirstById(any())).thenReturn(Optional.empty());
 
         assertDoesNotThrow(() -> debitorService.create(dto));
     }
@@ -295,11 +295,11 @@ public class DebitorServiceTest {
     @Test
     void update_Exists_UpdatesAndReturnsDTO() {
         DebitorDTO dto = buildValidDTO();
-        when(debitorRepository.findById(1L)).thenReturn(Optional.of(testDebitor1));
+        when(debitorRepository.findFirstById(1L)).thenReturn(Optional.of(testDebitor1));
         when(debitorRepository.save(testDebitor1)).thenReturn(testDebitor1);
-        when(mieterRepository.findById(10L)).thenReturn(Optional.of(testMieter));
+        when(mieterRepository.findFirstById(10L)).thenReturn(Optional.of(testMieter));
         when(mieterEinheitRepository.findEinheitIdsByMieterId(10L)).thenReturn(List.of(5L));
-        when(einheitRepository.findById(5L)).thenReturn(Optional.of(testEinheit));
+        when(einheitRepository.findFirstById(5L)).thenReturn(Optional.of(testEinheit));
 
         DebitorDTO result = debitorService.update(1L, dto);
 
@@ -311,7 +311,7 @@ public class DebitorServiceTest {
 
     @Test
     void update_NotFound_ThrowsNoSuchElementException() {
-        when(debitorRepository.findById(99L)).thenReturn(Optional.empty());
+        when(debitorRepository.findFirstById(99L)).thenReturn(Optional.empty());
 
         assertThrows(NoSuchElementException.class,
                 () -> debitorService.update(99L, buildValidDTO()));
@@ -321,7 +321,7 @@ public class DebitorServiceTest {
     void update_InvalidBetrag_ThrowsIllegalArgumentException() {
         DebitorDTO dto = buildValidDTO();
         dto.setBetrag(BigDecimal.ZERO);
-        when(debitorRepository.findById(1L)).thenReturn(Optional.of(testDebitor1));
+        when(debitorRepository.findFirstById(1L)).thenReturn(Optional.of(testDebitor1));
 
         assertThrows(IllegalArgumentException.class, () -> debitorService.update(1L, dto));
         verify(debitorRepository, never()).save(any());
@@ -332,7 +332,7 @@ public class DebitorServiceTest {
         DebitorDTO dto = buildValidDTO();
         dto.setDatumVon(BIS.plusDays(1));
         dto.setDatumBis(VON);
-        when(debitorRepository.findById(1L)).thenReturn(Optional.of(testDebitor1));
+        when(debitorRepository.findFirstById(1L)).thenReturn(Optional.of(testDebitor1));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> debitorService.update(1L, dto));
@@ -344,7 +344,7 @@ public class DebitorServiceTest {
     void update_ZahldatumBeforeDatumBis_ThrowsIllegalArgumentException() {
         DebitorDTO dto = buildValidDTO();
         dto.setZahldatum(BIS.minusDays(1));
-        when(debitorRepository.findById(1L)).thenReturn(Optional.of(testDebitor1));
+        when(debitorRepository.findFirstById(1L)).thenReturn(Optional.of(testDebitor1));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> debitorService.update(1L, dto));
@@ -356,9 +356,9 @@ public class DebitorServiceTest {
     void update_WithValidZahldatum_UpdatesSuccessfully() {
         DebitorDTO dto = buildValidDTO();
         dto.setZahldatum(BIS.plusDays(5));
-        when(debitorRepository.findById(1L)).thenReturn(Optional.of(testDebitor1));
+        when(debitorRepository.findFirstById(1L)).thenReturn(Optional.of(testDebitor1));
         when(debitorRepository.save(testDebitor1)).thenReturn(testDebitor1);
-        when(mieterRepository.findById(any())).thenReturn(Optional.empty());
+        when(mieterRepository.findFirstById(any())).thenReturn(Optional.empty());
 
         assertDoesNotThrow(() -> debitorService.update(1L, dto));
         verify(debitorRepository).save(testDebitor1);

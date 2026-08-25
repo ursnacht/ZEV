@@ -89,7 +89,7 @@ public class RechnungService {
 
         // Validate ZEV/VNB tariff coverage only if consumer units are selected
         boolean hasConsumers = einheitIds.stream()
-                .anyMatch(id -> einheitRepository.findById(id)
+                .anyMatch(id -> einheitRepository.findFirstById(id)
                         .map(e -> e.getTyp() == EinheitTyp.CONSUMER)
                         .orElse(false));
 
@@ -106,7 +106,7 @@ public class RechnungService {
         Set<Long> ladestationsRechnungErstellt = new HashSet<>();
 
         for (Long einheitId : einheitIds) {
-            einheitRepository.findById(einheitId).ifPresent(einheit -> {
+            einheitRepository.findFirstById(einheitId).ifPresent(einheit -> {
                 if (einheit.getTyp() == EinheitTyp.CONSUMER) {
                     // Get all tenants for this unit within the period
                     List<Mieter> mieter = mieterService.getMieterForQuartal(einheitId, von, bis);
@@ -314,7 +314,7 @@ public class RechnungService {
      */
     private boolean hatWohnung(Mieter mieter) {
         return mieterService.getEinheitIds(mieter.getId()).stream()
-                .map(einheitRepository::findById)
+                .map(einheitRepository::findFirstById)
                 .anyMatch(e -> e.map(x -> x.getTyp() == EinheitTyp.CONSUMER).orElse(false));
     }
 

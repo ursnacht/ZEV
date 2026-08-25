@@ -213,7 +213,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void getAbrechnungDetail_Found_ReturnsDetailMitBerechnung() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
 
         Optional<NkAbrechnungDetailDTO> result = nkAbrechnungService.getAbrechnungDetail(1L);
 
@@ -227,7 +227,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void getAbrechnungDetail_NotFound_ReturnsEmpty() {
         featureFlagAn();
-        when(abrechnungRepository.findById(99L)).thenReturn(Optional.empty());
+        when(abrechnungRepository.findFirstById(99L)).thenReturn(Optional.empty());
 
         Optional<NkAbrechnungDetailDTO> result = nkAbrechnungService.getAbrechnungDetail(99L);
 
@@ -237,7 +237,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void getAbrechnungDetail_MitPositionen_LiefertMieterbloeckeInEinemAufruf() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
         when(positionRepository.findByAbrechnungIdOrderByReihenfolge(1L))
                 .thenReturn(List.of(umlagePosition(10L, 1, "900.00")));
         when(mieterRepository.findByZeitraumOverlapping(VON, BIS)).thenReturn(List.of(mieter(1L, VON, null)));
@@ -261,7 +261,7 @@ public class NkAbrechnungServiceTest {
         // der Eigentuemer fuer seinen Allgemeinstrom-Messpunkt einen Umlageanteil - und die Summe
         // der Miettage uebersteige den Nenner, worauf jedes Speichern abgewiesen wuerde.
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
         when(positionRepository.findByAbrechnungIdOrderByReihenfolge(1L))
                 .thenReturn(List.of(umlagePosition(10L, 1, "900.00")));
         when(mieterRepository.findByZeitraumOverlapping(VON, BIS))
@@ -389,7 +389,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_NotFound_ReturnsEmpty() {
         featureFlagAn();
-        when(abrechnungRepository.findById(99L)).thenReturn(Optional.empty());
+        when(abrechnungRepository.findFirstById(99L)).thenReturn(Optional.empty());
 
         Optional<NkAbrechnungDetailDTO> result = nkAbrechnungService.saveAbrechnung(99L, detail());
 
@@ -402,7 +402,7 @@ public class NkAbrechnungServiceTest {
         // Der praktisch relevante Fall gleichzeitiger Bearbeitung.
         featureFlagAn();
         testAbrechnung1.setAbgerechnet(true);
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
 
         NkAbrechnungDetailDTO detail = detail();
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
@@ -415,7 +415,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_ValidInput_NummeriertReihenfolgeLueckenlosNeu() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
         stubPositionSave();
 
         NkAbrechnungDetailDTO detail = detail(
@@ -438,7 +438,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_ErsetztAlteZeilenStattSieAbzugleichen() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
         when(positionRepository.findByAbrechnungIdOrderByReihenfolge(1L))
                 .thenReturn(List.of(umlagePosition(10L, 1, "900.00")));
         stubPositionSave();
@@ -455,7 +455,7 @@ public class NkAbrechnungServiceTest {
     void saveAbrechnung_LeerePositionsliste_IstZulaessig() {
         // Speichern einer leeren Huelle muss moeglich bleiben.
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
 
         Optional<NkAbrechnungDetailDTO> result = nkAbrechnungService.saveAbrechnung(1L, detail());
 
@@ -466,7 +466,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_AendertKopfdaten_UebernimmtSieAufDieBestehendeAbrechnung() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
 
         NkAbrechnungDetailDTO detail = detail();
         detail.getAbrechnung().setBezeichnung("Neu benannt");
@@ -487,7 +487,7 @@ public class NkAbrechnungServiceTest {
         // Σ Tage(i) = 730 > Nenner = 365.
         featureFlagAn();
         testAbrechnung1.setAnzahlWohnungen(1);
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
         zweiGanzjaehrigeMieter();
 
         NkAbrechnungDetailDTO detail = detail();
@@ -507,7 +507,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_MehrWohnungenAlsBelegt_IstZulaessigerLeerstand() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
         zweiGanzjaehrigeMieter();
 
         // 9 Wohnungen erfasst, nur 2 belegt -> 730 <= 3285, der Rest bleibt unverteilt.
@@ -522,7 +522,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_PositionOhneArt_ThrowsException() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
 
         NkPositionDTO ohneArt = new NkPositionDTO();
         ohneArt.setBezeichnung("Irgendwas");
@@ -537,7 +537,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_PositionOhneBezeichnung_ThrowsException() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
 
         NkPositionDTO ohneBezeichnung = umlageDTO("  ", "900.00", 1);
         NkAbrechnungDetailDTO detail = detail(ohneBezeichnung);
@@ -551,7 +551,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_UmlageOhneTotalbetrag_ThrowsException() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
 
         NkPositionDTO ohneBetrag = umlageDTO("Allgemeinstrom", "900.00", 1);
         ohneBetrag.setTotalbetrag(null);
@@ -566,7 +566,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_UmlageOhneEinheit_ThrowsException() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
 
         NkPositionDTO ohneEinheit = umlageDTO("Allgemeinstrom", "900.00", 1);
         ohneEinheit.setEinheit(null);
@@ -579,7 +579,7 @@ public class NkAbrechnungServiceTest {
     void saveAbrechnung_UmlageOhneGesamtmenge_IstZulaessig() {
         // Die Gesamtmenge ist optional - ohne sie wird nur der Betrag verteilt.
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
         stubPositionSave();
 
         NkPositionDTO ohneMenge = umlageDTO("Allgemeinstrom", "900.00", 1);
@@ -591,7 +591,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_VerbrauchOhneBetragProEinheit_ThrowsException() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
 
         NkPositionDTO ohnePreis = verbrauchDTO("Warmwasser", "3.5000", 1);
         ohnePreis.setBetragProEinheit(null);
@@ -606,7 +606,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_ZuschlagOhneProzentsatz_ThrowsException() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
 
         NkPositionDTO ohneProzent = zuschlagDTO("Verwaltung", "5.00", 1);
         ohneProzent.setProzentsatz(null);
@@ -621,7 +621,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_AnteilOhneTotalbetrag_ThrowsException() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
 
         NkPositionDTO ohneTotal = new NkPositionDTO();
         ohneTotal.setArt(NkPositionsart.ANTEIL);
@@ -640,7 +640,7 @@ public class NkAbrechnungServiceTest {
         // Wer die Art einer Zeile wechselt, schickt sonst Reste der alten Art mit und laeuft in
         // den CHECK-Constraint, ohne dass die Maske etwas Falsches zeigte.
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
         stubPositionSave();
         zweiGanzjaehrigeMieter();
 
@@ -668,7 +668,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_ProzentsatzUeber100_ThrowsException() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
 
         NkAbrechnungDetailDTO detail = detail(zuschlagDTO("Verwaltung", "101.00", 1));
 
@@ -681,7 +681,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_NegativerProzentsatz_ThrowsException() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
 
         NkAbrechnungDetailDTO detail = detail(zuschlagDTO("Verwaltung", "-1.00", 1));
 
@@ -693,7 +693,7 @@ public class NkAbrechnungServiceTest {
         // Wer die Art einer Zeile wechselt, schickt Reste der alten Art mit; sie liefen sonst in
         // den CHECK-Constraint, ohne dass die Maske etwas Falsches zeigte.
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
         stubPositionSave();
 
         NkPositionDTO zuschlag = zuschlagDTO("Verwaltung", "5.00", 1);
@@ -716,7 +716,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_UmlageMitZuschlagsfeldern_LeertSie() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
         stubPositionSave();
 
         NkPositionDTO umlage = umlageDTO("Allgemeinstrom", "900.00", 1);
@@ -737,7 +737,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_VerbrauchsmengeJeMieter_WirdMitDerPositionGespeichert() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
         stubPositionSave();
 
         NkPositionDTO warmwasser = verbrauchDTO("Warmwasser", "3.5000", 1);
@@ -756,7 +756,7 @@ public class NkAbrechnungServiceTest {
     void saveAbrechnung_VerbrauchsmengeOhneWert_WirdUebersprungen() {
         // Eine nicht erfasste Menge ist kein Fehler - sonst liesse sich nicht zwischenspeichern.
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
         stubPositionSave();
 
         NkPositionDTO warmwasser = verbrauchDTO("Warmwasser", "3.5000", 1);
@@ -773,7 +773,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_MengenZuNichtVerbrauchsposition_WerdenIgnoriert() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
         stubPositionSave();
 
         NkPositionDTO umlage = umlageDTO("Allgemeinstrom", "900.00", 1);
@@ -787,7 +787,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_Zusatzposition_WirdMitOrgIdUndAbrechnungGespeichert() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
 
         NkAbrechnungDetailDTO detail = detail();
         detail.setZusaetze(List.of(zusatzDTO(7L, 1, "Saunagaenge")));
@@ -804,7 +804,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_ZusatzpositionOhneReihenfolge_NummeriertJeMieterDurch() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
 
         NkZusatzDTO erste = zusatzDTO(7L, null, "Sauna");
         NkZusatzDTO zweite = zusatzDTO(7L, null, "Schluessel");
@@ -825,7 +825,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_ZusatzpositionOhneMieter_ThrowsException() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
 
         NkAbrechnungDetailDTO detail = detail();
         detail.setZusaetze(List.of(zusatzDTO(null, 1, "Sauna")));
@@ -839,7 +839,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_Akonto_WirdMitOrgIdGespeichert() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
 
         NkAkontoDTO dto = new NkAkontoDTO();
         dto.setMieterId(7L);
@@ -863,7 +863,7 @@ public class NkAbrechnungServiceTest {
     void saveAbrechnung_AkontoOhneWerte_WirdMitNullBetraegenGespeichert() {
         // Fehlt das Stammdatum, bleibt das Feld leer und die Abrechnung ist trotzdem speicherbar.
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
 
         NkAkontoDTO leer = new NkAkontoDTO();
         leer.setMieterId(7L);
@@ -881,7 +881,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void saveAbrechnung_AkontoOhneMieter_ThrowsException() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
 
         NkAkontoDTO ohneMieter = new NkAkontoDTO();
         ohneMieter.setAnzahlMonate(new BigDecimal("4.50"));
@@ -899,7 +899,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void setAbgerechnet_Found_SetztDasFlag() {
         featureFlagAn();
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
         when(abrechnungRepository.save(testAbrechnung1)).thenReturn(testAbrechnung1);
 
         Optional<NkAbrechnung> result = nkAbrechnungService.setAbgerechnet(1L, true);
@@ -915,7 +915,7 @@ public class NkAbrechnungServiceTest {
         // sonst liesse sie sich nie wieder oeffnen.
         featureFlagAn();
         testAbrechnung1.setAbgerechnet(true);
-        when(abrechnungRepository.findById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
         when(abrechnungRepository.save(testAbrechnung1)).thenReturn(testAbrechnung1);
 
         Optional<NkAbrechnung> result = nkAbrechnungService.setAbgerechnet(1L, false);
@@ -927,7 +927,7 @@ public class NkAbrechnungServiceTest {
     @Test
     void setAbgerechnet_NotFound_ReturnsEmpty() {
         featureFlagAn();
-        when(abrechnungRepository.findById(99L)).thenReturn(Optional.empty());
+        when(abrechnungRepository.findFirstById(99L)).thenReturn(Optional.empty());
 
         assertTrue(nkAbrechnungService.setAbgerechnet(99L, true).isEmpty());
         verify(abrechnungRepository, never()).save(any());

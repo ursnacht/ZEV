@@ -66,7 +66,7 @@ public class MesswerteService {
                 einheitId, dateStr, file.getOriginalFilename(), file.getSize());
 
         // Fetch the Einheit entity
-        Einheit einheit = einheitRepository.findById(einheitId)
+        Einheit einheit = einheitRepository.findFirstById(einheitId)
                 .orElseThrow(() -> {
                     log.error("Einheit not found with id: {}", einheitId);
                     return new RuntimeException("Einheit not found with id: " + einheitId);
@@ -238,7 +238,7 @@ public class MesswerteService {
         LocalDateTime dateTimeFrom = dateFrom.atStartOfDay();
         LocalDateTime dateTimeTo = dateTo.atTime(23, 59, 59);
 
-        Einheit einheit = einheitRepository.findById(einheitId)
+        Einheit einheit = einheitRepository.findFirstById(einheitId)
                 .orElseThrow(() -> {
                     log.error("Einheit not found with id: {}", einheitId);
                     return new RuntimeException("Einheit not found");

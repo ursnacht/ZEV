@@ -118,7 +118,7 @@ public class NkAbrechnungService {
     public Optional<NkAbrechnungDetailDTO> getAbrechnungDetail(Long id) {
         pruefeFeatureFlag();
         hibernateFilterService.enableOrgFilter();
-        return abrechnungRepository.findById(id).map(this::baueDetail);
+        return abrechnungRepository.findFirstById(id).map(this::baueDetail);
     }
 
     /**
@@ -176,7 +176,7 @@ public class NkAbrechnungService {
         pruefeFeatureFlag();
         hibernateFilterService.enableOrgFilter();
 
-        Optional<NkAbrechnung> vorhanden = abrechnungRepository.findById(id);
+        Optional<NkAbrechnung> vorhanden = abrechnungRepository.findFirstById(id);
         if (vorhanden.isEmpty()) {
             log.warn("Nebenkostenabrechnung {} not found", id);
             return Optional.empty();
@@ -224,7 +224,7 @@ public class NkAbrechnungService {
         pruefeFeatureFlag();
         hibernateFilterService.enableOrgFilter();
 
-        return abrechnungRepository.findById(id).map(abrechnung -> {
+        return abrechnungRepository.findFirstById(id).map(abrechnung -> {
             abrechnung.setAbgerechnet(abgerechnet);
             log.info("Nebenkostenabrechnung {} abgerechnet={}", id, abgerechnet);
             return abrechnungRepository.save(abrechnung);
