@@ -38,9 +38,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  *       ob er greift.</li>
  * </ul>
  *
- * <p>Der Org-Filter ist hier bewusst nicht aktiv ({@code @DataJpaTest} kennt keinen
- * {@code HibernateFilterService}). Die Abfragen liefern deshalb mandantenübergreifend — das
- * Einschalten des Filters ist Aufgabe des Service und dort getestet.
+ * <p><b>Zum Org-Filter:</b> {@code @DataJpaTest} kennt keinen {@code HibernateFilterService},
+ * der Filter ist also standardmässig aus und die Abfragen liefern mandantenübergreifend. Hier
+ * stand, das Einschalten sei "Aufgabe des Service und dort getestet" — das traf nicht zu: Die
+ * Service-Tests mocken das Repository und können eine Hibernate-Zusicherung grundsätzlich nicht
+ * prüfen. Der Abschnitt „Mandantenfilter" unten schaltet ihn deshalb selbst ein
+ * ({@code aktiviereOrgFilter}) und prüft die Trennung dort, wo sie entsteht.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -109,6 +112,68 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
         org.setName(name);
         org.setErstelltAm(LocalDateTime.now());
         return organisationRepository.save(org).getId();
+    }
+
+    // ==================== Mandantenfilter ====================
+
+    /** Gegenprobe: Ohne Filter sind beide Mandanten sichtbar — sonst waere der Test darunter wertlos. */
+    @Test
+    void shouldSeeAllOrgsWhenOrgFilterDisabled() {
+        saveDebitor(mieterAId, "100.00", LocalDate.of(2026, 2, 1), LocalDate.of(2026, 2, 28), null);
+        debitorFuerOrg(ANDERE_ORG_ID, "999.00", LocalDate.of(2026, 2, 1));
+        syncMitDatenbank();
+
+        assertThat(debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31))).hasSize(2);
+    }
+
+    @Test
+    void shouldNotSeeDebitorOfOtherOrgWhenOrgFilterEnabled() {
+        Debitor eigener = saveDebitor(mieterAId, "100.00",
+                LocalDate.of(2026, 2, 1), LocalDate.of(2026, 2, 28), null);
+        Debitor fremder = debitorFuerOrg(ANDERE_ORG_ID, "999.00", LocalDate.of(2026, 2, 1));
+        syncMitDatenbank();
+
+        aktiviereOrgFilter(entityManager, TEST_ORG_ID);
+
+        assertThat(debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)))
+                .extracting(Debitor::getBetrag)
+                .singleElement()
+                .satisfies(betrag -> assertThat(betrag).isEqualByComparingTo("100.00"));
+        assertThat(debitorRepository.findFirstById(eigener.getId())).isPresent();
+        assertThat(debitorRepository.findFirstById(fremder.getId())).isEmpty();
+    }
+
+    /**
+     * Die Forderung eines fremden Mandanten darf durch {@code upsert} nicht ueberschrieben werden.
+     *
+     * <p>Der Unique-Key ist {@code (mieter_id, datum_von, org_id)} — die {@code org_id} gehoert
+     * also zum Schluessel. Die Abfrage ist natives SQL und sieht den Mandantenfilter nicht; sie
+     * ist allein deshalb sicher, weil ihr die {@code orgId} als Parameter uebergeben wird.
+     */
+    @Test
+    void upsertDarfFremdeForderungNichtUeberschreiben() {
+        Debitor fremder = debitorFuerOrg(ANDERE_ORG_ID, "999.00", LocalDate.of(2026, 2, 1));
+        syncMitDatenbank();
+
+        debitorRepository.upsert(fremder.getMieterId(), new BigDecimal("1.00"),
+                LocalDate.of(2026, 2, 1), LocalDate.of(2026, 2, 28), TEST_ORG_ID);
+        syncMitDatenbank();
+
+        aktiviereOrgFilter(entityManager, ANDERE_ORG_ID);
+        assertThat(debitorRepository.findFirstById(fremder.getId()).orElseThrow().getBetrag())
+                .isEqualByComparingTo("999.00");
+    }
+
+    private Debitor debitorFuerOrg(Long orgId, String betrag, LocalDate von) {
+        Debitor debitor = new Debitor();
+        debitor.setOrgId(orgId);
+        debitor.setMieterId(mieterBId);
+        debitor.setBetrag(new BigDecimal(betrag));
+        debitor.setDatumVon(von);
+        debitor.setDatumBis(von.plusMonths(1));
+        return debitorRepository.save(debitor);
     }
 
     private Mieter saveMieter(String name) {

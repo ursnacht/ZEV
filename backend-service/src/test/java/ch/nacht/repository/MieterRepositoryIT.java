@@ -6,6 +6,7 @@ import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Mieter;
 import ch.nacht.entity.MieterEinheit;
 import ch.nacht.entity.Organisation;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,8 +42,14 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
     @Autowired
     private OrganisationRepository organisationRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
     private Long TEST_ORG_ID;
     private Long einheitId;
+
+    /** Zweiter Mandant — nur als Gegenprobe des Mandantenfilters. */
+    private Long FREMD_ORG_ID;
 
     @BeforeEach
     void setUp() {
@@ -55,6 +62,12 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
         org.setName("Mieter Test Organisation");
         org.setErstelltAm(LocalDateTime.now());
         TEST_ORG_ID = organisationRepository.save(org).getId();
+
+        Organisation fremd = new Organisation();
+        fremd.setKeycloakOrgId(UUID.fromString("2c6b8f13-5a47-4e29-9d80-7b1c3e5a9f24"));
+        fremd.setName("Fremde Organisation");
+        fremd.setErstelltAm(LocalDateTime.now());
+        FREMD_ORG_ID = organisationRepository.save(fremd).getId();
 
         Einheit einheit = new Einheit("Test Einheit", EinheitTyp.CONSUMER);
         einheit.setOrgId(TEST_ORG_ID);
@@ -76,6 +89,71 @@ class MieterRepositoryIT extends AbstractIntegrationTest {
         Mieter gespeichert = mieterRepository.save(createMieter(name, mietbeginn, mietende));
         mieterEinheitRepository.save(new MieterEinheit(TEST_ORG_ID, gespeichert.getId(), einheitId));
         return gespeichert;
+    }
+
+    // ==================== Mandantenfilter ====================
+
+    /** Gegenprobe: Ohne Filter sind beide Mandanten sichtbar — sonst waere der Test darunter wertlos. */
+    @Test
+    void shouldSeeAllOrgsWhenOrgFilterDisabled() {
+        mieterRepository.saveAndFlush(createMieter("Eigener", LocalDate.of(2026, 1, 1), null));
+        mieterRepository.saveAndFlush(mieterFuerOrg(FREMD_ORG_ID, "Fremder"));
+        entityManager.clear();
+
+        assertThat(mieterRepository.findAllByOrderByNameAscMietbeginnDesc()).hasSize(2);
+    }
+
+    @Test
+    void shouldNotSeeMieterOfOtherOrgWhenOrgFilterEnabled() {
+        Mieter eigener = mieterRepository.saveAndFlush(
+                createMieter("Eigener", LocalDate.of(2026, 1, 1), null));
+        Mieter fremder = mieterRepository.saveAndFlush(mieterFuerOrg(FREMD_ORG_ID, "Fremder"));
+        entityManager.clear();
+
+        aktiviereOrgFilter(entityManager, TEST_ORG_ID);
+
+        assertThat(mieterRepository.findAllByOrderByNameAscMietbeginnDesc())
+                .extracting(Mieter::getName).containsExactly("Eigener");
+        assertThat(mieterRepository.findByZeitraumOverlapping(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)))
+                .extracting(Mieter::getName).containsExactly("Eigener");
+        assertThat(mieterRepository.findFirstById(eigener.getId())).isPresent();
+        assertThat(mieterRepository.findFirstById(fremder.getId())).isEmpty();
+    }
+
+    /**
+     * Die Regel "hoechstens ein Mieter ohne Mietende je Einheit" gilt je Mandant.
+     *
+     * <p>Die Abfrage verbindet {@code Mieter} mit {@code MieterEinheit} — geprueft wird damit
+     * auch, dass der Filter die verbundene Entity erfasst und nicht bloss die Wurzel.
+     */
+    @Test
+    void shouldNotLetOpenEndedMieterOfOtherOrgBlockCheck() {
+        Einheit fremdeEinheit = new Einheit("Fremde Wohnung", EinheitTyp.CONSUMER);
+        fremdeEinheit.setOrgId(FREMD_ORG_ID);
+        fremdeEinheit = einheitRepository.save(fremdeEinheit);
+
+        Mieter fremder = mieterRepository.save(mieterFuerOrg(FREMD_ORG_ID, "Fremder"));
+        mieterEinheitRepository.save(
+                new MieterEinheit(FREMD_ORG_ID, fremder.getId(), fremdeEinheit.getId()));
+        entityManager.flush();
+        entityManager.clear();
+
+        aktiviereOrgFilter(entityManager, TEST_ORG_ID);
+
+        assertThat(mieterRepository.existsOtherMieterWithoutMietende(fremdeEinheit.getId(), -1L))
+                .isFalse();
+    }
+
+    private Mieter mieterFuerOrg(Long orgId, String name) {
+        Mieter mieter = new Mieter();
+        mieter.setOrgId(orgId);
+        mieter.setName(name);
+        mieter.setStrasse("Fremdstrasse 9");
+        mieter.setPlz("3000");
+        mieter.setOrt("Bern");
+        mieter.setMietbeginn(LocalDate.of(2026, 1, 1));
+        return mieter;
     }
 
     private Mieter createMieter(String name, LocalDate mietbeginn, LocalDate mietende) {

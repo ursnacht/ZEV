@@ -5,6 +5,7 @@ import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Messwerte;
 import ch.nacht.entity.Organisation;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,7 +40,14 @@ class MesswerteRepositoryIT extends AbstractIntegrationTest {
     @Autowired
     private OrganisationRepository organisationRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
     private Long TEST_ORG_ID;
+
+    /** Zweiter Mandant — nur als Gegenprobe des Mandantenfilters. */
+    private Long FREMD_ORG_ID;
+    private Einheit fremdeEinheit;
 
     private Einheit producer;
     private Einheit consumer1;
@@ -63,6 +71,71 @@ class MesswerteRepositoryIT extends AbstractIntegrationTest {
         consumer1 = einheitRepository.save(consumer1);
         consumer2 = createEinheit("Wohnung B", EinheitTyp.CONSUMER);
         consumer2 = einheitRepository.save(consumer2);
+
+        Organisation fremd = new Organisation();
+        fremd.setKeycloakOrgId(UUID.fromString("5a8d2f36-9b14-4c72-a0e5-3d6b1f8c9e47"));
+        fremd.setName("Fremde Organisation");
+        fremd.setErstelltAm(LocalDateTime.now());
+        FREMD_ORG_ID = organisationRepository.save(fremd).getId();
+
+        Einheit fremde = new Einheit("Fremde Wohnung", EinheitTyp.CONSUMER);
+        fremde.setOrgId(FREMD_ORG_ID);
+        fremdeEinheit = einheitRepository.save(fremde);
+    }
+
+    // ==================== Mandantenfilter ====================
+
+    /** Gegenprobe: Ohne Filter sind die Messwerte beider Mandanten sichtbar. */
+    @Test
+    void shouldSeeAllOrgsWhenOrgFilterDisabled() {
+        LocalDateTime zeit = LocalDateTime.of(2026, 1, 15, 10, 0);
+        messwerteRepository.save(createMesswerte(zeit, consumer1, 100.0, 40.0, 40.0));
+        messwerteRepository.saveAndFlush(fremderMesswert(zeit));
+        entityManager.clear();
+
+        assertThat(messwerteRepository.findDistinctZeitBetween(
+                zeit.minusDays(1), zeit.plusDays(1))).hasSize(1);
+        assertThat(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER))
+                .hasSize(2);
+    }
+
+    /**
+     * Mit eingeschaltetem Filter zaehlen nur die eigenen Messwerte.
+     *
+     * <p>Besonders die Summen sind kritisch: Sie speisen die Statistik und die Rechnung. Ein
+     * mandantenuebergreifender Wert waere in beiden falsch und faellt nirgends auf.
+     */
+    @Test
+    void shouldNotSeeMesswerteOfOtherOrgWhenOrgFilterEnabled() {
+        LocalDateTime zeit = LocalDateTime.of(2026, 1, 15, 10, 0);
+        messwerteRepository.save(createMesswerte(zeit, consumer1, 100.0, 40.0, 40.0));
+        messwerteRepository.saveAndFlush(fremderMesswert(zeit));
+        entityManager.clear();
+
+        aktiviereOrgFilter(entityManager, TEST_ORG_ID);
+
+        assertThat(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER))
+                .hasSize(1);
+        assertThat(messwerteRepository.findByEinheitAndZeit(fremdeEinheit, zeit)).isEmpty();
+        assertThat(messwerteRepository.findByEinheitAndZeit(consumer1, zeit)).isPresent();
+        assertThat(messwerteRepository.sumTotalByEinheitTypAndZeitBetween(
+                EinheitTyp.CONSUMER, zeit.minusDays(1), zeit.plusDays(1))).isEqualTo(100.0);
+        assertThat(messwerteRepository.findDistinctEinheitenInRange(
+                zeit.minusDays(1), zeit.plusDays(1)))
+                .extracting(Einheit::getName).containsExactly("Wohnung A");
+    }
+
+    /**
+     * Messwert des zweiten Mandanten.
+     *
+     * <p>Die {@code org_id} wird hier ausdruecklich ueberschrieben: {@code createMesswerte} setzt
+     * {@code TEST_ORG_ID}, womit der Datensatz sonst dem eigenen Mandanten gehoerte und der
+     * Isolationstest nichts pruefte.
+     */
+    private Messwerte fremderMesswert(LocalDateTime zeit) {
+        Messwerte m = createMesswerte(zeit, fremdeEinheit, 999.0, 0.0, 0.0);
+        m.setOrgId(FREMD_ORG_ID);
+        return m;
     }
 
     private Einheit createEinheit(String name, EinheitTyp typ) {

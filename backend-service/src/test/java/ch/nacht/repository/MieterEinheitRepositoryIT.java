@@ -6,6 +6,7 @@ import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Mieter;
 import ch.nacht.entity.MieterEinheit;
 import ch.nacht.entity.Organisation;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,7 +49,13 @@ class MieterEinheitRepositoryIT extends AbstractIntegrationTest {
     @Autowired
     private OrganisationRepository organisationRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
     private Long TEST_ORG_ID;
+
+    /** Zweiter Mandant — nur als Gegenprobe des Mandantenfilters. */
+    private Long FREMD_ORG_ID;
     private Einheit wohnung;
     private Einheit ladestationA;
     private Einheit ladestationB;
@@ -65,6 +72,12 @@ class MieterEinheitRepositoryIT extends AbstractIntegrationTest {
         org.setErstelltAm(LocalDateTime.now());
         TEST_ORG_ID = organisationRepository.save(org).getId();
 
+        Organisation fremd = new Organisation();
+        fremd.setKeycloakOrgId(UUID.fromString("6b3e9d27-4c81-4a53-8e70-1f9a2c4d8b65"));
+        fremd.setName("Fremde Organisation");
+        fremd.setErstelltAm(LocalDateTime.now());
+        FREMD_ORG_ID = organisationRepository.save(fremd).getId();
+
         wohnung = einheitRepository.save(createEinheit("Wohnung A", EinheitTyp.CONSUMER, null));
         ladestationA = einheitRepository.save(
                 createEinheit("Ladestation A", EinheitTyp.LADESTATION, "RFID-A"));
@@ -77,6 +90,93 @@ class MieterEinheitRepositoryIT extends AbstractIntegrationTest {
         mieterEinheitRepository.deleteAll();
         mieterRepository.deleteAll();
         einheitRepository.deleteAll();
+    }
+
+    // ==================== Mandantenfilter ====================
+
+    /** Gegenprobe: Ohne Filter sind beide Zuordnungen sichtbar. */
+    @Test
+    void shouldSeeAllOrgsWhenOrgFilterDisabled() {
+        Mieter eigener = saveMieter("Eigener");
+        zuordnen(eigener, wohnung);
+        Long fremderMieterId = fremdeZuordnung();
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(mieterEinheitRepository.findByMieterIdIn(
+                List.of(eigener.getId(), fremderMieterId))).hasSize(2);
+    }
+
+    @Test
+    void shouldNotSeeZuordnungOfOtherOrgWhenOrgFilterEnabled() {
+        Mieter eigener = saveMieter("Eigener");
+        zuordnen(eigener, wohnung);
+        Long fremderMieterId = fremdeZuordnung();
+        entityManager.flush();
+        entityManager.clear();
+
+        aktiviereOrgFilter(entityManager, TEST_ORG_ID);
+
+        assertThat(mieterEinheitRepository.findByMieterId(eigener.getId())).hasSize(1);
+        assertThat(mieterEinheitRepository.findByMieterId(fremderMieterId)).isEmpty();
+        assertThat(mieterEinheitRepository.findEinheitIdsByMieterId(fremderMieterId)).isEmpty();
+        assertThat(mieterEinheitRepository.findByMieterIdIn(
+                List.of(eigener.getId(), fremderMieterId))).hasSize(1);
+    }
+
+    /**
+     * {@code countByEinheitId} traegt den Loeschschutz der Einheit. Zaehlte er
+     * mandantenuebergreifend, liesse sich eine eigene Einheit nicht mehr loeschen, weil an ihrer
+     * ID bei einem anderen Mandanten eine Zuordnung haengt.
+     */
+    @Test
+    void shouldCountOnlyOwnOrgForLoeschschutz() {
+        Long fremderMieterId = fremdeZuordnung();
+        entityManager.flush();
+        entityManager.clear();
+
+        aktiviereOrgFilter(entityManager, TEST_ORG_ID);
+
+        assertThat(mieterEinheitRepository.findByMieterId(fremderMieterId)).isEmpty();
+        assertThat(mieterEinheitRepository.countByEinheitId(fremdeEinheitId)).isZero();
+    }
+
+    /** Ein untergeschobener Fremdschluessel darf keine Zuordnung eines anderen Mandanten loeschen. */
+    @Test
+    void shouldDeleteOnlyZuordnungOfOwnOrgWhenOrgFilterEnabled() {
+        Long fremderMieterId = fremdeZuordnung();
+        entityManager.flush();
+        entityManager.clear();
+
+        aktiviereOrgFilter(entityManager, TEST_ORG_ID);
+        mieterEinheitRepository.deleteByMieterId(fremderMieterId);
+        entityManager.flush();
+        entityManager.clear();
+
+        aktiviereOrgFilter(entityManager, FREMD_ORG_ID);
+        assertThat(mieterEinheitRepository.findByMieterId(fremderMieterId)).hasSize(1);
+    }
+
+    private Long fremdeEinheitId;
+
+    /** Legt Einheit, Mieter und Zuordnung beim zweiten Mandanten an; liefert dessen Mieter-ID. */
+    private Long fremdeZuordnung() {
+        Einheit fremdeEinheit = new Einheit("Fremde Wohnung", EinheitTyp.CONSUMER);
+        fremdeEinheit.setOrgId(FREMD_ORG_ID);
+        fremdeEinheitId = einheitRepository.save(fremdeEinheit).getId();
+
+        Mieter fremder = new Mieter();
+        fremder.setOrgId(FREMD_ORG_ID);
+        fremder.setName("Fremder");
+        fremder.setStrasse("Fremdstrasse 9");
+        fremder.setPlz("3000");
+        fremder.setOrt("Bern");
+        fremder.setMietbeginn(LocalDate.of(2026, 1, 1));
+        Long fremderMieterId = mieterRepository.save(fremder).getId();
+
+        mieterEinheitRepository.save(
+                new MieterEinheit(FREMD_ORG_ID, fremderMieterId, fremdeEinheitId));
+        return fremderMieterId;
     }
 
     private Einheit createEinheit(String name, EinheitTyp typ, String messpunkt) {

@@ -4,6 +4,7 @@ import ch.nacht.AbstractIntegrationTest;
 import ch.nacht.entity.Organisation;
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,7 +35,13 @@ class TarifRepositoryIT extends AbstractIntegrationTest {
     @Autowired
     private OrganisationRepository organisationRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
     private Long TEST_ORG_ID;
+
+    /** Zweiter Mandant — nur als Gegenprobe des Mandantenfilters. */
+    private Long FREMD_ORG_ID;
 
     @BeforeEach
     void setUp() {
@@ -44,6 +51,76 @@ class TarifRepositoryIT extends AbstractIntegrationTest {
         org.setName("Test Organisation");
         org.setErstelltAm(LocalDateTime.now());
         TEST_ORG_ID = organisationRepository.save(org).getId();
+
+        Organisation fremd = new Organisation();
+        fremd.setKeycloakOrgId(UUID.fromString("a1f4c8d2-3e57-4b96-8a0d-6c2e91b7f45a"));
+        fremd.setName("Fremde Organisation");
+        fremd.setErstelltAm(LocalDateTime.now());
+        FREMD_ORG_ID = organisationRepository.save(fremd).getId();
+    }
+
+    // ==================== Mandantenfilter ====================
+
+    /**
+     * Gegenprobe: Ohne eingeschalteten Filter sind beide Mandanten sichtbar.
+     *
+     * <p>Ohne diesen Test waere der Isolationstest darunter wertlos — er waere auch dann gruen,
+     * wenn die Trennung bloss von den Testdaten kaeme und nicht vom Filter.
+     */
+    @Test
+    void shouldSeeAllOrgsWhenOrgFilterDisabled() {
+        tarifRepository.saveAndFlush(createTarif("Eigener", TarifTyp.ZEV,
+                new BigDecimal("0.20000"), LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)));
+        tarifRepository.saveAndFlush(tarifFuerOrg(FREMD_ORG_ID, "Fremder", TarifTyp.ZEV,
+                LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)));
+        entityManager.clear();
+
+        assertThat(tarifRepository.findAllByOrderByTariftypAscGueltigVonDesc()).hasSize(2);
+    }
+
+    @Test
+    void shouldNotSeeTarifOfOtherOrgWhenOrgFilterEnabled() {
+        Tarif eigener = tarifRepository.saveAndFlush(createTarif("Eigener", TarifTyp.ZEV,
+                new BigDecimal("0.20000"), LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)));
+        Tarif fremder = tarifRepository.saveAndFlush(tarifFuerOrg(FREMD_ORG_ID, "Fremder",
+                TarifTyp.VNB, LocalDate.of(2023, 1, 1), LocalDate.of(2023, 12, 31)));
+        entityManager.clear();
+
+        aktiviereOrgFilter(entityManager, TEST_ORG_ID);
+
+        assertThat(tarifRepository.findAllByOrderByTariftypAscGueltigVonDesc())
+                .extracting(Tarif::getBezeichnung)
+                .containsExactly("Eigener");
+        assertThat(tarifRepository.findFirstById(eigener.getId())).isPresent();
+        assertThat(tarifRepository.findFirstById(fremder.getId())).isEmpty();
+        // Das Jahr des fremden Tarifs darf nicht in der Jahresliste auftauchen.
+        assertThat(tarifRepository.findDistinctYears()).containsExactly(2024);
+    }
+
+    /**
+     * Die Ueberschneidungspruefung darf nur den eigenen Mandanten sehen.
+     *
+     * <p>Waere sie ungefiltert, blockierte der Tarif eines Mandanten das Anlegen eines Tarifs bei
+     * einem anderen — mit einer Fehlermeldung, die auf einen Datensatz zeigt, den der Benutzer
+     * nirgends finden kann.
+     */
+    @Test
+    void shouldNotLetTarifOfOtherOrgBlockOverlapCheck() {
+        tarifRepository.saveAndFlush(tarifFuerOrg(FREMD_ORG_ID, "Fremder", TarifTyp.ZEV,
+                LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)));
+        entityManager.clear();
+
+        aktiviereOrgFilter(entityManager, TEST_ORG_ID);
+
+        assertThat(tarifRepository.existsOverlappingTarif(TarifTyp.ZEV,
+                LocalDate.of(2024, 6, 1), LocalDate.of(2024, 6, 30), -1L)).isFalse();
+    }
+
+    private Tarif tarifFuerOrg(Long orgId, String bezeichnung, TarifTyp typ,
+                               LocalDate von, LocalDate bis) {
+        Tarif tarif = new Tarif(bezeichnung, typ, new BigDecimal("0.30000"), von, bis);
+        tarif.setOrgId(orgId);
+        return tarif;
     }
 
     private Tarif createTarif(String bezeichnung, TarifTyp typ, BigDecimal preis, LocalDate von, LocalDate bis) {

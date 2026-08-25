@@ -47,6 +47,10 @@ class ZaehlerRohdatenRepositoryIT extends AbstractIntegrationTest {
     private Long einheitId;
     private static final String MESSPUNKT = "MP-IT-001";
 
+    /** Zweiter Mandant — nur als Gegenprobe des Mandantenfilters. */
+    private Long fremdOrgId;
+    private Long fremdEinheitId;
+
     @BeforeEach
     void setUp() {
         rohdatenRepository.deleteAll();
@@ -62,6 +66,66 @@ class ZaehlerRohdatenRepositoryIT extends AbstractIntegrationTest {
         einheit.setOrgId(orgId);
         einheit.setMesspunkt(MESSPUNKT);
         einheitId = einheitRepository.save(einheit).getId();
+
+        Organisation fremd = new Organisation();
+        fremd.setKeycloakOrgId(UUID.randomUUID());
+        fremd.setName("Fremde Organisation");
+        fremd.setErstelltAm(LocalDateTime.now());
+        fremdOrgId = organisationRepository.save(fremd).getId();
+
+        Einheit fremdeEinheit = new Einheit("Fremde Wohnung", EinheitTyp.CONSUMER);
+        fremdeEinheit.setOrgId(fremdOrgId);
+        fremdeEinheit.setMesspunkt("MP-IT-FREMD");
+        fremdEinheitId = einheitRepository.save(fremdeEinheit).getId();
+    }
+
+    // ==================== Mandantenfilter ====================
+
+    /** Gegenprobe: Ohne Filter sind die Rohdaten beider Mandanten sichtbar. */
+    @Test
+    void shouldSeeAllOrgsWhenOrgFilterDisabled() {
+        save(LocalDateTime.of(2026, 1, 1, 0, 15), "100", "0", false);
+        fremdeRohdaten(LocalDateTime.of(2026, 1, 1, 0, 15));
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(rohdatenRepository.findEinheitIdsWithUnverarbeitet())
+                .containsExactlyInAnyOrder(einheitId, fremdEinheitId);
+    }
+
+    /**
+     * Mit eingeschaltetem Filter sind die Rohdaten des anderen Mandanten unsichtbar.
+     *
+     * <p>Zur Einordnung: Der Aggregations-Job ({@code ZaehlerAggregationService}) schaltet den
+     * Filter <b>absichtlich nicht</b> ein — er verarbeitet die Rohdaten aller Mandanten. Diese
+     * Zusicherung gilt also fuer jeden anderen Aufrufer, der unter einem Mandantenkontext liest.
+     */
+    @Test
+    void shouldNotSeeRohdatenOfOtherOrgWhenOrgFilterEnabled() {
+        LocalDateTime zeit = LocalDateTime.of(2026, 1, 1, 0, 15);
+        save(zeit, "100", "0", false);
+        fremdeRohdaten(zeit);
+        entityManager.flush();
+        entityManager.clear();
+
+        aktiviereOrgFilter(entityManager, orgId);
+
+        assertThat(rohdatenRepository.findEinheitIdsWithUnverarbeitet())
+                .containsExactly(einheitId);
+        assertThat(rohdatenRepository.findByEinheitIdAndZeit(fremdEinheitId, zeit)).isEmpty();
+        assertThat(rohdatenRepository.findByEinheitIdAndZeit(einheitId, zeit)).isPresent();
+        assertThat(rohdatenRepository
+                .findFirstByEinheitIdAndVerarbeitetFalseOrderByZeitAsc(fremdEinheitId)).isEmpty();
+        assertThat(rohdatenRepository.existsByEinheitIdAndZeitGreaterThanAndZeitLessThanEqual(
+                fremdEinheitId, zeit.minusHours(1), zeit.plusHours(1))).isFalse();
+    }
+
+    private ZaehlerRohdaten fremdeRohdaten(LocalDateTime zeit) {
+        ZaehlerRohdaten r = new ZaehlerRohdaten(fremdOrgId, fremdEinheitId, zeit,
+                new BigDecimal("999"), new BigDecimal("0"));
+        r.setVerarbeitet(false);
+        r.setEmpfangenAm(LocalDateTime.now());
+        return rohdatenRepository.save(r);
     }
 
     private ZaehlerRohdaten save(LocalDateTime zeit, String bezug, String einspeisung, boolean verarbeitet) {

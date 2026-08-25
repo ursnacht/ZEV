@@ -5,6 +5,7 @@ import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.MieterEinheit;
 import ch.nacht.entity.Organisation;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,7 +37,13 @@ class EinheitRepositoryIT extends AbstractIntegrationTest {
     @Autowired
     private MieterEinheitRepository mieterEinheitRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
     private Long TEST_ORG_ID;
+
+    /** Zweiter Mandant — nur als Gegenprobe des Mandantenfilters. */
+    private Long FREMD_ORG_ID;
 
     @BeforeEach
     void setUp() {
@@ -47,6 +54,98 @@ class EinheitRepositoryIT extends AbstractIntegrationTest {
         org.setName("Test Organisation");
         org.setErstelltAm(LocalDateTime.now());
         TEST_ORG_ID = organisationRepository.save(org).getId();
+
+        Organisation fremd = new Organisation();
+        fremd.setKeycloakOrgId(UUID.fromString("9e7a3c15-8d24-4f60-b193-5a8c2e0d7f36"));
+        fremd.setName("Fremde Organisation");
+        fremd.setErstelltAm(LocalDateTime.now());
+        FREMD_ORG_ID = organisationRepository.save(fremd).getId();
+    }
+
+    // ==================== Mandantenfilter ====================
+
+    /** Gegenprobe: Ohne Filter sind beide Mandanten sichtbar — sonst waere der Test darunter wertlos. */
+    @Test
+    void shouldSeeAllOrgsWhenOrgFilterDisabled() {
+        einheitRepository.saveAndFlush(createEinheit("Eigene", EinheitTyp.CONSUMER));
+        einheitRepository.saveAndFlush(einheitFuerOrg(FREMD_ORG_ID, "Fremde", EinheitTyp.CONSUMER, null));
+        entityManager.clear();
+
+        assertThat(einheitRepository.findAllByOrderByNameAsc()).hasSize(2);
+    }
+
+    @Test
+    void shouldNotSeeEinheitOfOtherOrgWhenOrgFilterEnabled() {
+        Einheit eigene = einheitRepository.saveAndFlush(createEinheit("Eigene", EinheitTyp.CONSUMER));
+        Einheit fremde = einheitRepository.saveAndFlush(
+                einheitFuerOrg(FREMD_ORG_ID, "Fremde", EinheitTyp.CONSUMER, null));
+        entityManager.clear();
+
+        aktiviereOrgFilter(entityManager, TEST_ORG_ID);
+
+        assertThat(einheitRepository.findAllByOrderByNameAsc())
+                .extracting(Einheit::getName).containsExactly("Eigene");
+        assertThat(einheitRepository.findFirstById(eigene.getId())).isPresent();
+        assertThat(einheitRepository.findFirstById(fremde.getId())).isEmpty();
+    }
+
+    /**
+     * Die Bilanz-Typen sind je Mandant Singletons — der BEZUG eines Mandanten darf den eines
+     * anderen nicht blockieren. Sonst koennte der zweite Mandant seinen Bilanzmesspunkt nie
+     * anlegen, mit einer Meldung, die auf einen unsichtbaren Datensatz zeigt.
+     */
+    @Test
+    void shouldNotLetBilanzTypOfOtherOrgBlockSingletonCheck() {
+        einheitRepository.saveAndFlush(einheitFuerOrg(FREMD_ORG_ID, "Fremder Bezug",
+                EinheitTyp.BEZUG, "CH-FREMD"));
+        entityManager.clear();
+
+        aktiviereOrgFilter(entityManager, TEST_ORG_ID);
+
+        assertThat(einheitRepository.existsByTyp(EinheitTyp.BEZUG)).isFalse();
+    }
+
+    /**
+     * Die RFID-Eindeutigkeit gilt je Mandant (Specs/Ladestationen.md). Zwei Mandanten duerfen
+     * dieselbe RFID fuehren — ihre Ladestationen haben nichts miteinander zu tun.
+     */
+    @Test
+    void shouldNotLetRfidOfOtherOrgBlockUniquenessCheck() {
+        einheitRepository.saveAndFlush(einheitFuerOrg(FREMD_ORG_ID, "Fremde Station",
+                EinheitTyp.LADESTATION, "RFID-1234"));
+        entityManager.clear();
+
+        aktiviereOrgFilter(entityManager, TEST_ORG_ID);
+
+        assertThat(einheitRepository.existsLadestationWithMesspunkt("RFID-1234", -1L)).isFalse();
+    }
+
+    /**
+     * Der Nenner der Nebenkostenumlage zaehlt die nebenkostenrelevanten Wohnungen. Zaehlte er
+     * mandantenuebergreifend, waere jede Umlage falsch — und zwar unauffaellig.
+     */
+    @Test
+    void shouldCountOnlyOwnOrgForNebenkostenNenner() {
+        Einheit eigene = createEinheit("Eigene Wohnung", EinheitTyp.CONSUMER);
+        eigene.setNebenkostenRelevant(true);
+        einheitRepository.saveAndFlush(eigene);
+
+        Einheit fremde = einheitFuerOrg(FREMD_ORG_ID, "Fremde Wohnung", EinheitTyp.CONSUMER, null);
+        fremde.setNebenkostenRelevant(true);
+        einheitRepository.saveAndFlush(fremde);
+        entityManager.clear();
+
+        aktiviereOrgFilter(entityManager, TEST_ORG_ID);
+
+        assertThat(einheitRepository.countByTypAndNebenkostenRelevantTrue(EinheitTyp.CONSUMER))
+                .isEqualTo(1);
+    }
+
+    private Einheit einheitFuerOrg(Long orgId, String name, EinheitTyp typ, String messpunkt) {
+        Einheit einheit = new Einheit(name, typ);
+        einheit.setOrgId(orgId);
+        einheit.setMesspunkt(messpunkt);
+        return einheit;
     }
 
     private Einheit createEinheit(String name, EinheitTyp typ) {

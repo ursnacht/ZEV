@@ -7,6 +7,7 @@ import ch.nacht.entity.Erfassungsart;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Organisation;
+import jakarta.persistence.EntityManager;
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
 import ch.nacht.entity.Tarifposition;
@@ -50,7 +51,13 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
     @Autowired
     private OrganisationRepository organisationRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
     private Long TEST_ORG_ID;
+
+    /** Zweiter Mandant — nur als Gegenprobe des Mandantenfilters. */
+    private Long FREMD_ORG_ID;
     private Einheit ladestationA;
     private Einheit ladestationB;
     private Tarif ladestromTarif;
@@ -69,6 +76,12 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
         org.setName("Tarifposition Test Organisation");
         org.setErstelltAm(LocalDateTime.now());
         TEST_ORG_ID = organisationRepository.save(org).getId();
+
+        Organisation fremd = new Organisation();
+        fremd.setKeycloakOrgId(UUID.fromString("7d2f4a68-1e93-4c05-b7a8-2f6d9c3e1b40"));
+        fremd.setName("Fremde Organisation");
+        fremd.setErstelltAm(LocalDateTime.now());
+        FREMD_ORG_ID = organisationRepository.save(fremd).getId();
 
         Einheit einheit = new Einheit("Test Einheit", EinheitTyp.CONSUMER);
         einheit.setOrgId(TEST_ORG_ID);
@@ -91,6 +104,78 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
         einheitRepository.deleteAll();
         tarifRepository.deleteAll();
         einheitRepository.deleteAll();
+    }
+
+    // ==================== Mandantenfilter ====================
+
+    /** Gegenprobe: Ohne Filter sind die Positionen beider Mandanten sichtbar. */
+    @Test
+    void shouldSeeAllOrgsWhenOrgFilterDisabled() {
+        savePosition(ladestationA, ladestromTarif, 2026, 3, "100.000");
+        Tarifposition fremde = fremdePosition();
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(tarifpositionRepository.findByEinheitId(ladestationA.getId())).hasSize(1);
+        assertThat(tarifpositionRepository.findByEinheitId(
+                fremde.getEinheit().getId())).hasSize(1);
+    }
+
+    @Test
+    void shouldNotSeeTarifpositionOfOtherOrgWhenOrgFilterEnabled() {
+        Tarifposition eigene = savePosition(ladestationA, ladestromTarif, 2026, 3, "100.000");
+        Tarifposition fremde = fremdePosition();
+        entityManager.flush();
+        entityManager.clear();
+
+        aktiviereOrgFilter(entityManager, TEST_ORG_ID);
+
+        assertThat(tarifpositionRepository.findFirstById(eigene.getId())).isPresent();
+        assertThat(tarifpositionRepository.findFirstById(fremde.getId())).isEmpty();
+        assertThat(tarifpositionRepository.findByEinheitId(fremdeEinheitId)).isEmpty();
+        assertThat(tarifpositionRepository.findByEinheitIdsAndQuartalOverlapping(
+                List.of(ladestationA.getId(), fremdeEinheitId), 2026, 1, 2026, 4))
+                .hasSize(1);
+    }
+
+    /**
+     * {@code countByTarifId} und {@code countByEinheitId} tragen den Loeschschutz von Tarif und
+     * Einheit. Zaehlten sie mandantenuebergreifend, liesse sich ein eigener Tarif nicht mehr
+     * loeschen, weil an seiner ID bei einem anderen Mandanten eine Position haengt.
+     */
+    @Test
+    void shouldCountOnlyOwnOrgForLoeschschutz() {
+        fremdePosition();
+        entityManager.flush();
+        entityManager.clear();
+
+        aktiviereOrgFilter(entityManager, TEST_ORG_ID);
+
+        assertThat(tarifpositionRepository.countByTarifId(fremderTarifId)).isZero();
+        assertThat(tarifpositionRepository.countByEinheitId(fremdeEinheitId)).isZero();
+    }
+
+    private Long fremdeEinheitId;
+    private Long fremderTarifId;
+
+    /** Legt Einheit, Tarif und Position beim zweiten Mandanten an. */
+    private Tarifposition fremdePosition() {
+        Einheit einheit = new Einheit("Fremde Station", EinheitTyp.LADESTATION);
+        einheit.setOrgId(FREMD_ORG_ID);
+        einheit.setMesspunkt("RFID-FREMD");
+        einheit = einheitRepository.save(einheit);
+        fremdeEinheitId = einheit.getId();
+
+        Tarif tarif = new Tarif("Fremder Ladestrom", TarifTyp.LADESTROM,
+                new BigDecimal("0.40000"), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        tarif.setOrgId(FREMD_ORG_ID);
+        tarif = tarifRepository.save(tarif);
+        fremderTarifId = tarif.getId();
+
+        Tarifposition position = new Tarifposition(einheit, tarif, 2026, 3,
+                new BigDecimal("999.000"));
+        position.setOrgId(FREMD_ORG_ID);
+        return tarifpositionRepository.save(position);
     }
 
     private Einheit createLadestation(String name, String rfid) {
