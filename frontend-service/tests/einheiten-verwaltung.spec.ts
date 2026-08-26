@@ -182,14 +182,14 @@ test.describe('Einheiten Management - Navigation and Display', () => {
 
         const headers = page.locator('.zev-table th');
         // Name, Typ, Messpunkt, Actions
-        expect(await headers.count()).toBeGreaterThanOrEqual(4);
+        await expect.poll(() => headers.count()).toBeGreaterThanOrEqual(4);
     });
 
     test('should display einheiten data in table rows', async ({ page }) => {
         await navigateToEinheiten(page);
 
         const rows = page.locator('.zev-table tbody tr');
-        expect(await rows.count()).toBeGreaterThan(0);
+        await expect.poll(() => rows.count()).toBeGreaterThan(0);
     });
 });
 
@@ -200,8 +200,9 @@ test.describe('Einheiten Management - Sorting', () => {
         // Sortieren laesst sich nur mit Daten pruefen - eine zu kurze Tabelle ist hier ein
         // Umgebungsfehler und soll auffallen, statt den Test stumm durchzuwinken.
         const rows = page.locator('.zev-table tbody tr');
-        expect(await rows.count(),
-            'Fuer den Sortier-Test werden mindestens zwei Einheiten benoetigt').toBeGreaterThan(1);
+        await expect.poll(() => rows.count(),
+            { message: 'Fuer den Sortier-Test werden mindestens zwei Einheiten benoetigt' })
+            .toBeGreaterThan(1);
 
         const nameHeader = page.locator('th').filter({ hasText: /Name/i }).first();
         await nameHeader.click();

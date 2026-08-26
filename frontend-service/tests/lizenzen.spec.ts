@@ -46,7 +46,7 @@ test.describe('Lizenzen – Page Structure', () => {
         await waitForLizenzenLoaded(page);
 
         const panels = page.locator('.zev-panel');
-        expect(await panels.count()).toBeGreaterThanOrEqual(2);
+        await expect.poll(() => panels.count()).toBeGreaterThanOrEqual(2);
 
         // First panel: Backend Libraries
         const firstPanel = panels.first();
@@ -87,7 +87,7 @@ test.describe('Lizenzen – Backend Libraries Table', () => {
 
         // Table should have rows
         const rows = backendPanel.locator('.zev-table tbody tr');
-        expect(await rows.count()).toBeGreaterThan(0);
+        await expect.poll(() => rows.count()).toBeGreaterThan(0);
     });
 
     test('should display correct table columns for backend libraries', async ({ page }) => {
@@ -96,7 +96,10 @@ test.describe('Lizenzen – Backend Libraries Table', () => {
 
         const backendPanel = page.locator('.zev-panel').first();
         const headers = backendPanel.locator('.zev-table thead th');
-        expect(await headers.count()).toBe(5);
+        // `expect.poll` statt `expect(await ...count())`: Ein blankes `count()` liest den
+        // DOM-Stand im Augenblick des Aufrufs. In Firefox stand die Tabelle noch nicht, und der
+        // Test scheiterte mit "Received: 0" — obwohl sie kurz danach da war.
+        await expect.poll(() => headers.count()).toBe(5);
     });
 
     test('should show library name and license in backend table rows', async ({ page }) => {
@@ -157,7 +160,7 @@ test.describe('Lizenzen – Frontend Libraries Table', () => {
         await expect(table).toBeVisible();
 
         const rows = frontendPanel.locator('.zev-table tbody tr');
-        expect(await rows.count()).toBeGreaterThan(0);
+        await expect.poll(() => rows.count()).toBeGreaterThan(0);
     });
 
     test('should show SHA-512 hashes for frontend libraries', async ({ page }) => {

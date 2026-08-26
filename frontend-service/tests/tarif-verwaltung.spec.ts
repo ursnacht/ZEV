@@ -264,7 +264,7 @@ test.describe('Tarif Management - Navigation and Display', () => {
 
         const headers = page.locator('.zev-table th');
         // Tariftyp, Bezeichnung, Preis, Gueltig von, Gueltig bis, Actions
-        expect(await headers.count()).toBeGreaterThanOrEqual(6);
+        await expect.poll(() => headers.count()).toBeGreaterThanOrEqual(6);
     });
 
     test('should display tariff type badges (ZEV/VNB)', async ({ page }) => {
@@ -273,13 +273,16 @@ test.describe('Tarif Management - Navigation and Display', () => {
         const tableRows = page.locator('.zev-table tbody tr');
         // Badges lassen sich nur mit Daten pruefen - eine leere Tabelle ist hier ein
         // Umgebungsfehler und soll auffallen, statt den Test stumm durchzuwinken.
-        expect(await tableRows.count(),
-            'Fuer den Badge-Test wird mindestens ein Tarif benoetigt').toBeGreaterThan(0);
+        await expect.poll(() => tableRows.count(),
+            { message: 'Fuer den Badge-Test wird mindestens ein Tarif benoetigt' })
+            .toBeGreaterThan(0);
 
-        // Jede Zeile traegt ein Badge
+        // Jede Zeile traegt ein Badge. Erst warten, bis eines gerendert ist: Zwei blanke
+        // `count()` verglichen sonst zwei Momentaufnahmen, die noch im Aufbau waren.
         const badges = page.locator('.zev-table tbody .tarif-typ-badge');
-        expect(await badges.count()).toBe(await tableRows.count());
         await expect(badges.first()).toBeVisible();
+        const anzahlZeilen = await tableRows.count();
+        await expect.poll(() => badges.count()).toBe(anzahlZeilen);
     });
 });
 
@@ -290,8 +293,9 @@ test.describe('Tarif Management - Sorting', () => {
         await expect(page.locator('.zev-table')).toBeVisible();
 
         const rows = page.locator('.zev-table tbody tr');
-        expect(await rows.count(),
-            'Fuer den Sortier-Test werden mindestens zwei Tarife benoetigt').toBeGreaterThan(1);
+        await expect.poll(() => rows.count(),
+            { message: 'Fuer den Sortier-Test werden mindestens zwei Tarife benoetigt' })
+            .toBeGreaterThan(1);
 
         const tariftypHeader = page.locator('th').filter({ hasText: /Tariftyp/i }).first();
         await tariftypHeader.click();
@@ -574,7 +578,7 @@ test.describe('Tarif Management - Validation Buttons', () => {
         await navigateToTarife(page);
 
         const buttons = page.locator('.zev-button-row button.zev-button--secondary');
-        expect(await buttons.count()).toBe(2);
+        await expect.poll(() => buttons.count()).toBe(2);
 
         const buttonTexts = await buttons.allTextContents();
         expect(buttonTexts.some(text => text.toLowerCase().includes('quartal'))).toBeTruthy();

@@ -110,7 +110,12 @@ async function setDateRange(page: Page, von: string, bis: string): Promise<void>
  */
 async function mieterIdOrFail(page: Page): Promise<string> {
     const options = page.locator('#mieterId').locator('option:not([disabled])');
-    if (await options.count() === 0) {
+    // Auf die erste Option WARTEN: Die Mieter kommen aus einer HTTP-Antwort, und `count()` fragt
+    // den DOM-Stand im Augenblick des Aufrufs ab. Ohne dieses Warten meldete der Helfer in
+    // Firefox „Kein Mieter vorhanden", obwohl die Liste eine Sekunde später gefüllt war.
+    const geladen = await options.first().waitFor({ state: 'attached', timeout: 15000 })
+        .then(() => true).catch(() => false);
+    if (!geladen) {
         throw new Error('Kein Mieter vorhanden - ohne Mieter lässt sich kein Debitor erfassen');
     }
     const value = await options.first().getAttribute('value');
@@ -322,7 +327,7 @@ test.describe('Debitorkontrolle - Navigation and Display', () => {
 
         const headers = page.locator('.zev-table th');
         // Auswahl, Mieter, Betrag, Datum von, Datum bis, Zahldatum, Status, Actions
-        expect(await headers.count()).toBeGreaterThanOrEqual(7);
+        await expect.poll(() => headers.count()).toBeGreaterThanOrEqual(7);
     });
 
     test('should show empty state message when no debitoren for period', async ({ page }) => {

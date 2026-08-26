@@ -292,7 +292,7 @@ test.describe('Mieter Management - Navigation and Display', () => {
 
         const headers = page.locator('.zev-table th');
         // Einheit, Name, Strasse, PLZ/Ort, Mietbeginn, Mietende, Actions
-        expect(await headers.count()).toBeGreaterThanOrEqual(6);
+        await expect.poll(() => headers.count()).toBeGreaterThanOrEqual(6);
     });
 });
 
@@ -303,8 +303,9 @@ test.describe('Mieter Management - Sorting', () => {
         const rows = page.locator('.zev-table tbody tr');
         // Sortieren laesst sich nur mit Daten pruefen - eine leere Tabelle ist hier ein
         // Umgebungsfehler und soll auffallen, statt den Test stumm durchzuwinken.
-        expect(await rows.count(),
-            'Fuer den Sortier-Test werden mindestens zwei Mieter benoetigt').toBeGreaterThan(1);
+        await expect.poll(() => rows.count(),
+            { message: 'Fuer den Sortier-Test werden mindestens zwei Mieter benoetigt' })
+            .toBeGreaterThan(1);
 
         const nameHeader = page.locator('th').filter({ hasText: /Name/i }).first();
         await nameHeader.click();

@@ -143,7 +143,7 @@ test.describe('Systemmeldungen - Seite und Filter', () => {
         // im Attribut.
         const optionen = page.locator('#kategorieFilter option');
         await expect(optionen.first()).toHaveAttribute('value', '');
-        expect(await optionen.count()).toBeGreaterThanOrEqual(1);
+        await expect.poll(() => optionen.count()).toBeGreaterThanOrEqual(1);
 
         // Jede weitere Option ist ein Kategorie-Key und damit nicht leer.
         const anzahl = await optionen.count();

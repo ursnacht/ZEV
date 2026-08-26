@@ -127,7 +127,7 @@ test.describe('Statistik Page - Monthly Statistics', () => {
 
             // Check for bar containers (visualization)
             const barContainers = firstMonthPanel.locator('.zev-bar-container');
-            expect(await barContainers.count()).toBeGreaterThan(0);
+            await expect.poll(() => barContainers.count()).toBeGreaterThan(0);
 
             // Kennzahlen-Panel (neues Feature): tabellarisch (ohne Titelzeile) im ersten
             // .zev-comparison-section; wird in BEIDEN Verteilmodi angezeigt.

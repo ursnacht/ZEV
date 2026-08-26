@@ -143,8 +143,11 @@ function gueltigkeit(versatz: number): { von: string; bis: string } {
 async function ersteZeileOrFail(page: Page): Promise<Locator> {
     await expect(page.locator('.zev-table')).toBeVisible();
     const zeilen = page.locator('.zev-table tbody tr');
-    expect(await zeilen.count(),
-        'Fuer diesen Test wird mindestens eine Tabellenzeile benoetigt').toBeGreaterThan(0);
+    // `expect.poll`, nicht `expect(await ...count())`: Die Tabelle ist sichtbar, bevor ihre Zeilen
+    // aus der Antwort des Servers gefuellt sind - ein blankes `count()` liest die leere Zwischenzeit.
+    await expect.poll(() => zeilen.count(),
+        { message: 'Fuer diesen Test wird mindestens eine Tabellenzeile benoetigt' })
+        .toBeGreaterThan(0);
     return zeilen.first();
 }
 
@@ -283,8 +286,9 @@ test.describe('Kebab Menu - Close Behavior', () => {
 
         await expect(page.locator('.zev-table')).toBeVisible();
         const tableRows = page.locator('.zev-table tbody tr');
-        expect(await tableRows.count(),
-            'Fuer diesen Test werden mindestens zwei Tabellenzeilen benoetigt').toBeGreaterThanOrEqual(2);
+        await expect.poll(() => tableRows.count(),
+            { message: 'Fuer diesen Test werden mindestens zwei Tabellenzeilen benoetigt' })
+            .toBeGreaterThanOrEqual(2);
 
         const firstRow = tableRows.nth(0);
         const secondRow = tableRows.nth(1);
