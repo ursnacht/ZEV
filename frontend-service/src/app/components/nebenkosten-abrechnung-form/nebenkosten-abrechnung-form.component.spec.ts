@@ -1,10 +1,19 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { createSpyObj, SpyObj } from '../../../testing/spy';
 import { NebenkostenAbrechnungFormComponent } from './nebenkosten-abrechnung-form.component';
 import { NebenkostenService } from '../../services/nebenkosten.service';
 import { TranslationService } from '../../services/translation.service';
-import { NkAbrechnungDetail } from '../../models/nebenkosten.model';
+import { CdkDragDrop } from '@angular/cdk/drag-drop';
+import {
+  NkAbrechnungDetail,
+  NkPosition,
+  NkPositionsart,
+  NkUmlageInfo,
+  NkZeile
+} from '../../models/nebenkosten.model';
+// `Mengeneinheit` lebt im Tarif-Modell und wird von der Nebenkostenabrechnung mitbenutzt.
+import { Mengeneinheit } from '../../models/tarif.model';
 
 /**
  * Tests der Bearbeitungsmaske (Specs/Nebenkosten/Abrechnung.md, FR-7).
@@ -444,6 +453,679 @@ describe('NebenkostenAbrechnungFormComponent', () => {
     it('should find the control figures by database id, not by position in the list', () => {
       const umlageZeile = component.berechnung!.mieter[0].zeilen[0];
       expect(component.umlageInfoFuer(umlageZeile)?.nichtVerteilt).toBe(450);
+    });
+  });
+
+  // ==================== Laden ====================
+
+  describe('Laden', () => {
+
+    it('should load the template when no billing id is given', () => {
+      const neu = TestBed.createComponent(NebenkostenAbrechnungFormComponent);
+      neu.componentInstance.abrechnungId = null;
+      neu.detectChanges();
+
+      expect(nebenkostenServiceSpy.getVorlage).toHaveBeenCalled();
+      expect(neu.componentInstance.laedt).toBe(false);
+    });
+
+    /**
+     * Die Vorlage bringt die vorgeschlagene Anzahl Wohnungen mit.
+     *
+     * Ohne diese Übernahme müsste der Benutzer den Nenner der Umlage raten — und ein zu kleiner
+     * Nenner lässt den Server das Speichern abweisen (FR-2).
+     */
+    it('should adopt the suggested number of flats from the template', () => {
+      const vorlage = structuredClone(serverDetail) as NkAbrechnungDetail;
+      vorlage.abrechnung.anzahlWohnungen = null;
+      vorlage.anzahlWohnungenVorschlag = 9;
+      nebenkostenServiceSpy.getVorlage.mockReturnValue(of(vorlage));
+
+      const neu = TestBed.createComponent(NebenkostenAbrechnungFormComponent);
+      neu.componentInstance.abrechnungId = null;
+      neu.detectChanges();
+
+      expect(neu.componentInstance.kopf.anzahlWohnungen).toBe(9);
+    });
+
+    it('should report an error when loading the detail fails', () => {
+      nebenkostenServiceSpy.getAbrechnungDetail.mockReturnValue(throwError(() => new Error('kaputt')));
+
+      const neu = TestBed.createComponent(NebenkostenAbrechnungFormComponent);
+      neu.componentInstance.abrechnungId = 1;
+      neu.detectChanges();
+
+      expect(neu.componentInstance.message).toBe('NK_FEHLER_LADEN');
+      expect(neu.componentInstance.laedt).toBe(false);
+    });
+
+    it('should report an error when loading the template fails', () => {
+      nebenkostenServiceSpy.getVorlage.mockReturnValue(throwError(() => new Error('kaputt')));
+
+      const neu = TestBed.createComponent(NebenkostenAbrechnungFormComponent);
+      neu.componentInstance.abrechnungId = null;
+      neu.detectChanges();
+
+      expect(neu.componentInstance.message).toBe('NK_FEHLER_LADEN');
+      expect(neu.componentInstance.laedt).toBe(false);
+    });
+  });
+
+  // ==================== Zustand der Maske ====================
+
+  describe('gesperrt und hatMieterbloecke', () => {
+
+    it('should not be locked while the billing is open', () => {
+      expect(component.gesperrt).toBe(false);
+    });
+
+    it('should be locked once the billing is closed', () => {
+      component.kopf.abgerechnet = true;
+
+      expect(component.gesperrt).toBe(true);
+    });
+
+    it('should report tenant blocks only when the server delivered rental days', () => {
+      expect(component.hatMieterbloecke).toBe(true);
+
+      component.mieterTage = [];
+
+      expect(component.hatMieterbloecke).toBe(false);
+    });
+  });
+
+  // ==================== Aufklappen der Mieterblöcke ====================
+
+  describe('Mieterblöcke', () => {
+
+    it('should open and close a tenant block on toggle', () => {
+      expect(component.istMieterOffen(100)).toBe(false);
+
+      component.toggleMieter(100);
+      expect(component.istMieterOffen(100)).toBe(true);
+
+      component.toggleMieter(100);
+      expect(component.istMieterOffen(100)).toBe(false);
+    });
+
+    it('should keep the blocks of other tenants closed', () => {
+      component.toggleMieter(100);
+
+      expect(component.istMieterOffen(200)).toBe(false);
+    });
+  });
+
+  // ==================== Hinweise ====================
+
+  describe('Hinweise', () => {
+
+    it('should hide the explanatory hint permanently and remember it', () => {
+      component.dismissHinweisErstSpeichern();
+
+      expect(component.hinweisErstSpeichernSichtbar).toBe(false);
+      expect(localStorage.getItem('zev.nebenkosten.hinweisErstSpeichern')).toBe('true');
+    });
+
+    it('should not show the explanatory hint again after it was dismissed', () => {
+      localStorage.setItem('zev.nebenkosten.hinweisErstSpeichern', 'true');
+
+      const neu = TestBed.createComponent(NebenkostenAbrechnungFormComponent);
+      neu.componentInstance.abrechnungId = 1;
+      neu.detectChanges();
+
+      expect(neu.componentInstance.hinweisErstSpeichernSichtbar).toBe(false);
+    });
+
+    /**
+     * Ein gesperrter Speicher darf die Maske nicht mitnehmen.
+     *
+     * In einem privaten Fenster oder bei blockierten Site-Daten wirft schon der Zugriff. Der
+     * Hinweis erscheint dann beim nächsten Öffnen erneut — unschön, aber bedienbar.
+     */
+    it('should survive a localStorage that throws', () => {
+      const setItem = vi.spyOn(Storage.prototype, 'setItem')
+        .mockImplementation(() => { throw new Error('gesperrt'); });
+      const getItem = vi.spyOn(Storage.prototype, 'getItem')
+        .mockImplementation(() => { throw new Error('gesperrt'); });
+
+      expect(() => component.dismissHinweisErstSpeichern()).not.toThrow();
+      expect(component.hinweisErstSpeichernSichtbar).toBe(false);
+
+      const neu = TestBed.createComponent(NebenkostenAbrechnungFormComponent);
+      neu.componentInstance.abrechnungId = 1;
+      expect(() => neu.detectChanges()).not.toThrow();
+      expect(neu.componentInstance.hinweisErstSpeichernSichtbar).toBe(true);
+
+      setItem.mockRestore();
+      getItem.mockRestore();
+    });
+
+    it('should hide the lock hint for the open form only', () => {
+      component.dismissHinweisAbgerechnet();
+
+      expect(component.hinweisAbgerechnetSichtbar).toBe(false);
+    });
+
+    /** Je Mieter einzeln: Wer einen Hinweis wegklickt, meint diesen einen Block. */
+    it('should dismiss the no-flat hint per tenant', () => {
+      expect(component.hinweisOhneWohnungSichtbar(100)).toBe(true);
+
+      component.dismissHinweisOhneWohnung(100);
+
+      expect(component.hinweisOhneWohnungSichtbar(100)).toBe(false);
+      expect(component.hinweisOhneWohnungSichtbar(200)).toBe(true);
+    });
+  });
+
+  // ==================== Positionen ====================
+
+  describe('Positionen', () => {
+
+    it('should add a position as UMLAGE and recalculate', () => {
+      const vorher = component.positionen.length;
+
+      component.onPositionHinzufuegen();
+
+      expect(component.positionen.length).toBe(vorher + 1);
+      expect(component.positionen.at(-1)?.art).toBe(NkPositionsart.UMLAGE);
+    });
+
+    it('should remove the position at the given index', () => {
+      component.onPositionEntfernen(0);
+
+      expect(component.positionen.length).toBe(1);
+      expect(component.positionen[0].bezeichnung).toBe('Warmwasser');
+    });
+
+    /**
+     * Beim Wechsel der Art werden die Felder der alten Art geleert.
+     *
+     * Ohne das Abräumen bliebe ein Totalbetrag an einer Zuschlagszeile hängen: unsichtbar, weil
+     * die Maske ihn ausblendet, aber im Rumpf des Requests — und dort läuft er in den
+     * CHECK-Constraint der Datenbank.
+     */
+    it('should clear the fields of the previous art on change', () => {
+      const position = component.positionen[0];
+      expect(position.totalbetrag).toBe(900);
+
+      position.art = NkPositionsart.ZUSCHLAG;
+      component.onArtChange(position);
+
+      expect(position.totalbetrag).toBeNull();
+      expect(position.gesamtmenge).toBeNull();
+      expect(position.betragProEinheit).toBeNull();
+      expect(position.prozentsatz).toBeNull();
+      expect(position.verbraeuche).toEqual([]);
+    });
+
+    it('should drop the unit for an art that carries none', () => {
+      const position = component.positionen[0];
+      position.art = NkPositionsart.ZUSCHLAG;
+
+      component.onArtChange(position);
+
+      expect(position.einheit).toBeNull();
+    });
+
+    it('should keep a unit for an art that needs one', () => {
+      const position = component.positionen[0];
+      position.art = NkPositionsart.VERBRAUCH;
+
+      component.onArtChange(position);
+
+      expect(position.einheit).toBe(Mengeneinheit.M3);
+    });
+
+    /** Die Reihenfolge bestimmt die Bemessungsgrundlage der Zuschläge — Verschieben rechnet neu. */
+    it('should reorder the positions on drop', () => {
+      component.onDrop({ previousIndex: 0, currentIndex: 1 } as CdkDragDrop<NkPosition[]>);
+
+      expect(component.positionen.map(p => p.bezeichnung))
+        .toEqual(['Warmwasser', 'Allgemeinstrom']);
+    });
+  });
+
+  // ==================== Stabile Zeilen-Identität ====================
+
+  describe('trackZeile', () => {
+
+    it('should key a saved line by its database id', () => {
+      expect(component.trackZeile(0, { id: 42 })).toBe('id-42');
+    });
+
+    it('should key an unsaved line by its index', () => {
+      expect(component.trackZeile(3, {})).toBe('neu-3');
+    });
+
+    /**
+     * Zwei ungespeicherte Zeilen dürfen nicht denselben Schlüssel tragen — sonst wirft Angular
+     * NG0955 (doppelte Keys) und die Tabelle bricht.
+     */
+    it('should give unsaved lines distinct keys', () => {
+      expect(component.trackZeile(0, {})).not.toBe(component.trackZeile(1, {}));
+    });
+  });
+
+  // ==================== Bemessungsgrundlage eines Zuschlags ====================
+
+  describe('bemessungsgrundlage', () => {
+
+    it('should name all positions above the given index', () => {
+      expect(component.bemessungsgrundlage(2)).toBe('Allgemeinstrom, Warmwasser');
+    });
+
+    it('should report that nothing is above the first position', () => {
+      expect(component.bemessungsgrundlage(0)).toBe('NK_KEINE_ZEILEN_DAVOR');
+    });
+
+    it('should skip positions without a label', () => {
+      // Eine frisch hinzugefuegte Zeile hat noch keine Bezeichnung und gehoert nicht in die
+      // Aufzaehlung - sonst stuende dort ein leerer Eintrag mit Komma.
+      component.positionen[0].bezeichnung = '';
+
+      expect(component.bemessungsgrundlage(2)).toBe('Warmwasser');
+    });
+  });
+
+  // ==================== Mengen je Mieter ====================
+
+  describe('mengeFuer und onMengeChange', () => {
+
+    it('should return the recorded quantity of a tenant', () => {
+      expect(component.mengeFuer(component.positionen[1], 100)).toBe(12);
+    });
+
+    it('should return null when nothing is recorded for that tenant', () => {
+      expect(component.mengeFuer(component.positionen[1], 999)).toBeNull();
+    });
+
+    it('should create the row when the tenant has none yet', () => {
+      const position = component.positionen[1];
+
+      component.onMengeChange(position, 200, 7);
+
+      expect(position.verbraeuche).toContainEqual({ mieterId: 200, menge: 7 });
+    });
+
+    it('should overwrite an existing quantity', () => {
+      const position = component.positionen[1];
+
+      component.onMengeChange(position, 100, 20);
+
+      expect(component.mengeFuer(position, 100)).toBe(20);
+    });
+
+    /**
+     * Ein leeres Feld heisst „nicht erfasst" und nicht „null Kubikmeter".
+     *
+     * Über `ngModelChange` kommt je nach Browser ein leerer String statt `null`; beides muss zu
+     * `null` werden, sonst stünde eine erfasste 0 dort, wo der Benutzer nichts angegeben hat.
+     */
+    it('should treat an empty string and null as "not recorded"', () => {
+      const position = component.positionen[1];
+
+      component.onMengeChange(position, 100, '');
+      expect(component.mengeFuer(position, 100)).toBeNull();
+
+      component.onMengeChange(position, 100, 5);
+      component.onMengeChange(position, 100, null);
+      expect(component.mengeFuer(position, 100)).toBeNull();
+    });
+
+    it('should accept a numeric string from the input field', () => {
+      const position = component.positionen[1];
+
+      component.onMengeChange(position, 100, '8.5');
+
+      expect(component.mengeFuer(position, 100)).toBe(8.5);
+    });
+  });
+
+  // ==================== Zusatzzeilen ====================
+
+  describe('Zusatzzeilen', () => {
+
+    it('should return only the extra lines of the given tenant', () => {
+      component.zusaetze = [
+        { mieterId: 100, bezeichnung: 'A', einheit: Mengeneinheit.STUECK, menge: 1, betragProEinheit: 1 },
+        { mieterId: 200, bezeichnung: 'B', einheit: Mengeneinheit.STUECK, menge: 1, betragProEinheit: 1 }
+      ];
+
+      expect(component.zusaetzeFuer(100).map(z => z.bezeichnung)).toEqual(['A']);
+    });
+
+    /**
+     * Eine neue Zusatzzeile landet am Ende der Kaskade.
+     *
+     * Ein Zuschlag rechnet auf alles, was über ihm steht. Eine neu eingefügte Zeile darf
+     * bestehende Zuschläge nicht rückwirkend verändern, solange der Benutzer sie nicht bewusst
+     * nach vorne schiebt.
+     */
+    it('should append a new extra line behind all positions', () => {
+      component.onZusatzHinzufuegen(100);
+
+      const neu = component.zusaetzeFuer(100)[0];
+      expect(neu.reihenfolge).toBe(component.positionen.length + 1);
+      expect(neu.einheit).toBe(Mengeneinheit.STUECK);
+      expect(neu.menge).toBeNull();
+    });
+
+    it('should count the existing extra lines of the tenant for the order', () => {
+      component.onZusatzHinzufuegen(100);
+      component.onZusatzHinzufuegen(100);
+
+      expect(component.zusaetzeFuer(100).map(z => z.reihenfolge))
+        .toEqual([component.positionen.length + 1, component.positionen.length + 2]);
+    });
+
+    it('should remove exactly the given extra line', () => {
+      component.onZusatzHinzufuegen(100);
+      component.onZusatzHinzufuegen(100);
+      const zuLoeschen = component.zusaetzeFuer(100)[0];
+
+      component.onZusatzEntfernen(zuLoeschen);
+
+      expect(component.zusaetze).not.toContain(zuLoeschen);
+      expect(component.zusaetzeFuer(100).length).toBe(1);
+    });
+
+    it('should ignore an extra line that is no longer in the list', () => {
+      const fremd = {
+        mieterId: 100, bezeichnung: 'weg', einheit: Mengeneinheit.STUECK,
+        menge: null, betragProEinheit: null
+      };
+      const vorher = component.zusaetze.length;
+
+      component.onZusatzEntfernen(fremd);
+
+      expect(component.zusaetze.length).toBe(vorher);
+    });
+  });
+
+  // ==================== Akonto ====================
+
+  describe('akontoFuer', () => {
+
+    it('should return the recorded prepayment of a tenant', () => {
+      expect(component.akontoFuer(100).betragProMonat).toBe(100);
+    });
+
+    /**
+     * Fehlt eine Akonto-Zeile, wird sie aus dem Vorschlag des Servers angelegt **und in die
+     * Liste aufgenommen**.
+     *
+     * Nur so überlebt der Vorschlag das Speichern: Ein unveränderter Block fiele sonst beim
+     * nächsten Laden auf 0 zurück, obwohl die Maske einen Wert anzeigte.
+     */
+    it('should create a prepayment row from the server suggestion', () => {
+      component.akonto = [];
+      component.berechnung = {
+        nenner: 730, summeTage: 365, umlagen: [],
+        mieter: [{
+          mieterId: 100, name: 'Anna Beispiel', tage: 365, ohneWohnung: false, zeilen: [],
+          kostentotal: 0, akontoAnzahlMonate: 11, akontoBetragProMonat: 150,
+          akontoKorrektur: -20, akontoTotal: 0, saldo: 0
+        }]
+      };
+
+      const akonto = component.akontoFuer(100);
+
+      expect(akonto.anzahlMonate).toBe(11);
+      expect(akonto.betragProMonat).toBe(150);
+      expect(akonto.korrektur).toBe(-20);
+      expect(component.akonto).toContain(akonto);
+    });
+
+    it('should create an empty prepayment row when the server has no suggestion', () => {
+      component.akonto = [];
+      component.berechnung = null;
+
+      const akonto = component.akontoFuer(999);
+
+      expect(akonto.anzahlMonate).toBeNull();
+      expect(akonto.betragProMonat).toBeNull();
+      expect(akonto.korrektur).toBe(0);
+    });
+
+    it('should return the same row on repeated calls', () => {
+      const erste = component.akontoFuer(500);
+
+      expect(component.akontoFuer(500)).toBe(erste);
+      expect(component.akonto.filter(a => a.mieterId === 500).length).toBe(1);
+    });
+  });
+
+  // ==================== Gültigkeit ====================
+
+  describe('istGueltig und istZeitraumGueltig', () => {
+
+    it('should accept the loaded billing', () => {
+      expect(component.istGueltig()).toBe(true);
+    });
+
+    it('should reject a label of only whitespace', () => {
+      component.kopf.bezeichnung = '   ';
+
+      expect(component.istGueltig()).toBe(false);
+    });
+
+    it('should accept a period of a single day', () => {
+      // von == bis ist ein gueltiger Zeitraum; die Pruefung darf nicht auf "kleiner" bestehen.
+      component.kopf.datumVon = '2026-05-01';
+      component.kopf.datumBis = '2026-05-01';
+
+      expect(component.istGueltig()).toBe(true);
+      expect(component.istZeitraumGueltig()).toBe(true);
+    });
+
+    it('should reject a period that ends before it starts', () => {
+      component.kopf.datumVon = '2026-12-31';
+      component.kopf.datumBis = '2026-01-01';
+
+      expect(component.istGueltig()).toBe(false);
+      expect(component.istZeitraumGueltig()).toBe(false);
+    });
+
+    it('should treat a half-filled period as not yet wrong', () => {
+      // Waehrend des Tippens fehlt das zweite Datum - das ist kein Fehler, nur unvollstaendig.
+      component.kopf.datumBis = '';
+
+      expect(component.istZeitraumGueltig()).toBe(true);
+      expect(component.istGueltig()).toBe(false);
+    });
+
+    it('should reject fewer than one flat', () => {
+      component.kopf.anzahlWohnungen = 0;
+      expect(component.istGueltig()).toBe(false);
+
+      component.kopf.anzahlWohnungen = null;
+      expect(component.istGueltig()).toBe(false);
+
+      component.kopf.anzahlWohnungen = 1;
+      expect(component.istGueltig()).toBe(true);
+    });
+  });
+
+  // ==================== Anzeige ====================
+
+  describe('Formatierung', () => {
+
+    /**
+     * Ein fehlender Betrag ist 0.00, eine fehlende Menge bleibt leer.
+     *
+     * Die Asymmetrie ist gewollt: Ein Betrag von null Franken ist eine Aussage, eine nicht
+     * erfasste Menge ist keine — dort stünde sonst „0.000", wo der Benutzer nichts angegeben hat.
+     */
+    it('should show a missing amount as zero and a missing quantity as empty', () => {
+      expect(component.betrag(null)).toBe('0.00');
+      expect(component.betrag(undefined)).toBe('0.00');
+      expect(component.menge(null)).toBe('');
+      expect(component.menge(undefined)).toBe('');
+    });
+
+    it('should format amounts with two and quantities with three decimals', () => {
+      expect(component.betrag(1234.5)).toBe("1'234.50");
+      expect(component.menge(12.3456)).toBe('12.346');
+    });
+
+    it('should show a recorded zero quantity', () => {
+      // Eine erfasste 0 ist eine Aussage und darf nicht wie "nicht erfasst" aussehen.
+      expect(component.menge(0)).toBe('0.000');
+    });
+  });
+
+  // ==================== Zeilen-Zuordnung ====================
+
+  describe('istEingebbareZeile', () => {
+
+    const zeile = (art: string, zusatzId: number | null = null) =>
+      ({ art, zusatzId, reihenfolge: 1, bezeichnung: '', betrag: 0 } as unknown as NkZeile);
+
+    it('should accept a consumption and a share line', () => {
+      expect(component.istEingebbareZeile(zeile('VERBRAUCH'))).toBe(true);
+      expect(component.istEingebbareZeile(zeile('ANTEIL'))).toBe(true);
+    });
+
+    it('should refuse a calculated line', () => {
+      expect(component.istEingebbareZeile(zeile('UMLAGE'))).toBe(false);
+      expect(component.istEingebbareZeile(zeile('ZUSCHLAG'))).toBe(false);
+    });
+
+    it('should refuse an extra line — it carries its own fields', () => {
+      expect(component.istEingebbareZeile(zeile('VERBRAUCH', 5))).toBe(false);
+    });
+
+    it('should refuse every line once the billing is closed', () => {
+      component.kopf.abgerechnet = true;
+
+      expect(component.istEingebbareZeile(zeile('VERBRAUCH'))).toBe(false);
+    });
+  });
+
+  describe('positionZuZeile', () => {
+
+    it('should find the position by its database id', () => {
+      const zeile = { positionId: 11, reihenfolge: 99 } as unknown as NkZeile;
+
+      expect(component.positionZuZeile(zeile)?.bezeichnung).toBe('Warmwasser');
+    });
+
+    it('should fall back to the order for an unsaved position', () => {
+      // Vor dem ersten Speichern hat die Position keine ID; die Vorschau fuehrt sie ueber die
+      // Listenposition.
+      const zeile = { positionId: null, reihenfolge: 1 } as unknown as NkZeile;
+
+      expect(component.positionZuZeile(zeile)?.bezeichnung).toBe('Allgemeinstrom');
+    });
+  });
+
+  describe('summeProzentStimmt', () => {
+
+    const info = (summeProzent: number) => ({ summeProzent } as unknown as NkUmlageInfo);
+
+    it('should accept exactly one hundred percent', () => {
+      expect(component.summeProzentStimmt(info(100))).toBe(true);
+    });
+
+    /**
+     * Die Toleranz von 0.0005 fängt **Gleitkomma-Rauschen** ab, nicht eine echte Lücke.
+     *
+     * Das ist geprüftes Ist-Verhalten und kein Zufall: Der Prozentsatz je Mieter wird mit drei
+     * Nachkommastellen erfasst ({@code nk_verbrauch.menge}, `NUMERIC(12,3)`), genau 100 % ist
+     * also erreichbar — 33.334 + 33.333 + 33.333. Deshalb *soll* 99.999 als Abweichung
+     * erscheinen, statt stillschweigend durchzugehen.
+     */
+    it('should accept floating point noise around one hundred', () => {
+      expect(component.summeProzentStimmt(info(99.9999999))).toBe(true);
+      expect(component.summeProzentStimmt(info(100.0000001))).toBe(true);
+    });
+
+    it('should flag a real deviation, however small', () => {
+      // 33.333 x 3 - erreichbar waere 100.000 ueber 33.334 + 33.333 + 33.333.
+      expect(component.summeProzentStimmt(info(99.999))).toBe(false);
+      expect(component.summeProzentStimmt(info(99.99))).toBe(false);
+      expect(component.summeProzentStimmt(info(120))).toBe(false);
+    });
+  });
+
+  // ==================== Verlassen und Speichern ====================
+
+  describe('Verlassen', () => {
+
+    it('should emit closed on cancel', () => {
+      const geschlossen = vi.fn();
+      component.closed.subscribe(geschlossen);
+
+      component.onAbbrechen();
+
+      expect(geschlossen).toHaveBeenCalled();
+    });
+
+    it('should emit closed on the way back to the list', () => {
+      const geschlossen = vi.fn();
+      component.closed.subscribe(geschlossen);
+
+      component.onZurueckZurUebersicht();
+
+      expect(geschlossen).toHaveBeenCalled();
+    });
+  });
+
+  describe('Speichern der Details', () => {
+
+    it('should send the complete state and report success', () => {
+      component.onSpeichern();
+
+      expect(nebenkostenServiceSpy.updateAbrechnung).toHaveBeenCalled();
+      const [id, detail] = nebenkostenServiceSpy.updateAbrechnung.mock.calls[0];
+      expect(id).toBe(1);
+      expect(detail.positionen.length).toBe(2);
+      expect(detail.akonto.length).toBeGreaterThan(0);
+      expect(component.messageType).toBe('success');
+    });
+
+    it('should announce the save to the list', () => {
+      const gespeichert = vi.fn();
+      component.saved.subscribe(gespeichert);
+
+      component.onSpeichern();
+
+      expect(gespeichert).toHaveBeenCalled();
+    });
+
+    /**
+     * Der Fehlerschlüssel des Servers wird wörtlich angezeigt.
+     *
+     * Nur so erfährt der Benutzer, warum abgewiesen wurde — etwa dass die Anzahl Wohnungen zu
+     * klein erfasst ist. Eine generische Meldung liesse ihn im Dunkeln.
+     */
+    it('should show the server error key when saving is rejected', () => {
+      nebenkostenServiceSpy.updateAbrechnung.mockReturnValue(
+        throwError(() => ({ error: 'NK_FEHLER_ANZAHL_WOHNUNGEN' })));
+
+      component.onSpeichern();
+
+      expect(component.message).toBe('NK_FEHLER_ANZAHL_WOHNUNGEN');
+      expect(component.messageType).toBe('error');
+    });
+
+    it('should fall back to a generic message when the error carries no key', () => {
+      nebenkostenServiceSpy.updateAbrechnung.mockReturnValue(throwError(() => ({})));
+
+      component.onSpeichern();
+
+      expect(component.message).toBe('NK_FEHLER_SPEICHERN');
+      expect(component.messageType).toBe('error');
+    });
+
+    it('should adopt the server values after saving', () => {
+      const antwort = structuredClone(serverDetail) as NkAbrechnungDetail;
+      antwort.abrechnung.bezeichnung = 'Vom Server umbenannt';
+      nebenkostenServiceSpy.updateAbrechnung.mockReturnValue(of(antwort));
+
+      component.onSpeichern();
+
+      expect(component.kopf.bezeichnung).toBe('Vom Server umbenannt');
     });
   });
 });

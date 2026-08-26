@@ -422,9 +422,12 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
   /**
    * Ergibt die Summe der Anteile 100%?
    *
-   * <p>Verglichen wird auf drei Nachkommastellen genau — so fein lässt sich ein Prozentsatz
-   * erfassen. Ein Gleitkomma-Vergleich auf exakte Gleichheit meldete sonst bei 33.333 × 3 eine
-   * Abweichung, die keine ist.
+   * <p>Die Toleranz fängt **Gleitkomma-Rauschen** ab (Summen wie 99.9999999), nicht eine echte
+   * Lücke. Hier stand, sie verhindere die Meldung bei 33.333 × 3 = 99.999 — das trifft nicht zu:
+   * 0.001 liegt über der Toleranz und wird gemeldet. Das ist auch richtig so, denn der
+   * Prozentsatz je Mieter wird mit drei Nachkommastellen erfasst
+   * ({@code nk_verbrauch.menge}, `NUMERIC(12,3)`), genau 100 % ist also erreichbar:
+   * 33.334 + 33.333 + 33.333.
    */
   summeProzentStimmt(info: NkUmlageInfo): boolean {
     return Math.abs(info.summeProzent - 100) < 0.0005;
