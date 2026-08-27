@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { createSpyObj, SpyObj } from '../../../testing/spy';
+import { fakeAsync, tick } from '../../../testing/fake-async';
 import { NebenkostenAbrechnungFormComponent } from './nebenkosten-abrechnung-form.component';
 import { NebenkostenService } from '../../services/nebenkosten.service';
 import { TranslationService } from '../../services/translation.service';
@@ -363,11 +364,188 @@ describe('NebenkostenAbrechnungFormComponent', () => {
       component.kopf.abgerechnet = true;
       fixture.detectChanges();
 
-      // Unten bleibt die Schaltflaeche stehen, aber gesperrt - oben verschwindet sie mit der
-      // ganzen Zeile, zu der auch "Position hinzufuegen" gehoert.
+      // Unten bleibt die Schaltflaeche stehen, aber gesperrt - oben verschwindet sie zusammen mit
+      // "Position hinzufuegen". Die Zeile selbst bleibt: "Zurueck zur Uebersicht" steht dort auch
+      // auf einer abgeschlossenen Abrechnung.
       const buttons = speichernButtons();
       expect(buttons.length).toBe(1);
       expect(buttons[0].disabled).toBe(true);
+    });
+  });
+
+  describe('Zurück zur Übersicht', () => {
+    function zurueckButtons(): HTMLButtonElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('button'))
+        .filter(b => (b as HTMLElement).textContent?.includes('NK_ZURUECK_UEBERSICHT')) as HTMLButtonElement[];
+    }
+
+    it('should offer the way back at the top and at the end of the form', () => {
+      // Aus demselben Grund wie das zweite Speichern: Bei dreissig Mieterbloecken liegt das Ende
+      // der Maske mehrere Bildschirmseiten entfernt.
+      expect(zurueckButtons().length).toBe(2);
+    });
+
+    it('should go back from the button at the top as well', () => {
+      const closed = vi.spyOn(component.closed, 'emit');
+
+      zurueckButtons()[0].click();
+
+      expect(closed).toHaveBeenCalled();
+    });
+
+    /**
+     * Auf einer abgeschlossenen Abrechnung ist der Weg zurück der einzige Grund, überhaupt eine
+     * Schaltfläche zu suchen — er bleibt deshalb stehen, während „Position hinzufügen" und das
+     * obere Speichern verschwinden.
+     */
+    it('should keep the upper way back when the billing is closed', () => {
+      component.kopf.abgerechnet = true;
+      fixture.detectChanges();
+
+      expect(zurueckButtons().length).toBe(2);
+      expect(zurueckButtons()[0].disabled).toBe(false);
+    });
+
+    it('should drop "Position hinzufügen" when the billing is closed', () => {
+      component.kopf.abgerechnet = true;
+      fixture.detectChanges();
+
+      const hinzufuegen = Array.from(fixture.nativeElement.querySelectorAll('button'))
+        .filter(b => (b as HTMLElement).textContent?.includes('NK_POSITION_HINZUFUEGEN'));
+      expect(hinzufuegen.length).toBe(0);
+    });
+  });
+
+  /**
+   * „Abbrechen" verwirft die nicht gespeicherten Änderungen und bleibt in der Maske.
+   *
+   * Vorher tat es dasselbe wie „Zurück zur Übersicht" — zwei Schaltflächen mit identischem
+   * Verhalten, von denen eine ein Versprechen gab, das sie nicht hielt.
+   */
+  describe('onAbbrechen', () => {
+    it('should reload the billing instead of leaving the form', () => {
+      const closed = vi.spyOn(component.closed, 'emit');
+      nebenkostenServiceSpy.getAbrechnungDetail.mockClear();
+
+      component.onAbbrechen();
+
+      expect(nebenkostenServiceSpy.getAbrechnungDetail).toHaveBeenCalledWith(1);
+      expect(closed).not.toHaveBeenCalled();
+    });
+
+    it('should discard unsaved changes', () => {
+      component.kopf.bezeichnung = 'Halb getippt';
+
+      component.onAbbrechen();
+
+      // Der Stand des Servers, nicht der getippte.
+      expect(component.kopf.bezeichnung).toBe('Nebenkosten 2026');
+    });
+
+    it('should confirm the discarding with a message', () => {
+      component.onAbbrechen();
+
+      expect(component.message).toBe('NK_AENDERUNGEN_VERWORFEN');
+      expect(component.messageType).toBe('success');
+    });
+
+    it('should clear field errors of a failed save attempt', () => {
+      component.speichernVersucht = true;
+
+      component.onAbbrechen();
+
+      expect(component.speichernVersucht).toBe(false);
+    });
+
+    /** Eine noch nicht gespeicherte Abrechnung hat keinen Stand, auf den man zurückfallen könnte. */
+    it('should close the form for a new billing', () => {
+      const closed = vi.spyOn(component.closed, 'emit');
+      component.abrechnungId = null;
+      nebenkostenServiceSpy.getAbrechnungDetail.mockClear();
+
+      component.onAbbrechen();
+
+      expect(closed).toHaveBeenCalled();
+      expect(nebenkostenServiceSpy.getAbrechnungDetail).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Schlägt das Laden fehl, steht die Fehlermeldung — und **bleibt** stehen.
+     *
+     * Würde die Erfolgsmeldung vor dem Ergebnis gezeigt, nähme ihr Fünf-Sekunden-Timer die
+     * Fehlermeldung mit: ein Fehler, der von selbst verschwindet.
+     */
+    it('should show the load error instead of a success message', fakeAsync(() => {
+      nebenkostenServiceSpy.getAbrechnungDetail.mockReturnValue(throwError(() => ({ status: 500 })));
+
+      component.onAbbrechen();
+
+      expect(component.message).toBe('NK_FEHLER_LADEN');
+      expect(component.messageType).toBe('error');
+
+      tick(5000);
+
+      expect(component.message).toBe('NK_FEHLER_LADEN');
+    }));
+
+    /** Der Timer der Erfolgsmeldung räumt nur die eigene Meldung ab. */
+    it('should not clear a later error message after five seconds', fakeAsync(() => {
+      component.onAbbrechen();
+      expect(component.message).toBe('NK_AENDERUNGEN_VERWORFEN');
+
+      nebenkostenServiceSpy.getAbrechnungDetail.mockReturnValue(throwError(() => ({ status: 500 })));
+      component.ladeDetail(1);
+      expect(component.message).toBe('NK_FEHLER_LADEN');
+
+      tick(5000);
+
+      expect(component.message).toBe('NK_FEHLER_LADEN');
+    }));
+  });
+
+  describe('Ausrichtung der Mengeneinheit', () => {
+    /**
+     * Die Mengeneinheit steht bei jeder Positionsart in derselben Rasterspalte.
+     *
+     * Geprüft wird die Zuordnung zur Spalte über die Klasse — die tatsächliche Ausrichtung ist
+     * eine Frage des Stylesheets und im jsdom nicht messbar. Ohne diese Klasse rutschte die
+     * Mengeneinheit einer Verbrauchsposition unter die *Gesamtmenge* der Umlage darüber.
+     */
+    function einheitFelder(): HTMLElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('.nk-positionen__feld--einheit'));
+    }
+
+    it('should assign the unit field of a consumption position to its own column', () => {
+      component.positionen = [{
+        art: NkPositionsart.VERBRAUCH, bezeichnung: 'Wasser', einheit: Mengeneinheit.M3,
+        totalbetrag: null, gesamtmenge: null, betragProEinheit: 1.85, prozentsatz: null,
+        verbraeuche: []
+      }];
+      fixture.detectChanges();
+
+      expect(einheitFelder().length).toBe(1);
+    });
+
+    it('should assign the unit field of an allocation position to the same column', () => {
+      component.positionen = [{
+        art: NkPositionsart.UMLAGE, bezeichnung: 'Allgemeinstrom', einheit: Mengeneinheit.CHF,
+        totalbetrag: 900, gesamtmenge: null, betragProEinheit: null, prozentsatz: null,
+        verbraeuche: []
+      }];
+      fixture.detectChanges();
+
+      expect(einheitFelder().length).toBe(1);
+    });
+
+    it('should not offer a unit field for a share or surcharge position', () => {
+      component.positionen = [{
+        art: NkPositionsart.ANTEIL, bezeichnung: 'Heizkosten', einheit: null,
+        totalbetrag: 1000, gesamtmenge: null, betragProEinheit: null, prozentsatz: null,
+        verbraeuche: []
+      }];
+      fixture.detectChanges();
+
+      expect(einheitFelder().length).toBe(0);
     });
   });
 
@@ -1052,13 +1230,18 @@ describe('NebenkostenAbrechnungFormComponent', () => {
 
   describe('Verlassen', () => {
 
-    it('should emit closed on cancel', () => {
+    /**
+     * „Abbrechen" verlässt die Maske **nicht** mehr, sondern lädt neu — Einzelheiten in
+     * `describe('onAbbrechen')`. Hier steht nur die Abgrenzung: Von den beiden Schaltflächen
+     * verlässt allein „Zurück zur Übersicht" die Maske.
+     */
+    it('should not emit closed on cancel of a saved billing', () => {
       const geschlossen = vi.fn();
       component.closed.subscribe(geschlossen);
 
       component.onAbbrechen();
 
-      expect(geschlossen).toHaveBeenCalled();
+      expect(geschlossen).not.toHaveBeenCalled();
     });
 
     it('should emit closed on the way back to the list', () => {
@@ -1068,6 +1251,87 @@ describe('NebenkostenAbrechnungFormComponent', () => {
       component.onZurueckZurUebersicht();
 
       expect(geschlossen).toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * „Zurück zur Übersicht" sichert und geht: „ich bin fertig" heisst beides.
+   *
+   * Der Weg hinaus ist damit nicht mehr verlustfrei zu haben — genau das war gewollt. Scheitert
+   * das Speichern, bleibt die Maske stehen: Ein Verlassen würde die Eingaben verwerfen, die
+   * gerade gesichert werden sollten.
+   */
+  describe('onZurueckZurUebersicht', () => {
+    it('should save before leaving', () => {
+      const geschlossen = vi.fn();
+      component.closed.subscribe(geschlossen);
+      component.kopf.bezeichnung = 'Geändert';
+
+      component.onZurueckZurUebersicht();
+
+      expect(nebenkostenServiceSpy.updateAbrechnung).toHaveBeenCalledWith(1, expect.anything());
+      expect(geschlossen).toHaveBeenCalled();
+    });
+
+    it('should not leave when the input is invalid', () => {
+      const geschlossen = vi.fn();
+      component.closed.subscribe(geschlossen);
+      component.kopf.bezeichnung = '';
+
+      component.onZurueckZurUebersicht();
+
+      expect(nebenkostenServiceSpy.updateAbrechnung).not.toHaveBeenCalled();
+      expect(geschlossen).not.toHaveBeenCalled();
+      expect(component.message).toBe('NK_FEHLER_EINGABEN');
+    });
+
+    it('should not leave when the server rejects the save', () => {
+      const geschlossen = vi.fn();
+      component.closed.subscribe(geschlossen);
+      nebenkostenServiceSpy.updateAbrechnung.mockReturnValue(
+        throwError(() => ({ error: 'NK_FEHLER_ZEITRAUM' })));
+
+      component.onZurueckZurUebersicht();
+
+      expect(geschlossen).not.toHaveBeenCalled();
+      expect(component.message).toBe('NK_FEHLER_ZEITRAUM');
+    });
+
+    /** Auf einer abgeschlossenen Abrechnung gibt es nichts zu speichern — der Server wiese es ab. */
+    it('should leave without saving when the billing is closed', () => {
+      const geschlossen = vi.fn();
+      component.closed.subscribe(geschlossen);
+      component.kopf.abgerechnet = true;
+
+      component.onZurueckZurUebersicht();
+
+      expect(nebenkostenServiceSpy.updateAbrechnung).not.toHaveBeenCalled();
+      expect(geschlossen).toHaveBeenCalled();
+    });
+
+    it('should create a new billing before leaving', () => {
+      const geschlossen = vi.fn();
+      component.closed.subscribe(geschlossen);
+      component.abrechnungId = null;
+      nebenkostenServiceSpy.createAbrechnung.mockReturnValue(
+        of({ ...serverDetail.abrechnung, id: 7 }));
+
+      component.onZurueckZurUebersicht();
+
+      expect(nebenkostenServiceSpy.createAbrechnung).toHaveBeenCalled();
+      expect(nebenkostenServiceSpy.updateAbrechnung).toHaveBeenCalledWith(7, expect.anything());
+      expect(geschlossen).toHaveBeenCalled();
+    });
+
+    /**
+     * Beide Bereiche stellen ihre Schaltflächen gleich dar: Der Modifier `--equal` setzte
+     * `flex: 1` auf jeden Button und zog sie über die ganze Zeile — die obere Zeile tut das nicht.
+     */
+    it('should not stretch the buttons across the row', () => {
+      const aktionen = fixture.nativeElement.querySelector('.zev-form-actions') as HTMLElement;
+
+      expect(aktionen).toBeTruthy();
+      expect(aktionen.classList.contains('zev-form-actions--equal')).toBe(false);
     });
   });
 

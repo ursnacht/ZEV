@@ -63,13 +63,43 @@
   cursor: grabbing;
 }
 
-/* Die art-abhaengigen Felder stehen nebeneinander und brechen auf schmalen Schirmen um.
-   `flex-start`, weil alle Felder oben mit ihrer Titelzeile beginnen. */
+/**
+ * Die art-abhaengigen Felder stehen in drei festen Spalten: Betrag, Menge, Mengeneinheit.
+ *
+ * Jede Positionsart fuellt davon nur, was sie kennt - Umlage alle drei, Verbrauch die erste und
+ * die dritte, Anteil und Zuschlag nur die erste. Die Mengeneinheit steht dadurch bei jeder Art an
+ * derselben Stelle, und die Auswahlfelder mehrerer Zeilen stehen untereinander.
+ *
+ * Vorher war das eine Flex-Zeile: Dort ruecken die Felder auf, und die Mengeneinheit einer
+ * Verbrauchsposition landete unter der *Gesamtmenge* der Umlage darueber.
+ *
+ * Die Spalten sind **fest** und nicht `minmax(0, …)`: Eine leere Spalte wuerde sonst auf 0
+ * zusammenfallen, und genau dieses Zusammenfallen war das Problem. Der Preis ist, dass eine
+ * Anteil- oder Zuschlagszeile die volle Breite beansprucht, obwohl sie ein Feld zeigt - die
+ * Spaltenbreite der Tabelle richtet sich ohnehin nach der breitesten Zeile.
+ */
 .nk-positionen__werte {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, 10rem);
   gap: var(--spacing-sm);
-  align-items: flex-start;
+  align-items: start;
+}
+
+/* Dritte Spalte, unabhaengig davon, wie viele Felder die Art davor kennt. */
+.nk-positionen__feld--einheit {
+  grid-column: 3;
+}
+
+/* Auf schmalen Schirmen untereinander: Dort ist eine Ausrichtung ueber Zeilen hinweg ohnehin
+   nicht sichtbar, und drei feste Spalten wuerden die Tabelle aus dem Bild schieben. */
+@media (max-width: 600px) {
+  .nk-positionen__werte {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nk-positionen__feld--einheit {
+    grid-column: auto;
+  }
 }
 
 /* Waehrend des Ziehens: die Vorschau des Angular CDK an die Tabelle angleichen */

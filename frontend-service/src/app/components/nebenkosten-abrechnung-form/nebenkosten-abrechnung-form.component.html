@@ -125,7 +125,7 @@
                           [name]="'menge' + i" min="0" step="0.001" [disabled]="gesperrt"
                           (ngModelChange)="rechne()" />
                       </label>
-                      <label class="nk-positionen__feld">{{ 'MENGENEINHEIT' | translate }}
+                      <label class="nk-positionen__feld nk-positionen__feld--einheit">{{ 'MENGENEINHEIT' | translate }}
                         <select class="zev-select" [(ngModel)]="position.einheit"
                           [name]="'einheit' + i" [disabled]="gesperrt">
                           @for (einheit of mengeneinheiten; track einheit) {
@@ -140,7 +140,7 @@
                           [name]="'proEinheit' + i" min="0" step="0.0001" [disabled]="gesperrt"
                           (ngModelChange)="rechne()" />
                       </label>
-                      <label class="nk-positionen__feld">{{ 'MENGENEINHEIT' | translate }}
+                      <label class="nk-positionen__feld nk-positionen__feld--einheit">{{ 'MENGENEINHEIT' | translate }}
                         <select class="zev-select" [(ngModel)]="position.einheit"
                           [name]="'einheit' + i" [disabled]="gesperrt">
                           @for (einheit of mengeneinheiten; track einheit) {
@@ -199,8 +199,11 @@
         <p>{{ 'NK_KEINE_POSITIONEN' | translate }}</p>
       }
 
-      @if (!gesperrt) {
-        <div class="zev-button-row">
+      <!-- Die Zeile steht ausserhalb der Sperr-Pruefung: Der Weg zurueck gilt auch fuer eine
+           abgeschlossene Abrechnung, die man nur liest - dort ist er sogar der einzige Grund,
+           ueberhaupt eine Schaltflaeche zu suchen. -->
+      <div class="zev-button-row">
+        @if (!gesperrt) {
           <button type="button" class="zev-button zev-button--secondary" (click)="onPositionHinzufuegen()">
             <app-icon name="plus"></app-icon>
             {{ 'NK_POSITION_HINZUFUEGEN' | translate }}
@@ -211,8 +214,14 @@
             <app-icon name="check"></app-icon>
             {{ 'SPEICHERN' | translate }}
           </button>
-        </div>
-      }
+        }
+        <!-- Aus demselben Grund wie das zweite Speichern: Das Ende der Maske liegt weit unten. -->
+        <button type="button" class="zev-button zev-button--secondary"
+          (click)="onZurueckZurUebersicht()">
+          <app-icon name="chevron-left"></app-icon>
+          {{ 'NK_ZURUECK_UEBERSICHT' | translate }}
+        </button>
+      </div>
 
       <!-- Kontrollzahlen: Leerstandsanteil und Rundungsdifferenz getrennt, weil sie
            verschiedene Ursachen haben und sonst nicht erklaerbar waeren. -->
@@ -442,7 +451,10 @@
     </div>
   }
 
-  <div class="zev-form-actions zev-form-actions--equal">
+  <!-- Ohne `--equal`: Der Modifier setzt `flex: 1` auf jeden Button und zieht sie ueber die
+       ganze Zeile. Die obere Zeile bei den allgemeinen Positionen tut das nicht - beide Bereiche
+       sollen gleich aussehen. -->
+  <div class="zev-form-actions">
     <!-- Bewusst NICHT ueber [disabled] gesperrt: Eine graue Schaltflaeche sagt nicht, was fehlt.
          Der Klick loest die Pruefung aus und benennt den Grund. -->
     <button type="button" class="zev-button zev-button--primary" [disabled]="gesperrt"

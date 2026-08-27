@@ -182,3 +182,113 @@ Umsetzung neu prüfen.
 
 ### Annahme 2: Kein PDF, keine Debitorenbuchung
 Beides ist in der Spec ausdrücklich out of scope (Abschnitt 7) und in keiner Phase enthalten.
+
+### „Zurück zur Übersicht" oben wiederholt, Mengeneinheit in eigener Rasterspalte
+
+Zwei Feinschliffe an der Erfassungsmaske (FR-7, 27.08.2026).
+
+**1. Zweiter Weg zurück oben.** „Zurück zur Übersicht" steht jetzt auch in der Button-Zeile der
+allgemeinen Positionen — aus demselben Grund wie das zweite Speichern: Bei dreissig Mieterblöcken
+liegt das Ende der Maske mehrere Bildschirmseiten entfernt.
+
+- Die Zeile steht neu **ausserhalb** von `@if (!gesperrt)`. Innerhalb wäre der Weg zurück genau
+  dann verschwunden, wenn man die Maske nur liest — und dort ist er der einzige Grund, überhaupt
+  eine Schaltfläche zu suchen. „Position hinzufügen" und das obere Speichern bleiben an die
+  Sperre gebunden.
+- Der Kommentar im bestehenden Test („oben verschwindet sie mit der ganzen Zeile") war damit
+  falsch und ist korrigiert; die Zusicherungen des Tests gelten unverändert.
+
+**2. Mengeneinheit untereinander.** `.nk-positionen__werte` ist von Flex auf ein **Raster mit drei
+festen Spalten** umgestellt: Betrag, Menge, Mengeneinheit. Die Mengeneinheit trägt
+`.nk-positionen__feld--einheit` mit `grid-column: 3` und steht damit bei jeder Positionsart an
+derselben Stelle.
+
+- Vorher rückten die Felder auf: Eine Verbrauchsposition kennt nur Betrag pro Einheit und
+  Mengeneinheit, deren Auswahlfeld landete deshalb unter der *Gesamtmenge* der Umlage darüber.
+- Die Spalten sind **fest** (`repeat(3, 10rem)`) und nicht `minmax(0, …)`: Eine leere Spalte fiele
+  sonst auf 0 zusammen — genau das Zusammenfallen war das Problem. Der Preis: Eine Anteil- oder
+  Zuschlagszeile beansprucht die volle Rasterbreite, obwohl sie ein Feld zeigt. Das kostet nichts,
+  weil die Spaltenbreite der Tabelle sich ohnehin nach der breitesten Zeile richtet.
+- Unter 600px stehen die Felder untereinander (`grid-template-columns: minmax(0, 1fr)`,
+  `grid-column: auto`); dort ist eine Ausrichtung über Zeilen hinweg nicht sichtbar, und drei feste
+  Spalten schöben die Tabelle aus dem Bild.
+- **Kein Design-System-Eingriff:** Die Klassen sind komponentenspezifisch, wie schon bei der
+  Feldausrichtung entschieden — `.zev-table td { vertical-align: top }` und ein Werte-Raster träfen
+  jede Tabelle der Anwendung.
+- **Tests:** Sieben Unit-Tests — zwei Wege zurück, oberer löst dieselbe Aktion aus, oberer bleibt
+  bei abgeschlossener Abrechnung, „Position hinzufügen" fällt weg, und die Spaltenzuordnung der
+  Mengeneinheit je Positionsart. Die Ausrichtung selbst ist eine Frage des Stylesheets und im jsdom
+  nicht messbar; geprüft wird die Klasse, die sie herstellt.
+
+### „Abbrechen" verwirft, statt die Maske zu verlassen
+
+„Abbrechen" und „Zurück zur Übersicht" riefen beide `this.closed.emit()` — zwei Schaltflächen mit
+identischem Verhalten, von denen eine ein Versprechen gab, das sie nicht hielt: Verworfen wurde
+nichts, die Maske wurde bloss verlassen (FR-7, 27.08.2026).
+
+- **`onAbbrechen()`** lädt jetzt über `ladeDetail(id, 'NK_AENDERUNGEN_VERWORFEN')` neu und bleibt in
+  der Maske. `speichernVersucht` wird zurückgesetzt: Feldfehler eines gescheiterten
+  Speicherversuchs gehören zu Eingaben, die es nicht mehr gibt.
+- **Neue Abrechnung:** Ohne `abrechnungId` gibt es keinen Stand, auf den man zurückfallen könnte —
+  dort schliesst „Abbrechen" die Maske wie bisher (Entscheid des Users). Derselbe Knopf hat damit
+  je nach Zustand zwei Bedeutungen; die Alternative, eine leergeräumte Maske, überrascht beim
+  Anlegen mehr als sie hilft.
+- **`ladeDetail(id, erfolgsmeldung?)`**: Die Meldung erscheint **im Erfolgszweig**, nicht beim
+  Aufrufer. Vor dem Ergebnis gezeigt, hätte ihr Fünf-Sekunden-Timer eine danach eintreffende
+  Fehlermeldung mitgenommen.
+- **Latenter Fehler mitkorrigiert:** `showMessage` löschte `this.message` nach fünf Sekunden
+  **bedingungslos**. Eine Fehlermeldung, die nach einer Erfolgsmeldung eintraf, verschwand damit
+  von selbst — entgegen der Konvention, dass Fehler bis zum Wegklicken stehen. Der Timer räumt
+  jetzt nur ab, wenn noch seine eigene Meldung steht. Betrifft jede Meldung dieser Maske, nicht nur
+  das Abbrechen.
+- **Migration V127**: Schlüssel `NK_AENDERUNGEN_VERWORFEN` (DE/EN), `ON CONFLICT (key) DO NOTHING`.
+  V126 war laut `flyway_schema_history` bereits ausgeführt, also eine neue Migration.
+- **Tests:** Sieben neue Unit-Tests (Neuladen statt Verlassen, Änderungen verworfen, Meldung,
+  Feldfehler weg, neue Abrechnung schliesst, Fehler beim Laden statt Erfolgsmeldung, Fehler
+  überlebt den Timer). Der bestehende Test `should emit closed on cancel` hielt das alte Verhalten
+  fest und ist zur Abgrenzung umgeschrieben: Von den beiden Schaltflächen verlässt allein „Zurück
+  zur Übersicht" die Maske.
+- **E2E unberührt:** Die Suite klickt „Abbrechen" nicht; sie greift den Weg zurück über
+  `.zev-form-actions .zev-button--secondary').last()`.
+
+### „Zurück zur Übersicht" speichert; Schaltflächen in beiden Bereichen gleich
+
+Zwei Nachträge (FR-7, 27.08.2026). Damit sind die drei Schaltflächen klar getrennt: **Speichern**
+sichert und bleibt, **Abbrechen** verwirft und bleibt, **Zurück zur Übersicht** sichert und geht.
+
+**1. Speichern auf dem Weg hinaus.** `onSpeichern()` ist zu `speichereUnd(danach?)`
+verallgemeinert; `onZurueckZurUebersicht()` ruft es mit `() => this.closed.emit()`.
+
+- Der Rückruf läuft **nur nach erfolgreichem Speichern**. Bei ungültigen Eingaben oder einem
+  Fehler des Servers bleibt die Maske stehen und zeigt den Grund — ein Verlassen würde genau die
+  Eingaben verwerfen, die gerade gesichert werden sollten.
+- `speichereDetail(id, danach?)` reicht den Rückruf durch; der Anlege-Pfad einer neuen Abrechnung
+  (create, dann update) ebenso.
+- Bei **abgeschlossener** Abrechnung führt der Weg direkt zurück: Die Felder sind gesperrt, und der
+  Server wiese das Schreiben ab.
+- **Kein Bestätigungstext nach dem Verlassen:** Die Erfolgsmeldung entsteht in der Maske, die
+  danach schliesst; die Liste zeigt keine Meldung. Sichtbar ist das Ergebnis an der Zeile.
+
+**2. Schaltflächen nicht über die Zeile gezogen.** Am Ende der Maske ist der Modifier
+`zev-form-actions--equal` entfernt — er setzt `flex: 1` auf jeden Button
+(`design-system/.../form.css:124`) und zog die drei über die ganze Breite, während die obere Zeile
+(`zev-button-row`) das nicht tut.
+
+- **Kein CSS geschrieben:** Beide Klassen kommen aus dem Design System, es fiel nur ein Modifier
+  weg. `zev-form-actions` bleibt für den unteren Bereich richtig — es bringt den oberen Abstand mit,
+  den die Aktionszeile am Formularende braucht.
+
+**Tests:** Sechs neue Unit-Tests (speichert vor dem Verlassen, bleibt bei ungültiger Eingabe, bleibt
+bei Serverfehler, verlässt ohne Speichern bei abgeschlossener Abrechnung, legt eine neue Abrechnung
+vorher an, kein `--equal` an der Aktionszeile). Der bestehende Test `should emit closed on the way
+back to the list` bestand nach der Änderung weiterhin — aber aus einem anderen Grund, weil der
+Mock synchron speichert; er dokumentiert das Speichern nicht und wird deshalb von den neuen Tests
+ergänzt, nicht ersetzt.
+
+**E2E unberührt:** Die vier Stellen, die den Rückweg klicken, tun das auf einer gültigen oder auf
+einer gesperrten Abrechnung.
+
+**Nachtrag zur Bezeichnung:** Die Schaltfläche heisst neu **„Speichern und zurück"** (V128, per
+`UPDATE zev.translation` nach dem Muster von V113/V114). Der Text war im Betrieb über den
+Übersetzungs-Editor schon geändert; ohne die Migration bekäme eine frisch aufgesetzte Datenbank
+weiterhin den alten aus V122. Der Schlüssel `NK_ZURUECK_UEBERSICHT` behält seinen Namen.

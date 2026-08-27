@@ -192,12 +192,23 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
     });
   }
 
-  ladeDetail(id: number): void {
+  /**
+   * Lädt den Stand des Servers und zeigt ihn an.
+   *
+   * @param id            ID der Abrechnung
+   * @param erfolgsmeldung Meldung, die **nach** erfolgreichem Laden erscheint. Bewusst hier und
+   *                       nicht beim Aufrufer: Vor dem Ergebnis gezeigt, würde ihr
+   *                       Fünf-Sekunden-Timer eine danach eintreffende Fehlermeldung mitnehmen.
+   */
+  ladeDetail(id: number, erfolgsmeldung?: string): void {
     this.laedt = true;
     this.nebenkostenService.getAbrechnungDetail(id).subscribe({
       next: (detail) => {
         this.uebernehme(detail);
         this.laedt = false;
+        if (erfolgsmeldung) {
+          this.showMessage(erfolgsmeldung, 'success');
+        }
       },
       error: () => {
         this.showMessage('NK_FEHLER_LADEN', 'error');
@@ -330,6 +341,17 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
   // ==================== Speichern ====================
 
   onSpeichern(): void {
+    this.speichereUnd();
+  }
+
+  /**
+   * Speichert und führt danach optional etwas aus.
+   *
+   * @param danach läuft **nur** nach erfolgreichem Speichern. Scheitert die Prüfung oder der
+   *               Server, bleibt die Maske stehen und zeigt den Grund — ein Weitergehen würde
+   *               genau die Eingaben verwerfen, die gerade gesichert werden sollten.
+   */
+  private speichereUnd(danach?: () => void): void {
     this.speichernVersucht = true;
     if (!this.istGueltig()) {
       // Die Feldfehler stehen jetzt an den Feldern; die Meldung oben sagt, dass gar nicht
@@ -339,14 +361,14 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
     }
 
     if (this.abrechnungId) {
-      this.speichereDetail(this.abrechnungId);
+      this.speichereDetail(this.abrechnungId, danach);
     } else {
       // Erst anlegen, dann den vollstaendigen Stand schreiben: Positionen brauchen eine ID.
       this.nebenkostenService.createAbrechnung(this.kopf).subscribe({
         next: (erstellt) => {
           this.abrechnungId = erstellt.id ?? null;
           if (this.abrechnungId) {
-            this.speichereDetail(this.abrechnungId);
+            this.speichereDetail(this.abrechnungId, danach);
           }
         },
         error: (error) => this.showMessage(error.error || 'NK_FEHLER_SPEICHERN', 'error')
@@ -354,20 +376,46 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
     }
   }
 
+  /**
+   * Verwirft die nicht gespeicherten Änderungen und zeigt den Stand des Servers.
+   *
+   * <p>Die Maske bleibt dabei **offen**. Vorher tat „Abbrechen" dasselbe wie „Zurück zur
+   * Übersicht" — zwei Schaltflächen mit demselben Verhalten, von denen eine ein Versprechen gab,
+   * das sie nicht hielt: Verworfen wurde nichts, die Maske wurde bloss verlassen.
+   *
+   * <p>Bei einer **noch nicht gespeicherten** Abrechnung gibt es keinen Stand, auf den man
+   * zurückfallen könnte. Dort schliesst „Abbrechen" die Maske wie bisher (Entscheid).
+   */
   onAbbrechen(): void {
-    this.closed.emit();
+    if (!this.abrechnungId) {
+      this.closed.emit();
+      return;
+    }
+
+    // Feldfehler eines gescheiterten Speicherversuchs gehören zu Eingaben, die es nicht mehr gibt.
+    this.speichernVersucht = false;
+    this.ladeDetail(this.abrechnungId, 'NK_AENDERUNGEN_VERWORFEN');
   }
 
   /**
-   * Weg zurück zur Liste, ohne dabei etwas zu verwerfen.
+   * Speichert und geht zur Liste zurück.
    *
-   * <p>Führt heute zum selben Ergebnis wie {@link onAbbrechen} — die Maske hält keinen Zustand,
-   * der beim Verlassen verlorenginge, weil Gespeichertes gespeichert ist. Getrennt trotzdem,
-   * weil die beiden Schaltflächen verschiedene Absichten benennen: „Abbrechen" heisst „ich
-   * verwerfe, was ich angefangen habe", „Zurück zur Übersicht" heisst „ich bin fertig".
+   * <p>„Ich bin fertig" heisst: sichern und raus. Scheitert das Speichern — ungültige Eingaben
+   * oder ein Fehler des Servers —, bleibt die Maske stehen und zeigt den Grund. Ein Verlassen
+   * würde genau die Eingaben verwerfen, die gerade gesichert werden sollten.
+   *
+   * <p>Bei einer <b>abgeschlossenen</b> Abrechnung gibt es nichts zu speichern: Die Felder sind
+   * gesperrt, und der Server wiese das Schreiben ab. Dort führt der Weg direkt zurück.
+   *
+   * <p>Abgegrenzt von {@link onAbbrechen}: Dieses verwirft und bleibt, dieses hier sichert und
+   * geht.
    */
   onZurueckZurUebersicht(): void {
-    this.closed.emit();
+    if (this.gesperrt) {
+      this.closed.emit();
+      return;
+    }
+    this.speichereUnd(() => this.closed.emit());
   }
 
   istGueltig(): boolean {
@@ -461,7 +509,7 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
     this.message = '';
   }
 
-  private speichereDetail(id: number): void {
+  private speichereDetail(id: number, danach?: () => void): void {
     const detail: NkAbrechnungDetail = {
       abrechnung: this.kopf,
       positionen: this.positionen,
@@ -477,6 +525,7 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
         this.uebernehme(gespeichert);
         this.showMessage('NK_ABRECHNUNG_GESPEICHERT', 'success');
         this.saved.emit();
+        danach?.();
       },
       error: (error) => this.showMessage(error.error || 'NK_FEHLER_SPEICHERN', 'error')
     });
@@ -544,7 +593,13 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
     this.messageType = type;
     if (type === 'success') {
       setTimeout(() => {
-        this.message = '';
+        // Nur die eigene Meldung abräumen: Steht inzwischen eine andere - typischerweise ein
+        // Fehler, der nach der Erfolgsmeldung eintraf -, würde ein bedingungsloses Leeren sie
+        // nach fünf Sekunden verschwinden lassen. Fehler bleiben stehen, bis sie weggeklickt
+        // werden (Projektkonvention).
+        if (this.message === message) {
+          this.message = '';
+        }
       }, 5000);
     }
   }

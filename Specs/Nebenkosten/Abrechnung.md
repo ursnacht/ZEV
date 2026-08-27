@@ -517,6 +517,16 @@ Service sichtbar und folgt dem bestehenden Muster des Org-Filters.
      Weder Zentrieren noch Ausrichten an der Unterkante genügt: Beim Zentrieren schweben die
      unbeschrifteten Felder, an der Unterkante richten sie sich am Hinweistext aus statt an den
      Eingaben.
+   * **Die art-abhängigen Felder stehen in drei festen Spalten:** Betrag, Menge, Mengeneinheit.
+     Jede Art füllt davon nur, was sie kennt — Umlage alle drei, Verbrauch die erste und die
+     **dritte**, Anteil und Zuschlag nur die erste. Damit steht die Mengeneinheit bei jeder Art an
+     derselben Stelle, und die Auswahlfelder mehrerer Zeilen stehen untereinander.
+
+     Vorher rückten die Felder auf, und die Mengeneinheit einer Verbrauchsposition landete unter
+     der *Gesamtmenge* der Umlage darüber. Die Spalten sind deshalb **fest** und nicht
+     mitschrumpfend: Eine leere Spalte fiele sonst zusammen, und genau das war das Problem. Auf
+     schmalen Schirmen (< 600px) stehen die Felder untereinander — dort ist eine Ausrichtung über
+     Zeilen hinweg ohnehin nicht sichtbar.
    * **Ordnen per Drag & Drop** (Entscheid): Die Zeilen werden mit der Maus verschoben; die
      `reihenfolge` ergibt sich aus der Position in der Liste und wird beim Speichern neu
      durchnummeriert. Ein Anfasser-Symbol macht die Zeile als verschiebbar erkennbar.
@@ -535,10 +545,43 @@ Service sichtbar und folgt dem bestehenden Muster des Org-Filters.
 * Am Ende der Maske drei Schaltflächen: **Speichern**, **Abbrechen** und
   **Zurück zur Übersicht**.
 
-  **Speichern** erscheint zusätzlich **oben bei den allgemeinen Positionen**, neben „Position
-  hinzufügen". Bei dreissig Mieterblöcken (NFR-1) liegt das Ende der Maske mehrere
-  Bildschirmseiten entfernt; wer am Kopf der Abrechnung arbeitet, soll dafür nicht ans Ende
-  scrollen müssen. Beide lösen dieselbe Aktion aus.
+  **Speichern** und **Zurück zur Übersicht** erscheinen zusätzlich **oben bei den allgemeinen
+  Positionen**, neben „Position hinzufügen". Bei dreissig Mieterblöcken (NFR-1) liegt das Ende der
+  Maske mehrere Bildschirmseiten entfernt; wer am Kopf der Abrechnung arbeitet, soll dafür nicht
+  ans Ende scrollen müssen. Die oberen lösen dieselbe Aktion aus wie die unteren.
+
+  Die obere Zeile ist bei einer **abgeschlossenen** Abrechnung nicht leer: „Position hinzufügen"
+  und „Speichern" fallen dort weg, **„Zurück zur Übersicht" bleibt**. Auf einer schreibgeschützten
+  Abrechnung ist der Weg zurück der einzige Grund, überhaupt eine Schaltfläche zu suchen.
+
+  **Abbrechen** verwirft die nicht gespeicherten Änderungen: Es lädt die Abrechnung neu und zeigt
+  den Stand des Servers, die Maske bleibt **offen** (Entscheid vom 27.08.2026). Eine Meldung
+  bestätigt das — sonst wäre der Klick auf einer unveränderten Maske ohne erkennbare Wirkung.
+  Feldfehler eines gescheiterten Speicherversuchs verschwinden mit; sie gehören zu Eingaben, die es
+  nicht mehr gibt.
+
+  Bei einer **noch nicht gespeicherten** Abrechnung gibt es keinen Stand, auf den man zurückfallen
+  könnte — dort schliesst „Abbrechen" die Maske (Entscheid). Derselbe Knopf hat damit je nach
+  Zustand zwei Bedeutungen; das ist in Kauf genommen, weil die Alternative — eine leergeräumte
+  Maske — beim Anlegen mehr überrascht als hilft.
+
+  **Vorher taten „Abbrechen" und „Zurück zur Übersicht" dasselbe.** Zwei Schaltflächen mit
+  identischem Verhalten, von denen eine ein Versprechen gab, das sie nicht hielt: Verworfen wurde
+  nichts, die Maske wurde bloss verlassen.
+
+  **Speichern und zurück** speichert und geht dann zur Liste (Entscheid vom 27.08.2026). „Ich bin
+  fertig" heisst beides. Die Schaltfläche hiess bis dahin „Zurück zur Übersicht"; der Text
+  verschwieg das Speichern, weshalb er mit V128 nachgezogen wurde. Der Übersetzungsschlüssel
+  behält seinen Namen (`NK_ZURUECK_UEBERSICHT`) — ihn umzubenennen hiesse, ihn in Vorlage, Tests
+  und E2E mitzuziehen, ohne dass sich am Verhalten etwas ändert. Scheitert das Speichern — ungültige Eingaben oder ein Fehler des Servers —,
+  **bleibt die Maske stehen** und zeigt den Grund: Ein Verlassen würde genau die Eingaben verwerfen,
+  die gerade gesichert werden sollten.
+
+  Bei einer **abgeschlossenen** Abrechnung gibt es nichts zu speichern; die Felder sind gesperrt,
+  und der Server wiese das Schreiben ab. Dort führt der Weg direkt zurück.
+
+  Damit sind die drei Schaltflächen klar getrennt: **Speichern** sichert und bleibt, **Abbrechen**
+  verwirft und bleibt, **Zurück zur Übersicht** sichert und geht.
 
   Speichern lässt die Maske offen, damit die vom Server gelieferten Zahlen geprüft werden können.
   Danach ist „Abbrechen" das falsche Wort für „ich bin fertig" — deshalb der eigene Weg zurück.
@@ -738,6 +781,11 @@ Die Liste ist der Mindestumfang; beim Umsetzen ergänzte Schlüssel folgen derse
       verschiebt die übrigen Felder der Zeile nicht.
 * [ ] Das gilt für jede Positionsart, also auch nach einem Wechsel der Art in derselben Zeile.
 * [ ] Anfasser und Löschen-Schaltfläche liegen auf derselben Linie wie die Eingabefelder.
+* [ ] Die **Mengeneinheit** steht bei jeder Positionsart in derselben Spalte: Bei einer
+      Verbrauchsposition erscheint sie unter der Mengeneinheit einer Umlageposition, nicht unter
+      deren Gesamtmenge.
+* [ ] Der Platz der nicht belegten Spalte bleibt frei — er fällt nicht zusammen, sonst rutschte
+      die Mengeneinheit wieder nach links.
 
 **Positionsart ANTEIL**
 * [ ] „Anteil (%)" steht in der Auswahl der Positionsart zur Verfügung.
@@ -765,7 +813,25 @@ Die Liste ist der Mindestumfang; beim Umsetzen ergänzte Schlüssel folgen derse
       das dasselbe tut wie das am Ende der Maske.
 * [ ] Bei abgeschlossener Abrechnung erscheint dieses zweite Speichern **nicht** — dort fehlt auch
       „Position hinzufügen".
-* [ ] „Zurück zur Übersicht" führt zur Liste, ohne zu speichern und ohne Rückfrage.
+* [ ] Bei den allgemeinen Positionen steht ausserdem ein zweites **Zurück zur Übersicht**, das
+      dasselbe tut wie das am Ende der Maske.
+* [ ] Dieses zweite „Zurück zur Übersicht" bleibt bei **abgeschlossener** Abrechnung stehen — es
+      ist dort die einzige Schaltfläche der oberen Zeile.
+* [ ] „Zurück zur Übersicht" **speichert** und führt dann zur Liste, ohne Rückfrage.
+* [ ] Bei ungültigen Eingaben speichert es nicht und **bleibt** in der Maske, mit derselben
+      Meldung wie ein gescheitertes Speichern.
+* [ ] Weist der Server das Speichern ab, bleibt die Maske ebenfalls stehen.
+* [ ] Bei **abgeschlossener** Abrechnung führt es direkt zur Liste, ohne zu speichern.
+* [ ] Eine neue Abrechnung wird dabei angelegt und gespeichert, bevor die Maske schliesst.
+* [ ] Die Schaltflächen am Ende der Maske sind **nicht** über die ganze Zeile gezogen — sie sehen
+      aus wie die oberen bei den allgemeinen Positionen.
+* [ ] „Abbrechen" einer **gespeicherten** Abrechnung lädt sie neu, bleibt in der Maske und
+      bestätigt das mit einer Meldung.
+* [ ] Dabei werden nicht gespeicherte Änderungen verworfen — die Maske zeigt den Stand des Servers.
+* [ ] Feldfehler eines vorangegangenen Speicherversuchs verschwinden mit dem Abbrechen.
+* [ ] „Abbrechen" einer **neuen**, noch nicht gespeicherten Abrechnung schliesst die Maske.
+* [ ] Die Erfolgsmeldung erscheint erst **nach** dem Laden: Schlägt es fehl, steht die
+      Fehlermeldung — und sie verschwindet nicht nach fünf Sekunden von selbst.
 * [ ] Bei abgeschlossener Abrechnung ist nur **Speichern** gesperrt; beide Wege zurück bleiben
       bedienbar.
 
