@@ -65,10 +65,23 @@ async function clearMessages(page: Page): Promise<void> {
     }
 }
 
-/** Öffnet die Maske für eine neue Abrechnung. Erwartet die geöffnete Liste. */
+/**
+ * Öffnet die Maske für eine neue Abrechnung. Erwartet die geöffnete Liste.
+ *
+ * <p>Wartet auf die **Antwort der Vorlage**, nicht nur auf das sichtbare Feld: Die Maske ist
+ * bedienbar, während die Vorlage unterwegs ist. Wer davor tippt, arbeitet auf einem Stand, den die
+ * Antwort noch anfassen kann — zwei Fälle dieser Suite scheiterten genau daran (die Bezeichnung war
+ * zwischen Tippen und Klick wieder weg). Die Anwendung überschreibt die Eingabe inzwischen nicht
+ * mehr; hier wird zusätzlich abgewartet, damit der Test unabhängig von der Antwortzeit ist.
+ */
 async function oeffneNeueAbrechnung(page: Page): Promise<void> {
+    const vorlage = page.waitForResponse(
+        res => res.url().includes('/api/nebenkosten/abrechnungen/vorlage')
+            && res.request().method() === 'GET',
+        { timeout: 20000 });
     await page.locator('.zev-button-row .zev-button--primary').first().click();
     await expect(page.locator('#bezeichnung')).toBeVisible({ timeout: 10000 });
+    await vorlage;
 }
 
 /** Füllt die Angaben zur Abrechnung. */

@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { createSpyObj, SpyObj } from '../../../testing/spy';
 import { fakeAsync, tick } from '../../../testing/fake-async';
 import { NebenkostenAbrechnungFormComponent } from './nebenkosten-abrechnung-form.component';
@@ -579,10 +579,15 @@ describe('NebenkostenAbrechnungFormComponent', () => {
       expect(component.messageType).toBe('error');
     });
 
+    /**
+     * Eine unberührte Maske für eine neue Abrechnung meldet Feldfehler statt zu werfen.
+     *
+     * <p>Bewusst auf einer **frischen** Komponente: Die Vorlage setzt den Kopf nicht mehr zurück
+     * (sie überschrieb sonst die ersten Eingaben), ein `ngOnInit()` auf der geladenen Instanz
+     * liesse deren Werte also stehen. Der ursprüngliche Fall bleibt derselbe — die Vorlage kommt
+     * serverförmig, mit `null` statt `''`, und ein `bezeichnung.trim()` darauf würde werfen.
+     */
     it('should report the errors of a completely untouched template', () => {
-      // Die Vorlage einer neuen Abrechnung kommt serverfoermig: bezeichnung, datumVon und
-      // datumBis sind `null`, nicht ''. Ohne Normalisierung wirft `bezeichnung.trim()` und der
-      // Klick auf Speichern bliebe ohne jede sichtbare Wirkung.
       const vorlage = {
         abrechnung: {
           id: null, bezeichnung: null, datumVon: null, datumBis: null,
@@ -592,12 +597,14 @@ describe('NebenkostenAbrechnungFormComponent', () => {
         anzahlWohnungenVorschlag: null
       };
       nebenkostenServiceSpy.getVorlage.mockReturnValue(of(vorlage as any));
-      component.abrechnungId = null;
-      component.ngOnInit();
 
-      expect(() => component.onSpeichern()).not.toThrow();
-      expect(component.message).toBe('NK_FEHLER_EINGABEN');
-      expect(component.istGueltig()).toBe(false);
+      const neu = TestBed.createComponent(NebenkostenAbrechnungFormComponent);
+      neu.componentInstance.abrechnungId = null;
+      neu.detectChanges();
+
+      expect(() => neu.componentInstance.onSpeichern()).not.toThrow();
+      expect(neu.componentInstance.message).toBe('NK_FEHLER_EINGABEN');
+      expect(neu.componentInstance.istGueltig()).toBe(false);
       expect(nebenkostenServiceSpy.createAbrechnung).not.toHaveBeenCalled();
     });
 
@@ -664,6 +671,59 @@ describe('NebenkostenAbrechnungFormComponent', () => {
       neu.detectChanges();
 
       expect(neu.componentInstance.kopf.anzahlWohnungen).toBe(9);
+    });
+
+    /**
+     * **Eine spät eintreffende Vorlage überschreibt die ersten Eingaben nicht.**
+     *
+     * Die Maske ist bedienbar, während die Vorlage unterwegs ist — `laedt` steuert kein
+     * Rendering. Vorher setzte die Antwort per `uebernehme()` den ganzen Kopf zurück: Der Benutzer
+     * tippte eine Bezeichnung, und sie war wieder weg. Zwei Fälle der E2E-Suite scheiterten daran
+     * beim ersten Speichern mit „Eingaben prüfen".
+     */
+    it('should not overwrite typed input when the template arrives late', () => {
+      const spaet = new Subject<NkAbrechnungDetail>();
+      nebenkostenServiceSpy.getVorlage.mockReturnValue(spaet);
+
+      const neu = TestBed.createComponent(NebenkostenAbrechnungFormComponent);
+      neu.componentInstance.abrechnungId = null;
+      neu.detectChanges();
+
+      // Der Benutzer tippt, bevor die Antwort da ist.
+      neu.componentInstance.kopf.bezeichnung = 'Nebenkosten 2087';
+      neu.componentInstance.kopf.datumVon = '2087-01-01';
+      neu.componentInstance.kopf.datumBis = '2087-12-31';
+      neu.componentInstance.kopf.anzahlWohnungen = 99;
+
+      const vorlage = structuredClone(serverDetail) as NkAbrechnungDetail;
+      vorlage.abrechnung.bezeichnung = '';
+      vorlage.abrechnung.datumVon = '';
+      vorlage.abrechnung.datumBis = '';
+      vorlage.anzahlWohnungenVorschlag = 9;
+      spaet.next(vorlage);
+
+      expect(neu.componentInstance.kopf.bezeichnung).toBe('Nebenkosten 2087');
+      expect(neu.componentInstance.kopf.datumVon).toBe('2087-01-01');
+      expect(neu.componentInstance.kopf.datumBis).toBe('2087-12-31');
+      expect(neu.componentInstance.kopf.anzahlWohnungen).toBe(99);
+      expect(neu.componentInstance.istGueltig()).toBe(true);
+    });
+
+    /** Der Vorschlag greift nur, wo noch keine Anzahl steht. */
+    it('should still adopt the suggestion when nothing was typed', () => {
+      const spaet = new Subject<NkAbrechnungDetail>();
+      nebenkostenServiceSpy.getVorlage.mockReturnValue(spaet);
+
+      const neu = TestBed.createComponent(NebenkostenAbrechnungFormComponent);
+      neu.componentInstance.abrechnungId = null;
+      neu.detectChanges();
+
+      const vorlage = structuredClone(serverDetail) as NkAbrechnungDetail;
+      vorlage.anzahlWohnungenVorschlag = 7;
+      spaet.next(vorlage);
+
+      expect(neu.componentInstance.kopf.anzahlWohnungen).toBe(7);
+      expect(neu.componentInstance.anzahlWohnungenVorschlag).toBe(7);
     });
 
     it('should report an error when loading the detail fails', () => {

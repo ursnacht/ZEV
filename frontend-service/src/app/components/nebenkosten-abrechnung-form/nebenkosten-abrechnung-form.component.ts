@@ -177,12 +177,28 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
     return this.mieterTage.length > 0;
   }
 
+  /**
+   * Holt die Vorlage einer neuen Abrechnung — im Wesentlichen den Vorschlag für die Anzahl
+   * Wohnungen.
+   *
+   * <p><b>Bewusst ohne {@link #uebernehme}:</b> Die Maske ist bedienbar, während die Vorlage noch
+   * unterwegs ist. Ein spät eintreffender Stand überschrieb die ersten Eingaben — der Benutzer
+   * tippte eine Bezeichnung, und sie war wieder weg. Die Vorlage trägt ohnehin nichts als leere
+   * Listen und den Vorschlag; genau der wird hier übernommen, und die Anzahl Wohnungen nur, wenn
+   * noch keine dasteht.
+   *
+   * <p>Sichtbar wurde das an zwei Fällen der E2E-Suite: Beide scheiterten beim ersten Speichern
+   * einer neuen Abrechnung mit „Eingaben prüfen", weil die Bezeichnung zwischen Tippen und Klick
+   * verschwunden war.
+   */
   ladeVorlage(): void {
     this.laedt = true;
     this.nebenkostenService.getVorlage().subscribe({
       next: (detail) => {
-        this.uebernehme(detail);
-        this.kopf.anzahlWohnungen = detail.anzahlWohnungenVorschlag;
+        this.anzahlWohnungenVorschlag = detail.anzahlWohnungenVorschlag;
+        if (this.kopf.anzahlWohnungen === null) {
+          this.kopf.anzahlWohnungen = detail.anzahlWohnungenVorschlag;
+        }
         this.laedt = false;
       },
       error: () => {
