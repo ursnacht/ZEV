@@ -1,5 +1,8 @@
 package ch.nacht.exception;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -13,6 +16,31 @@ import java.util.Map;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    /**
+     * Datenbank-Constraints (Eindeutigkeit, Fremdschluessel) als lesbare {@code 409}.
+     *
+     * <p>Ohne diesen Handler wurde jede {@code DataIntegrityViolationException} zur {@code 500} mit
+     * dem Standard-Fehlerobjekt von Spring. Die Angular-Masken zeigen {@code error.error} an — bei
+     * einem Objekt-Rumpf steht dort {@code [object Object]}, und der Benutzer erfaehrt nichts. Genau
+     * so trat es zweimal in E2E-Laeufen auf (doppelte Forderung; ein waehrend des Speicherns
+     * geloeschter Mieter in einer Nebenkostenabrechnung).
+     *
+     * <p>Der Rumpf ist bewusst **Klartext** und kein Objekt: Dieselbe Form wie bei
+     * {@code IllegalArgumentException} in den Controllern, sonst zeigt die Maske erneut
+     * {@code [object Object]}. Die Ursache steht nur im Log — die Meldung der Datenbank nennt
+     * Tabellen und Constraints und gehoert nicht an den Client.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<String> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        log.warn("Datenbank-Constraint verletzt: {}", ex.getMostSpecificCause().getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body("Der Datensatz konnte nicht gespeichert werden: Er verletzt eine Regel der "
+                        + "Datenbank (Eindeutigkeit oder Verweis auf einen anderen Datensatz). "
+                        + "Moeglicherweise wurde er zwischenzeitlich von jemand anderem geaendert.");
+    }
 
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     @ExceptionHandler(MethodArgumentNotValidException.class)
