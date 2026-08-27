@@ -210,23 +210,31 @@ async function closeOpenForm(page: Page): Promise<void> {
 /**
  * Helper to delete a mieter by name
  */
-async function deleteMieterByName(page: Page, name: string): Promise<void> {
+async function deleteMieterByName(page: Page, name: string): Promise<boolean> {
+    page.removeAllListeners('dialog');
     try {
-        page.removeAllListeners('dialog');
         await navigateToMieter(page);
         await closeOpenForm(page);
 
-        const mieterRow = page.locator(`tr:has-text("${name}")`).first();
-        if (!await mieterRow.isVisible().catch(() => false)) {
-            return;
+        const mieterRow = page.locator(`tr:has-text("${name}")`);
+
+        // Wartende Pruefung: `isVisible()` fragt OHNE zu warten. Die Zeile erscheint aber erst mit
+        // der Antwort der Listenabfrage - eine Pruefung, die zu fruéh "nicht vorhanden" meldet,
+        // liesse den Datensatz stillschweigend in der Datenbank zurueck.
+        const vorhanden = await mieterRow.first().waitFor({ state: 'visible', timeout: 10000 })
+            .then(() => true).catch(() => false);
+        if (!vorhanden) {
+            return true;
         }
 
         page.once('dialog', async dialog => { await dialog.accept(); });
-        await clickKebabMenuItem(page, mieterRow, 'delete');
-        await mieterRow.waitFor({ state: 'hidden', timeout: 10000 }).catch(() =>
-            console.log(`Cleanup: Mieter "${name}" ist nach dem Loeschen noch sichtbar`));
+        await clickKebabMenuItem(page, mieterRow.first(), 'delete');
+        await expect(mieterRow).toHaveCount(0, { timeout: 10000 });
+        return true;
     } catch (error) {
-        console.log(`Cleanup: Fehler beim Loeschen des Mieters "${name}": ${error}`);
+        console.error(`CLEANUP FEHLGESCHLAGEN: Mieter "${name}" - ${error}`);
+        return false;
+    } finally {
         page.removeAllListeners('dialog');
     }
 }
@@ -234,23 +242,28 @@ async function deleteMieterByName(page: Page, name: string): Promise<void> {
 /**
  * Helper to delete an einheit by name
  */
-async function deleteEinheitByName(page: Page, name: string): Promise<void> {
+async function deleteEinheitByName(page: Page, name: string): Promise<boolean> {
+    page.removeAllListeners('dialog');
     try {
-        page.removeAllListeners('dialog');
         await navigateToEinheiten(page);
         await closeOpenForm(page);
 
-        const einheitRow = page.locator(`tr:has-text("${name}")`).first();
-        if (!await einheitRow.isVisible().catch(() => false)) {
-            return;
+        const einheitRow = page.locator(`tr:has-text("${name}")`);
+
+        const vorhanden = await einheitRow.first().waitFor({ state: 'visible', timeout: 10000 })
+            .then(() => true).catch(() => false);
+        if (!vorhanden) {
+            return true;
         }
 
         page.once('dialog', async dialog => { await dialog.accept(); });
-        await clickKebabMenuItem(page, einheitRow, 'delete');
-        await einheitRow.waitFor({ state: 'hidden', timeout: 10000 }).catch(() =>
-            console.log(`Cleanup: Einheit "${name}" ist nach dem Loeschen noch sichtbar`));
+        await clickKebabMenuItem(page, einheitRow.first(), 'delete');
+        await expect(einheitRow).toHaveCount(0, { timeout: 10000 });
+        return true;
     } catch (error) {
-        console.log(`Cleanup: Fehler beim Loeschen der Einheit "${name}": ${error}`);
+        console.error(`CLEANUP FEHLGESCHLAGEN: Einheit "${name}" - ${error}`);
+        return false;
+    } finally {
         page.removeAllListeners('dialog');
     }
 }
@@ -260,16 +273,42 @@ test.beforeEach(() => {
     createdEinheitNames = [];
 });
 
-// Reihenfolge zwingend: Eine Einheit mit zugeordnetem Mieter laesst sich nicht loeschen.
+/**
+ * Raeumt die angelegten Datensaetze ab — und **scheitert sichtbar**, wenn das nicht gelingt.
+ *
+ * <p>Vorher wurde jeder Fehlschlag nur auf die Konsole geschrieben: Die Suite blieb gruen, waehrend
+ * die Datenbank volllief. Ein Rueckstand ist ein Befund und gehoert gemeldet. Ein zweiter Versuch
+ * davor, weil ein einzelnes Loeschen an einer stehenden Meldung oder einem offenen Formular
+ * scheitern kann.
+ *
+ * <p>Reihenfolge zwingend: Eine Einheit mit zugeordnetem Mieter laesst sich nicht loeschen.
+ */
 test.afterEach(async ({ page }) => {
+    const gescheitert: string[] = [];
+
     for (const name of createdMieterNames) {
-        await deleteMieterByName(page, name);
+        let erfolg = await deleteMieterByName(page, name);
+        if (!erfolg) {
+            erfolg = await deleteMieterByName(page, name);
+        }
+        if (!erfolg) {
+            gescheitert.push(`Mieter ${name}`);
+        }
     }
     for (const name of createdEinheitNames) {
-        await deleteEinheitByName(page, name);
+        let erfolg = await deleteEinheitByName(page, name);
+        if (!erfolg) {
+            erfolg = await deleteEinheitByName(page, name);
+        }
+        if (!erfolg) {
+            gescheitert.push(`Einheit ${name}`);
+        }
     }
     createdMieterNames = [];
     createdEinheitNames = [];
+
+    expect(gescheitert,
+        `Testdaten blieben in der Datenbank zurueck: ${gescheitert.join(', ')}`).toEqual([]);
 });
 
 test.describe('Mieter Management - Navigation and Display', () => {

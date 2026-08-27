@@ -133,24 +133,35 @@ async function createEinheitOrFail(page: Page, daten: {
 }
 
 /**
- * Helper to delete an einheit by name (nur Aufräumen — hier darf nachsichtig gearbeitet werden).
+ * Löscht eine Einheit über das Kebab-Menü. Liefert `true`, wenn danach keine Zeile mehr steht.
+ *
+ * <p>Die Existenzprüfung **wartet**: `isVisible()` fragt ohne zu warten, und die Zeile erscheint
+ * erst mit der Antwort der Listenabfrage. Eine zu früh gestellte Frage meldete „nicht vorhanden"
+ * und liesse den Datensatz stillschweigend in der Datenbank zurück — genau so entstanden die
+ * Rückstände, die in der Nebenkosten-Suite aufgefallen sind.
  */
-async function deleteEinheitByName(page: Page, name: string): Promise<void> {
+async function deleteEinheitByName(page: Page, name: string): Promise<boolean> {
+    page.removeAllListeners('dialog');
     try {
-        page.removeAllListeners('dialog');
         await navigateToEinheiten(page);
         await closeOpenForm(page);
 
-        const einheitRow = page.locator(`tr:has-text("${name}")`).first();
-        if (!await einheitRow.isVisible().catch(() => false)) {
-            return;
+        const einheitRow = page.locator(`tr:has-text("${name}")`);
+
+        const vorhanden = await einheitRow.first().waitFor({ state: 'visible', timeout: 10000 })
+            .then(() => true).catch(() => false);
+        if (!vorhanden) {
+            return true;
         }
+
         page.once('dialog', async dialog => { await dialog.accept(); });
-        await clickKebabMenuItem(page, einheitRow, 'delete');
-        await einheitRow.waitFor({ state: 'hidden', timeout: 10000 }).catch(() =>
-            console.log(`Cleanup: Einheit "${name}" ist nach dem Löschen noch sichtbar`));
+        await clickKebabMenuItem(page, einheitRow.first(), 'delete');
+        await expect(einheitRow).toHaveCount(0, { timeout: 10000 });
+        return true;
     } catch (error) {
-        console.log(`Cleanup: Fehler beim Löschen der Einheit "${name}": ${error}`);
+        console.error(`CLEANUP FEHLGESCHLAGEN: Einheit "${name}" - ${error}`);
+        return false;
+    } finally {
         page.removeAllListeners('dialog');
     }
 }
@@ -159,11 +170,27 @@ test.beforeEach(() => {
     createdEinheitNames = [];
 });
 
+/**
+ * Räumt die angelegten Einheiten ab — und **scheitert sichtbar**, wenn das nicht gelingt.
+ *
+ * <p>Vorher wurde jeder Fehlschlag nur auf die Konsole geschrieben: Die Suite blieb grün, während
+ * die Datenbank volllief. Ein Rückstand ist ein Befund und gehört gemeldet.
+ */
 test.afterEach(async ({ page }) => {
+    const gescheitert: string[] = [];
     for (const name of createdEinheitNames) {
-        await deleteEinheitByName(page, name);
+        let erfolg = await deleteEinheitByName(page, name);
+        if (!erfolg) {
+            erfolg = await deleteEinheitByName(page, name);
+        }
+        if (!erfolg) {
+            gescheitert.push(name);
+        }
     }
     createdEinheitNames = [];
+
+    expect(gescheitert,
+        `Testdaten blieben in der Datenbank zurueck: ${gescheitert.join(', ')}`).toEqual([]);
 });
 
 test.describe('Einheiten Management - Navigation and Display', () => {

@@ -192,22 +192,30 @@ async function createEinheitOrFail(page: Page, daten: EinheitDaten): Promise<voi
     await expect(page.locator(`tr:has-text("${daten.name}")`)).toBeVisible({ timeout: 10000 });
 }
 
-async function deleteEinheitByName(page: Page, name: string): Promise<void> {
+async function deleteEinheitByName(page: Page, name: string): Promise<boolean> {
+    page.removeAllListeners('dialog');
     try {
-        page.removeAllListeners('dialog');
         await navigateToEinheiten(page);
         await closeOpenForm(page);
 
         const row = page.locator(`tr:has-text("${name}")`);
-        if (!await row.first().isVisible().catch(() => false)) {
-            return;
+
+        // Wartende Pruefung: `isVisible()` fragt ohne zu warten, die Zeile erscheint aber erst mit
+        // der Antwort der Listenabfrage. Zu frueh gefragt hiess "nicht vorhanden" - und der
+        // Datensatz blieb stillschweigend in der Datenbank.
+        const vorhanden = await row.first().waitFor({ state: 'visible', timeout: 10000 })
+            .then(() => true).catch(() => false);
+        if (!vorhanden) {
+            return true;
         }
         page.once('dialog', async dialog => { await dialog.accept(); });
         await clickKebabMenuItem(page, row.first(), 'delete');
-        await row.first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() =>
-            console.log(`Cleanup: Einheit "${name}" ist nach dem Löschen noch sichtbar`));
+        await expect(row).toHaveCount(0, { timeout: 10000 });
+        return true;
     } catch (error) {
-        console.log(`Cleanup: Fehler beim Löschen der Einheit "${name}": ${error}`);
+        console.error(`CLEANUP FEHLGESCHLAGEN: Einheit "${name}" - ${error}`);
+        return false;
+    } finally {
         page.removeAllListeners('dialog');
     }
 }
@@ -279,22 +287,27 @@ async function createMieterOrFail(page: Page, daten: MieterDaten): Promise<void>
     await expect(page.locator(`tr:has-text("${daten.name}")`)).toBeVisible({ timeout: 10000 });
 }
 
-async function deleteMieterByName(page: Page, name: string): Promise<void> {
+async function deleteMieterByName(page: Page, name: string): Promise<boolean> {
+    page.removeAllListeners('dialog');
     try {
-        page.removeAllListeners('dialog');
         await navigateToMieter(page);
         await closeOpenForm(page);
 
         const row = page.locator(`tr:has-text("${name}")`);
-        if (!await row.first().isVisible().catch(() => false)) {
-            return;
+
+        const vorhanden = await row.first().waitFor({ state: 'visible', timeout: 10000 })
+            .then(() => true).catch(() => false);
+        if (!vorhanden) {
+            return true;
         }
         page.once('dialog', async dialog => { await dialog.accept(); });
         await clickKebabMenuItem(page, row.first(), 'delete');
-        await row.first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() =>
-            console.log(`Cleanup: Mieter "${name}" ist nach dem Löschen noch sichtbar`));
+        await expect(row).toHaveCount(0, { timeout: 10000 });
+        return true;
     } catch (error) {
-        console.log(`Cleanup: Fehler beim Löschen des Mieters "${name}": ${error}`);
+        console.error(`CLEANUP FEHLGESCHLAGEN: Mieter "${name}" - ${error}`);
+        return false;
+    } finally {
         page.removeAllListeners('dialog');
     }
 }
@@ -337,22 +350,27 @@ async function createLadestromTarifOrFail(page: Page, name: string): Promise<voi
     await expect(page.locator(`tr:has-text("${name}")`)).toBeVisible({ timeout: 10000 });
 }
 
-async function deleteTarifByName(page: Page, name: string): Promise<void> {
+async function deleteTarifByName(page: Page, name: string): Promise<boolean> {
+    page.removeAllListeners('dialog');
     try {
-        page.removeAllListeners('dialog');
         await navigateToTarife(page);
         await closeOpenForm(page);
 
         const row = page.locator(`tr:has-text("${name}")`);
-        if (!await row.first().isVisible().catch(() => false)) {
-            return;
+
+        const vorhanden = await row.first().waitFor({ state: 'visible', timeout: 10000 })
+            .then(() => true).catch(() => false);
+        if (!vorhanden) {
+            return true;
         }
         page.once('dialog', async dialog => { await dialog.accept(); });
         await clickKebabMenuItem(page, row.first(), 'delete');
-        await row.first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() =>
-            console.log(`Cleanup: Tarif "${name}" ist nach dem Löschen noch sichtbar`));
+        await expect(row).toHaveCount(0, { timeout: 10000 });
+        return true;
     } catch (error) {
-        console.log(`Cleanup: Fehler beim Löschen des Tarifs "${name}": ${error}`);
+        console.error(`CLEANUP FEHLGESCHLAGEN: Tarif "${name}" - ${error}`);
+        return false;
+    } finally {
         page.removeAllListeners('dialog');
     }
 }
@@ -491,28 +509,53 @@ test.beforeEach(() => {
     einheitenMitPositionen = [];
 });
 
+/**
+ * Raeumt die angelegten Datensaetze ab — und **scheitert sichtbar**, wenn das nicht gelingt.
+ *
+ * <p>Vorher wurde jeder Fehlschlag nur auf die Konsole geschrieben: Die Suite blieb gruen, waehrend
+ * die Datenbank volllief. Ein Rueckstand ist ein Befund und gehoert gemeldet. Ein zweiter Versuch
+ * davor, weil ein einzelnes Loeschen an einer stehenden Meldung oder einem offenen Formular
+ * scheitern kann.
+ *
+ * <p>Reihenfolge zwingend: Positionen verweisen auf den Tarif und blockieren das Loeschen des
+ * Mieters; der Mieter belegt die Einheit (Loeschschutz); die Einheit traegt die Positionen.
+ */
 test.afterEach(async ({ page, browserName }) => {
     if (browserName !== 'chromium') {
         return;
     }
-    // Reihenfolge zwingend: Positionen verweisen auf den Tarif und blockieren das Löschen des
-    // Mieters; der Mieter belegt die Einheit (Löschschutz); die Einheit trägt die Positionen.
+    const gescheitert: string[] = [];
+
+    /** Zweiter Versuch, bevor ein Rueckstand gemeldet wird. */
+    async function raeumeAb(was: string, loeschen: () => Promise<boolean>): Promise<void> {
+        let erfolg = await loeschen();
+        if (!erfolg) {
+            erfolg = await loeschen();
+        }
+        if (!erfolg) {
+            gescheitert.push(was);
+        }
+    }
+
     for (const name of [...new Set(einheitenMitPositionen)]) {
         await deletePositionen(page, name);
     }
     for (const name of createdMieterNames) {
-        await deleteMieterByName(page, name);
+        await raeumeAb(`Mieter ${name}`, () => deleteMieterByName(page, name));
     }
     for (const name of createdEinheitNames) {
-        await deleteEinheitByName(page, name);
+        await raeumeAb(`Einheit ${name}`, () => deleteEinheitByName(page, name));
     }
     for (const name of createdTarifNames) {
-        await deleteTarifByName(page, name);
+        await raeumeAb(`Tarif ${name}`, () => deleteTarifByName(page, name));
     }
     einheitenMitPositionen = [];
     createdMieterNames = [];
     createdEinheitNames = [];
     createdTarifNames = [];
+
+    expect(gescheitert,
+        `Testdaten blieben in der Datenbank zurueck: ${gescheitert.join(', ')}`).toEqual([]);
 });
 
 // ---------------------------------------------------------------------------
