@@ -2,6 +2,7 @@ package ch.nacht.service;
 
 import ch.nacht.dto.DebitorDTO;
 import ch.nacht.entity.Debitor;
+import ch.nacht.entity.Debitorherkunft;
 import ch.nacht.repository.DebitorRepository;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MieterEinheitRepository;
@@ -92,6 +93,7 @@ public class DebitorService {
         debitor.setDatumVon(dto.getDatumVon());
         debitor.setDatumBis(dto.getDatumBis());
         debitor.setZahldatum(dto.getZahldatum());
+        debitor.setHerkunft(herkunftOderZev(dto));
         Debitor saved = debitorRepository.save(debitor);
         log.info("Created debitor entry id={} for mieterId={}", saved.getId(), saved.getMieterId());
         return toDTO(saved);
@@ -115,6 +117,7 @@ public class DebitorService {
         debitor.setDatumVon(dto.getDatumVon());
         debitor.setDatumBis(dto.getDatumBis());
         debitor.setZahldatum(dto.getZahldatum());
+        debitor.setHerkunft(herkunftOderZev(dto));
         log.info("Updated debitor entry id={}", id);
         return toDTO(debitorRepository.save(debitor));
     }
@@ -142,16 +145,23 @@ public class DebitorService {
      * Only invoices with a mieter are persisted.
      * Updates betrag/datumBis only if zahldatum is not yet set.
      *
+     * <p>Das Upsert ist <b>je Herkunft</b> idempotent: Ein wiederholter Lauf aktualisiert seine
+     * eigene Forderung und laesst die der anderen Herkunft unberuehrt
+     * (Specs/Nebenkosten/RechnungenGenerieren.md, FR-5).
+     *
      * @param mieterId FK to mieter
      * @param betrag   Invoice amount in CHF
      * @param datumVon Start of billing period
      * @param datumBis End of billing period
+     * @param herkunft Herkunft der Forderung
      */
     @Transactional
-    public void upsertFromRechnung(Long mieterId, BigDecimal betrag, LocalDate datumVon, LocalDate datumBis) {
+    public void upsertFromRechnung(Long mieterId, BigDecimal betrag, LocalDate datumVon, LocalDate datumBis,
+                                   Debitorherkunft herkunft) {
         Long orgId = organizationContextService.getCurrentOrgId();
-        debitorRepository.upsert(mieterId, betrag, datumVon, datumBis, orgId);
-        log.info("Upserted debitor for mieterId={}, datumVon={}, betrag={}", mieterId, datumVon, betrag);
+        debitorRepository.upsert(mieterId, betrag, datumVon, datumBis, orgId, herkunft.name());
+        log.info("Upserted debitor for mieterId={}, datumVon={}, betrag={}, herkunft={}",
+                mieterId, datumVon, betrag, herkunft);
     }
 
     private void validate(DebitorDTO dto) {
@@ -172,6 +182,20 @@ public class DebitorService {
         }
     }
 
+    /**
+     * Herkunft aus dem Request oder {@code ZEV}
+     * (Specs/Nebenkosten/RechnungenGenerieren.md, FR-6).
+     *
+     * <p>Fehlt das Feld, gilt {@code ZEV}: Bestehende Aufrufer bleiben gueltig, und der Bestand ist
+     * ohnehin aus der Stromabrechnung entstanden. Ein <b>unbekannter</b> Wert kommt hier nicht an —
+     * {@code DebitorDTO.herkunft} ist als Enum typisiert, Jackson weist ihn mit {@code 400} ab,
+     * bevor der Service laeuft. Der Rueckfall deckt also nur das Fehlen und macht aus einem
+     * Tippfehler nicht stillschweigend eine ZEV-Forderung.
+     */
+    private Debitorherkunft herkunftOderZev(DebitorDTO dto) {
+        return dto.getHerkunft() != null ? dto.getHerkunft() : Debitorherkunft.ZEV;
+    }
+
     private DebitorDTO toDTO(Debitor d) {
         DebitorDTO dto = new DebitorDTO();
         dto.setId(d.getId());
@@ -180,6 +204,7 @@ public class DebitorService {
         dto.setDatumVon(d.getDatumVon());
         dto.setDatumBis(d.getDatumBis());
         dto.setZahldatum(d.getZahldatum());
+        dto.setHerkunft(d.getHerkunft());
         mieterRepository.findFirstById(d.getMieterId()).ifPresent(m -> {
             dto.setMieterName(m.getName());
             // Ein Mieter kann mehreren Einheiten zugeordnet sein (Wohnung + Ladestation(en)) -

@@ -12,11 +12,14 @@ import { IconComponent } from '../icon/icon.component';
 import { EinheitSelectorComponent } from '../einheit-selector/einheit-selector.component';
 import { TarifLuecke } from '../../models/tarif.model';
 import { formatTarifLuecke } from '../../utils/tarif-luecke.util';
+import { FeatureFlagDirective } from '../../directives/feature-flag.directive';
+import { RouterLink } from '@angular/router';
 
 @Component({
   selector: 'app-rechnungen',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe, QuarterSelectorComponent, IconComponent, EinheitSelectorComponent],
+  imports: [CommonModule, FormsModule, TranslatePipe, QuarterSelectorComponent, IconComponent,
+    EinheitSelectorComponent, FeatureFlagDirective, RouterLink],
   templateUrl: './rechnungen.component.html',
   styleUrls: ['./rechnungen.component.css']
 })

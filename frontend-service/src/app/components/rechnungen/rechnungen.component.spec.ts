@@ -5,6 +5,8 @@ import { RechnungenComponent } from './rechnungen.component';
 import { EinheitService } from '../../services/einheit.service';
 import { RechnungService, GeneratedRechnung, GenerateResponse } from '../../services/rechnung.service';
 import { TranslationService } from '../../services/translation.service';
+import { FeatureFlagService } from '../../services/feature-flag.service';
+import { provideRouter } from '@angular/router';
 import { Einheit, EinheitTyp } from '../../models/einheit.model';
 import { of, throwError } from 'rxjs';
 
@@ -38,7 +40,11 @@ describe('RechnungenComponent', () => {
     count: 1
   };
 
+  /** Zustand des Feature-Flags `NEBENKOSTENABRECHNUNG` fuer den jeweiligen Test. */
+  let nkFlagAktiv = true;
+
   beforeEach(async () => {
+    nkFlagAktiv = true;
     einheitServiceSpy = createSpyObj<EinheitService>('EinheitService', ['getAllEinheiten']);
     einheitServiceSpy.getAllEinheiten.mockReturnValue(of(mockEinheiten));
 
@@ -55,7 +61,10 @@ describe('RechnungenComponent', () => {
       providers: [
         { provide: EinheitService, useValue: einheitServiceSpy },
         { provide: RechnungService, useValue: rechnungServiceSpy },
-        { provide: TranslationService, useValue: translationServiceSpy }
+        { provide: TranslationService, useValue: translationServiceSpy },
+        { provide: FeatureFlagService, useValue: { isEnabled: () => nkFlagAktiv } },
+        // Der Hinweis auf den NK-Bereich traegt ein routerLink.
+        provideRouter([])
       ]
     }).compileComponents();
 
@@ -426,5 +435,43 @@ describe('RechnungenComponent', () => {
       expect(component.message).toBe('');
       expect(component.messageType).toBe('');
     }));
+  });
+
+  // ============ Hinweis auf den NK-Bereich (RechnungenGenerieren.md, FR-7 und FR-9) ============
+
+  describe('Hinweis auf die Nebenkosten', () => {
+    function hinweis(): HTMLElement | null {
+      return fixture.nativeElement.querySelector('.zev-message--info');
+    }
+
+    it('should point to the ancillary costs area while the feature flag is on', () => {
+      // Wer Nebenkostenrechnungen hier sucht, findet hier den Weg dorthin - eine zweite
+      // Bedienoberflaeche waere teurer als dieser Satz.
+      expect(hinweis()).toBeTruthy();
+      expect(hinweis()!.textContent).toContain('NK_HINWEIS_AUF_RECHNUNGEN_SEITE');
+    });
+
+    it('should link to the billing list', () => {
+      const link = hinweis()!.querySelector('a') as HTMLAnchorElement;
+
+      expect(link.getAttribute('href')).toBe('/nebenkosten/abrechnung');
+    });
+
+    /** Bei ausgeschaltetem Flag sieht die Seite aus wie vor dieser Aenderung. */
+    it('should not show the hint while the feature flag is off', async () => {
+      nkFlagAktiv = false;
+      const eigenes = TestBed.createComponent(RechnungenComponent);
+      eigenes.detectChanges();
+      await eigenes.whenStable();
+
+      expect(eigenes.nativeElement.querySelector('.zev-message--info')).toBeNull();
+    });
+
+    it('should leave the rest of the page untouched', () => {
+      // Kein Umschalter der Rechnungsart: Die Erzeugung liegt vollstaendig im NK-Bereich.
+      expect(fixture.nativeElement.querySelector('input[type="radio"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('app-quarter-selector')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('app-einheit-selector')).toBeTruthy();
+    });
   });
 });

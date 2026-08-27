@@ -1,6 +1,7 @@
 package ch.nacht.controller;
 
 import ch.nacht.dto.RechnungDTO;
+import ch.nacht.entity.Debitorherkunft;
 import ch.nacht.exception.TarifLuecke;
 import ch.nacht.exception.TarifLueckenException;
 import ch.nacht.service.DebitorService;
@@ -108,14 +109,15 @@ public class RechnungControllerTest {
             .andExpect(jsonPath("$.rechnungen[0].einheitName", is("Wohnung 1")))
             .andExpect(jsonPath("$.rechnungen[0].mieterName", is("Max Muster")));
 
-        verify(rechnungStorageService).clearAll();
+        verify(rechnungStorageService).clearArt(RechnungStorageService.Rechnungsart.ZEV);
         verify(rechnungService).berechneRechnungen(List.of(1L),
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 3, 31));
         verify(debitorService).upsertFromRechnung(
             eq(10L),
             eq(BigDecimal.valueOf(125.50).setScale(2)),
             eq(LocalDate.of(2024, 1, 1)),
-            eq(LocalDate.of(2024, 3, 31)));
+            eq(LocalDate.of(2024, 3, 31)),
+            eq(Debitorherkunft.ZEV));
     }
 
     @Test
@@ -145,8 +147,9 @@ public class RechnungControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.count", is(1)));
 
-        verify(debitorService, never()).upsertFromRechnung(any(), any(), any(), any());
-        verify(rechnungStorageService).store(eq("Wohnung_1_10"), any());
+        verify(debitorService, never()).upsertFromRechnung(any(), any(), any(), any(), any());
+        verify(rechnungStorageService).store(eq(RechnungStorageService.Rechnungsart.ZEV),
+            eq("Wohnung_1_10"), any(), eq("Wohnung_1_10.pdf"));
     }
 
     @Test
@@ -333,7 +336,8 @@ public class RechnungControllerTest {
             eq(10L),
             eq(BigDecimal.valueOf(125.50).setScale(2)),
             eq(LocalDate.of(2024, 1, 1)),
-            eq(LocalDate.of(2024, 3, 31)));
+            eq(LocalDate.of(2024, 3, 31)),
+            eq(Debitorherkunft.ZEV));
     }
 
     // ==================== GET /api/rechnungen/download/{key} ====================
@@ -341,8 +345,10 @@ public class RechnungControllerTest {
     @Test
     void downloadRechnung_Found_ReturnsPdfAttachment() throws Exception {
         byte[] pdfBytes = new byte[]{37, 80, 68, 70}; // %PDF
-        when(rechnungStorageService.get("Wohnung_1")).thenReturn(Optional.of(pdfBytes));
-        when(rechnungStorageService.getFilename("Wohnung_1")).thenReturn("Wohnung_1.pdf");
+        when(rechnungStorageService.get(RechnungStorageService.Rechnungsart.ZEV, "Wohnung_1"))
+            .thenReturn(Optional.of(pdfBytes));
+        when(rechnungStorageService.getFilename(RechnungStorageService.Rechnungsart.ZEV, "Wohnung_1"))
+            .thenReturn("Wohnung_1.pdf");
 
         mockMvc.perform(get("/api/rechnungen/download/Wohnung_1"))
             .andExpect(status().isOk())
@@ -353,7 +359,8 @@ public class RechnungControllerTest {
 
     @Test
     void downloadRechnung_NotFound_Returns404() throws Exception {
-        when(rechnungStorageService.get("unbekannt")).thenReturn(Optional.empty());
+        when(rechnungStorageService.get(RechnungStorageService.Rechnungsart.ZEV, "unbekannt"))
+            .thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/rechnungen/download/unbekannt"))
             .andExpect(status().isNotFound());

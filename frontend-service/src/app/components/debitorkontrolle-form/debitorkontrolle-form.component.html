@@ -46,6 +46,17 @@
     }
 
     <div class="zev-form-group">
+      <label for="herkunft">{{ 'DEBITOR_HERKUNFT' | translate }}:</label>
+      <select id="herkunft" class="zev-select" [(ngModel)]="formData.herkunft" name="herkunft"
+        [disabled]="!nkVerfuegbar" required>
+        <option value="ZEV">{{ 'DEBITOR_HERKUNFT_ZEV' | translate }}</option>
+        @if (nkVerfuegbar) {
+          <option value="NK">{{ 'DEBITOR_HERKUNFT_NK' | translate }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="zev-form-group">
       <label for="zahldatum">{{ 'ZAHLDATUM' | translate }}:</label>
       <input type="date" id="zahldatum" class="zev-input" [(ngModel)]="formData.zahldatum" name="zahldatum" />
       <div class="zev-form-hint">{{ 'ZAHLDATUM_HINT' | translate }}</div>

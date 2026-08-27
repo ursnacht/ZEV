@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NebenkostenService } from '../../services/nebenkosten.service';
-import { NkAbrechnung } from '../../models/nebenkosten.model';
+import { NkAbrechnung, NkRechnungLauf } from '../../models/nebenkosten.model';
 import { NebenkostenAbrechnungFormComponent } from '../nebenkosten-abrechnung-form/nebenkosten-abrechnung-form.component';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { SwissDatePipe } from '../../pipes/swiss-date.pipe';
@@ -9,6 +9,8 @@ import { TranslationService } from '../../services/translation.service';
 import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.component';
 import { ColumnResizeDirective } from '../../directives/column-resize.directive';
 import { IconComponent } from '../icon/icon.component';
+import { SwissNumberPipe } from '../../pipes/swiss-number.pipe';
+import { speichereBlob } from '../../utils/file-utils';
 
 /**
  * Liste der Nebenkostenabrechnungen (Specs/Nebenkosten/Abrechnung.md, FR-1 und FR-7).
@@ -27,7 +29,8 @@ import { IconComponent } from '../icon/icon.component';
     SwissDatePipe,
     KebabMenuComponent,
     ColumnResizeDirective,
-    IconComponent
+    IconComponent,
+    SwissNumberPipe
   ],
   templateUrl: './nebenkosten-abrechnung.component.html'
 })
@@ -41,10 +44,28 @@ export class NebenkostenAbrechnungComponent implements OnInit {
   sortColumn: 'bezeichnung' | 'datumVon' | 'datumBis' | null = 'datumVon';
   sortDirection: 'asc' | 'desc' = 'desc';
 
-  menuItems: KebabMenuItem[] = [
+  /**
+   * Zwei **feste** Menuelisten statt einer je Zeile gebauten.
+   *
+   * Das Kebab-Menue rendert mit `@for (item of items; track item)`, verfolgt die Eintraege also
+   * ueber ihre Objektidentitaet. Eine bei jeder Aenderungserkennung neu erzeugte Liste haette neue
+   * Identitaeten und liesse Angular das ganze Menue jedes Mal neu aufbauen — genau das `NG0956`,
+   * das die Abrechnungsmaske schon einmal gekostet hat.
+   */
+  private readonly menuOffen: KebabMenuItem[] = [
     { label: 'BEARBEITEN', action: 'edit', icon: 'edit-2' },
     { label: 'LOESCHEN', action: 'delete', danger: true, icon: 'trash-2' }
   ];
+
+  private readonly menuAbgerechnet: KebabMenuItem[] = [
+    { label: 'BEARBEITEN', action: 'edit', icon: 'edit-2' },
+    { label: 'NK_RECHNUNGEN_ERSTELLEN', action: 'rechnungen', icon: 'file-text' },
+    { label: 'LOESCHEN', action: 'delete', danger: true, icon: 'trash-2' }
+  ];
+
+  /** Ergebnis des letzten Rechnungslaufs; `null`, solange keiner gelaufen ist. */
+  lauf: NkRechnungLauf | null = null;
+  laufLaeuft = false;
 
   constructor(
     private nebenkostenService: NebenkostenService,
@@ -56,6 +77,9 @@ export class NebenkostenAbrechnungComponent implements OnInit {
   }
 
   loadAbrechnungen(): void {
+    // Das Ergebnis gehoert zu dem Stand, den die Tabelle beim Lauf zeigte. Nach einem Neuladen
+    // waere es ein Ergebnis zu Zeilen, die es so nicht mehr geben muss.
+    this.lauf = null;
     this.nebenkostenService.getAllAbrechnungen().subscribe({
       next: (data) => {
         this.abrechnungen = data;
@@ -68,11 +92,13 @@ export class NebenkostenAbrechnungComponent implements OnInit {
 
   onCreateNew(): void {
     this.selectedId = null;
+    this.lauf = null;
     this.showForm = true;
   }
 
   onEdit(abrechnung: NkAbrechnung): void {
     this.selectedId = abrechnung.id ?? null;
+    this.lauf = null;
     this.showForm = true;
   }
 
@@ -92,15 +118,71 @@ export class NebenkostenAbrechnungComponent implements OnInit {
     }
   }
 
+  /**
+   * Die Menueeintraege dieser Zeile.
+   *
+   * „Rechnungen erstellen" erscheint nur auf einer abgeschlossenen Abrechnung — bewusst als
+   * fehlender Eintrag und nicht als gesperrter: Ein ausgegrauter muesste erklaeren, warum er
+   * ausgegraut ist.
+   */
+  menuFuer(abrechnung: NkAbrechnung): KebabMenuItem[] {
+    return abrechnung.abgerechnet ? this.menuAbgerechnet : this.menuOffen;
+  }
+
   onMenuAction(action: string, abrechnung: NkAbrechnung): void {
     switch (action) {
       case 'edit':
         this.onEdit(abrechnung);
         break;
+      case 'rechnungen':
+        this.onRechnungenErstellen(abrechnung);
+        break;
       case 'delete':
         this.onDelete(abrechnung.id);
         break;
     }
+  }
+
+  /**
+   * Erzeugt die Rechnungen einer abgeschlossenen Abrechnung.
+   *
+   * Mit Rueckfrage, weil dabei Forderungen entstehen — das soll man nicht beim Zielen aufs
+   * Kebab-Menue ausloesen. Ein zweiter Lauf waere zwar idempotent (Upsert je Herkunft), erzeugte
+   * aber unnoetig ein zweites Ergebnis.
+   */
+  onRechnungenErstellen(abrechnung: NkAbrechnung): void {
+    if (!abrechnung.id || this.laufLaeuft) return;
+
+    if (!confirm(this.translationService.translate('NK_CONFIRM_RECHNUNGEN_ERSTELLEN'))) {
+      return;
+    }
+
+    this.laufLaeuft = true;
+    this.nebenkostenService.erzeugeRechnungen(abrechnung.id).subscribe({
+      next: (lauf) => {
+        this.laufLaeuft = false;
+        this.lauf = lauf;
+      },
+      error: (error) => {
+        this.laufLaeuft = false;
+        // Ein vorhandenes Ergebnis bleibt stehen: Ein halb ersetztes waere schlimmer als ein altes.
+        this.showMessage(error.error?.error || 'NK_FEHLER_RECHNUNGEN_ERSTELLEN', 'error');
+      }
+    });
+  }
+
+  /** Holt das PDF einer Ergebniszeile. */
+  onRechnungHerunterladen(mieterId: number, filename: string | null): void {
+    if (!this.lauf) return;
+
+    this.nebenkostenService.ladeRechnungPdf(this.lauf.abrechnungId, mieterId).subscribe({
+      next: (blob) => speichereBlob(blob, filename ?? 'nebenkosten.pdf'),
+      error: () => {
+        // Nach 30 Minuten ist die Ablage leer. Das ist kein Fehler, sondern ein Hinweis:
+        // Der Lauf laesst sich jederzeit wiederholen und ergibt dasselbe PDF.
+        this.showMessage('NK_RECHNUNG_ABGELAUFEN', 'error');
+      }
+    });
   }
 
   /**

@@ -163,6 +163,41 @@ export interface NkAbrechnungDetail {
   anzahlWohnungenVorschlag: number | null;
 }
 
+/**
+ * Eine Zeile im Ergebnis eines Rechnungslaufs
+ * (Specs/Nebenkosten/RechnungenGenerieren.md, FR-6).
+ *
+ * Kein Download-Schlüssel: Das PDF wird über Abrechnung und `mieterId` geholt.
+ *
+ * `filename` und `fehler` sind `null`, nicht `undefined` — Jackson schickt `null`, und ein
+ * `!== undefined` würde hier immer zutreffen.
+ */
+export interface NkRechnungErgebnis {
+  mieterId: number;
+  mieterName: string;
+  /** Zahlbarer Betrag, auf 5 Rappen gerundet; negativ bei einem Guthaben. */
+  saldo: number;
+  /** `false` bei Saldo ≤ 0 — dann entsteht ein PDF, aber keine Forderung. */
+  forderungGebucht: boolean;
+  filename: string | null;
+  /** Übersetzungsschlüssel bei einem gescheiterten Mieter, sonst `null`. */
+  fehler: string | null;
+}
+
+/** Ergebnis eines Rechnungslaufs über eine Abrechnung — Antwort von `POST .../rechnungen`. */
+export interface NkRechnungLauf {
+  abrechnungId: number;
+  bezeichnung: string;
+  von: string;
+  bis: string;
+  /** Zahl der erzeugten Rechnungen — getrennt von den Forderungen, damit „0 Forderungen"
+   *  bei durchweg Guthaben nicht wie ein Fehlschlag aussieht. */
+  anzahlRechnungen: number;
+  anzahlForderungen: number;
+  summeForderungen: number;
+  rechnungen: NkRechnungErgebnis[];
+}
+
 /** Positionsarten in der Reihenfolge, in der sie in der Auswahl erscheinen. */
 export const NK_POSITIONSARTEN: NkPositionsart[] = [
   NkPositionsart.UMLAGE,

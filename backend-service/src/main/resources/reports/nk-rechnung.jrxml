@@ -1,0 +1,333 @@
+<jasperReport name="nk-rechnung" pageWidth="595" pageHeight="842" columnWidth="555"
+              leftMargin="20" rightMargin="20" topMargin="15" bottomMargin="15"
+              uuid="b2c3d4e5-f6a7-8901-bcde-f23456789012">
+
+    <property name="com.jaspersoft.studio.data.defaultdataadapter" value="One Empty Record"/>
+
+    <!-- Parameters -->
+    <parameter name="RECHNUNG" class="ch.nacht.dto.NkRechnungDTO"/>
+    <parameter name="TRANSLATIONS" class="java.util.Map"/>
+    <parameter name="QR_CODE_IMAGE" class="java.io.InputStream"/>
+
+    <!-- Fields for NkRechnungZeile detail band -->
+    <field name="bezeichnung" class="java.lang.String"/>
+    <field name="mengeneinheit" class="java.lang.String"/>
+    <field name="menge" class="java.math.BigDecimal"/>
+    <field name="betragProEinheit" class="java.math.BigDecimal"/>
+    <field name="prozentsatz" class="java.math.BigDecimal"/>
+    <field name="betrag" class="java.math.BigDecimal"/>
+
+    <!-- Title Band - Header with addresses -->
+    <title height="200">
+        <!-- Right-aligned recipient address -->
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222211" x="355" y="50" width="200" height="15" blankWhenNull="true" fontSize="9.0" hTextAlign="Left">
+            <expression><![CDATA[$P{RECHNUNG}.getMieterName()]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222212" x="355" y="65" width="200" height="15" blankWhenNull="true" fontSize="9.0" hTextAlign="Left">
+            <expression><![CDATA[$P{RECHNUNG}.getMieterStrasse()]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222213" x="355" y="80" width="200" height="15" blankWhenNull="true" fontSize="9.0" hTextAlign="Left">
+            <expression><![CDATA[$P{RECHNUNG}.getMieterPlzOrt()]]></expression>
+        </element>
+
+        <!-- Left-aligned invoice info -->
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222214" x="0" y="0" width="120" height="15" fontSize="9.0">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("DATUM") + ":"]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222215" x="120" y="0" width="150" height="15" fontSize="9.0">
+            <expression><![CDATA[$P{RECHNUNG}.getErstellungsdatum().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))]]></expression>
+        </element>
+
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222216" x="0" y="15" width="120" height="15" fontSize="9.0">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("ZAHLUNGSFRIST") + ":"]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222217" x="120" y="15" width="150" height="15" blankWhenNull="true" fontSize="9.0">
+            <expression><![CDATA[$P{RECHNUNG}.getZahlungsfrist()]]></expression>
+        </element>
+
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222218" x="0" y="30" width="120" height="15" fontSize="9.0">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("ZEITRAUM") + ":"]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222219" x="120" y="30" width="200" height="15" fontSize="9.0">
+            <expression><![CDATA[$P{RECHNUNG}.getVon().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + " - " + $P{RECHNUNG}.getBis().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))]]></expression>
+        </element>
+
+        <element kind="textField" uuid="22222222-2222-2222-2222-22222222221a" x="0" y="50" width="120" height="15" fontSize="9.0">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("RECHNUNGSSTELLER") + ":"]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-22222222221b" x="120" y="50" width="200" height="15" blankWhenNull="true" fontSize="9.0">
+            <expression><![CDATA[$P{RECHNUNG}.getStellerName()]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-22222222221c" x="120" y="65" width="200" height="15" blankWhenNull="true" fontSize="9.0">
+            <expression><![CDATA[$P{RECHNUNG}.getStellerStrasse()]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-22222222221d" x="120" y="80" width="200" height="15" blankWhenNull="true" fontSize="9.0">
+            <expression><![CDATA[$P{RECHNUNG}.getStellerPlzOrt()]]></expression>
+        </element>
+
+        <!-- Title: Nebenkostenabrechnung -->
+        <element kind="textField" uuid="22222222-2222-2222-2222-22222222221e" x="0" y="120" width="555" height="30" forecolor="#0099CC" fontSize="18.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("NK_RECHNUNG_TITEL")]]></expression>
+        </element>
+
+        <!-- Subtitle: Bezeichnung der Abrechnung -->
+        <element kind="textField" uuid="22222222-2222-2222-2222-22222222221f" x="0" y="150" width="555" height="20" blankWhenNull="true" forecolor="#0099CC" fontSize="12.0" bold="true">
+            <expression><![CDATA[$P{RECHNUNG}.getBezeichnung()]]></expression>
+        </element>
+    </title>
+
+    <!-- Column Header - Table header -->
+    <columnHeader height="20">
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222221" mode="Opaque" x="0" y="0" width="245" height="20" backcolor="#F8F8F8" forecolor="#0099CC" fontSize="9.0" bold="true" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("BEZEICHNUNG")]]></expression>
+            <box>
+                <bottomPen lineWidth="2.0" lineColor="#0099CC"/>
+            </box>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222222" mode="Opaque" x="245" y="0" width="60" height="20" backcolor="#F8F8F8" forecolor="#0099CC" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("MENGE")]]></expression>
+            <box>
+                <bottomPen lineWidth="2.0" lineColor="#0099CC"/>
+            </box>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222223" mode="Opaque" x="305" y="0" width="45" height="20" backcolor="#F8F8F8" forecolor="#0099CC" fontSize="9.0" bold="true" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("EINHEIT_LABEL")]]></expression>
+            <box leftPadding="3">
+                <bottomPen lineWidth="2.0" lineColor="#0099CC"/>
+            </box>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222224" mode="Opaque" x="350" y="0" width="65" height="20" backcolor="#F8F8F8" forecolor="#0099CC" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("PREIS")]]></expression>
+            <box>
+                <bottomPen lineWidth="2.0" lineColor="#0099CC"/>
+            </box>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222225" mode="Opaque" x="415" y="0" width="55" height="20" backcolor="#F8F8F8" forecolor="#0099CC" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("NK_PROZENTSATZ")]]></expression>
+            <box>
+                <bottomPen lineWidth="2.0" lineColor="#0099CC"/>
+            </box>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222226" mode="Opaque" x="470" y="0" width="85" height="20" backcolor="#F8F8F8" forecolor="#0099CC" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("TOTAL") + " CHF"]]></expression>
+            <box>
+                <bottomPen lineWidth="2.0" lineColor="#0099CC"/>
+            </box>
+        </element>
+    </columnHeader>
+
+    <!-- Detail Band - Positionszeilen. Leere Zelle, wo die Positionsart das Feld nicht kennt:
+         PdfNumberFormat liefert bei null einen Gedankenstrich, und eine Spalte voller Striche
+         erklaert nichts. -->
+    <detail>
+        <band height="18">
+            <element kind="textField" uuid="22222222-2222-2222-2222-222222222231" x="0" y="0" width="245" height="18" fontSize="9.0" vTextAlign="Middle">
+                <expression><![CDATA[$F{bezeichnung}]]></expression>
+                <box>
+                    <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
+                </box>
+            </element>
+            <element kind="textField" uuid="22222222-2222-2222-2222-222222222232" x="245" y="0" width="60" height="18" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[$F{menge} != null ? ch.nacht.util.PdfNumberFormat.decimals($F{menge}, 3) : null]]></expression>
+                <box>
+                    <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
+                </box>
+            </element>
+            <element kind="textField" uuid="22222222-2222-2222-2222-222222222233" x="305" y="0" width="45" height="18" blankWhenNull="true" fontSize="8.0" vTextAlign="Middle">
+                <expression><![CDATA[$F{mengeneinheit} != null ? $P{TRANSLATIONS}.get($F{mengeneinheit}) : null]]></expression>
+                <box leftPadding="3">
+                    <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
+                </box>
+            </element>
+            <element kind="textField" uuid="22222222-2222-2222-2222-222222222234" x="350" y="0" width="65" height="18" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[$F{betragProEinheit} != null ? ch.nacht.util.PdfNumberFormat.decimals($F{betragProEinheit}, 4) : null]]></expression>
+                <box>
+                    <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
+                </box>
+            </element>
+            <element kind="textField" uuid="22222222-2222-2222-2222-222222222235" x="415" y="0" width="55" height="18" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[$F{prozentsatz} != null ? ch.nacht.util.PdfNumberFormat.decimals($F{prozentsatz}, 1) + " %" : null]]></expression>
+                <box>
+                    <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
+                </box>
+            </element>
+            <element kind="textField" uuid="22222222-2222-2222-2222-222222222236" x="470" y="0" width="85" height="18" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[ch.nacht.util.PdfNumberFormat.chf($F{betrag})]]></expression>
+                <box>
+                    <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
+                </box>
+            </element>
+        </band>
+    </detail>
+
+    <!-- Last Page Footer - QR Payment Slip. Faellt bei Saldo <= 0 ganz weg: Ein
+         Einzahlungsschein ueber 0 oder einen negativen Betrag ist ungueltig (FR-8). -->
+    <lastPageFooter height="250">
+        <printWhenExpression><![CDATA[$P{RECHNUNG}.isNachzahlung()]]></printWhenExpression>
+
+        <element kind="line" uuid="22222222-2222-2222-2222-222222222240" x="-20" y="0" width="595" height="1">
+            <pen lineWidth="0.5" lineStyle="Dashed"/>
+        </element>
+        <element kind="line" uuid="22222222-2222-2222-2222-222222222241" x="156" y="0" width="1" height="247">
+            <pen lineWidth="0.5" lineStyle="Dashed"/>
+        </element>
+
+        <!-- ============ EMPFANGSSCHEIN ============ -->
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222242" x="-6" y="14" width="148" height="18" fontSize="11.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_EMPFANGSSCHEIN")]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222243" x="-6" y="38" width="148" height="10" fontSize="6.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_KONTO_ZAHLBAR_AN")]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222244" x="-6" y="48" width="148" height="10" blankWhenNull="true" fontSize="8.0">
+            <expression><![CDATA[$P{RECHNUNG}.getIban() != null ? $P{RECHNUNG}.getIban().replaceAll("(.{4})", "$1 ").trim() : ""]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222245" x="-6" y="58" width="148" height="10" blankWhenNull="true" fontSize="8.0">
+            <expression><![CDATA[$P{RECHNUNG}.getStellerName()]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222246" x="-6" y="68" width="148" height="9" blankWhenNull="true" fontSize="7.0">
+            <expression><![CDATA[$P{RECHNUNG}.getStellerStrasse()]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222247" x="-6" y="77" width="148" height="9" blankWhenNull="true" fontSize="7.0">
+            <expression><![CDATA[$P{RECHNUNG}.getStellerPlzOrt()]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222248" x="-6" y="95" width="148" height="10" fontSize="6.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_ZAHLBAR_DURCH")]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222249" x="-6" y="105" width="148" height="10" blankWhenNull="true" fontSize="8.0">
+            <expression><![CDATA[$P{RECHNUNG}.getMieterName()]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-22222222224a" x="-6" y="115" width="148" height="9" blankWhenNull="true" fontSize="7.0">
+            <expression><![CDATA[$P{RECHNUNG}.getMieterStrasse()]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-22222222224b" x="-6" y="124" width="148" height="9" blankWhenNull="true" fontSize="7.0">
+            <expression><![CDATA[$P{RECHNUNG}.getMieterPlzOrt()]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-22222222224c" x="-6" y="145" width="40" height="10" fontSize="6.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_WAEHRUNG")]]></expression>
+        </element>
+        <element kind="staticText" uuid="22222222-2222-2222-2222-22222222224d" x="-6" y="155" width="40" height="12" fontSize="8.0">
+            <text><![CDATA[CHF]]></text>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-22222222224e" x="40" y="145" width="60" height="10" fontSize="6.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_BETRAG")]]></expression>
+        </element>
+        <!-- Betrag im Einzahlungsschein: bewusst NICHT ueber PdfNumberFormat. Die QR-Rechnung
+             schreibt das Betragsformat vor (Leerzeichen als Tausendertrennzeichen), das
+             Hochkomma aus Specs/generell.md gilt hier nicht. -->
+        <element kind="textField" uuid="22222222-2222-2222-2222-22222222224f" x="40" y="155" width="80" height="12" pattern="#,##0.00" blankWhenNull="true" fontSize="8.0">
+            <expression><![CDATA[$P{RECHNUNG}.getEndBetrag()]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222250" x="-6" y="180" width="148" height="12" fontSize="6.0" bold="true" hTextAlign="Right">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_ANNAHMESTELLE")]]></expression>
+        </element>
+
+        <!-- ============ ZAHLTEIL ============ -->
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222251" x="171" y="14" width="200" height="18" fontSize="11.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_ZAHLTEIL")]]></expression>
+        </element>
+        <element kind="image" uuid="22222222-2222-2222-2222-222222222252" x="171" y="38" width="130" height="130" scaleImage="RetainShape" onErrorType="Blank">
+            <expression><![CDATA[$P{QR_CODE_IMAGE}]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222253" x="171" y="175" width="40" height="12" fontSize="8.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_WAEHRUNG")]]></expression>
+        </element>
+        <element kind="staticText" uuid="22222222-2222-2222-2222-222222222254" x="171" y="187" width="40" height="14" fontSize="10.0">
+            <text><![CDATA[CHF]]></text>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222255" x="221" y="175" width="60" height="12" fontSize="8.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_BETRAG")]]></expression>
+        </element>
+        <!-- Betrag im Zahlteil: siehe Kommentar beim Empfangsschein-Betrag oben. -->
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222256" x="221" y="187" width="80" height="14" pattern="#,##0.00" blankWhenNull="true" fontSize="10.0">
+            <expression><![CDATA[$P{RECHNUNG}.getEndBetrag()]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222257" x="330" y="38" width="225" height="12" fontSize="8.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_KONTO_ZAHLBAR_AN")]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222258" x="330" y="50" width="225" height="12" blankWhenNull="true" fontSize="10.0">
+            <expression><![CDATA[$P{RECHNUNG}.getIban() != null ? $P{RECHNUNG}.getIban().replaceAll("(.{4})", "$1 ").trim() : ""]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222259" x="330" y="62" width="225" height="12" blankWhenNull="true" fontSize="10.0">
+            <expression><![CDATA[$P{RECHNUNG}.getStellerName()]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-22222222225a" x="330" y="74" width="225" height="11" blankWhenNull="true" fontSize="8.0">
+            <expression><![CDATA[$P{RECHNUNG}.getStellerStrasse()]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-22222222225b" x="330" y="85" width="225" height="11" blankWhenNull="true" fontSize="8.0">
+            <expression><![CDATA[$P{RECHNUNG}.getStellerPlzOrt()]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-22222222225c" x="330" y="105" width="225" height="12" fontSize="8.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_ZUSAETZLICHE_INFOS")]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-22222222225d" x="330" y="117" width="225" height="12" blankWhenNull="true" fontSize="10.0">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("NK_RECHNUNG_TITEL") + ($P{RECHNUNG}.getBezeichnung() != null ? " " + $P{RECHNUNG}.getBezeichnung() : "")]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-22222222225e" x="330" y="138" width="225" height="12" fontSize="8.0" bold="true">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("QR_ZAHLBAR_DURCH")]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-22222222225f" x="330" y="150" width="225" height="12" blankWhenNull="true" fontSize="10.0">
+            <expression><![CDATA[$P{RECHNUNG}.getMieterName()]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222260" x="330" y="162" width="225" height="11" blankWhenNull="true" fontSize="8.0">
+            <expression><![CDATA[$P{RECHNUNG}.getMieterStrasse()]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222261" x="330" y="173" width="225" height="11" blankWhenNull="true" fontSize="8.0">
+            <expression><![CDATA[$P{RECHNUNG}.getMieterPlzOrt()]]></expression>
+        </element>
+    </lastPageFooter>
+
+    <!-- Summary Band - Kostentotal, Akonto, Rundung, Saldo -->
+    <summary height="130">
+        <!-- Kostentotal -->
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222271" x="0" y="5" width="470" height="18" fontSize="9.0" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("NK_KOSTENTOTAL") + ":"]]></expression>
+            <box topPadding="3">
+                <topPen lineWidth="2.0" lineColor="#0099CC"/>
+            </box>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222272" x="470" y="5" width="85" height="18" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+            <expression><![CDATA[ch.nacht.util.PdfNumberFormat.chf($P{RECHNUNG}.getKostentotal())]]></expression>
+            <box topPadding="3">
+                <topPen lineWidth="2.0" lineColor="#0099CC"/>
+            </box>
+        </element>
+
+        <!-- Akonto total, mit der Herleitung daneben: Anzahl Monate mal Betrag je Monat -->
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222273" x="0" y="23" width="470" height="18" fontSize="9.0" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("NK_AKONTO_TOTAL") + " (" + ch.nacht.util.PdfNumberFormat.decimals($P{RECHNUNG}.getAkontoAnzahlMonate(), 0) + " x " + ch.nacht.util.PdfNumberFormat.chf($P{RECHNUNG}.getAkontoBetragProMonat()) + "):"]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222274" x="470" y="23" width="85" height="18" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+            <expression><![CDATA[ch.nacht.util.PdfNumberFormat.chf($P{RECHNUNG}.getAkontoTotal().negate())]]></expression>
+        </element>
+
+        <!-- Rundung, nur wenn eine entstanden ist -->
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222275" x="0" y="41" width="470" height="18" fontSize="9.0" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("RUNDUNG") + ":"]]></expression>
+            <printWhenExpression><![CDATA[$P{RECHNUNG}.getRundung().signum() != 0]]></printWhenExpression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222276" x="470" y="41" width="85" height="18" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+            <expression><![CDATA[ch.nacht.util.PdfNumberFormat.chf($P{RECHNUNG}.getRundung())]]></expression>
+            <printWhenExpression><![CDATA[$P{RECHNUNG}.getRundung().signum() != 0]]></printWhenExpression>
+        </element>
+
+        <!-- Saldo: benennt Nachzahlung oder Guthaben im Text, statt nur ein Vorzeichen zu zeigen -->
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222277" mode="Opaque" x="0" y="63" width="470" height="25" backcolor="#F0F8FF" fontSize="11.0" bold="true" vTextAlign="Middle">
+            <expression><![CDATA[$P{TRANSLATIONS}.get($P{RECHNUNG}.isNachzahlung() ? "NK_NACHZAHLUNG" : "NK_GUTHABEN") + ":"]]></expression>
+        </element>
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222278" mode="Opaque" x="470" y="63" width="85" height="25" backcolor="#F0F8FF" fontSize="11.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
+            <expression><![CDATA[ch.nacht.util.PdfNumberFormat.chf($P{RECHNUNG}.getEndBetrag())]]></expression>
+        </element>
+
+        <!-- Hinweis bei Guthaben: Sonst stuende dort ein negativer Betrag ohne Einzahlungsschein
+             und ohne Erklaerung, warum keiner dabei ist. -->
+        <element kind="textField" uuid="22222222-2222-2222-2222-222222222279" x="0" y="93" width="555" height="15" forecolor="#666666" fontSize="9.0">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("NK_KEINE_FORDERUNG")]]></expression>
+            <printWhenExpression><![CDATA[!$P{RECHNUNG}.isNachzahlung()]]></printWhenExpression>
+        </element>
+
+        <element kind="textField" uuid="22222222-2222-2222-2222-22222222227a" x="0" y="110" width="555" height="20" fontSize="10.0">
+            <expression><![CDATA[$P{TRANSLATIONS}.get("BESTEN_DANK")]]></expression>
+        </element>
+    </summary>
+</jasperReport>

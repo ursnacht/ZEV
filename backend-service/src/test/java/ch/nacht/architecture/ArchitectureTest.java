@@ -1,5 +1,6 @@
 package ch.nacht.architecture;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethod;
@@ -418,6 +419,17 @@ class ArchitectureTest {
          * <p>Der Preis dieses Entscheids ist, dass eine neue Methode den Aufruf vergessen kann und
          * dann ungeschuetzt ist: Das Menue bliebe verborgen, die API aber ueber jeden HTTP-Client
          * erreichbar. Diese Regel faengt genau das ab.
+         *
+         * <p><b>Geltungsbereich: alle Services mit dem Praefix {@code Nk}</b> — nicht nur
+         * {@code NkAbrechnung*}. Bis zur Rechnungserstellung war der Bereich auf jenes Praefix
+         * eingeschraenkt; {@code NkRechnungService} waere stillschweigend uebersprungen worden
+         * (Specs/Nebenkosten/RechnungenGenerieren.md, FR-9). Deny by default, wie bei der
+         * {@code findById}-Regel daneben.
+         *
+         * <p><b>Ausgenommen</b> sind namentlich die Services, die <b>keine Mandantendaten laden</b>
+         * und deshalb nichts zu schuetzen haben: Sie rechnen bzw. formen nur, was ihnen uebergeben
+         * wird. Ein {@code pruefeFeatureFlag()} waere dort Zierde — und die Ausnahme steht hier
+         * sichtbar, statt sich aus einem Praefix zu ergeben.
          */
         @Test
         @DisplayName("Jede oeffentliche Methode der NK-Services prueft den Feature-Flag")
@@ -440,9 +452,21 @@ class ArchitectureTest {
                     }
                 };
 
+            // Services ohne Mandantenzugriff: reine Rechen- bzw. Formatierungslogik.
+            Set<String> ohneMandantenzugriff = Set.of(
+                "NkBerechnungService",    // reine Funktionen auf Eingabedaten, keine Persistenz
+                "NkRechnungPdfService"    // fuellt nur das Template mit uebergebenen Daten
+            );
+
             ArchRule rule = classes()
                 .that().resideInAPackage("..service..")
-                .and().haveSimpleNameStartingWith("NkAbrechnung")
+                .and().haveSimpleNameStartingWith("Nk")
+                .and(new DescribedPredicate<JavaClass>("laden Mandantendaten") {
+                    @Override
+                    public boolean test(JavaClass service) {
+                        return !ohneMandantenzugriff.contains(service.getSimpleName());
+                    }
+                })
                 .should(checkFeatureFlag);
 
             rule.check(importedClasses);

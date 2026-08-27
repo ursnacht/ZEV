@@ -1,8 +1,11 @@
 package ch.nacht;
 
+import ch.nacht.dto.NkRechnungDTO;
+import ch.nacht.dto.NkRechnungZeileDTO;
 import ch.nacht.dto.RechnungDTO;
 import ch.nacht.dto.TarifZeileDTO;
 import ch.nacht.entity.TarifTyp;
+import ch.nacht.service.RechnungService;
 import net.sf.jasperreports.engine.JasperCompileManager;
 import net.sf.jasperreports.engine.JasperExportManager;
 import net.sf.jasperreports.engine.JasperFillManager;
@@ -113,6 +116,132 @@ class JasperTemplateCompileTest {
         rechnung.setTotalBetrag(new BigDecimal("24.60000"));
         rechnung.setEndBetrag(new BigDecimal("24.60"));
         rechnung.setRundung(new BigDecimal("-0.00500"));
+
+        rechnung.setZahlungsfrist("30 Tage");
+        rechnung.setIban("CH93 0076 2011 6238 5295 7");
+        rechnung.setStellerName("ZEV Musterhaus");
+        rechnung.setStellerStrasse("Sonnenweg 5");
+        rechnung.setStellerPlzOrt("3000 Bern");
+        return rechnung;
+    }
+
+    // ==================== Nebenkostenrechnung ====================
+
+    @Test
+    void testNkRechnungTemplateCompiles() throws Exception {
+        InputStream stream = getClass().getResourceAsStream("/reports/nk-rechnung.jrxml");
+        assertNotNull(stream, "nk-rechnung.jrxml not found");
+        JasperReport report = JasperCompileManager.compileReport(stream);
+        assertNotNull(report);
+        System.out.println("nk-rechnung.jrxml compiled successfully");
+    }
+
+    /**
+     * Fuellt das NK-Template mit einer Nachzahlung — der Fall, in dem der QR-Zahlteil gedruckt
+     * wird und alle Betragsfelder belegt sind.
+     *
+     * <p>Zum Warum siehe {@link #testRechnungTemplateFuelltBetraegeAlsBigDecimal()}: Ein Template
+     * kompiliert auch mit falschen Feldtypen, der Fehler kommt erst beim Fuellen.
+     */
+    @Test
+    void testNkRechnungTemplateFuelltNachzahlung() throws Exception {
+        JasperReport report = kompiliereNkTemplate();
+        NkRechnungDTO rechnung = testNkRechnung(new BigDecimal("812.37"));
+
+        byte[] pdf = fuelleNk(report, rechnung);
+
+        assertTrue(pdf.length > 0, "PDF darf nicht leer sein");
+        assertEquals("%PDF", new String(pdf, 0, 4, StandardCharsets.US_ASCII),
+                "Ergebnis muss ein PDF sein");
+    }
+
+    /**
+     * Dasselbe Template mit einem <b>Guthaben</b>.
+     *
+     * <p>Eigener Test, weil hier andere Zweige des Templates greifen: Der ganze
+     * {@code lastPageFooter} faellt ueber {@code printWhenExpression} weg, die Saldozeile
+     * beschriftet sich als Guthaben, und der Hinweis „keine Forderung" erscheint. Ein Fehler in
+     * einem dieser Ausdruecke waere im Nachzahlungsfall unsichtbar.
+     */
+    @Test
+    void testNkRechnungTemplateFuelltGuthaben() throws Exception {
+        JasperReport report = kompiliereNkTemplate();
+        NkRechnungDTO rechnung = testNkRechnung(new BigDecimal("-120.03"));
+
+        byte[] pdf = fuelleNk(report, rechnung);
+
+        assertEquals("%PDF", new String(pdf, 0, 4, StandardCharsets.US_ASCII),
+                "Ergebnis muss ein PDF sein");
+    }
+
+    private static JasperReport kompiliereNkTemplate() throws Exception {
+        InputStream stream = JasperTemplateCompileTest.class
+                .getResourceAsStream("/reports/nk-rechnung.jrxml");
+        assertNotNull(stream, "nk-rechnung.jrxml not found");
+        return JasperCompileManager.compileReport(stream);
+    }
+
+    private static byte[] fuelleNk(JasperReport report, NkRechnungDTO rechnung) throws Exception {
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("RECHNUNG", rechnung);
+        parameters.put("TRANSLATIONS", Map.of());
+        // Wie im Betrieb, wenn die QR-Erzeugung scheitert oder ein Guthaben vorliegt:
+        // das Bildelement traegt onErrorType="Blank" und muss null vertragen.
+        parameters.put("QR_CODE_IMAGE", null);
+
+        JasperPrint print = JasperFillManager.fillReport(report, parameters,
+                new JRBeanCollectionDataSource(rechnung.getZeilen()));
+        return JasperExportManager.exportReportToPdf(print);
+    }
+
+    /**
+     * NK-Rechnung mit einer Zeile je Positionsart, damit auch die Spalten getroffen werden, die
+     * nur eine Art fuellt (Menge, Preis, Prozentsatz).
+     *
+     * @param saldo ungerundeter Saldo; er bestimmt Rundung und Endbetrag
+     */
+    private static NkRechnungDTO testNkRechnung(BigDecimal saldo) {
+        NkRechnungDTO rechnung = new NkRechnungDTO();
+        rechnung.setAbrechnungId(12L);
+        rechnung.setBezeichnung("Nebenkosten 2026");
+        rechnung.setVon(LocalDate.of(2026, 1, 1));
+        rechnung.setBis(LocalDate.of(2026, 12, 31));
+        rechnung.setErstellungsdatum(LocalDate.of(2027, 1, 15));
+
+        rechnung.setMieterId(45L);
+        rechnung.setMieterName("Max Muster");
+        rechnung.setMieterStrasse("Musterstrasse 1");
+        rechnung.setMieterPlzOrt("8000 Zuerich");
+
+        NkRechnungZeileDTO umlage = new NkRechnungZeileDTO();
+        umlage.setBezeichnung("Allgemeinstrom");
+        umlage.setBetrag(new BigDecimal("240.55"));
+        rechnung.getZeilen().add(umlage);
+
+        NkRechnungZeileDTO verbrauch = new NkRechnungZeileDTO();
+        verbrauch.setBezeichnung("Wasser");
+        verbrauch.setMengeneinheit("M3");
+        verbrauch.setMenge(new BigDecimal("34.500"));
+        verbrauch.setBetragProEinheit(new BigDecimal("1.8500"));
+        verbrauch.setBetrag(new BigDecimal("63.83"));
+        rechnung.getZeilen().add(verbrauch);
+
+        NkRechnungZeileDTO zuschlag = new NkRechnungZeileDTO();
+        zuschlag.setBezeichnung("Verwaltungskosten");
+        zuschlag.setProzentsatz(new BigDecimal("3.00"));
+        zuschlag.setBetrag(new BigDecimal("9.13"));
+        rechnung.getZeilen().add(zuschlag);
+
+        rechnung.setKostentotal(new BigDecimal("313.51"));
+        rechnung.setAkontoAnzahlMonate(new BigDecimal("12"));
+        rechnung.setAkontoBetragProMonat(new BigDecimal("50.00"));
+        rechnung.setAkontoKorrektur(BigDecimal.ZERO);
+        rechnung.setAkontoTotal(new BigDecimal("600.00"));
+
+        BigDecimal endBetrag = RechnungService.roundTo5Rappen(saldo);
+        rechnung.setSaldo(saldo);
+        rechnung.setEndBetrag(endBetrag);
+        rechnung.setRundung(endBetrag.subtract(saldo));
 
         rechnung.setZahlungsfrist("30 Tage");
         rechnung.setIban("CH93 0076 2011 6238 5295 7");

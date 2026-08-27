@@ -602,9 +602,14 @@ daneben.
     Beleg ist nachholbar, indem der Lauf wiederholt wird; die Buchung ist idempotent. Umgekehrt —
     PDF zuerst, Buchung danach — bliebe im Fehlerfall ein Beleg ohne Forderung, und der fehlt in
     der Debitorenkontrolle, wo ihn niemand vermisst.
-* **Abrechnung wird während des Laufs wieder geöffnet:** Der Lauf läuft in einer Transaktion; Flag
-  und Zustand werden zu Beginn geprüft. Ein Wiedereröffnen danach macht die bereits gebuchten
-  Forderungen nicht ungültig — sie bleiben stehen und sind über die Debitorenkontrolle korrigierbar.
+* **Abrechnung wird während des Laufs wieder geöffnet:** Flag und Zustand werden zu Beginn geprüft.
+  Ein Wiedereröffnen danach macht die bereits gebuchten Forderungen nicht ungültig — sie bleiben
+  stehen und sind über die Debitorenkontrolle korrigierbar.
+  * **Der Lauf ist bewusst nicht atomar.** Jede Buchung schliesst für sich ab. Liefe alles in
+    *einer* Transaktion, würde eine gescheiterte Buchung sie als rollback-only markieren: Der
+    abgefangene Einzelfehler wäre folgenlos gewesen, der Commit am Ende schlüge mit einem
+    generischen `500` fehl, und die Rechnungen der übrigen Mieter wären verloren. Genau das
+    verlangt der Fall „Fehler bei einem einzelnen Mieter" nicht.
 * **Abrechnung wird gelöscht, nachdem Rechnungen erstellt wurden:** Die Forderungen bleiben; sie
   hängen am Mieter, nicht an der Abrechnung. Die PDF verfallen mit dem Speicher. Bewusst so — eine
   Kaskade auf `debitor` wäre ein stiller Datenverlust.

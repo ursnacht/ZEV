@@ -12,6 +12,17 @@
     </div>
   }
 
+  <!-- Nebenkostenrechnungen entstehen im NK-Bereich aus einer abgeschlossenen Abrechnung
+       (Specs/Nebenkosten/RechnungenGenerieren.md, FR-7). Wer sie hier sucht, findet hier den
+       Weg dorthin - eine zweite Bedienoberflaeche waere teurer als dieser Satz. Der Hinweis
+       haengt am Feature-Flag: Ohne NK-Bereich sieht die Seite aus wie vorher. -->
+  <div class="zev-message zev-message--info zev-message--statisch" *appFeature="'NEBENKOSTENABRECHNUNG'">
+    <span>
+      {{ 'NK_HINWEIS_AUF_RECHNUNGEN_SEITE' | translate }}
+      <a routerLink="/nebenkosten/abrechnung">{{ 'NK_ABRECHNUNG' | translate }}</a>
+    </span>
+  </div>
+
   <form (ngSubmit)="onGenerate()">
     <app-einheit-selector [onlyConsumers]="true" (selectionChange)="onSelectionChange($event)"></app-einheit-selector>
 

@@ -33,20 +33,28 @@ public interface DebitorRepository extends JpaRepository<Debitor, Long> {
     );
 
     /**
-     * Upsert a debitor entry by unique key (mieter_id, datum_von, org_id).
+     * Upsert a debitor entry by unique key (mieter_id, datum_von, herkunft, org_id).
      * Updates betrag and datum_bis only if zahldatum is not yet set.
+     *
+     * <p>Die {@code herkunft} gehoert in den Konfliktschluessel: Eine NK-Jahresabrechnung und die
+     * ZEV-Quartalsrechnung Q1 haben denselben {@code datum_von}, und ohne sie wuerde die eine
+     * Buchung die andere ueberschreiben. Der Schluessel muss <b>genau</b> dem Unique-Constraint
+     * {@code uq_debitor_mieter_von_herkunft_org} entsprechen (V126), sonst scheitert jeder Aufruf
+     * mit „no unique or exclusion constraint matching the ON CONFLICT specification".
      *
      * @param mieterId FK to mieter
      * @param betrag   Invoice amount in CHF
      * @param datumVon Start of billing period
      * @param datumBis End of billing period
      * @param orgId    Organisation ID
+     * @param herkunft {@code ZEV} oder {@code NK} — der Name des Enum-Werts, weil eine native
+     *                 Abfrage keinen Enum-Konverter durchlaeuft
      */
     @Modifying
     @Query(value = """
-        INSERT INTO zev.debitor (mieter_id, betrag, datum_von, datum_bis, zahldatum, org_id)
-        VALUES (:mieterId, :betrag, :datumVon, :datumBis, NULL, :orgId)
-        ON CONFLICT (mieter_id, datum_von, org_id)
+        INSERT INTO zev.debitor (mieter_id, betrag, datum_von, datum_bis, zahldatum, org_id, herkunft)
+        VALUES (:mieterId, :betrag, :datumVon, :datumBis, NULL, :orgId, :herkunft)
+        ON CONFLICT (mieter_id, datum_von, herkunft, org_id)
         DO UPDATE SET betrag = EXCLUDED.betrag, datum_bis = EXCLUDED.datum_bis
         WHERE zev.debitor.zahldatum IS NULL
         """, nativeQuery = true)
@@ -55,7 +63,8 @@ public interface DebitorRepository extends JpaRepository<Debitor, Long> {
         @Param("betrag") BigDecimal betrag,
         @Param("datumVon") LocalDate datumVon,
         @Param("datumBis") LocalDate datumBis,
-        @Param("orgId") Long orgId
+        @Param("orgId") Long orgId,
+        @Param("herkunft") String herkunft
     );
 
     /**

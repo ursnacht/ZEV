@@ -2,6 +2,7 @@ package ch.nacht.repository;
 
 import ch.nacht.AbstractIntegrationTest;
 import ch.nacht.entity.Debitor;
+import ch.nacht.entity.Debitorherkunft;
 import ch.nacht.entity.Mieter;
 import ch.nacht.entity.Organisation;
 import jakarta.persistence.EntityManager;
@@ -158,7 +159,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
         syncMitDatenbank();
 
         debitorRepository.upsert(fremder.getMieterId(), new BigDecimal("1.00"),
-                LocalDate.of(2026, 2, 1), LocalDate.of(2026, 2, 28), TEST_ORG_ID);
+                LocalDate.of(2026, 2, 1), LocalDate.of(2026, 2, 28), TEST_ORG_ID, Debitorherkunft.ZEV.name());
         syncMitDatenbank();
 
         aktiviereOrgFilter(entityManager, ANDERE_ORG_ID);
@@ -300,7 +301,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldInsertNewDebitorViaUpsert() {
         debitorRepository.upsert(mieterAId, new BigDecimal("250.00"),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID);
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name());
         syncMitDatenbank();
 
         List<Debitor> result = debitorRepository.findByDatumVonBetween(
@@ -322,7 +323,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
         syncMitDatenbank();
 
         debitorRepository.upsert(mieterAId, new BigDecimal("175.50"),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID);
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name());
         syncMitDatenbank();
 
         List<Debitor> result = debitorRepository.findByDatumVonBetween(
@@ -342,7 +343,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
         syncMitDatenbank();
 
         debitorRepository.upsert(mieterAId, new BigDecimal("999.00"),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 30), TEST_ORG_ID);
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 30), TEST_ORG_ID, Debitorherkunft.ZEV.name());
         syncMitDatenbank();
 
         List<Debitor> result = debitorRepository.findByDatumVonBetween(
@@ -358,9 +359,9 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
     void shouldCreateSeparateEntriesForDifferentPeriods() {
         // Der Schluessel enthaelt datum_von: Ein neues Quartal ergibt einen neuen Eintrag
         debitorRepository.upsert(mieterAId, new BigDecimal("100.00"),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID);
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name());
         debitorRepository.upsert(mieterAId, new BigDecimal("200.00"),
-                LocalDate.of(2026, 4, 1), LocalDate.of(2026, 6, 30), TEST_ORG_ID);
+                LocalDate.of(2026, 4, 1), LocalDate.of(2026, 6, 30), TEST_ORG_ID, Debitorherkunft.ZEV.name());
         syncMitDatenbank();
 
         List<Debitor> result = debitorRepository.findByDatumVonBetween(
@@ -374,9 +375,9 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldCreateSeparateEntriesForDifferentMieter() {
         debitorRepository.upsert(mieterAId, new BigDecimal("100.00"),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID);
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name());
         debitorRepository.upsert(mieterBId, new BigDecimal("200.00"),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID);
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name());
         syncMitDatenbank();
 
         List<Debitor> result = debitorRepository.findByDatumVonBetween(
@@ -392,9 +393,9 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
         // org_id gehoert zum Schluessel: Derselbe Mieter und Zeitraum in einem anderen Mandanten
         // ergibt einen eigenen Eintrag statt eines Konflikts
         debitorRepository.upsert(mieterAId, new BigDecimal("100.00"),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID);
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name());
         debitorRepository.upsert(mieterAId, new BigDecimal("200.00"),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), ANDERE_ORG_ID);
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), ANDERE_ORG_ID, Debitorherkunft.ZEV.name());
         syncMitDatenbank();
 
         // Ohne aktiven Org-Filter sind beide sichtbar - das Trennen ist Aufgabe des Service
@@ -411,7 +412,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
         // Mehrere Laeufe hintereinander duerfen die Tabelle nicht aufblaehen
         for (int lauf = 1; lauf <= 3; lauf++) {
             debitorRepository.upsert(mieterAId, new BigDecimal(lauf * 100 + ".00"),
-                    LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID);
+                    LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name());
             syncMitDatenbank();
         }
 
@@ -420,5 +421,133 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getBetrag()).isEqualByComparingTo("300.00");
+    }
+
+    // ==================== Herkunft im Unique-Key ====================
+    // Specs/Nebenkosten/RechnungenGenerieren.md FR-5
+
+    /**
+     * <b>Der Kern der Migration V126:</b> Dieselbe {@code (mieter_id, datum_von)} mit
+     * verschiedener Herkunft ergibt <b>zwei</b> Forderungen.
+     *
+     * <p>Eine NK-Jahresabrechnung 01.01.–31.12. und die ZEV-Quartalsrechnung Q1 haben denselben
+     * {@code datum_von}. Ohne die Herkunft im Schluessel haette die NK-Buchung die ZEV-Forderung
+     * desselben Mieters stillschweigend ueberschrieben — kein Fehler, keine Meldung, eine
+     * Forderung weg.
+     */
+    @Test
+    void upsertMitVerschiedenerHerkunft_ErzeugtZweiForderungen() {
+        debitorRepository.upsert(mieterAId, new BigDecimal("250.00"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID,
+                Debitorherkunft.ZEV.name());
+        debitorRepository.upsert(mieterAId, new BigDecimal("812.35"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), TEST_ORG_ID,
+                Debitorherkunft.NK.name());
+        syncMitDatenbank();
+
+        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 1));
+
+        assertThat(result).hasSize(2);
+        assertThat(result).extracting(Debitor::getHerkunft)
+                .containsExactlyInAnyOrder(Debitorherkunft.ZEV, Debitorherkunft.NK);
+        assertThat(result).extracting(Debitor::getBetrag)
+                .containsExactlyInAnyOrder(new BigDecimal("250.00"), new BigDecimal("812.35"));
+    }
+
+    /** Ein NK-Lauf aktualisiert seine eigene Forderung und laesst die ZEV-Forderung unberuehrt. */
+    @Test
+    void upsertNK_LaesstZEVForderungUnberuehrt() {
+        debitorRepository.upsert(mieterAId, new BigDecimal("250.00"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID,
+                Debitorherkunft.ZEV.name());
+        debitorRepository.upsert(mieterAId, new BigDecimal("100.00"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), TEST_ORG_ID,
+                Debitorherkunft.NK.name());
+        syncMitDatenbank();
+
+        // Zweiter NK-Lauf mit geaendertem Betrag
+        debitorRepository.upsert(mieterAId, new BigDecimal("199.95"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), TEST_ORG_ID,
+                Debitorherkunft.NK.name());
+        syncMitDatenbank();
+
+        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 1));
+
+        assertThat(result).hasSize(2);
+        assertThat(result).filteredOn(d -> d.getHerkunft() == Debitorherkunft.ZEV)
+                .singleElement()
+                .extracting(Debitor::getBetrag).isEqualTo(new BigDecimal("250.00"));
+        assertThat(result).filteredOn(d -> d.getHerkunft() == Debitorherkunft.NK)
+                .singleElement()
+                .extracting(Debitor::getBetrag).isEqualTo(new BigDecimal("199.95"));
+    }
+
+    /**
+     * <b>Regression des ZEV-Pfads.</b> Die {@code ON CONFLICT}-Klausel muss genau dem neuen
+     * Unique-Constraint entsprechen. Bliebe sie auf {@code (mieter_id, datum_von, org_id)},
+     * scheiterte <b>jeder</b> Upsert mit „no unique or exclusion constraint matching the ON
+     * CONFLICT specification" — auch der ZEV-seitige, der mit dieser Aenderung nichts zu tun hat.
+     */
+    @Test
+    void upsertZEV_FunktioniertNachDemSchluesseltausch() {
+        debitorRepository.upsert(mieterAId, new BigDecimal("100.00"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID,
+                Debitorherkunft.ZEV.name());
+        debitorRepository.upsert(mieterAId, new BigDecimal("175.50"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID,
+                Debitorherkunft.ZEV.name());
+        syncMitDatenbank();
+
+        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getBetrag()).isEqualByComparingTo("175.50");
+        assertThat(result.get(0).getHerkunft()).isEqualTo(Debitorherkunft.ZEV);
+    }
+
+    /** Eine bezahlte NK-Forderung wird von einem erneuten Lauf nicht angetastet. */
+    @Test
+    void upsertNK_BezahlteForderung_BleibtUnveraendert() {
+        debitorRepository.upsert(mieterAId, new BigDecimal("100.00"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), TEST_ORG_ID,
+                Debitorherkunft.NK.name());
+        syncMitDatenbank();
+
+        Debitor bezahlt = debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 1)).get(0);
+        bezahlt.setZahldatum(LocalDate.of(2027, 1, 20));
+        debitorRepository.save(bezahlt);
+        syncMitDatenbank();
+
+        debitorRepository.upsert(mieterAId, new BigDecimal("999.00"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), TEST_ORG_ID,
+                Debitorherkunft.NK.name());
+        syncMitDatenbank();
+
+        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 1));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getBetrag()).isEqualByComparingTo("100.00");
+        assertThat(result.get(0).getZahldatum()).isEqualTo(LocalDate.of(2027, 1, 20));
+    }
+
+    /** Ein ueber die Entity gespeicherter Eintrag traegt ohne Zutun {@code ZEV}. */
+    @Test
+    void saveOhneHerkunft_TraegtZEV() {
+        Debitor debitor = new Debitor();
+        debitor.setOrgId(TEST_ORG_ID);
+        debitor.setMieterId(mieterAId);
+        debitor.setBetrag(new BigDecimal("50.00"));
+        debitor.setDatumVon(LocalDate.of(2026, 7, 1));
+        debitor.setDatumBis(LocalDate.of(2026, 9, 30));
+
+        Debitor gespeichert = debitorRepository.save(debitor);
+        syncMitDatenbank();
+
+        assertThat(gespeichert.getHerkunft()).isEqualTo(Debitorherkunft.ZEV);
     }
 }

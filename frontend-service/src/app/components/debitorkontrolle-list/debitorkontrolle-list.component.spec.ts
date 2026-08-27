@@ -6,6 +6,7 @@ import { DebitorService } from '../../services/debitor.service';
 import { EinheitService } from '../../services/einheit.service';
 import { MieterService } from '../../services/mieter.service';
 import { TranslationService } from '../../services/translation.service';
+import { FeatureFlagService } from '../../services/feature-flag.service';
 import { Debitor } from '../../models/debitor.model';
 import { Einheit, EinheitTyp } from '../../models/einheit.model';
 import { Mieter } from '../../models/mieter.model';
@@ -36,6 +37,36 @@ describe('DebitorkontrolleListComponent', () => {
     { id: 2, mieterId: 11, mieterName: 'Anna Test', einheitName: 'OG rechts', betrag: 87.60, datumVon: '2025-01-01', datumBis: '2025-03-31', zahldatum: '2025-02-15' }
   ];
 
+  /**
+   * Gemischte Liste für den Herkunft-Filter: eine ZEV-Forderung, eine NK-Forderung und eine
+   * **ohne** Herkunft — so trägt sie der Bestand vor V126.
+   *
+   * Bewusst eine **Fabrik** und ohne Rückgriff auf `mockDebitoren`: `applySorting` sortiert die
+   * Array-Instanz, die der Service liefert — und das ist bei `of(mockDebitoren)` die geteilte
+   * Konstante selbst. Nach dem ersten Sortier-Test steht dort eine andere Reihenfolge, und
+   * `mockDebitoren[0]` ist ein anderer Eintrag als beim Schreiben des Tests.
+   */
+  function gemischteDebitoren(): Debitor[] {
+    return [
+      {
+        id: 1, mieterId: 10, mieterName: 'Max Muster', einheitName: 'EG links',
+        betrag: 123.45, datumVon: '2025-01-01', datumBis: '2025-03-31', herkunft: 'ZEV'
+      },
+      {
+        id: 2, mieterId: 11, mieterName: 'Anna Test', einheitName: 'OG rechts',
+        betrag: 87.60, datumVon: '2025-01-01', datumBis: '2025-03-31',
+        zahldatum: '2025-02-15', herkunft: 'NK'
+      },
+      {
+        id: 3, mieterId: 10, mieterName: 'Zeller Zoe',
+        betrag: 50, datumVon: '2025-01-01', datumBis: '2025-03-31'
+      }
+    ];
+  }
+
+  /** Zustand des Feature-Flags `NEBENKOSTENABRECHNUNG` für den jeweiligen Test. */
+  let nkFlagAktiv = true;
+
   beforeEach(async () => {
     debitorServiceSpy = createSpyObj<DebitorService>('DebitorService', [
       'getDebitoren', 'createDebitor', 'updateDebitor', 'deleteDebitor'
@@ -52,13 +83,16 @@ describe('DebitorkontrolleListComponent', () => {
     mieterServiceSpy.getAllMieter.mockReturnValue(of(mockMieter));
     translationServiceSpy.translate.mockImplementation((key: string) => key);
 
+    nkFlagAktiv = true;
+
     await TestBed.configureTestingModule({
       imports: [DebitorkontrolleListComponent],
       providers: [
         { provide: DebitorService, useValue: debitorServiceSpy },
         { provide: EinheitService, useValue: einheitServiceSpy },
         { provide: MieterService, useValue: mieterServiceSpy },
-        { provide: TranslationService, useValue: translationServiceSpy }
+        { provide: TranslationService, useValue: translationServiceSpy },
+        { provide: FeatureFlagService, useValue: { isEnabled: () => nkFlagAktiv } }
       ]
     }).compileComponents();
 
@@ -802,6 +836,136 @@ describe('DebitorkontrolleListComponent', () => {
       component.selectedIds.add(2);
       component.loadDebitoren();
       expect(component.selectedIds.size).toBe(0);
+    });
+  });
+
+  // ============ Herkunft (Specs/Nebenkosten/RechnungenGenerieren.md, FR-7) ============
+
+  describe('Herkunft-Filter', () => {
+    beforeEach(() => {
+      debitorServiceSpy.getDebitoren.mockReturnValue(of(gemischteDebitoren()));
+      component.loadDebitoren();
+      fixture.detectChanges();
+    });
+
+    it('should show all entries by default', () => {
+      // Kein gemerkter Zustand: Beim Öffnen der Seite steht der Filter auf ALLE, wie die
+      // übrigen Filter dieser Seite.
+      expect(component.herkunftFilter).toBe('ALLE');
+      expect(component.sichtbareDebitoren.length).toBe(3);
+    });
+
+    it('should show only ZEV entries when filtered to ZEV', () => {
+      component.herkunftFilter = 'ZEV';
+
+      expect(component.sichtbareDebitoren.map(d => d.id)).toEqual([1, 3]);
+    });
+
+    it('should show only NK entries when filtered to NK', () => {
+      component.herkunftFilter = 'NK';
+
+      expect(component.sichtbareDebitoren.map(d => d.id)).toEqual([2]);
+    });
+
+    /**
+     * Eine Forderung ohne Herkunft zählt als ZEV — der Bestand vor V126 ist aus der
+     * Stromabrechnung entstanden. Sie darf nicht durch jeden Filter fallen.
+     */
+    it('should treat a missing origin as ZEV', () => {
+      component.herkunftFilter = 'ZEV';
+      expect(component.sichtbareDebitoren.map(d => d.id)).toContain(3);
+
+      component.herkunftFilter = 'NK';
+      expect(component.sichtbareDebitoren.map(d => d.id)).not.toContain(3);
+    });
+
+    /**
+     * Ein Filterwechsel hebt die Auswahl auf: Sonst blieben ausgeblendete Zeilen ausgewählt, und
+     * „Auswahl löschen" träfe Forderungen, die der Benutzer gar nicht sieht.
+     */
+    it('should clear the selection when the filter changes', () => {
+      component.selectedIds.add(1);
+      component.selectedIds.add(2);
+
+      component.onHerkunftFilterChange();
+
+      expect(component.selectedIds.size).toBe(0);
+    });
+
+    it('should offer the NK option only while the feature flag is on', () => {
+      const optionen = () => Array.from(
+        (fixture.nativeElement.querySelector('#herkunftFilter') as HTMLSelectElement).options)
+        .map(o => o.value);
+
+      expect(component.nkVerfuegbar).toBe(true);
+      expect(optionen()).toEqual(['ALLE', 'ZEV', 'NK']);
+
+      nkFlagAktiv = false;
+      fixture.detectChanges();
+
+      expect(optionen()).toEqual(['ALLE', 'ZEV']);
+    });
+
+    it('should show the empty state when the filter matches nothing', () => {
+      debitorServiceSpy.getDebitoren.mockReturnValue(of([gemischteDebitoren()[0]]));
+      component.loadDebitoren();
+      component.herkunftFilter = 'NK';
+      fixture.detectChanges();
+
+      expect(component.sichtbareDebitoren.length).toBe(0);
+      expect(fixture.nativeElement.querySelector('.zev-empty-state')).toBeTruthy();
+    });
+  });
+
+  describe('Herkunft-Spalte', () => {
+    beforeEach(() => {
+      debitorServiceSpy.getDebitoren.mockReturnValue(of(gemischteDebitoren()));
+      component.loadDebitoren();
+      fixture.detectChanges();
+    });
+
+    /**
+     * Zeile über den Mieternamen suchen, nicht über den Index: Die Tabelle ist nach Name
+     * sortiert, und ein Index wäre eine Annahme über die Sortierung.
+     */
+    function zeileVon(mieterName: string): string {
+      const zeile = Array.from(fixture.nativeElement.querySelectorAll('tbody tr'))
+        .find(tr => ((tr as HTMLElement).textContent ?? '').includes(mieterName));
+      return ((zeile as HTMLElement | undefined)?.textContent) ?? '';
+    }
+
+    it('should render the origin as a translated badge', () => {
+      expect(zeileVon('Max Muster')).toContain('DEBITOR_HERKUNFT_ZEV');
+      expect(zeileVon('Anna Test')).toContain('DEBITOR_HERKUNFT_NK');
+    });
+
+    it('should label a missing origin as ZEV', () => {
+      expect(zeileVon('Zeller Zoe')).toContain('DEBITOR_HERKUNFT_ZEV');
+    });
+
+    /**
+     * Die Spalte bleibt bei ausgeschaltetem Flag sichtbar: Bestehende NK-Forderungen überleben ein
+     * Abschalten, und eine Forderung ohne erkennbare Herkunft wäre schlechter als eine mit.
+     */
+    it('should keep the column while the feature flag is off', () => {
+      nkFlagAktiv = false;
+      fixture.detectChanges();
+
+      expect(zeileVon('Anna Test')).toContain('DEBITOR_HERKUNFT_NK');
+    });
+
+    it('should sort by origin', () => {
+      component.onSort('herkunft');
+
+      expect(component.debitoren.map(d => d.herkunft ?? 'ZEV')).toEqual(['NK', 'ZEV', 'ZEV']);
+    });
+
+    it('should toggle the sort direction on the origin column', () => {
+      component.onSort('herkunft');
+      component.onSort('herkunft');
+
+      expect(component.sortDirection).toBe('desc');
+      expect(component.debitoren.map(d => d.herkunft ?? 'ZEV')).toEqual(['ZEV', 'ZEV', 'NK']);
     });
   });
 });

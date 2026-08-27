@@ -65,8 +65,11 @@
                     [attr.aria-label]="'NK_ABGERECHNET' | translate" />
                 </td>
                 <td>
+                  <!-- Menue je Zeile: "Rechnungen erstellen" nur auf einer abgeschlossenen
+                       Abrechnung. menuFuer() liefert eine von zwei festen Listen - eine hier
+                       erzeugte waere bei jeder Aenderungserkennung neu (NG0956). -->
                   <app-kebab-menu
-                    [items]="menuItems"
+                    [items]="menuFuer(abrechnung)"
                     (itemClick)="onMenuAction($event, abrechnung)">
                   </app-kebab-menu>
                 </td>
@@ -76,6 +79,80 @@
         </table>
       } @else {
         <p>{{ 'NK_KEINE_ABRECHNUNGEN' | translate }}</p>
+      }
+
+      @if (laufLaeuft) {
+        <div class="zev-spinner-container">
+          <div class="zev-spinner"></div>
+        </div>
+      }
+
+      <!-- Ergebnis des Rechnungslaufs. Aufbau wie das Panel "Generierte Rechnungen" auf der
+           Seite Rechnungen, damit die beiden Ergebnisdarstellungen gleich aussehen. -->
+      @if (lauf) {
+        <div class="zev-panel zev-panel--chart">
+          <h3 class="zev-panel__title">{{ 'NK_RECHNUNGEN_ERGEBNIS' | translate }}</h3>
+          <div class="zev-panel__content">
+            <p>
+              <strong>{{ lauf.bezeichnung }}</strong>
+              ({{ lauf.von | swissDate }} – {{ lauf.bis | swissDate }})
+            </p>
+            <!-- Zahl der Rechnungen und Zahl der Forderungen getrennt: Bei durchweg Guthaben
+                 entstehen Rechnungen, aber keine Forderungen - "0" ist dann kein Fehlschlag. -->
+            <p>
+              {{ 'NK_ANZAHL_RECHNUNGEN' | translate }}: <strong>{{ lauf.anzahlRechnungen }}</strong>
+              &nbsp;|&nbsp;
+              {{ 'NK_ANZAHL_FORDERUNGEN' | translate }}: <strong>{{ lauf.anzahlForderungen }}</strong>
+              &nbsp;|&nbsp;
+              {{ 'NK_SUMME_FORDERUNGEN' | translate }}:
+              <strong>{{ lauf.summeForderungen | swissNumber:2 }} CHF</strong>
+            </p>
+
+            <table class="zev-table">
+              <thead>
+                <tr>
+                  <th>{{ 'MIETER' | translate }}</th>
+                  <th class="zev-table__number">{{ 'BETRAG' | translate }} (CHF)</th>
+                  <th>{{ 'NK_FORDERUNG' | translate }}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (zeile of lauf.rechnungen; track zeile.mieterId) {
+                  <tr>
+                    <td>{{ zeile.mieterName }}</td>
+                    <!-- Der Text benennt Nachzahlung oder Guthaben; das Vorzeichen allein liest
+                         niemand. Dieselben Schluessel wie in der Abrechnungsmaske. -->
+                    <td class="zev-table__number">
+                      {{ zeile.saldo | swissNumber:2 }}
+                      <span class="zev-text--muted">
+                        {{ (zeile.saldo > 0 ? 'NK_NACHZAHLUNG' : 'NK_GUTHABEN') | translate }}
+                      </span>
+                    </td>
+                    <td>
+                      @if (zeile.fehler) {
+                        <span class="zev-status zev-status--error">{{ zeile.fehler | translate }}</span>
+                      } @else if (zeile.forderungGebucht) {
+                        <span class="zev-status zev-status--success">{{ 'NK_FORDERUNG' | translate }}</span>
+                      } @else {
+                        <span class="zev-text--muted">{{ 'NK_KEINE_FORDERUNG' | translate }}</span>
+                      }
+                    </td>
+                    <td>
+                      @if (!zeile.fehler) {
+                        <button class="zev-button zev-button--secondary"
+                          (click)="onRechnungHerunterladen(zeile.mieterId, zeile.filename)">
+                          <app-icon name="download"></app-icon>
+                          {{ 'DOWNLOAD' | translate }}
+                        </button>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
       }
     </div>
   }

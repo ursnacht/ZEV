@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { NkAbrechnung, NkAbrechnungDetail } from '../models/nebenkosten.model';
+import { NkAbrechnung, NkAbrechnungDetail, NkRechnungLauf } from '../models/nebenkosten.model';
 import { getRuntimeConfig } from '../runtime-config';
 
 /**
@@ -48,5 +48,31 @@ export class NebenkostenService {
 
   deleteAbrechnung(id: number): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
+  }
+
+  /**
+   * Erzeugt je Mieter eine Rechnung und bucht die Forderungen
+   * (Specs/Nebenkosten/RechnungenGenerieren.md, FR-6).
+   *
+   * Eigener Endpunkt im NK-Bereich, nicht `POST /api/rechnungen/generate`: Dessen Antwort wäre
+   * sonst je Rechnungsart eine andere geworden.
+   */
+  erzeugeRechnungen(abrechnungId: number, sprache?: string): Observable<NkRechnungLauf> {
+    return this.http.post<NkRechnungLauf>(`${this.apiUrl}/${abrechnungId}/rechnungen`,
+      { sprache: sprache ?? 'de' });
+  }
+
+  /**
+   * Holt das erzeugte PDF eines Mieters.
+   *
+   * Bewusst über `rechnung.service.ts` hinweg: Die Route liegt im NK-Bereich, damit die
+   * Rechnungsart strukturell feststeht und der Feature-Flag greift.
+   *
+   * Liefert das Blob, statt den Download selbst auszulösen — der Aufrufer muss den Fehlerfall
+   * behandeln: Nach 30 Minuten ist das PDF weg und der Server antwortet mit 404.
+   */
+  ladeRechnungPdf(abrechnungId: number, mieterId: number): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/${abrechnungId}/rechnungen/${mieterId}/pdf`,
+      { responseType: 'blob' });
   }
 }

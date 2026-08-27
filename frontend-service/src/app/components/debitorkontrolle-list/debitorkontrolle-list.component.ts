@@ -6,7 +6,7 @@ import { WithMessage } from '../../utils/with-message';
 import { DebitorService } from '../../services/debitor.service';
 import { EinheitService } from '../../services/einheit.service';
 import { MieterService } from '../../services/mieter.service';
-import { Debitor } from '../../models/debitor.model';
+import { Debitor, DebitorHerkunftFilter } from '../../models/debitor.model';
 import { Einheit, EinheitTyp } from '../../models/einheit.model';
 import { Mieter } from '../../models/mieter.model';
 import { DebitorkontrolleFormComponent } from '../debitorkontrolle-form/debitorkontrolle-form.component';
@@ -18,6 +18,7 @@ import { TranslationService } from '../../services/translation.service';
 import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.component';
 import { ColumnResizeDirective } from '../../directives/column-resize.directive';
 import { IconComponent } from '../icon/icon.component';
+import { FeatureFlagService } from '../../services/feature-flag.service';
 
 @Component({
   selector: 'app-debitorkontrolle-list',
@@ -41,7 +42,13 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
 
   selectedIds: Set<number> = new Set();
 
-  sortColumn: 'mieterName' | 'betrag' | 'datumVon' | 'datumBis' | 'zahldatum' | 'status' | null = 'mieterName';
+  /**
+   * Herkunft-Filter — **ohne** gemerkten Zustand: Beim Oeffnen der Seite steht er auf `ALLE`,
+   * wie die uebrigen Filter dieser Seite (Specs/Nebenkosten/RechnungenGenerieren.md, FR-7).
+   */
+  herkunftFilter: DebitorHerkunftFilter = 'ALLE';
+
+  sortColumn: 'mieterName' | 'betrag' | 'datumVon' | 'datumBis' | 'zahldatum' | 'status' | 'herkunft' | null = 'mieterName';
   sortDirection: 'asc' | 'desc' = 'asc';
 
   menuItemsOffen: KebabMenuItem[] = [
@@ -63,11 +70,47 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
     return debitor.zahldatum ? this.menuItemsBezahlt : this.menuItemsOffen;
   }
 
+  /**
+   * Die angezeigten Forderungen.
+   *
+   * Der Herkunft-Filter arbeitet **clientseitig** auf der schon geladenen Liste — wie das
+   * Status-Badge offen/bezahlt. Der Zeitraum wird serverseitig gefiltert; ein zweiter
+   * Query-Parameter kostete je Filterwechsel einen Roundtrip, ohne dass die Datenmenge das
+   * verlangt.
+   */
+  get sichtbareDebitoren(): Debitor[] {
+    if (this.herkunftFilter === 'ALLE') {
+      return this.debitoren;
+    }
+    // Der Bestand vor V126 traegt ZEV; ein fehlender Wert ist also ZEV und nicht "unbekannt".
+    return this.debitoren.filter(d => (d.herkunft ?? 'ZEV') === this.herkunftFilter);
+  }
+
+  /**
+   * Die Option **NK** erscheint nur mit eingeschaltetem Flag: Sonst stuende dort ein Filter fuer
+   * einen Bereich, den es fuer diesen Mandanten nicht gibt. Die **Spalte** bleibt unabhaengig
+   * davon sichtbar — bestehende NK-Forderungen ueberleben ein Abschalten.
+   */
+  get nkVerfuegbar(): boolean {
+    return this.featureFlagService.isEnabled('NEBENKOSTENABRECHNUNG');
+  }
+
+  /**
+   * Ein Wechsel des Filters hebt die Auswahl auf.
+   *
+   * Sonst blieben ausgeblendete Zeilen ausgewaehlt, und "Auswahl loeschen" traefe Forderungen,
+   * die der Benutzer gar nicht sieht.
+   */
+  onHerkunftFilterChange(): void {
+    this.selectedIds.clear();
+  }
+
   constructor(
     private debitorService: DebitorService,
     private einheitService: EinheitService,
     private mieterService: MieterService,
-    private translationService: TranslationService
+    private translationService: TranslationService,
+    private featureFlagService: FeatureFlagService
   ) { super(); }
 
   ngOnInit(): void {
@@ -299,7 +342,8 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
     });
   }
 
-  onSort(column: 'mieterName' | 'betrag' | 'datumVon' | 'datumBis' | 'zahldatum' | 'status'): void {
+  onSort(column: 'mieterName' | 'betrag' | 'datumVon' | 'datumBis' | 'zahldatum' | 'status'
+    | 'herkunft'): void {
     if (this.sortColumn === column) {
       this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
     } else {
@@ -320,6 +364,11 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
       if (column === 'status') {
         aValue = this.isOffen(a) ? 1 : 0;
         bValue = this.isOffen(b) ? 1 : 0;
+      } else if (column === 'herkunft') {
+        // Ein fehlender Wert ist ZEV und nicht "unbekannt" - sonst landete der Bestand vor V126
+        // durch die Null-Behandlung unten am Ende der Liste.
+        aValue = a.herkunft ?? 'ZEV';
+        bValue = b.herkunft ?? 'ZEV';
       } else {
         aValue = (a as any)[column];
         bValue = (b as any)[column];

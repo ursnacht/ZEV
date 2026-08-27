@@ -291,4 +291,119 @@ describe('NebenkostenService', () => {
 
     expect(fehler?.error?.error).toBe('NK_FEHLER_ABGERECHNET');
   });
+
+  // ============ Rechnungen (Specs/Nebenkosten/RechnungenGenerieren.md, FR-6) ============
+
+  describe('erzeugeRechnungen', () => {
+    const mockLauf = {
+      abrechnungId: 7,
+      bezeichnung: 'Nebenkosten 2026',
+      von: '2026-01-01',
+      bis: '2026-12-31',
+      anzahlRechnungen: 2,
+      anzahlForderungen: 1,
+      summeForderungen: 812.35,
+      rechnungen: [
+        {
+          mieterId: 45, mieterName: 'Max Muster', saldo: 812.35,
+          forderungGebucht: true, filename: 'Nebenkosten_2026_Max_Muster.pdf', fehler: null
+        },
+        {
+          mieterId: 46, mieterName: 'Erika Beispiel', saldo: -480,
+          forderungGebucht: false, filename: 'Nebenkosten_2026_Erika_Beispiel.pdf', fehler: null
+        }
+      ]
+    };
+
+    /**
+     * Eigener Endpunkt im NK-Bereich, **nicht** `POST /api/rechnungen/generate`: Dessen Antwort
+     * wäre sonst je Rechnungsart eine andere geworden.
+     */
+    it('should post to the NK route of the billing', () => {
+      let ergebnis: typeof mockLauf | undefined;
+      service.erzeugeRechnungen(7).subscribe(r => (ergebnis = r as typeof mockLauf));
+
+      const req = httpMock.expectOne(`${apiUrl}/7/rechnungen`);
+      expect(req.request.method).toBe('POST');
+      req.flush(mockLauf);
+
+      expect(ergebnis).toEqual(mockLauf);
+    });
+
+    it('should default the language to German', () => {
+      service.erzeugeRechnungen(7).subscribe();
+
+      const req = httpMock.expectOne(`${apiUrl}/7/rechnungen`);
+      expect(req.request.body).toEqual({ sprache: 'de' });
+      req.flush(mockLauf);
+    });
+
+    it('should pass the given language', () => {
+      service.erzeugeRechnungen(7, 'en').subscribe();
+
+      const req = httpMock.expectOne(`${apiUrl}/7/rechnungen`);
+      expect(req.request.body).toEqual({ sprache: 'en' });
+      req.flush(mockLauf);
+    });
+
+    it('should keep null apart from undefined in the result', () => {
+      // Jackson schickt `null`; ein `!== undefined` auf `fehler` würde immer zutreffen und jede
+      // Zeile als fehlerhaft lesen.
+      let ergebnis: typeof mockLauf | undefined;
+      service.erzeugeRechnungen(7).subscribe(r => (ergebnis = r as typeof mockLauf));
+
+      httpMock.expectOne(`${apiUrl}/7/rechnungen`).flush(mockLauf);
+
+      expect(ergebnis!.rechnungen[0].fehler).toBeNull();
+    });
+
+    it('should surface a rejected run of an open billing', () => {
+      let fehler: { error?: { error?: string } } | undefined;
+      service.erzeugeRechnungen(7).subscribe({ next: () => {}, error: e => (fehler = e) });
+
+      httpMock.expectOne(`${apiUrl}/7/rechnungen`)
+        .flush({ error: 'NK_FEHLER_NICHT_ABGERECHNET' },
+          { status: 400, statusText: 'Bad Request' });
+
+      expect(fehler?.error?.error).toBe('NK_FEHLER_NICHT_ABGERECHNET');
+    });
+
+    it('should surface a 403 when the feature flag is off', () => {
+      let status: number | undefined;
+      service.erzeugeRechnungen(7).subscribe({ next: () => {}, error: e => (status = e.status) });
+
+      httpMock.expectOne(`${apiUrl}/7/rechnungen`)
+        .flush({ error: 'FEATURE_FLAG_DEAKTIVIERT' }, { status: 403, statusText: 'Forbidden' });
+
+      expect(status).toBe(403);
+    });
+  });
+
+  describe('ladeRechnungPdf', () => {
+    it('should get the pdf as a blob from the NK route', () => {
+      let blob: Blob | undefined;
+      service.ladeRechnungPdf(7, 45).subscribe(b => (blob = b));
+
+      const req = httpMock.expectOne(`${apiUrl}/7/rechnungen/45/pdf`);
+      expect(req.request.method).toBe('GET');
+      expect(req.request.responseType).toBe('blob');
+      req.flush(new Blob(['%PDF']));
+
+      expect(blob).toBeInstanceOf(Blob);
+    });
+
+    /**
+     * Der Service löst den Download **nicht** selbst aus, sondern liefert das Blob: Nach 30
+     * Minuten ist das PDF weg, und der Aufrufer muss darauf einen Hinweis zeigen können.
+     */
+    it('should surface an expired pdf as an error', () => {
+      let status: number | undefined;
+      service.ladeRechnungPdf(7, 45).subscribe({ next: () => {}, error: e => (status = e.status) });
+
+      httpMock.expectOne(`${apiUrl}/7/rechnungen/45/pdf`)
+        .flush(null, { status: 404, statusText: 'Not Found' });
+
+      expect(status).toBe(404);
+    });
+  });
 });

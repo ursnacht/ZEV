@@ -6,6 +6,7 @@ import { Einheit } from '../../models/einheit.model';
 import { Mieter } from '../../models/mieter.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
+import { FeatureFlagService } from '../../services/feature-flag.service';
 
 @Component({
   selector: 'app-debitorkontrolle-form',
@@ -26,15 +27,29 @@ export class DebitorkontrolleFormComponent implements OnInit {
     betrag: 0,
     datumVon: '',
     datumBis: '',
-    zahldatum: undefined
+    zahldatum: undefined,
+    // Vorbelegung: Eine manuell erfasste Forderung ist der Regelfall aus der Stromabrechnung.
+    herkunft: 'ZEV'
   };
 
   selectedEinheitName: string = '';
   readonly Number = Number;
 
+  constructor(private featureFlagService: FeatureFlagService) {}
+
+  /**
+   * Ohne NK-Bereich bleibt `ZEV` der einzige Wert und das Feld gesperrt: Ein manuell erfasster
+   * NK-Debitor ohne NK-Bereich waere eine Forderung, die niemand erklaeren kann
+   * (Specs/Nebenkosten/RechnungenGenerieren.md, FR-7).
+   */
+  get nkVerfuegbar(): boolean {
+    return this.featureFlagService.isEnabled('NEBENKOSTENABRECHNUNG');
+  }
+
   ngOnInit(): void {
     if (this.debitor) {
-      this.formData = { ...this.debitor };
+      // Bestandsdaten koennen die Herkunft nicht tragen; dann gilt ZEV.
+      this.formData = { herkunft: 'ZEV', ...this.debitor };
       this.updateEinheitName();
     } else {
       const today = new Date().toISOString().split('T')[0];

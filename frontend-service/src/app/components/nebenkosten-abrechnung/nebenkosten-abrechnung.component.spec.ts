@@ -1,11 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { createSpyObj, SpyObj } from '../../../testing/spy';
 import { fakeAsync, tick } from '../../../testing/fake-async';
 import { NebenkostenAbrechnungComponent } from './nebenkosten-abrechnung.component';
 import { NebenkostenService } from '../../services/nebenkosten.service';
 import { TranslationService } from '../../services/translation.service';
-import { NkAbrechnung } from '../../models/nebenkosten.model';
+import { NkAbrechnung, NkRechnungLauf } from '../../models/nebenkosten.model';
 
 /**
  * Tests der Abrechnungsliste (Specs/Nebenkosten/Abrechnung.md, FR-1 und FR-7).
@@ -30,6 +30,32 @@ describe('NebenkostenAbrechnungComponent', () => {
   };
 
   /**
+   * Ergebnis eines Rechnungslaufs: eine Nachzahlung und ein Guthaben.
+   *
+   * Der Betrag der Nachzahlung ist vierstellig, damit die Schweizer Formatierung im DOM
+   * nachweisbar ist — bei dreistelligen Zahlen fiele ein fehlendes Hochkomma nicht auf.
+   */
+  const lauf: NkRechnungLauf = {
+    abrechnungId: 2,
+    bezeichnung: 'Abrechnung 2025',
+    von: '2025-01-01',
+    bis: '2025-12-31',
+    anzahlRechnungen: 2,
+    anzahlForderungen: 1,
+    summeForderungen: 1234.55,
+    rechnungen: [
+      {
+        mieterId: 45, mieterName: 'Max Muster', saldo: 1234.55,
+        forderungGebucht: true, filename: 'Nebenkosten_2025_Max_Muster.pdf', fehler: null
+      },
+      {
+        mieterId: 46, mieterName: 'Erika Beispiel', saldo: -480,
+        forderungGebucht: false, filename: 'Nebenkosten_2025_Erika_Beispiel.pdf', fehler: null
+      }
+    ]
+  };
+
+  /**
    * Zahl der ueberlagernden Meldungen (Erfolg/Fehler). Sie sind fixiert positioniert und liegen
    * alle an derselben Stelle - mehr als eine ist immer ein Fehler.
    */
@@ -46,8 +72,11 @@ describe('NebenkostenAbrechnungComponent', () => {
   beforeEach(async () => {
     nebenkostenServiceSpy = createSpyObj<NebenkostenService>('NebenkostenService', [
       'getAllAbrechnungen', 'getAbrechnungDetail', 'getVorlage',
-      'createAbrechnung', 'updateAbrechnung', 'setAbgerechnet', 'deleteAbrechnung'
+      'createAbrechnung', 'updateAbrechnung', 'setAbgerechnet', 'deleteAbrechnung',
+      'erzeugeRechnungen', 'ladeRechnungPdf'
     ]);
+    nebenkostenServiceSpy.erzeugeRechnungen.mockReturnValue(of(lauf));
+    nebenkostenServiceSpy.ladeRechnungPdf.mockReturnValue(of(new Blob(['%PDF'])));
     nebenkostenServiceSpy.getAllAbrechnungen.mockReturnValue(of([abrechnung2026, abrechnung2025]));
     nebenkostenServiceSpy.setAbgerechnet.mockReturnValue(of(abrechnung2026));
     nebenkostenServiceSpy.deleteAbrechnung.mockReturnValue(of(void 0));
@@ -295,5 +324,280 @@ describe('NebenkostenAbrechnungComponent', () => {
       component.dismissMessage();
       expect(component.message).toBe('');
     }));
+  });
+
+  // ============ Rechnungen erstellen (Specs/Nebenkosten/RechnungenGenerieren.md) ============
+
+  describe('menuFuer', () => {
+    it('should offer "Rechnungen erstellen" only on a closed billing', () => {
+      expect(component.menuFuer(abrechnung2025).map(i => i.action)).toContain('rechnungen');
+      expect(component.menuFuer(abrechnung2026).map(i => i.action)).not.toContain('rechnungen');
+    });
+
+    it('should keep the other entries on an open billing', () => {
+      expect(component.menuFuer(abrechnung2026).map(i => i.action)).toEqual(['edit', 'delete']);
+    });
+
+    it('should put the dangerous entry last', () => {
+      expect(component.menuFuer(abrechnung2025).map(i => i.action))
+        .toEqual(['edit', 'rechnungen', 'delete']);
+    });
+
+    /**
+     * Dieselbe Zeile liefert **dasselbe Objekt**.
+     *
+     * Das Kebab-Menü verfolgt seine Einträge über die Objektidentität (`track item`). Eine je
+     * Änderungserkennung neu gebaute Liste liesse Angular das Menü in jedem Zyklus neu aufbauen —
+     * genau das NG0956, das die Abrechnungsmaske schon einmal gekostet hat.
+     */
+    it('should return a stable array for repeated calls', () => {
+      expect(component.menuFuer(abrechnung2025)).toBe(component.menuFuer(abrechnung2025));
+      expect(component.menuFuer(abrechnung2026)).toBe(component.menuFuer(abrechnung2026));
+    });
+
+    it('should not share the array between open and closed', () => {
+      expect(component.menuFuer(abrechnung2025)).not.toBe(component.menuFuer(abrechnung2026));
+    });
+  });
+
+  describe('onRechnungenErstellen', () => {
+    it('should ask back before creating invoices', () => {
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+      component.onRechnungenErstellen(abrechnung2025);
+
+      expect(confirmSpy).toHaveBeenCalledWith('NK_CONFIRM_RECHNUNGEN_ERSTELLEN');
+      expect(nebenkostenServiceSpy.erzeugeRechnungen).not.toHaveBeenCalled();
+    });
+
+    it('should create the invoices after confirmation', () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+      component.onRechnungenErstellen(abrechnung2025);
+
+      expect(nebenkostenServiceSpy.erzeugeRechnungen).toHaveBeenCalledWith(2);
+      expect(component.lauf).toEqual(lauf);
+      expect(component.laufLaeuft).toBe(false);
+    });
+
+    it('should do nothing without an id', () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+      component.onRechnungenErstellen({ ...abrechnung2025, id: undefined });
+
+      expect(nebenkostenServiceSpy.erzeugeRechnungen).not.toHaveBeenCalled();
+    });
+
+    it('should mark the run as running until the answer arrives', () => {
+      const antwort = new Subject<NkRechnungLauf>();
+      nebenkostenServiceSpy.erzeugeRechnungen.mockReturnValue(antwort);
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+      component.onRechnungenErstellen(abrechnung2025);
+      expect(component.laufLaeuft).toBe(true);
+
+      antwort.next(lauf);
+      expect(component.laufLaeuft).toBe(false);
+    });
+
+    it('should ignore a second run while one is running', () => {
+      nebenkostenServiceSpy.erzeugeRechnungen.mockReturnValue(new Subject<NkRechnungLauf>());
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+      component.onRechnungenErstellen(abrechnung2025);
+      component.onRechnungenErstellen(abrechnung2025);
+
+      expect(nebenkostenServiceSpy.erzeugeRechnungen).toHaveBeenCalledTimes(1);
+    });
+
+    it('should show the message of the server on failure', () => {
+      nebenkostenServiceSpy.erzeugeRechnungen.mockReturnValue(
+        throwError(() => ({ error: { error: 'NK_FEHLER_NICHT_ABGERECHNET' } })));
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+      component.onRechnungenErstellen(abrechnung2025);
+
+      expect(component.message).toBe('NK_FEHLER_NICHT_ABGERECHNET');
+      expect(component.messageType).toBe('error');
+      expect(component.laufLaeuft).toBe(false);
+    });
+
+    it('should fall back to a generic message without a server text', () => {
+      nebenkostenServiceSpy.erzeugeRechnungen.mockReturnValue(throwError(() => ({ status: 500 })));
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+      component.onRechnungenErstellen(abrechnung2025);
+
+      expect(component.message).toBe('NK_FEHLER_RECHNUNGEN_ERSTELLEN');
+    });
+
+    /** Ein halb ersetztes Ergebnis waere schlimmer als ein altes. */
+    it('should keep an existing result when the next run fails', () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      component.onRechnungenErstellen(abrechnung2025);
+
+      nebenkostenServiceSpy.erzeugeRechnungen.mockReturnValue(throwError(() => ({ status: 500 })));
+      component.onRechnungenErstellen(abrechnung2025);
+
+      expect(component.lauf).toEqual(lauf);
+    });
+  });
+
+  describe('Ergebnis-Panel', () => {
+    function panel(): HTMLElement | null {
+      return fixture.nativeElement.querySelector('.zev-panel');
+    }
+
+    function zeilen(): HTMLElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('.zev-panel tbody tr'));
+    }
+
+    beforeEach(() => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      component.onRechnungenErstellen(abrechnung2025);
+      fixture.detectChanges();
+    });
+
+    it('should render one row per invoice', () => {
+      expect(panel()).toBeTruthy();
+      expect(zeilen().length).toBe(2);
+    });
+
+    it('should not render before a run', () => {
+      component.lauf = null;
+      fixture.detectChanges();
+
+      expect(panel()).toBeNull();
+    });
+
+    it('should name the counts separately', () => {
+      // Bei durchweg Guthaben entstehen Rechnungen, aber keine Forderungen - "0" ist dann kein
+      // Fehlschlag, und das muss am Panel ablesbar sein.
+      const text = panel()!.textContent!;
+      expect(text).toContain('NK_ANZAHL_RECHNUNGEN');
+      expect(text).toContain('NK_ANZAHL_FORDERUNGEN');
+      expect(text).toContain('NK_SUMME_FORDERUNGEN');
+    });
+
+    it('should format amounts in Swiss notation', () => {
+      // Punkt als Dezimaltrenner, ASCII-Hochkomma als Tausendertrenner (Specs/generell.md).
+      expect(zeilen()[0].textContent).toContain("1'234.55");
+    });
+
+    it('should name the sign in words', () => {
+      expect(zeilen()[0].textContent).toContain('NK_NACHZAHLUNG');
+      expect(zeilen()[1].textContent).toContain('NK_GUTHABEN');
+    });
+
+    it('should mark a booked receivable and a credit differently', () => {
+      expect(zeilen()[0].querySelector('.zev-status--success')).toBeTruthy();
+      expect(zeilen()[1].textContent).toContain('NK_KEINE_FORDERUNG');
+      expect(zeilen()[1].querySelector('.zev-status--success')).toBeNull();
+    });
+
+    it('should offer a download per row', () => {
+      expect(zeilen()[0].querySelector('button')).toBeTruthy();
+      expect(zeilen()[1].querySelector('button')).toBeTruthy();
+    });
+
+    it('should show the error and no download for a failed tenant', () => {
+      component.lauf = {
+        ...lauf,
+        rechnungen: [{ ...lauf.rechnungen[0], filename: null, fehler: 'NK_FEHLER_RECHNUNG_MIETER' }]
+      };
+      fixture.detectChanges();
+
+      expect(zeilen()[0].textContent).toContain('NK_FEHLER_RECHNUNG_MIETER');
+      expect(zeilen()[0].querySelector('button')).toBeNull();
+    });
+
+    /** Ein Ergebnis zu einem Stand, den die Tabelle darueber nicht mehr zeigt, ist irrefuehrend. */
+    it('should disappear when the list is reloaded', () => {
+      component.loadAbrechnungen();
+
+      expect(component.lauf).toBeNull();
+    });
+
+    it('should disappear when the form opens', () => {
+      component.onCreateNew();
+      expect(component.lauf).toBeNull();
+
+      component.onRechnungenErstellen(abrechnung2025);
+      component.onEdit(abrechnung2025);
+      expect(component.lauf).toBeNull();
+    });
+  });
+
+  describe('onRechnungHerunterladen', () => {
+    beforeEach(() => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      component.onRechnungenErstellen(abrechnung2025);
+    });
+
+    it('should load the pdf of the chosen tenant', () => {
+      component.onRechnungHerunterladen(45, 'Nebenkosten_2025_Max_Muster.pdf');
+
+      expect(nebenkostenServiceSpy.ladeRechnungPdf).toHaveBeenCalledWith(2, 45);
+    });
+
+    /**
+     * Der Klick wird am **Prototyp** abgefangen, nicht durch Ersetzen von
+     * `document.createElement`.
+     *
+     * Ein Stub auf der DOM-Fabrik liefert Angulars eigenem Rendering denselben Knoten zurück und
+     * bricht mit `HierarchyRequestError` — nicht in diesem Test, sondern in den nachfolgenden.
+     */
+    function fangeDownloadAb(): { name: () => string; klicks: () => number } {
+      const namen: string[] = [];
+      vi.spyOn(HTMLAnchorElement.prototype, 'click')
+        .mockImplementation(function (this: HTMLAnchorElement) {
+          namen.push(this.download);
+        });
+      return { name: () => namen[0], klicks: () => namen.length };
+    }
+
+    it('should save the blob under the given filename', () => {
+      const download = fangeDownloadAb();
+      const objectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:pdf');
+      const freigabe = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+
+      component.onRechnungHerunterladen(45, 'Nebenkosten_2025_Max_Muster.pdf');
+
+      expect(objectUrl).toHaveBeenCalled();
+      expect(download.klicks()).toBe(1);
+      expect(download.name()).toBe('Nebenkosten_2025_Max_Muster.pdf');
+      // Ohne Freigabe haelt der Browser das Blob bis zum Verlassen der Seite.
+      expect(freigabe).toHaveBeenCalledWith('blob:pdf');
+    });
+
+    it('should use a fallback name when none is given', () => {
+      const download = fangeDownloadAb();
+      vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:pdf');
+
+      component.onRechnungHerunterladen(45, null);
+
+      expect(download.name()).toBe('nebenkosten.pdf');
+    });
+
+    /**
+     * Nach 30 Minuten ist die Ablage leer. Das ist kein Fehler, sondern ein Hinweis: Der Lauf
+     * laesst sich wiederholen und ergibt dasselbe PDF.
+     */
+    it('should show a hint when the pdf has expired', () => {
+      nebenkostenServiceSpy.ladeRechnungPdf.mockReturnValue(throwError(() => ({ status: 404 })));
+
+      component.onRechnungHerunterladen(45, 'egal.pdf');
+
+      expect(component.message).toBe('NK_RECHNUNG_ABGELAUFEN');
+      expect(component.messageType).toBe('error');
+    });
+
+    it('should do nothing without a result', () => {
+      component.lauf = null;
+
+      component.onRechnungHerunterladen(45, 'egal.pdf');
+
+      expect(nebenkostenServiceSpy.ladeRechnungPdf).not.toHaveBeenCalled();
+    });
   });
 });

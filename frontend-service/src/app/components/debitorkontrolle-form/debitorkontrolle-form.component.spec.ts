@@ -4,6 +4,7 @@ import { Debitor } from '../../models/debitor.model';
 import { Einheit, EinheitTyp } from '../../models/einheit.model';
 import { Mieter } from '../../models/mieter.model';
 import { TranslationService } from '../../services/translation.service';
+import { FeatureFlagService } from '../../services/feature-flag.service';
 
 describe('DebitorkontrolleFormComponent', () => {
   let component: DebitorkontrolleFormComponent;
@@ -32,11 +33,22 @@ describe('DebitorkontrolleFormComponent', () => {
     zahldatum: undefined
   };
 
+  /**
+   * Zustand des Feature-Flags `NEBENKOSTENABRECHNUNG` für den jeweiligen Test.
+   *
+   * Als Variable und nicht als zweiter TestBed: Das Feld Herkunft hängt daran, und beide Zustände
+   * gehören in dieselbe Testreihe.
+   */
+  let nkFlagAktiv = true;
+
   beforeEach(async () => {
+    nkFlagAktiv = true;
+
     await TestBed.configureTestingModule({
       imports: [DebitorkontrolleFormComponent],
       providers: [
-        { provide: TranslationService, useValue: mockTranslationService }
+        { provide: TranslationService, useValue: mockTranslationService },
+        { provide: FeatureFlagService, useValue: { isEnabled: () => nkFlagAktiv } }
       ]
     }).compileComponents();
 
@@ -274,6 +286,69 @@ describe('DebitorkontrolleFormComponent', () => {
       const cancelSpy = vi.spyOn(component.cancel, 'emit');
       component.onCancel();
       expect(cancelSpy).toHaveBeenCalled();
+    });
+  });
+
+  // ============ Herkunft (Specs/Nebenkosten/RechnungenGenerieren.md, FR-7) ============
+
+  describe('Herkunft', () => {
+    function feld(): HTMLSelectElement {
+      return fixture.nativeElement.querySelector('#herkunft');
+    }
+
+    function optionen(): string[] {
+      return Array.from(feld().options).map(o => o.value);
+    }
+
+    it('should default to ZEV for a new entry', () => {
+      // Eine manuell erfasste Forderung ist der Regelfall aus der Stromabrechnung.
+      expect(component.formData.herkunft).toBe('ZEV');
+    });
+
+    it('should keep the origin of an existing entry', () => {
+      component.debitor = { ...validDebitor, herkunft: 'NK' };
+      component.ngOnInit();
+
+      expect(component.formData.herkunft).toBe('NK');
+    });
+
+    /** Bestandsdaten vor V126 tragen keine Herkunft; dann gilt ZEV. */
+    it('should fall back to ZEV for an entry without origin', () => {
+      component.debitor = { ...validDebitor };
+      component.ngOnInit();
+
+      expect(component.formData.herkunft).toBe('ZEV');
+    });
+
+    it('should offer both origins while the feature flag is on', () => {
+      expect(component.nkVerfuegbar).toBe(true);
+      expect(optionen()).toEqual(['ZEV', 'NK']);
+      expect(feld().disabled).toBe(false);
+    });
+
+    /**
+     * Ohne NK-Bereich bleibt ZEV der einzige Wert **und** das Feld gesperrt: Ein manuell erfasster
+     * NK-Debitor ohne NK-Bereich wäre eine Forderung, die niemand erklären kann.
+     */
+    it('should lock the field to ZEV while the feature flag is off', async () => {
+      nkFlagAktiv = false;
+      fixture.detectChanges();
+      // `NgModel` legt den gesperrten Zustand über ein aufgeschobenes Promise an, nicht in der
+      // Änderungserkennung selbst - ohne dieses Abwarten steht `disabled` noch auf false.
+      await fixture.whenStable();
+
+      expect(component.nkVerfuegbar).toBe(false);
+      expect(optionen()).toEqual(['ZEV']);
+      expect(feld().disabled).toBe(true);
+    });
+
+    it('should emit the origin with the form data', () => {
+      const saveSpy = vi.spyOn(component.save, 'emit');
+      component.formData = { ...validDebitor, herkunft: 'NK' };
+
+      component.onSubmit();
+
+      expect((saveSpy.mock.calls[0][0] as Debitor).herkunft).toBe('NK');
     });
   });
 });

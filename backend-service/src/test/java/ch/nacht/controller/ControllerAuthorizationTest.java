@@ -1,6 +1,7 @@
 package ch.nacht.controller;
 
 import ch.nacht.config.SecurityConfig;
+import ch.nacht.dto.NkRechnungLaufDTO;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.service.EinheitMatchingService;
@@ -9,6 +10,7 @@ import ch.nacht.service.EinstellungenService;
 import ch.nacht.service.FeatureFlagService;
 import ch.nacht.service.MieterService;
 import ch.nacht.service.NkAbrechnungService;
+import ch.nacht.service.NkRechnungService;
 import ch.nacht.service.SystemmeldungService;
 import ch.nacht.service.OrganisationService;
 import ch.nacht.service.OrganizationContextService;
@@ -29,10 +31,12 @@ import org.springframework.data.domain.SliceImpl;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -54,7 +58,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest({EinstellungenController.class, FeatureFlagController.class, TarifpositionController.class,
         EinheitController.class, MieterController.class, NkAbrechnungController.class,
-        SystemmeldungController.class})
+        NkRechnungController.class, SystemmeldungController.class})
 @Import(SecurityConfig.class)
 @TestPropertySource(properties = "app.cors.allowed-origins=http://localhost:4200")
 class ControllerAuthorizationTest {
@@ -67,6 +71,9 @@ class ControllerAuthorizationTest {
 
     @MockitoBean
     private FeatureFlagService featureFlagService;
+
+    @MockitoBean
+    private NkRechnungService nkRechnungService;
 
     @MockitoBean
     private TarifpositionService tarifpositionService;
@@ -496,5 +503,69 @@ class ControllerAuthorizationTest {
                         .with(jwt().authorities(new SimpleGrantedAuthority("systemmeldungen:manage")))
                         .with(csrf()))
                 .andExpect(status().isOk());
+    }
+
+    // ==================== NK-Rechnungen: nebenkosten:manage UND rechnungen:manage ====================
+    // Specs/Nebenkosten/RechnungenGenerieren.md NFR-2: Es ist eine NK-Aktion, aber sie stellt
+    // Rechnungen und bucht Forderungen. Heute halten alle drei Fachrollen beide Permissions - die
+    // Forderung ist also keine Einschraenkung, bleibt aber richtig, wenn die Rollen auseinanderlaufen.
+
+    @Test
+    void erzeugeRechnungen_withBothPermissions_reachesController() throws Exception {
+        when(nkRechnungService.erzeugeRechnungen(anyLong(), any())).thenReturn(new NkRechnungLaufDTO());
+
+        mockMvc.perform(post("/api/nebenkosten/abrechnungen/12/rechnungen")
+                        .with(jwt().authorities(
+                                new SimpleGrantedAuthority("nebenkosten:manage"),
+                                new SimpleGrantedAuthority("rechnungen:manage")))
+                        .with(csrf()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void erzeugeRechnungen_onlyNebenkostenManage_forbidden() throws Exception {
+        mockMvc.perform(post("/api/nebenkosten/abrechnungen/12/rechnungen")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("nebenkosten:manage")))
+                        .with(csrf()))
+                .andExpect(status().isForbidden());
+
+        verify(nkRechnungService, never()).erzeugeRechnungen(anyLong(), any());
+    }
+
+    @Test
+    void erzeugeRechnungen_onlyRechnungenManage_forbidden() throws Exception {
+        mockMvc.perform(post("/api/nebenkosten/abrechnungen/12/rechnungen")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("rechnungen:manage")))
+                        .with(csrf()))
+                .andExpect(status().isForbidden());
+
+        verify(nkRechnungService, never()).erzeugeRechnungen(anyLong(), any());
+    }
+
+    @Test
+    void erzeugeRechnungen_unauthenticated_unauthorized() throws Exception {
+        mockMvc.perform(post("/api/nebenkosten/abrechnungen/12/rechnungen").with(csrf()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    /** Der Download haengt am selben Controller und damit an denselben beiden Permissions. */
+    @Test
+    void ladeRechnungPdf_withBothPermissions_reachesController() throws Exception {
+        when(nkRechnungService.ladePdf(anyLong(), anyLong())).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/nebenkosten/abrechnungen/12/rechnungen/45/pdf")
+                        .with(jwt().authorities(
+                                new SimpleGrantedAuthority("nebenkosten:manage"),
+                                new SimpleGrantedAuthority("rechnungen:manage"))))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void ladeRechnungPdf_withoutPermission_forbidden() throws Exception {
+        mockMvc.perform(get("/api/nebenkosten/abrechnungen/12/rechnungen/45/pdf")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("mieter:read"))))
+                .andExpect(status().isForbidden());
+
+        verify(nkRechnungService, never()).ladePdf(anyLong(), anyLong());
     }
 }

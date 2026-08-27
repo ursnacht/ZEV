@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Locator, Page } from '@playwright/test';
 import { clickKebabMenuItem, navigateViaMenu, waitForFormResult } from './helpers';
 
 /**
@@ -185,8 +185,184 @@ async function loescheAbrechnung(page: Page, bezeichnung: string): Promise<boole
     }
 }
 
+/**
+ * Klickt einen Kebab-Eintrag über seinen **Text**.
+ *
+ * `clickKebabMenuItem` aus den Helpers kennt nur „erster" und „gefährlicher" Eintrag; für
+ * „Rechnungen erstellen" in der Mitte wäre das ein Index — und der verschiebt sich, sobald ein
+ * Eintrag dazukommt.
+ */
+async function klickeKebabEintrag(page: Page, zeile: Locator, text: string): Promise<void> {
+    await zeile.locator('.zev-kebab-button').click();
+    await zeile.locator('.zev-kebab-menu--open').waitFor({ state: 'visible', timeout: 5000 });
+    await zeile.locator('.zev-kebab-menu__item', { hasText: text }).click();
+}
+
+/** Setzt das Flag „abgerechnet" der Zeile und wartet auf die Bestätigung. */
+async function schliesseAbrechnungAb(page: Page, bezeichnung: string): Promise<void> {
+    const zeile = page.locator(`tr:has-text("${bezeichnung}")`);
+    await expect(zeile).toBeVisible({ timeout: 10000 });
+    await clearMessages(page);
+    // Abschliessen fragt bewusst NICHT nach - es ist jederzeit umkehrbar.
+    await zeile.locator('input[type="checkbox"]').check();
+    expect(await waitForFormResult(page)).toBe(true);
+    await clearMessages(page);
+}
+
+/**
+ * Löst den Rechnungslauf über das Kebab-Menü aus und wartet auf das Ergebnis-Panel.
+ *
+ * Die Rückfrage wird angenommen: Der Lauf bucht Forderungen, deshalb fragt er nach.
+ */
+async function erstelleRechnungen(page: Page, bezeichnung: string): Promise<void> {
+    await oeffneListeFrisch(page);
+    const zeile = page.locator(`tr:has-text("${bezeichnung}")`);
+    await expect(zeile).toBeVisible({ timeout: 10000 });
+
+    page.once('dialog', async dialog => { await dialog.accept(); });
+    const antwort = page.waitForResponse(
+        res => res.url().includes('/rechnungen') && res.request().method() === 'POST',
+        { timeout: 60000 });
+    await klickeKebabEintrag(page, zeile, 'Rechnungen erstellen');
+    const response = await antwort;
+    expect(response.status()).toBe(200);
+
+    await expect(page.locator('.zev-panel')).toBeVisible({ timeout: 20000 });
+}
+
+/** Zeitraum der Debitorenkontrolle setzen und auf die Antwort zu genau diesem Zeitraum warten. */
+async function setzeDebitorZeitraum(page: Page, von: string, bis: string): Promise<void> {
+    const antwort = page.waitForResponse(
+        res => res.url().includes('/api/debitoren')
+            && res.request().method() === 'GET'
+            && res.url().includes(`von=${von}`)
+            && res.url().includes(`bis=${bis}`),
+        { timeout: 20000 });
+    await page.locator('#dateFrom').fill(von);
+    await page.locator('#dateTo').fill(bis);
+    await antwort;
+}
+
+/** Öffnet die Debitorenkontrolle im Zeitraum der Testabrechnung. */
+async function oeffneDebitorenImTestzeitraum(page: Page): Promise<void> {
+    await page.goto('/debitoren', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.zev-container h1')).toBeVisible({ timeout: 20000 });
+    await setzeDebitorZeitraum(page, DATUM_VON, DATUM_BIS);
+}
+
+/**
+ * Räumt die vom Rechnungslauf gebuchten Forderungen ab.
+ *
+ * Im Zeitraum 2087 liegen ausschliesslich Testdaten — es werden deshalb **alle** Zeilen des
+ * Zeitraums gelöscht, ohne sie einzeln zuzuordnen. Liefert `true`, wenn danach keine mehr steht.
+ */
+async function loescheTestDebitoren(page: Page): Promise<boolean> {
+    page.removeAllListeners('dialog');
+    try {
+        await oeffneDebitorenImTestzeitraum(page);
+        const zeilen = page.locator('.zev-table tbody tr');
+
+        // Nicht ueber eine Zaehlung vorab: Jedes Loeschen laedt die Liste neu, und eine
+        // eingefrorene Anzahl wuerde nach dem ersten Durchgang auf veraltete Zeilen zeigen.
+        for (let versuch = 0; versuch < 50; versuch++) {
+            const anzahl = await zeilen.count();
+            if (anzahl === 0) {
+                return true;
+            }
+            page.once('dialog', async dialog => { await dialog.accept(); });
+            const erste = zeilen.first();
+            await erste.locator('.zev-kebab-button').click();
+            await erste.locator('.zev-kebab-menu--open').waitFor({ state: 'visible', timeout: 5000 });
+            await erste.locator('.zev-kebab-menu__item--danger').last().click();
+            await expect(zeilen).toHaveCount(anzahl - 1, { timeout: 15000 });
+        }
+        return await zeilen.count() === 0;
+    } catch (error) {
+        console.error(`CLEANUP FEHLGESCHLAGEN: Debitoren im Testzeitraum - ${error}`);
+        return false;
+    } finally {
+        page.removeAllListeners('dialog');
+    }
+}
+
+/** Wird gesetzt, sobald ein Test Forderungen gebucht hat — dann räumt `afterEach` sie ab. */
+let debitorenGebucht = false;
+
+// ---------------------------------------------------------------------------
+// Feature-Flag: Vorbedingung dieser Suite
+// ---------------------------------------------------------------------------
+
+const NK_FLAG_CHECKBOX = '#flag-NEBENKOSTENABRECHNUNG';
+const NK_FLAG_ENDPOINT = '/api/feature-flags/NEBENKOSTENABRECHNUNG';
+const EFFECTIVE_FLAGS_GET = '/api/feature-flags';
+
+/** Zustand des Flags vor dieser Suite — wird am Ende wiederhergestellt. */
+let nkFlagVorher: boolean | null = null;
+
+/**
+ * Schaltet das Flag `NEBENKOSTENABRECHNUNG` über die Einstellungen und wartet auf das `PUT`
+ * **und** das anschliessende Nachladen der effektiven Flags — erst danach kennt die reaktive
+ * Navigation den neuen Stand. Liefert den Zustand **vor** dem Aufruf.
+ */
+async function setzeNkFlag(page: Page, aktiv: boolean): Promise<boolean> {
+    await navigateViaMenu(page, '/einstellungen');
+    const checkbox = page.locator(NK_FLAG_CHECKBOX);
+    await checkbox.waitFor({ state: 'visible', timeout: 15000 });
+
+    const vorher = await checkbox.isChecked();
+    if (vorher === aktiv) {
+        return vorher;
+    }
+
+    const put = page.waitForResponse(
+        r => r.url().includes(NK_FLAG_ENDPOINT) && r.request().method() === 'PUT',
+        { timeout: 15000 });
+    const nachladen = page.waitForResponse(
+        r => r.url().endsWith(EFFECTIVE_FLAGS_GET) && r.request().method() === 'GET',
+        { timeout: 15000 });
+    await checkbox.click();
+    await put;
+    await nachladen.catch(() => console.log('setzeNkFlag: kein Nachladen der Flags erkannt'));
+    await waitForFormResult(page);
+    return vorher;
+}
+
+/**
+ * Der Bereich Nebenkosten liegt hinter einem Flag, dessen **Default `false`** ist
+ * (`FeatureFlag.NEBENKOSTENABRECHNUNG`): Ohne ausdrücklichen Mandanten-Schalter erscheint der
+ * Menüeintrag nicht, und jeder Test dieser Datei scheitert schon an der Navigation.
+ *
+ * <p>Diese Suite setzte den Schalter bisher **stillschweigend voraus**. Sie war damit von einem
+ * Zustand abhängig, den sie nicht selbst herstellt — und lief rot, sobald jemand das Flag
+ * abschaltete. Jetzt stellt sie ihre Vorbedingung selbst her und gibt den vorherigen Zustand am
+ * Ende zurück.
+ */
+test.beforeAll(async ({ browser }) => {
+    const page = await browser.newPage();
+    try {
+        nkFlagVorher = await setzeNkFlag(page, true);
+    } finally {
+        await page.close();
+    }
+});
+
+test.afterAll(async ({ browser }) => {
+    if (nkFlagVorher === null || nkFlagVorher === true) {
+        return;
+    }
+    const page = await browser.newPage();
+    try {
+        await setzeNkFlag(page, false);
+    } catch (error) {
+        console.error(`Feature-Flag konnte nicht zurueckgesetzt werden: ${error}`);
+    } finally {
+        await page.close();
+    }
+});
+
 test.beforeEach(() => {
     angelegteBezeichnungen = [];
+    debitorenGebucht = false;
 });
 
 /**
@@ -198,6 +374,14 @@ test.beforeEach(() => {
  */
 test.afterEach(async ({ page }) => {
     const gescheitert: string[] = [];
+
+    // Zuerst die Forderungen: Sie haengen am Mieter und nicht an der Abrechnung, ein Loeschen der
+    // Abrechnung nimmt sie also NICHT mit (bewusst so - eine Kaskade waere stiller Datenverlust).
+    if (debitorenGebucht && !await loescheTestDebitoren(page)) {
+        gescheitert.push('Debitoren im Testzeitraum');
+    }
+    debitorenGebucht = false;
+
     for (const bezeichnung of angelegteBezeichnungen) {
         let erfolg = await loescheAbrechnung(page, bezeichnung);
         if (!erfolg) {
@@ -485,5 +669,194 @@ test.describe('Nebenkostenabrechnung - abgerechnet', () => {
         expect(await waitForFormResult(page)).toBe(true);
         expect(dialogErschien).toBe(true);
         page.removeAllListeners('dialog');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Rechnungen aus der Abrechnung (Specs/Nebenkosten/RechnungenGenerieren.md)
+// ---------------------------------------------------------------------------
+
+test.describe('Nebenkostenabrechnung - Rechnungen', () => {
+
+    /**
+     * Der Menüeintrag erscheint **nur** auf einer abgeschlossenen Abrechnung — bewusst als
+     * fehlender Eintrag und nicht als gesperrter: Ein ausgegrauter müsste erklären, warum er
+     * ausgegraut ist (FR-2).
+     */
+    test('should offer the invoice run only on a closed billing', async ({ page }) => {
+        const bezeichnung = neueBezeichnung('Menue');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+        await page.locator('.zev-form-actions .zev-button--secondary').last().click();
+
+        const zeile = page.locator(`tr:has-text("${bezeichnung}")`);
+        await expect(zeile).toBeVisible({ timeout: 10000 });
+
+        // Offen: kein Eintrag.
+        await zeile.locator('.zev-kebab-button').click();
+        await expect(zeile.locator('.zev-kebab-menu--open')).toBeVisible({ timeout: 5000 });
+        await expect(zeile.locator('.zev-kebab-menu__item', { hasText: 'Rechnungen erstellen' }))
+            .toHaveCount(0);
+        await page.keyboard.press('Escape');
+
+        await schliesseAbrechnungAb(page, bezeichnung);
+
+        // Abgeschlossen: Eintrag vorhanden, und der gefaehrliche bleibt unten.
+        const zeileZu = page.locator(`tr:has-text("${bezeichnung}")`);
+        await zeileZu.locator('.zev-kebab-button').click();
+        await expect(zeileZu.locator('.zev-kebab-menu--open')).toBeVisible({ timeout: 5000 });
+        await expect(zeileZu.locator('.zev-kebab-menu__item', { hasText: 'Rechnungen erstellen' }))
+            .toBeVisible();
+        const eintraege = await zeileZu.locator('.zev-kebab-menu__item').allInnerTexts();
+        expect(eintraege.length).toBe(3);
+        expect(eintraege[2]).toContain('Löschen');
+        await page.keyboard.press('Escape');
+    });
+
+    /** Die Rückfrage schützt vor einem versehentlichen Klick — es entstehen Forderungen. */
+    test('should not create anything when the confirmation is declined', async ({ page }) => {
+        const bezeichnung = neueBezeichnung('Abbruch');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+        await page.locator('.zev-form-actions .zev-button--secondary').last().click();
+        await schliesseAbrechnungAb(page, bezeichnung);
+
+        const zeile = page.locator(`tr:has-text("${bezeichnung}")`);
+        let dialogErschien = false;
+        page.once('dialog', async dialog => { dialogErschien = true; await dialog.dismiss(); });
+        await klickeKebabEintrag(page, zeile, 'Rechnungen erstellen');
+        await page.waitForTimeout(1000);
+
+        expect(dialogErschien).toBe(true);
+        // Kein Ergebnis-Panel, also auch kein Lauf.
+        await expect(page.locator('.zev-panel')).toHaveCount(0);
+    });
+
+    /**
+     * Der vollständige Weg: abschliessen, Rechnungen erstellen, Ergebnis prüfen, PDF holen und
+     * die Forderung in der Debitorenkontrolle mit Herkunft **Nebenkosten** wiederfinden.
+     *
+     * Die Position ist eine ANTEIL-Zeile mit 50 % auf einen hohen Totalbetrag: Der Betrag hängt
+     * damit **nicht** an der Zahl der Mieter, die die Umgebung kennt, und liegt sicher über einem
+     * etwaigen Akonto — es entsteht also verlässlich eine Nachzahlung.
+     */
+    test('should create invoices, offer the pdf and book the receivable',
+        async ({ page }) => {
+        const bezeichnung = neueBezeichnung('Lauf');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+
+        await fuegePositionHinzu(page, 'ANTEIL', 'E2E Heizkosten');
+        await page.locator('.nk-positionen tbody tr').first()
+            .locator('input[type="number"]').first().fill('100000');
+
+        const block = await oeffneErstenMieterblock(page);
+        const prozentfeld = block.locator('.nk-mieterzeilen input[type="number"]').first();
+        await expect(prozentfeld).toBeVisible({ timeout: 10000 });
+        await prozentfeld.fill('50');
+
+        await clearMessages(page);
+        await speichernUnten(page).click();
+        expect(await waitForFormResult(page)).toBe(true);
+        await page.locator('.zev-form-actions .zev-button--secondary').last().click();
+
+        await schliesseAbrechnungAb(page, bezeichnung);
+
+        debitorenGebucht = true;
+        await erstelleRechnungen(page, bezeichnung);
+
+        // --- Ergebnis-Panel ---
+        const panel = page.locator('.zev-panel');
+        await expect(panel).toContainText('Erstellte Rechnungen');
+        await expect(panel).toContainText(bezeichnung);
+
+        const zeilen = panel.locator('tbody tr');
+        await expect(zeilen.first()).toBeVisible({ timeout: 10000 });
+        // Mindestens eine gebuchte Forderung - die Zeile mit 50 % traegt eine Nachzahlung.
+        await expect(panel.locator('.zev-status--success').first()).toBeVisible();
+        // Betraege im Schweizer Format: Punkt als Dezimal-, Hochkomma als Tausendertrenner.
+        await expect(panel).toContainText(/\d{1,3}(?:'\d{3})*\.\d{2}/);
+
+        // --- PDF ---
+        // Der Download wird ueber die Antwort geprueft und nicht ueber den Browser-Download:
+        // Das belegt Route, Berechtigung, Feature-Flag und Ablage in einem Zug, ohne von der
+        // Download-Mechanik des Browsers abzuhaengen.
+        const pdfAntwort = page.waitForResponse(
+            res => res.url().includes('/pdf') && res.request().method() === 'GET',
+            { timeout: 30000 });
+        await zeilen.first().locator('.zev-button--secondary').click();
+        const pdf = await pdfAntwort;
+        expect(pdf.status()).toBe(200);
+        expect(pdf.headers()['content-type']).toContain('application/pdf');
+        // Der Dateiname ist lesbar und nicht der Ablageschluessel aus zwei IDs.
+        expect(pdf.headers()['content-disposition']).toContain('Nebenkosten');
+
+        // --- Forderung in der Debitorenkontrolle ---
+        await oeffneDebitorenImTestzeitraum(page);
+        const debitorZeilen = page.locator('.zev-table tbody tr');
+        await expect(debitorZeilen.first()).toBeVisible({ timeout: 15000 });
+        // Im Testzeitraum liegen ausschliesslich die Forderungen dieses Laufs - jede muss die
+        // Herkunft Nebenkosten tragen.
+        const anzahl = await debitorZeilen.count();
+        for (let i = 0; i < anzahl; i++) {
+            await expect(debitorZeilen.nth(i)).toContainText('Nebenkosten');
+        }
+    });
+
+    /**
+     * Ein zweiter Lauf ist erlaubt und **erzeugt keine zweite Forderung**: Das Upsert läuft je
+     * Herkunft idempotent. Ohne die Herkunft im Unique-Key hätte er die ZEV-Forderung desselben
+     * Mieters mit demselben `datum_von` überschrieben.
+     */
+    test('should not create a second receivable on a repeated run', async ({ page }) => {
+        const bezeichnung = neueBezeichnung('Wiederholt');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+
+        await fuegePositionHinzu(page, 'ANTEIL', 'E2E Heizkosten');
+        await page.locator('.nk-positionen tbody tr').first()
+            .locator('input[type="number"]').first().fill('100000');
+        const block = await oeffneErstenMieterblock(page);
+        await block.locator('.nk-mieterzeilen input[type="number"]').first().fill('50');
+        await clearMessages(page);
+        await speichernUnten(page).click();
+        expect(await waitForFormResult(page)).toBe(true);
+        await page.locator('.zev-form-actions .zev-button--secondary').last().click();
+
+        await schliesseAbrechnungAb(page, bezeichnung);
+
+        debitorenGebucht = true;
+        await erstelleRechnungen(page, bezeichnung);
+        await oeffneDebitorenImTestzeitraum(page);
+        const nachErstem = await page.locator('.zev-table tbody tr').count();
+        expect(nachErstem).toBeGreaterThan(0);
+
+        await erstelleRechnungen(page, bezeichnung);
+        await oeffneDebitorenImTestzeitraum(page);
+
+        await expect(page.locator('.zev-table tbody tr')).toHaveCount(nachErstem);
+    });
+
+    /**
+     * Das Ergebnis gehört zu dem Stand, den die Tabelle beim Lauf zeigte — nach einem Neuladen
+     * wäre es ein Ergebnis zu Zeilen, die es so nicht mehr geben muss.
+     */
+    test('should drop the result panel when the list is reloaded', async ({ page }) => {
+        const bezeichnung = neueBezeichnung('Panel');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+        await page.locator('.zev-form-actions .zev-button--secondary').last().click();
+        await schliesseAbrechnungAb(page, bezeichnung);
+
+        // Ohne Positionen ist der Saldo <= 0: PDF ja, Forderung nein (FR-4). Der Test braucht
+        // deshalb kein Abraeumen in der Debitorenkontrolle.
+        await erstelleRechnungen(page, bezeichnung);
+        const panel = page.locator('.zev-panel');
+        await expect(panel).toBeVisible();
+        await expect(panel).toContainText('keine Forderung');
+
+        await oeffneListeFrisch(page);
+
+        await expect(page.locator('.zev-panel')).toHaveCount(0);
     });
 });

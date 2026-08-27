@@ -2,6 +2,7 @@ package ch.nacht.service;
 
 import ch.nacht.dto.DebitorDTO;
 import ch.nacht.entity.Debitor;
+import ch.nacht.entity.Debitorherkunft;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.Mieter;
 import ch.nacht.repository.DebitorRepository;
@@ -12,6 +13,7 @@ import ch.nacht.repository.MieterRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -393,10 +395,11 @@ public class DebitorServiceTest {
     void upsertFromRechnung_CallsRepositoryWithOrgId() {
         when(organizationContextService.getCurrentOrgId()).thenReturn(ORG_ID);
 
-        debitorService.upsertFromRechnung(10L, new BigDecimal("125.50"), VON, BIS);
+        debitorService.upsertFromRechnung(10L, new BigDecimal("125.50"), VON, BIS,
+                Debitorherkunft.ZEV);
 
         verify(organizationContextService).getCurrentOrgId();
-        verify(debitorRepository).upsert(10L, new BigDecimal("125.50"), VON, BIS, ORG_ID);
+        verify(debitorRepository).upsert(10L, new BigDecimal("125.50"), VON, BIS, ORG_ID, "ZEV");
     }
 
     // ==================== Helpers ====================
@@ -408,5 +411,79 @@ public class DebitorServiceTest {
         dto.setDatumVon(VON);
         dto.setDatumBis(BIS);
         return dto;
+    }
+
+    // ==================== Herkunft ====================
+    // Specs/Nebenkosten/RechnungenGenerieren.md FR-6
+
+    /**
+     * Fehlt die Herkunft im Request, setzt der Server {@code ZEV}.
+     *
+     * <p>Bestehende Aufrufer bleiben damit gueltig, und der Bestand ist ohnehin aus der
+     * Stromabrechnung entstanden — das ist eine Rueckschreibung und keine Annahme.
+     */
+    @Test
+    void create_OhneHerkunft_SetztZEV() {
+        DebitorDTO dto = buildValidDTO();
+        assertNull(dto.getHerkunft(), "Vorbedingung: der Request traegt keine Herkunft");
+        when(organizationContextService.getCurrentOrgId()).thenReturn(ORG_ID);
+        when(debitorRepository.save(any())).thenReturn(testDebitor1);
+
+        debitorService.create(dto);
+
+        ArgumentCaptor<Debitor> gespeichert = ArgumentCaptor.forClass(Debitor.class);
+        verify(debitorRepository).save(gespeichert.capture());
+        assertEquals(Debitorherkunft.ZEV, gespeichert.getValue().getHerkunft());
+    }
+
+    @Test
+    void create_MitHerkunftNK_UebernimmtSie() {
+        DebitorDTO dto = buildValidDTO();
+        dto.setHerkunft(Debitorherkunft.NK);
+        when(organizationContextService.getCurrentOrgId()).thenReturn(ORG_ID);
+        when(debitorRepository.save(any())).thenReturn(testDebitor1);
+
+        debitorService.create(dto);
+
+        ArgumentCaptor<Debitor> gespeichert = ArgumentCaptor.forClass(Debitor.class);
+        verify(debitorRepository).save(gespeichert.capture());
+        assertEquals(Debitorherkunft.NK, gespeichert.getValue().getHerkunft());
+    }
+
+    @Test
+    void update_OhneHerkunft_SetztZEV() {
+        DebitorDTO dto = buildValidDTO();
+        when(debitorRepository.findFirstById(1L)).thenReturn(Optional.of(testDebitor1));
+        when(debitorRepository.save(any())).thenReturn(testDebitor1);
+
+        debitorService.update(1L, dto);
+
+        ArgumentCaptor<Debitor> gespeichert = ArgumentCaptor.forClass(Debitor.class);
+        verify(debitorRepository).save(gespeichert.capture());
+        assertEquals(Debitorherkunft.ZEV, gespeichert.getValue().getHerkunft());
+    }
+
+    @Test
+    void getDebitoren_LiefertHerkunftImDTO() {
+        testDebitor1.setHerkunft(Debitorherkunft.NK);
+        when(debitorRepository.findByDatumVonBetween(VON, BIS)).thenReturn(List.of(testDebitor1));
+
+        List<DebitorDTO> result = debitorService.getDebitoren(VON, BIS);
+
+        assertEquals(Debitorherkunft.NK, result.get(0).getHerkunft());
+    }
+
+    /**
+     * Das Upsert traegt die Herkunft als <b>Name</b> in die native Abfrage — sie laeuft an keinem
+     * Enum-Konverter vorbei.
+     */
+    @Test
+    void upsertFromRechnung_HerkunftNK_ReichtNamenWeiter() {
+        when(organizationContextService.getCurrentOrgId()).thenReturn(ORG_ID);
+
+        debitorService.upsertFromRechnung(10L, new BigDecimal("812.35"), VON, BIS,
+                Debitorherkunft.NK);
+
+        verify(debitorRepository).upsert(10L, new BigDecimal("812.35"), VON, BIS, ORG_ID, "NK");
     }
 }

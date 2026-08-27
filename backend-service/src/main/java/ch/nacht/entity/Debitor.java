@@ -13,13 +13,17 @@ import java.time.LocalDate;
  *
  * <p>Der Unique-Constraint ist Teil des Vertrags dieser Entity und nicht bloss ein Index:
  * {@code DebitorRepository.upsert} verlaesst sich mit {@code ON CONFLICT (mieter_id, datum_von,
- * org_id)} darauf. Er stammt aus {@code V55__Create_Debitor_Table.sql} und wird hier gespiegelt,
- * damit ein aus dem Mapping erzeugtes Schema (Tests mit {@code ddl-auto=create-drop}) dieselbe
- * Zusicherung traegt wie die produktive Datenbank.
+ * herkunft, org_id)} darauf. Er stammt aus {@code V126__Add_Debitor_Herkunft.sql} und wird hier
+ * gespiegelt, damit ein aus dem Mapping erzeugtes Schema (Tests mit {@code ddl-auto=create-drop})
+ * dieselbe Zusicherung traegt wie die produktive Datenbank.
+ *
+ * <p>Die {@link Debitorherkunft} steht im Schluessel, damit ZEV- und NK-Forderung desselben
+ * Mieters mit demselben {@code datum_von} nebeneinander bestehen koennen.
  */
 @Entity
 @Table(name = "debitor", schema = "zev", uniqueConstraints = {
-    @UniqueConstraint(name = "uq_debitor_mieter_von_org", columnNames = {"mieter_id", "datum_von", "org_id"})
+    @UniqueConstraint(name = "uq_debitor_mieter_von_herkunft_org",
+                      columnNames = {"mieter_id", "datum_von", "herkunft", "org_id"})
 })
 @Filter(name = "orgFilter", condition = "org_id = :orgId")
 public class Debitor {
@@ -51,6 +55,11 @@ public class Debitor {
 
     @Column(name = "zahldatum")
     private LocalDate zahldatum;
+
+    @NotNull(message = "Herkunft is required")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "herkunft", length = 10, nullable = false)
+    private Debitorherkunft herkunft = Debitorherkunft.ZEV;
 
     public Debitor() {
     }
@@ -111,10 +120,18 @@ public class Debitor {
         this.zahldatum = zahldatum;
     }
 
+    public Debitorherkunft getHerkunft() {
+        return herkunft;
+    }
+
+    public void setHerkunft(Debitorherkunft herkunft) {
+        this.herkunft = herkunft;
+    }
+
     @Override
     public String toString() {
         return "Debitor{id=" + id + ", orgId=" + orgId + ", mieterId=" + mieterId +
                ", betrag=" + betrag + ", datumVon=" + datumVon + ", datumBis=" + datumBis +
-               ", zahldatum=" + zahldatum + "}";
+               ", zahldatum=" + zahldatum + ", herkunft=" + herkunft + "}";
     }
 }

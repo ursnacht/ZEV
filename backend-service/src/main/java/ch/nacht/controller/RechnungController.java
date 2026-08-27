@@ -1,6 +1,7 @@
 package ch.nacht.controller;
 
 import ch.nacht.dto.RechnungDTO;
+import ch.nacht.entity.Debitorherkunft;
 import ch.nacht.service.DebitorService;
 import ch.nacht.service.RechnungPdfService;
 import ch.nacht.service.RechnungService;
@@ -78,8 +79,10 @@ public class RechnungController {
             return ResponseEntity.badRequest().body(Map.of("error", "At least one unit must be selected"));
         }
 
-        // Clear previous invoices
-        rechnungStorageService.clearAll();
+        // Clear previous ZEV invoices. Bewusst nur die eigene Art: Die NK-Rechnungen werden auf
+        // einer anderen Seite erzeugt, und ein Aufraeumen ueber beide haette dort offene
+        // Download-Verweise stumm auf 404 gesetzt.
+        rechnungStorageService.clearArt(RechnungStorageService.Rechnungsart.ZEV);
 
         // Calculate invoices. A missing-tariff / coverage gap throws IllegalStateException,
         // which propagates out of this @Transactional method (clean rollback) and is mapped
@@ -112,21 +115,23 @@ public class RechnungController {
                             rechnung.getMieterId(),
                             betrag,
                             rechnung.getVon(),
-                            rechnung.getBis()
+                            rechnung.getBis(),
+                            Debitorherkunft.ZEV
                     );
                 } else if (rechnung.getMieterId() != null) {
                     log.info("Kein Debitor-Eintrag für 0-Rechnung (mieterId={}, einheit={}, {}–{})",
                             rechnung.getMieterId(), rechnung.getEinheitName(), rechnung.getVon(), rechnung.getBis());
                 }
 
-                rechnungStorageService.store(key, pdf);
+                String filename = rechnungStorageService.getFilename(key);
+                rechnungStorageService.store(RechnungStorageService.Rechnungsart.ZEV, key, pdf, filename);
 
                 Map<String, Object> meta = new HashMap<>();
                 meta.put("einheitId", rechnung.getEinheitId());
                 meta.put("einheitName", rechnung.getEinheitName());
                 meta.put("mieterName", rechnung.getMieterName());
                 meta.put("endBetrag", rechnung.getEndBetrag());
-                meta.put("filename", rechnungStorageService.getFilename(key));
+                meta.put("filename", filename);
                 meta.put("downloadKey", key);
                 generatedList.add(meta);
 
@@ -157,9 +162,10 @@ public class RechnungController {
     public ResponseEntity<byte[]> downloadRechnung(@PathVariable String key) {
         log.info("Download requested for invoice: {}", key);
 
-        return rechnungStorageService.get(key)
+        return rechnungStorageService.get(RechnungStorageService.Rechnungsart.ZEV, key)
                 .map(pdf -> {
-                    String filename = rechnungStorageService.getFilename(key);
+                    String filename = rechnungStorageService.getFilename(
+                            RechnungStorageService.Rechnungsart.ZEV, key);
                     log.info("Serving invoice download: {}, size: {} bytes", filename, pdf.length);
 
                     return ResponseEntity.ok()
