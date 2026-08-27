@@ -1,6 +1,7 @@
 package ch.nacht.repository;
 
 import ch.nacht.entity.Debitor;
+import ch.nacht.entity.Debitorherkunft;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -96,4 +97,25 @@ public interface DebitorRepository extends JpaRepository<Debitor, Long> {
      * @return Datensatz des eigenen Mandanten, sonst leer
      */
     Optional<Debitor> findFirstById(Long id);
+
+    /**
+     * Findet die Forderung zum Eindeutigkeitsschluessel {@code (mieter_id, datum_von, herkunft)} —
+     * <b>unter dem Mandantenfilter</b>, {@code org_id} kommt also aus dem Filter und nicht aus dem
+     * Request.
+     *
+     * <p>Dient der Vorpruefung in {@code DebitorService}: Ohne sie laeuft eine Neuanlage auf
+     * dasselbe Trippel in den Unique-Constraint {@code uq_debitor_mieter_von_herkunft_org} (V126).
+     * Der schlaegt als {@code DataIntegrityViolationException} durch, fuer die es keinen Handler
+     * gibt — der Benutzer sah {@code 500} und in der Maske {@code [object Object]}.
+     *
+     * @param mieterId FK auf den Mieter
+     * @param datumVon Beginn des Abrechnungszeitraums
+     * @param herkunft {@code ZEV} oder {@code NK}
+     * @return Bestehende Forderung des eigenen Mandanten, sonst leer
+     */
+    Optional<Debitor> findFirstByMieterIdAndDatumVonAndHerkunft(
+        Long mieterId,
+        LocalDate datumVon,
+        Debitorherkunft herkunft
+    );
 }

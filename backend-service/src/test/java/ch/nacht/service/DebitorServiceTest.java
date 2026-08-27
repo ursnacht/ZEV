@@ -292,6 +292,43 @@ public class DebitorServiceTest {
         verifyNoInteractions(debitorRepository);
     }
 
+    /**
+     * Doppelte Neuanlage: lesbare {@code 400} statt {@code 500}.
+     *
+     * <p>Der Unique-Constraint {@code uq_debitor_mieter_von_herkunft_org} (V126) griff bisher erst
+     * in der Datenbank — als {@code DataIntegrityViolationException} ohne Handler. In der Maske
+     * stand dann {@code [object Object]}, empirisch belegt in einem E2E-Lauf, bei dem ein Rest
+     * eines abgebrochenen Vorlaufs denselben Schluessel belegte.
+     */
+    @Test
+    void create_DuplicateSchluessel_ThrowsIllegalArgumentException() {
+        DebitorDTO dto = buildValidDTO();
+        when(debitorRepository.findFirstByMieterIdAndDatumVonAndHerkunft(
+                10L, VON, Debitorherkunft.ZEV)).thenReturn(Optional.of(testDebitor1));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> debitorService.create(dto));
+        assertTrue(ex.getMessage().contains(VON.toString()));
+        verify(debitorRepository, never()).save(any());
+    }
+
+    /**
+     * Dieselbe Kombination, aber andere Herkunft: erlaubt — die Herkunft gehoert zum Schluessel.
+     */
+    @Test
+    void create_GleicherSchluesselAndereHerkunft_SavesSuccessfully() {
+        DebitorDTO dto = buildValidDTO();
+        dto.setHerkunft(Debitorherkunft.NK);
+        when(organizationContextService.getCurrentOrgId()).thenReturn(ORG_ID);
+        when(debitorRepository.findFirstByMieterIdAndDatumVonAndHerkunft(
+                10L, VON, Debitorherkunft.NK)).thenReturn(Optional.empty());
+        when(debitorRepository.save(any())).thenReturn(testDebitor1);
+        when(mieterRepository.findFirstById(10L)).thenReturn(Optional.empty());
+
+        assertNotNull(debitorService.create(dto));
+        verify(debitorRepository).save(any());
+    }
+
     // ==================== update ====================
 
     @Test
@@ -317,6 +354,42 @@ public class DebitorServiceTest {
 
         assertThrows(NoSuchElementException.class,
                 () -> debitorService.update(99L, buildValidDTO()));
+    }
+
+    /**
+     * Bearbeiten des <b>eigenen</b> Datensatzes: Der bestehende Eintrag darf sich nicht selbst
+     * blockieren — sonst waere jede Aenderung an einer Forderung unmoeglich.
+     */
+    @Test
+    void update_EigenerSchluessel_SavesSuccessfully() {
+        DebitorDTO dto = buildValidDTO();
+        when(debitorRepository.findFirstById(1L)).thenReturn(Optional.of(testDebitor1));
+        when(debitorRepository.findFirstByMieterIdAndDatumVonAndHerkunft(
+                10L, VON, Debitorherkunft.ZEV)).thenReturn(Optional.of(testDebitor1));
+        when(debitorRepository.save(testDebitor1)).thenReturn(testDebitor1);
+        when(mieterRepository.findFirstById(10L)).thenReturn(Optional.empty());
+
+        assertNotNull(debitorService.update(1L, dto));
+        verify(debitorRepository).save(testDebitor1);
+    }
+
+    /**
+     * Bearbeiten auf den Schluessel eines <b>fremden</b> Datensatzes: abgewiesen.
+     */
+    @Test
+    void update_FremderSchluessel_ThrowsIllegalArgumentException() {
+        DebitorDTO dto = buildValidDTO();
+        Debitor anderer = new Debitor();
+        anderer.setId(2L);
+        anderer.setOrgId(ORG_ID);
+        anderer.setMieterId(10L);
+        anderer.setDatumVon(VON);
+        when(debitorRepository.findFirstById(1L)).thenReturn(Optional.of(testDebitor1));
+        when(debitorRepository.findFirstByMieterIdAndDatumVonAndHerkunft(
+                10L, VON, Debitorherkunft.ZEV)).thenReturn(Optional.of(anderer));
+
+        assertThrows(IllegalArgumentException.class, () -> debitorService.update(1L, dto));
+        verify(debitorRepository, never()).save(any());
     }
 
     @Test

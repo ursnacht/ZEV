@@ -91,6 +91,7 @@ public class DebitorService {
     public DebitorDTO create(DebitorDTO dto) {
         hibernateFilterService.enableOrgFilter();
         validate(dto);
+        pruefeEindeutigkeit(dto, null);
         Debitor debitor = new Debitor();
         debitor.setOrgId(organizationContextService.getCurrentOrgId());
         debitor.setMieterId(dto.getMieterId());
@@ -117,6 +118,7 @@ public class DebitorService {
         Debitor debitor = debitorRepository.findFirstById(id)
                 .orElseThrow(() -> new NoSuchElementException("Debitor not found: " + id));
         validate(dto);
+        pruefeEindeutigkeit(dto, id);
         debitor.setMieterId(dto.getMieterId());
         debitor.setBetrag(dto.getBetrag());
         debitor.setDatumVon(dto.getDatumVon());
@@ -167,6 +169,32 @@ public class DebitorService {
         debitorRepository.upsert(mieterId, betrag, datumVon, datumBis, orgId, herkunft.name());
         log.info("Upserted debitor for mieterId={}, datumVon={}, betrag={}, herkunft={}",
                 mieterId, datumVon, betrag, herkunft);
+    }
+
+    /**
+     * Weist eine Forderung ab, die den Eindeutigkeitsschluessel
+     * {@code (mieter_id, datum_von, herkunft, org_id)} bereits belegt.
+     *
+     * <p><b>Warum hier und nicht erst in der Datenbank:</b> Der Constraint
+     * {@code uq_debitor_mieter_von_herkunft_org} (V126) greift ohnehin, aber als
+     * {@code DataIntegrityViolationException}. Fuer die gibt es keinen Handler im
+     * {@code GlobalExceptionHandler} — die Maske bekam eine {@code 500} mit dem Standard-
+     * Fehlerobjekt von Spring und zeigte {@code [object Object]} an. Mit dieser Vorpruefung wird
+     * daraus eine lesbare {@code 400} auf demselben Weg wie die uebrigen Validierungen.
+     *
+     * @param dto      Zu speichernde Forderung
+     * @param eigeneId ID des bearbeiteten Datensatzes ({@code null} bei einer Neuanlage) — der
+     *                 eigene Datensatz darf sich selbst nicht im Weg stehen
+     */
+    private void pruefeEindeutigkeit(DebitorDTO dto, Long eigeneId) {
+        debitorRepository.findFirstByMieterIdAndDatumVonAndHerkunft(
+                        dto.getMieterId(), dto.getDatumVon(), herkunftOderZev(dto))
+                .filter(bestehend -> !bestehend.getId().equals(eigeneId))
+                .ifPresent(bestehend -> {
+                    throw new IllegalArgumentException(
+                            "Für diesen Mieter existiert bereits eine Forderung mit Datum von "
+                                    + dto.getDatumVon());
+                });
     }
 
     private void validate(DebitorDTO dto) {
