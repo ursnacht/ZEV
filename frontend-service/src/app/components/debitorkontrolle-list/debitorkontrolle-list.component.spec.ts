@@ -842,6 +842,20 @@ describe('DebitorkontrolleListComponent', () => {
   // ============ Herkunft (Specs/Nebenkosten/RechnungenGenerieren.md, FR-7) ============
 
   describe('Herkunft-Filter', () => {
+    /** Nur ZEV — für den Fall, dass die Option NK nichts finden könnte. */
+    function nurZevDebitoren(): Debitor[] {
+      return [{
+        id: 1, mieterId: 10, mieterName: 'Max Muster', einheitName: 'EG links',
+        betrag: 123.45, datumVon: '2025-01-01', datumBis: '2025-03-31', herkunft: 'ZEV'
+      }];
+    }
+
+    function optionen(): string[] {
+      return Array.from(
+        (fixture.nativeElement.querySelector('#herkunftFilter') as HTMLSelectElement).options)
+        .map(o => o.value);
+    }
+
     beforeEach(() => {
       debitorServiceSpy.getDebitoren.mockReturnValue(of(gemischteDebitoren()));
       component.loadDebitoren();
@@ -892,18 +906,81 @@ describe('DebitorkontrolleListComponent', () => {
       expect(component.selectedIds.size).toBe(0);
     });
 
-    it('should offer the NK option only while the feature flag is on', () => {
-      const optionen = () => Array.from(
-        (fixture.nativeElement.querySelector('#herkunftFilter') as HTMLSelectElement).options)
-        .map(o => o.value);
-
-      expect(component.nkVerfuegbar).toBe(true);
+    it('should offer the NK option while the feature flag is on', () => {
+      expect(component.nkFilterVerfuegbar).toBe(true);
       expect(optionen()).toEqual(['ALLE', 'ZEV', 'NK']);
+    });
 
+    /**
+     * **Was sichtbar ist, muss filterbar sein.**
+     *
+     * Bei ausgeschaltetem Flag zeigt „Alle" die NK-Forderungen weiterhin — es sind offene
+     * Geldforderungen, und sie zu verstecken wäre gefährlicher als sie zu zeigen. Dann muss es
+     * auch möglich bleiben, sie zu isolieren.
+     */
+    it('should keep the NK option while NK receivables are loaded, even with the flag off', () => {
       nkFlagAktiv = false;
       fixture.detectChanges();
 
+      expect(component.nkFilterVerfuegbar).toBe(true);
+      expect(optionen()).toEqual(['ALLE', 'ZEV', 'NK']);
+      expect(component.sichtbareDebitoren.length).toBe(3);
+    });
+
+    it('should still show NK receivables under "Alle" with the flag off', () => {
+      nkFlagAktiv = false;
+      fixture.detectChanges();
+
+      expect(component.herkunftFilter).toBe('ALLE');
+      expect(component.sichtbareDebitoren.map(d => d.herkunft)).toContain('NK');
+    });
+
+    it('should filter to the NK receivables with the flag off', () => {
+      nkFlagAktiv = false;
+      component.herkunftFilter = 'NK';
+      fixture.detectChanges();
+
+      expect(component.sichtbareDebitoren.map(d => d.id)).toEqual([2]);
+    });
+
+    /** Ohne NK-Forderungen und ohne Flag findet die Option nie etwas — sie bleibt weg. */
+    it('should drop the NK option without flag and without NK receivables', () => {
+      nkFlagAktiv = false;
+      debitorServiceSpy.getDebitoren.mockReturnValue(of(nurZevDebitoren()));
+      component.loadDebitoren();
+      fixture.detectChanges();
+
+      expect(component.nkFilterVerfuegbar).toBe(false);
       expect(optionen()).toEqual(['ALLE', 'ZEV']);
+    });
+
+    /**
+     * Verschwindet die Option, während sie gewählt ist, fällt der Filter auf **Alle** zurück:
+     * Sonst stünde im Auswahlfeld ein Wert, den es nicht mehr gibt, und die dann leere Liste
+     * liesse sich nur über einen anderen Filterwert verlassen.
+     */
+    it('should fall back to "Alle" when the chosen NK option disappears', () => {
+      nkFlagAktiv = false;
+      component.herkunftFilter = 'NK';
+
+      debitorServiceSpy.getDebitoren.mockReturnValue(of(nurZevDebitoren()));
+      component.loadDebitoren();
+      fixture.detectChanges();
+
+      expect(component.herkunftFilter).toBe('ALLE');
+      expect(component.sichtbareDebitoren.length).toBe(1);
+    });
+
+    it('should keep the chosen NK option while the flag is on', () => {
+      component.herkunftFilter = 'NK';
+
+      debitorServiceSpy.getDebitoren.mockReturnValue(of(nurZevDebitoren()));
+      component.loadDebitoren();
+
+      // Mit Flag bleibt die Option angeboten - und damit die Auswahl bestehen, auch wenn sie
+      // gerade nichts findet.
+      expect(component.herkunftFilter).toBe('NK');
+      expect(component.sichtbareDebitoren.length).toBe(0);
     });
 
     it('should show the empty state when the filter matches nothing', () => {

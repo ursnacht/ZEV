@@ -67,10 +67,12 @@ Grundlage: [`RechnungenGenerieren.md`](./RechnungenGenerieren.md).
 | [x] | 11. Liste: Menüeintrag | Zwei **feste** `KebabMenuItem[]` (mit und ohne `RECHNUNGEN_ERSTELLEN`) und eine Methode, die eine davon liefert — keine je Änderungserkennung neu gebaute Liste, sonst `NG0956` (das Menü rendert mit `track item`). Eintrag **vor** `LOESCHEN`; Rückfrage über `confirm`. |
 | [x] | 12. Ergebnis-Panel | `zev-panel` unter der Tabelle, Aufbau wie `GENERIERTE_RECHNUNGEN` auf der Seite Rechnungen. Beträge über `swissNumber:2`; Betragsspalte benennt `NK_NACHZAHLUNG`/`NK_GUTHABEN` im Text. `track zeile.mieterId`. Panel verschwindet beim Neuladen und beim Öffnen der Maske. |
 | [x] | 13. Hinweis auf `/rechnungen` | Ein `zev-message--info` mit Link auf `/nebenkosten/abrechnung`, gebunden an `*appFeature="'NEBENKOSTENABRECHNUNG'"`. Sonst keine Änderung an der Seite. |
-| [x] | 14. Debitorkontrolle | Spalte **Herkunft** als `zev-status`-Badge, sortierbar; Filter Alle/ZEV/NK (Option **NK** nur bei gesetztem Flag, Default **Alle** bei jedem Öffnen); Feld im Formular mit Vorbelegung `ZEV`, gesperrt bei ausgeschaltetem Flag. |
+| [x] | 14. Debitorkontrolle | Spalte **Herkunft** als `zev-status`-Badge, sortierbar; Filter Alle/ZEV/NK (Option **NK** flag- bzw. datenabhängig — siehe Phase 18, Default **Alle** bei jedem Öffnen); Feld im Formular mit Vorbelegung `ZEV`, gesperrt bei ausgeschaltetem Flag. |
 | [x] | 15. Backend-Tests | `NkRechnungServiceTest`, `NkRechnungControllerTest`, `RechnungStorageServiceTest` (**neu — es gibt bisher keinen**), `DebitorServiceTest`, `DebitorRepositoryIT`, `ControllerAuthorizationTest`, `JasperTemplateCompileTest` um Kompilieren **und Füllen** von `nk-rechnung.jrxml`. Details in der Tabelle unten. |
 | [x] | 16. Frontend-Unit-Tests | Menüeintrag nur bei `abgerechnet`, stabile Menü-Objekte, Rückfrage und Abbruch, Panel-Lebenszyklus, Zahlenformat, Debitorenliste mit Spalte und Filter. |
 | [x] | 17. E2E | Ein Lauf über eine abgeschlossene Abrechnung bis zum Download, danach die Forderung in der Debitorenkontrolle mit Herkunft **NK**. **Aufräumen inklusive der entstandenen Debitoren** — sonst bleiben Forderungen im Mandanten stehen. |
+| [x] | 18. Nachtrag: Herkunft-Filter | Die Option **NK** erschien nur bei gesetztem Flag, „Alle" zeigte die NK-Forderungen aber weiterhin — sichtbar, aber nicht filterbar. Die Option erscheint jetzt auch **ohne** Flag, sobald im Zeitraum eine NK-Forderung steht; verschwindet sie, während sie gewählt ist, fällt der Filter auf **Alle** zurück. Kein DB- und kein Übersetzungsbedarf. |
+| [x] | 19. Nachtrag: Akonto-Korrektur auf dem PDF | Die Akonto-Zeile weist die Korrektur mit Vorzeichen aus, wenn es eine gibt: `Akonto total (13 x 130.00, -50.00)`; ohne Korrektur bleibt sie weg. Dazu die Korrektur im Rechnungsaufbau null-sicher (das Template fragt ihr Vorzeichen). Die Fülltests lesen jetzt den **gedruckten Text** und prüfen damit, was auf dem Papier steht — nicht nur, dass das Füllen nicht abbricht. Kein DB- und kein Übersetzungsbedarf. |
 
 ### Validierung nach den Phasen
 * Backend: `cd backend-service && mvn compile -q`; nach Phase 9 `mvn test`
@@ -107,6 +109,9 @@ Grundlage: [`RechnungenGenerieren.md`](./RechnungenGenerieren.md).
 ### Frontend
 | Regel | Verhalten |
 |---|---|
+| Herkunft-Filter, Option **NK** | erscheint bei gesetztem Flag **oder** wenn im Zeitraum eine NK-Forderung steht |
+| Akonto-Korrektur auf dem PDF | wird nur bei `signum() != 0` ausgewiesen |
+| Filter **NK** gewählt, Option fällt weg | Rückfall auf **Alle** |
 | Abrechnung nicht `abgerechnet` | Menüeintrag **fehlt** (kein gesperrter Eintrag — ein ausgegrauter müsste erklären, warum) |
 | Rückfrage abgebrochen | kein Request, keine Forderung |
 | Lauf läuft | Spinner, kein zweiter Lauf |

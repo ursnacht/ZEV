@@ -36,7 +36,7 @@
             (ngModelChange)="onHerkunftFilterChange()">
             <option value="ALLE">{{ 'DEBITOR_HERKUNFT_ALLE' | translate }}</option>
             <option value="ZEV">{{ 'DEBITOR_HERKUNFT_ZEV' | translate }}</option>
-            @if (nkVerfuegbar) {
+            @if (nkFilterVerfuegbar) {
               <option value="NK">{{ 'DEBITOR_HERKUNFT_NK' | translate }}</option>
             }
           </select>

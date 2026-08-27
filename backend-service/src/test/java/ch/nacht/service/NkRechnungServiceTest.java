@@ -272,6 +272,32 @@ class NkRechnungServiceTest {
     }
 
     @Test
+    void baueRechnungen_UebernimmtAkontoKorrektur() {
+        mieterA.setAkontoKorrektur(new BigDecimal("-50.00"));
+        when(nkAbrechnungService.getAbrechnungDetail(ABRECHNUNG_ID)).thenReturn(Optional.of(detail()));
+
+        NkRechnungDTO rechnung = service.baueRechnungen(ABRECHNUNG_ID).get(0);
+
+        assertEquals(0, rechnung.getAkontoKorrektur().compareTo(new BigDecimal("-50.00")));
+    }
+
+    /**
+     * Die Korrektur ist <b>nie {@code null}</b>: Das Template fragt sie nach ihrem Vorzeichen, um
+     * sie nur bei einer tatsaechlichen Korrektur auszuweisen. Ein {@code null} liefe dort in eine
+     * NullPointerException — und die faellt erst beim Fuellen auf, nicht beim Kompilieren.
+     */
+    @Test
+    void baueRechnungen_KorrekturNull_WirdZuNull_Sicher() {
+        mieterA.setAkontoKorrektur(null);
+        when(nkAbrechnungService.getAbrechnungDetail(ABRECHNUNG_ID)).thenReturn(Optional.of(detail()));
+
+        NkRechnungDTO rechnung = service.baueRechnungen(ABRECHNUNG_ID).get(0);
+
+        assertNotNull(rechnung.getAkontoKorrektur());
+        assertEquals(0, rechnung.getAkontoKorrektur().signum());
+    }
+
+    @Test
     void baueRechnungen_UebernimmtAdresseDesMieters() {
         when(nkAbrechnungService.getAbrechnungDetail(ABRECHNUNG_ID)).thenReturn(Optional.of(detail()));
 

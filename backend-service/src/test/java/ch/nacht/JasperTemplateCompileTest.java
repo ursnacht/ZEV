@@ -9,6 +9,9 @@ import ch.nacht.service.RechnungService;
 import net.sf.jasperreports.engine.JasperCompileManager;
 import net.sf.jasperreports.engine.JasperExportManager;
 import net.sf.jasperreports.engine.JasperFillManager;
+import net.sf.jasperreports.engine.JRPrintElement;
+import net.sf.jasperreports.engine.JRPrintPage;
+import net.sf.jasperreports.engine.JRPrintText;
 import net.sf.jasperreports.engine.JasperPrint;
 import net.sf.jasperreports.engine.JasperReport;
 import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
@@ -22,6 +25,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -174,6 +178,63 @@ class JasperTemplateCompileTest {
                 "Ergebnis muss ein PDF sein");
     }
 
+    /**
+     * Akonto-Zeile <b>mit</b> Korrektur — der Ausdruck fragt die Korrektur nach ihrem Vorzeichen
+     * und wird nur in diesem Fall vollstaendig ausgewertet.
+     *
+     * <p>Eigener Test, weil der Zweig sonst nie laeuft: Die uebrigen Fuelltests tragen eine
+     * Korrektur von 0. Ein Fehler im Ausdruck — etwa ein {@code null} auf der Korrektur — faellt
+     * ausserdem erst beim Fuellen auf, nicht beim Kompilieren.
+     */
+    @Test
+    void testNkRechnungTemplateFuelltAkontoKorrektur() throws Exception {
+        JasperReport report = kompiliereNkTemplate();
+        NkRechnungDTO rechnung = testNkRechnung(new BigDecimal("812.37"));
+        rechnung.setAkontoAnzahlMonate(new BigDecimal("13"));
+        rechnung.setAkontoBetragProMonat(new BigDecimal("130.00"));
+        rechnung.setAkontoKorrektur(new BigDecimal("-50.00"));
+
+        String text = gedruckterText(fuelleNkPrint(report, rechnung));
+
+        assertTrue(text.contains("(13 x 130.00, -50.00)"),
+                "Die Korrektur muss in der Akonto-Zeile stehen. Gedruckt wurde:\n" + text);
+    }
+
+    /** Ohne Korrektur bleibt die Klammer bei der Herleitung — eine „0.00" erklaert nichts. */
+    @Test
+    void testNkRechnungTemplateOhneAkontoKorrektur() throws Exception {
+        JasperReport report = kompiliereNkTemplate();
+        NkRechnungDTO rechnung = testNkRechnung(new BigDecimal("812.37"));
+        rechnung.setAkontoAnzahlMonate(new BigDecimal("12"));
+        rechnung.setAkontoBetragProMonat(new BigDecimal("50.00"));
+        rechnung.setAkontoKorrektur(BigDecimal.ZERO);
+
+        String text = gedruckterText(fuelleNkPrint(report, rechnung));
+
+        assertTrue(text.contains("(12 x 50.00)"), "Gedruckt wurde:\n" + text);
+        // Auf das Komma pruefen, nicht auf "0.00": Die Herleitung selbst endet auf "50.00)".
+        assertFalse(text.contains(", 0.00)"), "Eine Korrektur von 0 darf nicht erscheinen");
+    }
+
+    /**
+     * Zahlenformat nach {@code Specs/generell.md}: Punkt als Dezimal-, ASCII-Hochkomma als
+     * Tausendertrenner. Ein {@code pattern} im Template oder ein {@code String.format} ohne
+     * {@code Locale.ROOT} liefert je Umgebung ein Komma — und faellt auf einer Maschine mit
+     * anderer Locale erst im Betrieb auf.
+     */
+    @Test
+    void testNkRechnungTemplateFormatiertBetraegeSchweizerisch() throws Exception {
+        JasperReport report = kompiliereNkTemplate();
+        NkRechnungDTO rechnung = testNkRechnung(new BigDecimal("1234.57"));
+        rechnung.setKostentotal(new BigDecimal("1234.57"));
+
+        String text = gedruckterText(fuelleNkPrint(report, rechnung));
+
+        assertTrue(text.contains("1'234.55"),
+                "Der zahlbare Betrag muss als 1'234.55 erscheinen. Gedruckt wurde:\n" + text);
+        assertFalse(text.contains("1,234"), "Kein Komma als Tausendertrenner");
+    }
+
     private static JasperReport kompiliereNkTemplate() throws Exception {
         InputStream stream = JasperTemplateCompileTest.class
                 .getResourceAsStream("/reports/nk-rechnung.jrxml");
@@ -182,6 +243,11 @@ class JasperTemplateCompileTest {
     }
 
     private static byte[] fuelleNk(JasperReport report, NkRechnungDTO rechnung) throws Exception {
+        return JasperExportManager.exportReportToPdf(fuelleNkPrint(report, rechnung));
+    }
+
+    private static JasperPrint fuelleNkPrint(JasperReport report, NkRechnungDTO rechnung)
+            throws Exception {
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("RECHNUNG", rechnung);
         parameters.put("TRANSLATIONS", Map.of());
@@ -189,9 +255,27 @@ class JasperTemplateCompileTest {
         // das Bildelement traegt onErrorType="Blank" und muss null vertragen.
         parameters.put("QR_CODE_IMAGE", null);
 
-        JasperPrint print = JasperFillManager.fillReport(report, parameters,
+        return JasperFillManager.fillReport(report, parameters,
                 new JRBeanCollectionDataSource(rechnung.getZeilen()));
-        return JasperExportManager.exportReportToPdf(print);
+    }
+
+    /**
+     * Der gedruckte Text des Berichts.
+     *
+     * <p>Erst damit pruefen die Fuelltests, was auf dem Papier <b>steht</b>, und nicht nur, dass
+     * das Fuellen nicht abbricht. Die Baender setzen ihre Elemente direkt, ohne Rahmen — eine
+     * Rekursion ueber {@code JRPrintFrame} braucht es hier deshalb nicht.
+     */
+    private static String gedruckterText(JasperPrint print) {
+        StringBuilder text = new StringBuilder();
+        for (JRPrintPage seite : print.getPages()) {
+            for (JRPrintElement element : seite.getElements()) {
+                if (element instanceof JRPrintText t) {
+                    text.append(t.getFullText()).append('\n');
+                }
+            }
+        }
+        return text.toString();
     }
 
     /**

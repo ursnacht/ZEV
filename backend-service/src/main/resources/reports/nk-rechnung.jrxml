@@ -293,9 +293,11 @@
             </box>
         </element>
 
-        <!-- Akonto total, mit der Herleitung daneben: Anzahl Monate mal Betrag je Monat -->
+        <!-- Akonto total, mit der Herleitung daneben: Anzahl Monate mal Betrag je Monat, und die
+             Korrektur nur dann, wenn es eine gibt: "(13 x 130.00, -50.00)". Eine dauerhaft
+             mitgedruckte "0.00" waere eine Zahl, die nichts erklaert. -->
         <element kind="textField" uuid="22222222-2222-2222-2222-222222222273" x="0" y="23" width="470" height="18" fontSize="9.0" vTextAlign="Middle">
-            <expression><![CDATA[$P{TRANSLATIONS}.get("NK_AKONTO_TOTAL") + " (" + ch.nacht.util.PdfNumberFormat.decimals($P{RECHNUNG}.getAkontoAnzahlMonate(), 0) + " x " + ch.nacht.util.PdfNumberFormat.chf($P{RECHNUNG}.getAkontoBetragProMonat()) + "):"]]></expression>
+            <expression><![CDATA[$P{TRANSLATIONS}.get("NK_AKONTO_TOTAL") + " (" + ch.nacht.util.PdfNumberFormat.decimals($P{RECHNUNG}.getAkontoAnzahlMonate(), 0) + " x " + ch.nacht.util.PdfNumberFormat.chf($P{RECHNUNG}.getAkontoBetragProMonat()) + ($P{RECHNUNG}.getAkontoKorrektur().signum() != 0 ? ", " + ch.nacht.util.PdfNumberFormat.chf($P{RECHNUNG}.getAkontoKorrektur()) : "") + "):"]]></expression>
         </element>
         <element kind="textField" uuid="22222222-2222-2222-2222-222222222274" x="470" y="23" width="85" height="18" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
             <expression><![CDATA[ch.nacht.util.PdfNumberFormat.chf($P{RECHNUNG}.getAkontoTotal().negate())]]></expression>

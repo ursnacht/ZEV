@@ -87,12 +87,19 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
   }
 
   /**
-   * Die Option **NK** erscheint nur mit eingeschaltetem Flag: Sonst stuende dort ein Filter fuer
-   * einen Bereich, den es fuer diesen Mandanten nicht gibt. Die **Spalte** bleibt unabhaengig
-   * davon sichtbar — bestehende NK-Forderungen ueberleben ein Abschalten.
+   * Die Option **NK** erscheint, wenn der Flag gesetzt ist **oder** im geladenen Zeitraum
+   * mindestens eine NK-Forderung steht (Specs/Nebenkosten/RechnungenGenerieren.md, FR-7).
+   *
+   * <p>Anfangs hing sie allein am Flag. Das war nicht schluessig: Bei ausgeschaltetem Flag zeigte
+   * „Alle" die NK-Forderungen weiterhin — richtig, denn es sind offene Geldforderungen —, aber es
+   * gab keine Moeglichkeit mehr, sie zu isolieren. **Was sichtbar ist, muss filterbar sein.**
+   *
+   * <p>Wo die Option nie etwas finden koennte, bleibt sie weg: Ein Mandant ohne NK-Bereich und
+   * ohne NK-Forderungen sieht nur Alle / ZEV.
    */
-  get nkVerfuegbar(): boolean {
-    return this.featureFlagService.isEnabled('NEBENKOSTENABRECHNUNG');
+  get nkFilterVerfuegbar(): boolean {
+    return this.featureFlagService.isEnabled('NEBENKOSTENABRECHNUNG')
+      || this.debitoren.some(d => d.herkunft === 'NK');
   }
 
   /**
@@ -103,6 +110,19 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
    */
   onHerkunftFilterChange(): void {
     this.selectedIds.clear();
+  }
+
+  /**
+   * Faengt den Filter **NK** ab, wenn seine Option nach dem Laden nicht mehr angeboten wird.
+   *
+   * <p>Das passiert bei ausgeschaltetem Flag, sobald der Zeitraum auf einen ohne NK-Forderungen
+   * wechselt. Ohne diesen Rueckfall stuende im Auswahlfeld ein Wert, den es nicht mehr gibt, und
+   * die dann leere Liste liesse sich nur ueber einen anderen Filterwert verlassen.
+   */
+  private haltFilterGueltig(): void {
+    if (this.herkunftFilter === 'NK' && !this.nkFilterVerfuegbar) {
+      this.herkunftFilter = 'ALLE';
+    }
   }
 
   constructor(
@@ -183,6 +203,7 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
         }
         this.debitoren = data;
         this.applySorting();
+        this.haltFilterGueltig();
       },
       error: () => {
         this.showMessage('FEHLER_LADEN_DEBITOREN', 'error');

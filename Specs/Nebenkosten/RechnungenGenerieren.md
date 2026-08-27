@@ -345,8 +345,19 @@ Schlüsselstring, die FR-5 abschafft. Über die Route ist die Art **strukturell*
   Herkunft wäre schlechter als eine mit.
 * Neuer Filter **Herkunft**: Alle / ZEV / NK, **Default Alle bei jedem Öffnen der Seite**
   (Entscheid) — der Filter behält seinen Zustand nicht, konsistent mit den übrigen Filtern der
-  Seite. Die Option **NK** wird nur angeboten, wenn der Flag gesetzt ist — sonst stünde dort eine
-  Auswahl für einen Bereich, den es für diesen Mandanten nicht gibt.
+  Seite.
+* **Die Option NK erscheint, wenn der Flag gesetzt ist _oder_ im geladenen Zeitraum mindestens
+  eine NK-Forderung steht** (Entscheid, Korrektur vom 27.08.2026).
+  * Ursprünglich hing die Option allein am Flag. Das war nicht schlüssig: Bei ausgeschaltetem Flag
+    zeigte „Alle" die NK-Forderungen weiterhin — richtig, denn es sind offene Geldforderungen, und
+    sie zu verstecken wäre gefährlicher als sie zu zeigen —, aber es gab keine Möglichkeit mehr,
+    sie zu isolieren. **Was sichtbar ist, muss filterbar sein.**
+  * Umgekehrt bleibt die Option weg, wo sie nie etwas finden könnte: Ein Mandant ohne NK-Bereich
+    und ohne NK-Forderungen sieht nur Alle / ZEV.
+  * Verschwindet die Option, während sie **gewählt** ist (der Zeitraum wechselt auf einen ohne
+    NK-Forderungen), fällt der Filter auf **Alle** zurück. Sonst stünde im Auswahlfeld ein Wert,
+    den es nicht mehr gibt, und die leere Liste liesse sich nur über einen anderen Filterwert
+    verlassen.
 * Das Erfassungsformular erhält ein Auswahlfeld **Herkunft** mit Vorbelegung `ZEV`. Bei
   ausgeschaltetem Flag ist `ZEV` der einzige Wert, und das Feld ist gesperrt — ein manuell
   erfasster NK-Debitor ohne NK-Bereich wäre eine Forderung, die niemand erklären kann.
@@ -373,6 +384,12 @@ Bezeichnungen, die die Maske schon verwendet.
 * Aufbau: Kopf mit Steller, Mieter und Zeitraum der Abrechnung; Tabelle der Zeilen; darunter
   Kostentotal, Akonto, Rundung und Saldo; Schweizer QR-Einzahlungsschein wie bei der
   Quartalsrechnung.
+* **Die Akonto-Zeile weist ihre Herleitung aus:** `Akonto total (12 x 50.00)`. Gibt es eine
+  **Korrektur**, steht sie mit ihrem Vorzeichen dahinter: `Akonto total (13 x 130.00, -50.00)`.
+  * Ohne Korrektur bleibt sie weg. Eine dauerhaft mitgedruckte `0.00` wäre eine Zahl, die nichts
+    erklärt — und der Mieter müsste rätseln, was sie bedeutet.
+  * Die Korrektur ist damit auf dem Beleg nachvollziehbar: Ohne sie ginge das Akonto-Total nicht
+    aus Monaten und Betrag auf, und die Rechnung wäre für den Empfänger nicht prüfbar.
 * **Feldtypen `java.math.BigDecimal`** — nicht `java.lang.Double`. Ein Template kompiliert auch mit
   falschen Feldtypen; der Fehler kommt erst beim Füllen
   (`Specs/RechnungenGenerieren.md`, Abschnitt 2).
@@ -452,6 +469,11 @@ daneben.
 * [ ] Die Beträge im PDF entsprechen denen der Abrechnungsmaske — es wird nicht neu gerechnet.
 * [ ] Der Endbetrag ist ein Vielfaches von 5 Rappen; die Differenz erscheint als **Rundung**.
 * [ ] Bei Saldo ≤ 0 fehlt der QR-Zahlteil im PDF.
+* [ ] Die Akonto-Zeile nennt Monate und Betrag je Monat: `Akonto total (12 x 50.00)`.
+* [ ] Bei einer Korrektur steht sie mit Vorzeichen dahinter: `Akonto total (13 x 130.00, -50.00)`.
+* [ ] Ohne Korrektur erscheint **keine** `0.00` in der Klammer.
+* [ ] Beide Fälle sind über den **gefüllten** Bericht geprüft, nicht nur über das Kompilieren —
+      der Ausdruck läuft erst beim Füllen.
 * [ ] Das Ergebnis-Panel nennt Zahl der Rechnungen, Zahl der Forderungen und deren Summe getrennt.
 * [ ] Ein zweiter Lauf **ersetzt** das Panel; es stehen nicht zwei Ergebnislisten untereinander.
 * [ ] Das Panel verschwindet beim Neuladen der Liste und beim Öffnen der Erfassungsmaske.
@@ -490,6 +512,8 @@ daneben.
 * [ ] Die Debitorenliste zeigt die Spalte **Herkunft** als übersetztes Badge.
 * [ ] Der Herkunft-Filter zeigt bei **ZEV** nur ZEV-Einträge, bei **NK** nur NK-Einträge, bei
       **Alle** beide.
+* [ ] Die Option **NK** erscheint bei gesetztem Flag immer — auch wenn im Zeitraum keine
+      NK-Forderung steht.
 * [ ] Alle bestehenden Debitoren tragen nach der Migration `herkunft = ZEV`.
 * [ ] Ein manuell erfasster Debitor bekommt eine Herkunft; das Formular gibt `ZEV` vor.
 * [ ] `POST /api/debitoren` **ohne** `herkunft` legt den Eintrag mit `ZEV` an (kein `400`).
@@ -530,10 +554,17 @@ daneben.
       der Flag sperrt nur den NK-Teil.
 * [ ] Bei ausgeschaltetem Flag fehlt der Hinweis auf `/rechnungen`; die Seite sieht aus wie vor
       dieser Änderung.
-* [ ] Bei ausgeschaltetem Flag fehlt die Filter-Option **NK** in der Debitorkontrolle, und das
-      Erfassungsformular lässt nur `ZEV` zu.
+* [ ] Bei ausgeschaltetem Flag lässt das **Erfassungsformular** der Debitorkontrolle nur `ZEV` zu.
+* [ ] Bei ausgeschaltetem Flag **und ohne NK-Forderungen** im Zeitraum fehlt die Filter-Option
+      **NK**.
+* [ ] Bei ausgeschaltetem Flag, aber **mit** NK-Forderungen im Zeitraum, ist die Option **NK**
+      wählbar und zeigt genau diese Forderungen — was sichtbar ist, ist filterbar.
+* [ ] Wechselt der Zeitraum auf einen **ohne** NK-Forderungen, während der Filter auf **NK**
+      steht und der Flag aus ist, fällt der Filter auf **Alle** zurück.
 * [ ] Bei ausgeschaltetem Flag bleibt die **Spalte Herkunft** sichtbar und zeigt bestehende
       NK-Forderungen weiterhin als `NK` — ein Abschalten verändert keine Daten.
+* [ ] Bei ausgeschaltetem Flag zeigt **Alle** die NK-Forderungen weiterhin mit an: Es sind offene
+      Geldforderungen, und sie zu verstecken wäre gefährlicher, als sie zu zeigen.
 * [ ] `NkRechnungService` ruft in jeder öffentlichen Methode `pruefeFeatureFlag()` **selbst** auf;
       die ArchUnit-Regel `nebenkostenServicesMustCheckFeatureFlag` erfasst ihn, weil ihr
       Geltungsbereich auf das Präfix `Nk` erweitert wurde.

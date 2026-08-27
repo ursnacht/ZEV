@@ -277,7 +277,12 @@ public class NkRechnungService {
         rechnung.setKostentotal(block.getKostentotal());
         rechnung.setAkontoAnzahlMonate(block.getAkontoAnzahlMonate());
         rechnung.setAkontoBetragProMonat(block.getAkontoBetragProMonat());
-        rechnung.setAkontoKorrektur(block.getAkontoKorrektur());
+        // Nie null: Das Template fragt die Korrektur nach ihrem Vorzeichen, um sie nur bei einer
+        // tatsaechlichen Korrektur auszuweisen (FR-8). Ein null liefe dort in eine
+        // NullPointerException - und die faellt erst beim Fuellen auf, nicht beim Kompilieren.
+        rechnung.setAkontoKorrektur(block.getAkontoKorrektur() != null
+                ? block.getAkontoKorrektur()
+                : BigDecimal.ZERO);
         rechnung.setAkontoTotal(block.getAkontoTotal());
 
         // Rundung des Endbetrags auf 5 Rappen - dieselbe Regel wie bei der Quartalsrechnung, und
