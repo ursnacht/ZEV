@@ -95,7 +95,7 @@ public class DebitorServiceTest {
 
     @Test
     void getDebitoren_ReturnsDTOList() {
-        when(debitorRepository.findByDatumVonBetween(VON, BIS))
+        when(debitorRepository.findByZeitraumUeberschneidung(VON, BIS))
                 .thenReturn(List.of(testDebitor1));
         when(mieterRepository.findFirstById(10L)).thenReturn(Optional.of(testMieter));
         when(mieterEinheitRepository.findEinheitIdsByMieterId(10L)).thenReturn(List.of(5L));
@@ -112,7 +112,7 @@ public class DebitorServiceTest {
 
     @Test
     void getDebitoren_EmptyRange_ReturnsEmptyList() {
-        when(debitorRepository.findByDatumVonBetween(any(), any())).thenReturn(List.of());
+        when(debitorRepository.findByZeitraumUeberschneidung(any(), any())).thenReturn(List.of());
 
         List<DebitorDTO> result = debitorService.getDebitoren(VON, BIS);
 
@@ -122,7 +122,7 @@ public class DebitorServiceTest {
 
     @Test
     void getDebitoren_MieterNotFound_EinheitNameIsNull() {
-        when(debitorRepository.findByDatumVonBetween(VON, BIS)).thenReturn(List.of(testDebitor1));
+        when(debitorRepository.findByZeitraumUeberschneidung(VON, BIS)).thenReturn(List.of(testDebitor1));
         when(mieterRepository.findFirstById(10L)).thenReturn(Optional.empty());
 
         List<DebitorDTO> result = debitorService.getDebitoren(VON, BIS);
@@ -134,7 +134,7 @@ public class DebitorServiceTest {
 
     @Test
     void getDebitoren_EinheitNotFound_EinheitNameIsNull() {
-        when(debitorRepository.findByDatumVonBetween(VON, BIS)).thenReturn(List.of(testDebitor1));
+        when(debitorRepository.findByZeitraumUeberschneidung(VON, BIS)).thenReturn(List.of(testDebitor1));
         when(mieterRepository.findFirstById(10L)).thenReturn(Optional.of(testMieter));
         when(mieterEinheitRepository.findEinheitIdsByMieterId(10L)).thenReturn(List.of(5L));
         when(einheitRepository.findFirstById(5L)).thenReturn(Optional.empty());
@@ -466,7 +466,7 @@ public class DebitorServiceTest {
     @Test
     void getDebitoren_LiefertHerkunftImDTO() {
         testDebitor1.setHerkunft(Debitorherkunft.NK);
-        when(debitorRepository.findByDatumVonBetween(VON, BIS)).thenReturn(List.of(testDebitor1));
+        when(debitorRepository.findByZeitraumUeberschneidung(VON, BIS)).thenReturn(List.of(testDebitor1));
 
         List<DebitorDTO> result = debitorService.getDebitoren(VON, BIS);
 

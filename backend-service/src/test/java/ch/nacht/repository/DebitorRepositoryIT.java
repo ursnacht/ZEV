@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>Beide Abfragen dieses Repositories sind von Hand geschrieben und liessen sich bisher nur
  * über die Oberfläche prüfen:
  * <ul>
- *   <li>{@code findByDatumVonBetween} filtert ausschliesslich über {@code datum_von} — ein
+ *   <li>{@code findByZeitraumUeberschneidung} filtert ausschliesslich über {@code datum_von} — ein
  *       Eintrag, dessen Zeitraum in den Filter hineinragt, aber davor beginnt, erscheint
  *       <b>nicht</b>. Diese Kante bestimmt, was die Debitorenkontrolle anzeigt.</li>
  *   <li>{@code upsert} ist natives SQL mit {@code ON CONFLICT}. Seine {@code WHERE
@@ -124,7 +124,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
         debitorFuerOrg(ANDERE_ORG_ID, "999.00", LocalDate.of(2026, 2, 1));
         syncMitDatenbank();
 
-        assertThat(debitorRepository.findByDatumVonBetween(
+        assertThat(debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31))).hasSize(2);
     }
 
@@ -137,7 +137,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
 
         aktiviereOrgFilter(entityManager, TEST_ORG_ID);
 
-        assertThat(debitorRepository.findByDatumVonBetween(
+        assertThat(debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)))
                 .extracting(Debitor::getBetrag)
                 .singleElement()
@@ -209,13 +209,13 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
         entityManager.clear();
     }
 
-    // ==================== findByDatumVonBetween ====================
+    // ==================== findByZeitraumUeberschneidung ====================
 
     @Test
     void shouldFindDebitorenWithinRange() {
         saveDebitor(mieterAId, "100.00", LocalDate.of(2026, 2, 15), LocalDate.of(2026, 3, 31), null);
 
-        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
 
         assertThat(result).hasSize(1);
@@ -229,34 +229,122 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
         saveDebitor(mieterAId, "10.00", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31), null);
         saveDebitor(mieterBId, "20.00", LocalDate.of(2026, 3, 31), LocalDate.of(2026, 4, 30), null);
 
-        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
 
         assertThat(result).hasSize(2);
     }
 
+    /** Nur wirklich daneben liegende Zeitraeume fallen heraus — ohne einen Tag Beruehrung. */
     @Test
     void shouldExcludeDebitorenOutsideRange() {
-        saveDebitor(mieterAId, "10.00", LocalDate.of(2025, 12, 31), LocalDate.of(2026, 1, 31), null);
+        saveDebitor(mieterAId, "10.00", LocalDate.of(2025, 11, 1), LocalDate.of(2025, 12, 31), null);
         saveDebitor(mieterBId, "20.00", LocalDate.of(2026, 4, 1), LocalDate.of(2026, 4, 30), null);
 
-        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
 
         assertThat(result).isEmpty();
     }
 
+    // ==================== Ueberschneidung statt Stichtag ====================
+    // Specs/Debitorkontrolle.md, FR-1
+
+    /**
+     * <b>Der Kern der Aenderung:</b> Ein Eintrag, der <b>vor</b> dem Zeitraum beginnt und in ihn
+     * hineinragt, wird angezeigt.
+     *
+     * <p>Vorher war der Filter ein Stichtagsfilter auf {@code datum_von} — ein bewusster Entscheid,
+     * der mit der Nebenkostenabrechnung unhaltbar wurde: Sie laeuft ueber ein ganzes Jahr, ihre
+     * Forderung begann im Januar und war damit in jedem Quartal ausser dem ersten unsichtbar,
+     * obwohl sie offen ist und den ganzen Zeitraum betrifft.
+     */
     @Test
-    void shouldFilterOnDatumVonOnly_NotOnOverlap() {
-        // Ein Eintrag vom 01.12.2025 bis 28.02.2026 ragt in den Filter hinein, beginnt aber
-        // davor - er erscheint bewusst NICHT. Der Filter ist ein Stichtagsfilter auf datum_von,
-        // keine Ueberschneidungspruefung.
+    void shouldIncludeDebitorStartingBeforeRange() {
         saveDebitor(mieterAId, "10.00", LocalDate.of(2025, 12, 1), LocalDate.of(2026, 2, 28), null);
 
-        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(result).hasSize(1);
+    }
+
+    /** Ein Eintrag, der im Zeitraum beginnt und darueber hinausreicht, ebenso. */
+    @Test
+    void shouldIncludeDebitorEndingAfterRange() {
+        saveDebitor(mieterAId, "10.00", LocalDate.of(2026, 3, 1), LocalDate.of(2026, 6, 30), null);
+
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(result).hasSize(1);
+    }
+
+    /**
+     * Der Fall, der die Aenderung ausgeloest hat: eine Jahresforderung aus der
+     * Nebenkostenabrechnung, gesehen aus jedem einzelnen Quartal.
+     */
+    @Test
+    void shouldIncludeJahresforderungInJedemQuartal() {
+        saveDebitor(mieterAId, "191.55", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), null);
+
+        for (int quartal = 0; quartal < 4; quartal++) {
+            LocalDate von = LocalDate.of(2026, 1 + quartal * 3, 1);
+            LocalDate bis = von.plusMonths(3).minusDays(1);
+
+            assertThat(debitorRepository.findByZeitraumUeberschneidung(von, bis))
+                    .as("Quartal ab %s", von)
+                    .hasSize(1);
+        }
+    }
+
+    /** Der Zeitraum liegt vollstaendig innerhalb der Forderung — auch das ist eine Ueberschneidung. */
+    @Test
+    void shouldIncludeDebitorSpanningTheWholeRange() {
+        saveDebitor(mieterAId, "10.00", LocalDate.of(2025, 1, 1), LocalDate.of(2027, 12, 31), null);
+
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(result).hasSize(1);
+    }
+
+    /**
+     * <b>Genau ein Tag</b> genuegt, an beiden Raendern: Eine Forderung, die am ersten Tag des
+     * Zeitraums endet, und eine, die am letzten Tag beginnt.
+     */
+    @Test
+    void shouldIncludeDebitorTouchingByASingleDay() {
+        saveDebitor(mieterAId, "10.00", LocalDate.of(2025, 10, 1), LocalDate.of(2026, 1, 1), null);
+        saveDebitor(mieterBId, "20.00", LocalDate.of(2026, 3, 31), LocalDate.of(2026, 9, 30), null);
+
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(result).hasSize(2);
+    }
+
+    /** Ein Tag daneben ist keine Ueberschneidung — die Grenze ist scharf. */
+    @Test
+    void shouldExcludeDebitorMissingByASingleDay() {
+        saveDebitor(mieterAId, "10.00", LocalDate.of(2025, 10, 1), LocalDate.of(2025, 12, 31), null);
+        saveDebitor(mieterBId, "20.00", LocalDate.of(2026, 4, 1), LocalDate.of(2026, 9, 30), null);
+
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
 
         assertThat(result).isEmpty();
+    }
+
+    /** Ein einzelner Tag als Zeitraum trifft jede Forderung, die ihn enthaelt. */
+    @Test
+    void shouldMatchASingleDayRange() {
+        saveDebitor(mieterAId, "10.00", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), null);
+
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
+                LocalDate.of(2026, 7, 15), LocalDate.of(2026, 7, 15));
+
+        assertThat(result).hasSize(1);
     }
 
     @Test
@@ -265,7 +353,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
         saveDebitor(mieterBId, "10.00", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31), null);
         saveDebitor(mieterAId, "20.00", LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31), null);
 
-        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
 
         assertThat(result).extracting(Debitor::getBetrag)
@@ -278,7 +366,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
 
     @Test
     void shouldReturnEmptyListWhenNothingMatches() {
-        assertThat(debitorRepository.findByDatumVonBetween(
+        assertThat(debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31))).isEmpty();
     }
 
@@ -288,7 +376,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
                 LocalDate.of(2026, 4, 15));
         syncMitDatenbank();
 
-        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
 
         assertThat(result).hasSize(1);
@@ -304,7 +392,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name());
         syncMitDatenbank();
 
-        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
 
         assertThat(result).hasSize(1);
@@ -326,7 +414,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name());
         syncMitDatenbank();
 
-        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
 
         assertThat(result).hasSize(1);
@@ -346,7 +434,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 30), TEST_ORG_ID, Debitorherkunft.ZEV.name());
         syncMitDatenbank();
 
-        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
 
         assertThat(result).hasSize(1);
@@ -364,7 +452,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
                 LocalDate.of(2026, 4, 1), LocalDate.of(2026, 6, 30), TEST_ORG_ID, Debitorherkunft.ZEV.name());
         syncMitDatenbank();
 
-        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
 
         assertThat(result).hasSize(2);
@@ -380,7 +468,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name());
         syncMitDatenbank();
 
-        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
 
         assertThat(result).hasSize(2);
@@ -399,7 +487,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
         syncMitDatenbank();
 
         // Ohne aktiven Org-Filter sind beide sichtbar - das Trennen ist Aufgabe des Service
-        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
 
         assertThat(result).hasSize(2);
@@ -416,7 +504,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
             syncMitDatenbank();
         }
 
-        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
 
         assertThat(result).hasSize(1);
@@ -445,7 +533,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
                 Debitorherkunft.NK.name());
         syncMitDatenbank();
 
-        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 1));
 
         assertThat(result).hasSize(2);
@@ -472,7 +560,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
                 Debitorherkunft.NK.name());
         syncMitDatenbank();
 
-        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 1));
 
         assertThat(result).hasSize(2);
@@ -500,7 +588,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
                 Debitorherkunft.ZEV.name());
         syncMitDatenbank();
 
-        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
 
         assertThat(result).hasSize(1);
@@ -516,7 +604,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
                 Debitorherkunft.NK.name());
         syncMitDatenbank();
 
-        Debitor bezahlt = debitorRepository.findByDatumVonBetween(
+        Debitor bezahlt = debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 1)).get(0);
         bezahlt.setZahldatum(LocalDate.of(2027, 1, 20));
         debitorRepository.save(bezahlt);
@@ -527,7 +615,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
                 Debitorherkunft.NK.name());
         syncMitDatenbank();
 
-        List<Debitor> result = debitorRepository.findByDatumVonBetween(
+        List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 1));
 
         assertThat(result).hasSize(1);

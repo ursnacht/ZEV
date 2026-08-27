@@ -49,17 +49,22 @@ public class DebitorService {
     }
 
     /**
-     * Get all debitor entries for the given date range (quarter filter).
+     * Alle Forderungen, deren Zeitraum den gewaehlten um mindestens einen Tag <b>ueberschneidet</b>
+     * (Specs/Debitorkontrolle.md, FR-1).
      *
-     * @param von Start date (inclusive)
-     * @param bis End date (inclusive)
+     * <p>Nicht mehr „{@code datum_von} liegt im gewaehlten Quartal": Eine Nebenkostenabrechnung
+     * laeuft ueber ein ganzes Jahr, ihre Forderung war damit in jedem Quartal ausser dem ersten
+     * unsichtbar — obwohl sie offen ist und den ganzen Zeitraum betrifft.
+     *
+     * @param von Start des gewaehlten Zeitraums (einschliesslich)
+     * @param bis Ende des gewaehlten Zeitraums (einschliesslich)
      * @return List of debitor DTOs with joined mieter and einheit names
      */
     @Transactional(readOnly = true)
     public List<DebitorDTO> getDebitoren(LocalDate von, LocalDate bis) {
         hibernateFilterService.enableOrgFilter();
-        log.info("Loading debitors from {} to {}", von, bis);
-        return debitorRepository.findByDatumVonBetween(von, bis).stream()
+        log.info("Loading debitors overlapping {} to {}", von, bis);
+        return debitorRepository.findByZeitraumUeberschneidung(von, bis).stream()
                 .map(this::toDTO)
                 .toList();
     }

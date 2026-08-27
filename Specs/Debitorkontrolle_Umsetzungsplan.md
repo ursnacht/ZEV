@@ -519,3 +519,26 @@ Lange Menü-Labels wie "Zahldatum löschen" brachen auf zwei Zeilen um, wobei di
 - `.zev-kebab-menu__item` von `display: block` auf `display: flex; align-items: flex-start` umgestellt. Dadurch bildet das Label eine eigene Flex-Spalte rechts neben dem Icon; umbrechende Zeilen richten sich am Zeilenanfang (unter dem ersten Wort) aus statt unter dem Icon.
 - Das bestehende `margin-right` des Icons (`.zev-kebab-menu__item .zev-icon`) wirkt im Flex-Layout als Abstand zwischen Icon und Label.
 - Rein gestalterisch, alle Kebab-Menüs profitieren (kein neues Backend, keine Übersetzung). Nach Änderung: `cd design-system && npm run build`.
+
+### Selektion über Überschneidung statt Stichtag auf `datum_von`
+
+Die Liste zeigt neu alles, was sich mit dem gewählten Zeitraum um mindestens einen Tag
+überschneidet (FR-1, Entscheid vom 27.08.2026). Auslöser war die Nebenkostenabrechnung: Sie läuft
+über ein ganzes Jahr, ihre Forderung beginnt im Januar — und war damit in jedem Quartal ausser dem
+ersten unsichtbar, obwohl sie offen ist und den ganzen Zeitraum betrifft.
+
+- **`DebitorRepository`**: `findByDatumVonBetween` → **`findByZeitraumUeberschneidung`** mit
+  `datum_von <= :bis AND datum_bis >= :von`. Umbenannt, weil der alte Name nach der Änderung das
+  Falsche behauptet hätte; 29 Aufrufstellen mitgezogen.
+- **`DebitorService.getDebitoren`**: unverändert in der Signatur, neue Abfrage, Javadoc mit der
+  Begründung.
+- **Kein DB- und kein Übersetzungsbedarf**, kein Frontend-Eingriff: Die Datumsfelder und der
+  Quartal-Selektor bleiben, nur die Bedeutung der Auswahl ändert sich.
+- **Zwei bestehende Integrationstests hielten die alte Regel fest** und mussten weichen —
+  `shouldFilterOnDatumVonOnly_NotOnOverlap` schon dem Namen nach, dazu
+  `shouldExcludeDebitorenOutsideRange`, dessen Beispiel (31.12.2025–31.01.2026) unter der neuen
+  Regel überschneidet. Ersetzt durch sieben Tests: Beginn vor dem Zeitraum, Ende danach,
+  Umspannung, Jahresforderung in allen vier Quartalen, Berührung von genau einem Tag an beiden
+  Rändern, ein Tag daneben, Einzeltag als Zeitraum.
+- **Nebenbefund, mitkorrigiert:** FR-2 nannte weiterhin den alten Unique-Constraint
+  `(mieter_id, datum_von, org_id)`. Seit V126 gehört die `herkunft` dazu.

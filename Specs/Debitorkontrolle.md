@@ -11,7 +11,20 @@
 1. Beim Generieren von Rechnungen (POST `/api/rechnungen/generate`) erstellt das System automatisch je einen Debitor-Eintrag pro generierter Rechnung **mit Mieter** (Produzenten und Leerstand werden übersprungen).
 2. Der Benutzer öffnet die Seite "Debitorkontrolle" aus dem Menü.
 3. Der Benutzer wählt ein Quartal mit dem Quartal-Selektor (analog Rechnungserstellung, `QuarterSelectorComponent`).
-4. Das System zeigt eine Liste aller Debitor-Einträge für das gewählte Quartal an.
+4. Das System zeigt alle Debitor-Einträge, deren Zeitraum sich mit dem gewählten um **mindestens
+   einen Tag überschneidet** (Entscheid vom 27.08.2026).
+   * Bedingung: `datum_von <= bis AND datum_bis >= von` — beide Grenzen einschliessend. Eine
+     Forderung, die am ersten Tag des gewählten Zeitraums endet, überschneidet ihn um genau einen
+     Tag und erscheint.
+   * **Vorher** war es ein Stichtagsfilter auf `datum_von`. Das war ein bewusster Entscheid und
+     hielt, solange jede Forderung aus einer Quartalsrechnung stammte. Mit der
+     Nebenkostenabrechnung (`Specs/Nebenkosten/RechnungenGenerieren.md`) stimmt es nicht mehr: Sie
+     läuft über ein ganzes Jahr, ihre Forderung beginnt im Januar — und war damit in jedem Quartal
+     ausser dem ersten unsichtbar, obwohl sie offen ist und den ganzen Zeitraum betrifft. Wer im Q3
+     nach offenen Forderungen sah, übersah sie.
+   * **Folge, die in Kauf genommen wird:** Eine Forderung über mehrere Quartale erscheint in jedem
+     davon. Das ist gewollt — sie ist in jedem davon offen. Die Summe der angezeigten Beträge ist
+     dadurch keine Quartalssumme mehr; die Debitorenkontrolle weist auch keine aus.
 5. Der Benutzer kann einzelne Einträge über das Kebab-Menü bearbeiten oder löschen.
 6. Beim Bearbeiten kann insbesondere das Zahldatum erfasst werden.
    - Zusätzlich bietet das Kebab-Menü die Schnellaktionen **Heute**, **Gestern** und **Zahldatum löschen**: Wählt der Benutzer "Heute", wird das Zahldatum des Eintrags sofort auf das aktuelle Datum gesetzt; wählt er "Gestern", auf den Vortag. Mit "Zahldatum löschen" wird das Zahldatum sofort entfernt und der Eintrag wechselt zurück auf den Status "Offen". Alle drei Aktionen werden ohne Öffnen des Formulars direkt gespeichert. "Heute"/"Gestern" setzen den Eintrag auf "Bezahlt". Die Aktion "Zahldatum löschen" wird nur angeboten, wenn ein Zahldatum gesetzt ist.
@@ -27,12 +40,17 @@
   * `datum_bis` (date, Pflicht)
   * `zahldatum` (date, optional)
   * `org_id` (FK → `zev.organisation.id`, Pflicht, Multi-Tenancy)
-* Unique-Constraint: `UNIQUE (mieter_id, datum_von, org_id)` – ermöglicht idempotentes Upsert beim Generieren
+* Unique-Constraint: `UNIQUE (mieter_id, datum_von, herkunft, org_id)` – ermöglicht idempotentes
+  Upsert beim Generieren, **je Herkunft**. Die `herkunft` kam mit V126 dazu, weil eine
+  NK-Jahresabrechnung und die ZEV-Quartalsrechnung denselben `datum_von` haben und die eine Buchung
+  die andere sonst überschrieben hätte (`Specs/Nebenkosten/RechnungenGenerieren.md`, FR-5).
+* `herkunft` (varchar(10), Pflicht, `ZEV` \| `NK`, Default `ZEV`) – Herkunft der Forderung
 * `ON DELETE CASCADE` auf `mieter_id`: Wird ein Mieter gelöscht, werden zugehörige Debitor-Einträge automatisch mitgelöscht
 * Der GET-Endpunkt liefert im `DebitorDTO` die Felder `mieterName` und `einheitName` per JOIN auf `mieter` und `einheit` (keine Denormalisierung)
 * Flyway-Migration für die neue Tabelle
 * REST-Endpunkte unter `/api/debitoren` (`zev_admin`-Rolle):
-  * `GET /api/debitoren?von=...&bis=...` – Liste gefiltert nach Quartal
+  * `GET /api/debitoren?von=...&bis=...` – Liste aller Forderungen, deren Zeitraum sich mit
+    `von`/`bis` überschneidet (FR-1)
   * `POST /api/debitoren` – Manuell erstellen
   * `PUT /api/debitoren/{id}` – Bearbeiten
   * `DELETE /api/debitoren/{id}` – Löschen
@@ -76,7 +94,14 @@
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
             * [x] Beim Generieren von Rechnungen wird für jede Rechnung **mit Mieter** automatisch ein Debitor-Eintrag persistiert (Produzenten und Leerstand werden übersprungen)
 * [x] Die Seite "Debitorkontrolle" ist aus dem Menü mit der Rolle `zev_admin` erreichbar
-* [x] Die Quartal-Auswahl filtert die angezeigte Liste korrekt (Einträge mit `datum_von` im gewählten Quartal)
+* [x] Die Quartal-Auswahl filtert die angezeigte Liste korrekt: Angezeigt wird, was sich mit dem
+      gewählten Zeitraum um mindestens einen Tag überschneidet
+* [x] Ein Eintrag, der **vor** dem Zeitraum beginnt und in ihn hineinragt, erscheint
+* [x] Ein Eintrag, der im Zeitraum beginnt und **darüber hinaus** reicht, erscheint
+* [x] Ein Eintrag, der den ganzen Zeitraum **umspannt**, erscheint
+* [x] Eine Jahresforderung erscheint in **jedem** der vier Quartale
+* [x] Eine Berührung von **genau einem Tag** genügt — an beiden Rändern
+* [x] Ein Tag daneben erscheint **nicht**: Die Grenze ist scharf
 * [x] Beim Öffnen der Seite ist das vorangehende Quartal vorselektiert ("Datum von"/"Datum bis" = erster/letzter Tag des Vorquartals, Quartal-Button aktiv); im Q1 wird Q4 des Vorjahres vorselektiert
 * [x] Die Tabelle zeigt Mieter mit Name und Einheitname in einer Spalte an
 * [x] Einträge ohne Zahldatum werden als "Offen" angezeigt, Einträge mit Zahldatum als "Bezahlt"

@@ -19,15 +19,27 @@ import java.util.Optional;
 public interface DebitorRepository extends JpaRepository<Debitor, Long> {
 
     /**
-     * Find all debitor entries with datum_von within the given range.
-     * Hibernate org filter must be enabled before calling this method.
+     * Alle Forderungen, deren Zeitraum sich mit dem gegebenen um <b>mindestens einen Tag</b>
+     * ueberschneidet (Specs/Debitorkontrolle.md, FR-1).
      *
-     * @param von Start date (inclusive)
-     * @param bis End date (inclusive)
-     * @return List of debitor entries ordered by datum_von
+     * <p>Die Bedingung ist {@code datum_von <= bis AND datum_bis >= von} — beide Grenzen
+     * einschliesslich. Eine Forderung, die am ersten Tag des gewaehlten Zeitraums endet,
+     * ueberschneidet ihn um genau einen Tag und wird angezeigt.
+     *
+     * <p><b>Warum nicht mehr {@code datum_von} im Zeitraum:</b> Eine Nebenkostenabrechnung laeuft
+     * ueber ein ganzes Jahr. Ihre Forderung begann im Januar und war damit in jedem Quartal
+     * ausser dem ersten unsichtbar — obwohl sie offen ist und den ganzen Zeitraum betrifft. Wer im
+     * Q3 nach offenen Forderungen sah, uebersah sie.
+     *
+     * <p>Hibernate org filter must be enabled before calling this method.
+     *
+     * @param von Start des gewaehlten Zeitraums (einschliesslich)
+     * @param bis Ende des gewaehlten Zeitraums (einschliesslich)
+     * @return Forderungen mit Ueberschneidung, nach {@code datum_von} sortiert
      */
-    @Query("SELECT d FROM Debitor d WHERE d.datumVon >= :von AND d.datumVon <= :bis ORDER BY d.datumVon, d.mieterId")
-    List<Debitor> findByDatumVonBetween(
+    @Query("SELECT d FROM Debitor d WHERE d.datumVon <= :bis AND d.datumBis >= :von "
+            + "ORDER BY d.datumVon, d.mieterId")
+    List<Debitor> findByZeitraumUeberschneidung(
         @Param("von") LocalDate von,
         @Param("bis") LocalDate bis
     );
