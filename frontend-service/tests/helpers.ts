@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { expect, Page } from '@playwright/test';
 
 /**
  * tests / helpers.ts
@@ -321,4 +321,56 @@ export function getPreviousQuarter(): { label: string; von: string; bis: string 
         von: format(new Date(year, startMonth, 1)),
         bis: format(new Date(year, startMonth + 3, 0))
     };
+}
+
+/**
+ * Loescht die Zeile, die den Text enthaelt, ueber das Kebab-Menue. Erwartet die geoeffnete,
+ * geladene Liste.
+ *
+ * <p>Liefert `true`, wenn danach keine solche Zeile mehr steht — auch dann, wenn von Anfang an
+ * keine da war. `false` heisst: Der Datensatz steht noch, das Aufraeumen ist gescheitert. Der
+ * Aufrufer soll das im `afterEach` **melden**, nicht auf die Konsole schreiben: Ein Rueckstand ist
+ * ein Befund, und eine gruene Suite ueber einer volllaufenden Datenbank ist schlimmer als ein
+ * roter Test.
+ *
+ * <p>Die Existenzpruefung **wartet**. `isVisible()` fragt ohne zu warten, und die Zeile erscheint
+ * erst mit der Antwort der Listenabfrage; zu frueh gefragt hiess "nicht vorhanden", und der
+ * Datensatz blieb stillschweigend liegen. Genau so entstanden die Rueckstaende, die zuerst in der
+ * Nebenkosten- und dann in der Tarifpositionen-Suite aufgefallen sind.
+ *
+ * @param page    Seite mit der geoeffneten Liste
+ * @param text    Text, den die zu loeschende Zeile enthaelt (typischerweise der Name)
+ * @param timeout Wartezeit je Schritt
+ */
+export async function loescheZeileMitText(page: Page, text: string,
+                                          timeout: number = 10000): Promise<boolean> {
+    page.removeAllListeners('dialog');
+    try {
+        const zeile = page.locator(`tr:has-text("${text}")`);
+
+        const vorhanden = await zeile.first().waitFor({ state: 'visible', timeout })
+            .then(() => true).catch(() => false);
+        if (!vorhanden) {
+            return true;
+        }
+
+        page.once('dialog', async dialog => { await dialog.accept(); });
+
+        // Bewusst der **letzte** gefaehrliche Eintrag und nicht `clickKebabMenuItem`: Eine Zeile
+        // kann mehrere davon tragen - eine bezahlte Forderung bietet "Zahldatum loeschen" UND
+        // "Loeschen", beide als `--danger`. Ein mehrdeutiger Locator wirft im Strict Mode, und der
+        // Datensatz blieb liegen. "Loeschen" steht ueberall zuletzt.
+        const erste = zeile.first();
+        await erste.locator('.zev-kebab-button').click();
+        await erste.locator('.zev-kebab-menu--open').waitFor({ state: 'visible', timeout: 5000 });
+        await erste.locator('.zev-kebab-menu__item--danger').last().click();
+
+        await expect(zeile).toHaveCount(0, { timeout });
+        return true;
+    } catch (error) {
+        console.error(`CLEANUP FEHLGESCHLAGEN: "${text}" - ${error}`);
+        return false;
+    } finally {
+        page.removeAllListeners('dialog');
+    }
 }

@@ -1,5 +1,7 @@
 import { test, expect, Locator, Page } from '@playwright/test';
-import { clickKebabMenuItem, navigateViaMenu, waitForFormResult, waitForTableWithData } from './helpers';
+import {
+    clickKebabMenuItem, loescheZeileMitText, navigateViaMenu, waitForFormResult, waitForTableWithData
+} from './helpers';
 
 /**
  * tests / tarifpositionen.spec.ts
@@ -128,25 +130,16 @@ async function createZusatzTarif(page: Page, bezeichnung: string, einheit: Menge
     await expect(page.locator(`tr:has-text("${bezeichnung}")`)).toBeVisible({ timeout: 10000 });
 }
 
-async function deleteZeileByName(page: Page, route: string, name: string): Promise<void> {
+async function deleteZeileByName(page: Page, route: string, name: string): Promise<boolean> {
     try {
-        page.removeAllListeners('dialog');
         await navigateTo(page, route);
         await closeOpenForm(page);
         await waitForTableWithData(page, 10000);
-
-        const row = page.locator(`tr:has-text("${name}")`).first();
-        if (!await row.isVisible().catch(() => false)) {
-            return;
-        }
-        page.once('dialog', async dialog => { await dialog.accept(); });
-        await clickKebabMenuItem(page, row, 'delete');
-        await row.waitFor({ state: 'hidden', timeout: 10000 }).catch(() =>
-            console.log(`Cleanup: "${name}" ist nach dem Löschen noch sichtbar`));
     } catch (error) {
-        console.log(`Cleanup: Fehler beim Löschen von "${name}": ${error}`);
-        page.removeAllListeners('dialog');
+        console.error(`CLEANUP FEHLGESCHLAGEN: Liste ${route} fuer "${name}" - ${error}`);
+        return false;
     }
+    return loescheZeileMitText(page, name);
 }
 
 // ---------------------------------------------------------------------------
@@ -266,27 +259,50 @@ test.beforeEach(() => {
     einheitenMitPositionen = [];
 });
 
+/**
+ * Raeumt die angelegten Datensaetze ab — und **scheitert sichtbar**, wenn das nicht gelingt.
+ *
+ * <p>Vorher wurde jeder Fehlschlag nur auf die Konsole geschrieben. Genau hier blieben nach einem
+ * Lauf ein Mieter und eine Einheit zurueck, ohne dass die Suite es meldete.
+ *
+ * <p>Reihenfolge zwingend: Positionen sperren Tarif und Mieter, der Mieter sperrt die Einheit.
+ */
 test.afterEach(async ({ page, browserName }) => {
     if (browserName !== 'chromium') {
         return;
     }
-    // Reihenfolge zwingend: Positionen sperren Tarif und Mieter, der Mieter sperrt die Einheit.
+    const gescheitert: string[] = [];
+
+    /** Zweiter Versuch, bevor ein Rueckstand gemeldet wird. */
+    async function raeumeAb(was: string, route: string, name: string): Promise<void> {
+        let erfolg = await deleteZeileByName(page, route, name);
+        if (!erfolg) {
+            erfolg = await deleteZeileByName(page, route, name);
+        }
+        if (!erfolg) {
+            gescheitert.push(`${was} ${name}`);
+        }
+    }
+
     for (const name of [...new Set(einheitenMitPositionen)]) {
         await deletePositionen(page, name);
     }
     for (const name of createdMieterNames) {
-        await deleteZeileByName(page, '/mieter', name);
+        await raeumeAb('Mieter', '/mieter', name);
     }
     for (const name of createdEinheitNames) {
-        await deleteZeileByName(page, '/einheiten', name);
+        await raeumeAb('Einheit', '/einheiten', name);
     }
     for (const name of createdTarifNames) {
-        await deleteZeileByName(page, '/tarife', name);
+        await raeumeAb('Tarif', '/tarife', name);
     }
     einheitenMitPositionen = [];
     createdMieterNames = [];
     createdEinheitNames = [];
     createdTarifNames = [];
+
+    expect(gescheitert,
+        `Testdaten blieben in der Datenbank zurueck: ${gescheitert.join(', ')}`).toEqual([]);
 });
 
 // ---------------------------------------------------------------------------

@@ -453,7 +453,7 @@ async function deletePositionen(page: Page, einheitName: string): Promise<void> 
             await expect(rows).toHaveCount(count - 1, { timeout: 10000 });
         }
     } catch (error) {
-        console.log(`Cleanup: Fehler beim Löschen der Positionen von "${einheitName}": ${error}`);
+        console.error(`CLEANUP FEHLGESCHLAGEN: Fehler beim Löschen der Positionen von "${einheitName}": ${error}`);
         page.removeAllListeners('dialog');
     }
 }

@@ -1,5 +1,8 @@
 import { test, expect, Locator, Page } from '@playwright/test';
-import { clickKebabMenuItem, navigateViaMenu, openKebabMenu, waitForFormResult, waitForTableWithData } from './helpers';
+import {
+    clickKebabMenuItem, loescheZeileMitText, navigateViaMenu, openKebabMenu, waitForFormResult,
+    waitForTableWithData
+} from './helpers';
 
 /**
  * tests / ladestromtarif.spec.ts
@@ -165,31 +168,27 @@ async function createLadestromTarif(page: Page, daten: TarifDaten): Promise<bool
     return waitForFormResult(page, 20000);
 }
 
-async function deleteTarifByName(page: Page, name: string): Promise<void> {
-    try {
-        page.removeAllListeners('dialog');
-        await navigateToTarife(page);
-
-        const form = page.locator('form');
-        if (await form.isVisible().catch(() => false)) {
-            await form.locator('button.zev-button--secondary').click();
+/** Schliesst ein offenes Formular ueber "Abbrechen", falls eines sichtbar ist. */
+async function closeOpenForm(page: Page): Promise<void> {
+    const form = page.locator('form');
+    if (await form.isVisible().catch(() => false)) {
+        const abbrechen = form.locator('button.zev-button--secondary').first();
+        if (await abbrechen.isVisible().catch(() => false)) {
+            await abbrechen.click();
             await expect(form).not.toBeVisible({ timeout: 5000 });
         }
-
-        const row = page.locator(`tr:has-text("${name}")`);
-        if (!await row.first().isVisible().catch(() => false)) {
-            console.log(`Cleanup: Tarif "${name}" nicht gefunden (bereits gelöscht?)`);
-            return;
-        }
-
-        page.once('dialog', async dialog => { await dialog.accept(); });
-        await clickKebabMenuItem(page, row.first(), 'delete');
-        await row.first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() =>
-            console.log(`Cleanup: Tarif "${name}" ist nach dem Löschen noch sichtbar`));
-    } catch (error) {
-        console.log(`Cleanup: Fehler beim Löschen des Tarifs "${name}": ${error}`);
-        page.removeAllListeners('dialog');
     }
+}
+
+async function deleteTarifByName(page: Page, name: string): Promise<boolean> {
+    try {
+        await navigateToTarife(page);
+        await closeOpenForm(page);
+    } catch (error) {
+        console.error(`CLEANUP FEHLGESCHLAGEN: Liste fuer Tarif "${name}" - ${error}`);
+        return false;
+    }
+    return loescheZeileMitText(page, name);
 }
 
 /**
@@ -243,22 +242,15 @@ async function ensureLadestation(page: Page): Promise<void> {
     }
 }
 
-async function deleteEinheitByName(page: Page, name: string): Promise<void> {
+async function deleteEinheitByName(page: Page, name: string): Promise<boolean> {
     try {
-        page.removeAllListeners('dialog');
         await navigateToEinheiten(page);
-        const row = page.locator(`tr:has-text("${name}")`);
-        if (!await row.first().isVisible().catch(() => false)) {
-            return;
-        }
-        page.once('dialog', async dialog => { await dialog.accept(); });
-        await clickKebabMenuItem(page, row.first(), 'delete');
-        await row.first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() =>
-            console.log(`Cleanup: Einheit "${name}" ist nach dem Löschen noch sichtbar`));
+        await closeOpenForm(page);
     } catch (error) {
-        console.log(`Cleanup: Fehler beim Löschen der Einheit "${name}": ${error}`);
-        page.removeAllListeners('dialog');
+        console.error(`CLEANUP FEHLGESCHLAGEN: Liste fuer Einheit "${name}" - ${error}`);
+        return false;
     }
+    return loescheZeileMitText(page, name);
 }
 
 // ---------------------------------------------------------------------------
@@ -302,31 +294,15 @@ async function createMieter(page: Page, daten: MieterDaten): Promise<boolean> {
     return waitForFormResult(page, 20000);
 }
 
-async function deleteMieterByName(page: Page, name: string): Promise<void> {
+async function deleteMieterByName(page: Page, name: string): Promise<boolean> {
     try {
-        page.removeAllListeners('dialog');
         await navigateToMieter(page);
-
-        const form = page.locator('form');
-        if (await form.isVisible().catch(() => false)) {
-            await form.locator('button.zev-button--secondary').click();
-            await expect(form).not.toBeVisible({ timeout: 5000 });
-        }
-
-        const row = page.locator(`tr:has-text("${name}")`);
-        if (!await row.first().isVisible().catch(() => false)) {
-            console.log(`Cleanup: Mieter "${name}" nicht gefunden (bereits gelöscht?)`);
-            return;
-        }
-
-        page.once('dialog', async dialog => { await dialog.accept(); });
-        await clickKebabMenuItem(page, row.first(), 'delete');
-        await row.first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() =>
-            console.log(`Cleanup: Mieter "${name}" ist nach dem Löschen noch sichtbar`));
+        await closeOpenForm(page);
     } catch (error) {
-        console.log(`Cleanup: Fehler beim Löschen des Mieters "${name}": ${error}`);
-        page.removeAllListeners('dialog');
+        console.error(`CLEANUP FEHLGESCHLAGEN: Liste fuer Mieter "${name}" - ${error}`);
+        return false;
     }
+    return loescheZeileMitText(page, name);
 }
 
 /** Stellt den gemeinsam genutzten Testmieter sicher (idempotent, siehe ensureLadestromTarif). */
@@ -503,9 +479,18 @@ test.afterAll(async ({ browser, browserName }) => {
         // Reihenfolge zwingend: Positionen verweisen auf den Tarif (ON DELETE RESTRICT),
         // der Mieter belegt die Einheit (Löschschutz), die Einheit trägt die Positionen.
         await deletePositionen(page, LADESTATION_NAME);
-        await deleteMieterByName(page, MIETER_NAME);
-        await deleteEinheitByName(page, LADESTATION_NAME);
-        await deleteTarifByName(page, TARIF_NAME);
+        const gescheitert: string[] = [];
+        if (!await deleteMieterByName(page, MIETER_NAME)) {
+            gescheitert.push(`Mieter ${MIETER_NAME}`);
+        }
+        if (!await deleteEinheitByName(page, LADESTATION_NAME)) {
+            gescheitert.push(`Einheit ${LADESTATION_NAME}`);
+        }
+        if (!await deleteTarifByName(page, TARIF_NAME)) {
+            gescheitert.push(`Tarif ${TARIF_NAME}`);
+        }
+        expect(gescheitert,
+            `Testdaten blieben in der Datenbank zurueck: ${gescheitert.join(', ')}`).toEqual([]);
     } finally {
         await page.close();
     }
@@ -517,22 +502,43 @@ test.beforeEach(() => {
     einheitenMitPositionen = [];
 });
 
+/**
+ * Raeumt die angelegten Datensaetze ab — und **scheitert sichtbar**, wenn das nicht gelingt.
+ *
+ * <p>Vorher wurde jeder Fehlschlag nur auf die Konsole geschrieben: Die Suite blieb gruen, waehrend
+ * die Datenbank volllief.
+ */
 test.afterEach(async ({ page, browserName }) => {
     if (browserName !== 'chromium') {
         return;
     }
+    const gescheitert: string[] = [];
+
+    async function raeumeAb(was: string, loeschen: () => Promise<boolean>): Promise<void> {
+        let erfolg = await loeschen();
+        if (!erfolg) {
+            erfolg = await loeschen();
+        }
+        if (!erfolg) {
+            gescheitert.push(was);
+        }
+    }
+
     for (const name of einheitenMitPositionen) {
         await deletePositionen(page, name);
     }
     for (const name of createdMieterNames) {
-        await deleteMieterByName(page, name);
+        await raeumeAb(`Mieter ${name}`, () => deleteMieterByName(page, name));
     }
     for (const name of createdTarifNames) {
-        await deleteTarifByName(page, name);
+        await raeumeAb(`Tarif ${name}`, () => deleteTarifByName(page, name));
     }
     einheitenMitPositionen = [];
     createdMieterNames = [];
     createdTarifNames = [];
+
+    expect(gescheitert,
+        `Testdaten blieben in der Datenbank zurueck: ${gescheitert.join(', ')}`).toEqual([]);
 });
 
 // ---------------------------------------------------------------------------

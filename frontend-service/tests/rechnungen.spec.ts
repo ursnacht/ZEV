@@ -1,5 +1,7 @@
 import { test as baseTest, expect, Locator, Page } from '@playwright/test';
-import { getPreviousQuarter, navigateViaMenu, waitForFormResult, waitForTableWithData } from './helpers';
+import {
+    getPreviousQuarter, loescheZeileMitText, navigateViaMenu, waitForFormResult, waitForTableWithData
+} from './helpers';
 
 /**
  * tests / rechnungen.spec.ts
@@ -53,20 +55,25 @@ const test = baseTest.extend<{ tarifTracker: TarifTracker }>({
             return;
         }
 
-        page.removeAllListeners('dialog');
-        await navigateToTarife(page);
-
+        // Raeumt auf und **meldet** Rueckstaende: Vorher wurde ein nicht gefundener Tarif als
+        // "bereits geloescht" auf die Konsole geschrieben und uebersprungen - `isVisible()` fragt
+        // aber ohne zu warten, und die Zeile erscheint erst mit der Antwort der Listenabfrage.
+        // Die Suite blieb gruen, waehrend die Datenbank volllief.
+        const gescheitert: string[] = [];
         for (const name of tracker.names) {
-            const row = page.locator(`tr:has-text("${name}")`).first();
-            if (!await row.isVisible().catch(() => false)) {
-                console.log(`Cleanup: Tarif "${name}" nicht gefunden (bereits geloescht)`);
-                continue;
+            await navigateToTarife(page);
+            let erfolg = await loescheZeileMitText(page, name);
+            if (!erfolg) {
+                await navigateToTarife(page);
+                erfolg = await loescheZeileMitText(page, name);
             }
-            page.once('dialog', dialog => dialog.accept());
-            await row.locator('.zev-kebab-button').click();
-            await row.locator('.zev-kebab-menu__item--danger').click();
-            await expect(row).not.toBeVisible({ timeout: 10000 });
+            if (!erfolg) {
+                gescheitert.push(name);
+            }
         }
+
+        expect(gescheitert,
+            `Testdaten blieben in der Datenbank zurueck: ${gescheitert.join(', ')}`).toEqual([]);
     }
 });
 

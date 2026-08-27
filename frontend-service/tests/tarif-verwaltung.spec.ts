@@ -1,5 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
-import { navigateViaMenu, clickKebabMenuItem, waitForFormResult, waitForTableWithData } from './helpers';
+import {
+    clickKebabMenuItem, loescheZeileMitText, navigateViaMenu, waitForFormResult, waitForTableWithData
+} from './helpers';
 
 /**
  * tests / tarif-verwaltung.spec.ts
@@ -137,51 +139,33 @@ async function createTarifOrFail(page: Page, data: {
 }
 
 /**
- * Helper to delete a tariff by name
+ * Loescht einen Tarif ueber das Kebab-Menue. Liefert `true`, wenn danach keine Zeile mehr steht.
+ *
+ * <p>Wartet zusaetzlich auf die DELETE-Antwort: Sie ist das verlaessliche Signal dafuer, dass der
+ * Server den Tarif wirklich entfernt hat - eine verschwundene Zeile allein koennte auch ein
+ * Neuladen der Liste sein.
  */
-async function deleteTarifByName(page: Page, name: string): Promise<void> {
+async function deleteTarifByName(page: Page, name: string): Promise<boolean> {
     try {
-        page.removeAllListeners('dialog');
-
         await navigateToTarife(page);
-
-        // Cancel any open form first
-        const cancelButton = page.locator('button.zev-button--secondary').first();
-        const form = page.locator('form');
-        if (await form.isVisible().catch(() => false)
-            && await cancelButton.isVisible().catch(() => false)) {
-            await cancelButton.click();
-            await page.waitForTimeout(300);
-        }
-
+        await closeOpenForm(page);
         await waitForTableWithData(page, 10000);
-
-        const tarifRow = page.locator(`tr:has-text("${name}")`).first();
-        if (!await tarifRow.isVisible().catch(() => false)) {
-            return;
-        }
-
-        // Set up dialog handler BEFORE clicking, use once() to avoid accumulation
-        page.once('dialog', async dialog => { await dialog.accept(); });
-
-        // Wait for DELETE API response as reliable completion signal
-        const deleteResponsePromise = page.waitForResponse(
-            resp => resp.url().includes('/api/tarife') && resp.request().method() === 'DELETE',
-            { timeout: 10000 }
-        );
-
-        await clickKebabMenuItem(page, tarifRow, 'delete');
-
-        await deleteResponsePromise.catch(() =>
-            console.log(`Cleanup: Keine DELETE-Antwort fuer "${name}"`)
-        );
-
-        await tarifRow.waitFor({ state: 'hidden', timeout: 5000 }).catch(() =>
-            console.log(`Cleanup: Tarif "${name}" ist nach dem Loeschen noch sichtbar`)
-        );
     } catch (error) {
-        console.log(`Cleanup: Fehler beim Loeschen des Tarifs "${name}": ${error}`);
-        page.removeAllListeners('dialog');
+        console.error(`CLEANUP FEHLGESCHLAGEN: Tarifliste fuer "${name}" - ${error}`);
+        return false;
+    }
+    return loescheZeileMitText(page, name);
+}
+
+/** Schliesst ein offenes Formular ueber "Abbrechen", falls eines sichtbar ist. */
+async function closeOpenForm(page: Page): Promise<void> {
+    const form = page.locator('form');
+    if (await form.isVisible().catch(() => false)) {
+        const cancelButton = form.locator('button.zev-button--secondary').first();
+        if (await cancelButton.isVisible().catch(() => false)) {
+            await cancelButton.click();
+            await expect(form).not.toBeVisible({ timeout: 5000 });
+        }
     }
 }
 
@@ -227,11 +211,28 @@ async function runValidation(page: Page, modus: 'quartale' | 'jahre'): Promise<{
 /**
  * Cleanup function to delete all created tariffs
  */
+/**
+ * Raeumt die angelegten Tarife ab — und **scheitert sichtbar**, wenn das nicht gelingt.
+ *
+ * <p>Vorher wurde jeder Fehlschlag nur auf die Konsole geschrieben: Die Suite blieb gruen, waehrend
+ * die Datenbank volllief. Ein zweiter Versuch davor, weil ein einzelnes Loeschen an einer stehenden
+ * Meldung oder einem offenen Formular scheitern kann.
+ */
 async function cleanupCreatedTariffs(page: Page): Promise<void> {
+    const gescheitert: string[] = [];
     for (const name of createdTarifNames) {
-        await deleteTarifByName(page, name);
+        let erfolg = await deleteTarifByName(page, name);
+        if (!erfolg) {
+            erfolg = await deleteTarifByName(page, name);
+        }
+        if (!erfolg) {
+            gescheitert.push(name);
+        }
     }
     createdTarifNames = [];
+
+    expect(gescheitert,
+        `Testdaten blieben in der Datenbank zurueck: ${gescheitert.join(', ')}`).toEqual([]);
 }
 
 // Reset tracking before each test

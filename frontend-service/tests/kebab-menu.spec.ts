@@ -1,5 +1,8 @@
 import { test as baseTest, expect, Locator, Page } from '@playwright/test';
-import { navigateViaMenu, openKebabMenu, closeKebabMenu, closeKebabMenuWithEsc, clickKebabMenuItem, waitForFormResult, waitForTableWithData } from './helpers';
+import {
+    clickKebabMenuItem, closeKebabMenu, closeKebabMenuWithEsc, loescheZeileMitText, navigateViaMenu,
+    openKebabMenu, waitForFormResult, waitForTableWithData
+} from './helpers';
 
 /**
  * tests / kebab-menu.spec.ts
@@ -37,48 +40,24 @@ const test = baseTest.extend<{ tarifTracker: TarifTracker }>({
             return;
         }
 
-        try {
-            page.removeAllListeners('dialog');
+        // Raeumt auf und **meldet** Rueckstaende. Vorher lief das ueber `isVisible()` - das fragt
+        // ohne zu warten - und schrieb jeden Fehlschlag nur auf die Konsole: Die Suite blieb gruen,
+        // waehrend die Datenbank volllief.
+        const gescheitert: string[] = [];
+        for (const tarifName of [...tracker.names]) {
             await navigateToTarife(page);
-
-            const form = page.locator('form');
-            if (await form.isVisible().catch(() => false)) {
-                const cancelButton = page.locator('button.zev-button--secondary');
-                if (await cancelButton.isVisible().catch(() => false)) {
-                    await cancelButton.click();
-                    await page.waitForTimeout(500);
-                }
+            let erfolg = await loescheZeileMitText(page, tarifName);
+            if (!erfolg) {
+                await navigateToTarife(page);
+                erfolg = await loescheZeileMitText(page, tarifName);
             }
-
-            await waitForTableWithData(page, 5000);
-
-            for (const tarifName of [...tracker.names]) {
-                console.log(`Cleanup: Deleting tariff "${tarifName}"`);
-
-                const tarifRow = page.locator(`tr:has-text("${tarifName}")`);
-                if (await tarifRow.isVisible().catch(() => false)) {
-                    page.once('dialog', async dialog => {
-                        await dialog.accept();
-                    });
-
-                    const kebabButton = tarifRow.locator('.zev-kebab-button');
-                    await kebabButton.click();
-                    await page.waitForTimeout(300);
-
-                    const deleteItem = tarifRow.locator('.zev-kebab-menu__item--danger');
-                    await deleteItem.click();
-
-                    await page.waitForTimeout(1500);
-                    console.log(`Cleanup: Deleted tariff "${tarifName}"`);
-                } else {
-                    console.log(`Cleanup: Tariff "${tarifName}" not found (already deleted)`);
-                }
+            if (!erfolg) {
+                gescheitert.push(tarifName);
             }
-            console.log('Cleanup: All tracked test tariffs processed');
-        } catch (error) {
-            console.log(`Cleanup error: ${error}`);
-            page.removeAllListeners('dialog');
         }
+
+        expect(gescheitert,
+            `Testdaten blieben in der Datenbank zurueck: ${gescheitert.join(', ')}`).toEqual([]);
     }
 });
 

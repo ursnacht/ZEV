@@ -92,6 +92,24 @@ async function fuelleKopf(page: Page, bezeichnung: string): Promise<void> {
     await page.locator('#anzahlWohnungen').fill(ANZAHL_WOHNUNGEN);
 }
 
+/**
+ * Wartet auf das Ergebnis eines Speichervorgangs und nennt im Fehlerfall die **Meldung**.
+ *
+ * `waitForFormResult` liefert `false`, wenn eine FEHLERmeldung sichtbar ist — nicht, wenn keine
+ * Meldung kommt (dann wirft es selbst). Ohne diesen Helfer stand im Report nur
+ * `Expected: true / Received: false`; der Meldungstext steht nicht im Snapshot von Playwright und
+ * war nach einem gelungenen Retry gar nicht mehr rekonstruierbar. Genau daran hing ein Flaky-Fall
+ * dieser Suite.
+ */
+async function erwarteErfolg(page: Page, was: string): Promise<void> {
+    if (await waitForFormResult(page, 20000)) {
+        return;
+    }
+    const meldung = await page.locator('.zev-message--error').first().textContent()
+        .catch(() => '');
+    throw new Error(`${was}: Speichern abgewiesen — "${meldung?.trim()}"`);
+}
+
 /** Die Speichern-Schaltfläche am Ende der Maske. */
 function speichernUnten(page: Page) {
     return page.locator('.zev-form-actions .zev-button--primary');
@@ -104,7 +122,7 @@ async function erstelleAbrechnung(page: Page, bezeichnung: string): Promise<void
     await fuelleKopf(page, bezeichnung);
     await clearMessages(page);
     await speichernUnten(page).click();
-    expect(await waitForFormResult(page)).toBe(true);
+    await erwarteErfolg(page, 'Abrechnung anlegen');
 }
 
 /**
@@ -218,7 +236,7 @@ async function schliesseAbrechnungAb(page: Page, bezeichnung: string): Promise<v
     await clearMessages(page);
     // Abschliessen fragt bewusst NICHT nach - es ist jederzeit umkehrbar.
     await zeile.locator('input[type="checkbox"]').check();
-    expect(await waitForFormResult(page)).toBe(true);
+    await erwarteErfolg(page, 'Abrechnung abschliessen');
     await clearMessages(page);
 }
 
@@ -541,7 +559,7 @@ test.describe('Nebenkostenabrechnung - Positionen', () => {
 
         await clearMessages(page);
         await speichernUnten(page).click();
-        expect(await waitForFormResult(page)).toBe(true);
+        await erwarteErfolg(page, 'Umlage-Position speichern');
 
         // Kontrollzahlen: Der Nenner ist absichtlich zu gross, es bleibt also etwas unverteilt.
         const kontrolle = page.locator('.nk-kontrolle tbody tr').first();
@@ -578,7 +596,7 @@ test.describe('Nebenkostenabrechnung - Positionen', () => {
 
         await clearMessages(page);
         await speichernUnten(page).click();
-        expect(await waitForFormResult(page)).toBe(true);
+        await erwarteErfolg(page, 'Anteil-Position speichern');
 
         // Nach dem Speichern zeigt die Maske die Werte des Servers - derselbe Betrag.
         const blockNachher = await oeffneErstenMieterblock(page);
@@ -599,7 +617,7 @@ test.describe('Nebenkostenabrechnung - Positionen', () => {
 
         await clearMessages(page);
         await speichernUnten(page).click();
-        expect(await waitForFormResult(page)).toBe(true);
+        await erwarteErfolg(page, 'Verbrauch-Position speichern');
 
         // Frisch geladener Zustand: Das Feld muss ohne weitere Eingabe bedienbar sein. Erreicht
         // ueber Verlassen und Wiederoeffnen - die Maske wird neu aufgebaut und laedt die Daten
@@ -642,7 +660,7 @@ test.describe('Nebenkostenabrechnung - abgerechnet', () => {
         let dialogErschien = false;
         page.on('dialog', async dialog => { dialogErschien = true; await dialog.accept(); });
         await zeile.locator('input[type="checkbox"]').check();
-        expect(await waitForFormResult(page)).toBe(true);
+        await erwarteErfolg(page, 'Abrechnung abschliessen');
         expect(dialogErschien).toBe(false);
         page.removeAllListeners('dialog');
 
@@ -671,7 +689,7 @@ test.describe('Nebenkostenabrechnung - abgerechnet', () => {
         await clearMessages(page);
 
         await zeile.locator('input[type="checkbox"]').check();
-        expect(await waitForFormResult(page)).toBe(true);
+        await erwarteErfolg(page, 'Abrechnung abschliessen');
         await clearMessages(page);
 
         // Das Oeffnen einer abgeschlossenen Abrechnung fragt zurueck.
@@ -679,7 +697,7 @@ test.describe('Nebenkostenabrechnung - abgerechnet', () => {
         page.on('dialog', async dialog => { dialogErschien = true; await dialog.accept(); });
         await page.locator(`tr:has-text("${bezeichnung}")`).locator('input[type="checkbox"]')
             .uncheck();
-        expect(await waitForFormResult(page)).toBe(true);
+        await erwarteErfolg(page, 'Abrechnung wieder oeffnen');
         expect(dialogErschien).toBe(true);
         page.removeAllListeners('dialog');
     });
@@ -770,7 +788,7 @@ test.describe('Nebenkostenabrechnung - Rechnungen', () => {
 
         await clearMessages(page);
         await speichernUnten(page).click();
-        expect(await waitForFormResult(page)).toBe(true);
+        await erwarteErfolg(page, 'Anteil je Mieter speichern');
         await page.locator('.zev-form-actions .zev-button--secondary').last().click();
 
         await schliesseAbrechnungAb(page, bezeichnung);
@@ -797,12 +815,22 @@ test.describe('Nebenkostenabrechnung - Rechnungen', () => {
         const pdfAntwort = page.waitForResponse(
             res => res.url().includes('/pdf') && res.request().method() === 'GET',
             { timeout: 30000 });
+        // Der Klick loest zusaetzlich einen echten Browser-Download aus. Er muss abgewartet
+        // werden, bevor navigiert wird: In Firefox scheiterte das anschliessende `page.goto`
+        // sonst mit „Download is starting" — die Navigation fiel in den Beginn des Downloads.
+        const download = page.waitForEvent('download', { timeout: 30000 }).catch(() => null);
         await zeilen.first().locator('.zev-button--secondary').click();
         const pdf = await pdfAntwort;
         expect(pdf.status()).toBe(200);
         expect(pdf.headers()['content-type']).toContain('application/pdf');
         // Der Dateiname ist lesbar und nicht der Ablageschluessel aus zwei IDs.
         expect(pdf.headers()['content-disposition']).toContain('Nebenkosten');
+
+        // Download abgeschlossen (oder es gab keinen) — erst danach ist Navigieren sicher.
+        const abgelegt = await download;
+        if (abgelegt) {
+            await abgelegt.path();
+        }
 
         // --- Forderung in der Debitorenkontrolle ---
         await oeffneDebitorenImTestzeitraum(page);
@@ -833,7 +861,7 @@ test.describe('Nebenkostenabrechnung - Rechnungen', () => {
         await block.locator('.nk-mieterzeilen input[type="number"]').first().fill('50');
         await clearMessages(page);
         await speichernUnten(page).click();
-        expect(await waitForFormResult(page)).toBe(true);
+        await erwarteErfolg(page, 'Anteil je Mieter speichern');
         await page.locator('.zev-form-actions .zev-button--secondary').last().click();
 
         await schliesseAbrechnungAb(page, bezeichnung);

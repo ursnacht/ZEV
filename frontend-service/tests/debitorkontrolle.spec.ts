@@ -1,5 +1,8 @@
 import { test, expect, Locator, Page } from '@playwright/test';
-import { getPreviousQuarter, navigateViaMenu, clickKebabMenuItem, waitForFormResult, waitForTableWithData } from './helpers';
+import {
+    clickKebabMenuItem, getPreviousQuarter, loescheZeileMitText, navigateViaMenu, waitForFormResult,
+    waitForTableWithData
+} from './helpers';
 
 /**
  * tests / debitorkontrolle.spec.ts
@@ -201,6 +204,17 @@ async function submitAndExpectSuccess(page: Page, was: string): Promise<void> {
 async function createDebitorOrFail(page: Page, daten: {
     von: string; bis: string; betrag: string; zahldatum?: string;
 }): Promise<Locator> {
+    // Erst einen Rest eines abgebrochenen Vorlaufs im eigenen Fenster raeumen: Eine Forderung ist
+    // ueber (`mieter_id`, `datum_von`, `herkunft`, `org_id`) eindeutig, eine Neuanlage auf einen
+    // belegten Schluessel weist das Backend ab. Genau das passierte, nachdem ein Lauf beim
+    // Aufraeumen gescheitert war — der naechste Lauf scheiterte dann schon beim Anlegen, und der
+    // Rest blieb erneut liegen. Der Zeitraum ist je Test und Browser-Projekt disjunkt, hier wird
+    // also nur der eigene Rest entfernt.
+    await setDateRange(page, daten.von, daten.bis);
+    if (!await loescheZeileMitText(page, formatToSwiss(daten.von), 2000)) {
+        throw new Error(`Rest im eigenen Zeitfenster ${formatToSwiss(daten.von)} nicht entfernbar`);
+    }
+
     await openCreateForm(page);
     const mieterId = await mieterIdOrFail(page);
     await fillDebitorForm(page, {
@@ -239,27 +253,18 @@ async function clickDeleteInKebab(page: Page, row: Locator): Promise<void> {
  * Delete a debitor row that contains the given datumVon date text (nur Aufräumen — hier darf
  * nachsichtig gearbeitet werden, ein Fehlschlag soll den Test nicht überschreiben).
  */
-async function deleteDebitorByDate(page: Page, datumVon: string): Promise<void> {
+async function deleteDebitorByDate(page: Page, datumVon: string): Promise<boolean> {
     const swissDate = formatToSwiss(datumVon);
     try {
-        page.removeAllListeners('dialog');
         await navigateToDebitorkontrolle(page);
         // Use the whole year as range to safely find any test entry regardless of month
         const year = datumVon.substring(0, 4);
         await setDateRange(page, `${year}-01-01`, `${year}-12-31`);
-
-        const row = page.locator(`tr:has-text("${swissDate}")`).first();
-        if (!await row.isVisible().catch(() => false)) {
-            return;
-        }
-        page.once('dialog', async dialog => { await dialog.accept(); });
-        await clickDeleteInKebab(page, row);
-        await row.waitFor({ state: 'hidden', timeout: 10000 }).catch(() =>
-            console.log(`Cleanup: Debitor "${swissDate}" ist nach dem Löschen noch sichtbar`));
     } catch (error) {
-        console.log(`Cleanup: Fehler beim Löschen von "${swissDate}": ${error}`);
-        page.removeAllListeners('dialog');
+        console.error(`CLEANUP FEHLGESCHLAGEN: Liste fuer Debitor "${swissDate}" - ${error}`);
+        return false;
     }
+    return loescheZeileMitText(page, swissDate);
 }
 
 /**
@@ -274,11 +279,27 @@ test.beforeEach(() => {
     createdDebitorDates = [];
 });
 
+/**
+ * Raeumt die angelegten Forderungen ab — und **scheitert sichtbar**, wenn das nicht gelingt.
+ *
+ * <p>Vorher wurde jeder Fehlschlag nur auf die Konsole geschrieben: Die Suite blieb gruen, waehrend
+ * die Datenbank volllief.
+ */
 test.afterEach(async ({ page }) => {
+    const gescheitert: string[] = [];
     for (const date of createdDebitorDates) {
-        await deleteDebitorByDate(page, date);
+        let erfolg = await deleteDebitorByDate(page, date);
+        if (!erfolg) {
+            erfolg = await deleteDebitorByDate(page, date);
+        }
+        if (!erfolg) {
+            gescheitert.push(date);
+        }
     }
     createdDebitorDates = [];
+
+    expect(gescheitert,
+        `Testdaten blieben in der Datenbank zurueck: ${gescheitert.join(', ')}`).toEqual([]);
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
