@@ -451,131 +451,131 @@ daneben.
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
 **Auslösung**
-* [ ] Im Kebab-Menü einer Zeile mit gesetztem `abgerechnet` steht der Eintrag
+* [x] Im Kebab-Menü einer Zeile mit gesetztem `abgerechnet` steht der Eintrag
       **Rechnungen erstellen**.
-* [ ] Auf einer Zeile **ohne** `abgerechnet` fehlt der Eintrag; die übrigen Einträge sind
+* [x] Auf einer Zeile **ohne** `abgerechnet` fehlt der Eintrag; die übrigen Einträge sind
       unverändert vorhanden.
-* [ ] Der Eintrag steht vor `LOESCHEN`.
-* [ ] Ein Klick fragt zurück; bei Abbruch passiert nichts — kein Aufruf, keine Forderung.
-* [ ] Die Zeilen-Menüs werden **nicht** je Änderungserkennung neu erzeugt: Die Konsole zeigt kein
+* [x] Der Eintrag steht vor `LOESCHEN`.
+* [x] Ein Klick fragt zurück; bei Abbruch passiert nichts — kein Aufruf, keine Forderung.
+* [x] Die Zeilen-Menüs werden **nicht** je Änderungserkennung neu erzeugt: Die Konsole zeigt kein
       `NG0956`, und zwei Aufrufe der Menü-Methode für dieselbe Zeile liefern dasselbe Objekt.
-* [ ] Auf `/rechnungen` gibt es **keinen** Umschalter der Rechnungsart; die Seite verhält sich wie
+* [x] Auf `/rechnungen` gibt es **keinen** Umschalter der Rechnungsart; die Seite verhält sich wie
       vor dieser Änderung, ergänzt um den Hinweis auf den NK-Bereich.
 
 **Erzeugung**
-* [ ] Ein Lauf über eine Abrechnung mit *n* Mietern erzeugt *n* PDF und *n* Ergebniszeilen.
-* [ ] Jede Ergebniszeile bietet den Download ihrer Rechnung an; die Datei ist ein PDF
+* [x] Ein Lauf über eine Abrechnung mit *n* Mietern erzeugt *n* PDF und *n* Ergebniszeilen.
+* [x] Jede Ergebniszeile bietet den Download ihrer Rechnung an; die Datei ist ein PDF
       (beginnt mit `%PDF`).
-* [ ] Die Beträge im PDF entsprechen denen der Abrechnungsmaske — es wird nicht neu gerechnet.
-* [ ] Der Endbetrag ist ein Vielfaches von 5 Rappen; die Differenz erscheint als **Rundung**.
-* [ ] Bei Saldo ≤ 0 fehlt der QR-Zahlteil im PDF.
-* [ ] Die Akonto-Zeile nennt Monate und Betrag je Monat: `Akonto total (12 x 50.00)`.
-* [ ] Bei einer Korrektur steht sie mit Vorzeichen dahinter: `Akonto total (13 x 130.00, -50.00)`.
-* [ ] Ohne Korrektur erscheint **keine** `0.00` in der Klammer.
-* [ ] Beide Fälle sind über den **gefüllten** Bericht geprüft, nicht nur über das Kompilieren —
+* [x] Die Beträge im PDF entsprechen denen der Abrechnungsmaske — es wird nicht neu gerechnet.
+* [x] Der Endbetrag ist ein Vielfaches von 5 Rappen; die Differenz erscheint als **Rundung**.
+* [x] Bei Saldo ≤ 0 fehlt der QR-Zahlteil im PDF.
+* [x] Die Akonto-Zeile nennt Monate und Betrag je Monat: `Akonto total (12 x 50.00)`.
+* [x] Bei einer Korrektur steht sie mit Vorzeichen dahinter: `Akonto total (13 x 130.00, -50.00)`.
+* [x] Ohne Korrektur erscheint **keine** `0.00` in der Klammer.
+* [x] Beide Fälle sind über den **gefüllten** Bericht geprüft, nicht nur über das Kompilieren —
       der Ausdruck läuft erst beim Füllen.
-* [ ] Das Ergebnis-Panel nennt Zahl der Rechnungen, Zahl der Forderungen und deren Summe getrennt.
-* [ ] Ein zweiter Lauf **ersetzt** das Panel; es stehen nicht zwei Ergebnislisten untereinander.
-* [ ] Das Panel verschwindet beim Neuladen der Liste und beim Öffnen der Erfassungsmaske.
-* [ ] Ein NK-Lauf macht die Downloads eines vorangegangenen **ZEV**-Laufs nicht ungültig, und ein
+* [x] Das Ergebnis-Panel nennt Zahl der Rechnungen, Zahl der Forderungen und deren Summe getrennt.
+* [x] Ein zweiter Lauf **ersetzt** das Panel; es stehen nicht zwei Ergebnislisten untereinander.
+* [x] Das Panel verschwindet beim Neuladen der Liste und beim Öffnen der Erfassungsmaske.
+* [x] Ein NK-Lauf macht die Downloads eines vorangegangenen **ZEV**-Laufs nicht ungültig, und ein
       ZEV-Lauf nicht die eines NK-Laufs (`clearArt` trifft nur die eigene Art).
-* [ ] Eine ZEV-Einheit mit dem Namen **„nk 12"** und `mieterId = 45` überschreibt **nicht** das PDF
+* [x] Eine ZEV-Einheit mit dem Namen **„nk 12"** und `mieterId = 45` überschreibt **nicht** das PDF
       der NK-Abrechnung 12 für Mieter 45 — die Namensräume sind getrennt, nicht bloss verschieden
       benannt.
-* [ ] Der Download liefert den **gespeicherten** Dateinamen (lesbar, z.B.
+* [x] Der Download liefert den **gespeicherten** Dateinamen (lesbar, z.B.
       `Nebenkosten_2026_Muster_Hans.pdf`); der Dateiname einer ZEV-Rechnung ist unverändert.
-* [ ] Ein abgelaufener Download führt zu einem übersetzten Hinweis (`NK_RECHNUNG_ABGELAUFEN`),
+* [x] Ein abgelaufener Download führt zu einem übersetzten Hinweis (`NK_RECHNUNG_ABGELAUFEN`),
       nicht zu einem stummen Fehlschlag.
-* [ ] Scheitert das Ablegen des PDF nach der Buchung, bleibt die Forderung bestehen und die Zeile
+* [x] Scheitert das Ablegen des PDF nach der Buchung, bleibt die Forderung bestehen und die Zeile
       trägt `NK_FEHLER_RECHNUNG_MIETER`; die übrigen Mieter sind davon nicht betroffen.
 
 **Zahlenformatierung**
-* [ ] Beträge im Ergebnis-Panel erscheinen als `1'234.55` — Punkt als Dezimaltrenner, Hochkomma
+* [x] Beträge im Ergebnis-Panel erscheinen als `1'234.55` — Punkt als Dezimaltrenner, Hochkomma
       (ASCII `'`) als Tausendertrenner, unabhängig von der Browser-Locale.
-* [ ] Beträge im PDF erscheinen im selben Format; das `.jrxml` enthält **kein** `pattern`-Attribut
+* [x] Beträge im PDF erscheinen im selben Format; das `.jrxml` enthält **kein** `pattern`-Attribut
       auf einem Betragsfeld.
-* [ ] Die Betragsfelder von Empfangsschein und Zahlteil folgen dem QR-Standard, nicht dieser Regel.
-* [ ] Die Betragsspalte des Panels benennt **Nachzahlung** bzw. **Guthaben** im Text und verlässt
+* [x] Die Betragsfelder von Empfangsschein und Zahlteil folgen dem QR-Standard, nicht dieser Regel.
+* [x] Die Betragsspalte des Panels benennt **Nachzahlung** bzw. **Guthaben** im Text und verlässt
       sich nicht auf das Vorzeichen; verwendet werden die bestehenden Schlüssel `NK_NACHZAHLUNG`
       und `NK_GUTHABEN`.
 
 **Debitoren**
-* [ ] Für jeden Mieter mit Saldo > 0 entsteht ein Debitor mit `herkunft = NK`, dem gerundeten
+* [x] Für jeden Mieter mit Saldo > 0 entsteht ein Debitor mit `herkunft = NK`, dem gerundeten
       Saldo und dem Zeitraum der Abrechnung.
-* [ ] Für Saldo ≤ 0 entsteht **kein** Debitor; die Ergebniszeile weist das aus.
-* [ ] Ein zweiter Lauf über dieselbe Abrechnung erzeugt **keine** zweite Forderung, sondern
+* [x] Für Saldo ≤ 0 entsteht **kein** Debitor; die Ergebniszeile weist das aus.
+* [x] Ein zweiter Lauf über dieselbe Abrechnung erzeugt **keine** zweite Forderung, sondern
       aktualisiert die bestehende (Upsert je Herkunft).
-* [ ] Ein NK-Lauf **überschreibt keine ZEV-Forderung** desselben Mieters mit demselben
+* [x] Ein NK-Lauf **überschreibt keine ZEV-Forderung** desselben Mieters mit demselben
       `datum_von` — beide Einträge bestehen nebeneinander.
-* [ ] Ein Debitor mit gesetztem `zahldatum` wird von einem erneuten Lauf **nicht** verändert
+* [x] Ein Debitor mit gesetztem `zahldatum` wird von einem erneuten Lauf **nicht** verändert
       (bestehendes Upsert-Verhalten).
-* [ ] Die Debitorenliste zeigt die Spalte **Herkunft** als übersetztes Badge.
-* [ ] Der Herkunft-Filter zeigt bei **ZEV** nur ZEV-Einträge, bei **NK** nur NK-Einträge, bei
+* [x] Die Debitorenliste zeigt die Spalte **Herkunft** als übersetztes Badge.
+* [x] Der Herkunft-Filter zeigt bei **ZEV** nur ZEV-Einträge, bei **NK** nur NK-Einträge, bei
       **Alle** beide.
-* [ ] Die Option **NK** erscheint bei gesetztem Flag immer — auch wenn im Zeitraum keine
+* [x] Die Option **NK** erscheint bei gesetztem Flag immer — auch wenn im Zeitraum keine
       NK-Forderung steht.
-* [ ] Alle bestehenden Debitoren tragen nach der Migration `herkunft = ZEV`.
-* [ ] Ein manuell erfasster Debitor bekommt eine Herkunft; das Formular gibt `ZEV` vor.
-* [ ] `POST /api/debitoren` **ohne** `herkunft` legt den Eintrag mit `ZEV` an (kein `400`).
-* [ ] `POST /api/debitoren` mit einem **unbekannten** Wert antwortet mit `400`, nicht mit `500`.
-* [ ] **Regression ZEV:** Ein ZEV-Lauf bucht nach der Migration weiterhin seine Forderung. Die
+* [x] Alle bestehenden Debitoren tragen nach der Migration `herkunft = ZEV`.
+* [x] Ein manuell erfasster Debitor bekommt eine Herkunft; das Formular gibt `ZEV` vor.
+* [x] `POST /api/debitoren` **ohne** `herkunft` legt den Eintrag mit `ZEV` an (kein `400`).
+* [x] `POST /api/debitoren` mit einem **unbekannten** Wert antwortet mit `400`, nicht mit `500`.
+* [x] **Regression ZEV:** Ein ZEV-Lauf bucht nach der Migration weiterhin seine Forderung. Die
       `ON CONFLICT`-Klausel in `DebitorRepository:49` ist im Gleichschritt mit dem Unique-Key
       angepasst — bleibt sie auf `(mieter_id, datum_von, org_id)`, scheitert **jeder** Upsert mit
       „no unique or exclusion constraint matching the ON CONFLICT specification", auch der
       ZEV-seitige.
 
 **Sicherheit**
-* [ ] `POST /api/nebenkosten/abrechnungen/{id}/rechnungen` verlangt `nebenkosten:manage` **und**
+* [x] `POST /api/nebenkosten/abrechnungen/{id}/rechnungen` verlangt `nebenkosten:manage` **und**
       `rechnungen:manage`; fehlt eine der beiden, antwortet der Endpunkt mit `403`.
-* [ ] Bei ausgeschaltetem Feature-Flag antwortet der Endpunkt mit `403` — auch mit beiden
+* [x] Bei ausgeschaltetem Feature-Flag antwortet der Endpunkt mit `403` — auch mit beiden
       Permissions.
-* [ ] Eine Abrechnung, die zwischen Laden und Klick wieder geöffnet wurde, wird mit `400` und
+* [x] Eine Abrechnung, die zwischen Laden und Klick wieder geöffnet wurde, wird mit `400` und
       `NK_FEHLER_NICHT_ABGERECHNET` abgewiesen.
-* [ ] Eine `abrechnungId` eines **fremden Mandanten** liefert `404` und ist nicht von einer
+* [x] Eine `abrechnungId` eines **fremden Mandanten** liefert `404` und ist nicht von einer
       unbekannten ID unterscheidbar. Der Zugriff läuft über eine gefilterte Abfrage
       (`findFirstById`), nicht über `findById`; die ArchUnit-Regel in
       `ArchitectureTest.SecurityRules` hält das fest.
-* [ ] `POST /api/rechnungen/generate` ist unverändert: Ein Aufruf mit `von`, `bis`, `einheitIds`
+* [x] `POST /api/rechnungen/generate` ist unverändert: Ein Aufruf mit `von`, `bis`, `einheitIds`
       verhält sich wie vor dieser Änderung, und ein Aufruf ohne `einheitIds` antwortet weiterhin
       mit `400`.
-* [ ] Die Antwort des NK-Endpunkts hat genau die Form aus FR-6; `anzahlForderungen` und
+* [x] Die Antwort des NK-Endpunkts hat genau die Form aus FR-6; `anzahlForderungen` und
       `summeForderungen` passen zu den tatsächlich gebuchten Debitoren.
-* [ ] Der NK-Download verlangt dieselben beiden Permissions wie die Erzeugung; eine fremde
+* [x] Der NK-Download verlangt dieselben beiden Permissions wie die Erzeugung; eine fremde
       `abrechnungId` liefert `404`.
 
 **Feature-Flag (FR-9)**
-* [ ] Bei ausgeschaltetem Flag ist die Seite `/nebenkosten/abrechnung` nicht erreichbar — der
+* [x] Bei ausgeschaltetem Flag ist die Seite `/nebenkosten/abrechnung` nicht erreichbar — der
       Menüeintrag samt Aktion ist damit unerreichbar.
-* [ ] Bei ausgeschaltetem Flag antwortet der **NK-Download** mit `403`, auch für ein vorher
+* [x] Bei ausgeschaltetem Flag antwortet der **NK-Download** mit `403`, auch für ein vorher
       erzeugtes PDF.
-* [ ] Bei ausgeschaltetem Flag bleibt `GET /api/rechnungen/download/{key}` für ZEV-Rechnungen
+* [x] Bei ausgeschaltetem Flag bleibt `GET /api/rechnungen/download/{key}` für ZEV-Rechnungen
       uneingeschränkt nutzbar — der Endpunkt wurde nicht angefasst.
-* [ ] Bei ausgeschaltetem Flag ist `POST /api/rechnungen/generate` (ZEV) uneingeschränkt möglich —
+* [x] Bei ausgeschaltetem Flag ist `POST /api/rechnungen/generate` (ZEV) uneingeschränkt möglich —
       der Flag sperrt nur den NK-Teil.
-* [ ] Bei ausgeschaltetem Flag fehlt der Hinweis auf `/rechnungen`; die Seite sieht aus wie vor
+* [x] Bei ausgeschaltetem Flag fehlt der Hinweis auf `/rechnungen`; die Seite sieht aus wie vor
       dieser Änderung.
-* [ ] Bei ausgeschaltetem Flag lässt das **Erfassungsformular** der Debitorkontrolle nur `ZEV` zu.
-* [ ] Bei ausgeschaltetem Flag **und ohne NK-Forderungen** im Zeitraum fehlt die Filter-Option
+* [x] Bei ausgeschaltetem Flag lässt das **Erfassungsformular** der Debitorkontrolle nur `ZEV` zu.
+* [x] Bei ausgeschaltetem Flag **und ohne NK-Forderungen** im Zeitraum fehlt die Filter-Option
       **NK**.
-* [ ] Bei ausgeschaltetem Flag, aber **mit** NK-Forderungen im Zeitraum, ist die Option **NK**
+* [x] Bei ausgeschaltetem Flag, aber **mit** NK-Forderungen im Zeitraum, ist die Option **NK**
       wählbar und zeigt genau diese Forderungen — was sichtbar ist, ist filterbar.
-* [ ] Wechselt der Zeitraum auf einen **ohne** NK-Forderungen, während der Filter auf **NK**
+* [x] Wechselt der Zeitraum auf einen **ohne** NK-Forderungen, während der Filter auf **NK**
       steht und der Flag aus ist, fällt der Filter auf **Alle** zurück.
-* [ ] Bei ausgeschaltetem Flag bleibt die **Spalte Herkunft** sichtbar und zeigt bestehende
+* [x] Bei ausgeschaltetem Flag bleibt die **Spalte Herkunft** sichtbar und zeigt bestehende
       NK-Forderungen weiterhin als `NK` — ein Abschalten verändert keine Daten.
-* [ ] Bei ausgeschaltetem Flag zeigt **Alle** die NK-Forderungen weiterhin mit an: Es sind offene
+* [x] Bei ausgeschaltetem Flag zeigt **Alle** die NK-Forderungen weiterhin mit an: Es sind offene
       Geldforderungen, und sie zu verstecken wäre gefährlicher, als sie zu zeigen.
-* [ ] `NkRechnungService` ruft in jeder öffentlichen Methode `pruefeFeatureFlag()` **selbst** auf;
+* [x] `NkRechnungService` ruft in jeder öffentlichen Methode `pruefeFeatureFlag()` **selbst** auf;
       die ArchUnit-Regel `nebenkostenServicesMustCheckFeatureFlag` erfasst ihn, weil ihr
       Geltungsbereich auf das Präfix `Nk` erweitert wurde.
-* [ ] Die erweiterte ArchUnit-Regel ist **gegengeprüft**: Ein entfernter `pruefeFeatureFlag()`-Aufruf
+* [x] Die erweiterte ArchUnit-Regel ist **gegengeprüft**: Ein entfernter `pruefeFeatureFlag()`-Aufruf
       in einem `Nk`-Service lässt sie fehlschlagen. Eine Regel, die nie ausgelöst hat, beweist
       nichts.
 
 **i18n**
-* [ ] Alle neuen Texte stammen aus dem `TranslationService`; keine fest verdrahteten Strings.
-* [ ] Jeder neue Schlüssel hat einen deutschen **und** einen englischen Text.
-* [ ] Die Übersetzungsmigration ist wiederholbar (`ON CONFLICT (key) DO NOTHING`).
+* [x] Alle neuen Texte stammen aus dem `TranslationService`; keine fest verdrahteten Strings.
+* [x] Jeder neue Schlüssel hat einen deutschen **und** einen englischen Text.
+* [x] Die Übersetzungsmigration ist wiederholbar (`ON CONFLICT (key) DO NOTHING`).
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 

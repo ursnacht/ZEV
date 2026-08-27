@@ -1,6 +1,7 @@
 package ch.nacht.controller;
 
 import ch.nacht.dto.DebitorDTO;
+import ch.nacht.entity.Debitorherkunft;
 import ch.nacht.service.DebitorService;
 import ch.nacht.service.OrganisationService;
 import ch.nacht.service.OrganizationContextService;
@@ -9,6 +10,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -23,6 +25,8 @@ import java.util.Optional;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -220,6 +224,76 @@ public class DebitorControllerTest {
 
         mockMvc.perform(delete("/api/debitoren/99"))
             .andExpect(status().isNotFound());
+    }
+
+    // ==================== Herkunft ====================
+    // Specs/Nebenkosten/RechnungenGenerieren.md, FR-6
+
+    /**
+     * Ein <b>unbekannter</b> Wert fuer die Herkunft wird mit {@code 400} abgewiesen — nicht mit
+     * {@code 500}.
+     *
+     * <p>Das leistet die Typisierung: {@code DebitorDTO.herkunft} ist ein Enum, Jackson weist den
+     * Wert an der Grenze ab, und der Service laeuft gar nicht an. Waere das Feld ein
+     * {@code String}, liefe der Wert bis in den CHECK-Constraint der Datenbank und kaeme als
+     * {@code 500} zurueck — dieser Test haelt den Unterschied fest.
+     */
+    @Test
+    void createDebitor_UnbekannteHerkunft_ReturnsBadRequest() throws Exception {
+        String json = """
+            {
+                "mieterId": 10,
+                "betrag": 125.50,
+                "datumVon": "2024-01-01",
+                "datumBis": "2024-03-31",
+                "herkunft": "GIBTSNICHT"
+            }
+            """;
+
+        mockMvc.perform(post("/api/debitoren")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json))
+            .andExpect(status().isBadRequest());
+
+        verify(debitorService, never()).create(any());
+    }
+
+    @Test
+    void createDebitor_HerkunftNK_ReichtSieAnDenServiceWeiter() throws Exception {
+        when(debitorService.create(any())).thenReturn(testDebitor);
+        String json = """
+            {
+                "mieterId": 10,
+                "betrag": 125.50,
+                "datumVon": "2024-01-01",
+                "datumBis": "2024-03-31",
+                "herkunft": "NK"
+            }
+            """;
+
+        mockMvc.perform(post("/api/debitoren")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json))
+            .andExpect(status().isCreated());
+
+        ArgumentCaptor<DebitorDTO> gesendet = ArgumentCaptor.forClass(DebitorDTO.class);
+        verify(debitorService).create(gesendet.capture());
+        assertEquals(Debitorherkunft.NK, gesendet.getValue().getHerkunft());
+    }
+
+    /** Ohne Feld bleibt die Herkunft {@code null} — den Rueckfall auf {@code ZEV} macht der Service. */
+    @Test
+    void createDebitor_OhneHerkunft_ReichtNullWeiter() throws Exception {
+        when(debitorService.create(any())).thenReturn(testDebitor);
+
+        mockMvc.perform(post("/api/debitoren")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(buildValidRequestJson()))
+            .andExpect(status().isCreated());
+
+        ArgumentCaptor<DebitorDTO> gesendet = ArgumentCaptor.forClass(DebitorDTO.class);
+        verify(debitorService).create(gesendet.capture());
+        assertNull(gesendet.getValue().getHerkunft());
     }
 
     // ==================== Helpers ====================
