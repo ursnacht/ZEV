@@ -180,6 +180,19 @@ input[type="date"].zev-input {
   box-sizing: border-box;
 }
 
+/*
+ * Toggle-Buttons stehen in derselben Zeile wie Eingabefelder und Schaltflaechen und muessen
+ * deshalb dieselbe Hoehe tragen - sonst sitzt eine Auswahlreihe sichtbar tiefer als das Feld
+ * daneben, obwohl beide unten ausgerichtet sind.
+ */
+.zev-date-range-row .zev-toggle-button {
+  height: 38px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xxs);
+}
+
 /* Dark Mode */
 [data-theme="dark"] .zev-input,
 [data-theme="dark"] .zev-select {

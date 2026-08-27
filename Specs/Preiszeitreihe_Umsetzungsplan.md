@@ -89,6 +89,7 @@ Grundlage: `Specs/Preiszeitreihe.md`.
 |  [x]   | 15. Einbindung in Tarife       | `<app-preiszeitreihe-chart>` in `tarif-list.component.html` hinter `*appFeature="'PREISZEITREIHE'"`              |
 |  [x]   | 16. Bundle-Kontrolle           | Produktionsbau: `main-*.js` wächst < 20 kB, ECharts in eigenem Chunk                                            |
 |  [x]   | 17. Doku nachziehen            | `Specs/Berechtigungen.md` (Controller-Matrix)                                                                   |
+|  [x]   | 21. Steuerzeile + Darstellung   | Eine Zeile auf gleicher Höhe, Umschaltung Linie/Balken, `V131` (Vibe-Ergänzung)                                  |
 |  [ ]   | 18. Backend-Tests              | `/3_backend-tests` — Service, Controller, Repository-IT, `ControllerAuthorizationTest`                           |
 |  [ ]   | 19. Frontend-Unit-Tests        | `/4_frontend-unit-tests` — Service, Komponente (ECharts gemockt)                                                 |
 |  [ ]   | 20. E2E-Tests                  | `/5_e2e-tests` — nur Chromium, `serial`, Flag setzen und zurückstellen                                           |
@@ -559,3 +560,45 @@ Festgehalten, weil sie den Plan korrigieren — nicht als Notiz am Rand:
    liegt bei 2 mb) — aber sie gehört aufgeräumt, unabhängig von diesem Feature.
 7. **Nicht umgesetzt:** Phasen 18–20 (Tests) laufen über die Commands `/3_backend-tests`,
    `/4_frontend-unit-tests` und `/5_e2e-tests`; die Umsetzung erstellt bewusst keine Tests.
+
+---
+
+## Phase 21: Steuerzeile und Darstellungsart (Ergänzung)
+
+Nachgezogene Anforderung: alle Bedienelemente auf gleicher Höhe, dazu eine Umschaltung der
+Darstellung zwischen **Datum bis** und **Herunterladen**.
+
+* **Eine Zeile statt zwei.** Bereichsauswahl, Pfeile, Datumsfelder, Darstellungsumschaltung und
+  „Herunterladen" stehen jetzt in **einer** `zev-date-range-row`. Die Klasse liefert die untere
+  Ausrichtung und 38 px Höhe für `.zev-input` und `.zev-button` bereits — für
+  `.zev-toggle-button` fehlte die Regel und wurde im Design System **ergänzt** (`form.css`), statt
+  sie in der Komponente zu duplizieren. Ohne sie sass die Auswahlreihe sichtbar tiefer als das
+  Feld daneben.
+* **Gruppierung:** `.preiszeitreihe__gruppe` setzt zusammengehörende Toggle-Buttons dichter
+  beieinander als die Gruppen untereinander. Sonst wäre nicht erkennbar, dass Tag/Woche/Monat eine
+  Auswahl bilden und die Pfeile eine andere.
+* **Linie / Balken** als zwei Toggle-Buttons statt eines einzelnen Umschalters: So ist die aktive
+  Darstellung sichtbar, ohne die Beschriftung interpretieren zu müssen — dasselbe Muster wie eine
+  Zeile darüber.
+* **Kein Nachladen beim Umschalten** (`setzeDarstellung`): Die Daten liegen vor, es ändert sich nur
+  ihre Darstellung. Balken sind mit `barMaxWidth: 24` begrenzt — über einen Monat liegen bis zu
+  2'976 Balken nebeneinander.
+* **`V131__Add_Preiszeitreihe_Darstellung_Translations.sql`** für `DARSTELLUNG_LINIE` und
+  `DARSTELLUNG_BALKEN`. Eigene Migration, **weil V130 bereits ausgeführt war** (per `zev-db`
+  geprüft: 129 und 130 stehen mit `success = true` in `flyway_schema_history`) — eine Änderung hätte
+  die Checksum-Prüfung beim nächsten Start gebrochen.
+
+### Nachtrag zu Phase 21: zwei Fehler in der Darstellung
+
+Beim Ausprobieren gemeldet — beide behoben:
+
+1. **Balken zeichneten nichts.** `core.use([...])` registrierte nur `charts.LineChart`. ECharts
+   meldet einen **nicht registrierten Serientyp nicht als Fehler**: `type: 'bar'` wird stillschweigend
+   ignoriert, die Fläche bleibt leer. Jetzt ist `charts.BarChart` mitregistriert. Lehre für weitere
+   Serientypen in diesem Diagramm: Registrierung und `type` gehören zusammen geändert.
+2. **Die Linie war ein Flächendiagramm.** Das `areaStyle` auf der Linienserie füllte die Fläche unter
+   der Kurve. Entfernt — eine gefüllte Fläche liest sich als Summe über die Zeit, und aufsummierte
+   Preise sind sinnlos. Der Farb-Token `--color-primary-light` wird damit nicht mehr gebraucht und
+   ist aus `farben()` verschwunden.
+
+Keine Migration nötig; die Übersetzungen aus `V131` bleiben unverändert.

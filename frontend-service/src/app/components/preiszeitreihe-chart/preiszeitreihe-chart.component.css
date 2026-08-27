@@ -1,6 +1,7 @@
 /**
  * Nur komponentenspezifisches CSS. Alles Wiederverwendbare kommt aus dem Design System
- * (zev-panel--chart, zev-toggle-button, zev-date-range-row, zev-message, zev-button).
+ * (zev-panel--chart, zev-toggle-button, zev-date-range-row, zev-message, zev-button) - die
+ * gemeinsame Hoehe von Feldern, Schaltflaechen und Toggle-Buttons regelt zev-date-range-row.
  */
 
 .preiszeitreihe {
@@ -14,18 +15,18 @@
   margin-bottom: var(--spacing-sm);
 }
 
+/* Bricht bei schmalen Fenstern um, statt die Zeile zu quetschen. */
 .preiszeitreihe__steuerung {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--spacing-md);
+  row-gap: var(--spacing-sm);
 }
 
-/* Die Spannen-Auswahl braucht die volle Breite nicht - sonst rutschen die Datumsfelder in die
-   naechste Zeile, obwohl daneben Platz ist. */
-.preiszeitreihe__spannen {
-  width: auto;
-  margin-bottom: 0;
+/* Zusammengehoerende Toggle-Buttons stehen dicht beieinander, die Gruppen weiter auseinander -
+   sonst waere nicht erkennbar, dass Tag/Woche/Monat eine Auswahl bilden und die Pfeile eine
+   andere. */
+.preiszeitreihe__gruppe {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacing-xxs);
 }
 
 /* Fuellt den Panel-Inhalt; die Hoehe kommt von zev-panel--chart und bleibt per resize

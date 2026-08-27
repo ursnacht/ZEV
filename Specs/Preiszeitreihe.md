@@ -81,19 +81,25 @@ Neue Tabelle `zev.preiszeitreihe` (Flyway `V129__Create_Preiszeitreihe.sql`):
 **Platzierung:** Am Ende von `tarif-list.component.html`, nach der Tarifliste und **vor** `<app-tarif-form>`, als eigene Komponente `<app-preiszeitreihe-chart>`; sichtbar nur mit aktivem Flag (`*appFeature="'PREISZEITREIHE'"`, FR-6).
 
 **Aufbau (von oben nach unten):**
-1. `zev-panel` mit Titel **Einspeisepreise** (`zev-panel__title`).
-2. Steuerzeile:
-   * Schaltflächen **TAG / WOCHE / MONAT** (`zev-button--secondary`, die aktive Auswahl markiert — dasselbe Muster wie die Quartalsschaltflächen des `quarter-selector`).
-   * **‹** und **›** zum Blättern.
-   * **Datum von** / **Datum bis** (`input type="date"`, IDs `preisVon` / `preisBis`) in `zev-date-range-row`; eine Eingabe hier hebt die TAG/WOCHE/MONAT-Markierung auf.
-   * Schaltfläche **Herunterladen** (`zev-button--primary`, Icon `download`).
-3. Diagramm in `zev-panel--chart` (dieselbe Klasse wie `messwerte-chart`), Höhe fix, Breite 100 %.
-4. Meldungsbereich (`zev-message--success` / `--error`) über dem Panel-Inhalt; Erfolgsmeldungen verschwinden nach 5 Sekunden, Fehlermeldungen bleiben.
+1. Titel **Einspeisepreise** mit Icon `bar-chart-2`.
+2. **Eine einzige Steuerzeile** (`zev-date-range-row`) — alle Bedienelemente stehen **auf gleicher Höhe**, in dieser Reihenfolge von links nach rechts:
+   1. **Tag / Woche / Monat** als Toggle-Buttons (`zev-toggle-button`, die aktive Auswahl markiert — dasselbe Muster wie die Quartalsschaltflächen).
+   2. **‹** und **›** zum Blättern (`chevron-left` / `chevron-right`).
+   3. **Datum von** / **Datum bis** (`input type="date"`, IDs `preisVon` / `preisBis`); eine Eingabe hier hebt die Tag/Woche/Monat-Markierung auf.
+   4. **Linie / Balken** als Toggle-Buttons — die Darstellungsart des Diagramms.
+   5. Schaltfläche **Herunterladen** (`zev-button--primary`, Icon `download`).
+
+   Die gemeinsame Höhe (38 px für Eingabefelder, Schaltflächen und Toggle-Buttons) und die untere Ausrichtung kommen aus `zev-date-range-row` im Design System — nicht aus komponenteneigenem CSS. Zusammengehörende Toggle-Buttons stehen dichter beieinander als die Gruppen untereinander, damit erkennbar bleibt, was eine Auswahl bildet. Bei schmalen Fenstern bricht die Zeile um.
+3. Diagramm in `zev-panel--chart` (dieselbe Klasse wie `messwerte-chart`), Höhe verstellbar, Breite 100 %.
+4. Meldungsbereich (`zev-message--success` / `--error`) über der Steuerzeile; Erfolgsmeldungen verschwinden nach 5 Sekunden, Fehlermeldungen bleiben.
 
 **Diagramm:**
-* **Bibliothek ECharts** (`echarts`, Apache-2.0), modular über `echarts/core` mit `LineChart`, `GridComponent`, `TooltipComponent`, `DataZoomComponent` und `CanvasRenderer` — kein Voll-Import.
+* **Bibliothek ECharts** (`echarts`, Apache-2.0), modular über `echarts/core` mit `LineChart`, **`BarChart`**, `GridComponent`, `TooltipComponent`, `DataZoomComponent` und `CanvasRenderer` — kein Voll-Import. **Beide** Diagrammtypen müssen registriert sein: Ein nicht registrierter Typ zeichnet stillschweigend nichts, ECharts meldet ihn nicht als Fehler.
 * **Nachgeladen statt mitgeliefert:** Der Import erfolgt **dynamisch** (`await import('echarts/core')` beim Initialisieren der Komponente), nicht als statischer Import am Dateikopf. Grund: `/tarife` ist eine **eager** Route (`app.routes.ts`), ein statischer Import landete also im Initial-Bundle und jede Seite der Anwendung lüde ECharts mit (NFR-1). Solange die Bibliothek lädt, zeigt das Panel einen Ladezustand; scheitert das Nachladen, erscheint eine Fehlermeldung und die Seite bleibt bedienbar.
-* **Typ:** Stufenlinie (`step: 'end'`) — ein Preis gilt für die **ganze** Viertelstunde; eine interpolierte Linie behauptete einen stetigen Verlauf, den es nicht gibt.
+* **Zwei Darstellungsarten, umschaltbar** (Default **Linie**):
+  * **Linie:** **reine** Stufenlinie (`step: 'end'`, **ohne** `areaStyle`) — ein Preis gilt für die **ganze** Viertelstunde; eine interpolierte Linie behauptete einen stetigen Verlauf, den es nicht gibt. Keine Flächenfüllung: Eine gefüllte Fläche liest sich als Summe über die Zeit, und aufsummierte Preise sind sinnlos.
+  * **Balken:** je Intervall ein Balken (`type: 'bar'`, `barMaxWidth`) — betont die einzelne Viertelstunde statt des Verlaufs.
+  * Das Umschalten zeichnet nur neu und lädt **nicht** nach: Es ändert sich die Sicht, nicht die Daten. Die Wahl gilt für die Sitzung und wird nicht gespeichert.
 * **x-Achse:** Zeit in Europe/Zurich; **y-Achse:** CHF/kWh.
 * **Zoom:** `dataZoom` mit `inside` (Mausrad/Touch) **und** `slider` (Griff unter der Achse).
 * **Tooltip:** Zeitpunkt (`dd.MM.yyyy HH:mm`) und Preis im **Schweizer Zahlenformat** (`Specs/generell.md` §Zahlenformatierung): Punkt als Dezimaltrennzeichen, Hochkomma als Tausendertrennzeichen, 5 Nachkommastellen, Fehlwert `–`. Formatierung über `formatSwissNumber()` aus `src/app/utils/number-utils.ts` — **keine** `toLocaleString()`, kein ECharts-eigenes `valueFormatter` mit Locale.
@@ -186,7 +192,13 @@ Neue Tabelle `zev.preiszeitreihe` (Flyway `V129__Create_Preiszeitreihe.sql`):
 **Darstellung**
 * [ ] Der Bereich **Einspeisepreise** erscheint auf `/tarife` unterhalb der Tarifliste.
 * [ ] Beim Öffnen zeigt das Diagramm den **heutigen Tag**.
-* [ ] **TAG / WOCHE / MONAT** setzen die Spanne; die aktive Auswahl ist visuell markiert.
+* [ ] **Tag / Woche / Monat** setzen die Spanne; die aktive Auswahl ist visuell markiert.
+* [ ] Bereichsauswahl, Pfeile, Datumsfelder, Darstellungsumschaltung und **Herunterladen** stehen in **einer** Zeile und haben dieselbe Höhe (38 px).
+* [ ] Die Umschaltung **Linie / Balken** steht zwischen **Datum bis** und **Herunterladen**.
+* [ ] Beim Öffnen ist **Linie** aktiv; ein Klick auf **Balken** zeigt Balken je Viertelstunde, ein Klick auf **Linie** wieder die Stufenlinie.
+* [ ] Die Linie ist eine **reine** Linie ohne Flächenfüllung.
+* [ ] Beide Darstellungen zeichnen tatsächlich etwas — keine der beiden bleibt leer.
+* [ ] Das Umschalten der Darstellung löst **keinen** HTTP-Aufruf aus.
 * [ ] **Datum von / Datum bis** setzen eine freie Spanne und heben die TAG/WOCHE/MONAT-Markierung auf.
 * [ ] **‹ / ›** verschieben die Spanne um genau ihre Länge; die Werte werden neu geladen.
 * [ ] Mausrad/Touch zoomt innerhalb der geladenen Spanne, der Slider verschiebt den Ausschnitt — **ohne** neuen HTTP-Aufruf.
@@ -275,6 +287,7 @@ Neue Tabelle `zev.preiszeitreihe` (Flyway `V129__Create_Preiszeitreihe.sql`):
 |---|---|
 | `db/migration/V129__Create_Preiszeitreihe.sql` | neu: Tabelle, Unique-Constraint, Spaltenkommentare |
 | `db/migration/V130__Add_Preiszeitreihe_Translations.sql` | neu: Übersetzungen DE/EN |
+| `db/migration/V131__Add_Preiszeitreihe_Darstellung_Translations.sql` | neu: `DARSTELLUNG_LINIE`, `DARSTELLUNG_BALKEN` — eigene Migration, weil V130 bereits ausgeführt war |
 | `entity/Preiszeitreihe.java`, `repository/PreiszeitreiheRepository.java` | neu (Vorlage `Tarif`/`TarifRepository`, Upsert nach `DebitorRepository`) |
 | `service/PreiszeitreiheService.java`, `service/PreiszeitreiheDownloadJob.java` | neu. Der Job trägt **`@Component`**, nicht `@Service` — sonst bricht `NamingConventionTests.servicesShouldEndWithService()`. Vorbild `SystemmeldungCleanupJob` |
 | `controller/PreiszeitreiheController.java`, `dto/Preiszeitreihe*DTO.java` | neu (Vorlage `TarifController`) |

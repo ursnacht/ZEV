@@ -2,7 +2,7 @@ import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } fr
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PreiszeitreiheService } from '../../services/preiszeitreihe.service';
-import { PreiszeitreihePunkt, Spanne } from '../../models/preiszeitreihe.model';
+import { Darstellung, PreiszeitreihePunkt, Spanne } from '../../models/preiszeitreihe.model';
 import { TranslationService } from '../../services/translation.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
@@ -29,6 +29,8 @@ export class PreiszeitreiheChartComponent extends WithMessage
   @ViewChild('diagramm') diagrammRef?: ElementRef<HTMLDivElement>;
 
   spanne: Spanne = 'TAG';
+  /** Linie oder Balken. Gilt für die Sitzung; die Reihe selbst ändert sich dadurch nicht. */
+  darstellung: Darstellung = 'LINIE';
   von = '';
   bis = '';
   punkte: PreiszeitreihePunkt[] = [];
@@ -108,6 +110,20 @@ export class PreiszeitreiheChartComponent extends WithMessage
       this.bis = this.alsIso(this.plusTage(bis, richtung * tage));
     }
     this.lade();
+  }
+
+  /**
+   * Wechselt zwischen Stufenlinie und Balken.
+   *
+   * Zeichnet nur neu - **kein** Server-Aufruf: Die Daten liegen schon vor, es ändert sich allein
+   * ihre Darstellung.
+   */
+  setzeDarstellung(darstellung: Darstellung): void {
+    if (this.darstellung === darstellung) {
+      return;
+    }
+    this.darstellung = darstellung;
+    void this.zeichne();
   }
 
   /** Eine Eingabe in den Datumsfeldern hebt die Spannen-Auswahl auf. */
@@ -201,7 +217,10 @@ export class PreiszeitreiheChartComponent extends WithMessage
         import('echarts/renderers')
       ]);
       core.use([
+        // Beide Diagrammtypen: Ohne BarChart zeichnet `type: 'bar'` stillschweigend NICHTS -
+        // ECharts meldet einen nicht registrierten Typ nicht als Fehler, die Flaeche bleibt leer.
         charts.LineChart,
+        charts.BarChart,
         komponenten.GridComponent,
         komponenten.TooltipComponent,
         komponenten.DataZoomComponent,
@@ -254,15 +273,40 @@ export class PreiszeitreiheChartComponent extends WithMessage
         splitLine: { lineStyle: { color: farben.gitter } }
       },
       dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 10 }],
-      series: [{
-        type: 'line',
-        step: 'end',
-        showSymbol: false,
-        connectNulls: false,
-        lineStyle: { color: farben.linie, width: 2 },
-        areaStyle: { color: farben.flaeche },
+      series: [this.serie(daten, farben)]
+    };
+  }
+
+  /**
+   * Die Datenserie in der gewählten Darstellung.
+   *
+   * **Linie:** Stufenlinie (`step: 'end'`) - ein Preis gilt für die **ganze** Viertelstunde, eine
+   * interpolierte Linie behauptete einen stetigen Verlauf, den es nicht gibt.
+   *
+   * **Balken:** je Intervall ein Balken, mit `barMaxWidth` begrenzt. Über einen Monat liegen bis zu
+   * 2'976 Balken nebeneinander; ohne Begrenzung würde ECharts sie in einer schmalen Ansicht zu
+   * einer Fläche verschmelzen.
+   */
+  private serie(daten: number[][],
+                farben: { linie: string }): Record<string, unknown> {
+    if (this.darstellung === 'BALKEN') {
+      return {
+        type: 'bar',
+        barMaxWidth: 24,
+        itemStyle: { color: farben.linie },
         data: daten
-      }]
+      };
+    }
+    // Reine Linie, **keine** Flaechenfuellung: Mit `areaStyle` sah die Darstellung wie ein
+    // Flaechendiagramm aus, und die gefuellte Flaeche suggeriert eine Summe ueber die Zeit -
+    // aufsummierte Preise sind aber sinnlos.
+    return {
+      type: 'line',
+      step: 'end',
+      showSymbol: false,
+      connectNulls: false,
+      lineStyle: { color: farben.linie, width: 2 },
+      data: daten
     };
   }
 
@@ -270,7 +314,7 @@ export class PreiszeitreiheChartComponent extends WithMessage
    * Farben aus den Design-Tokens statt hart kodiert - sonst wäre das Diagramm im Dark Mode
    * unlesbar (Specs/DarkMode.md).
    */
-  private farben(): { achse: string; text: string; gitter: string; linie: string; flaeche: string } {
+  private farben(): { achse: string; text: string; gitter: string; linie: string } {
     const stil = getComputedStyle(document.documentElement);
     const token = (name: string, fallback: string) =>
       stil.getPropertyValue(name).trim() || fallback;
@@ -280,8 +324,7 @@ export class PreiszeitreiheChartComponent extends WithMessage
       achse: token('--color-gray-500', '#cccccc'),
       text: token('--color-gray-700', '#555555'),
       gitter: token('--color-gray-300', '#e0e0e0'),
-      linie: token('--color-primary', '#4CAF50'),
-      flaeche: token('--color-primary-light', '#81C784')
+      linie: token('--color-primary', '#4CAF50')
     };
   }
 

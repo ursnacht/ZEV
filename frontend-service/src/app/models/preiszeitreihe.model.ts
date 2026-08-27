@@ -24,3 +24,12 @@ export interface PreiszeitreiheDownload {
 
 /** Gewählte Darstellungsspanne; `FREI` = über Datum von/bis gesetzt. */
 export type Spanne = 'TAG' | 'WOCHE' | 'MONAT' | 'FREI';
+
+/**
+ * Darstellungsart des Diagramms.
+ *
+ * `LINIE` ist eine **Stufen**linie (ein Preis gilt für die ganze Viertelstunde), `BALKEN` zeigt
+ * je Intervall einen Balken. Beide sagen dasselbe aus - Balken betonen die einzelne
+ * Viertelstunde, die Linie den Verlauf.
+ */
+export type Darstellung = 'LINIE' | 'BALKEN';

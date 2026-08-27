@@ -10,8 +10,11 @@
     </div>
   }
 
-  <div class="preiszeitreihe__steuerung">
-    <div class="zev-quarter-selector preiszeitreihe__spannen">
+  <!-- Eine einzige `zev-date-range-row`: Sie richtet alles unten aus und gibt Eingabefeldern,
+       Schaltflaechen und Toggle-Buttons dieselbe Hoehe (38px). Getrennte Zeilen sassen sichtbar
+       auf verschiedenen Hoehen. -->
+  <div class="zev-date-range-row preiszeitreihe__steuerung">
+    <div class="preiszeitreihe__gruppe">
       <button type="button" class="zev-toggle-button"
         [class.zev-toggle-button--active]="spanne === 'TAG'" (click)="setzeSpanne('TAG')">
         {{ 'SPANNE_TAG' | translate }}
@@ -24,6 +27,9 @@
         [class.zev-toggle-button--active]="spanne === 'MONAT'" (click)="setzeSpanne('MONAT')">
         {{ 'SPANNE_MONAT' | translate }}
       </button>
+    </div>
+
+    <div class="preiszeitreihe__gruppe">
       <button type="button" class="zev-toggle-button"
         [attr.aria-label]="'ZURUECK' | translate" [title]="'ZURUECK' | translate"
         (click)="blaettere(-1)">
@@ -36,26 +42,38 @@
       </button>
     </div>
 
-    <div class="zev-date-range-row">
-      <div class="zev-form-group">
-        <label for="preisVon">{{ 'VON_DATUM' | translate }}:</label>
-        <input type="date" id="preisVon" class="zev-input" name="preisVon"
-          [(ngModel)]="von" (ngModelChange)="onDatumChange()">
-      </div>
+    <div class="zev-form-group">
+      <label for="preisVon">{{ 'VON_DATUM' | translate }}:</label>
+      <input type="date" id="preisVon" class="zev-input" name="preisVon"
+        [(ngModel)]="von" (ngModelChange)="onDatumChange()">
+    </div>
 
-      <div class="zev-form-group">
-        <label for="preisBis">{{ 'BIS_DATUM' | translate }}:</label>
-        <input type="date" id="preisBis" class="zev-input" name="preisBis"
-          [(ngModel)]="bis" (ngModelChange)="onDatumChange()">
-      </div>
+    <div class="zev-form-group">
+      <label for="preisBis">{{ 'BIS_DATUM' | translate }}:</label>
+      <input type="date" id="preisBis" class="zev-input" name="preisBis"
+        [(ngModel)]="bis" (ngModelChange)="onDatumChange()">
+    </div>
 
-      <div class="zev-button-group">
-        <button type="button" class="zev-button zev-button--primary"
-          [disabled]="laedtHerunter" (click)="onHerunterladen()">
-          <app-icon name="download"></app-icon>
-          {{ laedtHerunter ? ('LADE_DATEN' | translate) : ('PREISE_HERUNTERLADEN' | translate) }}
-        </button>
-      </div>
+    <!-- Darstellungsart: aendert nur die Sicht auf dieselben Daten, deshalb kein Nachladen. -->
+    <div class="preiszeitreihe__gruppe">
+      <button type="button" class="zev-toggle-button"
+        [class.zev-toggle-button--active]="darstellung === 'LINIE'"
+        (click)="setzeDarstellung('LINIE')">
+        {{ 'DARSTELLUNG_LINIE' | translate }}
+      </button>
+      <button type="button" class="zev-toggle-button"
+        [class.zev-toggle-button--active]="darstellung === 'BALKEN'"
+        (click)="setzeDarstellung('BALKEN')">
+        {{ 'DARSTELLUNG_BALKEN' | translate }}
+      </button>
+    </div>
+
+    <div class="zev-button-group">
+      <button type="button" class="zev-button zev-button--primary"
+        [disabled]="laedtHerunter" (click)="onHerunterladen()">
+        <app-icon name="download"></app-icon>
+        {{ laedtHerunter ? ('LADE_DATEN' | translate) : ('PREISE_HERUNTERLADEN' | translate) }}
+      </button>
     </div>
   </div>
 
