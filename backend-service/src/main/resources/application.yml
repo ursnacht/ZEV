@@ -124,6 +124,16 @@ systemmeldung:
     tage: 90                 # erledigte Meldungen älter als N Tage werden gelöscht
     cron: "0 0 3 * * *"      # täglich 03:00 (Cleanup-Job, ohne mqtt-Profil)
 
+# Preiszeitreihe: dynamische Einspeisepreise (Specs/Preiszeitreihe.md)
+preiszeitreihe:
+  url: "https://api.bkw.ch/api/dyntariffs/v1/Tariffs"   # Quelle der Einspeisepreise (oeffentlich)
+  download:
+    cron: "0 0 2 * * *"    # täglich 02:00; nur wenn mindestens ein Mandant das Flag aktiv hat
+  timeout:
+    # Ohne Grenzen haengt der Job im Zweifel bis zum naechsten Lauf an einer stummen Verbindung.
+    verbindung: 5s
+    lesen: 10s
+
 # Logging Configuration
 logging:
   level:

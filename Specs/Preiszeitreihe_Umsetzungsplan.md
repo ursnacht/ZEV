@@ -25,12 +25,15 @@ Grundlage: `Specs/Preiszeitreihe.md`.
 | `db/migration/V130__Add_Preiszeitreihe_Translations.sql` | Übersetzungen DE/EN |
 | `entity/Preiszeitreihe.java` | Entity **ohne** `org_id` (begründete Ausnahme, FR-2) |
 | `repository/PreiszeitreiheRepository.java` | Bereichsabfrage + natives Upsert |
-| `service/PreiszeitreiheService.java` | Abruf, Umwandlung, Validierung, Upsert, Systemmeldung |
+| `service/PreiszeitreiheService.java` | Maske-zugewandt: Bereichsabfrage und Download, prueft das Feature-Flag |
+| `service/PreiszeitreiheAbrufService.java` | Beschaffung: HTTP, Validierung, Upsert, Systemmeldungen (ohne Mandantenkontext — siehe Abweichung 1) |
+| `util/PreiszeitreiheZeit.java` | Umrechnung UTC ↔ Europe/Zurich an einer Stelle |
+| `exception/PreiszeitreiheQuelleException.java` | Fehler der Quelle → `502` |
 | `service/PreiszeitreiheDownloadJob.java` | `@Component` + `@Scheduled` (nicht `@Service`) |
 | `controller/PreiszeitreiheController.java` | `GET` Bereich, `POST` Download |
 | `dto/PreiszeitreihePunktDTO.java` | Ausgabe: `zeit` (Ortszeit), `preis` |
 | `dto/PreiszeitreiheDownloadDTO.java` | Ergebnis: `abgerufen`, `neu`, `aktualisiert`, `uebersprungen`, `publikation` |
-| `dto/BkwTariffsResponse.java` (+ verschachtelte Records) | Abbild der Fremdantwort |
+| `dto/BkwTariffsResponseDTO.java` (+ verschachtelte Records) | Abbild der Fremdantwort |
 | `config/RestClientConfig.java` | `RestClient`-Bean mit Timeouts |
 
 ### Neu — Frontend
@@ -53,7 +56,10 @@ Grundlage: `Specs/Preiszeitreihe.md`.
 | `application.yml` | Block `preiszeitreihe:` (`url`, `download.cron`, Timeouts) |
 | `test/.../architecture/ArchitectureTest.java` | Ausnahme in `everyEntityMustHaveOrgId`, neue Flag-Regel |
 | `components/tarif-list/tarif-list.component.html` | `<app-preiszeitreihe-chart>` hinter `*appFeature` |
-| `frontend-service/package.json` | Abhängigkeit `echarts` |
+| `frontend-service/package.json` | Abhängigkeit `echarts` (6.1.0, exakt gepinnt wie die übrigen) |
+| `design-system/.../quarter-selector.css` | geteilte Deklarationen für `zev-toggle-button` |
+| `components/design-system-showcase/…html` | Showcase-Eintrag für `zev-toggle-button` |
+| `components/tarif-list/tarif-list.component.ts` | Import der Komponente und der `appFeature`-Direktive |
 | `Specs/Berechtigungen.md` | Zeile `PreiszeitreiheController` → `tarife:manage` |
 
 ### Unverändert (bewusst)
@@ -66,23 +72,23 @@ Grundlage: `Specs/Preiszeitreihe.md`.
 
 | Status | Phase                          | Beschreibung                                                                                                    |
 |--------|--------------------------------|-----------------------------------------------------------------------------------------------------------------|
-|  [ ]   | 1. DB-Migration                | `V129__Create_Preiszeitreihe.sql`: Sequenz, Tabelle, `UNIQUE (zeit_von)`, Spaltenkommentare                      |
-|  [ ]   | 2. Entity + Repository         | `Preiszeitreihe` (ohne `org_id`), Bereichsabfrage, natives Upsert nach dem Muster `DebitorRepository`            |
-|  [ ]   | 3. Konfiguration              | `application.yml`-Block, `RestClientConfig` mit Verbindungs-/Lese-Timeout                                        |
-|  [ ]   | 4. Fremd-DTOs                  | `BkwTariffsResponse` samt verschachtelten Records, tolerant gegen unbekannte Felder                             |
-|  [ ]   | 5. Feature-Flag                | Flag `PREISZEITREIHE`, `FeatureFlagService.getOrgIdsMitAktivemFlag`, Kategorie-Konstante in `SystemmeldungService` |
-|  [ ]   | 6. Backend-Service             | Abruf, Validierung (Einheit, Menge), Umwandlung, Upsert in `zeit_von`-Reihenfolge, Systemmeldung + `autoResolve` |
-|  [ ]   | 7. Geplanter Job               | `PreiszeitreiheDownloadJob` (`@Component`, `@Scheduled`), überspringt ohne aktives Flag                          |
-|  [ ]   | 8. Backend-Controller + DTOs   | `GET` mit Datum→UTC-Umrechnung und Grenzen, `POST` mit Statuscodes `200/400/403/502`                             |
-|  [ ]   | 9. ArchUnit                    | Namentliche `org_id`-Ausnahme, neue Regel „Flag-Prüfung in `Preiszeitreihe*`-Services"                          |
-|  [ ]   | 10. Übersetzungen              | `V130__Add_Preiszeitreihe_Translations.sql`, alle Keys mit `ON CONFLICT (key) DO NOTHING`                        |
-|  [ ]   | 11. Abhängigkeit ECharts       | `npm i echarts`, Lizenz/SBOM prüfen (`/lizenzen`)                                                               |
-|  [ ]   | 12. Frontend-Model + Service   | `preiszeitreihe.model.ts`, `preiszeitreihe.service.ts` über `getRuntimeConfig().apiBaseUrl`                      |
-|  [ ]   | 13. Frontend-Komponente (TS)   | Spannenlogik TAG/WOCHE/MONAT, Blättern, Laden, **dynamischer** ECharts-Import, Fehler-/Ladezustand               |
-|  [ ]   | 14. Frontend-Template + CSS    | Steuerzeile und Panel aus Design-System-Klassen; Design System **zuerst** prüfen                                 |
-|  [ ]   | 15. Einbindung in Tarife       | `<app-preiszeitreihe-chart>` in `tarif-list.component.html` hinter `*appFeature="'PREISZEITREIHE'"`              |
-|  [ ]   | 16. Bundle-Kontrolle           | Produktionsbau: `main-*.js` wächst < 20 kB, ECharts in eigenem Chunk                                            |
-|  [ ]   | 17. Doku nachziehen            | `Specs/Berechtigungen.md` (Controller-Matrix)                                                                   |
+|  [x]   | 1. DB-Migration                | `V129__Create_Preiszeitreihe.sql`: Sequenz, Tabelle, `UNIQUE (zeit_von)`, Spaltenkommentare                      |
+|  [x]   | 2. Entity + Repository         | `Preiszeitreihe` (ohne `org_id`), Bereichsabfrage, natives Upsert nach dem Muster `DebitorRepository`            |
+|  [x]   | 3. Konfiguration              | `application.yml`-Block, `RestClientConfig` mit Verbindungs-/Lese-Timeout                                        |
+|  [x]   | 4. Fremd-DTOs                  | `BkwTariffsResponse` samt verschachtelten Records, tolerant gegen unbekannte Felder                             |
+|  [x]   | 5. Feature-Flag                | Flag `PREISZEITREIHE`, `FeatureFlagService.getOrgIdsMitAktivemFlag`, Kategorie-Konstante in `SystemmeldungService` |
+|  [x]   | 6. Backend-Service             | Abruf, Validierung (Einheit, Menge), Umwandlung, Upsert in `zeit_von`-Reihenfolge, Systemmeldung + `autoResolve` |
+|  [x]   | 7. Geplanter Job               | `PreiszeitreiheDownloadJob` (`@Component`, `@Scheduled`), überspringt ohne aktives Flag                          |
+|  [x]   | 8. Backend-Controller + DTOs   | `GET` mit Datum→UTC-Umrechnung und Grenzen, `POST` mit Statuscodes `200/400/403/502`                             |
+|  [x]   | 9. ArchUnit                    | Namentliche `org_id`-Ausnahme, neue Regel „Flag-Prüfung in `Preiszeitreihe*`-Services"                          |
+|  [x]   | 10. Übersetzungen              | `V130__Add_Preiszeitreihe_Translations.sql`, alle Keys mit `ON CONFLICT (key) DO NOTHING`                        |
+|  [x]   | 11. Abhängigkeit ECharts       | `npm i echarts`, Lizenz/SBOM prüfen (`/lizenzen`)                                                               |
+|  [x]   | 12. Frontend-Model + Service   | `preiszeitreihe.model.ts`, `preiszeitreihe.service.ts` über `getRuntimeConfig().apiBaseUrl`                      |
+|  [x]   | 13. Frontend-Komponente (TS)   | Spannenlogik TAG/WOCHE/MONAT, Blättern, Laden, **dynamischer** ECharts-Import, Fehler-/Ladezustand               |
+|  [x]   | 14. Frontend-Template + CSS    | Steuerzeile und Panel aus Design-System-Klassen; Design System **zuerst** prüfen                                 |
+|  [x]   | 15. Einbindung in Tarife       | `<app-preiszeitreihe-chart>` in `tarif-list.component.html` hinter `*appFeature="'PREISZEITREIHE'"`              |
+|  [x]   | 16. Bundle-Kontrolle           | Produktionsbau: `main-*.js` wächst < 20 kB, ECharts in eigenem Chunk                                            |
+|  [x]   | 17. Doku nachziehen            | `Specs/Berechtigungen.md` (Controller-Matrix)                                                                   |
 |  [ ]   | 18. Backend-Tests              | `/3_backend-tests` — Service, Controller, Repository-IT, `ControllerAuthorizationTest`                           |
 |  [ ]   | 19. Frontend-Unit-Tests        | `/4_frontend-unit-tests` — Service, Komponente (ECharts gemockt)                                                 |
 |  [ ]   | 20. E2E-Tests                  | `/5_e2e-tests` — nur Chromium, `serial`, Flag setzen und zurückstellen                                           |
@@ -509,3 +515,47 @@ Zusätzliche Annahmen dieses Plans:
    übernimmt die Darstellung.
 9. **`@if (!showForm)`** um das Diagramm (Phase 15) — Annahme über die gewünschte Ergonomie, leicht
    umzustellen, falls das Diagramm auch neben dem Formular sichtbar bleiben soll.
+
+---
+
+## Abweichungen und Befunde der Umsetzung
+
+Festgehalten, weil sie den Plan korrigieren — nicht als Notiz am Rand:
+
+1. **Zwei Services statt einem** (Phasen 6/7). `PreiszeitreiheService` ist die Maske-zugewandte
+   Seite und prüft in jeder öffentlichen Methode das Feature-Flag; `PreiszeitreiheAbrufService`
+   beschafft und schreibt. Der Grund ist zwingend: Die Flag-Prüfung braucht
+   `organizationContextService.getCurrentOrgId()`, und im geplanten Job gibt es keinen angemeldeten
+   Benutzer. Ein einziger Service hätte entweder die Prüfung aufgeben oder im Job scheitern müssen.
+   Die ArchUnit-Regel nimmt `PreiszeitreiheAbrufService` und den Job namentlich aus — dieselbe
+   Konstruktion wie `NkBerechnungService` bei der Nebenkostenabrechnung.
+2. **`BkwTariffsResponseDTO`** statt `BkwTariffsResponse`: Die Regel `dtosShouldEndWithDTO` verlangt
+   das Suffix für alle Klassen in `..dto..` (verschachtelte Records sind als Member-Klassen
+   ausgenommen).
+3. **Neuer Design-System-Baustein `zev-toggle-button`** (Phase 14). Für Tag/Woche/Monat gab es keine
+   passende Klasse; `zev-quarter-button` trifft die Optik genau, heisst aber nach den Quartalen.
+   Die Deklarationen sind jetzt **geteilt** (`.zev-quarter-button, .zev-toggle-button`) statt
+   kopiert, samt Eintrag im Showcase.
+4. **Ein Übersetzungs-Key mehr** als geplant: `PREISE_ZEITRAUM_VERTAUSCHT` für die
+   frontendseitige Prüfung. `FEHLER_BEIM_LADEN_DER_DATEN` und `LADE_DATEN` waren schon vorhanden und
+   werden wiederverwendet.
+5. **`SystemmeldungService.erfasse` kürzt `parameter` nicht.** Die Methode `kuerze()` existiert, wird
+   aber nur von `erfasseAudit` verwendet. Der Abruf-Service kürzt deshalb selbst auf 500 Zeichen.
+   Die zentrale Lücke bleibt bestehen — ein Aufrufer mit langem Text lässt `erfasse` auflaufen. Das
+   zu schliessen gehört nicht in dieses Feature, ist aber eine Zeile in `erfasse`.
+6. **Bundle-Zahlen gemessen** (Phase 16), Produktionsbau je mit und ohne die Änderung:
+
+   | | `main-*.js` | Initial total |
+   |---|---|---|
+   | vorher | 974.06 kB | 1.04 MB |
+   | nachher | 983.46 kB | 1.05 MB |
+
+   Zuwachs **+9.4 kB** — die Vorgabe (< 20 kB) ist erfüllt. ECharts liegt in eigenen, **lazy**
+   Chunks (`charts` 675 kB, `components` 643 kB, `renderers` 84 kB, `core` 9 kB) und wird erst beim
+   Öffnen des Diagramms geladen.
+
+   **Vorbestehend:** Die Budget-Warnung von Angular (`maximumWarning: 1mb`) trat schon **vor** dieser
+   Änderung auf (41 kB über Budget, jetzt 52 kB). Sie ist eine Warnung, kein Fehler (`maximumError`
+   liegt bei 2 mb) — aber sie gehört aufgeräumt, unabhängig von diesem Feature.
+7. **Nicht umgesetzt:** Phasen 18–20 (Tests) laufen über die Commands `/3_backend-tests`,
+   `/4_frontend-unit-tests` und `/5_e2e-tests`; die Umsetzung erstellt bewusst keine Tests.

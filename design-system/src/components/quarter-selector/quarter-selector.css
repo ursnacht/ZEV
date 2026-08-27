@@ -20,7 +20,14 @@
   font-size: var(--font-size-sm);
 }
 
-.zev-quarter-button {
+/*
+ * `zev-toggle-button` ist derselbe Baustein unter neutralem Namen: eine Reihe sich gegenseitig
+ * ausschliessender Schaltflaechen, von denen eine aktiv ist. Die Quartalsauswahl war die erste
+ * Verwendung, die Preiszeitreihe (Tag/Woche/Monat) die zweite - die Deklarationen sind deshalb
+ * geteilt und nicht kopiert.
+ */
+.zev-quarter-button,
+.zev-toggle-button {
   padding: var(--spacing-xs) var(--spacing-sm);
   border: 1px solid var(--color-gray-300);
   border-radius: var(--radius-sm);
@@ -32,25 +39,29 @@
   transition: all var(--transition-fast);
 }
 
-.zev-quarter-button:hover {
+.zev-quarter-button:hover,
+.zev-toggle-button:hover {
   border-color: var(--color-primary);
   background-color: var(--color-gray-50);
 }
 
-.zev-quarter-button--active {
+.zev-quarter-button--active,
+.zev-toggle-button--active {
   background-color: var(--color-primary);
   border-color: var(--color-primary);
   color: var(--color-white);
 }
 
-.zev-quarter-button--active:hover {
+.zev-quarter-button--active:hover,
+.zev-toggle-button--active:hover {
   background-color: var(--color-primary-hover);
   border-color: var(--color-primary-hover);
 }
 
 /* Responsive: Buttons etwas kleiner auf kleinen Bildschirmen */
 @media (max-width: 600px) {
-  .zev-quarter-button {
+  .zev-quarter-button,
+  .zev-toggle-button {
     padding: var(--spacing-xs) var(--spacing-xs);
     font-size: var(--font-size-xs);
   }

@@ -119,6 +119,7 @@ Die Spalten `zev_user` / `zev_admin` / `org_admin` sind gleich dargestellt wie i
 | TranslationController    | `GET /api/translations`                                                     | `hasAuthority('translations:read')`      | ✅  | ✅        | ✅        |
 | TranslationController    | `GET /list`, `POST`, `PUT`, `DELETE`                                        | `hasAuthority('translations:manage')`    | ❌  | ✅        | ❌        |
 | TarifController          | alle                                                                        | `hasAuthority('tarife:manage')`          | ❌  | ✅        | ✅        |
+| PreiszeitreiheController | alle (`GET`, `POST /download`)                                              | `hasAuthority('tarife:manage')`          | ❌  | ✅        | ✅        |
 | MieterController         | `GET /api/mieter` (Liste), `GET /{id}`                                       | `hasAuthority('mieter:read')`            | ✅  | ✅        | ✅        |
 | MieterController         | `POST`, `PUT`, `DELETE`                                                      | `hasAuthority('mieter:manage')`          | ❌  | ✅        | ✅        |
 | DebitorController        | alle                                                                        | `hasAuthority('debitoren:manage')`       | ✅  | ✅        | ✅        |

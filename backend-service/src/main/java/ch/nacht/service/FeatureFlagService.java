@@ -2,6 +2,7 @@ package ch.nacht.service;
 
 import ch.nacht.dto.FeatureFlagDTO;
 import ch.nacht.entity.FeatureFlag;
+import ch.nacht.entity.Organisation;
 import ch.nacht.repository.OrganisationRepository;
 
 import org.slf4j.Logger;
@@ -89,6 +90,29 @@ public class FeatureFlagService {
     public boolean isEnabled(Long orgId, FeatureFlag flag) {
         Boolean override = loadOverrides(orgId).get(flag.name());
         return override != null ? override : flag.isDefaultEnabled();
+    }
+
+    /**
+     * Alle Organisationen, für die das Flag effektiv aktiv ist.
+     *
+     * <p>Nötig für mandantenübergreifende Jobs: Sie haben keinen Mandantenkontext, müssen aber
+     * wissen, ob überhaupt jemand das Feature nutzt (kein Abruf einer Fremd-API auf Vorrat) und für
+     * wen eine Systemmeldung zu erfassen ist — {@code /systemmeldungen} ist mandantenbezogen, eine
+     * Meldung ohne {@code org_id} sähe niemand.
+     *
+     * <p>Bewusst über {@link #isEnabled(Long, FeatureFlag)} und nicht direkt über die
+     * Überschreibungen: So greift auch ein später geänderter globaler Default, ohne dass diese
+     * Methode angepasst werden muss.
+     *
+     * @param flag zu prüfendes Flag
+     * @return IDs der Organisationen mit aktivem Flag, sonst leere Liste
+     */
+    @Transactional(readOnly = true)
+    public List<Long> getOrgIdsMitAktivemFlag(FeatureFlag flag) {
+        return organisationRepository.findAll().stream()
+                .map(Organisation::getId)
+                .filter(orgId -> isEnabled(orgId, flag))
+                .toList();
     }
 
     /**

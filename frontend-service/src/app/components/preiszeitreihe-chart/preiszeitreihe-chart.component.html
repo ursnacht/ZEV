@@ -1,0 +1,75 @@
+<div class="preiszeitreihe">
+  <h2 class="preiszeitreihe__titel">
+    <app-icon name="bar-chart-2"></app-icon>
+    {{ 'EINSPEISEPREISE' | translate }}
+  </h2>
+
+  @if (message) {
+    <div class="zev-message" [ngClass]="'zev-message--' + messageType" (click)="dismissMessage()">
+      {{ message }}
+    </div>
+  }
+
+  <div class="preiszeitreihe__steuerung">
+    <div class="zev-quarter-selector preiszeitreihe__spannen">
+      <button type="button" class="zev-toggle-button"
+        [class.zev-toggle-button--active]="spanne === 'TAG'" (click)="setzeSpanne('TAG')">
+        {{ 'SPANNE_TAG' | translate }}
+      </button>
+      <button type="button" class="zev-toggle-button"
+        [class.zev-toggle-button--active]="spanne === 'WOCHE'" (click)="setzeSpanne('WOCHE')">
+        {{ 'SPANNE_WOCHE' | translate }}
+      </button>
+      <button type="button" class="zev-toggle-button"
+        [class.zev-toggle-button--active]="spanne === 'MONAT'" (click)="setzeSpanne('MONAT')">
+        {{ 'SPANNE_MONAT' | translate }}
+      </button>
+      <button type="button" class="zev-toggle-button"
+        [attr.aria-label]="'ZURUECK' | translate" [title]="'ZURUECK' | translate"
+        (click)="blaettere(-1)">
+        <app-icon name="chevron-left"></app-icon>
+      </button>
+      <button type="button" class="zev-toggle-button"
+        [attr.aria-label]="'VOR' | translate" [title]="'VOR' | translate"
+        (click)="blaettere(1)">
+        <app-icon name="chevron-right"></app-icon>
+      </button>
+    </div>
+
+    <div class="zev-date-range-row">
+      <div class="zev-form-group">
+        <label for="preisVon">{{ 'VON_DATUM' | translate }}:</label>
+        <input type="date" id="preisVon" class="zev-input" name="preisVon"
+          [(ngModel)]="von" (ngModelChange)="onDatumChange()">
+      </div>
+
+      <div class="zev-form-group">
+        <label for="preisBis">{{ 'BIS_DATUM' | translate }}:</label>
+        <input type="date" id="preisBis" class="zev-input" name="preisBis"
+          [(ngModel)]="bis" (ngModelChange)="onDatumChange()">
+      </div>
+
+      <div class="zev-button-group">
+        <button type="button" class="zev-button zev-button--primary"
+          [disabled]="laedtHerunter" (click)="onHerunterladen()">
+          <app-icon name="download"></app-icon>
+          {{ laedtHerunter ? ('LADE_DATEN' | translate) : ('PREISE_HERUNTERLADEN' | translate) }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="zev-panel zev-panel--chart">
+    <div class="zev-panel__content">
+      <!-- Der Behaelter bleibt immer im DOM: ECharts braucht ein gemessenes Element, ein per @if
+           entferntes haette beim ersten Zeichnen die Groesse 0. -->
+      <div #diagramm class="preiszeitreihe__diagramm"></div>
+
+      @if (laedt) {
+        <p class="preiszeitreihe__hinweis">{{ 'DIAGRAMM_LAEDT' | translate }}</p>
+      } @else if (punkte.length === 0) {
+        <p class="preiszeitreihe__hinweis">{{ 'KEINE_PREISE_VORHANDEN' | translate }}</p>
+      }
+    </div>
+  </div>
+</div>

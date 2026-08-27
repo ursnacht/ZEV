@@ -55,6 +55,13 @@ public class SystemmeldungService {
     /** Meldungs-Key (INFO, Audit): die Solar-Verteilung wurde manuell gestartet. */
     public static final String KEY_VERTEILUNG_MANUELL = "VERTEILUNG_MANUELL_GESTARTET";
 
+    /** Kategorie-Übersetzungs-Key für Meldungen der Preiszeitreihe (Specs/Preiszeitreihe.md). */
+    public static final String KATEGORIE_PREISZEITREIHE = "SYSTEMMELDUNG_KATEGORIE_PREISZEITREIHE";
+    /** Meldungs-Key (WARN): Der Abruf der Einspeisepreise ist gescheitert. */
+    public static final String KEY_PREISZEITREIHE_ABRUF_FEHLER = "PREISZEITREIHE_ABRUF_FEHLER";
+    /** Meldungs-Key (WARN): Einzelne Preisintervalle der Quelle wurden übersprungen. */
+    public static final String KEY_PREISZEITREIHE_UEBERSPRUNGEN = "PREISZEITREIHE_WERTE_UEBERSPRUNGEN";
+
     /** Maximale Länge von {@code parameter} (DB-Spaltenbreite). */
     private static final int PARAMETER_MAX_LAENGE = 500;
 

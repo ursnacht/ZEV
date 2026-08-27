@@ -19,7 +19,14 @@ public enum FeatureFlag {
      * Steuert die Sichtbarkeit des Bereichs Nebenkostenabrechnung (Specs/Nebenkosten/).
      * Default {@code false}: Der Bereich ist im Aufbau und wird erst je Mandant freigeschaltet.
      */
-    NEBENKOSTENABRECHNUNG(false, "FEATURE_FLAG_NEBENKOSTENABRECHNUNG");
+    NEBENKOSTENABRECHNUNG(false, "FEATURE_FLAG_NEBENKOSTENABRECHNUNG"),
+
+    /**
+     * Steuert die Preiszeitreihe der dynamischen Einspeisepreise (Specs/Preiszeitreihe.md).
+     * Default {@code false}: Die Reihe ist Vorbereitung auf dynamische Tarife und wird je Mandant
+     * freigeschaltet. Der taegliche Abruf laeuft nur, wenn mindestens ein Mandant sie aktiv hat.
+     */
+    PREISZEITREIHE(false, "FEATURE_FLAG_PREISZEITREIHE");
 
     private final boolean defaultEnabled;
     private final String beschreibungKey;

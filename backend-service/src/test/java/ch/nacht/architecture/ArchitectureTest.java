@@ -384,6 +384,9 @@ class ArchitectureTest {
         /**
          * Jede mandantenfaehige Entity muss ein org_id-Feld tragen (Mandanten-Trennung).
          * Translation = global (keine Mandanten-Daten), Organisation = der Mandant selbst.
+         *
+         * <p><b>Deny by default:</b> Ausgenommen sind nur die namentlich aufgefuehrten Entities.
+         * Eine neu hinzukommende Entity ist automatisch erfasst — und das ist der Zweck der Regel.
          */
         @Test
         @DisplayName("Jede Entity hat ein org_id-Feld (Mandanten-Trennung)")
@@ -401,11 +404,26 @@ class ArchitectureTest {
                     }
                 };
 
+            // Entities ohne Mandantenbezug - namentlich, damit die Ausnahme in der Regel steht
+            // und nicht aus einem Namensmuster entsteht.
+            Set<String> ohneMandantenbezug = Set.of(
+                // Marktdaten: Die Einspeisepreise der BKW sind fuer alle Mandanten identisch, eine
+                // Kopie je Mandant waere redundant, und der taegliche Abruf-Job hat keinen
+                // Mandantenkontext (Specs/Preiszeitreihe.md, FR-2). Geschuetzt ist der Zugriff
+                // ueber die Permission tarife:manage am Controller.
+                "Preiszeitreihe");
+
             ArchRule rule = classes()
                 .that().resideInAPackage("..entity..")
                 .and().areAnnotatedWith(Entity.class)
                 .and().haveSimpleNameNotContaining("Translation")
                 .and().haveSimpleNameNotContaining("Organisation")
+                .and(new DescribedPredicate<JavaClass>("tragen Mandantendaten") {
+                    @Override
+                    public boolean test(JavaClass entity) {
+                        return !ohneMandantenbezug.contains(entity.getSimpleName());
+                    }
+                })
                 .should(haveOrgIdField);
 
             rule.check(importedClasses);
@@ -465,6 +483,59 @@ class ArchitectureTest {
                     @Override
                     public boolean test(JavaClass service) {
                         return !ohneMandantenzugriff.contains(service.getSimpleName());
+                    }
+                })
+                .should(checkFeatureFlag);
+
+            rule.check(importedClasses);
+        }
+
+        /**
+         * Dieselbe Regel fuer die Preiszeitreihe (Specs/Preiszeitreihe.md, FR-6): Jede oeffentliche
+         * Methode prueft das Feature-Flag {@code PREISZEITREIHE}.
+         *
+         * <p>Ohne sie waere der Flag reine Kosmetik — das Panel auf der Tarifseite bliebe verborgen,
+         * die API aber ueber jeden HTTP-Client erreichbar. Und ohne <b>Regel</b> kann eine spaeter
+         * ergaenzte Methode die Pruefung stillschweigend auslassen.
+         *
+         * <p><b>Ausgenommen</b> sind namentlich die Klassen, die <b>keinen Mandantenkontext haben</b>:
+         * Sie laufen auch im geplanten Job, wo kein Benutzer angemeldet ist und es folglich keine
+         * {@code org_id} gibt. Sie exponieren nichts nach aussen — der Controller spricht
+         * ausschliesslich mit {@code PreiszeitreiheService}.
+         */
+        @Test
+        @DisplayName("Jede oeffentliche Methode der Preiszeitreihe-Services prueft den Feature-Flag")
+        void preiszeitreiheServicesMustCheckFeatureFlag() {
+            ArchCondition<JavaClass> checkFeatureFlag =
+                new ArchCondition<>("in jeder oeffentlichen Methode pruefeFeatureFlag() aufrufen") {
+                    @Override
+                    public void check(JavaClass service, ConditionEvents events) {
+                        for (JavaMethod method : service.getMethods()) {
+                            if (!method.getModifiers().contains(JavaModifier.PUBLIC)) {
+                                continue;
+                            }
+                            boolean prueft = method.getMethodCallsFromSelf().stream()
+                                .anyMatch(call -> call.getTarget().getName().equals("pruefeFeatureFlag"));
+                            if (!prueft) {
+                                events.add(SimpleConditionEvent.violated(method,
+                                    method.getFullName() + " prueft den Feature-Flag nicht"));
+                            }
+                        }
+                    }
+                };
+
+            // Ohne Mandantenkontext: laufen auch im geplanten Job.
+            Set<String> ohneMandantenkontext = Set.of(
+                "PreiszeitreiheAbrufService",   // Beschaffung; prueft das Flag ueber die Mandantenmenge
+                "PreiszeitreiheDownloadJob");   // entscheidet ueber die Mandantenmenge
+
+            ArchRule rule = classes()
+                .that().resideInAPackage("..service..")
+                .and().haveSimpleNameStartingWith("Preiszeitreihe")
+                .and(new DescribedPredicate<JavaClass>("haben einen Mandantenkontext") {
+                    @Override
+                    public boolean test(JavaClass service) {
+                        return !ohneMandantenkontext.contains(service.getSimpleName());
                     }
                 })
                 .should(checkFeatureFlag);

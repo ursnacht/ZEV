@@ -124,6 +124,16 @@
     </div>
   }
 
+  <!-- Preiszeitreihe der dynamischen Einspeisepreise (Specs/Preiszeitreihe.md).
+       Nur bei aktivem Feature-Flag, und nicht neben dem offenen Formular: Sonst konkurrieren
+       Diagramm und Eingabe um die Aufmerksamkeit, und das Diagramm wird bei jedem Wechsel neu
+       aufgebaut. -->
+  @if (!showForm) {
+    <div *appFeature="'PREISZEITREIHE'">
+      <app-preiszeitreihe-chart></app-preiszeitreihe-chart>
+    </div>
+  }
+
   @if (showForm) {
     <app-tarif-form [tarif]="selectedTarif" (save)="onFormSubmit($event)"
     (cancel)="onFormCancel()"></app-tarif-form>

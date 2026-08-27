@@ -11,11 +11,14 @@ import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.comp
 import { ColumnResizeDirective } from '../../directives/column-resize.directive';
 import { formatSwissNumber } from '../../utils/number-utils';
 import { IconComponent } from '../icon/icon.component';
+import { PreiszeitreiheChartComponent } from '../preiszeitreihe-chart/preiszeitreihe-chart.component';
+import { FeatureFlagDirective } from '../../directives/feature-flag.directive';
 
 @Component({
   selector: 'app-tarif-list',
   standalone: true,
-  imports: [CommonModule, TarifFormComponent, TranslatePipe, SwissDatePipe, KebabMenuComponent, ColumnResizeDirective, IconComponent],
+  imports: [CommonModule, TarifFormComponent, TranslatePipe, SwissDatePipe, KebabMenuComponent,
+    ColumnResizeDirective, IconComponent, PreiszeitreiheChartComponent, FeatureFlagDirective],
   templateUrl: './tarif-list.component.html',
   styleUrls: ['./tarif-list.component.css']
 })
