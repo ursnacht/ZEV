@@ -1,8 +1,8 @@
 package ch.nacht.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.Check;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.PositiveOrZero;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -23,7 +23,17 @@ import java.time.LocalDateTime;
  * Umrechnung nach Europe/Zurich passiert erst bei der Ausgabe.
  */
 @Entity
-@Table(name = "preiszeitreihe", schema = "zev")
+@Table(name = "preiszeitreihe", schema = "zev", uniqueConstraints = {
+    // Spiegelt den Constraint aus V129. Notwendig, nicht dekorativ: Das native Upsert nennt
+    // ON CONFLICT (zeit_von), und in einer von Hibernate erzeugten Schema-Variante (Tests mit
+    // ddl-auto) gaebe es den Constraint sonst nicht - jeder Upsert scheiterte dort mit
+    // "no unique or exclusion constraint matching the ON CONFLICT specification".
+    @UniqueConstraint(name = "uq_preiszeitreihe_zeit_von", columnNames = {"zeit_von"})
+})
+// Ebenfalls aus V129 gespiegelt, aus demselben Grund: In einem von Hibernate erzeugten Schema
+// (Tests mit ddl-auto) gaebe es die Pruefungen sonst nicht, und ein Test koennte eine Zusicherung
+// bestaetigen, die produktiv gar nicht von der Datenbank kommt.
+@Check(name = "ck_preiszeitreihe_intervall", constraints = "zeit_von < zeit_bis")
 public class Preiszeitreihe {
 
     @Id
@@ -40,8 +50,15 @@ public class Preiszeitreihe {
     @Column(name = "zeit_bis", nullable = false)
     private LocalDateTime zeitBis;
 
+    /**
+      * Einspeisepreis in CHF/kWh — <b>darf 0 und negativ sein</b>.
+      *
+      * <p>Kein Vorzeichen-Wächter, und das ist der Punkt: Bei Überangebot (viel Sonne, wenig Last)
+      * kostet das Einspeisen Geld statt Ertrag zu bringen. Eine Prüfung auf {@code >= 0} liesse den
+      * Abruf genau in jenen Stunden scheitern, die für eine Steuerung am interessantesten sind.
+      * V132 hat den entsprechenden CHECK-Constraint aus V129 wieder entfernt.
+      */
     @NotNull(message = "Preis is required")
-    @PositiveOrZero(message = "Preis must not be negative")
     @Column(name = "preis", precision = 10, scale = 5, nullable = false)
     private BigDecimal preis;
 
@@ -66,6 +83,19 @@ public class Preiszeitreihe {
         this.zeitBis = zeitBis;
         this.preis = preis;
         this.publikation = publikation;
+    }
+
+    /**
+     * Setzt {@code aktualisiertAm}, wenn ueber JPA gespeichert wird.
+     *
+     * <p>Der Normalfall ist das native Upsert, das {@code now()} selbst schreibt. Ueber
+     * {@code save()} gaebe es ohne diesen Haken eine NOT-NULL-Verletzung — die Spalte hat einen
+     * Default in der Datenbank, aber Hibernate schickt beim Insert eine explizite {@code null}.
+     */
+    @PrePersist
+    @PreUpdate
+    void setzeAktualisierungszeitpunkt() {
+        this.aktualisiertAm = LocalDateTime.now();
     }
 
     public Long getId() {

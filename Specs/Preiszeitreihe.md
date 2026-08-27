@@ -63,7 +63,7 @@ Neue Tabelle `zev.preiszeitreihe` (Flyway `V129__Create_Preiszeitreihe.sql`):
 | `id` | `bigserial` | ja | Technischer Schlüssel |
 | `zeit_von` | `timestamp` | ja | Intervallbeginn, **UTC** |
 | `zeit_bis` | `timestamp` | ja | Intervallende, **UTC** |
-| `preis` | `numeric(10,5)` | ja | Einspeisepreis in CHF/kWh — dieselbe Praezision wie `tarif.preis` (`NUMERIC(10,5)`, V22) |
+| `preis` | `numeric(10,5)` | ja | Einspeisepreis in CHF/kWh — dieselbe Präzision wie `tarif.preis` (`NUMERIC(10,5)`, V22). **Darf 0 und negativ sein** |
 | `publikation` | `timestamp` | **nein** | `publication_timestamp` der Quelle, UTC — Herkunftsnachweis des Werts |
 | `aktualisiert_am` | `timestamp` | ja | Zeitpunkt des letzten Schreibens (Default `now()`) |
 
@@ -74,6 +74,7 @@ Neue Tabelle `zev.preiszeitreihe` (Flyway `V129__Create_Preiszeitreihe.sql`):
 * **Hinweis zur `findById`-Regel:** `servicesMustNotUseFindByIdOnFilteredRepositories` führt die Repositories ungefilterter Entities in einer Whitelist (`ungefiltert`). Lädt der Service je einen Einzelsatz über `findById`, muss `PreiszeitreiheRepository` dort ergänzt werden. Die hier beschriebenen Zugriffe brauchen kein `findById` (Abfrage nach Zeitspanne, Upsert nach `zeit_von`).
 * **Zeitzone:** Gespeichert wird **UTC, verbatim aus der Quelle**. Grund: Bei lokaler Zeit (Europe/Zurich) bricht der Unique-Schlüssel an der Zeitumstellung — in der Nacht der Rückstellung tritt die Stunde 02:00–03:00 **zweimal** auf, vier Viertelstundenwerte kollidierten mit vier anderen und würden einander überschreiben; in der Nacht der Vorstellung fehlt sie. Die Umrechnung auf Europe/Zurich passiert erst bei der Darstellung.
 * **`publikation` ist optional.** Fehlt der `publication_timestamp` in der Antwort oder ist er unlesbar, bleibt die Spalte **leer** — die Preise werden trotzdem gespeichert. Zwei Gründe: Ein `NOT NULL` hätte den gesamten Abruf scheitern lassen und 96 fehlerfreie Preise verworfen, nur weil ein Metadatum fehlt; und ein ersatzweise eingesetzter Abrufzeitpunkt wäre eine **erfundene** Herkunftsangabe. Wann geschrieben wurde, steht ohnehin in `aktualisiert_am`.
+* **0 und negative Preise sind gültig — kein Vorzeichen-Wächter.** Bei Überangebot (viel Sonne, wenig Last) kostet das Einspeisen Geld, statt Ertrag zu bringen; die Quelle liefert dann einen negativen Wert. V129 hatte hier fälschlich `CHECK (preis >= 0)`, **V132 entfernt den Constraint wieder**. Eine Prüfung auf `>= 0` liesse den Abruf genau in jenen Stunden scheitern, die für eine Steuerung am interessantesten sind — und ein abgewiesener Abruf ist eine dauerhafte Lücke (§1). Es gibt deshalb weder im Backend noch in der Datenbank eine Vorzeichenprüfung.
 * **Keine Retention:** Die Historie wächst unbegrenzt (35'040 Zeilen/Jahr — für PostgreSQL vernachlässigbar). Preise sind Marktdaten, keine Personendaten; `Specs/Datenaufbewahrung.md` braucht dafür keine Frist. Kein Löschjob.
 
 ### FR-3: Layout
@@ -135,6 +136,7 @@ Neue Tabelle `zev.preiszeitreihe` (Flyway `V129__Create_Preiszeitreihe.sql`):
 * Umwandlung je Eintrag aus `prices`:
   * `start_timestamp` / `end_timestamp` → `zeit_von` / `zeit_bis` (UTC).
   * Preis aus dem **ersten** `feed_in`-Element. Ist das Array leer, wird der Eintrag **übersprungen** und gezählt (Log auf `warn`) — ein fehlender Preis darf nicht als `0.00000` in der Reihe landen, das wäre eine Falschaussage.
+  * **Übersprungen wird nur, was fehlt — nicht, was ungewohnt aussieht.** Ein geliefertes `0` oder ein negativer Wert ist ein gültiger Marktpreis und wird übernommen (FR-2).
   * Ist `unit` **nicht** `CHF_kWh`, wird der **gesamte** Abruf abgewiesen (FR-7). Eine stillschweigende Übernahme in fremder Einheit (z.B. Rp./kWh) verfälschte die Reihe um Faktor 100.
 * Einträge mit fehlendem `start_timestamp`, fehlendem `value` oder negativem Intervall (`end` ≤ `start`) werden übersprungen und gezählt.
 * **Schreiben in aufsteigender `zeit_von`-Reihenfolge.** Job und Schaltfläche können gleichzeitig dieselben Zeilen schreiben; nehmen beide die Sperren in derselben Reihenfolge, kann kein Deadlock entstehen — der zweite wartet. Eine beliebige Reihenfolge riskierte ein `40P01`, und das kommt als `CannotAcquireLockException` durch, die **kein** Handler auf eine lesbare Antwort abbildet (§5).
@@ -175,6 +177,8 @@ Neue Tabelle `zev.preiszeitreihe` (Flyway `V129__Create_Preiszeitreihe.sql`):
 * [ ] Ein **zweiter** Abruf derselben Daten erzeugt **keine** zusätzlichen Zeilen (Upsert über `zeit_von`); ein geänderter Preis derselben Viertelstunde **überschreibt** den alten Wert.
 * [ ] Die gespeicherten Zeitstempel sind **UTC**, verbatim aus der Quelle (`start_timestamp` → `zeit_von`).
 * [ ] Der Preis wird mit 5 Nachkommastellen gespeichert (`0.138` → `0.13800`).
+* [ ] Ein **negativer** Preis (z.B. `-0.025`) wird gespeichert und im Diagramm angezeigt — nicht übersprungen und nicht abgewiesen.
+* [ ] Ein Preis von `0` wird gespeichert (und ist von „kein Preis geliefert" unterschieden: dieser Eintrag wird übersprungen).
 * [ ] `publikation` trägt den `publication_timestamp` der Antwort.
 * [ ] Fehlt `publication_timestamp` oder ist er unlesbar, werden die Preise **trotzdem** gespeichert und `publikation` bleibt leer.
 * [ ] Liefert die Quelle mehr als 10'000 Einträge, wird **nichts** gespeichert; der Abruf antwortet mit `502` und erzeugt eine Systemmeldung.
@@ -255,6 +259,7 @@ Neue Tabelle `zev.preiszeitreihe` (Flyway `V129__Create_Preiszeitreihe.sql`):
 | HTTP 4xx/5xx der Quelle | wie oben, Status im Meldungsparameter |
 | Antwort ist kein gültiges JSON / `prices` fehlt | wie oben, Meldung nennt „unerwartetes Format" |
 | `prices` ist leer | Abruf gilt als erfolgreich mit 0 Werten; Hinweis „keine Preise geliefert" in der Maske, Systemmeldung `PREISZEITREIHE_WERTE_UEBERSPRUNGEN` mit Anzahl 0 entfällt |
+| Negativer Preis oder Preis `0` | Wird gespeichert und dargestellt — gültiger Marktwert, keine Prüfung auf das Vorzeichen (FR-2) |
 | Einzelner Eintrag ohne `feed_in`/`value` | Eintrag übersprungen und gezählt, Rest wird gespeichert, `WARN`-Systemmeldung `PREISZEITREIHE_WERTE_UEBERSPRUNGEN` |
 | Fremde Einheit (`unit != CHF_kWh`) | **Kompletter** Abruf abgewiesen, nichts gespeichert |
 | Doppelte `start_timestamp` in einer Antwort | Letzter Eintrag gewinnt (Upsert), kein Abbruch |
@@ -288,6 +293,7 @@ Neue Tabelle `zev.preiszeitreihe` (Flyway `V129__Create_Preiszeitreihe.sql`):
 | `db/migration/V129__Create_Preiszeitreihe.sql` | neu: Tabelle, Unique-Constraint, Spaltenkommentare |
 | `db/migration/V130__Add_Preiszeitreihe_Translations.sql` | neu: Übersetzungen DE/EN |
 | `db/migration/V131__Add_Preiszeitreihe_Darstellung_Translations.sql` | neu: `DARSTELLUNG_LINIE`, `DARSTELLUNG_BALKEN` — eigene Migration, weil V130 bereits ausgeführt war |
+| `db/migration/V132__Preiszeitreihe_Negative_Preise.sql` | neu: entfernt `ck_preiszeitreihe_preis` aus V129 — negative Preise sind zulässig (FR-2) |
 | `entity/Preiszeitreihe.java`, `repository/PreiszeitreiheRepository.java` | neu (Vorlage `Tarif`/`TarifRepository`, Upsert nach `DebitorRepository`) |
 | `service/PreiszeitreiheService.java`, `service/PreiszeitreiheDownloadJob.java` | neu. Der Job trägt **`@Component`**, nicht `@Service` — sonst bricht `NamingConventionTests.servicesShouldEndWithService()`. Vorbild `SystemmeldungCleanupJob` |
 | `controller/PreiszeitreiheController.java`, `dto/Preiszeitreihe*DTO.java` | neu (Vorlage `TarifController`) |

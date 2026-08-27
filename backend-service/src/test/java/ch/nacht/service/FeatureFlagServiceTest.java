@@ -65,6 +65,65 @@ public class FeatureFlagServiceTest {
         orgWithOverrideFalse.setFeatureFlags(overrides);
     }
 
+    // ==================== getOrgIdsMitAktivemFlag ====================
+
+    /**
+     * Grundlage der mandantenuebergreifenden Jobs (Specs/Preiszeitreihe.md, FR-6): Sie haben keinen
+     * Mandantenkontext und muessen wissen, fuer wen ein Feature aktiv ist — sowohl um eine Fremd-API
+     * nicht auf Vorrat abzurufen als auch um Systemmeldungen zuzuordnen.
+     */
+    @Test
+    void getOrgIdsMitAktivemFlag_DefaultTrueUndKeinOverride_LiefertOrganisation() {
+        when(organisationRepository.findAll()).thenReturn(List.of(orgWithoutOverride));
+        when(organisationRepository.findById(ORG_ID)).thenReturn(Optional.of(orgWithoutOverride));
+
+        List<Long> orgIds = featureFlagService.getOrgIdsMitAktivemFlag(FeatureFlag.MESSWERTE_UPLOAD);
+
+        assertEquals(List.of(ORG_ID), orgIds);
+    }
+
+    @Test
+    void getOrgIdsMitAktivemFlag_OverrideFalse_LaesstOrganisationWeg() {
+        when(organisationRepository.findAll()).thenReturn(List.of(orgWithOverrideFalse));
+        when(organisationRepository.findById(ORG_ID)).thenReturn(Optional.of(orgWithOverrideFalse));
+
+        List<Long> orgIds = featureFlagService.getOrgIdsMitAktivemFlag(FeatureFlag.MESSWERTE_UPLOAD);
+
+        assertTrue(orgIds.isEmpty());
+    }
+
+    /** Flag mit Default {@code false}: ohne ausdrueckliche Freischaltung ist niemand dabei. */
+    @Test
+    void getOrgIdsMitAktivemFlag_DefaultFalse_LiefertNiemanden() {
+        when(organisationRepository.findAll()).thenReturn(List.of(orgWithoutOverride));
+        when(organisationRepository.findById(ORG_ID)).thenReturn(Optional.of(orgWithoutOverride));
+
+        assertTrue(featureFlagService.getOrgIdsMitAktivemFlag(FeatureFlag.PREISZEITREIHE).isEmpty());
+    }
+
+    @Test
+    void getOrgIdsMitAktivemFlag_NurFreigeschalteteOrganisation() {
+        Organisation freigeschaltet = new Organisation();
+        freigeschaltet.setId(2L);
+        Map<String, Boolean> overrides = new HashMap<>();
+        overrides.put(FeatureFlag.PREISZEITREIHE.name(), true);
+        freigeschaltet.setFeatureFlags(overrides);
+
+        when(organisationRepository.findAll()).thenReturn(List.of(orgWithoutOverride, freigeschaltet));
+        when(organisationRepository.findById(ORG_ID)).thenReturn(Optional.of(orgWithoutOverride));
+        when(organisationRepository.findById(2L)).thenReturn(Optional.of(freigeschaltet));
+
+        assertEquals(List.of(2L),
+                featureFlagService.getOrgIdsMitAktivemFlag(FeatureFlag.PREISZEITREIHE));
+    }
+
+    @Test
+    void getOrgIdsMitAktivemFlag_KeineOrganisationen_LiefertLeereListe() {
+        when(organisationRepository.findAll()).thenReturn(List.of());
+
+        assertTrue(featureFlagService.getOrgIdsMitAktivemFlag(FeatureFlag.PREISZEITREIHE).isEmpty());
+    }
+
     // ==================== getEffectiveFlags ====================
 
     @Test

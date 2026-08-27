@@ -90,7 +90,7 @@ Grundlage: `Specs/Preiszeitreihe.md`.
 |  [x]   | 16. Bundle-Kontrolle           | Produktionsbau: `main-*.js` wächst < 20 kB, ECharts in eigenem Chunk                                            |
 |  [x]   | 17. Doku nachziehen            | `Specs/Berechtigungen.md` (Controller-Matrix)                                                                   |
 |  [x]   | 21. Steuerzeile + Darstellung   | Eine Zeile auf gleicher Höhe, Umschaltung Linie/Balken, `V131` (Vibe-Ergänzung)                                  |
-|  [ ]   | 18. Backend-Tests              | `/3_backend-tests` — Service, Controller, Repository-IT, `ControllerAuthorizationTest`                           |
+|  [x]   | 18. Backend-Tests              | `/3_backend-tests` — Service, Controller, Repository-IT, `ControllerAuthorizationTest`                           |
 |  [ ]   | 19. Frontend-Unit-Tests        | `/4_frontend-unit-tests` — Service, Komponente (ECharts gemockt)                                                 |
 |  [ ]   | 20. E2E-Tests                  | `/5_e2e-tests` — nur Chromium, `serial`, Flag setzen und zurückstellen                                           |
 
@@ -602,3 +602,69 @@ Beim Ausprobieren gemeldet — beide behoben:
    ist aus `farben()` verschwunden.
 
 Keine Migration nötig; die Übersetzungen aus `V131` bleiben unverändert.
+
+---
+
+## Phase 18: Backend-Tests
+
+**70 neue Unit-Tests und 18 Integrationstests**, alle grün; komplette Suite danach 1227 Unit +
+325 Integration.
+
+| Testklasse | Anzahl | Schwerpunkt |
+|---|---|---|
+| `util/PreiszeitreiheZeitTest` | 12 | Umrechnung UTC ↔ Ortszeit, **beide Umstellungstage** (23 h / 25 h, also 92 bzw. 100 Werte) |
+| `service/PreiszeitreiheServiceTest` | 11 | Flag-Prüfung in jeder Methode, Spannenvalidierung (null, vertauscht, 366/367 Tage), Datum→UTC-Grenzen |
+| `service/PreiszeitreiheAbrufServiceTest` | 21 | Beschaffung über `MockRestServiceServer` — **echtes JSON**, also inkl. `snake_case`-Abbildung; Einheitsprüfung, übersprungene Intervalle, Zählung neu/aktualisiert, Schreibreihenfolge, Systemmeldungen, Selbstheilung, Kürzung auf 500 Zeichen |
+| `service/PreiszeitreiheDownloadJobTest` | 5 | kein Mandant mit Flag → **kein** Fremdaufruf; Fehler reisst den Lauf nicht mit |
+| `controller/PreiszeitreiheControllerTest` | 11 | Statuscodes und Klartext-Rumpf: `200`, `400`, `403`, `502` |
+| `service/FeatureFlagServiceTest` (ergänzt) | +5 | `getOrgIdsMitAktivemFlag` mit Default true/false und Override |
+| `controller/ControllerAuthorizationTest` (ergänzt) | +5 | `tarife:manage` mit echtem Security-Filter, 401/403 |
+| `repository/PreiszeitreiheRepositoryIT` | 18 | Upsert-Idempotenz, Preiskorrektur, **ausschliessende** Obergrenze, Sortierung, Constraints |
+
+### Befunde der Testerstellung (Produktivcode angepasst)
+
+1. **Die Entity spiegelte die Constraints aus V129 nicht.** `@UniqueConstraint` **und** zwei
+   `@Check` sind nachgetragen. Nicht Kosmetik: In einem von Hibernate erzeugten Schema (Tests mit
+   `ddl-auto`) gäbe es sie sonst nicht — das native `ON CONFLICT (zeit_von)` scheiterte dort mit
+   „no unique or exclusion constraint matching", und ein Test hätte Zusicherungen bestätigt, die
+   produktiv allein von Flyway kommen.
+2. **`aktualisiert_am` ist NOT NULL, JPA schickt aber explizit `null`.** Der Upsert setzt `now()`
+   selbst; ein `save()` wäre in eine NOT-NULL-Verletzung gelaufen. Behoben mit
+   `@PrePersist`/`@PreUpdate`.
+3. **Negativer Preis: zwei Wege, zwei Wächter.** Über JPA greift `@PositiveOrZero`, der Wert
+   erreicht die Datenbank nicht. Der **Upsert umgeht die Bean-Validierung** — dort ist der
+   CHECK-Constraint die einzige Verteidigungslinie. Beide Wege sind jetzt einzeln getestet.
+4. **Kein `@AfterEach` in Constraint-Tests.** Nach einer Verletzung ist die Transaktion in Postgres
+   abgebrochen; ein Aufräumen darin scheitert selbst („current transaction is aborted").
+   `@DataJpaTest` rollt ohnehin zurück.
+5. **Der WebMvc-Slice braucht `OrganisationService`** als Mock — der `OrganizationInterceptor` wird
+   mitgeladen.
+
+---
+
+## Nachtrag: negative Preise sind zulässig
+
+Fachliche Korrektur — meine Annahme in V129 (`CHECK (preis >= 0)`) war falsch. Dynamische
+Einspeisepreise können 0 und negativ sein: Bei Überangebot kostet das Einspeisen Geld, statt Ertrag
+zu bringen. Ein Vorzeichen-Wächter hätte den Abruf **genau in den interessantesten Stunden**
+scheitern lassen — und ein abgewiesener Abruf ist eine dauerhafte Lücke, weil die Quelle keine
+Historie liefert.
+
+Entfernt an **vier** Stellen — eine hätte nicht gereicht:
+
+| Ort | Vorher | Jetzt |
+|---|---|---|
+| `V129` (Datenbank) | `CHECK (preis >= 0)` | **`V132`** löscht den Constraint (V129 ist ausgeführt, laut `flyway_schema_history` mit `success = true` — sie darf nicht geändert werden) |
+| `Preiszeitreihe` (Entity) | `@PositiveOrZero` | entfällt |
+| `Preiszeitreihe` (Entity) | `@Check(… "preis >= 0")` | entfällt; der Intervall-Check bleibt |
+| `PreiszeitreiheAbrufService.umwandeln` | `if (wert.signum() < 0) return null;` | entfällt — **übersprungen wird nur, was fehlt, nicht was ungewohnt aussieht** |
+
+Die dritte Stelle war die gefährlichste: Sie hätte negative Preise **stillschweigend übersprungen**
+und in der Zählung als „übersprungen" ausgewiesen — die Reihe hätte Lücken gehabt, ohne dass ein
+Fehler sichtbar geworden wäre.
+
+Tests umgestellt: Die zwei Fälle, die eine Verletzung erwarteten, prüfen jetzt das Gegenteil
+(`upsert_NegativerPreis_WirdGespeichert`, `speichern_NegativerPreis_WirdGespeichert`), dazu ein
+neuer Fall im Abruf (`abrufen_NegativerUndNullPreis_WerdenUebernommen`). Frontend unverändert:
+`formatSwissNumber` setzt das Vorzeichen selbst, ECharts stellt negative Werte in beiden
+Darstellungen dar.

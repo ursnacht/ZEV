@@ -176,7 +176,8 @@ public class PreiszeitreiheAbrufService {
      *
      * <p>Ein leeres {@code feed_in} oder ein fehlender Wert wird <b>uebersprungen</b> und nicht als
      * {@code 0.00000} gespeichert: Kein Preis ist etwas anderes als Preis null, und die Reihe darf
-     * darueber nicht luegen.
+     * darueber nicht luegen. Ein geliefertes {@code 0} oder ein negativer Wert ist dagegen ein
+     * gueltiger Preis und wird uebernommen.
      */
     private Preiszeitreihe umwandeln(BkwTariffsResponseDTO.BkwPrice preis,
                                      LocalDateTime publikation) {
@@ -190,10 +191,9 @@ public class PreiszeitreiheAbrufService {
         if (erster == null || erster.value() == null) {
             return null;
         }
+        // Kein Vorzeichen-Filter: 0 und negative Preise sind gueltige Marktwerte (Ueberangebot).
+        // Uebersprungen wird nur, was FEHLT - nicht, was ungewohnt aussieht.
         BigDecimal wert = erster.value();
-        if (wert.signum() < 0) {
-            return null;
-        }
         LocalDateTime von = nachUtc(preis.startTimestamp());
         LocalDateTime bis = nachUtc(preis.endTimestamp());
         if (von == null || bis == null || !von.isBefore(bis)) {

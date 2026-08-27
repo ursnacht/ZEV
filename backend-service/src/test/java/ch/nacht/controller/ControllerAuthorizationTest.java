@@ -14,6 +14,7 @@ import ch.nacht.service.NkRechnungService;
 import ch.nacht.service.SystemmeldungService;
 import ch.nacht.service.OrganisationService;
 import ch.nacht.service.OrganizationContextService;
+import ch.nacht.service.PreiszeitreiheService;
 import ch.nacht.service.TarifpositionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,7 +59,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest({EinstellungenController.class, FeatureFlagController.class, TarifpositionController.class,
         EinheitController.class, MieterController.class, NkAbrechnungController.class,
-        NkRechnungController.class, SystemmeldungController.class})
+        NkRechnungController.class, SystemmeldungController.class, PreiszeitreiheController.class})
 @Import(SecurityConfig.class)
 @TestPropertySource(properties = "app.cors.allowed-origins=http://localhost:4200")
 class ControllerAuthorizationTest {
@@ -92,6 +93,9 @@ class ControllerAuthorizationTest {
 
     @MockitoBean
     private SystemmeldungService systemmeldungService;
+
+    @MockitoBean
+    private PreiszeitreiheService preiszeitreiheService;
 
     @MockitoBean
     private OrganizationContextService organizationContextService;
@@ -567,5 +571,54 @@ class ControllerAuthorizationTest {
                 .andExpect(status().isForbidden());
 
         verify(nkRechnungService, never()).ladePdf(anyLong(), anyLong());
+    }
+
+    // ==================== Preiszeitreihe: tarife:manage ====================
+    // Specs/Preiszeitreihe.md NFR-2: dieselbe Permission wie die Seite /tarife, auf der das
+    // Diagramm sitzt - lesend wie schreibend. Zusaetzlich prueft der Service das Feature-Flag;
+    // das ist hier bewusst nicht Gegenstand (PreiszeitreiheServiceTest).
+
+    @Test
+    void getPreiszeitreihe_withTarifeManage_reachesController() throws Exception {
+        when(preiszeitreiheService.getPunkte(any(), any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/preiszeitreihe?von=2026-01-01&bis=2026-01-31")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("tarife:manage"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getPreiszeitreihe_withoutPermission_forbidden() throws Exception {
+        mockMvc.perform(get("/api/preiszeitreihe?von=2026-01-01&bis=2026-01-31")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("messwerte:read"))))
+                .andExpect(status().isForbidden());
+
+        verify(preiszeitreiheService, never()).getPunkte(any(), any());
+    }
+
+    @Test
+    void getPreiszeitreihe_unauthenticated_unauthorized() throws Exception {
+        mockMvc.perform(get("/api/preiszeitreihe?von=2026-01-01&bis=2026-01-31"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void downloadPreiszeitreihe_withoutPermission_forbidden() throws Exception {
+        // Der Download ruft eine Fremd-API und schreibt - er darf niemandem offenstehen, der die
+        // Tarife nicht verwalten darf.
+        mockMvc.perform(post("/api/preiszeitreihe/download")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("debitoren:manage")))
+                        .with(csrf()))
+                .andExpect(status().isForbidden());
+
+        verify(preiszeitreiheService, never()).download();
+    }
+
+    @Test
+    void downloadPreiszeitreihe_unauthenticated_unauthorized() throws Exception {
+        mockMvc.perform(post("/api/preiszeitreihe/download").with(csrf()))
+                .andExpect(status().isUnauthorized());
+
+        verify(preiszeitreiheService, never()).download();
     }
 }
