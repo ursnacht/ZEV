@@ -1,5 +1,7 @@
 import { test, expect, Locator, Page } from '@playwright/test';
-import { navigateViaMenu, clickKebabMenuItem, waitForFormResult, waitForTableWithData } from './helpers';
+import {
+    clickKebabMenuItem, navigateViaMenu, raeumeMitWiederholung, waitForFormResult, waitForTableWithData
+} from './helpers';
 
 /**
  * tests / einheiten-verwaltung.spec.ts
@@ -12,6 +14,13 @@ import { navigateViaMenu, clickKebabMenuItem, waitForFormResult, waitForTableWit
  */
 
 // Track created einheiten for cleanup
+/**
+ * Mehr Zeit als die 30 Sekunden der Voreinstellung: Das Aufraeumen laeuft im `afterEach` und
+ * zaehlt bei Playwright zum Test-Timeout. Es muss notfalls abwarten, bis der Mieter einer parallel
+ * laufenden Nebenkostenabrechnung wieder loeschbar ist.
+ */
+test.describe.configure({ timeout: 120000 });
+
 let createdEinheitNames: string[] = [];
 
 /**
@@ -178,12 +187,11 @@ test.beforeEach(() => {
  */
 test.afterEach(async ({ page }) => {
     const gescheitert: string[] = [];
+    // Mehrere Versuche mit Pause: Haengt an der Einheit ein Mieter, den eine parallel laufende
+    // Nebenkostenabrechnung erfasst hat, ist erst der Mieter und damit auch die Einheit
+    // voruebergehend gesperrt.
     for (const name of createdEinheitNames) {
-        let erfolg = await deleteEinheitByName(page, name);
-        if (!erfolg) {
-            erfolg = await deleteEinheitByName(page, name);
-        }
-        if (!erfolg) {
+        if (!await raeumeMitWiederholung(() => deleteEinheitByName(page, name))) {
             gescheitert.push(name);
         }
     }

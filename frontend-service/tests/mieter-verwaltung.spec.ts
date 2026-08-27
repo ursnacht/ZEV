@@ -1,5 +1,8 @@
 import { test, expect, Locator, Page } from '@playwright/test';
-import { navigateViaMenu, clickKebabMenuItem, waitForFormResult, waitForTableWithData } from './helpers';
+import {
+    clickKebabMenuItem, navigateViaMenu, raeumeMitWiederholung, waitForFormResult,
+    waitForTableWithData
+} from './helpers';
 
 /**
  * tests / mieter-verwaltung.spec.ts
@@ -14,6 +17,13 @@ import { navigateViaMenu, clickKebabMenuItem, waitForFormResult, waitForTableWit
  * kein Lauf mehr mit einem anderen oder mit echten Daten ueberschneiden - und jede Anlage,
  * die trotzdem fehlschlaegt, laesst den Test ehrlich rot werden.
  */
+
+/**
+ * Mehr Zeit als die 30 Sekunden der Voreinstellung: Das Aufraeumen laeuft im `afterEach` und
+ * zaehlt bei Playwright zum Test-Timeout. Es muss notfalls abwarten, bis eine parallel laufende
+ * Nebenkostenabrechnung ihren Griff auf den Mieter loest.
+ */
+test.describe.configure({ timeout: 120000 });
 
 // Track created objects for cleanup (Mieter zuerst - die Einheit ist sonst gesperrt)
 let createdMieterNames: string[] = [];
@@ -286,21 +296,17 @@ test.beforeEach(() => {
 test.afterEach(async ({ page }) => {
     const gescheitert: string[] = [];
 
+    // Mehrere Versuche mit Pause: Laeuft parallel ein Test der Nebenkostenabrechnung, ist der
+    // frisch angelegte Mieter in dessen Abrechnung erfasst (`nk_akonto`/`nk_verbrauch`/`nk_zusatz`,
+    // ON DELETE RESTRICT) und darf bis zu deren Loeschung zu Recht nicht geloescht werden. Der
+    // parallele Test raeumt seine Abrechnung selbst ab - danach gelingt es.
     for (const name of createdMieterNames) {
-        let erfolg = await deleteMieterByName(page, name);
-        if (!erfolg) {
-            erfolg = await deleteMieterByName(page, name);
-        }
-        if (!erfolg) {
+        if (!await raeumeMitWiederholung(() => deleteMieterByName(page, name))) {
             gescheitert.push(`Mieter ${name}`);
         }
     }
     for (const name of createdEinheitNames) {
-        let erfolg = await deleteEinheitByName(page, name);
-        if (!erfolg) {
-            erfolg = await deleteEinheitByName(page, name);
-        }
-        if (!erfolg) {
+        if (!await raeumeMitWiederholung(() => deleteEinheitByName(page, name))) {
             gescheitert.push(`Einheit ${name}`);
         }
     }

@@ -6,6 +6,28 @@ import { expect, Page } from '@playwright/test';
  */
 
 /**
+ * Mietende der Fixture-Mieter dieser Suite — bewusst gesetzt und bewusst **vor** dem Zeitraum der
+ * Nebenkosten-Testabrechnung (2087).
+ *
+ * <p>Eine Nebenkostenabrechnung erfasst jeden Mieter, dessen Mietverhaeltnis in ihren Zeitraum
+ * faellt, und schreibt dafuer Zeilen in `nk_akonto`, `nk_verbrauch` und `nk_zusatz` — alle mit
+ * `ON DELETE RESTRICT` auf `mieter_id`. Ein **offenes** Mietverhaeltnis reicht bis in jede Zukunft:
+ * Solange ein NK-Test lief, war jeder frisch angelegte Testmieter nicht loeschbar (der Server
+ * meldet zu Recht "er kommt in einer Nebenkostenabrechnung vor"), und das Aufraeumen liess ihn
+ * liegen. Genau daran blieben ueber mehrere Laeufe Mieter und Einheiten in der Datenbank.
+ *
+ * <p>Die Kopplung wirkte in **beide** Richtungen: Die NK-Maske traegt jeden Mieter des Zeitraums,
+ * also auch die einer parallel laufenden Suite. Loeschte diese ihren Mieter, waehrend die NK-Maske
+ * speicherte, verletzte der Schreibvorgang den Fremdschluessel — der Server antwortete mit `500`
+ * und die Maske zeigte `[object Object]` (belegt im Lauf vom 27.08.:
+ * `500 PUT /api/nebenkosten/abrechnungen/801`).
+ *
+ * <p>Das Datum liegt weit nach den Rechnungszeitraeumen der Tests (2026) und weit vor 2087.
+ * `mieter-verwaltung.spec.ts` erreicht dasselbe seit je mit seinen 2099er-Daten.
+ */
+export const E2E_MIETENDE = '2030-12-31';
+
+/**
  * Handle Keycloak login if redirected to login page.
  * @param username Keycloak-Benutzername (Default: testuser / zev_admin)
  * @param password Passwort (Default: testpassword)
@@ -368,9 +390,48 @@ export async function loescheZeileMitText(page: Page, text: string,
         await expect(zeile).toHaveCount(0, { timeout });
         return true;
     } catch (error) {
-        console.error(`CLEANUP FEHLGESCHLAGEN: "${text}" - ${error}`);
+        // Die Meldung des Servers mitschreiben: Bleibt die Zeile stehen, hat das Loeschen einen
+        // Grund - und der stand bisher nirgends. Zwei Aufraeum-Runden gingen dafuer drauf, den
+        // Grund aus dem Verhalten zu erschliessen ("Mieter kann nicht geloescht werden: er kommt
+        // in einer Nebenkostenabrechnung vor").
+        const meldung = await page.locator('.zev-message--error').first().textContent()
+            .catch(() => null);
+        const grund = meldung ? ` - Server: "${meldung.trim()}"` : '';
+        console.error(`CLEANUP FEHLGESCHLAGEN: "${text}"${grund} - ${error}`);
         return false;
     } finally {
         page.removeAllListeners('dialog');
     }
+}
+
+/**
+ * Wiederholt einen Aufraeumschritt mit Pause, bis er gelingt.
+ *
+ * <p>Ein Loeschen kann **voruebergehend** zu Recht abgewiesen werden: Laeuft parallel ein Test der
+ * Nebenkostenabrechnung, erfasst dessen Abrechnung jeden Mieter mit Mietverhaeltnis im
+ * Abrechnungszeitraum (`nk_akonto`, `nk_verbrauch`, `nk_zusatz` - alle mit
+ * `ON DELETE RESTRICT` auf `mieter_id`). Solange diese Abrechnung existiert, antwortet der Server
+ * korrekt mit "Mieter kann nicht geloescht werden: er kommt in einer Nebenkostenabrechnung vor".
+ * Der parallele Test loescht seine Abrechnung am Ende selbst - ein spaeterer Versuch gelingt.
+ *
+ * <p>Deshalb wird gewartet und nicht sofort aufgegeben. Gelingt es nach allen Versuchen nicht,
+ * bleibt es ein echter Rueckstand und der Test soll rot werden.
+ *
+ * @param schritt   Aufraeumschritt, `true` = erledigt
+ * @param versuche  Anzahl Versuche
+ * @param pauseMs   Pause zwischen den Versuchen
+ */
+export async function raeumeMitWiederholung(schritt: () => Promise<boolean>,
+                                            versuche: number = 3,
+                                            pauseMs: number = 6000): Promise<boolean> {
+    for (let i = 1; i <= versuche; i++) {
+        if (await schritt()) {
+            return true;
+        }
+        if (i < versuche) {
+            console.error(`Aufraeumen: Versuch ${i}/${versuche} gescheitert, warte ${pauseMs} ms`);
+            await new Promise(resolve => setTimeout(resolve, pauseMs));
+        }
+    }
+    return false;
 }

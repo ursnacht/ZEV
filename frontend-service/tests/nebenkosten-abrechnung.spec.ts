@@ -16,6 +16,20 @@ import { clickKebabMenuItem, navigateViaMenu, waitForFormResult } from './helper
  */
 test.describe.configure({ mode: 'serial', timeout: 180000 });
 
+/**
+ * **Nur Chromium.** Diese Suite schaltet das mandantenweite Feature-Flag
+ * `NEBENKOSTENABRECHNUNG` ein und am Ende wieder aus. Laufen beide Browser-Projekte parallel, sehen
+ * beide `beforeAll` das Flag noch auf `false` — und wer zuerst fertig ist, schaltet es dem anderen
+ * mitten im Lauf ab. Dessen naechstes Speichern beantwortet der Server dann mit `403`
+ * (`FeatureDisabledException`) und einem Objekt-Rumpf, in der Maske als „[object Object]".
+ * `feature-flag-upload.spec.ts` zieht aus demselben Grund dieselbe Grenze.
+ */
+test.beforeEach(({ browserName }) => {
+    test.skip(browserName !== 'chromium',
+        'NEBENKOSTENABRECHNUNG ist ein mandantenweites Flag; nur in einem Browser testen, um '
+        + 'Zustands-Races zu vermeiden.');
+});
+
 const ROUTE = '/nebenkosten/abrechnung';
 
 /**
@@ -34,6 +48,9 @@ const DATUM_BIS = '2087-12-31';
 const ANZAHL_WOHNUNGEN = '99';
 
 let angelegteBezeichnungen: string[] = [];
+
+/** Fehlerantworten (>= 400) der laufenden Testinstanz — Grundlage der Diagnose in `erwarteErfolg`. */
+let fehlerAntworten: string[] = [];
 
 // ---------------------------------------------------------------------------
 // Hilfsfunktionen
@@ -107,7 +124,13 @@ async function erwarteErfolg(page: Page, was: string): Promise<void> {
     }
     const meldung = await page.locator('.zev-message--error').first().textContent()
         .catch(() => '');
-    throw new Error(`${was}: Speichern abgewiesen — "${meldung?.trim()}"`);
+    // „[object Object]" heisst: Der Server antwortete mit einem Objekt-Rumpf (500 oder ein Handler
+    // mit `Map.of("error", …)`), nicht mit dem 400-Klartext des Controllers. Dann zaehlt nur noch,
+    // was auf der Leitung stand.
+    const antworten = fehlerAntworten.length > 0
+        ? `\nFehlerantworten:\n  ${fehlerAntworten.join('\n  ')}`
+        : '';
+    throw new Error(`${was}: Speichern abgewiesen — "${meldung?.trim()}"${antworten}`);
 }
 
 /** Die Speichern-Schaltfläche am Ende der Maske. */
@@ -368,7 +391,12 @@ async function setzeNkFlag(page: Page, aktiv: boolean): Promise<boolean> {
  * abschaltete. Jetzt stellt sie ihre Vorbedingung selbst her und gibt den vorherigen Zustand am
  * Ende zurück.
  */
-test.beforeAll(async ({ browser }) => {
+test.beforeAll(async ({ browser }, testInfo) => {
+    // `test.skip` im `beforeEach` haelt die Worker-Hooks NICHT auf - sonst wuerde Firefox das Flag
+    // weiterhin umschalten, obwohl es keinen einzigen Test dieser Datei ausfuehrt.
+    if (testInfo.project.name !== 'chromium') {
+        return;
+    }
     const page = await browser.newPage();
     try {
         nkFlagVorher = await setzeNkFlag(page, true);
@@ -377,7 +405,10 @@ test.beforeAll(async ({ browser }) => {
     }
 });
 
-test.afterAll(async ({ browser }) => {
+test.afterAll(async ({ browser }, testInfo) => {
+    if (testInfo.project.name !== 'chromium') {
+        return;
+    }
     if (nkFlagVorher === null || nkFlagVorher === true) {
         return;
     }
@@ -391,9 +422,21 @@ test.afterAll(async ({ browser }) => {
     }
 });
 
-test.beforeEach(() => {
+test.beforeEach(({ page }) => {
     angelegteBezeichnungen = [];
     debitorenGebucht = false;
+
+    // Fehlerantworten des Servers mitschreiben. Die Maske zeigt bei einem Objekt-Body nur
+    // „[object Object]"; welcher Fehler dahinter steckte, war aus dem Report nicht zu holen.
+    fehlerAntworten = [];
+    page.on('response', async res => {
+        if (res.status() < 400 || !res.url().includes('/api/')) {
+            return;
+        }
+        const rumpf = await res.text().catch(() => '');
+        fehlerAntworten.push(
+            `${res.status()} ${res.request().method()} ${res.url()} -> ${rumpf.slice(0, 400)}`);
+    });
 });
 
 /**

@@ -1,5 +1,8 @@
 import { test, expect, Locator, Page } from '@playwright/test';
-import { clickKebabMenuItem, navigateViaMenu, waitForFormResult, waitForTableWithData } from './helpers';
+import {
+    E2E_MIETENDE, clickKebabMenuItem, navigateViaMenu, raeumeMitWiederholung,
+    waitForFormResult, waitForTableWithData
+} from './helpers';
 
 /**
  * tests / ladestationen.spec.ts
@@ -267,9 +270,9 @@ async function createMieter(page: Page, daten: MieterDaten): Promise<boolean> {
     await page.locator('#plz').fill('3000');
     await page.locator('#ort').fill('Bern');
     await page.locator('#mietbeginn').fill(daten.mietbeginn);
-    if (daten.mietende) {
-        await page.locator('#mietende').fill(daten.mietende);
-    }
+    // Ohne ausdruecklichen Wunsch befristet (siehe E2E_MIETENDE): Ein offenes Mietverhaeltnis wird
+    // von einer parallel laufenden NK-Testabrechnung erfasst und sperrt das Loeschen des Mieters.
+    await page.locator('#mietende').fill(daten.mietende ?? E2E_MIETENDE);
 
     await clearMessages(page);
     await page.locator('button[type="submit"]').click();
@@ -526,13 +529,16 @@ test.afterEach(async ({ page, browserName }) => {
     }
     const gescheitert: string[] = [];
 
-    /** Zweiter Versuch, bevor ein Rueckstand gemeldet wird. */
+    /**
+     * Mehrere Versuche mit Pause, bevor ein Rueckstand gemeldet wird.
+     *
+     * <p>Die Pause ist notwendig: Laeuft parallel ein Test der Nebenkostenabrechnung, ist der
+     * frisch angelegte Mieter in dessen Abrechnung erfasst (`nk_akonto`, `nk_verbrauch`,
+     * `nk_zusatz` - alle `ON DELETE RESTRICT`) und darf bis zu deren Loeschung zu Recht nicht
+     * geloescht werden. Der parallele Test raeumt seine Abrechnung selbst ab.
+     */
     async function raeumeAb(was: string, loeschen: () => Promise<boolean>): Promise<void> {
-        let erfolg = await loeschen();
-        if (!erfolg) {
-            erfolg = await loeschen();
-        }
-        if (!erfolg) {
+        if (!await raeumeMitWiederholung(loeschen)) {
             gescheitert.push(was);
         }
     }

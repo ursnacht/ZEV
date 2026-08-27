@@ -1,6 +1,7 @@
 import { test, expect, Locator, Page } from '@playwright/test';
 import {
-    clickKebabMenuItem, loescheZeileMitText, navigateViaMenu, waitForFormResult, waitForTableWithData
+    E2E_MIETENDE, clickKebabMenuItem, loescheZeileMitText, navigateViaMenu,
+    raeumeMitWiederholung, waitForFormResult, waitForTableWithData
 } from './helpers';
 
 /**
@@ -186,6 +187,9 @@ async function createMieter(page: Page): Promise<void> {
     await page.locator('#plz').fill('3000');
     await page.locator('#ort').fill('Bern');
     await page.locator('#mietbeginn').fill('2010-01-01');
+    // Befristet: siehe E2E_MIETENDE - ein offenes Mietverhaeltnis wuerde von einer parallel
+    // laufenden NK-Testabrechnung erfasst und sperrte das Loeschen dieses Mieters.
+    await page.locator('#mietende').fill(E2E_MIETENDE);
 
     await clearMessages(page);
     await page.locator('button[type="submit"]').click();
@@ -273,12 +277,16 @@ test.afterEach(async ({ page, browserName }) => {
     }
     const gescheitert: string[] = [];
 
-    /** Zweiter Versuch, bevor ein Rueckstand gemeldet wird. */
+    /**
+     * Mehrere Versuche mit Pause, bevor ein Rueckstand gemeldet wird.
+     *
+     * <p>Die Pause ist nicht Kosmetik: Laeuft parallel ein Test der Nebenkostenabrechnung, ist der
+     * frisch angelegte Mieter in dessen Abrechnung erfasst und darf bis zu deren Loeschung nicht
+     * geloescht werden - der Server weist das zu Recht ab. Genau daran blieben "E2E Zusatz Mieter"
+     * und die zugehoerige Wohnung mehrfach liegen.
+     */
     async function raeumeAb(was: string, route: string, name: string): Promise<void> {
-        let erfolg = await deleteZeileByName(page, route, name);
-        if (!erfolg) {
-            erfolg = await deleteZeileByName(page, route, name);
-        }
+        const erfolg = await raeumeMitWiederholung(() => deleteZeileByName(page, route, name));
         if (!erfolg) {
             gescheitert.push(`${was} ${name}`);
         }
