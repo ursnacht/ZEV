@@ -91,7 +91,7 @@ Grundlage: `Specs/Preiszeitreihe.md`.
 |  [x]   | 17. Doku nachziehen            | `Specs/Berechtigungen.md` (Controller-Matrix)                                                                   |
 |  [x]   | 21. Steuerzeile + Darstellung   | Eine Zeile auf gleicher Höhe, Umschaltung Linie/Balken, `V131` (Vibe-Ergänzung)                                  |
 |  [x]   | 18. Backend-Tests              | `/3_backend-tests` — Service, Controller, Repository-IT, `ControllerAuthorizationTest`                           |
-|  [ ]   | 19. Frontend-Unit-Tests        | `/4_frontend-unit-tests` — Service, Komponente (ECharts gemockt)                                                 |
+|  [x]   | 19. Frontend-Unit-Tests        | `/4_frontend-unit-tests` — Service, Komponente (ECharts gemockt)                                                 |
 |  [ ]   | 20. E2E-Tests                  | `/5_e2e-tests` — nur Chromium, `serial`, Flag setzen und zurückstellen                                           |
 
 ---
@@ -668,3 +668,25 @@ Tests umgestellt: Die zwei Fälle, die eine Verletzung erwarteten, prüfen jetzt
 neuer Fall im Abruf (`abrufen_NegativerUndNullPreis_WerdenUebernommen`). Frontend unverändert:
 `formatSwissNumber` setzt das Vorzeichen selbst, ECharts stellt negative Werte in beiden
 Darstellungen dar.
+
+---
+
+## Phase 19: Frontend-Unit-Tests
+
+**46 neue Tests** (9 Service, 37 Komponente); Suite danach 1544 in 57 Dateien.
+
+| Testdatei | Anzahl | Schwerpunkt |
+|---|---|---|
+| `services/preiszeitreihe.service.spec.ts` | 9 | URL samt Query-Parametern, leere Liste, `publikation: null`, Weitergabe von `400`/`502`/`403` mit Klartext |
+| `components/preiszeitreihe-chart/…spec.ts` | 37 | Spannen (Woche Mo–So, Monat 1.–letzter), Blättern über Monats- und **Jahresgrenze**, freie Spanne um ihre eigene Länge, Laden samt Fehlerpfaden, Download-Meldung, Umschaltung ohne Nachladen, Serien-Optionen, Meldungs-Timer |
+
+### Zwei Entscheidungen zur Testbarkeit
+
+1. **Das Zeichnen ist gestubbt** (`vi.spyOn(component, 'zeichne')`, vor dem ersten
+   `detectChanges`). ECharts wird dynamisch nachgeladen und braucht ein gemessenes Element mit
+   Canvas — in jsdom gibt es beides nicht. Geprüft wird stattdessen die Logik, und die
+   Serien-Optionen werden als **reine Funktion** aufgerufen (`serie()`, `optionen()`).
+2. **Was ein Unit-Test hier nicht kann:** Ob die Bibliothek beide Serientypen registriert hat.
+   `type: 'bar'` ohne `charts.BarChart` zeichnet stumm nichts, ECharts meldet keinen Fehler — und
+   genau das war der erste Fehlversuch. Diese Lücke deckt nur der E2E-Test (Phase 20). Der
+   Unit-Test hält dafür die andere Hälfte fest: Die Linie trägt **kein** `areaStyle`.
