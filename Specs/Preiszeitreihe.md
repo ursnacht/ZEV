@@ -173,61 +173,61 @@ Neue Tabelle `zev.preiszeitreihe` (Flyway `V129__Create_Preiszeitreihe.sql`):
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
 **Abruf und Speicherung**
-* [ ] Ein manueller Abruf über **Herunterladen** speichert die 96 Viertelstundenwerte des gelieferten Fensters und meldet Anzahl neu/aktualisiert samt Publikationszeitpunkt.
-* [ ] Ein **zweiter** Abruf derselben Daten erzeugt **keine** zusätzlichen Zeilen (Upsert über `zeit_von`); ein geänderter Preis derselben Viertelstunde **überschreibt** den alten Wert.
-* [ ] Die gespeicherten Zeitstempel sind **UTC**, verbatim aus der Quelle (`start_timestamp` → `zeit_von`).
-* [ ] Der Preis wird mit 5 Nachkommastellen gespeichert (`0.138` → `0.13800`).
-* [ ] Ein **negativer** Preis (z.B. `-0.025`) wird gespeichert und im Diagramm angezeigt — nicht übersprungen und nicht abgewiesen.
-* [ ] Ein Preis von `0` wird gespeichert (und ist von „kein Preis geliefert" unterschieden: dieser Eintrag wird übersprungen).
-* [ ] `publikation` trägt den `publication_timestamp` der Antwort.
-* [ ] Fehlt `publication_timestamp` oder ist er unlesbar, werden die Preise **trotzdem** gespeichert und `publikation` bleibt leer.
-* [ ] Liefert die Quelle mehr als 10'000 Einträge, wird **nichts** gespeichert; der Abruf antwortet mit `502` und erzeugt eine Systemmeldung.
-* [ ] Liefert die Quelle eine andere `unit` als `CHF_kWh`, wird **kein** Wert gespeichert und der Abruf als Fehler gemeldet.
-* [ ] Ein Eintrag mit leerem `feed_in` wird übersprungen, nicht als `0` gespeichert; die Antwort nennt die Zahl der übersprungenen Einträge.
-* [ ] Der geplante Job läuft täglich um 02:00 (Default-Cron `0 0 2 * * *`) und ist über `application.yml` umstellbar.
-* [ ] Hat **keine** Organisation das Flag aktiv, führt der Job **keinen** HTTP-Aufruf aus.
-* [ ] Ein fehlgeschlagener Abruf erzeugt je Organisation mit aktivem Flag eine `WARN`-Systemmeldung mit Kategorie `SYSTEMMELDUNG_KATEGORIE_PREISZEITREIHE` und Key `PREISZEITREIHE_ABRUF_FEHLER`.
-* [ ] Ein **zweiter** Fehlschlag erzeugt **keinen** zweiten Eintrag, sondern erhöht `zaehler` und `zuletzt_aufgetreten` des offenen Eintrags.
-* [ ] Ein erfolgreicher Abruf setzt die offene Fehlermeldung automatisch auf erledigt (`autoResolve`).
-* [ ] Werden einzelne Einträge übersprungen, entsteht eine `WARN`-Systemmeldung `PREISZEITREIHE_WERTE_UEBERSPRUNGEN` mit Anzahl und Zeitraum; die übrigen Werte sind gespeichert.
-* [ ] Ein Abruf ohne übersprungene Einträge setzt eine offene `PREISZEITREIHE_WERTE_UEBERSPRUNGEN`-Meldung auf erledigt.
-* [ ] Auch der **manuelle** Abruf erzeugt bei einem Fehler die Systemmeldung (nicht nur die Meldung in der Maske).
+* [x] Ein manueller Abruf über **Herunterladen** speichert die 96 Viertelstundenwerte des gelieferten Fensters und meldet Anzahl neu/aktualisiert samt Publikationszeitpunkt.
+* [x] Ein **zweiter** Abruf derselben Daten erzeugt **keine** zusätzlichen Zeilen (Upsert über `zeit_von`); ein geänderter Preis derselben Viertelstunde **überschreibt** den alten Wert.
+* [x] Die gespeicherten Zeitstempel sind **UTC**, verbatim aus der Quelle (`start_timestamp` → `zeit_von`).
+* [x] Der Preis wird mit 5 Nachkommastellen gespeichert (`0.138` → `0.13800`).
+* [x] Ein **negativer** Preis (z.B. `-0.025`) wird gespeichert und im Diagramm angezeigt — nicht übersprungen und nicht abgewiesen.
+* [x] Ein Preis von `0` wird gespeichert (und ist von „kein Preis geliefert" unterschieden: dieser Eintrag wird übersprungen).
+* [x] `publikation` trägt den `publication_timestamp` der Antwort.
+* [x] Fehlt `publication_timestamp` oder ist er unlesbar, werden die Preise **trotzdem** gespeichert und `publikation` bleibt leer.
+* [x] Liefert die Quelle mehr als 10'000 Einträge, wird **nichts** gespeichert; der Abruf antwortet mit `502` und erzeugt eine Systemmeldung.
+* [x] Liefert die Quelle eine andere `unit` als `CHF_kWh`, wird **kein** Wert gespeichert und der Abruf als Fehler gemeldet.
+* [x] Ein Eintrag mit leerem `feed_in` wird übersprungen, nicht als `0` gespeichert; die Antwort nennt die Zahl der übersprungenen Einträge.
+* [x] Der geplante Job läuft täglich um 02:00 (Default-Cron `0 0 2 * * *`) und ist über `application.yml` umstellbar.
+* [x] Hat **keine** Organisation das Flag aktiv, führt der Job **keinen** HTTP-Aufruf aus.
+* [x] Ein fehlgeschlagener Abruf erzeugt je Organisation mit aktivem Flag eine `WARN`-Systemmeldung mit Kategorie `SYSTEMMELDUNG_KATEGORIE_PREISZEITREIHE` und Key `PREISZEITREIHE_ABRUF_FEHLER`.
+* [x] Ein **zweiter** Fehlschlag erzeugt **keinen** zweiten Eintrag, sondern erhöht `zaehler` und `zuletzt_aufgetreten` des offenen Eintrags.
+* [x] Ein erfolgreicher Abruf setzt die offene Fehlermeldung automatisch auf erledigt (`autoResolve`).
+* [x] Werden einzelne Einträge übersprungen, entsteht eine `WARN`-Systemmeldung `PREISZEITREIHE_WERTE_UEBERSPRUNGEN` mit Anzahl und Zeitraum; die übrigen Werte sind gespeichert.
+* [x] Ein Abruf ohne übersprungene Einträge setzt eine offene `PREISZEITREIHE_WERTE_UEBERSPRUNGEN`-Meldung auf erledigt.
+* [x] Auch der **manuelle** Abruf erzeugt bei einem Fehler die Systemmeldung (nicht nur die Meldung in der Maske).
 
 **Darstellung**
-* [ ] Der Bereich **Einspeisepreise** erscheint auf `/tarife` unterhalb der Tarifliste.
-* [ ] Beim Öffnen zeigt das Diagramm den **heutigen Tag**.
-* [ ] **Tag / Woche / Monat** setzen die Spanne; die aktive Auswahl ist visuell markiert.
-* [ ] Bereichsauswahl, Pfeile, Datumsfelder, Darstellungsumschaltung und **Herunterladen** stehen in **einer** Zeile und haben dieselbe Höhe (38 px).
-* [ ] Die Umschaltung **Linie / Balken** steht zwischen **Datum bis** und **Herunterladen**.
-* [ ] Beim Öffnen ist **Linie** aktiv; ein Klick auf **Balken** zeigt Balken je Viertelstunde, ein Klick auf **Linie** wieder die Stufenlinie.
-* [ ] Die Linie ist eine **reine** Linie ohne Flächenfüllung.
-* [ ] Beide Darstellungen zeichnen tatsächlich etwas — keine der beiden bleibt leer.
-* [ ] Das Umschalten der Darstellung löst **keinen** HTTP-Aufruf aus.
-* [ ] **Datum von / Datum bis** setzen eine freie Spanne und heben die TAG/WOCHE/MONAT-Markierung auf.
-* [ ] **‹ / ›** verschieben die Spanne um genau ihre Länge; die Werte werden neu geladen.
-* [ ] Mausrad/Touch zoomt innerhalb der geladenen Spanne, der Slider verschiebt den Ausschnitt — **ohne** neuen HTTP-Aufruf.
-* [ ] Die Linie ist eine **Stufenlinie** (ein Preis gilt für die ganze Viertelstunde).
-* [ ] Tooltip und Achsenbeschriftung zeigen Zahlen im Schweizer Format (Punkt als Dezimal-, Hochkomma als Tausendertrennzeichen), `–` bei Fehlwerten.
-* [ ] Ohne Werte in der Spanne erscheint der Hinweis `KEINE_PREISE_VORHANDEN` statt eines leeren Diagramms.
-* [ ] Das Diagramm ist im Dark Mode lesbar (Farben aus Design-Tokens).
-* [ ] Alle Texte des Bereichs kommen aus dem `TranslationService` (kein hartkodierter Text), DE und EN vorhanden.
-* [ ] ECharts liegt **nicht** im Initial-Bundle: Nach dem Produktionsbau wächst `main-*.js` um weniger als 20 kB, die Bibliothek steht in einem eigenen Chunk.
-* [ ] Scheitert das Nachladen der Bibliothek, erscheint eine Fehlermeldung und die Seite bleibt bedienbar.
+* [x] Der Bereich **Einspeisepreise** erscheint auf `/tarife` unterhalb der Tarifliste.
+* [x] Beim Öffnen zeigt das Diagramm den **heutigen Tag**.
+* [x] **Tag / Woche / Monat** setzen die Spanne; die aktive Auswahl ist visuell markiert.
+* [x] Bereichsauswahl, Pfeile, Datumsfelder, Darstellungsumschaltung und **Herunterladen** stehen in **einer** Zeile und haben dieselbe Höhe (38 px).
+* [x] Die Umschaltung **Linie / Balken** steht zwischen **Datum bis** und **Herunterladen**.
+* [x] Beim Öffnen ist **Linie** aktiv; ein Klick auf **Balken** zeigt Balken je Viertelstunde, ein Klick auf **Linie** wieder die Stufenlinie.
+* [x] Die Linie ist eine **reine** Linie ohne Flächenfüllung.
+* [x] Beide Darstellungen zeichnen tatsächlich etwas — keine der beiden bleibt leer.
+* [x] Das Umschalten der Darstellung löst **keinen** HTTP-Aufruf aus.
+* [x] **Datum von / Datum bis** setzen eine freie Spanne und heben die TAG/WOCHE/MONAT-Markierung auf.
+* [x] **‹ / ›** verschieben die Spanne um genau ihre Länge; die Werte werden neu geladen.
+* [x] Mausrad/Touch zoomt innerhalb der geladenen Spanne, der Slider verschiebt den Ausschnitt — **ohne** neuen HTTP-Aufruf.
+* [x] Die Linie ist eine **Stufenlinie** (ein Preis gilt für die ganze Viertelstunde).
+* [x] Tooltip und Achsenbeschriftung zeigen Zahlen im Schweizer Format (Punkt als Dezimal-, Hochkomma als Tausendertrennzeichen), `–` bei Fehlwerten.
+* [x] Ohne Werte in der Spanne erscheint der Hinweis `KEINE_PREISE_VORHANDEN` statt eines leeren Diagramms.
+* [x] Das Diagramm ist im Dark Mode lesbar (Farben aus Design-Tokens).
+* [x] Alle Texte des Bereichs kommen aus dem `TranslationService` (kein hartkodierter Text), DE und EN vorhanden.
+* [x] ECharts liegt **nicht** im Initial-Bundle: Nach dem Produktionsbau wächst `main-*.js` um weniger als 20 kB, die Bibliothek steht in einem eigenen Chunk.
+* [x] Scheitert das Nachladen der Bibliothek, erscheint eine Fehlermeldung und die Seite bleibt bedienbar.
 * [ ] `GET` über einen Monat (2'976 Punkte) antwortet in unter 500 ms (im Integrationstest gemessen).
 
 **Sicherheit und Flag**
-* [ ] Ohne Permission `tarife:manage` liefern `GET /api/preiszeitreihe` und `POST /api/preiszeitreihe/download` **403**.
-* [ ] Bei deaktiviertem Flag `PREISZEITREIHE` liefern beide Endpunkte **403**, auch mit `tarife:manage`.
-* [ ] Bei deaktiviertem Flag ist der Bereich auf `/tarife` **nicht** sichtbar.
-* [ ] Das Flag ist unter `/einstellungen` je Mandant schaltbar (nur `zev_admin`, Permission `featureflags:manage`).
+* [x] Ohne Permission `tarife:manage` liefern `GET /api/preiszeitreihe` und `POST /api/preiszeitreihe/download` **403**.
+* [x] Bei deaktiviertem Flag `PREISZEITREIHE` liefern beide Endpunkte **403**, auch mit `tarife:manage`.
+* [x] Bei deaktiviertem Flag ist der Bereich auf `/tarife` **nicht** sichtbar.
+* [x] Das Flag ist unter `/einstellungen` je Mandant schaltbar (nur `zev_admin`, Permission `featureflags:manage`).
 
 **Fehlerfälle**
-* [ ] Ist die Quelle nicht erreichbar, bleibt die Maske bedienbar und zeigt eine lesbare Fehlermeldung (kein `[object Object]`, keine leere Meldung).
-* [ ] `GET` mit `von` nach `bis` liefert **400** mit lesbarer Meldung.
-* [ ] `GET` mit einer Spanne über 366 Tagen liefert **400**.
-* [ ] `GET` auf eine Spanne ohne Daten liefert **200** und eine leere Liste.
-* [ ] `GET` liefert die Zeitpunkte in Ortszeit (Europe/Zurich), korrekt aus UTC umgerechnet; ein Tag mit Zeitumstellung liefert **92** bzw. **100** Werte.
-* [ ] Ein Fehler der **Quelle** ergibt `502`, eine fehlende/ungültige Konfiguration `400` — beide mit Klartext-Rumpf.
+* [x] Ist die Quelle nicht erreichbar, bleibt die Maske bedienbar und zeigt eine lesbare Fehlermeldung (kein `[object Object]`, keine leere Meldung).
+* [x] `GET` mit `von` nach `bis` liefert **400** mit lesbarer Meldung.
+* [x] `GET` mit einer Spanne über 366 Tagen liefert **400**.
+* [x] `GET` auf eine Spanne ohne Daten liefert **200** und eine leere Liste.
+* [x] `GET` liefert die Zeitpunkte in Ortszeit (Europe/Zurich), korrekt aus UTC umgerechnet; ein Tag mit Zeitumstellung liefert **92** bzw. **100** Werte.
+* [x] Ein Fehler der **Quelle** ergibt `502`, eine fehlende/ungültige Konfiguration `400` — beide mit Klartext-Rumpf.
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
