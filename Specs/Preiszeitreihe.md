@@ -213,7 +213,6 @@ Neue Tabelle `zev.preiszeitreihe` (Flyway `V129__Create_Preiszeitreihe.sql`):
 * [x] Alle Texte des Bereichs kommen aus dem `TranslationService` (kein hartkodierter Text), DE und EN vorhanden.
 * [x] ECharts liegt **nicht** im Initial-Bundle: Nach dem Produktionsbau wächst `main-*.js` um weniger als 20 kB, die Bibliothek steht in einem eigenen Chunk.
 * [x] Scheitert das Nachladen der Bibliothek, erscheint eine Fehlermeldung und die Seite bleibt bedienbar.
-* [ ] `GET` über einen Monat (2'976 Punkte) antwortet in unter 500 ms (im Integrationstest gemessen).
 
 **Sicherheit und Flag**
 * [x] Ohne Permission `tarife:manage` liefern `GET /api/preiszeitreihe` und `POST /api/preiszeitreihe/download` **403**.
@@ -232,7 +231,8 @@ Neue Tabelle `zev.preiszeitreihe` (Flyway `V129__Create_Preiszeitreihe.sql`):
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
 ### NFR-1: Performance
-* Ein Monat sind bis zu **2'976** Punkte (31 × 96). `GET` antwortet dafür in **< 500 ms**, das Diagramm rendert in **< 1 s**. Keine serverseitige Verdichtung — die Rohauflösung ist der Zweck der Reihe.
+* Ein Monat sind bis zu **2'976** Punkte (31 × 96). Zielgrössen: `GET` unter **500 ms**, Diagramm unter **1 s**. Keine serverseitige Verdichtung — die Rohauflösung ist der Zweck der Reihe.
+* **Bewusst kein Akzeptanzkriterium.** Diese Zahlen sind Entwurfsziele, keine geprüfte Zusicherung: Eine Zeitschwelle, gemessen auf einer Testcontainers-Instanz im Buildlauf, sagt nichts über die Produktion — sie hängt an Maschine, Last und Datenbestand des Testrechners. Ein Test darüber wäre entweder so grosszügig, dass er nichts fängt, oder so streng, dass er willkürlich rot wird. Gemessen wird bei einem konkreten Verdacht, nicht auf Vorrat.
 * Die Abfrage läuft über einen Index auf `zeit_von` (der Unique-Constraint genügt).
 * Der Abruf der Quelle beansprucht das Backend nicht messbar (eine Anfrage, 96 Einträge, einmal täglich).
 * **ECharts gehört nicht ins Initial-Bundle.** Das Haupt-Bundle liegt heute bei ~**950 kB** gegen die Budgets in `angular.json` (`maximumWarning: 1mb`, `maximumError: 2mb`); ECharts statisch importiert überschreitet die Warnschwelle und verlangsamt **jede** Seite, auch ohne Diagramm. Deshalb wird die Bibliothek **dynamisch nachgeladen** (FR-3) und liegt in einem eigenen Chunk. Prüfkriterium nach dem Build: `main-*.js` wächst um **< 20 kB**, ECharts erscheint in einem separaten Chunk.
