@@ -80,37 +80,37 @@ Während die Bibliothek nachgeladen wird, zeigt das Panel `DIAGRAMM_LAEDT`; sche
 
 **Verhalten bleibt**
 * [ ] Die **14 bestehenden E2E-Tests** in `tests/messwerte-grafik.spec.ts` laufen **unverändert** grün — insbesondere der Pixel-Vergleich „Zeitraum mit Messwerten bemalt mehr als einer ohne".
-* [ ] Die Bedienung ist unverändert: Einheiten-Mehrfachauswahl, „Alle auswählen", Quartals-Schaltflächen, `Datum von` zieht `Datum bis` auf das Monatsende, gesperrte Schaltfläche ohne Auswahl, Fehlermeldung bei vertauschtem Zeitraum.
-* [ ] Ein Panel je gewählter Einheit mit Titel `Name [Typ]`; die Erfolgsmeldung nennt Datenpunkte und Einheiten.
-* [ ] Beide Datenreihen erscheinen, die ZEV-Reihe negativ aufgetragen.
+* [x] Die Bedienung ist unverändert: Einheiten-Mehrfachauswahl, „Alle auswählen", Quartals-Schaltflächen, `Datum von` zieht `Datum bis` auf das Monatsende, gesperrte Schaltfläche ohne Auswahl, Fehlermeldung bei vertauschtem Zeitraum.
+* [x] Ein Panel je gewählter Einheit mit Titel `Name [Typ]`; die Erfolgsmeldung nennt Datenpunkte und Einheiten.
+* [x] Beide Datenreihen erscheinen, die ZEV-Reihe negativ aufgetragen.
 
 **Neu und geändert**
-* [ ] Mausrad/Touch zoomt innerhalb des geladenen Zeitraums, der Slider verschiebt den Ausschnitt — **ohne** neuen HTTP-Aufruf.
-* [ ] Die Linie ist eine **Stufenlinie**, ohne Flächenfüllung.
-* [ ] Zahlen in Achsenbeschriftung, Tooltip und Legende stehen im Schweizer Format (Punkt als Dezimal-, Hochkomma als Tausendertrennzeichen). In `messwerte-chart.component.ts` kommt weder `toLocaleString` noch `toFixed` vor; die Formatierung läuft ausschliesslich über `formatSwissNumber`. (Projektweit sind beide zulässig — `number-utils.ts` verwendet `toFixed` selbst, und genau dort gehört es hin.)
-* [ ] Die Legendennamen kommen aus dem `TranslationService` (`TOTAL`, `ZEV`) und stehen beim Zeichnen in der aktiven Sprache. **Nicht** gefordert ist, dass ein Sprachwechsel ein bereits gezeichnetes Diagramm erneuert (FR-3, bekannte Einschränkung).
-* [ ] Achsen-, Gitter- und Reihenfarben stammen aus Design-Tokens. **Keine Diagrammfarbe** ist ein Literal; die Rückfallwerte im gemeinsamen Farb-Baustein sind erlaubt und erwünscht (ohne sie wäre das Diagramm unsichtbar, falls ein Token fehlt).
-* [ ] Die Achsentitel kommen aus `ZEIT` und `KWH`, nicht aus festem Text.
-* [ ] Das Diagramm folgt einer Grössenänderung des Panels (kein `responsive: false`, keine manuelle Canvas-Berechnung).
-* [ ] Beim Verlassen der Seite wird die ECharts-Instanz freigegeben und der `ResizeObserver` abgemeldet.
+* [x] Mausrad/Touch zoomt innerhalb des geladenen Zeitraums, der Slider verschiebt den Ausschnitt — **ohne** neuen HTTP-Aufruf.
+* [x] Die Linie ist eine **Stufenlinie**, ohne Flächenfüllung.
+* [x] Zahlen in Achsenbeschriftung, Tooltip und Legende stehen im Schweizer Format (Punkt als Dezimal-, Hochkomma als Tausendertrennzeichen). In `messwerte-chart.component.ts` kommt weder `toLocaleString` noch `toFixed` vor; die Formatierung läuft ausschliesslich über `formatSwissNumber`. (Projektweit sind beide zulässig — `number-utils.ts` verwendet `toFixed` selbst, und genau dort gehört es hin.)
+* [x] Die Legendennamen kommen aus dem `TranslationService` (`TOTAL`, `ZEV`) und stehen beim Zeichnen in der aktiven Sprache. **Nicht** gefordert ist, dass ein Sprachwechsel ein bereits gezeichnetes Diagramm erneuert (FR-3, bekannte Einschränkung).
+* [x] Achsen-, Gitter- und Reihenfarben stammen aus Design-Tokens. **Keine Diagrammfarbe** ist ein Literal; die Rückfallwerte im gemeinsamen Farb-Baustein sind erlaubt und erwünscht (ohne sie wäre das Diagramm unsichtbar, falls ein Token fehlt).
+* [x] Die Achsentitel kommen aus `ZEIT` und `KWH`, nicht aus festem Text.
+* [x] Das Diagramm folgt einer Grössenänderung des Panels (kein `responsive: false`, keine manuelle Canvas-Berechnung).
+* [x] Beim Verlassen der Seite wird die ECharts-Instanz freigegeben und der `ResizeObserver` abgemeldet.
 
 **Sicherheit unverändert**
-* [ ] `/chart` bleibt mit der Permission `messwerte:read` erreichbar und ohne sie gesperrt (`composite-roles.spec.ts` deckt das mit einem Fall ab).
+* [x] `/chart` bleibt mit der Permission `messwerte:read` erreichbar und ohne sie gesperrt (`composite-roles.spec.ts` deckt das mit einem Fall ab).
 
 **Bundle und Abhängigkeit**
-* [ ] `chart.js` steht nicht mehr in `package.json`, und `grep -r "chart.js" frontend-service/src` findet nichts.
-* [ ] Nach dem Produktionsbau ist `main-*.js` **kleiner** als vorher; die Zahl wird gemessen und im Umsetzungsplan festgehalten.
-* [ ] ECharts liegt weiterhin **nicht** im Initial-Bundle, sondern in eigenen Chunks (dynamischer Import).
-* [ ] Auf der Seite **Lizenzen** erscheint chart.js nicht mehr.
+* [x] `chart.js` steht nicht mehr in `package.json`, und `grep -r "chart.js" frontend-service/src` findet nichts.
+* [x] Nach dem Produktionsbau ist `main-*.js` **kleiner** als vorher; die Zahl wird gemessen und im Umsetzungsplan festgehalten.
+* [x] ECharts liegt weiterhin **nicht** im Initial-Bundle, sondern in eigenen Chunks (dynamischer Import).
+* [x] Auf der Seite **Lizenzen** erscheint chart.js nicht mehr.
 
 **Gemeinsame Bausteine**
-* [ ] Nachladen der Bibliothek, Farben und Zeitformatierung stehen **einmal** im Projekt und werden von beiden Diagrammen genutzt.
-* [ ] Die Tests der Preiszeitreihe (37 Unit, 13 E2E) laufen nach der Umstellung unverändert grün.
+* [x] Nachladen der Bibliothek, Farben und Zeitformatierung stehen **einmal** im Projekt und werden von beiden Diagrammen genutzt.
+* [x] Die Tests der Preiszeitreihe (37 Unit, 13 E2E) laufen nach der Umstellung unverändert grün.
 
 **Fehlerfälle**
-* [ ] Scheitert das Nachladen der Bibliothek, erscheint eine Fehlermeldung, und die Seite bleibt bedienbar (Auswahl, Zeitraum, Navigation).
-* [ ] Ein Zeitraum ohne Messwerte führt zu einer Meldung mit `0` Datenpunkten; das Panel entsteht, das Diagramm bleibt leer, die Seite bleibt bedienbar.
-* [ ] Ein Fehler beim Laden der Messwerte zeigt eine lesbare Meldung (kein `[object Object]`).
+* [x] Scheitert das Nachladen der Bibliothek, erscheint eine Fehlermeldung, und die Seite bleibt bedienbar (Auswahl, Zeitraum, Navigation).
+* [x] Ein Zeitraum ohne Messwerte führt zu einer Meldung mit `0` Datenpunkten; das Panel entsteht, das Diagramm bleibt leer, die Seite bleibt bedienbar.
+* [x] Ein Fehler beim Laden der Messwerte zeigt eine lesbare Meldung (kein `[object Object]`).
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
