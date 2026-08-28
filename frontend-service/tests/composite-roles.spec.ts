@@ -70,4 +70,19 @@ test.describe('Composite-Roles: permission-basierter Zugriff', () => {
 
         await expect(page).toHaveURL(/\/statistik$/);
     });
+
+    /**
+     * Die Messwerte-Grafik haengt an `messwerte:read` — die Permission hat auch `zev_user`. Der Fall
+     * steht hier, weil der Wechsel der Diagramm-Bibliothek (Specs/EChart.md) die Seite umgebaut hat:
+     * Er belegt, dass die Absicherung dabei unveraendert geblieben ist.
+     */
+    test('zev_user kann die Messwerte-Grafik ansehen (messwerte:read)', async ({ page }) => {
+        await loginAs(page, MEMBER.user, MEMBER.pass);
+        await gotoRoute(page, '/chart');
+
+        await expect(page).toHaveURL(/\/chart$/);
+        // Die Maske ist da und bedienbar, nicht bloss die Route erreichbar.
+        await expect(page.locator('#einheit-select-all')).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('#dateFrom')).toBeVisible();
+    });
 });

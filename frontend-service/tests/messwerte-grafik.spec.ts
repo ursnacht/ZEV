@@ -24,8 +24,12 @@ const CANVAS = '.zev-panel--chart canvas';
 async function oeffneGrafik(page: Page): Promise<void> {
     await navigateViaMenu(page, '/chart');
     await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
-    // Die Einheiten kommen aus einer HTTP-Antwort; ohne sie ist die Maske nicht bedienbar.
-    await page.locator('#einheit-select-all').waitFor({ state: 'visible', timeout: 15000 });
+    // Auf die ERSTE echte Einheit warten, nicht auf `#einheit-select-all`: Das Kästchen „Alle
+    // auswählen" steht **statisch** im Template und ist auch sichtbar, solange die Einheiten noch
+    // nicht geladen sind. Ein `count()` direkt danach liest 0 — dieser Test war deshalb flaky, und
+    // dieselbe Falle hat schon eine Messung verdorben.
+    await page.locator('.zev-checkbox-item:not(.zev-checkbox-item--select-all) input[type="checkbox"]')
+        .first().waitFor({ state: 'attached', timeout: 20000 });
 }
 
 function anzeigenButton(page: Page) {
@@ -272,6 +276,47 @@ test.describe('Messwerte-Grafik - Diagramm', () => {
         // Die Maske bleibt bedienbar: Panel und Canvas entstehen, nur ohne Datenreihe.
         await expect(page.locator(CANVAS)).toBeVisible({ timeout: 20000 });
         await expect(anzeigenButton(page)).toBeEnabled();
+    });
+
+    /**
+     * Zoomen: Mausrad über dem Diagramm ändert das Bild — **ohne** neuen Server-Aufruf.
+     *
+     * Der Zoom kam mit dem Wechsel auf ECharts (`Specs/EChart.md`) und ist die einzige neue
+     * Funktion dieses Umbaus. Geprüft wird über die bemalten Pixel: Ein anderer Ausschnitt ergibt
+     * ein anderes Bild. Ein Zoom, der zufällig **genau** dieselbe Pixelzahl bemalt, ist bei
+     * fünfstelligen Zahlen praktisch ausgeschlossen.
+     */
+    test('should zoom with the mouse wheel without asking the server', async ({ page }) => {
+        await oeffneGrafik(page);
+        await ersteEinheit(page).check();
+
+        const datenpunkte = await zeigeAn(page);
+        test.skip(!datenpunkte, 'Im Vorquartal liegen keine Messwerte - Zoom nicht pruefbar');
+        const vorher = await warteAufGezeichnetesDiagramm(page);
+
+        let aufrufe = 0;
+        page.on('request', (r) => {
+            if (r.url().includes('/api/messwerte')) {
+                aufrufe++;
+            }
+        });
+
+        // Das Diagramm liegt unterhalb des Formulars und kann teilweise ausserhalb des
+        // Sichtfensters sein - ein Mausrad-Ereignis an einer nicht sichtbaren Stelle erreicht
+        // ECharts nicht.
+        const canvas = page.locator(CANVAS).first();
+        await canvas.scrollIntoViewIfNeeded();
+        const flaeche = await canvas.boundingBox();
+        await page.mouse.move(flaeche!.x + flaeche!.width / 2, flaeche!.y + flaeche!.height / 2);
+        for (let i = 0; i < 5; i++) {
+            await page.mouse.wheel(0, -300);
+            await page.waitForTimeout(120);
+        }
+
+        await expect.poll(() => gezeichnetePixel(page), { timeout: 10000 })
+            .not.toBe(vorher);
+        expect(aufrufe).toBe(0);
+        page.removeAllListeners('request');
     });
 
     /**

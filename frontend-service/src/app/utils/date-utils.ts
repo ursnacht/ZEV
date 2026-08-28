@@ -100,3 +100,32 @@ export function swissToIsoDate(swissDate: string): string {
 
   return `${year}-${month}-${day}`;
 }
+
+/**
+ * Formats a date to Swiss date and time (dd.MM.yyyy HH:mm)
+ *
+ * Bewusst manuell gebildet und **nicht** über `toLocaleString()`: Das haengt an der
+ * Laufzeit-Locale und liefert je nach Umgebung ein anderes Trennzeichen
+ * (`Specs/generell.md`, Zahlenformatierung).
+ *
+ * @param date - Date object or ISO string
+ * @param fallback - Value to return if date is null/undefined (default: '-')
+ * @returns Formatted string (dd.MM.yyyy HH:mm) or fallback value
+ *
+ * @example
+ * formatSwissDateTime('2026-08-27T15:50:00') // '27.08.2026 15:50'
+ * formatSwissDateTime(null) // '-'
+ */
+export function formatSwissDateTime(date: Date | string | null | undefined,
+                                    fallback: string = '-'): string {
+  if (date === null || date === undefined || date === '') {
+    return fallback;
+  }
+  const wert = date instanceof Date ? date : new Date(date);
+  if (isNaN(wert.getTime())) {
+    return fallback;
+  }
+  const zwei = (teil: number) => String(teil).padStart(2, '0');
+  return `${zwei(wert.getDate())}.${zwei(wert.getMonth() + 1)}.${wert.getFullYear()} `
+    + `${zwei(wert.getHours())}:${zwei(wert.getMinutes())}`;
+}

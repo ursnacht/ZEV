@@ -30,7 +30,6 @@
     "@angular/platform-browser-dynamic": "^21.2.21",
     "@angular/router": "^21.2.21",
     "@zev/design-system": "file:../design-system",
-    "chart.js": "4.5.1",
     "echarts": "6.1.0",
     "keycloak-angular": "^21.0.0",
     "keycloak-js": "^25.0.0",

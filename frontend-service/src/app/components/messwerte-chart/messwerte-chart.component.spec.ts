@@ -1,21 +1,48 @@
 import { createSpyObj, SpyObj } from '../../../testing/spy';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MesswerteChartComponent } from './messwerte-chart.component';
-import { MesswerteService } from '../../services/messwerte.service';
+import { MesswerteService, MesswertData } from '../../services/messwerte.service';
 import { EinheitService } from '../../services/einheit.service';
 import { TranslationService } from '../../services/translation.service';
 import { Einheit, EinheitTyp } from '../../models/einheit.model';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
+/**
+ * Unit-Tests der Messwerte-Grafik (`Specs/EChart.md`).
+ *
+ * <p><b>Das Zeichnen ist gestubbt.</b> ECharts wird dynamisch nachgeladen und braucht ein gemessenes
+ * Element mit Canvas — in jsdom gibt es beides nicht. Ohne den Stub liefe nach dem Testende ein
+ * `setTimeout` in eine Zeichnung, deren Fehler niemand mehr zuordnet. Geprüft wird deshalb die
+ * Logik, und die Diagramm-Optionen werden als **reine Funktion** aufgerufen.
+ *
+ * <p>Dass beide Datenreihen tatsächlich gezeichnet werden, zeigt nur der E2E-Test
+ * (`tests/messwerte-grafik.spec.ts`) — er vergleicht die bemalten Pixel eines Zeitraums mit und ohne
+ * Messwerte.
+ */
 describe('MesswerteChartComponent', () => {
   let component: MesswerteChartComponent;
   let fixture: ComponentFixture<MesswerteChartComponent>;
   let messwerteServiceSpy: SpyObj<MesswerteService>;
   let einheitServiceSpy: SpyObj<EinheitService>;
   let translationServiceSpy: SpyObj<TranslationService>;
+  let zeichnenSpy: ReturnType<typeof vi.spyOn>;
 
   const mockConsumer: Einheit = { id: 1, name: 'Wohnung A', typ: EinheitTyp.CONSUMER };
   const mockProducer: Einheit = { id: 2, name: 'Solar Anlage', typ: EinheitTyp.PRODUCER };
+
+  const messwerte: MesswertData[] = [
+    { zeit: '2026-01-15T10:00:00', total: 1.5, zev: 0.5 },
+    { zeit: '2026-01-15T10:15:00', total: 2.25, zev: 1.25 }
+  ];
+
+  /** Zugriff auf die privaten Bausteine — Testcode darf das, Produktivcode nicht. */
+  function privat(): {
+    optionen: (data: MesswertData[]) => Record<string, unknown>;
+    legende: (key: string, summe: number, kwh: string) => string;
+    reihe: (name: string, daten: number[][], farbe: string) => Record<string, unknown>;
+  } {
+    return component as unknown as ReturnType<typeof privat>;
+  }
 
   beforeEach(async () => {
     messwerteServiceSpy = createSpyObj<MesswerteService>('MesswerteService', ['getMesswerteByEinheit']);
@@ -39,6 +66,10 @@ describe('MesswerteChartComponent', () => {
 
     fixture = TestBed.createComponent(MesswerteChartComponent);
     component = fixture.componentInstance;
+    // Stub VOR detectChanges: `onSubmit` zeichnet sonst wirklich und fasst ECharts an.
+    zeichnenSpy = vi.spyOn(
+      component as unknown as { createChartsSequentially: (r: MesswertData[][]) => Promise<void> },
+      'createChartsSequentially').mockResolvedValue(undefined);
     fixture.detectChanges();
   });
 
@@ -137,6 +168,124 @@ describe('MesswerteChartComponent', () => {
       component.dateTo = '2024-03-31';
       component.onSubmit();
       expect(messwerteServiceSpy.getMesswerteByEinheit).toHaveBeenCalledWith(1, '2024-01-01', '2024-03-31');
+    });
+
+    it('should create one chart entry per selected einheit', () => {
+      component.selectedEinheiten = [mockConsumer, mockProducer];
+      component.onSubmit();
+
+      expect(component.charts.length).toBe(2);
+      expect(component.charts[0].einheitName).toBe('Wohnung A');
+      expect(component.charts[0].instanz).toBeNull();
+      expect(zeichnenSpy).toHaveBeenCalled();
+    });
+
+    it('should report the number of loaded data points', () => {
+      messwerteServiceSpy.getMesswerteByEinheit.mockReturnValue(of(messwerte));
+      component.selectedEinheiten = [mockConsumer];
+
+      component.onSubmit();
+
+      expect(component.messageType).toBe('success');
+      expect(component.message).toContain('2');
+      expect(component.loading).toBe(false);
+    });
+
+    it('should show a readable error when loading fails', () => {
+      messwerteServiceSpy.getMesswerteByEinheit
+        .mockReturnValue(throwError(() => ({ message: 'Netzwerkfehler' })));
+      component.selectedEinheiten = [mockConsumer];
+
+      component.onSubmit();
+
+      expect(component.messageType).toBe('error');
+      expect(component.message).toContain('Netzwerkfehler');
+      expect(component.message).not.toContain('[object Object]');
+      expect(component.loading).toBe(false);
+    });
+  });
+
+  describe('optionen', () => {
+    it('should build two series, the ZEV one mirrored below zero', () => {
+      const optionen = privat().optionen(messwerte);
+      const serien = optionen['series'] as { name: string; data: number[][] }[];
+
+      expect(serien).toHaveLength(2);
+      // Total unveraendert, ZEV negativ - so unterscheidet die Grafik Bezug und Eigenverbrauch.
+      expect(serien[0].data[0][1]).toBe(1.5);
+      expect(serien[1].data[0][1]).toBe(-0.5);
+    });
+
+    it('should turn the timestamps into numbers for the time axis', () => {
+      const serien = privat().optionen(messwerte)['series'] as { data: number[][] }[];
+
+      expect(serien[0].data[0][0]).toBe(new Date('2026-01-15T10:00:00').getTime());
+      expect((privat().optionen(messwerte)['xAxis'] as { type: string })['type']).toBe('time');
+    });
+
+    it('should offer zoom inside and as a slider', () => {
+      const dataZoom = privat().optionen(messwerte)['dataZoom'] as { type: string }[];
+
+      expect(dataZoom.map(z => z.type)).toEqual(['inside', 'slider']);
+    });
+
+    it('should name the axes from the translation service', () => {
+      const optionen = privat().optionen(messwerte);
+
+      expect((optionen['xAxis'] as { name: string })['name']).toBe('ZEIT');
+      expect((optionen['yAxis'] as { name: string })['name']).toBe('KWH');
+    });
+
+    it('should work with an empty data set', () => {
+      const serien = privat().optionen([])['series'] as { data: number[][] }[];
+
+      expect(serien).toHaveLength(2);
+      expect(serien[0].data).toEqual([]);
+    });
+  });
+
+  describe('legende', () => {
+    it('should combine the translated name with the swiss formatted sum', () => {
+      // 1234.5 -> 1'234.500: Hochkomma als Tausendertrennzeichen, drei Nachkommastellen.
+      expect(privat().legende('TOTAL', 1234.5, 'kWh')).toBe("TOTAL (Σ 1'234.500 kWh)");
+    });
+
+    it('should keep the sign of a negative sum', () => {
+      expect(privat().legende('ZEV', -12.25, 'kWh')).toBe('ZEV (Σ -12.250 kWh)');
+    });
+  });
+
+  describe('reihe', () => {
+    it('should build a step line with sampling and without symbols', () => {
+      const reihe = privat().reihe('Total', [[1, 2]], '#4CAF50');
+
+      expect(reihe['type']).toBe('line');
+      expect(reihe['step']).toBe('end');
+      expect(reihe['sampling']).toBe('lttb');
+      expect(reihe['showSymbol']).toBe(false);
+      expect(reihe['connectNulls']).toBe(false);
+      // Keine Flaechenfuellung: Eine gefuellte Flaeche liest sich als Summe ueber die Zeit.
+      expect(reihe['areaStyle']).toBeUndefined();
+    });
+  });
+
+  describe('ngOnDestroy', () => {
+    it('should dispose every instance and disconnect every observer', () => {
+      const dispose = vi.fn();
+      const disconnect = vi.fn();
+      component.charts = [{
+        einheitId: 1, einheitName: 'Wohnung A', einheitTyp: 'CONSUMER',
+        instanz: { dispose } as unknown as import('echarts/core').ECharts
+      }];
+      (component as unknown as { observers: Map<number, { disconnect: () => void }> })
+        .observers.set(1, { disconnect });
+
+      component.ngOnDestroy();
+
+      // Ohne Freigabe waechst der Speicher mit jedem "Anzeigen" - die Seite erlaubt beliebig
+      // viele Diagramme.
+      expect(dispose).toHaveBeenCalled();
+      expect(disconnect).toHaveBeenCalled();
     });
   });
 });

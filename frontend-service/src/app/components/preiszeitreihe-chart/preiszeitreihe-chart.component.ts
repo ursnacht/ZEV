@@ -8,6 +8,9 @@ import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
 import { WithMessage } from '../../utils/with-message';
 import { formatSwissNumber } from '../../utils/number-utils';
+import { formatSwissDateTime } from '../../utils/date-utils';
+import { chartFarben } from '../../utils/chart-farben';
+import { ladeECharts } from '../../utils/echarts-loader';
 
 /**
  * Diagramm der dynamischen Einspeisepreise (Specs/Preiszeitreihe.md, FR-3).
@@ -40,9 +43,9 @@ export class PreiszeitreiheChartComponent extends WithMessage
   bibliothekFehlt = false;
 
   /**
-   * ECharts wird **dynamisch** nachgeladen, nicht am Dateikopf importiert: `/tarife` ist eine eager
-   * Route, ein statischer Import landete im Initial-Bundle und jede Seite der Anwendung lüde die
-   * Bibliothek mit (Specs/Preiszeitreihe.md, NFR-1).
+   * ECharts wird **dynamisch** nachgeladen (`utils/echarts-loader.ts`), nicht am Dateikopf
+   * importiert: `/tarife` ist eine eager Route, ein statischer Import landete im Initial-Bundle und
+   * jede Seite der Anwendung lüde die Bibliothek mit (Specs/Preiszeitreihe.md, NFR-1).
    */
   private echarts?: typeof import('echarts/core');
   private instanz?: import('echarts/core').ECharts;
@@ -201,7 +204,12 @@ export class PreiszeitreiheChartComponent extends WithMessage
     this.instanz.setOption(this.optionen(), true);
   }
 
-  /** Lädt `echarts` beim ersten Zeichnen nach. `false`, wenn das misslingt. */
+  /**
+   * Lädt `echarts` beim ersten Zeichnen nach. `false`, wenn das misslingt.
+   *
+   * Die Registrierung der Module steht im gemeinsamen Loader — dort für alle Diagramme gemeinsam,
+   * weil ein nicht registrierter Serientyp stumm nichts zeichnet (Specs/EChart.md, FR-5).
+   */
   private async ladeBibliothek(): Promise<boolean> {
     if (this.echarts) {
       return true;
@@ -209,30 +217,14 @@ export class PreiszeitreiheChartComponent extends WithMessage
     if (this.bibliothekFehlt) {
       return false;
     }
-    try {
-      const [core, charts, komponenten, renderer] = await Promise.all([
-        import('echarts/core'),
-        import('echarts/charts'),
-        import('echarts/components'),
-        import('echarts/renderers')
-      ]);
-      core.use([
-        // Beide Diagrammtypen: Ohne BarChart zeichnet `type: 'bar'` stillschweigend NICHTS -
-        // ECharts meldet einen nicht registrierten Typ nicht als Fehler, die Flaeche bleibt leer.
-        charts.LineChart,
-        charts.BarChart,
-        komponenten.GridComponent,
-        komponenten.TooltipComponent,
-        komponenten.DataZoomComponent,
-        renderer.CanvasRenderer
-      ]);
-      this.echarts = core;
-      return true;
-    } catch {
+    const geladen = await ladeECharts();
+    if (!geladen) {
       this.bibliothekFehlt = true;
       this.showMessage(this.translationService.translate('DIAGRAMM_NICHT_LADBAR'), 'error');
       return false;
     }
+    this.echarts = geladen;
+    return true;
   }
 
   /**
@@ -311,28 +303,25 @@ export class PreiszeitreiheChartComponent extends WithMessage
   }
 
   /**
-   * Farben aus den Design-Tokens statt hart kodiert - sonst wäre das Diagramm im Dark Mode
-   * unlesbar (Specs/DarkMode.md).
+   * Farben aus den Design-Tokens (`utils/chart-farben.ts`) statt hart kodiert — sonst wäre das
+   * Diagramm im Dark Mode unlesbar (Specs/DarkMode.md).
+   *
+   * Die Reihe dieses Diagramms nutzt die Primärfarbe; `linie` bleibt als eigener Name, damit die
+   * Serienfunktion nur die eine Farbe kennt, die sie braucht.
    */
   private farben(): { achse: string; text: string; gitter: string; linie: string } {
-    const stil = getComputedStyle(document.documentElement);
-    const token = (name: string, fallback: string) =>
-      stil.getPropertyValue(name).trim() || fallback;
-    // Die Neutraltoene kippen im Dark Mode (gray-600 ist dort hell) - genau deshalb kommen die
-    // Farben aus den Tokens und nicht aus festen Werten.
+    const farben = chartFarben();
     return {
-      achse: token('--color-gray-500', '#cccccc'),
-      text: token('--color-gray-700', '#555555'),
-      gitter: token('--color-gray-300', '#e0e0e0'),
-      linie: token('--color-primary', '#4CAF50')
+      achse: farben.achse,
+      text: farben.text,
+      gitter: farben.gitter,
+      linie: farben.primaer
     };
   }
 
-  /** `dd.MM.yyyy HH:mm` - bewusst manuell, nicht über `toLocaleString` (Specs/generell.md). */
+  /** `dd.MM.yyyy HH:mm` über `utils/date-utils.ts` — dort für alle Diagramme gemeinsam. */
   private formatiereZeit(datum: Date): string {
-    const zwei = (wert: number) => String(wert).padStart(2, '0');
-    return `${zwei(datum.getDate())}.${zwei(datum.getMonth() + 1)}.${datum.getFullYear()} `
-      + `${zwei(datum.getHours())}:${zwei(datum.getMinutes())}`;
+    return formatSwissDateTime(datum);
   }
 
   private alsIso(datum: Date): string {

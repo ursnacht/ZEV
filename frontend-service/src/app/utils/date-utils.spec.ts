@@ -1,4 +1,4 @@
-import { formatSwissDate, parseSwissDate, swissToIsoDate } from './date-utils';
+import { formatSwissDate, formatSwissDateTime, parseSwissDate, swissToIsoDate } from './date-utils';
 
 describe('Date Utils', () => {
   describe('formatSwissDate', () => {
@@ -93,6 +93,32 @@ describe('Date Utils', () => {
       expect(swissToIsoDate('')).toBe('');
       expect(swissToIsoDate('invalid')).toBe('');
       expect(swissToIsoDate('2024-01-15')).toBe('');
+    });
+  });
+
+  describe('formatSwissDateTime', () => {
+    it('should format an ISO string', () => {
+      expect(formatSwissDateTime('2026-08-27T15:50:00')).toBe('27.08.2026 15:50');
+    });
+
+    it('should format a Date object', () => {
+      expect(formatSwissDateTime(new Date(2026, 0, 5, 7, 9))).toBe('05.01.2026 07:09');
+    });
+
+    it('should pad day, month, hour and minute', () => {
+      // Fuehrende Nullen sind der haeufigste Fehler beim Selberbauen - deshalb ein eigener Fall.
+      expect(formatSwissDateTime(new Date(2026, 8, 1, 0, 0))).toBe('01.09.2026 00:00');
+    });
+
+    it('should return the fallback for null and undefined', () => {
+      expect(formatSwissDateTime(null)).toBe('-');
+      expect(formatSwissDateTime(undefined)).toBe('-');
+      expect(formatSwissDateTime('')).toBe('-');
+      expect(formatSwissDateTime(null, '–')).toBe('–');
+    });
+
+    it('should return the fallback for an unreadable value', () => {
+      expect(formatSwissDateTime('kein Datum')).toBe('-');
     });
   });
 });

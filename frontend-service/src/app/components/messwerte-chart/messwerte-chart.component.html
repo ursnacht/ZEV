@@ -42,7 +42,15 @@
           <div class="zev-panel zev-panel--chart">
             <h3 class="zev-panel__title">{{ chartData.einheitName }} [{{ chartData.einheitTyp | einheitTyp }}]</h3>
             <div class="zev-panel__content">
-              <canvas [id]="'chart-' + chartData.einheitId"></canvas>
+              <!-- Behaelter statt <canvas>: ECharts legt sein Canvas selbst darin an. Die ID bleibt,
+                   damit die Komponente den Behaelter weiterhin ueber getElementById findet. -->
+              <div [id]="'chart-' + chartData.einheitId" class="messwerte-chart__diagramm"></div>
+
+              @if (bibliothekLaedt) {
+                <p class="messwerte-chart__hinweis">{{ 'DIAGRAMM_LAEDT' | translate }}</p>
+              } @else if (bibliothekFehlt) {
+                <p class="messwerte-chart__hinweis">{{ 'DIAGRAMM_NICHT_LADBAR' | translate }}</p>
+              }
             </div>
           </div>
         }

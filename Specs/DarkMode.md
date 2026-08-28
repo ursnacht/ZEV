@@ -58,7 +58,10 @@
 * **Ungültiger Wert in localStorage:** Ignorieren und Systempräferenz verwenden.
 * **Druckansicht:** Dark Mode via `@media print` deaktivieren (Drucken immer im Light Mode).
 * **PDF-Export / JasperReports:** Nicht betroffen – PDFs werden serverseitig generiert und ignorieren das Theme.
-* **Charts (Chart.js):** Chart-Farben müssen im Dark Mode ebenfalls angepasst werden (Achsen, Gridlines, Labels).
+* **Charts:** Chart-Farben müssen im Dark Mode ebenfalls angepasst werden (Achsen, Gridlines, Labels).
+  **Nachgezogen (Specs/EChart.md):** Beide Diagramme (Messwerte-Grafik und Preiszeitreihe) laufen auf ECharts
+  und lesen ihre Farben aus den Design-Tokens (`utils/chart-farben.ts`). Der Punkt ist damit erledigt — mit
+  einer Einschränkung: Ein Moduswechsel bei **offenem** Diagramm wirkt erst beim nächsten Zeichnen.
 
 ## 6. Abhängigkeiten & betroffene Funktionalität
 * **Voraussetzungen:** Keine – rein additives Feature.
@@ -82,3 +85,5 @@
 * Soll das Dark-Mode-Icon im Hamburger-Menü auch ausserhalb des geöffneten Menüs sichtbar sein (z.B. direkt in der Navbar neben dem Hamburger-Icon)? --> gute Idee, so umsetzen
 * Welche konkreten Dark-Mode-Farbwerte sollen verwendet werden (eigene Palette oder Bootstrap/Material-Referenz)? --> Bootstrap/Material-Referenz
 * Sollen Charts (Chart.js) automatisch auf Dark-Mode-Farben umgestellt werden, oder bleibt das explizit Out of Scope? --> Charts bleiben out of scope
+  *(Überholt: Mit `Specs/EChart.md` beziehen beide Diagramme ihre Farben aus den Tokens. Die damalige Antwort
+  bleibt als Zeitdokument stehen.)*
