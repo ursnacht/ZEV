@@ -74,25 +74,25 @@ Grundlage: `Specs/Preiszeitreihe.md`.
 |--------|--------------------------------|-----------------------------------------------------------------------------------------------------------------|
 |  [x]   | 1. DB-Migration                | `V129__Create_Preiszeitreihe.sql`: Sequenz, Tabelle, `UNIQUE (zeit_von)`, Spaltenkommentare                      |
 |  [x]   | 2. Entity + Repository         | `Preiszeitreihe` (ohne `org_id`), Bereichsabfrage, natives Upsert nach dem Muster `DebitorRepository`            |
-|  [x]   | 3. Konfiguration              | `application.yml`-Block, `RestClientConfig` mit Verbindungs-/Lese-Timeout                                        |
-|  [x]   | 4. Fremd-DTOs                  | `BkwTariffsResponse` samt verschachtelten Records, tolerant gegen unbekannte Felder                             |
+|  [x]   | 3. Konfiguration               | `application.yml`-Block, `RestClientConfig` mit Verbindungs-/Lese-Timeout                                       |
+|  [x]   | 4. Fremd-DTOs                  | `BkwTariffsResponseDTO` samt verschachtelten Records, tolerant gegen unbekannte Felder                          |
 |  [x]   | 5. Feature-Flag                | Flag `PREISZEITREIHE`, `FeatureFlagService.getOrgIdsMitAktivemFlag`, Kategorie-Konstante in `SystemmeldungService` |
 |  [x]   | 6. Backend-Service             | Abruf, Validierung (Einheit, Menge), Umwandlung, Upsert in `zeit_von`-Reihenfolge, Systemmeldung + `autoResolve` |
 |  [x]   | 7. Geplanter Job               | `PreiszeitreiheDownloadJob` (`@Component`, `@Scheduled`), überspringt ohne aktives Flag                          |
 |  [x]   | 8. Backend-Controller + DTOs   | `GET` mit Datum→UTC-Umrechnung und Grenzen, `POST` mit Statuscodes `200/400/403/502`                             |
-|  [x]   | 9. ArchUnit                    | Namentliche `org_id`-Ausnahme, neue Regel „Flag-Prüfung in `Preiszeitreihe*`-Services"                          |
+|  [x]   | 9. ArchUnit                    | Namentliche `org_id`-Ausnahme, neue Regel „Flag-Prüfung in `Preiszeitreihe*`-Services"                         |
 |  [x]   | 10. Übersetzungen              | `V130__Add_Preiszeitreihe_Translations.sql`, alle Keys mit `ON CONFLICT (key) DO NOTHING`                        |
 |  [x]   | 11. Abhängigkeit ECharts       | `npm i echarts`, Lizenz/SBOM prüfen (`/lizenzen`)                                                               |
 |  [x]   | 12. Frontend-Model + Service   | `preiszeitreihe.model.ts`, `preiszeitreihe.service.ts` über `getRuntimeConfig().apiBaseUrl`                      |
 |  [x]   | 13. Frontend-Komponente (TS)   | Spannenlogik TAG/WOCHE/MONAT, Blättern, Laden, **dynamischer** ECharts-Import, Fehler-/Ladezustand               |
 |  [x]   | 14. Frontend-Template + CSS    | Steuerzeile und Panel aus Design-System-Klassen; Design System **zuerst** prüfen                                 |
 |  [x]   | 15. Einbindung in Tarife       | `<app-preiszeitreihe-chart>` in `tarif-list.component.html` hinter `*appFeature="'PREISZEITREIHE'"`              |
-|  [x]   | 16. Bundle-Kontrolle           | Produktionsbau: `main-*.js` wächst < 20 kB, ECharts in eigenem Chunk                                            |
+|  [x]   | 16. Bundle-Kontrolle           | Produktionsbau: `main-*.js` wächst < 20 kB, ECharts in eigenem Chunk                                           |
 |  [x]   | 17. Doku nachziehen            | `Specs/Berechtigungen.md` (Controller-Matrix)                                                                   |
-|  [x]   | 21. Steuerzeile + Darstellung   | Eine Zeile auf gleicher Höhe, Umschaltung Linie/Balken, `V131` (Vibe-Ergänzung)                                  |
-|  [x]   | 18. Backend-Tests              | `/3_backend-tests` — Service, Controller, Repository-IT, `ControllerAuthorizationTest`                           |
-|  [x]   | 19. Frontend-Unit-Tests        | `/4_frontend-unit-tests` — Service, Komponente (ECharts gemockt)                                                 |
-|  [ ]   | 20. E2E-Tests                  | `/5_e2e-tests` — nur Chromium, `serial`, Flag setzen und zurückstellen                                           |
+|  [x]   | 18. Steuerzeile + Darstellung  | Eine Zeile auf gleicher Höhe, Umschaltung Linie/Balken, `V131` (Ergänzung)                                       |
+|  [x]   | 19. Backend-Tests              | `/3_backend-tests` — Service, Controller, Repository-IT, `ControllerAuthorizationTest`                           |
+|  [x]   | 20. Frontend-Unit-Tests        | `/4_frontend-unit-tests` — Service, Komponente (Zeichnen gestubbt)                                               |
+|  [x]   | 21. E2E-Tests                  | `/5_e2e-tests` — nur Chromium, `serial`, Flag setzen und zurückstellen                                           |
 
 ---
 
@@ -558,12 +558,13 @@ Festgehalten, weil sie den Plan korrigieren — nicht als Notiz am Rand:
    **Vorbestehend:** Die Budget-Warnung von Angular (`maximumWarning: 1mb`) trat schon **vor** dieser
    Änderung auf (41 kB über Budget, jetzt 52 kB). Sie ist eine Warnung, kein Fehler (`maximumError`
    liegt bei 2 mb) — aber sie gehört aufgeräumt, unabhängig von diesem Feature.
-7. **Nicht umgesetzt:** Phasen 18–20 (Tests) laufen über die Commands `/3_backend-tests`,
-   `/4_frontend-unit-tests` und `/5_e2e-tests`; die Umsetzung erstellt bewusst keine Tests.
+7. **Tests in eigenen Durchgängen.** Die Umsetzung selbst erstellt bewusst keine Tests; sie
+   entstanden über `/3_backend-tests`, `/4_frontend-unit-tests` und `/5_e2e-tests` — dokumentiert in
+   den Phasen 19 bis 21 weiter unten.
 
 ---
 
-## Phase 21: Steuerzeile und Darstellungsart (Ergänzung)
+## Phase 18: Steuerzeile und Darstellungsart (Ergänzung)
 
 Nachgezogene Anforderung: alle Bedienelemente auf gleicher Höhe, dazu eine Umschaltung der
 Darstellung zwischen **Datum bis** und **Herunterladen**.
@@ -588,7 +589,7 @@ Darstellung zwischen **Datum bis** und **Herunterladen**.
   geprüft: 129 und 130 stehen mit `success = true` in `flyway_schema_history`) — eine Änderung hätte
   die Checksum-Prüfung beim nächsten Start gebrochen.
 
-### Nachtrag zu Phase 21: zwei Fehler in der Darstellung
+### Nachtrag zu Phase 18: zwei Fehler in der Darstellung
 
 Beim Ausprobieren gemeldet — beide behoben:
 
@@ -605,7 +606,7 @@ Keine Migration nötig; die Übersetzungen aus `V131` bleiben unverändert.
 
 ---
 
-## Phase 18: Backend-Tests
+## Phase 19: Backend-Tests
 
 **70 neue Unit-Tests und 18 Integrationstests**, alle grün; komplette Suite danach 1227 Unit +
 325 Integration.
@@ -671,7 +672,7 @@ Darstellungen dar.
 
 ---
 
-## Phase 19: Frontend-Unit-Tests
+## Phase 20: Frontend-Unit-Tests
 
 **46 neue Tests** (9 Service, 37 Komponente); Suite danach 1544 in 57 Dateien.
 
@@ -688,5 +689,53 @@ Darstellungen dar.
    Serien-Optionen werden als **reine Funktion** aufgerufen (`serie()`, `optionen()`).
 2. **Was ein Unit-Test hier nicht kann:** Ob die Bibliothek beide Serientypen registriert hat.
    `type: 'bar'` ohne `charts.BarChart` zeichnet stumm nichts, ECharts meldet keinen Fehler — und
-   genau das war der erste Fehlversuch. Diese Lücke deckt nur der E2E-Test (Phase 20). Der
+   genau das war der erste Fehlversuch. Diese Lücke deckt nur der E2E-Test (Phase 21). Der
    Unit-Test hält dafür die andere Hälfte fest: Die Linie trägt **kein** `areaStyle`.
+
+---
+
+## Phase 21: E2E-Tests
+
+**`tests/preiszeitreihe.spec.ts`, 13 Tests, grün** (29.6 s). Nur Chromium und `serial` — die Suite
+schaltet das mandantenweite Flag `PREISZEITREIHE` und stellt am Ende den vorgefundenen Zustand
+wieder her (Vorbild `feature-flag-upload.spec.ts`).
+
+### Der Test, den es nur hier geben kann
+
+```ts
+const alsLinie = await gezeichnetePixel(page);   // > 0
+await spannenButton(page, 'Balken').click();
+const alsBalken = await gezeichnetePixel(page);  // > 0
+```
+
+`gezeichnetePixel` liest die Canvas-Pixel über `getImageData` und zählt die **nicht durchsichtigen**.
+Ein leeres Canvas ist vollständig transparent — genau so sah der nicht registrierte
+Balken-Serientyp aus. Kein Unit-Test kann das sehen (jsdom hat kein Canvas), und ECharts meldet
+einen unbekannten Serientyp nicht als Fehler.
+
+### Weitere Fälle
+
+Aufbau (alle Bedienelemente in **einer** Zeile, gemessen über `boundingBox`: gleiche Höhe und
+Grundlinie), Reihenfolge der Umschaltung zwischen „Datum bis" und „Herunterladen", Start auf heute
+mit Tag+Linie aktiv, Monat lädt 1.–letzter, Blättern einen Tag zurück (mit Warten auf die Antwort
+**genau dieser** Spanne), freie Datumseingabe hebt die Markierung auf, vertauschter Zeitraum ohne
+Server-Aufruf abgewiesen, Download meldet lesbar (nie `[object Object]`), Umschalten ohne
+HTTP-Aufruf, Hinweis statt leerem Diagramm, Bereich verschwindet bei ausgeschaltetem Flag.
+
+### Zwei Korrekturen und ein Befund
+
+1. **Mein erster „kein Server-Aufruf"-Test war falsch gedacht.** Nach dem Füllen von `von` ist die
+   Spanne bis zum heutigen `bis` noch gültig — der Ladevorgang dort ist korrekt. Der Zähler startet
+   jetzt erst danach; nur `bis` **vor** `von` darf keinen Aufruf auslösen.
+2. **Der Download geht an die echte BKW-API.** Ist sie nicht erreichbar, überspringt sich der
+   Datentest mit Begründung im Report statt stumm grün zu werden; der Robustheitstest daneben
+   akzeptiert bewusst Erfolg **oder** lesbaren Fehler.
+3. **Befund im Bestand:** `tarif-verwaltung.spec.ts` suchte `button.zev-button--primary` ohne
+   `.first()`. Bei aktivem Flag steht auf der Tarifseite ein zweiter primärer Button
+   („Herunterladen") — Strict-Mode-Verletzung in beiden Browsern. Korrigiert, wie es die übrigen
+   zehn Stellen derselben Datei schon halten. Das Feature hat damit einen bestehenden Test
+   gebrochen, und nur ein voller Lauf zeigte es.
+
+**Kein Aufräumen von Testdaten, mit Absicht:** Die Reihe ist mandantenübergreifende Marktdaten, kein
+Testbestand; der Download schreibt per Upsert genau das, was der Job täglich tut. Zurückgestellt
+wird nur das Flag.

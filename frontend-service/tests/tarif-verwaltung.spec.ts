@@ -252,7 +252,10 @@ test.describe('Tarif Management - Navigation and Display', () => {
         const title = page.locator('.zev-container h1');
         await expect(title).toBeVisible();
 
-        const createButton = page.locator('button.zev-button--primary');
+        // `.first()` wie ueberall sonst in dieser Datei: Auf der Tarifseite steht bei aktivem Flag
+        // PREISZEITREIHE ein zweiter primaerer Button ("Herunterladen" im Diagramm-Bereich), und
+        // ein mehrdeutiger Locator wirft im Strict Mode.
+        const createButton = page.locator('button.zev-button--primary').first();
         await expect(createButton).toBeVisible();
 
         await expect(page.locator('.zev-table')).toBeVisible();
