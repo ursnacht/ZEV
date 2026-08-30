@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { navigateViaMenu } from './helpers';
+import { navigateViaMenu, klappeMonateAuf } from './helpers';
 
 /**
  * tests / statistik.spec.ts
@@ -121,6 +121,9 @@ test.describe('Statistik Page - Monthly Statistics', () => {
             const firstMonthPanel = monthPanels.first();
             await expect(firstMonthPanel).toBeVisible();
 
+            // Die Monate starten zugeklappt - der Inhalt liegt erst nach dem Aufklappen im DOM.
+            await klappeMonateAuf(page);
+
             // Check for bar chart table
             const barTable = firstMonthPanel.locator('.zev-table--bars');
             await expect(barTable).toBeVisible();
@@ -158,6 +161,37 @@ test.describe('Statistik Page - Monthly Statistics', () => {
         }
     });
 
+    test('should start with all month panels collapsed and toggle them individually', async ({ page }) => {
+        await navigateToStatistik(page);
+
+        const submitButton = page.locator('button.zev-button--primary[type="submit"]');
+        await submitButton.click();
+        await expect(submitButton).toBeEnabled({ timeout: 15000 });
+
+        const schalter = page.locator('.zev-panel--month > .zev-collapsible > .zev-collapsible__header');
+        const anzahl = await schalter.count();
+        test.skip(anzahl === 0, 'Keine Monatsdaten im Standard-Zeitraum (Vorquartal) vorhanden.');
+
+        // Alle zugeklappt: kein Monat zeigt Inhalt, obwohl die Kopfzeilen alle da sind.
+        for (let i = 0; i < anzahl; i++) {
+            await expect(schalter.nth(i)).toHaveAttribute('aria-expanded', 'false');
+        }
+        const inhalt = page.locator('.zev-panel--month > .zev-collapsible > .zev-collapsible__content');
+        await expect(inhalt).toHaveCount(0);
+
+        // Aufklappen bringt genau einen Inhalt - die anderen Monate bleiben zu.
+        await schalter.first().click();
+        await expect(inhalt).toHaveCount(1);
+        await expect(page.locator('.zev-panel--month .zev-table--bars')).toHaveCount(1);
+        if (anzahl > 1) {
+            await expect(schalter.nth(1)).toHaveAttribute('aria-expanded', 'false');
+        }
+
+        // Erneuter Klick klappt wieder zu.
+        await schalter.first().click();
+        await expect(inhalt).toHaveCount(0);
+    });
+
     test('should render a non-empty title tooltip on every Kennzahl row', async ({ page }) => {
         await navigateToStatistik(page);
 
@@ -177,6 +211,7 @@ test.describe('Statistik Page - Monthly Statistics', () => {
         }
 
         const firstMonthPanel = monthPanels.first();
+        await klappeMonateAuf(page);
 
         // Kennzahlen-Panel: headerless 3-Spalten-Tabelle im ersten .zev-comparison-section.
         const kennzahlenTable = firstMonthPanel.locator('.zev-comparison-section .zev-table--compact').first();

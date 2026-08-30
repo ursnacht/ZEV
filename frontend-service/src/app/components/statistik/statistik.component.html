@@ -111,304 +111,317 @@
     <!-- Monthly Statistics -->
     @for (monat of statistik?.monate; track monat; let i = $index) {
       <div class="zev-panel zev-panel--month">
-        <h3 class="zev-panel__title">
-          <span class="zev-status-indicator">
-            <span class="zev-status-dot" [ngClass]="getStatusClass(monat.datenVollstaendig)"></span>
-            <span>{{ getMonthName(monat.monat) }} {{ monat.jahr }}</span>
-          </span>
-          <span class="zev-panel__subtitle">({{ monat.von | swissDate }} - {{ monat.bis | swissDate }})</span>
-        </h3>
-        <div class="zev-panel__content">
-          <!-- Summen Tabelle mit Balkendiagrammen -->
-          <table class="zev-table zev-table--bars">
-            <thead>
-              <tr>
-                <th class="zev-table__label-col">{{ 'BESCHREIBUNG' | translate }}</th>
-                <th class="zev-table__bar-col">{{ 'VISUALISIERUNG' | translate }}</th>
-                <th class="zev-table__number">{{ 'WERT' | translate }} (kWh)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <!-- title je Zeile: erklärender Hinweis zum visualisierten Wert (wie bei den Kennzahlen) -->
-              <tr [title]="'PRODUKTION_TOTAL_HINWEIS' | translate">
-                <td>{{ 'PRODUKTION_TOTAL' | translate }}</td>
-                <td class="zev-table__bar-cell">
-                  <div class="zev-bar-container">
-                    <div class="zev-bar"
-                      [style.width.%]="getBarWidth(monat.summeProducerTotal, monat)"
-                      [style.background-color]="getBarColor('A')">
-                    </div>
-                  </div>
-                </td>
-                <td class="zev-table__number">{{ formatNumber(monat.summeProducerTotal) }}</td>
-              </tr>
-              <tr [title]="'VERBRAUCH_TOTAL_HINWEIS' | translate">
-                <td>{{ 'VERBRAUCH_TOTAL' | translate }}</td>
-                <td class="zev-table__bar-cell">
-                  <div class="zev-bar-container">
-                    <div class="zev-bar"
-                      [style.width.%]="getBarWidth(monat.summeConsumerTotal, monat)"
-                      [style.background-color]="getBarColor('B')">
-                    </div>
-                  </div>
-                </td>
-                <td class="zev-table__number">{{ formatNumber(monat.summeConsumerTotal) }}</td>
-              </tr>
-              <tr [title]="'ZEV_PRODUCER_HINWEIS' | translate">
-                <td>{{ 'ZEV_PRODUCER' | translate }} (A)</td>
-                <td class="zev-table__bar-cell">
-                  <div class="zev-bar-container">
-                    <div class="zev-bar"
-                      [style.width.%]="getBarWidth(monat.summeProducerZev, monat)"
-                      [style.background-color]="getBarColor('C')">
-                    </div>
-                  </div>
-                </td>
-                <td class="zev-table__number">{{ formatNumber(monat.summeProducerZev) }}</td>
-              </tr>
-              <tr [title]="'ZEV_CONSUMER_HINWEIS' | translate">
-                <td>{{ 'ZEV_CONSUMER' | translate }} (B)</td>
-                <td class="zev-table__bar-cell">
-                  <div class="zev-bar-container">
-                    <div class="zev-bar"
-                      [style.width.%]="getBarWidth(monat.summeConsumerZev, monat)"
-                      [style.background-color]="getBarColor('D')">
-                    </div>
-                  </div>
-                </td>
-                <td class="zev-table__number">{{ formatNumber(monat.summeConsumerZev) }}</td>
-              </tr>
-              <tr [title]="'ZEV_CONSUMER_BERECHNET_HINWEIS' | translate">
-                <td>{{ 'ZEV_CONSUMER_BERECHNET' | translate }} (C)</td>
-                <td class="zev-table__bar-cell">
-                  <div class="zev-bar-container">
-                    <div class="zev-bar"
-                      [style.width.%]="getBarWidth(monat.summeConsumerZevCalculated, monat)"
-                      [style.background-color]="getBarColor('E')">
-                    </div>
-                  </div>
-                </td>
-                <td class="zev-table__number">{{ formatNumber(monat.summeConsumerZevCalculated) }}</td>
-              </tr>
-              <!-- Bilanzmesspunkte (nur falls Einheit vorhanden; Beschriftung = Einheiten-Name).
-                   Die berechneten Werte "Bezug von VNB"/"Rücklieferung" werden nicht mehr als
-                   Zeilen angezeigt, sondern nur noch im Summen-Vergleich verwendet (FR-5.7). -->
-              @if (monat.bilanzRuecklieferungName) {
-                <tr [title]="'STATISTIK_BILANZ_RUECKLIEFERUNG_HINWEIS' | translate">
-                  <td>{{ isBilanz ? ('STATISTIK_RUECKLIEFERUNG_GEMESSEN' | translate) : monat.bilanzRuecklieferungName }}</td>
-                  <td class="zev-table__bar-cell">
-                    <div class="zev-bar-container">
-                      <div class="zev-bar"
-                        [style.width.%]="getBarWidth(monat.bilanzRuecklieferung, monat)"
-                        [style.background-color]="getBarColor('I')">
-                      </div>
-                    </div>
-                  </td>
-                  <td class="zev-table__number">{{ formatNumber(monat.bilanzRuecklieferung) }}</td>
+        <!-- Gleiches Muster wie "Details anzeigen" weiter unten und die Mieter in der
+             Nebenkostenabrechnung: Ein Quartal liefert drei Monate, aufgeklappt waere die Seite
+             mehrere Bildschirmseiten lang. Alle starten zugeklappt; Datenstatus und Zeitraum
+             stehen deshalb schon in der Kopfzeile. -->
+        <div class="zev-collapsible">
+          <button type="button" class="zev-collapsible__header" (click)="toggleMonthPanel(i)"
+            [attr.aria-expanded]="isMonthPanelExpanded(i)" [attr.aria-controls]="'monat-' + i">
+            <span class="zev-status-indicator">
+              <span class="zev-status-dot" [ngClass]="getStatusClass(monat.datenVollstaendig)"></span>
+              <span>{{ getMonthName(monat.monat) }} {{ monat.jahr }}</span>
+            </span>
+            <span class="zev-panel__subtitle">({{ monat.von | swissDate }} - {{ monat.bis | swissDate }})</span>
+            <span class="zev-collapsible__icon">{{ isMonthPanelExpanded(i) ? '▼' : '▶' }}</span>
+          </button>
+          @if (isMonthPanelExpanded(i)) {
+          <div class="zev-collapsible__content" [id]="'monat-' + i">
+            <!-- Summen Tabelle mit Balkendiagrammen -->
+            <table class="zev-table zev-table--bars">
+              <thead>
+                <tr>
+                  <th class="zev-table__label-col">{{ 'BESCHREIBUNG' | translate }}</th>
+                  <th class="zev-table__bar-col">{{ 'VISUALISIERUNG' | translate }}</th>
+                  <th class="zev-table__number">{{ 'WERT' | translate }} (kWh)</th>
                 </tr>
-              }
-              @if (monat.bilanzBezugName) {
-                <tr [title]="'STATISTIK_BILANZ_BEZUG_HINWEIS' | translate">
-                  <td>{{ monat.bilanzBezugName }}</td>
-                  <td class="zev-table__bar-cell">
-                    <div class="zev-bar-container">
-                      <div class="zev-bar"
-                        [style.width.%]="getBarWidth(monat.bilanzBezug, monat)"
-                        [style.background-color]="getBarColor('H')">
-                      </div>
-                    </div>
-                  </td>
-                  <td class="zev-table__number">{{ formatNumber(monat.bilanzBezug) }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-          <!-- Statistik-Kennzahlen (in beiden Verteilmodi) - tabellarisch, ohne Titelzeile -->
-          <div class="zev-comparison-section">
-            <h4>{{ 'STATISTIK_KENNZAHLEN' | translate }}</h4>
-            <table class="zev-table zev-table--compact zev-table--auto">
+              </thead>
               <tbody>
-                @for (kz of getKennzahlen(monat); track kz.labelKey) {
-                  <tr [title]="kz.hintKey | translate">
-                    <td>
-                      {{ kz.labelKey | translate }}
-                      @if (kz.berechnet) {
-                        <span class="zev-tag" [title]="'KENNZAHL_BERECHNET_HINWEIS' | translate">{{ 'KENNZAHL_BERECHNET' | translate }}</span>
-                      }
+                <!-- title je Zeile: erklärender Hinweis zum visualisierten Wert (wie bei den Kennzahlen) -->
+                <tr [title]="'PRODUKTION_TOTAL_HINWEIS' | translate">
+                  <td>{{ 'PRODUKTION_TOTAL' | translate }}</td>
+                  <td class="zev-table__bar-cell">
+                    <div class="zev-bar-container">
+                      <div class="zev-bar"
+                        [style.width.%]="getBarWidth(monat.summeProducerTotal, monat)"
+                        [style.background-color]="getBarColor('A')">
+                      </div>
+                    </div>
+                  </td>
+                  <td class="zev-table__number">{{ formatNumber(monat.summeProducerTotal) }}</td>
+                </tr>
+                <tr [title]="'VERBRAUCH_TOTAL_HINWEIS' | translate">
+                  <td>{{ 'VERBRAUCH_TOTAL' | translate }}</td>
+                  <td class="zev-table__bar-cell">
+                    <div class="zev-bar-container">
+                      <div class="zev-bar"
+                        [style.width.%]="getBarWidth(monat.summeConsumerTotal, monat)"
+                        [style.background-color]="getBarColor('B')">
+                      </div>
+                    </div>
+                  </td>
+                  <td class="zev-table__number">{{ formatNumber(monat.summeConsumerTotal) }}</td>
+                </tr>
+                <tr [title]="'ZEV_PRODUCER_HINWEIS' | translate">
+                  <td>{{ 'ZEV_PRODUCER' | translate }} (A)</td>
+                  <td class="zev-table__bar-cell">
+                    <div class="zev-bar-container">
+                      <div class="zev-bar"
+                        [style.width.%]="getBarWidth(monat.summeProducerZev, monat)"
+                        [style.background-color]="getBarColor('C')">
+                      </div>
+                    </div>
+                  </td>
+                  <td class="zev-table__number">{{ formatNumber(monat.summeProducerZev) }}</td>
+                </tr>
+                <tr [title]="'ZEV_CONSUMER_HINWEIS' | translate">
+                  <td>{{ 'ZEV_CONSUMER' | translate }} (B)</td>
+                  <td class="zev-table__bar-cell">
+                    <div class="zev-bar-container">
+                      <div class="zev-bar"
+                        [style.width.%]="getBarWidth(monat.summeConsumerZev, monat)"
+                        [style.background-color]="getBarColor('D')">
+                      </div>
+                    </div>
+                  </td>
+                  <td class="zev-table__number">{{ formatNumber(monat.summeConsumerZev) }}</td>
+                </tr>
+                <tr [title]="'ZEV_CONSUMER_BERECHNET_HINWEIS' | translate">
+                  <td>{{ 'ZEV_CONSUMER_BERECHNET' | translate }} (C)</td>
+                  <td class="zev-table__bar-cell">
+                    <div class="zev-bar-container">
+                      <div class="zev-bar"
+                        [style.width.%]="getBarWidth(monat.summeConsumerZevCalculated, monat)"
+                        [style.background-color]="getBarColor('E')">
+                      </div>
+                    </div>
+                  </td>
+                  <td class="zev-table__number">{{ formatNumber(monat.summeConsumerZevCalculated) }}</td>
+                </tr>
+                <!-- Bilanzmesspunkte (nur falls Einheit vorhanden; Beschriftung = Einheiten-Name).
+                     Die berechneten Werte "Bezug von VNB"/"Rücklieferung" werden nicht mehr als
+                     Zeilen angezeigt, sondern nur noch im Summen-Vergleich verwendet (FR-5.7). -->
+                @if (monat.bilanzRuecklieferungName) {
+                  <tr [title]="'STATISTIK_BILANZ_RUECKLIEFERUNG_HINWEIS' | translate">
+                    <td>{{ isBilanz ? ('STATISTIK_RUECKLIEFERUNG_GEMESSEN' | translate) : monat.bilanzRuecklieferungName }}</td>
+                    <td class="zev-table__bar-cell">
+                      <div class="zev-bar-container">
+                        <div class="zev-bar"
+                          [style.width.%]="getBarWidth(monat.bilanzRuecklieferung, monat)"
+                          [style.background-color]="getBarColor('I')">
+                        </div>
+                      </div>
                     </td>
-                    <td class="zev-table__number">{{ kz.value }}</td>
-                    <td>{{ kz.unit }}</td>
+                    <td class="zev-table__number">{{ formatNumber(monat.bilanzRuecklieferung) }}</td>
+                  </tr>
+                }
+                @if (monat.bilanzBezugName) {
+                  <tr [title]="'STATISTIK_BILANZ_BEZUG_HINWEIS' | translate">
+                    <td>{{ monat.bilanzBezugName }}</td>
+                    <td class="zev-table__bar-cell">
+                      <div class="zev-bar-container">
+                        <div class="zev-bar"
+                          [style.width.%]="getBarWidth(monat.bilanzBezug, monat)"
+                          [style.background-color]="getBarColor('H')">
+                        </div>
+                      </div>
+                    </td>
+                    <td class="zev-table__number">{{ formatNumber(monat.bilanzBezug) }}</td>
                   </tr>
                 }
               </tbody>
             </table>
-          </div>
-
-          <!-- Vergleiche (nur im Producer-Messung-Modus; im Bilanzmodus ersetzt durch die Kennzahlen) -->
-          @if (!isBilanz) {
-          <div class="zev-comparison-section">
-            <h4>{{ 'SUMMEN_VERGLEICH' | translate }}</h4>
-            <p class="zev-toleranz-info">{{ 'TOLERANZ' | translate }}: {{ statistik?.toleranz }} kWh</p>
-            <div class="zev-comparison-grid">
-              <div class="zev-comparison-item">
-                <span class="zev-status-indicator">
-                  <span class="zev-status-dot" [ngClass]="getComparisonStatusClass(monat.summenCDGleich)"></span>
-                  <span>A = B</span>
-                </span>
-                @if (!monat.summenCDGleich) {
-                  <span class="zev-differenz">
-                    {{ 'DIFFERENZ' | translate }}: {{ formatDifferenz(monat.differenzCD) }} kWh
-                  </span>
-                }
-              </div>
-              <div class="zev-comparison-item">
-                <span class="zev-status-indicator">
-                  <span class="zev-status-dot" [ngClass]="getComparisonStatusClass(monat.summenCEGleich)"></span>
-                  <span>A = C</span>
-                </span>
-                @if (!monat.summenCEGleich) {
-                  <span class="zev-differenz">
-                    {{ 'DIFFERENZ' | translate }}: {{ formatDifferenz(monat.differenzCE) }} kWh
-                  </span>
-                }
-              </div>
-              <div class="zev-comparison-item">
-                <span class="zev-status-indicator">
-                  <span class="zev-status-dot" [ngClass]="getComparisonStatusClass(monat.summenDEGleich)"></span>
-                  <span>B = C</span>
-                </span>
-                @if (!monat.summenDEGleich) {
-                  <span class="zev-differenz">
-                    {{ 'DIFFERENZ' | translate }}: {{ formatDifferenz(monat.differenzDE) }} kWh
-                  </span>
-                }
-              </div>
-              @if (monat.bilanzRuecklieferungName) {
-                <div class="zev-comparison-item" [title]="'TOOLTIP_VERGLEICH_RUECKLIEFERUNG' | translate">
-                  <span class="zev-status-indicator">
-                    <span class="zev-status-dot" [ngClass]="getComparisonStatusClass(monat.ruecklieferungBilanzGleich)"></span>
-                    <span>{{ 'VERGLEICH_RUECKLIEFERUNG' | translate }}</span>
-                  </span>
-                  @if (!monat.ruecklieferungBilanzGleich) {
-                    <span class="zev-differenz">
-                      {{ 'DIFFERENZ' | translate }}: {{ formatDifferenz(monat.ruecklieferungBilanzDifferenz) }} kWh
-                    </span>
-                  }
-                </div>
-              }
-              @if (monat.bilanzBezugName) {
-                <div class="zev-comparison-item" [title]="'TOOLTIP_VERGLEICH_BEZUG' | translate">
-                  <span class="zev-status-indicator">
-                    <span class="zev-status-dot" [ngClass]="getComparisonStatusClass(monat.bezugBilanzGleich)"></span>
-                    <span>{{ 'VERGLEICH_BEZUG' | translate }}</span>
-                  </span>
-                  @if (!monat.bezugBilanzGleich) {
-                    <span class="zev-differenz">
-                      {{ 'DIFFERENZ' | translate }}: {{ formatDifferenz(monat.bezugBilanzDifferenz) }} kWh
-                    </span>
-                  }
-                </div>
-              }
-            </div>
-          </div>
-          }
-          <!-- Summen pro Einheit -->
-          @if (monat.einheitSummen && monat.einheitSummen.length > 0) {
-            <div class="zev-einheit-summen-section">
-              <h4>{{ 'SUMMEN_PRO_EINHEIT' | translate }}</h4>
-              <table class="zev-table zev-table--compact">
-                <thead>
-                  <tr>
-                    <th>{{ 'EINHEIT' | translate }}</th>
-                    <th>{{ 'TYP' | translate }}</th>
-                    <th class="zev-table__number">{{ 'TOTAL' | translate }} (kWh)</th>
-                    <th class="zev-table__number">{{ 'ZEV' | translate }} (kWh)</th>
-                    <th class="zev-table__number">{{ 'ZEV_BERECHNET' | translate }} (kWh)</th>
-                    <th></th>
-                  </tr>
-                </thead>
+            <!-- Statistik-Kennzahlen (in beiden Verteilmodi) - tabellarisch, ohne Titelzeile -->
+            <div class="zev-comparison-section">
+              <h4>{{ 'STATISTIK_KENNZAHLEN' | translate }}</h4>
+              <table class="zev-table zev-table--compact zev-table--auto">
                 <tbody>
-                  @for (einheit of monat.einheitSummen; track einheit) {
-                    <tr
-                      [ngClass]="{'zev-table__row--producer': einheit.einheitTyp === 'PRODUCER', 'zev-table__row--consumer': einheit.einheitTyp === 'CONSUMER'}">
-                      <td>{{ einheit.einheitName }}</td>
-                      <td>{{ einheit.einheitTyp | einheitTyp }}</td>
-                      <td class="zev-table__number">{{ formatNumber(einheit.summeTotal) }}</td>
-                      <td class="zev-table__number">{{ isBilanzTyp(einheit.einheitTyp) ? '-' : formatNumber(einheit.summeZev) }}</td>
-                      <td class="zev-table__number">{{ einheit.einheitTyp === 'CONSUMER' ? formatNumber(einheit.summeZevCalculated) : '-' }}</td>
+                  @for (kz of getKennzahlen(monat); track kz.labelKey) {
+                    <tr [title]="kz.hintKey | translate">
                       <td>
-                        @if (einheit.einheitTyp === 'CONSUMER') {
-                          <button type="button" class="zev-button zev-button--secondary zev-button--compact"
-                            [disabled]="einheit.summeTotal === 0" (click)="onDownloadCsv(monat, einheit)">
-                            <app-icon name="download"></app-icon>
-                            {{ 'DOWNLOAD_CSV' | translate }}
-                          </button>
+                        {{ kz.labelKey | translate }}
+                        @if (kz.berechnet) {
+                          <span class="zev-tag" [title]="'KENNZAHL_BERECHNET_HINWEIS' | translate">{{ 'KENNZAHL_BERECHNET' | translate }}</span>
+                        }
+                        @if (kz.luecke) {
+                          <span class="zev-tag" [title]="'KENNZAHL_LUECKENHAFT_HINWEIS' | translate">{{ 'KENNZAHL_LUECKENHAFT' | translate }}</span>
                         }
                       </td>
+                      <td class="zev-table__number">{{ kz.value }}</td>
+                      <td>{{ kz.unit }}</td>
                     </tr>
                   }
                 </tbody>
               </table>
             </div>
-          }
-          <!-- Aufklappbare Details -->
-          @if (!monat.datenVollstaendig || monat.tageAbweichungen.length > 0) {
-            <div class="zev-collapsible">
-              <button type="button" class="zev-collapsible__header" (click)="toggleMonthDetails(i)">
-                <span>{{ 'DETAILS_ANZEIGEN' | translate }}</span>
-                <span class="zev-collapsible__icon">{{ isMonthExpanded(i) ? '▼' : '▶' }}</span>
-              </button>
-              @if (isMonthExpanded(i)) {
-                <div class="zev-collapsible__content">
-                  <!-- Fehlende Einheiten -->
-                  @if (monat.fehlendeEinheiten.length > 0) {
-                    <div>
-                      <strong>{{ 'FEHLENDE_EINHEITEN' | translate }}:</strong>
-                      <ul class="zev-list">
-                        @for (einheit of monat.fehlendeEinheiten; track einheit) {
-                          <li>{{ einheit }}</li>
-                        }
-                      </ul>
-                    </div>
-                  }
-                  <!-- Fehlende Tage -->
-                  @if (monat.fehlendeTage.length > 0) {
-                    <div>
-                      <strong>{{ 'FEHLENDE_TAGE' | translate }}:</strong>
-                      <span class="zev-tag-list">
-                        @for (tag of monat.fehlendeTage; track tag) {
-                          <span class="zev-tag">{{ tag | swissDate }}</span>
-                        }
-                      </span>
-                    </div>
-                  }
-                  <!-- Tage mit Abweichungen -->
-                  @if (monat.tageAbweichungen.length > 0) {
-                    <div>
-                      <strong>{{ 'TAGE_MIT_ABWEICHUNGEN' | translate }}:</strong>
-                      <table class="zev-table zev-table--compact">
-                        <thead>
-                          <tr>
-                            <th>{{ 'DATUM' | translate }}</th>
-                            <th>{{ 'ABWEICHUNG' | translate }}</th>
-                            <th class="zev-table__number">{{ 'DIFFERENZ' | translate }} (kWh)</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          @for (abweichung of monat.tageAbweichungen; track abweichung) {
-                            <tr>
-                              <td>{{ abweichung.datum | swissDate }}</td>
-                              <td>{{ abweichung.abweichungstyp }}</td>
-                              <td class="zev-table__number">{{ formatNumber(abweichung.differenz) }}</td>
-                            </tr>
-                          }
-                        </tbody>
-                      </table>
-                    </div>
+
+            <!-- Vergleiche (nur im Producer-Messung-Modus; im Bilanzmodus ersetzt durch die Kennzahlen) -->
+            @if (!isBilanz) {
+            <div class="zev-comparison-section">
+              <h4>{{ 'SUMMEN_VERGLEICH' | translate }}</h4>
+              <p class="zev-toleranz-info">{{ 'TOLERANZ' | translate }}: {{ statistik?.toleranz }} kWh</p>
+              <div class="zev-comparison-grid">
+                <div class="zev-comparison-item">
+                  <span class="zev-status-indicator">
+                    <span class="zev-status-dot" [ngClass]="getComparisonStatusClass(monat.summenCDGleich)"></span>
+                    <span>A = B</span>
+                  </span>
+                  @if (!monat.summenCDGleich) {
+                    <span class="zev-differenz">
+                      {{ 'DIFFERENZ' | translate }}: {{ formatDifferenz(monat.differenzCD) }} kWh
+                    </span>
                   }
                 </div>
-              }
+                <div class="zev-comparison-item">
+                  <span class="zev-status-indicator">
+                    <span class="zev-status-dot" [ngClass]="getComparisonStatusClass(monat.summenCEGleich)"></span>
+                    <span>A = C</span>
+                  </span>
+                  @if (!monat.summenCEGleich) {
+                    <span class="zev-differenz">
+                      {{ 'DIFFERENZ' | translate }}: {{ formatDifferenz(monat.differenzCE) }} kWh
+                    </span>
+                  }
+                </div>
+                <div class="zev-comparison-item">
+                  <span class="zev-status-indicator">
+                    <span class="zev-status-dot" [ngClass]="getComparisonStatusClass(monat.summenDEGleich)"></span>
+                    <span>B = C</span>
+                  </span>
+                  @if (!monat.summenDEGleich) {
+                    <span class="zev-differenz">
+                      {{ 'DIFFERENZ' | translate }}: {{ formatDifferenz(monat.differenzDE) }} kWh
+                    </span>
+                  }
+                </div>
+                @if (monat.bilanzRuecklieferungName) {
+                  <div class="zev-comparison-item" [title]="'TOOLTIP_VERGLEICH_RUECKLIEFERUNG' | translate">
+                    <span class="zev-status-indicator">
+                      <span class="zev-status-dot" [ngClass]="getComparisonStatusClass(monat.ruecklieferungBilanzGleich)"></span>
+                      <span>{{ 'VERGLEICH_RUECKLIEFERUNG' | translate }}</span>
+                    </span>
+                    @if (!monat.ruecklieferungBilanzGleich) {
+                      <span class="zev-differenz">
+                        {{ 'DIFFERENZ' | translate }}: {{ formatDifferenz(monat.ruecklieferungBilanzDifferenz) }} kWh
+                      </span>
+                    }
+                  </div>
+                }
+                @if (monat.bilanzBezugName) {
+                  <div class="zev-comparison-item" [title]="'TOOLTIP_VERGLEICH_BEZUG' | translate">
+                    <span class="zev-status-indicator">
+                      <span class="zev-status-dot" [ngClass]="getComparisonStatusClass(monat.bezugBilanzGleich)"></span>
+                      <span>{{ 'VERGLEICH_BEZUG' | translate }}</span>
+                    </span>
+                    @if (!monat.bezugBilanzGleich) {
+                      <span class="zev-differenz">
+                        {{ 'DIFFERENZ' | translate }}: {{ formatDifferenz(monat.bezugBilanzDifferenz) }} kWh
+                      </span>
+                    }
+                  </div>
+                }
+              </div>
             </div>
+            }
+            <!-- Summen pro Einheit -->
+            @if (monat.einheitSummen && monat.einheitSummen.length > 0) {
+              <div class="zev-einheit-summen-section">
+                <h4>{{ 'SUMMEN_PRO_EINHEIT' | translate }}</h4>
+                <table class="zev-table zev-table--compact">
+                  <thead>
+                    <tr>
+                      <th>{{ 'EINHEIT' | translate }}</th>
+                      <th>{{ 'TYP' | translate }}</th>
+                      <th class="zev-table__number">{{ 'TOTAL' | translate }} (kWh)</th>
+                      <th class="zev-table__number">{{ 'ZEV' | translate }} (kWh)</th>
+                      <th class="zev-table__number">{{ 'ZEV_BERECHNET' | translate }} (kWh)</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (einheit of monat.einheitSummen; track einheit) {
+                      <tr
+                        [ngClass]="{'zev-table__row--producer': einheit.einheitTyp === 'PRODUCER', 'zev-table__row--consumer': einheit.einheitTyp === 'CONSUMER'}">
+                        <td>{{ einheit.einheitName }}</td>
+                        <td>{{ einheit.einheitTyp | einheitTyp }}</td>
+                        <td class="zev-table__number">{{ formatNumber(einheit.summeTotal) }}</td>
+                        <td class="zev-table__number">{{ isBilanzTyp(einheit.einheitTyp) ? '-' : formatNumber(einheit.summeZev) }}</td>
+                        <td class="zev-table__number">{{ einheit.einheitTyp === 'CONSUMER' ? formatNumber(einheit.summeZevCalculated) : '-' }}</td>
+                        <td>
+                          @if (einheit.einheitTyp === 'CONSUMER') {
+                            <button type="button" class="zev-button zev-button--secondary zev-button--compact"
+                              [disabled]="einheit.summeTotal === 0" (click)="onDownloadCsv(monat, einheit)">
+                              <app-icon name="download"></app-icon>
+                              {{ 'DOWNLOAD_CSV' | translate }}
+                            </button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+            <!-- Aufklappbare Details -->
+            @if (!monat.datenVollstaendig || monat.tageAbweichungen.length > 0) {
+              <div class="zev-collapsible">
+                <button type="button" class="zev-collapsible__header" (click)="toggleMonthDetails(i)">
+                  <span>{{ 'DETAILS_ANZEIGEN' | translate }}</span>
+                  <span class="zev-collapsible__icon">{{ isMonthExpanded(i) ? '▼' : '▶' }}</span>
+                </button>
+                @if (isMonthExpanded(i)) {
+                  <div class="zev-collapsible__content">
+                    <!-- Fehlende Einheiten -->
+                    @if (monat.fehlendeEinheiten.length > 0) {
+                      <div>
+                        <strong>{{ 'FEHLENDE_EINHEITEN' | translate }}:</strong>
+                        <ul class="zev-list">
+                          @for (einheit of monat.fehlendeEinheiten; track einheit) {
+                            <li>{{ einheit }}</li>
+                          }
+                        </ul>
+                      </div>
+                    }
+                    <!-- Fehlende Tage -->
+                    @if (monat.fehlendeTage.length > 0) {
+                      <div>
+                        <strong>{{ 'FEHLENDE_TAGE' | translate }}:</strong>
+                        <span class="zev-tag-list">
+                          @for (tag of monat.fehlendeTage; track tag) {
+                            <span class="zev-tag">{{ tag | swissDate }}</span>
+                          }
+                        </span>
+                      </div>
+                    }
+                    <!-- Tage mit Abweichungen -->
+                    @if (monat.tageAbweichungen.length > 0) {
+                      <div>
+                        <strong>{{ 'TAGE_MIT_ABWEICHUNGEN' | translate }}:</strong>
+                        <table class="zev-table zev-table--compact">
+                          <thead>
+                            <tr>
+                              <th>{{ 'DATUM' | translate }}</th>
+                              <th>{{ 'ABWEICHUNG' | translate }}</th>
+                              <th class="zev-table__number">{{ 'DIFFERENZ' | translate }} (kWh)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @for (abweichung of monat.tageAbweichungen; track abweichung) {
+                              <tr>
+                                <td>{{ abweichung.datum | swissDate }}</td>
+                                <td>{{ abweichung.abweichungstyp }}</td>
+                                <td class="zev-table__number">{{ formatNumber(abweichung.differenz) }}</td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
           }
         </div>
       </div>

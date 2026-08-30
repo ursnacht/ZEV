@@ -230,7 +230,7 @@ public class StatistikService {
         berechneEinheitSummen(dto, vonDateTime, bisDateTime);
 
         // Statistik-Kennzahlen (Stufe 1: aus den Summen)
-        berechneKennzahlen(dto);
+        berechneKennzahlen(dto, vonDateTime, bisDateTime);
         // Batterie geladen/entladen/Wirkungsgrad (Stufe 2: Pro-Intervall-Aggregation)
         berechneBatterieKennzahlen(dto, vonDateTime, bisDateTime);
 
@@ -242,8 +242,14 @@ public class StatistikService {
      * bereits vorhandenen Monats-Summen. Quoten-KPIs sind modus-agnostisch (nur ZEV-/Total-Summen);
      * `null` bei Nenner 0. Der Netto-Speicherfluss setzt Producer + Bilanz-Bezug + Rücklieferung
      * voraus (sonst `null`). Batterie geladen/entladen/Wirkungsgrad werden in Stufe 2 ergänzt.
+     *
+     * <p>Zusätzlich die <b>gemessenen</b> Gegenstücke aus dem Netzbezug der BEZUG-Einheit
+     * (FR-1.7): Autarkiegrad und Netzbezugsquote aus {@code B / C} statt aus dem ZEV-Anteil der
+     * Consumer. Beide Zahlen sind richtig, messen aber Verschiedenes – die Differenz ist der
+     * Verbrauchsanteil, der weder direkt aus der PV noch aus dem Netz kam (typischerweise
+     * Batterie-Entladung).
      */
-    private void berechneKennzahlen(MonatsStatistikDTO dto) {
+    private void berechneKennzahlen(MonatsStatistikDTO dto, LocalDateTime von, LocalDateTime bis) {
         double p = dto.getSummeProducerTotal() != null ? dto.getSummeProducerTotal() : 0.0;
         double c = dto.getSummeConsumerTotal() != null ? dto.getSummeConsumerTotal() : 0.0;
         double cz = dto.getSummeConsumerZev() != null ? dto.getSummeConsumerZev() : 0.0;
@@ -255,6 +261,32 @@ public class StatistikService {
         dto.setEigenverbrauchsquote(p > 0 ? pz / p : null);
         dto.setEinspeisequote(p > 0 ? (p - pz) / p : null);
         dto.setZevEigenverbrauch(cz);
+
+        // Gemessene Gegenstücke (nur mit BEZUG-Einheit und Verbrauch > 0)
+        boolean bilanzVerfuegbar = dto.getBilanzBezugName() != null && c > 0;
+        dto.setBilanzKennzahlenVerfuegbar(bilanzVerfuegbar);
+        if (bilanzVerfuegbar) {
+            double b = dto.getBilanzBezug() != null ? dto.getBilanzBezug() : 0.0;
+            dto.setNetzbezugsquoteGemessen(b / c);
+            dto.setAutarkiegradGemessen(1.0 - b / c);
+            // Lücken in der Bilanzmessung machen B zu klein und den Autarkiegrad zu optimistisch.
+            // Die Vollständigkeitsprüfung arbeitet tage- und einheitengenau und sieht fehlende
+            // Intervalle innerhalb eines Tages nicht - deshalb hier eine eigene Zählung.
+            long intervalleBezug = messwerteRepository
+                    .countDistinctZeitByEinheitTypAndZeitBetween(EinheitTyp.BEZUG, von, bis);
+            long intervalleConsumer = messwerteRepository
+                    .countDistinctZeitByEinheitTypAndZeitBetween(EinheitTyp.CONSUMER, von, bis);
+            dto.setBilanzBezugLueckenhaft(intervalleBezug < intervalleConsumer);
+            if (dto.isBilanzBezugLueckenhaft()) {
+                logger.warn("Monat {}/{}: Bilanz-Bezug deckt nur {} von {} Intervallen ab - "
+                        + "die gemessenen Kennzahlen sind zu optimistisch",
+                        dto.getJahr(), dto.getMonat(), intervalleBezug, intervalleConsumer);
+            }
+        } else {
+            dto.setNetzbezugsquoteGemessen(null);
+            dto.setAutarkiegradGemessen(null);
+            dto.setBilanzBezugLueckenhaft(false);
+        }
 
         // Netto-Speicherfluss (berechnet/geschätzt): nur bei Producer + Bilanz-Bezug + Rücklieferung
         boolean producerVorhanden = p > 0;

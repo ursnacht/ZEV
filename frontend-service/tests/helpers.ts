@@ -435,3 +435,31 @@ export async function raeumeMitWiederholung(schritt: () => Promise<boolean>,
     }
     return false;
 }
+
+/**
+ * Klappt auf der Statistik-Seite die Monats-Panels auf.
+ *
+ * <p>Die Monate starten **zugeklappt** (`Specs/Statistik.md`, FR "Monats-Panels aufklappbar"):
+ * Balken-Tabelle, Kennzahlen, Vergleiche und "Summen pro Einheit" liegen dann nicht im DOM. Jeder
+ * Test, der diese Inhalte prueft, muss vorher aufklappen - sonst laeuft er nicht rot, sondern
+ * findet stillschweigend nichts.
+ *
+ * @param page    Seite mit geladener Statistik
+ * @param anzahl  Wie viele Monate aufgeklappt werden sollen (Default: nur der erste)
+ * @returns       Anzahl tatsaechlich aufgeklappter Monate (0 = keine Monatsdaten geladen)
+ */
+export async function klappeMonateAuf(page: Page, anzahl: number = 1): Promise<number> {
+    // Direkte Kinder: Ein aufgeklappter Monat enthaelt mit "Details anzeigen" eine zweite
+    // .zev-collapsible__header - die darf hier nicht mitgezaehlt werden.
+    const schalter = page.locator('.zev-panel--month > .zev-collapsible > .zev-collapsible__header');
+    const vorhanden = await schalter.count();
+    const zuOeffnen = Math.min(anzahl, vorhanden);
+    for (let i = 0; i < zuOeffnen; i++) {
+        const knopf = schalter.nth(i);
+        if (await knopf.getAttribute('aria-expanded') === 'false') {
+            await knopf.click();
+        }
+        await expect(knopf).toHaveAttribute('aria-expanded', 'true');
+    }
+    return zuOeffnen;
+}

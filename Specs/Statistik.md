@@ -48,6 +48,23 @@
     * [ ] Die Hinweise sind in DE und EN vorhanden und werden über den `TranslationService` geladen (keine Hardcodings im Template).
     * [ ] Alle Hinweis-Keys sind per Flyway-Migration angelegt: Die `TranslatePipe` fällt bei fehlendem Key auf den **Key-Namen** zurück (`TranslationService.translate`), ein Tooltip wie „PRODUKTION_TOTAL_HINWEIS" wäre also direkt sichtbar und gilt als Fehler.
     * [ ] Werte, Balkenlängen, Sortierung und PDF-Ausgabe sind unverändert.
+* **Monats-Panels aufklappbar (Nachtrag):** Die Monate eines Zeitraums (bei der Vorbelegung „Vorquartal" drei) werden **aufklappbar** dargestellt und sind beim Laden **alle zugeklappt**.
+  * Ausgeklappt füllt ein einzelner Monat (Balken-Tabelle, Kennzahlen, Summen-Vergleich, „Summen pro Einheit", Details) rund eine Bildschirmseite; drei Monate untereinander machen die Seite unübersichtlich. Zugeklappt passt der ganze Zeitraum auf einen Blick.
+  * Darstellung wie bei „Details anzeigen" auf derselben Seite und bei den Mieter-Blöcken der Nebenkostenabrechnung (`Specs/Nebenkosten/Abrechnung.md`): Design-System-Baustein **Collapsible** (`.zev-collapsible`), also eine klickbare Kopfleiste mit Dreieck rechts.
+  * Die Kopfleiste zeigt Datenstatus-Punkt, Monatsname, Jahr und den Zeitraum – die geschlossene Ansicht sagt damit weiterhin aus, ob der Monat vollständige Daten hat.
+  * Jeder Monat wird **einzeln** auf- und zugeklappt; ein erneuter Klick schliesst ihn wieder.
+  * Ein neuer Abruf über „Anzeigen" setzt alle Monate wieder auf zugeklappt – sonst bliebe ein Panel offen, das anschliessend einen anderen Monat zeigt.
+  * Die **Detail-Sektion innerhalb** eines Monats („Details anzeigen" für fehlende Einheiten/Tage und Tage mit Abweichungen) bleibt davon unberührt und behält ihren eigenen Zustand.
+  * Rein visuell: **keine** Änderung an Werten, Berechnungen oder der **PDF-Ausgabe** (das PDF enthält weiterhin alle Monate vollständig), **keine** neuen Texte (Monatsname und Zeitraum stehen bereits in der Kopfzeile).
+  * **Akzeptanzkriterien:**
+    * [ ] Nach dem Laden einer Statistik sind alle Monats-Panels zugeklappt; die Kopfzeilen aller Monate sind sichtbar, aber kein Monatsinhalt (Balken-Tabelle, Kennzahlen, „Summen pro Einheit").
+    * [ ] Ein Klick auf die Kopfleiste eines Monats klappt genau diesen Monat auf; die übrigen bleiben zugeklappt.
+    * [ ] Ein erneuter Klick auf dieselbe Kopfleiste klappt den Monat wieder zu.
+    * [ ] Die Kopfleiste zeigt auch im zugeklappten Zustand Monatsname, Jahr, Zeitraum und den Datenstatus-Punkt.
+    * [ ] Kopfleiste und Inhalt verwenden den bestehenden Collapsible-Baustein des Design Systems – kein eigenes CSS für die Statistik-Seite.
+    * [ ] Ein erneuter Abruf über „Anzeigen" klappt alle Monate wieder zu.
+    * [ ] Der Zustand von „Details anzeigen" innerhalb eines Monats wird durch das Auf-/Zuklappen des Monats nicht verändert.
+    * [ ] Die PDF-Ausgabe ist unverändert (alle Monate vollständig).
 
 ### 3. Technische Spezifikationen (Technical Specs)
 * Verwende das Design System

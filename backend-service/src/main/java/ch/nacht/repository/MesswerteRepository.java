@@ -48,6 +48,18 @@ public interface MesswerteRepository extends JpaRepository<Messwerte, Long> {
     List<Einheit> findDistinctEinheitenInRange(@Param("dateFrom") LocalDateTime dateFrom, @Param("dateTo") LocalDateTime dateTo);
 
     /**
+     * Anzahl der 15-Min-Zeitpunkte, für die ein Messwert dieses Einheiten-Typs vorliegt.
+     *
+     * <p>Gebraucht für die <b>gemessenen</b> Kennzahlen: Der Netzbezug der BEZUG-Einheit taugt nur
+     * dann als Nenner-Grundlage, wenn er den Monat lückenlos abdeckt. Fehlen einzelne Intervalle
+     * (Bilanz-Lücken, FR-2.5), ist die Summe zu klein und der daraus gerechnete Autarkiegrad zu
+     * optimistisch – die tages- und einheitengenaue Vollständigkeitsprüfung sieht solche Lücken
+     * innerhalb eines Tages nicht.
+     */
+    @Query("SELECT COUNT(DISTINCT m.zeit) FROM Messwerte m WHERE m.einheit.typ = :typ AND m.zeit >= :dateFrom AND m.zeit < :dateTo")
+    long countDistinctZeitByEinheitTypAndZeitBetween(@Param("typ") EinheitTyp typ, @Param("dateFrom") LocalDateTime dateFrom, @Param("dateTo") LocalDateTime dateTo);
+
+    /**
      * Aggregiert je 15-Min-Intervall (zeit) die Beträge der vier Bilanz-Komponenten für die
      * Batterie-Kennzahlen (Spec Statistik-Kennzahlen.md, Stufe 2). Rückgabe je Zeile:
      * {@code [zeit, produktion, verbrauch, bezug, ruecklieferung]} (alle als Betrag/positiv).

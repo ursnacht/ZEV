@@ -1,6 +1,6 @@
 import { test, expect, Page, Locator } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { navigateViaMenu } from './helpers';
+import { navigateViaMenu, klappeMonateAuf } from './helpers';
 
 /**
  * tests / export-messdaten.spec.ts
@@ -32,6 +32,13 @@ async function loadStatistik(page: Page): Promise<boolean> {
     await submitButton.click();
     // Loading finished when the submit button is enabled again.
     await expect(submitButton).toBeEnabled({ timeout: 15000 });
+
+    // Die Monate starten zugeklappt (`Specs/Statistik.md`); "Summen pro Einheit" liegt erst nach
+    // dem Aufklappen im DOM. Ohne diesen Schritt faende der Test stillschweigend nichts und alle
+    // Tests dieser Datei wuerden uebersprungen statt rot zu laufen.
+    if (await klappeMonateAuf(page) === 0) {
+        return false;
+    }
 
     // Wait for the per-unit summary section (only present when data exists).
     const summenSection = page.locator('.zev-einheit-summen-section').first();

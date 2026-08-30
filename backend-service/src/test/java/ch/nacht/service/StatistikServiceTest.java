@@ -617,6 +617,103 @@ public class StatistikServiceTest {
     }
 
     @Test
+    void berechneKennzahlen_MitBezugEinheit_GemesseneQuotenAusMessung() {
+        // C=1000, Cz=600 (gerechnet 60 %), gemessener Netzbezug B=38
+        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
+        stubBilanzEinheiten(38.0, 300.0);
+        when(messwerteRepository.sumBilanzKomponentenPerZeitBetween(any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertTrue(monat.isBilanzKennzahlenVerfuegbar());
+        assertEquals(0.038, monat.getNetzbezugsquoteGemessen(), 1e-9);   // B/C
+        assertEquals(0.962, monat.getAutarkiegradGemessen(), 1e-9);      // 1 − B/C
+        // Die gerechneten Werte bleiben daneben unveraendert stehen - genau ihre Differenz zu den
+        // gemessenen ist der Verbrauchsanteil aus der Batterie.
+        assertEquals(0.6, monat.getAutarkiegrad(), 1e-9);
+        assertEquals(0.4, monat.getNetzbezugsquote(), 1e-9);
+    }
+
+    @Test
+    void berechneKennzahlen_GemesseneUndGerechneteQuote_SindJeweilsKomplemente() {
+        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
+        stubBilanzEinheiten(38.0, 300.0);
+        when(messwerteRepository.sumBilanzKomponentenPerZeitBetween(any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertEquals(1.0, monat.getAutarkiegradGemessen() + monat.getNetzbezugsquoteGemessen(), 1e-9);
+    }
+
+    @Test
+    void berechneKennzahlen_OhneBezugEinheit_GemesseneQuotenNull() {
+        // findFirstByTyp(BEZUG) nicht gestubt -> Optional.empty()
+        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertFalse(monat.isBilanzKennzahlenVerfuegbar());
+        assertNull(monat.getAutarkiegradGemessen());
+        assertNull(monat.getNetzbezugsquoteGemessen());
+        // Ohne BEZUG-Einheit wird auch nicht auf Luecken geprueft.
+        verify(messwerteRepository, never())
+                .countDistinctZeitByEinheitTypAndZeitBetween(eq(EinheitTyp.BEZUG), any(), any());
+    }
+
+    @Test
+    void berechneKennzahlen_KeinVerbrauch_GemesseneQuotenNull() {
+        // C = 0 -> der Nenner fehlt, wie bei den gerechneten Quoten
+        stubKpiRun(-1200.0, 0.0, -900.0, 0.0, 0.0);
+        stubBilanzEinheiten(38.0, 300.0);
+        when(messwerteRepository.sumBilanzKomponentenPerZeitBetween(any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertFalse(monat.isBilanzKennzahlenVerfuegbar());
+        assertNull(monat.getAutarkiegradGemessen());
+        assertNull(monat.getNetzbezugsquoteGemessen());
+    }
+
+    @Test
+    void berechneKennzahlen_BezugMitLuecken_WirdGekennzeichnet() {
+        // Der Netzbezug deckt nur 2000 von 2880 Intervallen ab: die Summe ist zu klein, der
+        // gemessene Autarkiegrad damit zu optimistisch. Das muss sichtbar sein.
+        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
+        stubBilanzEinheiten(38.0, 300.0);
+        when(messwerteRepository.sumBilanzKomponentenPerZeitBetween(any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(messwerteRepository.countDistinctZeitByEinheitTypAndZeitBetween(
+                eq(EinheitTyp.BEZUG), any(), any())).thenReturn(2000L);
+        when(messwerteRepository.countDistinctZeitByEinheitTypAndZeitBetween(
+                eq(EinheitTyp.CONSUMER), any(), any())).thenReturn(2880L);
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertTrue(monat.isBilanzBezugLueckenhaft());
+        // Der Wert wird trotzdem geliefert - gekennzeichnet ist besser als gar nicht.
+        assertNotNull(monat.getAutarkiegradGemessen());
+    }
+
+    @Test
+    void berechneKennzahlen_BezugLueckenlos_NichtGekennzeichnet() {
+        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
+        stubBilanzEinheiten(38.0, 300.0);
+        when(messwerteRepository.sumBilanzKomponentenPerZeitBetween(any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(messwerteRepository.countDistinctZeitByEinheitTypAndZeitBetween(
+                eq(EinheitTyp.BEZUG), any(), any())).thenReturn(2880L);
+        when(messwerteRepository.countDistinctZeitByEinheitTypAndZeitBetween(
+                eq(EinheitTyp.CONSUMER), any(), any())).thenReturn(2880L);
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertFalse(monat.isBilanzBezugLueckenhaft());
+    }
+
+    @Test
     void berechneKennzahlen_KeineBilanzDaten_BatterieNichtVerfuegbar() {
         // findFirstByTyp(BEZUG/RUECKLIEFERUNG) nicht gestubt → Optional.empty()
         stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);

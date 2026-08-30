@@ -33,6 +33,13 @@ public class MonatsStatistikDTO {
     private Double netzbezugsquote;           // (C − Cz) / C
     private Double einspeisequote;            // (P − Pz) / P
     private Double zevEigenverbrauch;         // Cz (kWh)
+    // Gemessene Gegenstuecke: aus dem Netzbezug der BEZUG-Bilanz-Einheit statt aus dem ZEV-Anteil
+    // der Consumer. Die Differenz zu den obigen Werten ist der Beitrag, der weder direkt aus der
+    // PV noch aus dem Netz kam - typischerweise die Batterie-Entladung.
+    private Double autarkiegradGemessen;      // 1 − B / C
+    private Double netzbezugsquoteGemessen;   // B / C
+    private boolean bilanzKennzahlenVerfuegbar;   // BEZUG-Einheit vorhanden und C > 0
+    private boolean bilanzBezugLueckenhaft;       // BEZUG deckt nicht alle Consumer-Intervalle ab
     // Batterie-Kennzahlen (berechnet/geschätzt aus der Energiebilanz); null = nicht ermittelbar.
     private Double batterieNetto;             // P − C + B − R (kWh)
     private Double batterieGeladen;           // Σ max(0, Netto_i) (kWh, Stufe 2)
@@ -387,5 +394,37 @@ public class MonatsStatistikDTO {
 
     public void setBatterieKennzahlenVerfuegbar(boolean batterieKennzahlenVerfuegbar) {
         this.batterieKennzahlenVerfuegbar = batterieKennzahlenVerfuegbar;
+    }
+
+    public Double getAutarkiegradGemessen() {
+        return autarkiegradGemessen;
+    }
+
+    public void setAutarkiegradGemessen(Double autarkiegradGemessen) {
+        this.autarkiegradGemessen = autarkiegradGemessen;
+    }
+
+    public Double getNetzbezugsquoteGemessen() {
+        return netzbezugsquoteGemessen;
+    }
+
+    public void setNetzbezugsquoteGemessen(Double netzbezugsquoteGemessen) {
+        this.netzbezugsquoteGemessen = netzbezugsquoteGemessen;
+    }
+
+    public boolean isBilanzKennzahlenVerfuegbar() {
+        return bilanzKennzahlenVerfuegbar;
+    }
+
+    public void setBilanzKennzahlenVerfuegbar(boolean bilanzKennzahlenVerfuegbar) {
+        this.bilanzKennzahlenVerfuegbar = bilanzKennzahlenVerfuegbar;
+    }
+
+    public boolean isBilanzBezugLueckenhaft() {
+        return bilanzBezugLueckenhaft;
+    }
+
+    public void setBilanzBezugLueckenhaft(boolean bilanzBezugLueckenhaft) {
+        this.bilanzBezugLueckenhaft = bilanzBezugLueckenhaft;
     }
 }

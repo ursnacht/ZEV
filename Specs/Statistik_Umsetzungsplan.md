@@ -544,3 +544,43 @@ Statistik-Kennzahlen (`Specs/Statistik-Kennzahlen.md` FR-3.5, dort `<tr [title]=
   Vergleichs-Items (`TOOLTIP_VERGLEICH_*`).
 - **PDF unverändert**: Tooltips existieren nur im Web (`StatistikPdfService` nicht betroffen).
 - **Tests**: keine Anpassung nötig – `statistik.component.spec.ts` prüft die Balken-Tabelle nicht.
+
+### Monats-Panels aufklappbar, alle zugeklappt
+
+Die drei Monate eines Quartals füllten aufgeklappt je rund eine Bildschirmseite. Neu ist jeder Monat
+ein Collapsible; beim Laden sind alle zugeklappt.
+
+- **Kein neues CSS**: Verwendet wird der bestehende Design-System-Baustein `.zev-collapsible` /
+  `.zev-collapsible__header` / `.zev-collapsible__content` – dasselbe Muster wie „Details anzeigen"
+  weiter unten auf derselben Seite und wie die Mieter-Blöcke in
+  `nebenkosten-abrechnung-form.component.html`. Damit sieht die Seite an allen drei Stellen gleich
+  aus, und das Design System bleibt unverändert.
+  - Ein erster Entwurf hatte stattdessen eine neue Panel-Variante (`.zev-panel__title--toggle`)
+    eingeführt, damit der Monatstitel seine Schriftgrösse behält. Verworfen zugunsten der
+    Einheitlichkeit – ein zweites Aufklapp-Design neben dem bestehenden ist der teurere Weg.
+- **Struktur**: Der Wrapper `<div class="zev-panel zev-panel--month">` bleibt (Abstand zwischen den
+  Monaten, Anker für die E2E-Tests); darin sitzt das Collapsible. Der frühere `<h3>`-Titel entfällt,
+  seine Bestandteile (Datenstatus-Punkt, Monatsname, Jahr) stehen jetzt in der Kopfleiste; der
+  Zeitraum behält die bestehende Klasse `.zev-panel__subtitle`, das Dreieck steht rechts
+  (`.zev-collapsible__icon`) wie bei den anderen Collapsibles.
+- **`statistik.component.ts`**: neuer Zustand `expandedMonthPanels: Set<number>` mit
+  `toggleMonthPanel(i)` / `isMonthPanelExpanded(i)`; `onSubmit()` leert das Set, damit nach einem
+  Zeitraumwechsel kein Monat offen bleibt, der jetzt einen anderen Zeitraum zeigt. Der bestehende
+  Zustand `expandedMonths` („Details anzeigen" **innerhalb** eines Monats) bleibt unangetastet – zwei
+  unabhängige Ebenen.
+- **Keine neuen Texte, kein Backend, keine Migration**: Monatsname, Zeitraum und Datenstatus standen
+  bereits in der Kopfzeile. Die **PDF-Ausgabe** ist nicht betroffen (`StatistikPdfService` enthält
+  weiterhin alle Monate vollständig).
+- **Tests**:
+  - `statistik.component.spec.ts`: sechs neue Fälle (Start zugeklappt, einzelnes Auf-/Zuklappen,
+    Unabhängigkeit mehrerer Monate, Unabhängigkeit von „Details anzeigen", Zurücksetzen beim
+    Absenden).
+  - `tests/helpers.ts`: neuer Helfer `klappeMonateAuf(page, anzahl)`, der über `aria-expanded`
+    aufklappt und die Anzahl geöffneter Monate zurückgibt. Der Selektor greift bewusst über
+    **direkte Kinder** (`.zev-panel--month > .zev-collapsible > .zev-collapsible__header`): Ein
+    aufgeklappter Monat enthält mit „Details anzeigen" eine zweite Collapsible-Kopfleiste.
+  - `tests/statistik.spec.ts`: die beiden Tests auf Monatsinhalte klappen zuerst auf; ein neuer Test
+    prüft „alle zugeklappt → einzeln auf → wieder zu".
+  - `tests/export-messdaten.spec.ts`: `loadStatistik()` klappt auf, **bevor** es auf
+    „Summen pro Einheit" wartet. Ohne diesen Schritt hätte der Helfer stillschweigend `false`
+    geliefert und **alle** Tests der Datei übersprungen statt rot zu laufen.

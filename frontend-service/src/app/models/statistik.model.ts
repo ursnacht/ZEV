@@ -66,6 +66,12 @@ export interface MonatsStatistik {
   netzbezugsquote: number | null;
   einspeisequote: number | null;
   zevEigenverbrauch: number | null;
+  // Gemessene Gegenstücke aus dem Netzbezug der BEZUG-Bilanz-Einheit; null = keine BEZUG-Einheit
+  autarkiegradGemessen: number | null;
+  netzbezugsquoteGemessen: number | null;
+  bilanzKennzahlenVerfuegbar: boolean;
+  /** Der Netzbezug deckt nicht alle Intervalle ab - die gemessenen Werte sind zu optimistisch. */
+  bilanzBezugLueckenhaft: boolean;
   // Batterie-Kennzahlen (berechnet/geschätzt), null = nicht ermittelbar
   batterieNetto: number | null;
   batterieGeladen: number | null;

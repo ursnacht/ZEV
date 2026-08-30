@@ -53,7 +53,11 @@ describe('StatistikComponent', () => {
     batterieGeladen: 120,
     batterieEntladen: 20,
     batterieWirkungsgrad: 0.1667,
-    batterieKennzahlenVerfuegbar: true
+    batterieKennzahlenVerfuegbar: true,
+    autarkiegradGemessen: 0.8444,
+    netzbezugsquoteGemessen: 0.1556,
+    bilanzKennzahlenVerfuegbar: true,
+    bilanzBezugLueckenhaft: false
   };
 
   const mockStatistik: Statistik = {
@@ -139,6 +143,13 @@ describe('StatistikComponent', () => {
     it('should initialize expandedMonths as empty set', () => {
       expect(component.expandedMonths.size).toBe(0);
     });
+
+    it('should start with every month panel collapsed', () => {
+      // Alle zugeklappt: Ein Quartal liefert drei Monate, aufgeklappt waere die Seite mehrere
+      // Bildschirmseiten lang.
+      expect(component.expandedMonthPanels.size).toBe(0);
+      expect(component.isMonthPanelExpanded(0)).toBe(false);
+    });
   });
 
   describe('onDateFromChange', () => {
@@ -208,6 +219,15 @@ describe('StatistikComponent', () => {
       component.expandedMonths.add(0);
       component.onSubmit();
       expect(component.expandedMonths.size).toBe(0);
+    });
+
+    it('should collapse all month panels on submit', () => {
+      // Sonst bliebe nach einem Zeitraumwechsel ein Panel offen, das jetzt einen anderen
+      // Monat zeigt.
+      component.expandedMonthPanels.add(0);
+      component.expandedMonthPanels.add(2);
+      component.onSubmit();
+      expect(component.expandedMonthPanels.size).toBe(0);
     });
 
     it('should show error message when dateFrom is empty', () => {
@@ -354,6 +374,33 @@ describe('StatistikComponent', () => {
       component.onDownloadCsv(mockMonat, consumerEinheit);
       expect(component.messageType).toBe('error');
       expect(component.message).toBe('EXPORT_CSV_FEHLER');
+    });
+  });
+
+  describe('toggleMonthPanel', () => {
+    it('should expand a collapsed month panel', () => {
+      component.toggleMonthPanel(0);
+      expect(component.isMonthPanelExpanded(0)).toBe(true);
+    });
+
+    it('should collapse an expanded month panel', () => {
+      component.toggleMonthPanel(0);
+      component.toggleMonthPanel(0);
+      expect(component.isMonthPanelExpanded(0)).toBe(false);
+    });
+
+    it('should handle multiple month panels independently', () => {
+      component.toggleMonthPanel(0);
+      component.toggleMonthPanel(1);
+      component.toggleMonthPanel(0);
+      expect(component.isMonthPanelExpanded(0)).toBe(false);
+      expect(component.isMonthPanelExpanded(1)).toBe(true);
+    });
+
+    it('should not touch the details toggle of the same month', () => {
+      // Zwei unabhaengige Zustaende: das Panel selbst und die Detail-Sektion darin.
+      component.toggleMonthPanel(0);
+      expect(component.isMonthExpanded(0)).toBe(false);
     });
   });
 
@@ -598,16 +645,40 @@ describe('StatistikComponent', () => {
       batterieWirkungsgrad: null
     };
 
-    it('should return 5 rows when battery figures are not available', () => {
-      expect(component.getKennzahlen(monatOhneBatterie).length).toBe(5);
+    const monatOhneBilanz: MonatsStatistik = {
+      ...monatOhneBatterie,
+      bilanzKennzahlenVerfuegbar: false,
+      autarkiegradGemessen: null,
+      netzbezugsquoteGemessen: null
+    };
+
+    it('should return 5 rows without battery and without a measured grid supply', () => {
+      expect(component.getKennzahlen(monatOhneBilanz).length).toBe(5);
     });
 
-    it('should return 9 rows when battery figures are available', () => {
-      expect(component.getKennzahlen(mockMonat).length).toBe(9);
+    it('should return 7 rows when only the measured grid supply is available', () => {
+      expect(component.getKennzahlen(monatOhneBatterie).length).toBe(7);
+    });
+
+    it('should return 11 rows when battery and measured grid supply are available', () => {
+      expect(component.getKennzahlen(mockMonat).length).toBe(11);
     });
 
     it('should not include any battery rows when not available', () => {
       const labels = component.getKennzahlen(monatOhneBatterie).map(z => z.labelKey);
+      expect(labels).toEqual([
+        'KENNZAHL_AUTARKIEGRAD',
+        'KENNZAHL_AUTARKIEGRAD_GEMESSEN',
+        'KENNZAHL_EIGENVERBRAUCHSQUOTE',
+        'KENNZAHL_NETZBEZUGSQUOTE',
+        'KENNZAHL_NETZBEZUGSQUOTE_GEMESSEN',
+        'KENNZAHL_EINSPEISEQUOTE',
+        'KENNZAHL_ZEV_EIGENVERBRAUCH'
+      ]);
+    });
+
+    it('should omit the measured rows when there is no balance unit', () => {
+      const labels = component.getKennzahlen(monatOhneBilanz).map(z => z.labelKey);
       expect(labels).toEqual([
         'KENNZAHL_AUTARKIEGRAD',
         'KENNZAHL_EIGENVERBRAUCHSQUOTE',
@@ -617,12 +688,47 @@ describe('StatistikComponent', () => {
       ]);
     });
 
+    it('should place each measured figure right after its calculated counterpart', () => {
+      // Nebeneinander gelesen faellt die Differenz auf - und genau die ist der Batterie-Anteil.
+      const labels = component.getKennzahlen(mockMonat).map(z => z.labelKey);
+      expect(labels.indexOf('KENNZAHL_AUTARKIEGRAD_GEMESSEN'))
+        .toBe(labels.indexOf('KENNZAHL_AUTARKIEGRAD') + 1);
+      expect(labels.indexOf('KENNZAHL_NETZBEZUGSQUOTE_GEMESSEN'))
+        .toBe(labels.indexOf('KENNZAHL_NETZBEZUGSQUOTE') + 1);
+    });
+
+    it('should format the measured figures as percentages', () => {
+      const zeilen = component.getKennzahlen(mockMonat);
+      const gemessen = zeilen.find(z => z.labelKey === 'KENNZAHL_AUTARKIEGRAD_GEMESSEN');
+      expect(gemessen?.value).toBe('84.4');
+      expect(gemessen?.unit).toBe('%');
+      // Gemessen ist nicht geschaetzt - der "berechnet"-Hinweis gehoert hier nicht hin.
+      expect(gemessen?.berechnet).toBe(false);
+    });
+
+    it('should mark the measured figures when the grid supply has gaps', () => {
+      const mitLuecke = { ...mockMonat, bilanzBezugLueckenhaft: true };
+      const zeilen = component.getKennzahlen(mitLuecke);
+
+      expect(zeilen.find(z => z.labelKey === 'KENNZAHL_AUTARKIEGRAD_GEMESSEN')?.luecke).toBe(true);
+      expect(zeilen.find(z => z.labelKey === 'KENNZAHL_NETZBEZUGSQUOTE_GEMESSEN')?.luecke).toBe(true);
+      // Die gerechneten Werte haengen nicht am Bilanz-Messwert.
+      expect(zeilen.find(z => z.labelKey === 'KENNZAHL_AUTARKIEGRAD')?.luecke).toBeFalsy();
+    });
+
+    it('should not mark the measured figures when the grid supply is complete', () => {
+      const zeilen = component.getKennzahlen(mockMonat);
+      expect(zeilen.find(z => z.labelKey === 'KENNZAHL_AUTARKIEGRAD_GEMESSEN')?.luecke).toBe(false);
+    });
+
     it('should include battery rows in order when available', () => {
       const labels = component.getKennzahlen(mockMonat).map(z => z.labelKey);
       expect(labels).toEqual([
         'KENNZAHL_AUTARKIEGRAD',
+        'KENNZAHL_AUTARKIEGRAD_GEMESSEN',
         'KENNZAHL_EIGENVERBRAUCHSQUOTE',
         'KENNZAHL_NETZBEZUGSQUOTE',
+        'KENNZAHL_NETZBEZUGSQUOTE_GEMESSEN',
         'KENNZAHL_EINSPEISEQUOTE',
         'KENNZAHL_ZEV_EIGENVERBRAUCH',
         'KENNZAHL_BATTERIE_NETTO',
@@ -676,8 +782,10 @@ describe('StatistikComponent', () => {
     });
 
     it('should mark battery rows as calculated (berechnet=true)', () => {
-      const zeilen = component.getKennzahlen(mockMonat);
-      const batterieZeilen = zeilen.slice(5);
+      // Ueber den Namen statt ueber die Position: Vor den Batterie-Zeilen stehen inzwischen
+      // sieben Zeilen, ein `slice(5)` waere beim naechsten Zusatz wieder falsch.
+      const batterieZeilen = component.getKennzahlen(mockMonat)
+        .filter(z => z.labelKey.startsWith('KENNZAHL_BATTERIE_'));
       expect(batterieZeilen.length).toBe(4);
       batterieZeilen.forEach(z => expect(z.berechnet).toBe(true));
     });

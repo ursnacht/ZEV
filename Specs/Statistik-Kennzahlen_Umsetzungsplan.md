@@ -93,3 +93,58 @@ Alle Prozent-KPIs: Anzeige mit 1 Nachkommastelle + `%`; kWh wie bestehende Stati
 * **Cache:** Der bestehende `statistik`-Caffeine-Cache (TTL 15 min) greift unverändert, da die KPIs Teil des berechneten `StatistikDTO` sind.
 * **„berechnet"-Markierung (Annahme):** falls kein passender Design-System-Baustein existiert, neue wiederverwendbare Klasse in `design-system/src/components/statistik/` (z.B. `.zev-info-value--berechnet`) + Tooltip via `KENNZAHL_BERECHNET_HINWEIS`.
 * **Migrations-Version:** aktuell höchste ist `V89`; die Übersetzungs-Migration wird als `V90` angelegt (zum Umsetzungszeitpunkt final prüfen).
+
+## Nachtrag: Gemessene Gegenstücke zu Autarkiegrad und Netzbezugsquote (FR-1.6)
+
+**Auslöser:** Bei einer Anlage standen ein gemessener Netzbezug von 38 kWh und eine Netzbezugsquote
+von 9.8 % (bei 985 kWh Verbrauch) nebeneinander auf derselben Seite. Beide Zahlen waren richtig —
+die Quote rechnet aus dem ZEV-Anteil der Konsumenten (`(C − Cz)/C`), die 38 kWh sind der Zähler am
+Netzanschluss. Nebeneinander gelesen widersprachen sie sich trotzdem. Statt eine der beiden
+Definitionen zu ersetzen, werden nun **beide** ausgewiesen: Ihre Differenz ist der Verbrauchsanteil,
+der weder direkt aus der PV noch aus dem Netz kam — typischerweise die Batterie-Entladung.
+
+### Backend
+* `MesswerteRepository.countDistinctZeitByEinheitTypAndZeitBetween(typ, von, bis)` — neue Query für
+  die Intervall-Abdeckung (JPQL, damit der `orgFilter` greift).
+* `MonatsStatistikDTO`: `autarkiegradGemessen`, `netzbezugsquoteGemessen`,
+  `bilanzKennzahlenVerfuegbar`, `bilanzBezugLueckenhaft`.
+* `StatistikService.berechneKennzahlen(dto, von, bis)` — Signatur um den Zeitraum erweitert (für die
+  Lückenprüfung). Rechnet `B/C` bzw. `1 − B/C`, sobald eine `BEZUG`-Einheit existiert **und** `C > 0`.
+* **Lückenprüfung:** `pruefeDatenVollstaendigkeitMonat` arbeitet tage- und einheitengenau und sieht
+  fehlende Intervalle **innerhalb** eines Tages nicht — genau die entstehen aber, wenn das
+  Bilanzmodell einzelne Intervalle ohne `BEZUG`-Messwert überspringt (`distributeBilanz`, FR-2.5).
+  Deshalb wird die Anzahl `BEZUG`-Intervalle gegen die der Konsumenten gezählt; bei Unterdeckung
+  `bilanzBezugLueckenhaft = true` plus WARN-Log mit den beiden Zahlen. Der Wert wird **trotzdem**
+  geliefert: gekennzeichnet ist brauchbarer als „–".
+
+### Frontend
+* `MonatsStatistik` um die vier Felder erweitert.
+* `KennzahlZeile` erhält das optionale Flag `luecke`; `getKennzahlen()` schiebt die gemessene Zeile
+  **direkt hinter** ihr gerechnetes Gegenstück, damit die Differenz beim Lesen auffällt.
+* Kennzeichnung „lückenhaft" über die bestehende `.zev-tag`-Darstellung neben `KENNZAHL_BERECHNET` —
+  **kein neues CSS**.
+* Die gemessenen Zeilen tragen **nicht** die Markierung „berechnet/geschätzt": Sie stammen aus einer
+  Messung, nicht aus einem Residuum der Energiebilanz.
+
+### PDF
+* `statistik.jrxml`: zwei Zeilen in der linken Spalte (y=376/392) mit
+  `printWhenExpression = bilanzKennzahlenVerfuegbar`, darunter der Lücken-Hinweis (y=408). Band von
+  470 auf 502 erhöht, Subreport „Summen pro Einheit" von y=392 auf y=432 verschoben.
+* Geprüft mit `mvn test -Dtest=JasperTemplateCompileTest`.
+
+### i18n
+* `V133__Add_Statistik_Kennzahlen_Gemessen_Translations.sql` (V132 war die höchste angewandte
+  Migration, via `zev-db` geprüft): sechs neue Keys mit `ON CONFLICT (key) DO NOTHING`.
+* Zusätzlich zwei `UPDATE`s auf `KENNZAHL_AUTARKIEGRAD_HINWEIS` und `KENNZAHL_NETZBEZUGSQUOTE_HINWEIS`:
+  Solange der Autarkiegrad allein stand, genügte „intern aus PV/Batterie gedeckt"; neben dem
+  gemessenen Wert muss der Tooltip sagen, dass eine Batterie-Entladung hier **nicht** mitzählt. Beide
+  `UPDATE`s sind mit dem **alten Textwert** in der `WHERE`-Klausel abgesichert — eine eigene Anpassung
+  über die Übersetzungsverwaltung wird dadurch nicht überschrieben.
+
+### Tests
+* `StatistikServiceTest`: sechs neue Fälle (Werte aus der Messung, Komplementarität, ohne
+  `BEZUG`-Einheit, `C = 0`, mit und ohne Lücken) — 40 Tests grün.
+* `statistik.component.spec.ts` / `statistik.service.spec.ts`: Fixtures um die vier Felder erweitert,
+  acht neue Fälle (Zeilenanzahl 5/7/11, Reihenfolge, Formatierung, Lücken-Kennzeichnung).
+* Ein bestehender Test griff die Batterie-Zeilen über `zeilen.slice(5)` ab und brach durch die zwei
+  zusätzlichen Zeilen. Neu wird über den Key-Präfix gefiltert — beim nächsten Zusatz hält das.

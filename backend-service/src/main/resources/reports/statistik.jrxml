@@ -44,6 +44,10 @@
     <field name="autarkiegrad" class="java.lang.Double"/>
     <field name="eigenverbrauchsquote" class="java.lang.Double"/>
     <field name="netzbezugsquote" class="java.lang.Double"/>
+    <field name="autarkiegradGemessen" class="java.lang.Double"/>
+    <field name="netzbezugsquoteGemessen" class="java.lang.Double"/>
+    <field name="bilanzKennzahlenVerfuegbar" class="java.lang.Boolean"/>
+    <field name="bilanzBezugLueckenhaft" class="java.lang.Boolean"/>
     <field name="einspeisequote" class="java.lang.Double"/>
     <field name="zevEigenverbrauch" class="java.lang.Double"/>
     <field name="batterieNetto" class="java.lang.Double"/>
@@ -122,7 +126,7 @@
 
     <!-- Detail Band - One band per month -->
     <detail>
-        <band height="470">
+        <band height="502">
             <!-- Month header -->
             <element kind="textField" uuid="33333333-3333-3333-3333-33333333330c" x="0" y="10" width="555" height="25" forecolor="#333333" fontSize="14.0" bold="true" vTextAlign="Middle">
                 <expression><![CDATA[java.time.Month.of($F{monat}).getDisplayName(java.time.format.TextStyle.FULL, "de".equals($P{SPRACHE}) ? java.util.Locale.GERMAN : java.util.Locale.ENGLISH) + " " + $F{jahr} + " (" + $F{von}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + " - " + $F{bis}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + ")"]]></expression>
@@ -417,6 +421,30 @@
                 <expression><![CDATA[$F{zevEigenverbrauch} != null ? ch.nacht.util.PdfNumberFormat.kwh($F{zevEigenverbrauch}) + " kWh" : "–"]]></expression>
             </element>
 
+            <!-- Gemessene Gegenstücke (linke Spalte; nur mit BEZUG-Bilanz-Einheit) -->
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333380" x="0" y="376" width="200" height="15" fontSize="9.0">
+                <printWhenExpression><![CDATA[$F{bilanzKennzahlenVerfuegbar}]]></printWhenExpression>
+                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_AUTARKIEGRAD_GEMESSEN") + ":"]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333381" x="200" y="376" width="75" height="15" fontSize="9.0" bold="true" hTextAlign="Right">
+                <printWhenExpression><![CDATA[$F{bilanzKennzahlenVerfuegbar}]]></printWhenExpression>
+                <expression><![CDATA[ch.nacht.util.PdfNumberFormat.percent($F{autarkiegradGemessen})]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333382" x="0" y="392" width="200" height="15" fontSize="9.0">
+                <printWhenExpression><![CDATA[$F{bilanzKennzahlenVerfuegbar}]]></printWhenExpression>
+                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_NETZBEZUGSQUOTE_GEMESSEN") + ":"]]></expression>
+            </element>
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333383" x="200" y="392" width="75" height="15" fontSize="9.0" bold="true" hTextAlign="Right">
+                <printWhenExpression><![CDATA[$F{bilanzKennzahlenVerfuegbar}]]></printWhenExpression>
+                <expression><![CDATA[ch.nacht.util.PdfNumberFormat.percent($F{netzbezugsquoteGemessen})]]></expression>
+            </element>
+            <!-- Lücken im gemessenen Netzbezug: ohne diesen Hinweis wirken die beiden Werte
+                 belastbarer, als sie sind. -->
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333384" x="0" y="408" width="290" height="20" forecolor="#999999" fontSize="7.0" italic="true">
+                <printWhenExpression><![CDATA[$F{bilanzKennzahlenVerfuegbar} && $F{bilanzBezugLueckenhaft}]]></printWhenExpression>
+                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_LUECKENHAFT") + ": " + $P{TRANSLATIONS}.get("KENNZAHL_LUECKENHAFT_HINWEIS")]]></expression>
+            </element>
+
             <!-- Batterie-KPIs (rechte Spalte; nur wenn Producer + Bilanz-Bezug + Rücklieferung vorhanden) -->
             <element kind="textField" uuid="33333333-3333-3333-3333-33333333336b" x="300" y="296" width="180" height="15" fontSize="9.0">
                 <printWhenExpression><![CDATA[$F{batterieKennzahlenVerfuegbar}]]></printWhenExpression>
@@ -456,7 +484,7 @@
             </element>
 
             <!-- Subreport: Summen pro Einheit -->
-            <element kind="subreport" uuid="33333333-3333-3333-3333-333333333330" x="0" y="392" width="555" height="50">
+            <element kind="subreport" uuid="33333333-3333-3333-3333-333333333330" x="0" y="432" width="555" height="50">
                 <printWhenExpression><![CDATA[$F{einheitSummen} != null && !$F{einheitSummen}.isEmpty()]]></printWhenExpression>
                 <parameter name="TRANSLATIONS">
                     <expression><![CDATA[$P{TRANSLATIONS}]]></expression>

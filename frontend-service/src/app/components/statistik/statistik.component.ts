@@ -18,7 +18,10 @@ export interface KennzahlZeile {
   hintKey: string;
   value: string;
   unit: string;
+  /** Geschätzter Wert (Residuum der Energiebilanz) - wird als solcher gekennzeichnet. */
   berechnet: boolean;
+  /** Der zugrunde liegende Messwert hat Lücken - der Wert ist zu optimistisch. */
+  luecke?: boolean;
 }
 
 @Component({
@@ -36,6 +39,13 @@ export class StatistikComponent extends WithMessage implements OnInit {
 
   statistik: Statistik | null = null;
   expandedMonths: Set<number> = new Set();
+  /**
+   * Aufgeklappte Monats-Panels. Ein Quartal liefert drei Monate, jeder mit Balken-Tabelle,
+   * Kennzahlen, Vergleichen und Summen pro Einheit - aufgeklappt sind das mehrere
+   * Bildschirmseiten. Deshalb starten alle zugeklappt; die Kopfzeile zeigt Monat, Zeitraum und
+   * Datenstatus, damit die geschlossene Ansicht trotzdem etwas aussagt.
+   */
+  expandedMonthPanels: Set<number> = new Set();
   expandedGlobalDetails = false;
 
   /** Aktiver Verteilmodus ist BILANZ (Modus-abhängige Anzeige/Hinweise). */
@@ -103,6 +113,7 @@ export class StatistikComponent extends WithMessage implements OnInit {
     this.loading = true;
     this.statistik = null;
     this.expandedMonths.clear();
+    this.expandedMonthPanels.clear();
 
     this.statistikService.getStatistik(this.dateFrom, this.dateTo).subscribe({
       next: (data) => {
@@ -166,6 +177,18 @@ export class StatistikComponent extends WithMessage implements OnInit {
       },
       error: () => this.showMessage(this.translationService.translate('EXPORT_CSV_FEHLER'), 'error')
     });
+  }
+
+  toggleMonthPanel(index: number): void {
+    if (this.expandedMonthPanels.has(index)) {
+      this.expandedMonthPanels.delete(index);
+    } else {
+      this.expandedMonthPanels.add(index);
+    }
+  }
+
+  isMonthPanelExpanded(index: number): boolean {
+    return this.expandedMonthPanels.has(index);
   }
 
   toggleMonthDetails(index: number): void {
@@ -232,15 +255,31 @@ export class StatistikComponent extends WithMessage implements OnInit {
    * Baut die Kennzahlen-Zeilen eines Monats für die tabellarische Darstellung
    * (Bezeichnung | Wert rechtsbündig | Einheit linksbündig). Batterie-Kennzahlen nur, wenn
    * die dafür nötigen Bilanz-Daten vorhanden sind (`batterieKennzahlenVerfuegbar`).
+   *
+   * <p>Die **gemessenen** Werte stehen direkt hinter ihren gerechneten Gegenstücken, damit die
+   * Differenz beim Lesen auffällt: Sie ist der Verbrauchsanteil, der weder direkt aus der PV noch
+   * aus dem Netz kam - typischerweise die Batterie-Entladung.
    */
   getKennzahlen(monat: MonatsStatistik): KennzahlZeile[] {
     const zeilen: KennzahlZeile[] = [
-      this.percentZeile('KENNZAHL_AUTARKIEGRAD', monat.autarkiegrad, false),
+      this.percentZeile('KENNZAHL_AUTARKIEGRAD', monat.autarkiegrad, false)
+    ];
+    if (monat.bilanzKennzahlenVerfuegbar) {
+      zeilen.push(this.gemesseneZeile('KENNZAHL_AUTARKIEGRAD_GEMESSEN',
+        monat.autarkiegradGemessen, monat.bilanzBezugLueckenhaft));
+    }
+    zeilen.push(
       this.percentZeile('KENNZAHL_EIGENVERBRAUCHSQUOTE', monat.eigenverbrauchsquote, false),
-      this.percentZeile('KENNZAHL_NETZBEZUGSQUOTE', monat.netzbezugsquote, false),
+      this.percentZeile('KENNZAHL_NETZBEZUGSQUOTE', monat.netzbezugsquote, false)
+    );
+    if (monat.bilanzKennzahlenVerfuegbar) {
+      zeilen.push(this.gemesseneZeile('KENNZAHL_NETZBEZUGSQUOTE_GEMESSEN',
+        monat.netzbezugsquoteGemessen, monat.bilanzBezugLueckenhaft));
+    }
+    zeilen.push(
       this.percentZeile('KENNZAHL_EINSPEISEQUOTE', monat.einspeisequote, false),
       this.kwhZeile('KENNZAHL_ZEV_EIGENVERBRAUCH', monat.zevEigenverbrauch, false)
-    ];
+    );
     if (monat.batterieKennzahlenVerfuegbar) {
       zeilen.push(
         this.signedKwhZeile('KENNZAHL_BATTERIE_NETTO', monat.batterieNetto),
@@ -250,6 +289,11 @@ export class StatistikComponent extends WithMessage implements OnInit {
       );
     }
     return zeilen;
+  }
+
+  /** Aus dem gemessenen Netzbezug abgeleitete Quote; bei Lücken in der Messung gekennzeichnet. */
+  private gemesseneZeile(labelKey: string, value: number | null, luecke: boolean): KennzahlZeile {
+    return { ...this.percentZeile(labelKey, value, false), luecke };
   }
 
   private percentZeile(labelKey: string, value: number | null, berechnet: boolean): KennzahlZeile {
