@@ -15,6 +15,15 @@ public class NkBerechnungDTO {
     /** Summe der Miettage aller Mieter; muss {@code <= nenner} sein (FR-2). */
     private long summeTage;
 
+    /** Nenner der Umlage pro Person: {@code Anzahl Personen x Tage im Zeitraum} (FR-2). */
+    private long nennerPerson;
+
+    /**
+     * Summe {@code Miettage x Wohnungen x Personen} aller Mieter; muss {@code <= nennerPerson}
+     * sein — dieselbe Regel wie bei den Wohnungen, nur mit Köpfen gewichtet.
+     */
+    private long summePersonenTage;
+
     private List<NkMieterAbrechnungDTO> mieter = new ArrayList<>();
 
     private List<NkUmlageInfoDTO> umlagen = new ArrayList<>();
@@ -32,6 +41,22 @@ public class NkBerechnungDTO {
 
     public long getSummeTage() {
         return summeTage;
+    }
+
+    public long getNennerPerson() {
+        return nennerPerson;
+    }
+
+    public void setNennerPerson(long nennerPerson) {
+        this.nennerPerson = nennerPerson;
+    }
+
+    public long getSummePersonenTage() {
+        return summePersonenTage;
+    }
+
+    public void setSummePersonenTage(long summePersonenTage) {
+        this.summePersonenTage = summePersonenTage;
     }
 
     public void setSummeTage(long summeTage) {

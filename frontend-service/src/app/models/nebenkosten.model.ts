@@ -7,6 +7,13 @@ import { Mengeneinheit } from './tarif.model';
 export enum NkPositionsart {
   /** Gesamtkosten zeitanteilig verteilt; Leerstand bleibt unverteilt. */
   UMLAGE = 'UMLAGE',
+  /**
+    * Wie UMLAGE, aber nach Köpfen statt nach Wohnungen verteilt (Grünabfuhr).
+    *
+    * Nenner ist `Anzahl Personen x Tage`, Zähler `Miettage x Wohnungen x Personen je Wohnung`.
+    * Ohne erfasste Personenzahlen rechnet die Art genau wie UMLAGE.
+    */
+  UMLAGE_PERSON = 'UMLAGE_PERSON',
   /** Je Mieter gemessene Menge mal Preis je Einheit. */
   VERBRAUCH = 'VERBRAUCH',
   /** Prozent auf die Summe aller Zeilen mit kleinerer Reihenfolge. */
@@ -28,6 +35,8 @@ export interface NkAbrechnung {
   datumBis: string;  // ISO date format: YYYY-MM-DD
   /** Bildet mit den Tagen des Zeitraums den Nenner der Umlage. */
   anzahlWohnungen: number | null;
+  /** Bildet mit den Tagen des Zeitraums den Nenner der Umlage pro Person; Vorschlag = Wohnungen. */
+  anzahlPersonen: number | null;
   abgerechnet: boolean;
   erstelltAm?: string;
 }
@@ -71,6 +80,16 @@ export interface NkZusatz {
   betragProEinheit: number | null;
 }
 
+/**
+ * Anzahl Personen je Wohnung eines Mieters. Fehlt der Eintrag, gilt 1 — dann rechnet eine Umlage
+ * pro Person genau wie eine Umlage pro Wohnung.
+ */
+export interface NkPerson {
+  id?: number;
+  mieterId: number;
+  anzahlPersonen: number | null;
+}
+
 /** Akonto-Angaben eines Mieters; alle drei Werte sind überschreibbare Vorschläge. */
 export interface NkAkonto {
   id?: number;
@@ -110,6 +129,10 @@ export interface NkMieterAbrechnung {
   name: string;
   /** Miettage im Zeitraum, bereits mit der Zahl der Wohnungen multipliziert. */
   tage: number;
+  /** Personen je Wohnung dieses Mieters; Vorgabe 1. */
+  anzahlPersonen: number;
+  /** Zähler der Umlage pro Person: `tage x anzahlPersonen`. */
+  personenTage: number;
   /** Kein zugeordnetes Wohnobjekt — die Maske weist darauf hin, statt den Mieter zu verschweigen. */
   ohneWohnung: boolean;
   zeilen: NkZeile[];
@@ -142,6 +165,10 @@ export interface NkUmlageInfo {
 export interface NkBerechnung {
   nenner: number;
   summeTage: number;
+  /** Nenner der Umlage pro Person: `Anzahl Personen x Tage im Zeitraum`. */
+  nennerPerson: number;
+  /** Summe `Miettage x Wohnungen x Personen` aller Mieter; muss `<= nennerPerson` sein. */
+  summePersonenTage: number;
   mieter: NkMieterAbrechnung[];
   umlagen: NkUmlageInfo[];
 }
@@ -161,6 +188,10 @@ export interface NkAbrechnungDetail {
   berechnung?: NkBerechnung;
   /** Vorschlag für die Anzahl Wohnungen; `null`, wenn es keine CONSUMER-Einheiten gibt. */
   anzahlWohnungenVorschlag: number | null;
+  /** Vorschlag für die Anzahl Personen: die Anzahl Wohnungen. */
+  anzahlPersonenVorschlag: number | null;
+  /** Erfasste Personenzahlen je Mieter; fehlt eine, gilt 1. */
+  personen: NkPerson[];
 }
 
 /**
@@ -201,6 +232,7 @@ export interface NkRechnungLauf {
 /** Positionsarten in der Reihenfolge, in der sie in der Auswahl erscheinen. */
 export const NK_POSITIONSARTEN: NkPositionsart[] = [
   NkPositionsart.UMLAGE,
+  NkPositionsart.UMLAGE_PERSON,
   NkPositionsart.VERBRAUCH,
   NkPositionsart.ANTEIL,
   NkPositionsart.ZUSCHLAG

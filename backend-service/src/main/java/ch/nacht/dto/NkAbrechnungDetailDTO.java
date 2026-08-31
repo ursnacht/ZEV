@@ -37,6 +37,15 @@ public class NkAbrechnungDetailDTO {
      */
     private Integer anzahlWohnungenVorschlag;
 
+    /**
+     * Vorschlag für die Anzahl Personen: die Anzahl Wohnungen. Zusammen mit der Vorgabe „1 Person
+     * je Mieter" rechnet eine Umlage pro Person damit genau wie eine Umlage pro Wohnung.
+     */
+    private Integer anzahlPersonenVorschlag;
+
+    /** Erfasste Personenzahlen je Mieter; fehlt eine, gilt 1. */
+    private List<NkPersonDTO> personen = new ArrayList<>();
+
     public NkAbrechnungDetailDTO() {
     }
 
@@ -78,6 +87,22 @@ public class NkAbrechnungDetailDTO {
 
     public void setBerechnung(NkBerechnungDTO berechnung) {
         this.berechnung = berechnung;
+    }
+
+    public Integer getAnzahlPersonenVorschlag() {
+        return anzahlPersonenVorschlag;
+    }
+
+    public void setAnzahlPersonenVorschlag(Integer anzahlPersonenVorschlag) {
+        this.anzahlPersonenVorschlag = anzahlPersonenVorschlag;
+    }
+
+    public List<NkPersonDTO> getPersonen() {
+        return personen;
+    }
+
+    public void setPersonen(List<NkPersonDTO> personen) {
+        this.personen = personen;
     }
 
     public Integer getAnzahlWohnungenVorschlag() {

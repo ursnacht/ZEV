@@ -148,17 +148,36 @@ async function erstelleAbrechnung(page: Page, bezeichnung: string): Promise<void
     await erwarteErfolg(page, 'Abrechnung anlegen');
 }
 
+/** Positionsarten, die dieser Test kennt — die Namen stammen aus `NkPositionsart`. */
+type Positionsart = 'UMLAGE' | 'UMLAGE_PERSON' | 'VERBRAUCH' | 'ANTEIL' | 'ZUSCHLAG';
+
 /**
- * Position der Art im Auswahlfeld — die Reihenfolge stammt aus `NK_POSITIONSARTEN`.
+ * Wählt eine Positionsart über ihren **Namen** aus dem Auswahlfeld.
  *
- * Bewusst über den **Index**: Das Select bindet mit `[ngValue]`, Angular vergibt dort technische
- * Werte (`0: UMLAGE`). Ein `selectOption('UMLAGE')` liefe in ein „did not find some options",
- * dessen Meldung nur das Symptom nennt.
+ * Das Select bindet mit `[ngValue]`; Angular schreibt dort technische Werte der Form
+ * `0: UMLAGE`. Ein `selectOption('UMLAGE')` läuft deshalb in ein „did not find some options".
+ *
+ * Frühere Fassung ging über einen **hartcodierten Index** (`{ UMLAGE: 0, VERBRAUCH: 1, … }`) —
+ * und brach, sobald eine neue Art dazukam: `UMLAGE_PERSON` rutschte auf Platz 1, der Test für
+ * ANTEIL wählte fortan VERBRAUCH. Er scheiterte dann an einem Betrag (50'000.00 statt 500.00),
+ * also weit weg von der Ursache. Deshalb wird der Wert jetzt zur Laufzeit aus den Optionen
+ * gelesen: Der Name steht im technischen Wert hinter dem Doppelpunkt, die Position ist
+ * gleichgültig.
  */
-const ART_INDEX = { UMLAGE: 0, VERBRAUCH: 1, ANTEIL: 2, ZUSCHLAG: 3 } as const;
+async function waehleArt(select: Locator, art: Positionsart): Promise<void> {
+    const wert = await select.locator('option').evaluateAll(
+        (optionen, gesucht) => (optionen as HTMLOptionElement[])
+            .map(o => o.value)
+            .find(v => v === gesucht || v.endsWith(`: ${gesucht}`)) ?? '',
+        art);
+    if (!wert) {
+        throw new Error(`Positionsart "${art}" steht nicht zur Auswahl`);
+    }
+    await select.selectOption(wert);
+}
 
 /** Fügt eine Position hinzu und wählt ihre Art. */
-async function fuegePositionHinzu(page: Page, art: keyof typeof ART_INDEX,
+async function fuegePositionHinzu(page: Page, art: Positionsart,
                                   bezeichnung: string): Promise<void> {
     const zeilenVorher = await page.locator('.nk-positionen tbody tr').count();
     // „Position hinzufuegen" ist die erste sekundaere Schaltflaeche im Positionen-Panel.
@@ -167,8 +186,41 @@ async function fuegePositionHinzu(page: Page, art: keyof typeof ART_INDEX,
     await expect(zeilen).toHaveCount(zeilenVorher + 1, { timeout: 10000 });
 
     const neueZeile = zeilen.nth(zeilenVorher);
-    await neueZeile.locator('select').first().selectOption({ index: ART_INDEX[art] });
+    await waehleArt(neueZeile.locator('select').first(), art);
     await neueZeile.locator('input[type="text"]').fill(bezeichnung);
+}
+
+/** Schweizer Betragsformat (1'234.50) als Zahl - fuer Groessenvergleiche. */
+function betragAlsZahl(text: string): number {
+    return Number(text.replace(/'/g, ''));
+}
+
+/** Betrag einer Position im Totalbetrag der Kontrollzahlen (Spalte „Summe verteilt"). */
+function verteiltFuer(page: Page, bezeichnung: string): Locator {
+    return page.locator('.nk-kontrolle tbody tr', { hasText: bezeichnung }).locator('td').nth(2);
+}
+
+/** Betrag einer Position in der Zeile eines Mieterblocks. */
+function betragImBlock(block: Locator, bezeichnung: string): Locator {
+    return block.locator('.nk-mieterzeilen tbody tr', { hasText: bezeichnung })
+        .locator('td').nth(3);
+}
+
+/**
+ * Eingabefeld „Personen je Wohnung" eines Mieterblocks.
+ *
+ * Über das `id`-Präfix und nicht über die Beschriftung: Der Text kommt aus der Datenbank und lässt
+ * sich über den Übersetzungs-Editor ändern — ein `getByLabel` bräche dann.
+ */
+function personenfeld(block: Locator): Locator {
+    return block.locator('input[id^="personen"]');
+}
+
+/** Trimmter Text eines Feldes, sobald es nicht mehr „0.00" zeigt. */
+async function betragSobaldGesetzt(feld: Locator): Promise<string> {
+    await expect.poll(async () => (await feld.textContent())?.trim(), { timeout: 10000 })
+        .not.toBe('0.00');
+    return (await feld.textContent())!.trim();
 }
 
 /**
@@ -645,6 +697,95 @@ test.describe('Nebenkostenabrechnung - Positionen', () => {
         const blockNachher = await oeffneErstenMieterblock(page);
         await expect(blockNachher.locator('.nk-mieterzeilen tbody tr').first())
             .toContainText('500.00', { timeout: 10000 });
+    });
+
+    test('should hide the persons field until a per-person allocation exists', async ({ page }) => {
+        // Ein wirkungsloses Eingabefeld laedt zum Ausfuellen ein - ohne Personenumlage hat die
+        // Zahl keine Wirkung und das Feld hat nichts im Block zu suchen.
+        const bezeichnung = neueBezeichnung('PersonFeld');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+
+        await fuegePositionHinzu(page, 'UMLAGE', 'E2E Wohnung-Umlage');
+        const ohne = await oeffneErstenMieterblock(page);
+        await expect(personenfeld(ohne)).toHaveCount(0);
+
+        await fuegePositionHinzu(page, 'UMLAGE_PERSON', 'E2E Person-Umlage');
+        const mit = await oeffneErstenMieterblock(page);
+        await expect(personenfeld(mit)).toBeVisible({ timeout: 10000 });
+        // Vorgabe 1 - damit rechnet die Personenumlage wie die Wohnungsumlage.
+        await expect(personenfeld(mit)).toHaveValue('1');
+    });
+
+    test('should distribute a per-person allocation like a per-apartment one by default',
+        async ({ page }) => {
+        // Die Kernzusage der Erweiterung: Vorschlag "Personen = Wohnungen" plus Vorgabe "1 Person
+        // je Mieter" ergibt dieselben Betraege wie die Umlage pro Wohnung. Damit ist der Test
+        // unabhaengig davon, wie viele Wohnungen und Mieter die Umgebung kennt - verglichen werden
+        // zwei Zahlen derselben Abrechnung, nicht eine Zahl gegen eine Erwartung.
+        const bezeichnung = neueBezeichnung('PersonGleich');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+
+        await fuegePositionHinzu(page, 'UMLAGE', 'E2E Wohnung-Umlage');
+        await page.locator('.nk-positionen tbody tr').nth(0)
+            .locator('input[type="number"]').first().fill('1000');
+        await fuegePositionHinzu(page, 'UMLAGE_PERSON', 'E2E Person-Umlage');
+        await page.locator('.nk-positionen tbody tr').nth(1)
+            .locator('input[type="number"]').first().fill('1000');
+
+        const erwartet = await betragSobaldGesetzt(verteiltFuer(page, 'E2E Wohnung-Umlage'));
+        await expect(verteiltFuer(page, 'E2E Person-Umlage')).toHaveText(erwartet);
+
+        // Und nach dem Speichern nochmal: Jetzt rechnet das Backend, nicht die Vorschau. Weichen
+        // die beiden Seiten auseinander, faellt es genau hier auf.
+        await clearMessages(page);
+        await speichernUnten(page).click();
+        await erwarteErfolg(page, 'Personenumlage speichern');
+
+        await expect(verteiltFuer(page, 'E2E Wohnung-Umlage')).toHaveText(erwartet);
+        await expect(verteiltFuer(page, 'E2E Person-Umlage')).toHaveText(erwartet);
+    });
+
+    test('should raise a tenant share with more persons and leave the apartment share alone',
+        async ({ page }) => {
+        const bezeichnung = neueBezeichnung('PersonMehr');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+
+        await fuegePositionHinzu(page, 'UMLAGE', 'E2E Wohnung-Umlage');
+        await page.locator('.nk-positionen tbody tr').nth(0)
+            .locator('input[type="number"]').first().fill('1000');
+        await fuegePositionHinzu(page, 'UMLAGE_PERSON', 'E2E Person-Umlage');
+        await page.locator('.nk-positionen tbody tr').nth(1)
+            .locator('input[type="number"]').first().fill('1000');
+
+        const block = await oeffneErstenMieterblock(page);
+        const proWohnung = await betragSobaldGesetzt(betragImBlock(block, 'E2E Wohnung-Umlage'));
+        const vorher = await betragSobaldGesetzt(betragImBlock(block, 'E2E Person-Umlage'));
+        expect(vorher).toBe(proWohnung);
+
+        // Mehr Koepfe in dieser Wohnung: Der Anteil dieses Mieters an der Personenumlage steigt,
+        // der an der Wohnungsumlage bleibt.
+        await personenfeld(block).fill('4');
+
+        await expect.poll(async () =>
+            (await betragImBlock(block, 'E2E Person-Umlage').textContent())?.trim(),
+            { timeout: 10000 }).not.toBe(vorher);
+
+        const nachher = (await betragImBlock(block, 'E2E Person-Umlage').textContent())!.trim();
+        expect(betragAlsZahl(nachher)).toBeGreaterThan(betragAlsZahl(vorher));
+        await expect(betragImBlock(block, 'E2E Wohnung-Umlage')).toHaveText(proWohnung);
+
+        // Das Backend muss zum selben Ergebnis kommen wie die Vorschau.
+        await clearMessages(page);
+        await speichernUnten(page).click();
+        await erwarteErfolg(page, 'Personenzahl speichern');
+
+        const blockNachher = await oeffneErstenMieterblock(page);
+        await expect(personenfeld(blockNachher)).toHaveValue('4');
+        await expect(betragImBlock(blockNachher, 'E2E Person-Umlage')).toHaveText(nachher);
+        await expect(betragImBlock(blockNachher, 'E2E Wohnung-Umlage')).toHaveText(proWohnung);
     });
 
     test('should offer a quantity field for a consumption position right away', async ({ page }) => {

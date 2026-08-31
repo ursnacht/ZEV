@@ -2,6 +2,7 @@ package ch.nacht.service;
 
 import ch.nacht.dto.NkAbrechnungDetailDTO;
 import ch.nacht.dto.NkAkontoDTO;
+import ch.nacht.dto.NkPersonDTO;
 import ch.nacht.dto.NkMieterBasisDTO;
 import ch.nacht.dto.NkPositionDTO;
 import ch.nacht.dto.NkVerbrauchDTO;
@@ -13,6 +14,7 @@ import ch.nacht.entity.Mieter;
 import ch.nacht.entity.MieterEinheit;
 import ch.nacht.entity.NkAbrechnung;
 import ch.nacht.entity.NkAkonto;
+import ch.nacht.entity.NkPerson;
 import ch.nacht.entity.NkPosition;
 import ch.nacht.entity.NkPositionsart;
 import ch.nacht.entity.NkVerbrauch;
@@ -23,6 +25,7 @@ import ch.nacht.repository.MieterEinheitRepository;
 import ch.nacht.repository.MieterRepository;
 import ch.nacht.repository.NkAbrechnungRepository;
 import ch.nacht.repository.NkAkontoRepository;
+import ch.nacht.repository.NkPersonRepository;
 import ch.nacht.repository.NkPositionRepository;
 import ch.nacht.repository.NkVerbrauchRepository;
 import ch.nacht.repository.NkZusatzRepository;
@@ -62,6 +65,7 @@ public class NkAbrechnungService {
     private final NkVerbrauchRepository verbrauchRepository;
     private final NkZusatzRepository zusatzRepository;
     private final NkAkontoRepository akontoRepository;
+    private final NkPersonRepository personRepository;
     private final MieterRepository mieterRepository;
     private final MieterEinheitRepository mieterEinheitRepository;
     private final EinheitRepository einheitRepository;
@@ -75,6 +79,7 @@ public class NkAbrechnungService {
                                NkVerbrauchRepository verbrauchRepository,
                                NkZusatzRepository zusatzRepository,
                                NkAkontoRepository akontoRepository,
+                               NkPersonRepository personRepository,
                                MieterRepository mieterRepository,
                                MieterEinheitRepository mieterEinheitRepository,
                                EinheitRepository einheitRepository,
@@ -87,6 +92,7 @@ public class NkAbrechnungService {
         this.verbrauchRepository = verbrauchRepository;
         this.zusatzRepository = zusatzRepository;
         this.akontoRepository = akontoRepository;
+        this.personRepository = personRepository;
         this.mieterRepository = mieterRepository;
         this.mieterEinheitRepository = mieterEinheitRepository;
         this.einheitRepository = einheitRepository;
@@ -137,6 +143,7 @@ public class NkAbrechnungService {
         NkAbrechnungDetailDTO detail = new NkAbrechnungDetailDTO();
         detail.setAbrechnung(new NkAbrechnung());
         detail.setAnzahlWohnungenVorschlag(vorschlagAnzahlWohnungen());
+        detail.setAnzahlPersonenVorschlag(vorschlagAnzahlWohnungen());
         return detail;
     }
 
@@ -153,6 +160,7 @@ public class NkAbrechnungService {
         hibernateFilterService.enableOrgFilter();
         log.info("Creating Nebenkostenabrechnung: {}", abrechnung);
 
+        ergaenzeAnzahlPersonen(abrechnung);
         pruefeKopf(abrechnung);
         abrechnung.setId(null);
         abrechnung.setOrgId(organizationContextService.getCurrentOrgId());
@@ -187,21 +195,27 @@ public class NkAbrechnungService {
 
         NkAbrechnung neu = detail.getAbrechnung();
         if (neu != null) {
+            // Vorgabe vor der Pruefung setzen: Ein Aufrufer, der das Feld nicht kennt, soll nicht
+            // an einer Meldung scheitern, deren Antwort die Anzahl Wohnungen ist.
+            ergaenzeAnzahlPersonen(neu);
             pruefeKopf(neu);
             abrechnung.setBezeichnung(neu.getBezeichnung());
             abrechnung.setDatumVon(neu.getDatumVon());
             abrechnung.setDatumBis(neu.getDatumBis());
             abrechnung.setAnzahlWohnungen(neu.getAnzahlWohnungen());
+            abrechnung.setAnzahlPersonen(neu.getAnzahlPersonen());
         }
 
         List<NkMieterBasisDTO> mieter = ladeMieter(abrechnung);
         pruefeNenner(abrechnung, mieter);
+        pruefeNennerPerson(abrechnung, mieter, detail.getPositionen(), detail.getPersonen());
         pruefePositionen(detail.getPositionen());
 
         Long orgId = organizationContextService.getCurrentOrgId();
         ersetzePositionen(abrechnung, detail.getPositionen(), orgId);
         ersetzeZusaetze(abrechnung, detail.getZusaetze(), orgId);
         ersetzeAkonto(abrechnung, detail.getAkonto(), orgId);
+        ersetzePersonen(abrechnung, detail.getPersonen(), orgId);
 
         abrechnungRepository.save(abrechnung);
         log.info("Saved Nebenkostenabrechnung {} with {} positions", id, detail.getPositionen().size());
@@ -259,6 +273,7 @@ public class NkAbrechnungService {
         List<NkVerbrauch> verbraeuche = verbrauchRepository.findByAbrechnungId(abrechnung.getId());
         List<NkZusatz> zusaetze = zusatzRepository.findByAbrechnungIdOrderByMieterIdAscReihenfolgeAsc(abrechnung.getId());
         List<NkAkonto> akonto = akontoRepository.findByAbrechnungId(abrechnung.getId());
+        List<NkPerson> personen = personRepository.findByAbrechnungId(abrechnung.getId());
         List<NkMieterBasisDTO> mieter = ladeMieter(abrechnung);
 
         NkAbrechnungDetailDTO detail = new NkAbrechnungDetailDTO();
@@ -266,9 +281,11 @@ public class NkAbrechnungService {
         detail.setPositionen(zuPositionsDTOs(positionen, verbraeuche));
         detail.setZusaetze(zuZusatzDTOs(zusaetze));
         detail.setAkonto(zuAkontoDTOs(akonto));
+        detail.setPersonen(zuPersonDTOs(personen));
         detail.setAnzahlWohnungenVorschlag(vorschlagAnzahlWohnungen());
+        detail.setAnzahlPersonenVorschlag(vorschlagAnzahlWohnungen());
         detail.setBerechnung(berechnungService.berechne(
-                abrechnung, positionen, verbraeuche, zusaetze, akonto, mieter));
+                abrechnung, positionen, verbraeuche, zusaetze, akonto, personen, mieter));
         return detail;
     }
 
@@ -292,6 +309,16 @@ public class NkAbrechnungService {
             dto.setBetragProEinheit(p.getBetragProEinheit());
             dto.setProzentsatz(p.getProzentsatz());
             dto.setVerbraeuche(mengen.getOrDefault(p.getId(), new ArrayList<>()));
+            dtos.add(dto);
+        }
+        return dtos;
+    }
+
+    private List<NkPersonDTO> zuPersonDTOs(List<NkPerson> personen) {
+        List<NkPersonDTO> dtos = new ArrayList<>();
+        for (NkPerson person : personen) {
+            NkPersonDTO dto = new NkPersonDTO(person.getMieterId(), person.getAnzahlPersonen());
+            dto.setId(person.getId());
             dtos.add(dto);
         }
         return dtos;
@@ -473,6 +500,34 @@ public class NkAbrechnungService {
         }
     }
 
+    /**
+     * Ersetzt die Personenzahlen der Abrechnung — wie beim Akonto: erst löschen, dann neu schreiben.
+     *
+     * <p>Eine Zahl gleich der Vorgabe wird <b>nicht</b> gespeichert. Sonst entstünde für jeden
+     * Mieter jeder Abrechnung eine Zeile, nur um „1" festzuhalten — und weil {@code nk_person}
+     * mit {@code ON DELETE RESTRICT} auf den Mieter zeigt, wäre danach kein Mieter mehr löschbar,
+     * der überhaupt in einer Abrechnung vorkommt.
+     */
+    private void ersetzePersonen(NkAbrechnung abrechnung, List<NkPersonDTO> dtos, Long orgId) {
+        personRepository.deleteByAbrechnungId(abrechnung.getId());
+        personRepository.flush();
+
+        for (NkPersonDTO dto : dtos) {
+            if (dto.getMieterId() == null) {
+                throw new IllegalArgumentException("Anzahl Personen ohne Mieter");
+            }
+            int personen = dto.getAnzahlPersonen() != null
+                    ? dto.getAnzahlPersonen() : NkBerechnungService.PERSONEN_VORGABE;
+            if (personen < 1) {
+                throw new IllegalArgumentException("NK_FEHLER_ANZAHL_PERSONEN");
+            }
+            if (personen == NkBerechnungService.PERSONEN_VORGABE) {
+                continue;
+            }
+            personRepository.save(new NkPerson(orgId, abrechnung.getId(), dto.getMieterId(), personen));
+        }
+    }
+
     // ===================== Prüfungen =====================
 
     /**
@@ -489,6 +544,19 @@ public class NkAbrechnungService {
         }
     }
 
+    /**
+     * Fehlt die Anzahl Personen, gilt die Anzahl Wohnungen (FR-2).
+     *
+     * <p>Nicht als Fehler behandelt: Der Vorschlag ist genau diese Zahl, und ein Aufrufer, der das
+     * Feld nicht kennt, soll dieselbe Rechnung bekommen wie vor der Erweiterung — eine Umlage pro
+     * Person verhält sich dann wie eine Umlage pro Wohnung.
+     */
+    private void ergaenzeAnzahlPersonen(NkAbrechnung abrechnung) {
+        if (abrechnung.getAnzahlPersonen() == null) {
+            abrechnung.setAnzahlPersonen(abrechnung.getAnzahlWohnungen());
+        }
+    }
+
     private void pruefeKopf(NkAbrechnung abrechnung) {
         if (abrechnung.getDatumVon() == null || abrechnung.getDatumBis() == null) {
             throw new IllegalArgumentException("NK_FEHLER_ZEITRAUM_PFLICHT");
@@ -498,6 +566,9 @@ public class NkAbrechnungService {
         }
         if (abrechnung.getAnzahlWohnungen() == null || abrechnung.getAnzahlWohnungen() < 1) {
             throw new IllegalArgumentException("NK_FEHLER_ANZAHL_WOHNUNGEN");
+        }
+        if (abrechnung.getAnzahlPersonen() == null || abrechnung.getAnzahlPersonen() < 1) {
+            throw new IllegalArgumentException("NK_FEHLER_ANZAHL_PERSONEN");
         }
     }
 
@@ -535,6 +606,51 @@ public class NkAbrechnungService {
     }
 
     /**
+     * Prüft {@code Σ (Tage(i) x Personen(i)) <= Anzahl Personen x Tage} (FR-2).
+     *
+     * <p>Dieselbe Regel wie bei den Wohnungen, nur mit Köpfen gewichtet: Ist die Anzahl Personen zu
+     * klein erfasst, überstiege die Summe der verteilten Beträge den Totalbetrag.
+     *
+     * <p><b>Nur wenn es überhaupt eine Position dieser Art gibt.</b> Ohne diese Einschränkung
+     * blockierte eine erfasste Personenzahl das Speichern einer Abrechnung, die gar keine
+     * Personenumlage enthält — die Zahl hätte dort keine Wirkung, wohl aber die Fehlermeldung.
+     */
+    private void pruefeNennerPerson(NkAbrechnung abrechnung, List<NkMieterBasisDTO> mieter,
+                                    List<NkPositionDTO> positionen, List<NkPersonDTO> personen) {
+        boolean hatPersonenumlage = positionen.stream()
+                .anyMatch(p -> p.getArt() == NkPositionsart.UMLAGE_PERSON);
+        if (!hatPersonenumlage) {
+            return;
+        }
+
+        Map<Long, Integer> personenJeMieter = new HashMap<>();
+        for (NkPersonDTO dto : personen) {
+            if (dto.getMieterId() != null && dto.getAnzahlPersonen() != null) {
+                personenJeMieter.put(dto.getMieterId(), dto.getAnzahlPersonen());
+            }
+        }
+
+        long tageImZeitraum = berechnungService.tageImZeitraum(
+                abrechnung.getDatumVon(), abrechnung.getDatumBis());
+        long nenner = (long) abrechnung.getAnzahlPersonen() * tageImZeitraum;
+
+        long summe = 0;
+        for (NkMieterBasisDTO m : mieter) {
+            long tage = berechnungService.miettageImZeitraum(
+                    m, abrechnung.getDatumVon(), abrechnung.getDatumBis()) * m.getAnzahlWohnungen();
+            summe += tage * personenJeMieter.getOrDefault(
+                    m.getMieterId(), NkBerechnungService.PERSONEN_VORGABE);
+        }
+
+        if (summe > nenner) {
+            // Klartext und kein Uebersetzungs-Key: Die Meldung muss beide Zahlen nennen.
+            throw new IllegalArgumentException(
+                    "Die Anzahl Personen ist zu klein erfasst: Die Mieter belegen " + summe
+                            + " Personentage, der Nenner erlaubt aber nur " + nenner + ".");
+        }
+    }
+
+    /**
      * Art-abhängige Pflichtfelder (FR-2). Dieselbe Regel steht als CHECK-Constraint in der
      * Datenbank; hier steht sie, damit statt eines Constraint-Fehlers eine lesbare Meldung kommt.
      */
@@ -547,7 +663,11 @@ public class NkAbrechnungService {
                 throw new IllegalArgumentException("NK_FEHLER_POSITION_BEZEICHNUNG");
             }
             switch (p.getArt()) {
-                case UMLAGE -> {
+                // Beide Umlagen brauchen dieselben Felder - nur der Verteilschluessel
+                // unterscheidet sie. Wichtig, dass sie hier zusammen stehen: Der `default`-Zweig
+                // wirft NK_FEHLER_POSITION_ART, eine fehlende Art faellt also erst beim Speichern
+                // auf und nicht beim Rechnen.
+                case UMLAGE, UMLAGE_PERSON -> {
                     if (p.getTotalbetrag() == null || p.getEinheit() == null) {
                         throw new IllegalArgumentException("NK_FEHLER_POSITION_UMLAGE");
                     }

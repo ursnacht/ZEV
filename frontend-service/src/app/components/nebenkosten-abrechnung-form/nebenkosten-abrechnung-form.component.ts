@@ -8,6 +8,7 @@ import {
   NkAbrechnung,
   NkAbrechnungDetail,
   NkAkonto,
+  NkPerson,
   NkBerechnung,
   NkMieterAbrechnung,
   NkPosition,
@@ -22,7 +23,7 @@ import {
   leerePosition
 } from '../../models/nebenkosten.model';
 import { Mengeneinheit } from '../../models/tarif.model';
-import { NkMieterTage, berechneVorschau } from '../../utils/nebenkosten-berechnung';
+import { NkMieterTage, PERSONEN_VORGABE, berechneVorschau } from '../../utils/nebenkosten-berechnung';
 import { formatSwissNumber } from '../../utils/number-utils';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
@@ -62,18 +63,35 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
     datumVon: '',
     datumBis: '',
     anzahlWohnungen: null,
+    anzahlPersonen: null,
     abgerechnet: false
   };
 
   positionen: NkPosition[] = [];
   zusaetze: NkZusatz[] = [];
   akonto: NkAkonto[] = [];
+  personen: NkPerson[] = [];
 
   /** Vom Server gelieferte Miettage — Grundlage der clientseitigen Vorschau. */
   mieterTage: NkMieterTage[] = [];
 
   berechnung: NkBerechnung | null = null;
   anzahlWohnungenVorschlag: number | null = null;
+  anzahlPersonenVorschlag: number | null = null;
+
+  /**
+   * Hat der Benutzer die Anzahl Personen selbst gesetzt?
+   *
+   * <p>Solange nicht, **folgt** sie der Anzahl Wohnungen — das ist die Vorgabe „Default = Anzahl
+   * Wohnungen" (`Specs/Nebenkosten/Abrechnung.md`, FR-2). Ohne dieses Nachziehen bliebe sie auf
+   * dem Vorschlag des Servers (Zahl der nebenkostenrelevanten Einheiten) stehen, und wer die
+   * Anzahl Wohnungen ändert, bekäme zwei verschiedene Nenner: Eine Umlage pro Person verteilte
+   * dann anders als eine Umlage pro Wohnung, obwohl noch keine Personenzahl erfasst ist.
+   *
+   * <p>Ab dem ersten Speichern ist die Zahl erfasst und folgt nicht mehr — sonst verschöbe eine
+   * Korrektur der Wohnungszahl stillschweigend die Personenumlage einer bestehenden Abrechnung.
+   */
+  private personenFolgtWohnungen = true;
 
   laedt = false;
   message = '';
@@ -196,8 +214,12 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
     this.nebenkostenService.getVorlage().subscribe({
       next: (detail) => {
         this.anzahlWohnungenVorschlag = detail.anzahlWohnungenVorschlag;
+        this.anzahlPersonenVorschlag = detail.anzahlPersonenVorschlag;
         if (this.kopf.anzahlWohnungen === null) {
           this.kopf.anzahlWohnungen = detail.anzahlWohnungenVorschlag;
+        }
+        if (this.kopf.anzahlPersonen === null) {
+          this.kopf.anzahlPersonen = detail.anzahlPersonenVorschlag;
         }
         this.laedt = false;
       },
@@ -434,6 +456,22 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
     this.speichereUnd(() => this.closed.emit());
   }
 
+  /**
+   * Anzahl Wohnungen geändert: Die Anzahl Personen zieht nach, solange sie nicht erfasst ist.
+   */
+  onAnzahlWohnungenChange(): void {
+    if (this.personenFolgtWohnungen) {
+      this.kopf.anzahlPersonen = this.kopf.anzahlWohnungen;
+    }
+    this.rechne();
+  }
+
+  /** Anzahl Personen von Hand gesetzt: Ab jetzt folgt sie der Anzahl Wohnungen nicht mehr. */
+  onAnzahlPersonenChange(): void {
+    this.personenFolgtWohnungen = false;
+    this.rechne();
+  }
+
   istGueltig(): boolean {
     return !!(
       this.kopf.bezeichnung.trim() &&
@@ -441,7 +479,9 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
       this.kopf.datumBis &&
       this.kopf.datumVon <= this.kopf.datumBis &&
       this.kopf.anzahlWohnungen !== null &&
-      this.kopf.anzahlWohnungen >= 1
+      this.kopf.anzahlWohnungen >= 1 &&
+      this.kopf.anzahlPersonen !== null &&
+      this.kopf.anzahlPersonen >= 1
     );
   }
 
@@ -531,7 +571,9 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
       positionen: this.positionen,
       zusaetze: this.zusaetze,
       akonto: this.akonto,
-      anzahlWohnungenVorschlag: this.anzahlWohnungenVorschlag
+      personen: this.personen,
+      anzahlWohnungenVorschlag: this.anzahlWohnungenVorschlag,
+      anzahlPersonenVorschlag: this.anzahlPersonenVorschlag
     };
 
     this.nebenkostenService.updateAbrechnung(id, detail).subscribe({
@@ -561,7 +603,17 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
     this.positionen = detail.positionen ?? [];
     this.zusaetze = detail.zusaetze ?? [];
     this.akonto = detail.akonto ?? [];
+    this.personen = detail.personen ?? [];
     this.anzahlWohnungenVorschlag = detail.anzahlWohnungenVorschlag;
+    this.anzahlPersonenVorschlag = detail.anzahlPersonenVorschlag;
+    // Vorschlag greift auch beim Laden einer Abrechnung, die noch vor dieser Erweiterung
+    // gespeichert wurde und deshalb keinen Wert mitbringt.
+    if (this.kopf.anzahlPersonen == null) {
+      this.kopf.anzahlPersonen = detail.anzahlPersonenVorschlag ?? this.kopf.anzahlWohnungen;
+    } else {
+      // Eine gespeicherte Abrechnung trägt ihre eigene Zahl - die folgt der Wohnungszahl nicht.
+      this.personenFolgtWohnungen = false;
+    }
     this.berechnung = detail.berechnung ?? null;
     this.mieterTage = (detail.berechnung?.mieter ?? []).map((m: NkMieterAbrechnung) => ({
       mieterId: m.mieterId,
@@ -569,6 +621,14 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
       tage: m.tage,
       ohneWohnung: m.ohneWohnung
     }));
+
+    // Personenzahl je Mieter: Der Server speichert nur Abweichungen von der Vorgabe, die Maske
+    // braucht aber fuer jeden Block ein Feld - sonst haette ngModel nichts zum Binden.
+    for (const block of detail.berechnung?.mieter ?? []) {
+      if (!this.personen.some(x => x.mieterId === block.mieterId)) {
+        this.personen.push({ mieterId: block.mieterId, anzahlPersonen: block.anzahlPersonen });
+      }
+    }
 
     // Akonto-Vorschlaege des Servers uebernehmen, damit ein unveraendert gespeicherter Block
     // dieselben Werte behaelt statt auf 0 zu fallen.
@@ -584,6 +644,31 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
     }
   }
 
+  /**
+   * Gibt es mindestens eine Position, die nach Personen verteilt?
+   *
+   * <p>Nur dann zeigt die Maske je Mieter das Personenfeld. Ein Feld ohne Wirkung anzuzeigen laedt
+   * zum Ausfuellen ein und weckt die Erwartung, dass sich etwas aendert.
+   */
+  get hatPersonenumlage(): boolean {
+    return this.positionen.some(p => p.art === NkPositionsart.UMLAGE_PERSON);
+  }
+
+  /**
+   * Personenzahl-Eintrag eines Mieters; wird bei Bedarf mit der Vorgabe angelegt.
+   *
+   * <p>Gleiche Bauart wie {@code akontoFuer}: Die Maske braucht ein Objekt zum Binden, auch wenn
+   * der Server nichts gespeichert hat.
+   */
+  personFuer(mieterId: number): NkPerson {
+    let eintrag = this.personen.find(x => x.mieterId === mieterId);
+    if (!eintrag) {
+      eintrag = { mieterId, anzahlPersonen: PERSONEN_VORGABE };
+      this.personen.push(eintrag);
+    }
+    return eintrag;
+  }
+
   /** Vorschau neu rechnen — bei jeder Änderung in der Maske. */
   rechne(): void {
     if (!this.hatMieterbloecke || this.kopf.anzahlWohnungen === null) {
@@ -591,8 +676,10 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
     }
     const tageImZeitraum = this.tageImZeitraum();
     const nenner = this.kopf.anzahlWohnungen * tageImZeitraum;
+    const nennerPerson = (this.kopf.anzahlPersonen ?? 0) * tageImZeitraum;
     this.berechnung = berechneVorschau(
-      nenner, this.mieterTage, this.positionen, this.zusaetze, this.akonto);
+      nenner, this.mieterTage, this.positionen, this.zusaetze, this.akonto,
+      nennerPerson, this.personen);
   }
 
   private tageImZeitraum(): number {

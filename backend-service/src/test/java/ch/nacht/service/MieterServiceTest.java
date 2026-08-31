@@ -5,6 +5,7 @@ import ch.nacht.entity.MieterEinheit;
 import ch.nacht.repository.MieterEinheitRepository;
 import ch.nacht.repository.MieterRepository;
 import ch.nacht.repository.NkAkontoRepository;
+import ch.nacht.repository.NkPersonRepository;
 import ch.nacht.repository.NkVerbrauchRepository;
 import ch.nacht.repository.NkZusatzRepository;
 import ch.nacht.repository.TarifpositionRepository;
@@ -51,6 +52,9 @@ public class MieterServiceTest {
 
     @Mock
     private NkAkontoRepository nkAkontoRepository;
+
+    @Mock
+    private NkPersonRepository nkPersonRepository;
 
     @Mock
     private OrganizationContextService organizationContextService;

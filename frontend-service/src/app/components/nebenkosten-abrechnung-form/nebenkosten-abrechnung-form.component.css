@@ -53,6 +53,26 @@
   width: 2.5rem;
 }
 
+/**
+ * Spalte der Verteilart.
+ *
+ * `.zev-select` ist `width: 100%`; ein Auswahlfeld hat damit keine Mindestbreite aus seinem
+ * Inhalt, und die Spalte faellt bei automatischem Tabellenlayout auf die Breite ihrer
+ * Ueberschrift ("Art") zusammen. Die laengste Option wird dann abgeschnitten.
+ *
+ * Die Breite deckt die laengste Beschriftung beider Sprachen ab - das ist nicht die deutsche
+ * ("Umlage pro Wohnung", ~10rem), sondern die englische ("Allocation per apartment", ~12.2rem) -
+ * samt Innenabstand und Aufklapp-Symbol.
+ *
+ * Bewusst hier und nicht im Design System: Das ist die Geometrie *dieser* Tabelle, kein
+ * wiederverwendbarer Baustein. Dieselbe Ueberlegung wie bei `griff-spalte` darueber; die
+ * Tabellen-Komponente des Design Systems kennt nur `zev-table__checkbox-col` und
+ * `zev-table__number`, beide passen hier nicht.
+ */
+.nk-positionen__art-spalte {
+  width: 13rem;
+}
+
 .nk-positionen__griff {
   cursor: grab;
   color: var(--color-gray-500);

@@ -60,6 +60,23 @@ public class NkAbrechnung {
     @Column(name = "anzahl_wohnungen", nullable = false)
     private Integer anzahlWohnungen;
 
+    /**
+     * Nenner der Umlage pro Person: {@code anzahlPersonen * Tage im Zeitraum}.
+     *
+     * <p>Wie {@link #anzahlWohnungen} erfasst und nicht abgeleitet. Vorgeschlagen wird die Anzahl
+     * Wohnungen: Zusammen mit der Vorgabe „1 Person je Mieter" rechnet eine Umlage pro Person dann
+     * genau wie eine Umlage pro Wohnung — eine bestehende Abrechnung ändert ihre Zahlen also nicht,
+     * bloss weil es die neue Art gibt.
+     *
+     * <p><b>Bewusst ohne {@code @NotNull}:</b> Ein Aufrufer, der das Feld nicht kennt, würde sonst
+     * schon an der Eingangsvalidierung mit 400 abgewiesen — noch bevor der Service die Vorgabe
+     * setzen könnte. Die Spalte ist trotzdem {@code NOT NULL}; gefüllt wird sie in
+     * {@code NkAbrechnungService.ergaenzeAnzahlPersonen}.
+     */
+    @Min(value = 1, message = "Anzahl Personen must be at least 1")
+    @Column(name = "anzahl_personen", nullable = false)
+    private Integer anzahlPersonen;
+
     /** Gesetzt = abgeschlossen; die Abrechnung ist dann schreibgeschützt. */
     @Column(name = "abgerechnet", nullable = false)
     private boolean abgerechnet = false;
@@ -118,6 +135,14 @@ public class NkAbrechnung {
         this.anzahlWohnungen = anzahlWohnungen;
     }
 
+    public Integer getAnzahlPersonen() {
+        return anzahlPersonen;
+    }
+
+    public void setAnzahlPersonen(Integer anzahlPersonen) {
+        this.anzahlPersonen = anzahlPersonen;
+    }
+
     public boolean isAbgerechnet() {
         return abgerechnet;
     }
@@ -137,7 +162,7 @@ public class NkAbrechnung {
     @Override
     public String toString() {
         return "NkAbrechnung{id=" + id + ", bezeichnung='" + bezeichnung + "', von=" + datumVon
-                + ", bis=" + datumBis + ", wohnungen=" + anzahlWohnungen
+                + ", bis=" + datumBis + ", wohnungen=" + anzahlWohnungen + ", personen=" + anzahlPersonen
                 + ", abgerechnet=" + abgerechnet + "}";
     }
 }

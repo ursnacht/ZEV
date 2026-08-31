@@ -42,6 +42,34 @@ public class NkMieterAbrechnungDTO {
     public NkMieterAbrechnungDTO() {
     }
 
+    /**
+     * Personen je Wohnung dieses Mieters (Vorgabe 1) — die Maske zeigt sie als Eingabefeld, die
+     * Rechnung nutzt sie als Faktor der Umlage pro Person.
+     */
+    private int anzahlPersonen = 1;
+
+    /**
+     * Zähler der Umlage pro Person: {@code tage x anzahlPersonen}, also Miettage mal Wohnungen mal
+     * Personen. Sichtbar gemacht, damit sich der Anteil einer Personenumlage nachrechnen lässt.
+     */
+    private long personenTage;
+
+    public int getAnzahlPersonen() {
+        return anzahlPersonen;
+    }
+
+    public void setAnzahlPersonen(int anzahlPersonen) {
+        this.anzahlPersonen = anzahlPersonen;
+    }
+
+    public long getPersonenTage() {
+        return personenTage;
+    }
+
+    public void setPersonenTage(long personenTage) {
+        this.personenTage = personenTage;
+    }
+
     public Long getMieterId() {
         return mieterId;
     }

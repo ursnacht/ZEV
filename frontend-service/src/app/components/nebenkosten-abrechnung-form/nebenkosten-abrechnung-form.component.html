@@ -52,16 +52,31 @@
         <div class="zev-form-error">{{ 'NK_FEHLER_ZEITRAUM' | translate }}</div>
       }
 
-      <div class="zev-form-group">
-        <label for="anzahlWohnungen">{{ 'NK_ANZAHL_WOHNUNGEN' | translate }}:</label>
-        <input type="number" id="anzahlWohnungen" class="zev-input" [(ngModel)]="kopf.anzahlWohnungen"
-          name="anzahlWohnungen" min="1" step="1" [disabled]="gesperrt" (ngModelChange)="rechne()" />
-        <!-- Der Hinweis nennt die Wirkung: ohne ihn ist nicht erkennbar, dass diese Zahl
-             daraeber entscheidet, wie viel bei Leerstand unverteilt bleibt. -->
-        <div class="zev-form-hint">{{ 'NK_ANZAHL_WOHNUNGEN_HINT' | translate }}</div>
-        @if (speichernVersucht && (kopf.anzahlWohnungen === null || kopf.anzahlWohnungen < 1)) {
-          <div class="zev-form-error">{{ 'NK_FEHLER_ANZAHL_WOHNUNGEN' | translate }}</div>
-        }
+      <!-- Beide Nenner nebeneinander: Sie gehoeren zusammen gelesen - die Anzahl Personen wird
+           mit der Anzahl Wohnungen vorgeschlagen. -->
+      <div class="zev-form-row">
+        <div class="zev-form-group">
+          <label for="anzahlWohnungen">{{ 'NK_ANZAHL_WOHNUNGEN' | translate }}:</label>
+          <input type="number" id="anzahlWohnungen" class="zev-input" [(ngModel)]="kopf.anzahlWohnungen"
+            name="anzahlWohnungen" min="1" step="1" [disabled]="gesperrt"
+            (ngModelChange)="onAnzahlWohnungenChange()" />
+          <!-- Der Hinweis nennt die Wirkung: ohne ihn ist nicht erkennbar, dass diese Zahl
+               daraeber entscheidet, wie viel bei Leerstand unverteilt bleibt. -->
+          <div class="zev-form-hint">{{ 'NK_ANZAHL_WOHNUNGEN_HINT' | translate }}</div>
+          @if (speichernVersucht && (kopf.anzahlWohnungen === null || kopf.anzahlWohnungen < 1)) {
+            <div class="zev-form-error">{{ 'NK_FEHLER_ANZAHL_WOHNUNGEN' | translate }}</div>
+          }
+        </div>
+        <div class="zev-form-group">
+          <label for="anzahlPersonen">{{ 'NK_ANZAHL_PERSONEN' | translate }}:</label>
+          <input type="number" id="anzahlPersonen" class="zev-input" [(ngModel)]="kopf.anzahlPersonen"
+            name="anzahlPersonen" min="1" step="1" [disabled]="gesperrt"
+            (ngModelChange)="onAnzahlPersonenChange()" />
+          <div class="zev-form-hint">{{ 'NK_ANZAHL_PERSONEN_HINT' | translate }}</div>
+          @if (speichernVersucht && (kopf.anzahlPersonen === null || kopf.anzahlPersonen < 1)) {
+            <div class="zev-form-error">{{ 'NK_FEHLER_ANZAHL_PERSONEN' | translate }}</div>
+          }
+        </div>
       </div>
     </div>
   </div>
@@ -75,7 +90,7 @@
           <thead>
             <tr>
               <th class="nk-positionen__griff-spalte"></th>
-              <th>{{ 'NK_ART' | translate }}</th>
+              <th class="nk-positionen__art-spalte">{{ 'NK_ART' | translate }}</th>
               <th>{{ 'BEZEICHNUNG' | translate }}</th>
               <th>{{ 'NK_WERTE' | translate }}</th>
               <th></th>
@@ -114,7 +129,8 @@
                   <!-- Nicht zutreffende Felder werden ausgeblendet, nicht bloss gesperrt:
                        Eine leere gesperrte Eingabe sieht aus wie ein vergessener Wert. -->
                   <div class="nk-positionen__werte">
-                    @if (position.art === Positionsart.UMLAGE) {
+                    @if (position.art === Positionsart.UMLAGE
+                         || position.art === Positionsart.UMLAGE_PERSON) {
                       <label class="nk-positionen__feld">{{ 'NK_TOTALBETRAG' | translate }}
                         <input type="number" class="zev-input" [(ngModel)]="position.totalbetrag"
                           [name]="'total' + i" min="0" step="0.01" [disabled]="gesperrt"
@@ -284,6 +300,24 @@
         </button>
         @if (istMieterOffen(block.mieterId)) {
         <div class="zev-collapsible__content">
+          <!-- Nur bei einer Umlage pro Person sichtbar: Ohne eine solche Position hat die Zahl
+               keine Wirkung, und ein wirkungsloses Feld laedt zum Ausfuellen ein. -->
+          @if (hatPersonenumlage) {
+            <div class="zev-form-row">
+              <div class="zev-form-group">
+                <label [attr.for]="'personen' + block.mieterId">
+                  {{ 'NK_MIETER_ANZAHL_PERSONEN' | translate }}
+                </label>
+                <input type="number" class="zev-input" min="1" step="1"
+                  [id]="'personen' + block.mieterId"
+                  [(ngModel)]="personFuer(block.mieterId).anzahlPersonen"
+                  [name]="'personen' + block.mieterId" [disabled]="gesperrt"
+                  (ngModelChange)="rechne()" />
+                <div class="zev-form-hint">{{ 'NK_MIETER_ANZAHL_PERSONEN_HINT' | translate }}</div>
+              </div>
+            </div>
+          }
+
           @if (block.ohneWohnung && hinweisOhneWohnungSichtbar(block.mieterId)) {
             <div class="zev-message zev-message--info zev-message--statisch zev-message--dismissible"
               (click)="dismissHinweisOhneWohnung(block.mieterId)">
@@ -325,7 +359,8 @@
                   <td>{{ zeile.art === Positionsart.ANTEIL ? '%' : (zeile.einheit ? (zeile.einheit | translate) : '') }}</td>
                   <td class="number">{{ betrag(zeile.betrag) }}</td>
                   <td>
-                    @if (zeile.art === Positionsart.UMLAGE && umlageInfoFuer(zeile); as info) {
+                    @if ((zeile.art === Positionsart.UMLAGE
+                          || zeile.art === Positionsart.UMLAGE_PERSON) && umlageInfoFuer(zeile); as info) {
                       <span class="zev-text--muted">
                         {{ 'NK_NICHT_VERTEILT' | translate }}: {{ betrag(info.nichtVerteilt) }}
                       </span>

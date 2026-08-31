@@ -21,12 +21,12 @@ describe('NebenkostenAbrechnungComponent', () => {
 
   const abrechnung2026: NkAbrechnung = {
     id: 1, bezeichnung: 'Nebenkosten 2026', datumVon: '2026-01-01', datumBis: '2026-12-31',
-    anzahlWohnungen: 9, abgerechnet: false
+    anzahlWohnungen: 9, anzahlPersonen: 9, abgerechnet: false
   };
 
   const abrechnung2025: NkAbrechnung = {
     id: 2, bezeichnung: 'Abrechnung 2025', datumVon: '2025-01-01', datumBis: '2025-12-31',
-    anzahlWohnungen: 9, abgerechnet: true
+    anzahlWohnungen: 9, anzahlPersonen: 9, abgerechnet: true
   };
 
   /**
@@ -84,11 +84,13 @@ describe('NebenkostenAbrechnungComponent', () => {
     // laedt in ngOnInit ihre Vorlage.
     nebenkostenServiceSpy.getVorlage.mockReturnValue(of({
       abrechnung: { ...abrechnung2026, id: undefined },
-      positionen: [], zusaetze: [], akonto: [], anzahlWohnungenVorschlag: 9
+      positionen: [], zusaetze: [], akonto: [], personen: [],
+      anzahlWohnungenVorschlag: 9, anzahlPersonenVorschlag: 9
     }));
     nebenkostenServiceSpy.getAbrechnungDetail.mockReturnValue(of({
       abrechnung: abrechnung2026,
-      positionen: [], zusaetze: [], akonto: [], anzahlWohnungenVorschlag: 9
+      positionen: [], zusaetze: [], akonto: [], personen: [],
+      anzahlWohnungenVorschlag: 9, anzahlPersonenVorschlag: 9
     }));
 
     await TestBed.configureTestingModule({

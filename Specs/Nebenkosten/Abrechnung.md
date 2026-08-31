@@ -55,6 +55,7 @@ Umsetzung; über sein Entfernen wird separat entschieden.
 | Art | Zweck | Erfasst wird | Je Mieter |
 |---|---|---|---|
 | **UMLAGE** | Gesamtkosten nach Schlüssel verteilt (Allgemeinstrom, Regenwasser) | Bezeichnung, Totalbetrag, Gesamtmenge *(optional)*, Einheit | **berechnet**, schreibgeschützt |
+| **UMLAGE_PERSON** | wie UMLAGE, aber nach **Köpfen** verteilt (Grünabfuhr) | wie UMLAGE | **berechnet**, schreibgeschützt |
 | **VERBRAUCH** | gemessene Menge je Mieter (Warmwasser) | Bezeichnung, Einheit, Betrag pro Einheit | **Menge eingeben**, Betrag berechnet |
 | **ANTEIL** | Gesamtkosten nach einem von aussen vorgegebenen Schlüssel (Heizkosten) | Bezeichnung, **Totalbetrag** | **Prozentsatz eingeben**, Betrag berechnet |
 | **ZUSCHLAG** | Prozent auf die Summe (Verwaltungskosten) | Bezeichnung, Prozentsatz | **berechnet**, schreibgeschützt |
@@ -195,6 +196,96 @@ mehr als angefallen ist. Das System prüft deshalb:
 Ist die Bedingung verletzt, wird das Speichern mit einer Meldung abgewiesen, die beide Werte
 nennt. Der umgekehrte Fall — mehr Wohnungen als belegt — ist zulässig und genau der Leerstand.
 
+### Umlage pro Person (Nachtrag)
+
+Nicht alle Gesamtkosten fallen nach Wohnungen an. Die **Grünabfuhr** ist der typische Fall: Sie
+richtet sich nach Köpfen, nicht nach Türen. Dafür gibt es die Positionsart **`UMLAGE_PERSON`**.
+Die bestehende `UMLAGE` bleibt unverändert — Name, Beschriftung und Rechnung.
+
+```
+Anzahl Personen = erfasstes Feld der Abrechnung (Vorschlag: Anzahl Wohnungen)
+Personen(i)     = erfasste Personen je Wohnung des Mieters i (Vorgabe 1)
+
+Nenner        = Anzahl Personen x Tage im Zeitraum
+PersonenTage(i) = Tage(i) x Personen(i)        (Tage(i) wie bei UMLAGE, also inkl. Wohnungen)
+
+Betrag je Mieter i = Totalbetrag x PersonenTage(i) / Nenner
+Menge  je Mieter i = Gesamtmenge x PersonenTage(i) / Nenner   (nur wenn Gesamtmenge erfasst ist)
+```
+
+**Alles bleibt gleich, solange nichts erfasst wird (Entscheid).** Die Anzahl Personen wird mit der
+**Anzahl Wohnungen** vorbelegt, die Personen je Mieter mit **1**.
+
+Gemeint ist der **Wert des Feldes** „Anzahl Wohnungen", nicht der Vorschlag des Servers (die Zahl
+der nebenkostenrelevanten Einheiten). In einer **neuen** Abrechnung zieht die Anzahl Personen deshalb
+nach, solange sie nicht selbst erfasst wurde; ab dem ersten Speichern trägt die Abrechnung ihre
+eigene Zahl und folgt nicht mehr — sonst verschöbe eine Korrektur der Wohnungszahl stillschweigend
+die Personenumlage einer bestehenden Abrechnung. Bleiben beide Vorgaben stehen, ist
+`PersonenTage(i) = Tage(i)` und `Nenner` derselbe wie bei der Wohnungsumlage — eine Umlage pro
+Person rechnet dann **genau** wie eine Umlage pro Wohnung. Das ist Absicht: Eine bestehende
+Abrechnung ändert ihre Zahlen nicht, bloss weil es die neue Art gibt, und die neue Art ist ohne
+Vorbereitung benutzbar.
+
+**„Personen je Wohnung" heisst je Wohnung (Annahme).** Die Zahl liegt über `Tage(i)` und damit über
+den Wohnungen: Wer zwei Wohnungen mit je drei Personen mietet, trägt sechs Anteile. Für den
+Regelfall — ein Mieter, eine Wohnung — ist der Unterschied ohne Belang; bei mehreren Wohnungen ist
+diese Lesart die einzige, die zur Beschriftung passt.
+
+**Die Personenzahl gehört zur Abrechnung, nicht zum Mieter (Entscheid).** Ein Haushalt wächst und
+schrumpft; eine abgeschlossene Abrechnung muss ihre Zahlen behalten. Gespeichert wird sie in
+`zev.nk_person` je Abrechnung und Mieter — derselbe Grundsatz, aus dem die Anzahl Wohnungen am Kopf
+der Abrechnung steht und nicht aus den Einheiten abgeleitet wird.
+
+**Gespeichert wird nur, was von der Vorgabe abweicht (Entscheid).** Eine erfasste `1` erzeugt keine
+Zeile. Sonst entstünde für jeden Mieter jeder Abrechnung eine Zeile, nur um „1" festzuhalten — und
+weil `nk_person` wie die übrigen Nebenkosten-Tabellen mit `ON DELETE RESTRICT` auf den Mieter zeigt,
+wäre danach kein Mieter mehr löschbar, der überhaupt in einer Abrechnung vorkommt.
+
+**Zu klein erfasste Anzahl Personen wird abgewiesen** — dieselbe Regel wie bei den Wohnungen:
+
+```
+Σ (Tage(i) x Personen(i)) über alle Mieter  <=  Anzahl Personen x Tage im Zeitraum
+```
+
+Geprüft wird **nur, wenn die Abrechnung mindestens eine Position der Art `UMLAGE_PERSON` enthält.**
+Ohne eine solche hat die Personenzahl keine Wirkung; eine Fehlermeldung dazu wäre eine Sperre ohne
+Gegenwert. Wie bei den Wohnungen bleibt der umgekehrte Fall zulässig und ergibt einen unverteilten
+Anteil zu Lasten des Eigentümers.
+
+**Fehlt die Anzahl Personen im Rumpf, gilt die Anzahl Wohnungen.** Ein Aufrufer, der das Feld nicht
+kennt, bekommt damit dieselbe Rechnung wie vor der Erweiterung — deshalb trägt das Feld bewusst
+**kein** `@NotNull` auf der Entity, sondern wird im Service ergänzt; die Spalte ist trotzdem
+`NOT NULL`.
+
+**Darstellung:** „Anzahl Wohnungen" und „Anzahl Personen" stehen im Kopf **nebeneinander** in einer
+`.zev-form-row`. Das Feld je Mieter erscheint **nur**, wenn die Abrechnung eine Position dieser Art
+enthält — ein wirkungsloses Eingabefeld lädt zum Ausfüllen ein und weckt eine falsche Erwartung.
+
+**Beschriftung und Spaltenbreite (Nachtrag):** Die Art `UMLAGE` heisst in der Auswahl
+**„Umlage pro Wohnung"** (englisch „Allocation per apartment"). „Umlage" allein sagt nicht mehr,
+wonach verteilt wird, sobald es die Umlage pro Person gibt; der Schlüssel `NK_ART_UMLAGE` und die
+Enum-Konstante bleiben unverändert. Die erste Spalte der Tabelle „Allgemeine Positionen" ist so
+breit, dass die längste Beschriftung vollständig lesbar ist — `.zev-select` ist `width: 100%` und
+gibt der Spalte keine Mindestbreite, sie fiele sonst auf die Breite ihrer Überschrift zusammen.
+
+* [ ] Die Auswahl der Verteilart zeigt „Umlage pro Wohnung" vollständig, ohne Abschneiden; ebenso „Umlage pro Person".
+* [ ] Die Beschriftung stammt aus einer Migration, nicht nur aus dem Übersetzungs-Editor — eine frisch aufgesetzte Datenbank zeigt denselben Text.
+
+**Akzeptanzkriterien:**
+* [ ] Die Auswahl der Positionsart enthält „Umlage pro Person"; „Umlage" ist unverändert benannt.
+* [ ] Der Kopf der Abrechnung hat ein Feld „Anzahl Personen"; es steht neben „Anzahl Wohnungen".
+* [ ] „Anzahl Personen" ist mit der Anzahl Wohnungen vorbelegt und mindestens 1; sonst wird das Speichern mit einer Meldung abgewiesen.
+* [ ] In einer neuen Abrechnung zieht „Anzahl Personen" nach, wenn „Anzahl Wohnungen" geändert wird — bis die Zahl selbst erfasst ist. Bei einer gespeicherten Abrechnung zieht sie nicht mehr nach.
+* [ ] Enthält die Abrechnung eine Position der Art „Umlage pro Person", erscheint je Mieter ein Feld „Personen je Wohnung" mit der Vorgabe 1; ohne eine solche Position erscheint es nicht.
+* [ ] Eine Umlage pro Person mit den Vorgaben (Personen = Wohnungen, 1 Person je Mieter) ergibt **dieselben** Beträge wie eine Umlage pro Wohnung mit demselben Totalbetrag.
+* [ ] Beispiel: 5 Personen, 2 ganzjährige Mieter mit 3 bzw. 2 Personen, Totalbetrag 1'000.00 → 600.00 / 400.00 CHF.
+* [ ] Sind weniger Personen erfasst als im Nenner stehen, bleibt der Rest unverteilt und wird als „nicht verteilt" ausgewiesen (wie bei Leerstand).
+* [ ] Eine erfasste Gesamtmenge wird nach demselben Schlüssel verteilt.
+* [ ] `Σ (Tage(i) x Personen(i)) > Anzahl Personen x Tage` wird beim Speichern mit einer Meldung abgewiesen, die beide Zahlen nennt — aber nur, wenn eine Position dieser Art vorhanden ist.
+* [ ] Eine Personenzahl gleich der Vorgabe 1 wird nicht gespeichert; ein Mieter bleibt dadurch löschbar, solange er nur mit der Vorgabe vorkommt.
+* [ ] Ein Rumpf ohne „Anzahl Personen" wird angenommen und mit der Anzahl Wohnungen gerechnet.
+* [ ] Bestehende Abrechnungen behalten nach der Migration ihre Beträge (`anzahl_personen = anzahl_wohnungen`).
+
 **Berechnung bei ZUSCHLAG (Entscheid): kaskadierend.** Ein Zuschlag rechnet auf die Summe aller
 Zeilen **vor** ihm:
 
@@ -327,6 +418,7 @@ prüfbar.
 | `datum_von` | DATE | ✅ | |
 | `datum_bis` | DATE | ✅ | `CHECK (datum_von <= datum_bis)` |
 | `anzahl_wohnungen` | INTEGER | ✅ | `CHECK (anzahl_wohnungen > 0)`; bildet den Nenner der Umlage (FR-2) |
+| `anzahl_personen` | INTEGER | ✅ | `CHECK (anzahl_personen > 0)`; Nenner der Umlage pro Person; Vorschlag = `anzahl_wohnungen` |
 | `abgerechnet` | BOOLEAN | ✅ | Default `false` |
 | `erstellt_am` | TIMESTAMP | ✅ | |
 
@@ -336,12 +428,12 @@ prüfbar.
 |---|---|---|---|
 | `id`, `org_id` | BIGINT | ✅ | |
 | `abrechnung_id` | BIGINT | ✅ | FK, `ON DELETE CASCADE` |
-| `art` | VARCHAR(20) | ✅ | `UMLAGE` \| `VERBRAUCH` \| `ANTEIL` \| `ZUSCHLAG`, CHECK-Constraint |
+| `art` | VARCHAR(20) | ✅ | `UMLAGE` \| `UMLAGE_PERSON` \| `VERBRAUCH` \| `ANTEIL` \| `ZUSCHLAG`, CHECK-Constraint |
 | `bezeichnung` | VARCHAR(150) | ✅ | |
 | `reihenfolge` | INTEGER | ✅ | Anzeigereihenfolge |
 | `einheit` | VARCHAR(20) | ❌ | `M3` \| `CHF` \| `KWH` \| `STUECK`; bei `ZUSCHLAG` und `ANTEIL` leer |
-| `totalbetrag` | NUMERIC(12,2) | ❌ | `UMLAGE` und `ANTEIL` |
-| `gesamtmenge` | NUMERIC(12,3) | ❌ | nur `UMLAGE`, optional |
+| `totalbetrag` | NUMERIC(12,2) | ❌ | `UMLAGE`, `UMLAGE_PERSON` und `ANTEIL` |
+| `gesamtmenge` | NUMERIC(12,3) | ❌ | nur `UMLAGE` und `UMLAGE_PERSON`, optional |
 | `betrag_pro_einheit` | NUMERIC(12,4) | ❌ | nur `VERBRAUCH` |
 | `prozentsatz` | NUMERIC(5,2) | ❌ | nur `ZUSCHLAG`; bei `ANTEIL` steht er je Mieter in `nk_verbrauch.menge` |
 
@@ -353,7 +445,8 @@ Service — sonst entstehen bei einem Fehler im Code Zeilen, die sich nicht mehr
 
 ```sql
 CHECK (
-  (art = 'UMLAGE'    AND totalbetrag IS NOT NULL AND einheit IS NOT NULL
+  (art IN ('UMLAGE', 'UMLAGE_PERSON')
+                     AND totalbetrag IS NOT NULL AND einheit IS NOT NULL
                      AND betrag_pro_einheit IS NULL AND prozentsatz IS NULL)
   OR (art = 'VERBRAUCH' AND betrag_pro_einheit IS NOT NULL AND einheit IS NOT NULL
                      AND totalbetrag IS NULL AND gesamtmenge IS NULL AND prozentsatz IS NULL)
@@ -389,6 +482,21 @@ CHECK (
 
 `UNIQUE (abrechnung_id, mieter_id, reihenfolge, org_id)`
 
+**`zev.nk_person`** — Anzahl Personen je Wohnung eines Mieters
+
+| Spalte | Typ | Pflicht | Bemerkung |
+|---|---|---|---|
+| `id`, `org_id` | BIGINT | ✅ | |
+| `abrechnung_id` | BIGINT | ✅ | FK, `ON DELETE CASCADE` |
+| `mieter_id` | BIGINT | ✅ | FK `zev.mieter`, `ON DELETE RESTRICT` (Loeschschutz, s.u.) |
+| `anzahl_personen` | INTEGER | ✅ | `CHECK (anzahl_personen > 0)`, Default `1` |
+
+`UNIQUE (abrechnung_id, mieter_id, org_id)`
+
+Eigene Tabelle und keine Spalte in `nk_akonto`: Die Personenzahl hat mit dem Akonto nichts zu tun,
+auch wenn beide dieselbe Körnung haben. Zeilen entstehen **nur** für Mieter mit einer von 1
+abweichenden Zahl.
+
 **`zev.nk_akonto`** — Akonto je Abrechnung und Mieter
 
 | Spalte | Typ | Pflicht | Bemerkung |
@@ -406,8 +514,9 @@ CHECK (
 sich jederzeit aus den erfassten Daten. Sie zu speichern hiesse, zwei Wahrheiten zu pflegen.
 
 **Löschschutz statt Einfrieren (Entscheid):** Damit die Zahlen einer abgeschlossenen Abrechnung
-stabil bleiben, verweisen `nk_verbrauch`, `nk_zusatz` und `nk_akonto` mit **`ON DELETE RESTRICT`**
-auf `zev.mieter` — ein Mieter, der in einer Abrechnung vorkommt, lässt sich nicht mehr löschen.
+stabil bleiben, verweisen `nk_verbrauch`, `nk_zusatz`, `nk_akonto` und `nk_person` mit
+**`ON DELETE RESTRICT`** auf `zev.mieter` — ein Mieter, der in einer Abrechnung vorkommt, lässt sich
+nicht mehr löschen.
 
 Das ist nötig, weil die Annahme „ein Mieter kann ohnehin nicht gelöscht werden" **nicht
 zutrifft**: `MieterService.deleteMieter` (Zeile 159-165) blockiert nur, wenn **Tarifpositionen**

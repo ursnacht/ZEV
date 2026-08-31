@@ -5,6 +5,7 @@ import ch.nacht.entity.MieterEinheit;
 import ch.nacht.repository.MieterEinheitRepository;
 import ch.nacht.repository.MieterRepository;
 import ch.nacht.repository.NkAkontoRepository;
+import ch.nacht.repository.NkPersonRepository;
 import ch.nacht.repository.NkVerbrauchRepository;
 import ch.nacht.repository.NkZusatzRepository;
 import ch.nacht.repository.TarifpositionRepository;
@@ -40,6 +41,7 @@ public class MieterService {
     private final NkVerbrauchRepository nkVerbrauchRepository;
     private final NkZusatzRepository nkZusatzRepository;
     private final NkAkontoRepository nkAkontoRepository;
+    private final NkPersonRepository nkPersonRepository;
     private final OrganizationContextService organizationContextService;
     private final HibernateFilterService hibernateFilterService;
 
@@ -49,6 +51,7 @@ public class MieterService {
                          NkVerbrauchRepository nkVerbrauchRepository,
                          NkZusatzRepository nkZusatzRepository,
                          NkAkontoRepository nkAkontoRepository,
+                         NkPersonRepository nkPersonRepository,
                          OrganizationContextService organizationContextService,
                          HibernateFilterService hibernateFilterService) {
         this.mieterRepository = mieterRepository;
@@ -57,6 +60,7 @@ public class MieterService {
         this.nkVerbrauchRepository = nkVerbrauchRepository;
         this.nkZusatzRepository = nkZusatzRepository;
         this.nkAkontoRepository = nkAkontoRepository;
+        this.nkPersonRepository = nkPersonRepository;
         this.organizationContextService = organizationContextService;
         this.hibernateFilterService = hibernateFilterService;
     }
@@ -183,7 +187,8 @@ public class MieterService {
 
         long nebenkosten = nkVerbrauchRepository.countByMieterId(id)
                 + nkZusatzRepository.countByMieterId(id)
-                + nkAkontoRepository.countByMieterId(id);
+                + nkAkontoRepository.countByMieterId(id)
+                + nkPersonRepository.countByMieterId(id);
         if (nebenkosten > 0) {
             throw new IllegalArgumentException(
                     "Mieter kann nicht gelöscht werden: er kommt in einer Nebenkostenabrechnung vor");

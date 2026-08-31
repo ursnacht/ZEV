@@ -292,3 +292,172 @@ einer gesperrten Abrechnung.
 `UPDATE zev.translation` nach dem Muster von V113/V114). Der Text war im Betrieb über den
 Übersetzungs-Editor schon geändert; ohne die Migration bekäme eine frisch aufgesetzte Datenbank
 weiterhin den alten aus V122. Der Schlüssel `NK_ZURUECK_UEBERSICHT` behält seinen Namen.
+
+## Nachtrag: Umlage pro Person
+
+Neue Positionsart `UMLAGE_PERSON` neben der unveränderten `UMLAGE`. Verteilt nach Köpfen statt nach
+Wohnungen; Nenner ist `Anzahl Personen x Tage`, Zähler `Tage(i) x Personen(i)`.
+
+**Leitgedanke der Umsetzung:** Mit den Vorgaben (Anzahl Personen = Anzahl Wohnungen, 1 Person je
+Mieter) muss die neue Art **identisch** zur alten rechnen. Das macht die Erweiterung rückwärtssicher
+und die neue Art ohne Vorbereitung benutzbar; ein Unit-Test hält genau das fest
+(`umlagePerson_OhneErfassteZahlen_RechnetWieUmlageProWohnung`).
+
+### Datenbank
+* `V135__Nk_Umlage_Pro_Person.sql`
+  * `nk_abrechnung.anzahl_personen` (nullable anlegen → aus `anzahl_wohnungen` befüllen → `NOT NULL`
+    → `CHECK > 0`). Der Backfill ist der Grund, dass bestehende Abrechnungen ihre Beträge behalten.
+  * `ck_nk_position_art` **und** `ck_nk_position_felder` neu erzeugt. Beide zählen erlaubte Werte
+    auf — eine neue Enum-Konstante braucht deshalb DDL, sonst scheitert erst das Speichern zur
+    Laufzeit. `UMLAGE_PERSON` teilt den Feldbedarf mit `UMLAGE` (`art IN (...)`).
+  * `zev.nk_person` samt Sequenz und Index; `ON DELETE CASCADE` auf die Abrechnung,
+    `ON DELETE RESTRICT` auf den Mieter wie bei den drei übrigen Nebenkosten-Tabellen.
+* `V136__Add_Nk_Umlage_Pro_Person_Translations.sql` — sechs Keys, `ON CONFLICT (key) DO NOTHING`.
+  `NK_ART_UMLAGE` bleibt „Umlage": die bestehende Art wird **nicht** umbenannt.
+* V134 war die höchste angewendete Migration (via `zev-db` geprüft).
+
+### Backend
+* `NkPositionsart.UMLAGE_PERSON`, `NkAbrechnung.anzahlPersonen`, Entity `NkPerson` +
+  `NkPersonRepository`, DTO `NkPersonDTO`.
+* `NkBerechnungService.berechne(...)` bekommt `List<NkPerson>`. `UMLAGE` und `UMLAGE_PERSON` teilen
+  sich **einen** `case`-Zweig — sie rechnen identisch, nur der Verteilschlüssel unterscheidet sich.
+  `setzeAbweichungen` wählt die Bezugsgrösse jetzt über ein `switch` (Prozentsumme / Personenanteil /
+  Zeitanteil).
+* `NkMieterAbrechnungDTO` führt `anzahlPersonen` und `personenTage` mit, `NkBerechnungDTO`
+  zusätzlich `nennerPerson` und `summePersonenTage` — damit sich ein Anteil nachrechnen lässt.
+* `NkAbrechnungService`: `ergaenzeAnzahlPersonen` (fehlt der Wert, gilt die Anzahl Wohnungen) läuft
+  **vor** `pruefeKopf`, sonst scheiterte ein Aufrufer an einer Meldung, deren Antwort die Anzahl
+  Wohnungen ist. `pruefeNennerPerson` prüft `Σ (Tage x Personen) <= Nenner`, aber **nur** wenn eine
+  Position dieser Art vorhanden ist. `ersetzePersonen` speichert nur Abweichungen von der Vorgabe.
+* `MieterService`: `nkPersonRepository.countByMieterId` in den Löschschutz aufgenommen.
+* **Kein `@NotNull`** auf `anzahlPersonen`: Es griffe schon in der Eingangsvalidierung und würde
+  einen Rumpf ohne das Feld mit 400 abweisen, bevor der Service die Vorgabe setzen kann. Zwei
+  Controller-Tests haben genau das aufgedeckt.
+
+### Frontend
+* Modell: Enum-Wert, `NkAbrechnung.anzahlPersonen`, `NkPerson`, `NK_POSITIONSARTEN`,
+  `NkMieterAbrechnung.anzahlPersonen/personenTage`, `NkBerechnung.nennerPerson/summePersonenTage`,
+  `NkAbrechnungDetail.personen/anzahlPersonenVorschlag`. `NK_ARTEN_OHNE_EINHEIT` **unverändert** —
+  `UMLAGE_PERSON` braucht wie `UMLAGE` eine Mengeneinheit.
+* `nebenkosten-berechnung.ts`: dieselbe Erweiterung wie im Backend, damit die Sofortvorschau nicht
+  auseinanderläuft. Die zwei neuen Parameter haben Vorgabewerte, damit bestehende Aufrufe und Tests
+  gültig bleiben.
+* Komponente: `personen`-Liste, `personFuer(mieterId)` (Bauart wie `akontoFuer`), Getter
+  `hatPersonenumlage`. `uebernehme` legt für jeden Mieterblock einen Eintrag an — der Server
+  speichert nur Abweichungen, `ngModel` braucht aber überall ein Objekt.
+* Template: Beide Nenner-Felder in einer `.zev-form-row`; das Feld je Mieter nur bei
+  `hatPersonenumlage`. **Kein neues CSS** — `.zev-form-row`, `.zev-form-group`, `.zev-form-hint`
+  und `.zev-form-error` genügen.
+
+### Tests
+* `NkBerechnungServiceTest`: 54 (8 neu, u.a. Gleichheit mit der Wohnungsumlage, Verteilung nach
+  Köpfen, Personen je Wohnung bei zwei Wohnungen, unverteilter Anteil, Nenner 0).
+* `NkAbrechnungServiceTest`: 59 (5 neu, u.a. Nennerprüfung mit und ohne Personenumlage, keine Zeile
+  bei der Vorgabe, Ergänzung der fehlenden Anzahl).
+* Alle 34 `berechne(...)`-Aufrufe der Testsuite um das neue Argument erweitert — per Skript über die
+  geklammerten Argumentgrenzen, nicht per Textsuche.
+* Frontend: `nebenkosten-berechnung.spec.ts` 41 (6 neu), Formular-Spec 124 (10 neu), Fixtures der
+  drei betroffenen Specs um die neuen Felder ergänzt.
+* Gesamt: 1249 Backend, 1602 Frontend.
+
+### Nachgereicht: zweiter switch über die Positionsart
+
+Der erste Wurf war beim Speichern mit `NK_FEHLER_POSITION_ART` gescheitert. Ursache: `pruefePositionen`
+in `NkAbrechnungService` hat einen **eigenen** `switch` über die Art, dessen `default`-Zweig genau
+diese Meldung wirft. `UMLAGE_PERSON` fiel dort hinein — das Rechnen stimmte, das Speichern wurde
+abgewiesen.
+
+Übersehen wurde er, weil die Suche nach `NkPositionsart.` nicht greift: Ein `switch` benutzt **bare
+case labels** (`case UMLAGE ->`). Wer die Art erweitert, muss nach `switch` **und** nach `case`
+suchen — es gibt drei solche Stellen im Backend (Rechnen, Kontrollzahlen, Validierung) und eine im
+Frontend.
+
+Warum die neuen Tests es nicht gezeigt haben: Der einzige Test mit einer `UMLAGE_PERSON`-Position
+erwartete eine Ausnahme aus der **Nennerprüfung** — und die läuft vor `pruefePositionen`, der Zweig
+wurde also nie erreicht. Nachgezogen sind deshalb zwei Fälle, die den Pfad wirklich durchlaufen
+(`saveAbrechnung_UmlageProPerson_WirdGespeichert`, `..._OhneTotalbetrag_ThrowsException`); beide
+schlagen ohne den Fix mit `NK_FEHLER_POSITION_ART` fehl. Backend jetzt 1251 Tests.
+
+### Nachgereicht: E2E-Helfer wählte die Positionsart über einen Index
+
+Die E2E-Suite meldete **einen** Fehler — im Test für die **ANTEIL**-Position, die von dieser
+Erweiterung gar nicht betroffen ist: erwartet `500.00`, erhalten `50'000.00` bei Einheit `m³`.
+
+Ursache: `fuegePositionHinzu` in `tests/nebenkosten-abrechnung.spec.ts` wählte die Art über eine
+hartcodierte Indextabelle (`{ UMLAGE: 0, VERBRAUCH: 1, ANTEIL: 2, ZUSCHLAG: 3 }`) in die Reihenfolge
+von `NK_POSITIONSARTEN`. `UMLAGE_PERSON` steht dort auf Platz 1 — damit rutschte alles dahinter eins
+weiter, und der ANTEIL-Test wählte fortan **VERBRAUCH**. Die 1000 landete als „Betrag pro Einheit",
+die 50 als Menge: 50'000.00, mit der Standardeinheit `m³`. Der Fehler zeigte sich also an einem
+Betrag, weit weg von seiner Ursache.
+
+Nur ein Test schlug fehl, weil die Datei `mode: 'serial'` fährt: Nach dem Fehlschlag lief der Rest
+der Gruppe nicht mehr (die acht „did not run" des Berichts). Die Tests für VERBRAUCH und ZUSCHLAG
+hätten es genauso getroffen.
+
+Behoben mit `waehleArt(select, art)`: Der technische Wert (`0: UMLAGE`) wird zur Laufzeit aus den
+Optionen gelesen und über den **Namen** hinter dem Doppelpunkt gesucht — die Position ist
+gleichgültig, eine weitere Art bricht den Helfer nicht mehr. 18 von 18 Tests der Datei grün.
+
+**Dieselbe Falle steht noch in `tests/tarifpositionen.spec.ts`** (`EINHEIT_INDEX` für die
+Mengeneinheit). Aktuell harmlos, weil `Mengeneinheit` unverändert ist — aber die nächste neue
+Einheit bricht sie auf dieselbe Weise.
+
+### Nachtrag: Spaltenbreite der Verteilart
+
+Die Auswahl schnitt „Umlage pro Wohnung" ab. Ursache ist nicht die neue Art, sondern
+`.zev-select { width: 100% }`: Ein Auswahlfeld hat damit keine Mindestbreite aus seinem Inhalt, und
+bei automatischem Tabellenlayout fällt die Spalte auf die Breite ihrer Überschrift („Art")
+zusammen. Vorher fiel es nicht auf, weil „Umlage" und „Verbrauch" kurz genug waren.
+
+* `.nk-positionen__art-spalte { width: 13rem }` in der Komponenten-CSS, Klasse am `<th>`.
+  Maßgebend ist nicht der deutsche Text („Umlage pro Wohnung", ~10rem), sondern der englische
+  („Allocation per apartment", ~12.2rem) — samt Innenabstand und Aufklapp-Symbol.
+* **Nicht** ins Design System: Das ist die Geometrie *dieser* Tabelle. Dieselbe Überlegung wie bei
+  `.nk-positionen__griff-spalte`; die Tabellen-Komponente kennt nur `zev-table__checkbox-col`
+  (2.5rem) und `zev-table__number`, beide passen hier nicht.
+* `V138__Nk_Art_Umlage_Pro_Wohnung.sql` zieht die Beschriftung nach: Der Text war im Betrieb über
+  den Übersetzungs-Editor schon auf „Umlage pro Wohnung" geändert, stand aber nur in **einer**
+  Datenbank. Ohne die Migration bekäme eine frisch aufgesetzte weiterhin „Umlage" aus V120 — und
+  die Spaltenbreite wäre dort auf einen Text ausgelegt, den es nicht gibt. Gleiches Muster wie
+  V128. Beide `UPDATE`s prüfen den alten Wert, greifen auf der bestehenden Datenbank also ins Leere.
+  Englisch mitgezogen: Neben „Allocation per person" verliert das blosse „Allocation" genau die
+  Unterscheidung, um die es geht.
+
+### Nachgereicht: E2E-Tests — und ein Fehler, den sie aufgedeckt haben
+
+Drei Fälle in `tests/nebenkosten-abrechnung.spec.ts`:
+
+1. *should hide the persons field until a per-person allocation exists* — das Feld je Mieter
+   erscheint erst mit einer Position dieser Art, mit der Vorgabe 1.
+2. *should distribute a per-person allocation like a per-apartment one by default* — beide Arten mit
+   demselben Totalbetrag in **einer** Abrechnung; die verteilten Summen müssen gleich sein, vor und
+   nach dem Speichern. Bewusst ein Vergleich zweier Zahlen derselben Abrechnung statt einer Zahl
+   gegen eine Erwartung: Damit ist der Test unabhängig davon, wie viele Wohnungen und Mieter die
+   Umgebung kennt — und er prüft zugleich, dass Vorschau und Backend übereinstimmen.
+3. *should raise a tenant share with more persons and leave the apartment share alone* — mehr Köpfe
+   heben den Anteil dieses Mieters an der Personenumlage, der an der Wohnungsumlage bleibt.
+
+Selektoren: das Personenfeld über das `id`-Präfix (`input[id^="personen"]`) und nicht über die
+Beschriftung — der Text kommt aus der Datenbank und lässt sich im Editor ändern.
+
+**Fall 2 schlug beim ersten Lauf fehl** — und zwar zu Recht: Wohnungsumlage 90.90 verteilt,
+Personenumlage 999.99. Ursache war ein Fehler gegen die Vorgabe „Default = Anzahl Wohnungen": Die
+Maske übernahm den **Vorschlag des Servers** (Zahl der nebenkostenrelevanten Einheiten, hier 9) und
+nicht den **Wert des Feldes** (im Test bewusst 99, damit etwas unverteilt bleibt). Damit liefen zwei
+verschiedene Nenner, und eine Personenumlage verteilte anders als eine Wohnungsumlage, obwohl noch
+keine Personenzahl erfasst war.
+
+Behoben mit `onAnzahlWohnungenChange()` / `onAnzahlPersonenChange()` und dem Merker
+`personenFolgtWohnungen`: In einer neuen Abrechnung zieht die Anzahl Personen nach, bis sie von Hand
+gesetzt wird; eine gespeicherte Abrechnung trägt ihre eigene Zahl und folgt nicht mehr. Drei
+Unit-Tests halten die drei Fälle fest (Frontend 1605).
+
+**Bemerkenswert:** Der Fehler war mit Unit-Tests nicht zu sehen — dort war „Personen = Wohnungen"
+in jedem Fixture ohnehin erfüllt. Erst eine Umgebung, in der die beiden Zahlen auseinanderliegen,
+macht ihn sichtbar. Genau dafür ist der E2E-Test da.
+
+### Offen
+* **E2E-Verifikation der Korrektur:** Die drei Fälle laufen gegen den Container; die Korrektur
+  liegt nur im Arbeitsverzeichnis. Nach einem Frontend-Rebuild ist der Lauf zu wiederholen. Sinnvoll wäre ein Fall, der eine Position „Umlage pro Person"
+  anlegt, bei zwei Mietern unterschiedliche Personenzahlen erfasst und die Beträge prüft. Braucht
+  einen Stack-Rebuild.

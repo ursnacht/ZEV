@@ -11,7 +11,8 @@ import {
   NkPosition,
   NkPositionsart,
   NkUmlageInfo,
-  NkZeile
+  NkZeile,
+  leerePosition
 } from '../../models/nebenkosten.model';
 // `Mengeneinheit` lebt im Tarif-Modell und wird von der Nebenkostenabrechnung mitbenutzt.
 import { Mengeneinheit } from '../../models/tarif.model';
@@ -36,6 +37,7 @@ describe('NebenkostenAbrechnungFormComponent', () => {
       datumVon: '2026-01-01',
       datumBis: '2026-12-31',
       anzahlWohnungen: 2,
+      anzahlPersonen: 2,
       abgerechnet: false,
       erstelltAm: '2026-01-05T10:00:00'
     },
@@ -67,10 +69,14 @@ describe('NebenkostenAbrechnungFormComponent', () => {
     ],
     zusaetze: [],
     akonto: [{ id: 5, mieterId: 100, anzahlMonate: 12, betragProMonat: 100, korrektur: 0 }],
+    personen: [],
     anzahlWohnungenVorschlag: 2,
+    anzahlPersonenVorschlag: 2,
     berechnung: {
       nenner: 730,
       summeTage: 365,
+      nennerPerson: 730,
+      summePersonenTage: 365,
       umlagen: [{
         positionId: 10,
         bezeichnung: 'Allgemeinstrom',
@@ -83,6 +89,8 @@ describe('NebenkostenAbrechnungFormComponent', () => {
         mieterId: 100,
         name: 'Anna Beispiel',
         tage: 365,
+        anzahlPersonen: 1,
+        personenTage: 365,
         ohneWohnung: false,
         kostentotal: 504,
         akontoAnzahlMonate: 12,
@@ -591,10 +599,12 @@ describe('NebenkostenAbrechnungFormComponent', () => {
       const vorlage = {
         abrechnung: {
           id: null, bezeichnung: null, datumVon: null, datumBis: null,
-          anzahlWohnungen: null, abgerechnet: false
+          anzahlWohnungen: null, anzahlPersonen: null, abgerechnet: false
         },
         positionen: [], zusaetze: [], akonto: [], berechnung: null,
-        anzahlWohnungenVorschlag: null
+        personen: [],
+        anzahlWohnungenVorschlag: null,
+        anzahlPersonenVorschlag: null
       };
       nebenkostenServiceSpy.getVorlage.mockReturnValue(of(vorlage as any));
 
@@ -1098,9 +1108,10 @@ describe('NebenkostenAbrechnungFormComponent', () => {
     it('should create a prepayment row from the server suggestion', () => {
       component.akonto = [];
       component.berechnung = {
-        nenner: 730, summeTage: 365, umlagen: [],
+        nenner: 730, summeTage: 365, nennerPerson: 730, summePersonenTage: 365, umlagen: [],
         mieter: [{
-          mieterId: 100, name: 'Anna Beispiel', tage: 365, ohneWohnung: false, zeilen: [],
+          mieterId: 100, name: 'Anna Beispiel', tage: 365, anzahlPersonen: 1,
+          personenTage: 365, ohneWohnung: false, zeilen: [],
           kostentotal: 0, akontoAnzahlMonate: 11, akontoBetragProMonat: 150,
           akontoKorrektur: -20, akontoTotal: 0, saldo: 0
         }]
@@ -1450,6 +1461,132 @@ describe('NebenkostenAbrechnungFormComponent', () => {
       component.onSpeichern();
 
       expect(component.kopf.bezeichnung).toBe('Vom Server umbenannt');
+    });
+  });
+
+  describe('Umlage pro Person', () => {
+
+    it('should default the number of persons to the proposal', () => {
+      // "Default = Anzahl Wohnungen": Der Server schlaegt beide Zahlen gleich vor.
+      expect(component.kopf.anzahlPersonen).toBe(2);
+    });
+
+    /**
+     * Eine **neue** Abrechnung: Die Anzahl Personen zieht der Anzahl Wohnungen nach.
+     *
+     * „Default = Anzahl Wohnungen" heisst der WERT des Feldes, nicht der Vorschlag des Servers.
+     * Ohne das Nachziehen blieb die Zahl auf dem Vorschlag stehen — eine Umlage pro Person
+     * verteilte dann anders als eine Umlage pro Wohnung, obwohl noch nichts erfasst war. Genau
+     * das hat der E2E-Test aufgedeckt (99 Wohnungen im Test, 9 vorgeschlagene Einheiten).
+     */
+    it('should let the number of persons follow the apartments on a new billing', () => {
+      const vorlage = structuredClone(serverDetail) as NkAbrechnungDetail;
+      vorlage.abrechnung.anzahlWohnungen = null;
+      vorlage.abrechnung.anzahlPersonen = null;
+      vorlage.anzahlWohnungenVorschlag = 9;
+      vorlage.anzahlPersonenVorschlag = 9;
+      nebenkostenServiceSpy.getVorlage.mockReturnValue(of(vorlage));
+
+      const neu = TestBed.createComponent(NebenkostenAbrechnungFormComponent);
+      neu.componentInstance.abrechnungId = null;
+      neu.detectChanges();
+      expect(neu.componentInstance.kopf.anzahlPersonen).toBe(9);
+
+      neu.componentInstance.kopf.anzahlWohnungen = 99;
+      neu.componentInstance.onAnzahlWohnungenChange();
+
+      expect(neu.componentInstance.kopf.anzahlPersonen).toBe(99);
+    });
+
+    it('should stop following once the number of persons is set by hand', () => {
+      const vorlage = structuredClone(serverDetail) as NkAbrechnungDetail;
+      vorlage.abrechnung.anzahlWohnungen = null;
+      vorlage.abrechnung.anzahlPersonen = null;
+      nebenkostenServiceSpy.getVorlage.mockReturnValue(of(vorlage));
+
+      const neu = TestBed.createComponent(NebenkostenAbrechnungFormComponent);
+      neu.componentInstance.abrechnungId = null;
+      neu.detectChanges();
+
+      neu.componentInstance.kopf.anzahlPersonen = 5;
+      neu.componentInstance.onAnzahlPersonenChange();
+      neu.componentInstance.kopf.anzahlWohnungen = 99;
+      neu.componentInstance.onAnzahlWohnungenChange();
+
+      expect(neu.componentInstance.kopf.anzahlPersonen).toBe(5);
+    });
+
+    it('should not follow on a saved billing', () => {
+      // Die geladene Abrechnung traegt ihre eigene Zahl (Fixture: 2). Eine Korrektur der
+      // Wohnungszahl darf die Personenumlage nicht stillschweigend verschieben.
+      component.kopf.anzahlWohnungen = 99;
+      component.onAnzahlWohnungenChange();
+
+      expect(component.kopf.anzahlPersonen).toBe(2);
+    });
+
+    it('should reject saving without a number of persons', () => {
+      component.kopf.anzahlPersonen = null;
+      expect(component.istGueltig()).toBe(false);
+    });
+
+    it('should reject a number of persons below one', () => {
+      component.kopf.anzahlPersonen = 0;
+      expect(component.istGueltig()).toBe(false);
+    });
+
+    it('should create a person entry with the default on first access', () => {
+      const eintrag = component.personFuer(4711);
+
+      expect(eintrag.anzahlPersonen).toBe(1);
+      expect(component.personen).toContain(eintrag);
+    });
+
+    it('should return the same entry on repeated access', () => {
+      const erste = component.personFuer(4711);
+      erste.anzahlPersonen = 3;
+
+      // Sonst verloere ngModel den eingegebenen Wert bei der naechsten Neuberechnung.
+      expect(component.personFuer(4711)).toBe(erste);
+      expect(component.personFuer(4711).anzahlPersonen).toBe(3);
+    });
+
+    it('should show the per-tenant field only with a per-person item', () => {
+      component.positionen = [];
+      expect(component.hatPersonenumlage).toBe(false);
+
+      component.positionen = [leerePosition(NkPositionsart.UMLAGE_PERSON)];
+      expect(component.hatPersonenumlage).toBe(true);
+    });
+
+    it('should not report a per-person item for a plain allocation', () => {
+      component.positionen = [leerePosition(NkPositionsart.UMLAGE)];
+      expect(component.hatPersonenumlage).toBe(false);
+    });
+
+    it('should offer the new type in the dropdown', () => {
+      expect(component.positionsarten).toContain(NkPositionsart.UMLAGE_PERSON);
+    });
+
+    it('should give the new type a unit like a plain allocation', () => {
+      // UMLAGE_PERSON braucht wie UMLAGE eine Mengeneinheit - der CHECK-Constraint verlangt sie.
+      expect(leerePosition(NkPositionsart.UMLAGE_PERSON).einheit).not.toBeNull();
+    });
+
+    it('should feed the person numbers into the preview', () => {
+      component.positionen = [{
+        ...leerePosition(NkPositionsart.UMLAGE_PERSON),
+        id: 77, bezeichnung: 'Gruenabfuhr', totalbetrag: 1000
+      }];
+      component.kopf.anzahlPersonen = 4;
+      component.personFuer(100).anzahlPersonen = 4;
+
+      component.rechne();
+
+      // Ein Mieter mit 4 von 4 Personen traegt den ganzen Betrag.
+      const zeile = component.berechnung?.mieter[0].zeilen[0];
+      expect(zeile?.betrag).toBe(1000);
+      expect(component.berechnung?.mieter[0].personenTage).toBe(4 * 365);
     });
   });
 });

@@ -17,6 +17,19 @@ public enum NkPositionsart {
      */
     UMLAGE,
 
+    /**
+     * Wie {@link #UMLAGE}, aber nach <b>Koepfen</b> statt nach Wohnungen verteilt (Gruenabfuhr).
+     *
+     * <p>Nenner ist {@code Anzahl Personen x Tage im Zeitraum}, Zaehler
+     * {@code Miettage x Wohnungen x Personen je Wohnung}. Die Personenzahl je Mieter steht in
+     * {@code zev.nk_person}, Vorgabe 1; die Anzahl Personen der Abrechnung wird mit der Anzahl
+     * Wohnungen vorgeschlagen. Bleiben beide Vorgaben stehen, rechnet diese Art <b>genau</b> wie
+     * {@link #UMLAGE} - erst eine erfasste Personenzahl verschiebt die Anteile.
+     *
+     * <p>Wie bei {@link #UMLAGE} bleibt bei Leerstand ein Anteil unverteilt.
+     */
+    UMLAGE_PERSON,
+
     /** Je Mieter gemessene Menge mal Preis je Einheit (Warmwasser, Heizung). */
     VERBRAUCH,
 

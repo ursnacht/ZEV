@@ -7,6 +7,7 @@ import ch.nacht.dto.NkUmlageInfoDTO;
 import ch.nacht.dto.NkZeileDTO;
 import ch.nacht.entity.NkAbrechnung;
 import ch.nacht.entity.NkAkonto;
+import ch.nacht.entity.NkPerson;
 import ch.nacht.entity.NkPosition;
 import ch.nacht.entity.NkPositionsart;
 import ch.nacht.entity.NkVerbrauch;
@@ -52,6 +53,13 @@ public class NkBerechnungService {
     private static final BigDecimal HUNDERT = BigDecimal.valueOf(100);
 
     /**
+     * Personen je Wohnung, wenn nichts erfasst ist. Mit dieser Vorgabe und dem Vorschlag
+     * "Anzahl Personen = Anzahl Wohnungen" rechnet eine Umlage pro Person genau wie eine Umlage
+     * pro Wohnung - eine bestehende Abrechnung aendert ihre Zahlen also nicht.
+     */
+    public static final int PERSONEN_VORGABE = 1;
+
+    /**
      * Berechnet die gesamte Abrechnung.
      *
      * @param abrechnung Zeitraum und Anzahl Wohnungen (bildet den Nenner)
@@ -59,6 +67,7 @@ public class NkBerechnungService {
      * @param verbraeuche Erfasste Mengen zu den VERBRAUCH-Positionen
      * @param zusaetze Zusatzpositionen aller Mieter
      * @param akontos Erfasste Akonto-Angaben; fehlt eine, wird sie vorgeschlagen
+     * @param personen Erfasste Personenzahlen je Mieter; fehlt eine, gilt {@link #PERSONEN_VORGABE}
      * @param mieter Die abzurechnenden Mieter
      * @return Blöcke je Mieter und Kontrollzahlen je Umlageposition
      */
@@ -67,10 +76,13 @@ public class NkBerechnungService {
                                     List<NkVerbrauch> verbraeuche,
                                     List<NkZusatz> zusaetze,
                                     List<NkAkonto> akontos,
+                                    List<NkPerson> personen,
                                     List<NkMieterBasisDTO> mieter) {
 
         long tageImZeitraum = tageImZeitraum(abrechnung.getDatumVon(), abrechnung.getDatumBis());
         long nenner = (long) abrechnung.getAnzahlWohnungen() * tageImZeitraum;
+        // Eigener Nenner: Die Umlage pro Person zaehlt Koepfe, nicht Wohnungen.
+        long nennerPerson = (long) nullSicher(abrechnung.getAnzahlPersonen(), 0) * tageImZeitraum;
 
         List<NkPosition> sortierte = new ArrayList<>(positionen);
         sortierte.sort(Comparator.comparing(NkPosition::getReihenfolge));
@@ -81,12 +93,18 @@ public class NkBerechnungService {
         for (NkAkonto a : akontos) {
             akontoJeMieter.put(a.getMieterId(), a);
         }
+        Map<Long, Integer> personenJeMieter = new HashMap<>();
+        for (NkPerson p : personen) {
+            personenJeMieter.put(p.getMieterId(), p.getAnzahlPersonen());
+        }
 
         // Kontrollzahlen je verteilender Position (UMLAGE und ANTEIL): gefuellt waehrend der
         // Mieterschleife, damit die verteilten Betraege nur einmal gerechnet werden.
         Map<Long, NkUmlageInfoDTO> umlagen = new LinkedHashMap<>();
         for (NkPosition p : sortierte) {
-            if (p.getArt() == NkPositionsart.UMLAGE || p.getArt() == NkPositionsart.ANTEIL) {
+            if (p.getArt() == NkPositionsart.UMLAGE
+                    || p.getArt() == NkPositionsart.UMLAGE_PERSON
+                    || p.getArt() == NkPositionsart.ANTEIL) {
                 NkUmlageInfoDTO info = new NkUmlageInfoDTO();
                 info.setPositionId(p.getId());
                 info.setBezeichnung(p.getBezeichnung());
@@ -98,20 +116,25 @@ public class NkBerechnungService {
 
         NkBerechnungDTO ergebnis = new NkBerechnungDTO();
         ergebnis.setNenner(nenner);
+        ergebnis.setNennerPerson(nennerPerson);
 
         long summeTage = 0;
+        long summePersonenTage = 0;
         for (NkMieterBasisDTO basis : mieter) {
             NkMieterAbrechnungDTO block = berechneMieter(
-                    basis, abrechnung, nenner, sortierte,
+                    basis, abrechnung, nenner, nennerPerson, sortierte,
                     mengeJePosition, zusatzJeMieter.getOrDefault(basis.getMieterId(), List.of()),
-                    akontoJeMieter.get(basis.getMieterId()), umlagen);
+                    akontoJeMieter.get(basis.getMieterId()),
+                    personenJeMieter.get(basis.getMieterId()), umlagen);
             summeTage += block.getTage();
+            summePersonenTage += block.getPersonenTage();
             ergebnis.getMieter().add(block);
         }
         ergebnis.setSummeTage(summeTage);
+        ergebnis.setSummePersonenTage(summePersonenTage);
 
         for (NkUmlageInfoDTO info : umlagen.values()) {
-            setzeAbweichungen(info, summeTage, nenner);
+            setzeAbweichungen(info, summeTage, nenner, summePersonenTage, nennerPerson);
         }
         ergebnis.setUmlagen(new ArrayList<>(umlagen.values()));
 
@@ -187,10 +210,12 @@ public class NkBerechnungService {
     private NkMieterAbrechnungDTO berechneMieter(NkMieterBasisDTO basis,
                                                  NkAbrechnung abrechnung,
                                                  long nenner,
+                                                 long nennerPerson,
                                                  List<NkPosition> positionen,
                                                  Map<Long, Map<Long, BigDecimal>> mengeJePosition,
                                                  List<NkZusatz> zusaetze,
                                                  NkAkonto akonto,
+                                                 Integer anzahlPersonen,
                                                  Map<Long, NkUmlageInfoDTO> umlagen) {
 
         NkMieterAbrechnungDTO block = new NkMieterAbrechnungDTO();
@@ -201,6 +226,13 @@ public class NkBerechnungService {
         long miettage = miettageImZeitraum(basis, abrechnung.getDatumVon(), abrechnung.getDatumBis());
         long tage = miettage * Math.max(0, basis.getAnzahlWohnungen());
         block.setTage(tage);
+
+        // "Personen je Wohnung": Die Zahl gilt je Wohnung, deshalb liegt sie ueber `tage` und nicht
+        // ueber den Miettagen. Wer zwei Wohnungen mit je drei Personen mietet, traegt sechs Anteile.
+        int personen = nullSicher(anzahlPersonen, PERSONEN_VORGABE);
+        block.setAnzahlPersonen(personen);
+        long personenTage = tage * personen;
+        block.setPersonenTage(personenTage);
 
         // Die Zuschlagskaskade rechnet auf die Summe aller Zeilen davor. Beide Quellen teilen sich
         // deshalb einen Nummernraum; bei Gleichstand kommt die allgemeine Position zuerst.
@@ -215,7 +247,8 @@ public class NkBerechnungService {
         BigDecimal laufendeSumme = BigDecimal.ZERO;
         for (Object quelle : zeilenQuellen) {
             NkZeileDTO zeile = quelle instanceof NkPosition p
-                    ? zeileAusPosition(p, basis, tage, nenner, mengeJePosition, laufendeSumme, umlagen)
+                    ? zeileAusPosition(p, basis, tage, nenner, personenTage, nennerPerson,
+                            mengeJePosition, laufendeSumme, umlagen)
                     : zeileAusZusatz((NkZusatz) quelle);
             laufendeSumme = laufendeSumme.add(zeile.getBetrag());
             block.getZeilen().add(zeile);
@@ -230,6 +263,8 @@ public class NkBerechnungService {
                                         NkMieterBasisDTO basis,
                                         long tage,
                                         long nenner,
+                                        long personenTage,
+                                        long nennerPerson,
                                         Map<Long, Map<Long, BigDecimal>> mengeJePosition,
                                         BigDecimal laufendeSumme,
                                         Map<Long, NkUmlageInfoDTO> umlagen) {
@@ -241,8 +276,13 @@ public class NkBerechnungService {
         zeile.setEinheit(p.getEinheit());
 
         switch (p.getArt()) {
-            case UMLAGE -> {
-                BigDecimal anteil = anteil(tage, nenner);
+            // Beide Umlagen rechnen identisch - nur der Verteilschluessel unterscheidet sich:
+            // Wohnungstage gegen Personentage. Deshalb ein gemeinsamer Zweig statt zweier fast
+            // gleicher.
+            case UMLAGE, UMLAGE_PERSON -> {
+                BigDecimal anteil = p.getArt() == NkPositionsart.UMLAGE_PERSON
+                        ? anteil(personenTage, nennerPerson)
+                        : anteil(tage, nenner);
                 if (p.getGesamtmenge() != null) {
                     zeile.setMenge(p.getGesamtmenge().multiply(anteil)
                             .setScale(MENGE_SCALE, RoundingMode.HALF_UP));
@@ -353,10 +393,14 @@ public class NkBerechnungService {
      * <p>Die Rundungsdifferenz ist in beiden Fällen der Rest zwischen dem exakt verteilbaren
      * Betrag und der Summe der gerundeten Zeilen.
      */
-    private void setzeAbweichungen(NkUmlageInfoDTO info, long summeTage, long nenner) {
-        BigDecimal anteil = info.getArt() == NkPositionsart.ANTEIL
-                ? info.getSummeProzent().divide(HUNDERT, ZWISCHEN_SCALE, RoundingMode.HALF_UP)
-                : anteil(summeTage, nenner);
+    private void setzeAbweichungen(NkUmlageInfoDTO info, long summeTage, long nenner,
+                                   long summePersonenTage, long nennerPerson) {
+        BigDecimal anteil = switch (info.getArt()) {
+            case ANTEIL -> info.getSummeProzent()
+                    .divide(HUNDERT, ZWISCHEN_SCALE, RoundingMode.HALF_UP);
+            case UMLAGE_PERSON -> anteil(summePersonenTage, nennerPerson);
+            default -> anteil(summeTage, nenner);
+        };
 
         BigDecimal exaktVerteilbar = info.getTotalbetrag().multiply(anteil)
                 .setScale(GELD_SCALE, RoundingMode.HALF_UP);
@@ -402,5 +446,9 @@ public class NkBerechnungService {
 
     private static BigDecimal nullSicher(BigDecimal wert) {
         return wert != null ? wert : BigDecimal.ZERO;
+    }
+
+    private static int nullSicher(Integer wert, int ersatz) {
+        return wert != null ? wert : ersatz;
     }
 }

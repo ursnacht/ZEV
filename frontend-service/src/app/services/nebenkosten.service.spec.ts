@@ -26,6 +26,7 @@ describe('NebenkostenService', () => {
     datumVon: '2026-01-01',
     datumBis: '2026-12-31',
     anzahlWohnungen: 9,
+    anzahlPersonen: 9,
     abgerechnet: false
   };
 
@@ -53,7 +54,9 @@ describe('NebenkostenService', () => {
       betragProEinheit: 25
     }],
     akonto: [{ id: 3, mieterId: 100, anzahlMonate: 12, betragProMonat: 150, korrektur: 0 }],
-    anzahlWohnungenVorschlag: 9
+    personen: [],
+    anzahlWohnungenVorschlag: 9,
+    anzahlPersonenVorschlag: 9
   };
 
   beforeEach(() => {
@@ -172,6 +175,7 @@ describe('NebenkostenService', () => {
       datumVon: '2027-01-01',
       datumBis: '2027-12-31',
       anzahlWohnungen: 9,
+      anzahlPersonen: 9,
       abgerechnet: false
     };
     let ergebnis: NkAbrechnung | undefined;
@@ -224,7 +228,10 @@ describe('NebenkostenService', () => {
 
     httpMock.expectOne(`${apiUrl}/7`).flush({
       ...mockDetail,
-      berechnung: { nenner: 3285, summeTage: 3285, mieter: [], umlagen: [] }
+      berechnung: {
+        nenner: 3285, summeTage: 3285, nennerPerson: 3285, summePersonenTage: 3285,
+        mieter: [], umlagen: []
+      }
     });
 
     expect(ergebnis?.berechnung?.nenner).toBe(3285);

@@ -2,6 +2,7 @@ package ch.nacht.service;
 
 import ch.nacht.dto.NkAbrechnungDetailDTO;
 import ch.nacht.dto.NkAkontoDTO;
+import ch.nacht.dto.NkPersonDTO;
 import ch.nacht.dto.NkPositionDTO;
 import ch.nacht.dto.NkVerbrauchDTO;
 import ch.nacht.dto.NkZusatzDTO;
@@ -13,6 +14,7 @@ import ch.nacht.entity.Mieter;
 import ch.nacht.entity.MieterEinheit;
 import ch.nacht.entity.NkAbrechnung;
 import ch.nacht.entity.NkAkonto;
+import ch.nacht.entity.NkPerson;
 import ch.nacht.entity.NkPosition;
 import ch.nacht.entity.NkPositionsart;
 import ch.nacht.entity.NkVerbrauch;
@@ -23,6 +25,7 @@ import ch.nacht.repository.MieterEinheitRepository;
 import ch.nacht.repository.MieterRepository;
 import ch.nacht.repository.NkAbrechnungRepository;
 import ch.nacht.repository.NkAkontoRepository;
+import ch.nacht.repository.NkPersonRepository;
 import ch.nacht.repository.NkPositionRepository;
 import ch.nacht.repository.NkVerbrauchRepository;
 import ch.nacht.repository.NkZusatzRepository;
@@ -84,6 +87,9 @@ public class NkAbrechnungServiceTest {
 
     @Mock
     private NkAkontoRepository akontoRepository;
+
+    @Mock
+    private NkPersonRepository personRepository;
 
     @Mock
     private MieterRepository mieterRepository;
@@ -515,6 +521,132 @@ public class NkAbrechnungServiceTest {
 
         assertTrue(result.isPresent());
         assertEquals(730, result.get().getBerechnung().getSummeTage());
+    }
+
+    // ---------- Umlage pro Person (FR-2) ----------
+
+    @Test
+    void saveAbrechnung_UmlageProPerson_WirdGespeichert() {
+        // Der Fall, der in der ersten Fassung fehlte: pruefePositionen hatte einen eigenen switch
+        // ueber die Positionsart, dessen default-Zweig NK_FEHLER_POSITION_ART wirft. Die neue Art
+        // fiel dort hinein - jedes Speichern wurde abgewiesen, obwohl das Rechnen stimmte.
+        featureFlagAn();
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        stubPositionSave();
+
+        NkAbrechnungDetailDTO detail = detail(umlagePersonDTO("Gruenabfuhr", "1000.00", 1));
+
+        assertTrue(nkAbrechnungService.saveAbrechnung(1L, detail).isPresent());
+
+        ArgumentCaptor<NkPosition> captor = ArgumentCaptor.forClass(NkPosition.class);
+        verify(positionRepository).save(captor.capture());
+        assertEquals(NkPositionsart.UMLAGE_PERSON, captor.getValue().getArt());
+        assertEquals(new BigDecimal("1000.00"), captor.getValue().getTotalbetrag());
+        // Einheit bleibt erhalten - anders als bei ANTEIL, wo sie geleert wird.
+        assertEquals(Mengeneinheit.CHF, captor.getValue().getEinheit());
+    }
+
+    @Test
+    void saveAbrechnung_UmlageProPersonOhneTotalbetrag_ThrowsException() {
+        // Gleiche Pflichtfelder wie bei der Umlage pro Wohnung - also auch dieselbe Meldung.
+        featureFlagAn();
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+
+        NkPositionDTO ohneBetrag = umlagePersonDTO("Gruenabfuhr", "1000.00", 1);
+        ohneBetrag.setTotalbetrag(null);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> nkAbrechnungService.saveAbrechnung(1L, detail(ohneBetrag)));
+        assertEquals("NK_FEHLER_POSITION_UMLAGE", ex.getMessage());
+    }
+
+    // ---------- Nennerpruefung Personen (FR-2) ----------
+
+    @Test
+    void saveAbrechnung_AnzahlPersonenZuKlein_ThrowsExceptionMitBeidenWerten() {
+        // Zwei ganzjaehrige Mieter mit je 3 Personen, aber nur 2 Personen erfasst:
+        // Σ (Tage x Personen) = 2190 > Nenner = 730.
+        featureFlagAn();
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        zweiGanzjaehrigeMieter();
+
+        NkAbrechnungDetailDTO detail = detail(umlagePersonDTO("Gruenabfuhr", "1000.00", 1));
+        detail.getAbrechnung().setAnzahlPersonen(2);
+        detail.setPersonen(List.of(new NkPersonDTO(1L, 3), new NkPersonDTO(2L, 3)));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> nkAbrechnungService.saveAbrechnung(1L, detail));
+
+        assertTrue(ex.getMessage().contains("Anzahl Personen"), ex.getMessage());
+        assertTrue(ex.getMessage().contains("2190"), ex.getMessage());
+        assertTrue(ex.getMessage().contains("730"), ex.getMessage());
+        verify(positionRepository, never()).save(any());
+    }
+
+    @Test
+    void saveAbrechnung_AnzahlPersonenZuKleinOhnePersonenumlage_IstZulaessig() {
+        // Ohne eine Position dieser Art hat die Personenzahl keine Wirkung - dann darf sie das
+        // Speichern auch nicht blockieren.
+        featureFlagAn();
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        zweiGanzjaehrigeMieter();
+
+        NkAbrechnungDetailDTO detail = detail(umlageDTO("Allgemeinstrom", "900.00", 1));
+        detail.getAbrechnung().setAnzahlPersonen(2);
+        detail.setPersonen(List.of(new NkPersonDTO(1L, 3), new NkPersonDTO(2L, 3)));
+
+        assertTrue(nkAbrechnungService.saveAbrechnung(1L, detail).isPresent());
+    }
+
+    @Test
+    void saveAbrechnung_PersonenzahlGleichVorgabe_WirdNichtGespeichert() {
+        // Sonst entstuende fuer jeden Mieter jeder Abrechnung eine Zeile, nur um "1" festzuhalten -
+        // und weil nk_person mit ON DELETE RESTRICT auf den Mieter zeigt, waere danach kein Mieter
+        // mehr loeschbar, der ueberhaupt in einer Abrechnung vorkommt.
+        featureFlagAn();
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        zweiGanzjaehrigeMieter();
+
+        NkAbrechnungDetailDTO detail = detail();
+        detail.setPersonen(List.of(new NkPersonDTO(1L, 1), new NkPersonDTO(2L, 4)));
+
+        nkAbrechnungService.saveAbrechnung(1L, detail);
+
+        ArgumentCaptor<NkPerson> captor = ArgumentCaptor.forClass(NkPerson.class);
+        verify(personRepository).save(captor.capture());
+        assertEquals(2L, captor.getValue().getMieterId());
+        assertEquals(4, captor.getValue().getAnzahlPersonen());
+    }
+
+    @Test
+    void saveAbrechnung_OhneAnzahlPersonen_UebernimmtDieAnzahlWohnungen() {
+        // Ein Aufrufer, der das Feld nicht kennt, soll dieselbe Rechnung bekommen wie vorher.
+        featureFlagAn();
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        zweiGanzjaehrigeMieter();
+
+        NkAbrechnungDetailDTO detail = detail();
+        detail.getAbrechnung().setAnzahlPersonen(null);
+
+        Optional<NkAbrechnungDetailDTO> result = nkAbrechnungService.saveAbrechnung(1L, detail);
+
+        assertTrue(result.isPresent());
+        assertEquals(9, result.get().getAbrechnung().getAnzahlPersonen());
+        assertEquals(3285, result.get().getBerechnung().getNennerPerson());
+    }
+
+    @Test
+    void saveAbrechnung_PersonenzahlUnterEins_ThrowsException() {
+        featureFlagAn();
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        zweiGanzjaehrigeMieter();
+
+        NkAbrechnungDetailDTO detail = detail();
+        detail.setPersonen(List.of(new NkPersonDTO(1L, 0)));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> nkAbrechnungService.saveAbrechnung(1L, detail));
+        assertEquals("NK_FEHLER_ANZAHL_PERSONEN", ex.getMessage());
     }
 
     // ---------- Art-abhaengige Pflichtfelder (FR-2) ----------
@@ -1014,6 +1146,16 @@ public class NkAbrechnungServiceTest {
         dto.setEinheit(Mengeneinheit.M3);
         dto.setTotalbetrag(new BigDecimal(totalbetrag));
         dto.setGesamtmenge(new BigDecimal("500.000"));
+        return dto;
+    }
+
+    private NkPositionDTO umlagePersonDTO(String bezeichnung, String totalbetrag, int reihenfolge) {
+        NkPositionDTO dto = new NkPositionDTO();
+        dto.setArt(NkPositionsart.UMLAGE_PERSON);
+        dto.setBezeichnung(bezeichnung);
+        dto.setReihenfolge(reihenfolge);
+        dto.setEinheit(Mengeneinheit.CHF);
+        dto.setTotalbetrag(new BigDecimal(totalbetrag));
         return dto;
     }
 

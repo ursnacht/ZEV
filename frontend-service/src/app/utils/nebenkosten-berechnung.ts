@@ -2,6 +2,7 @@ import {
   NkAkonto,
   NkBerechnung,
   NkMieterAbrechnung,
+  NkPerson,
   NkPosition,
   NkPositionsart,
   NkUmlageInfo,
@@ -33,6 +34,9 @@ export interface NkMieterTage {
   ohneWohnung: boolean;
 }
 
+/** Personen je Wohnung, wenn nichts erfasst ist - wie `PERSONEN_VORGABE` im Backend. */
+export const PERSONEN_VORGABE = 1;
+
 /**
  * Kaufmännisch runden, von Null weg — wie `RoundingMode.HALF_UP` im Backend.
  *
@@ -59,13 +63,17 @@ function zahl(wert: number | null | undefined): number {
  * @param positionen Allgemeine Positionen in der Reihenfolge der Liste
  * @param zusaetze Zusatzpositionen aller Mieter
  * @param akonto Akonto-Angaben je Mieter
+ * @param nennerPerson Anzahl Personen × Tage im Zeitraum — Nenner der Umlage pro Person
+ * @param personen Personenzahlen je Mieter; fehlt eine, gilt `PERSONEN_VORGABE`
  */
 export function berechneVorschau(
   nenner: number,
   mieter: NkMieterTage[],
   positionen: NkPosition[],
   zusaetze: NkZusatz[],
-  akonto: NkAkonto[]
+  akonto: NkAkonto[],
+  nennerPerson: number = 0,
+  personen: NkPerson[] = []
 ): NkBerechnung {
   // Die Reihenfolge kommt aus der Listenposition - genau so vergibt sie das Backend beim
   // Speichern neu. Wer eine Zeile verschiebt, sieht die Wirkung auf die Zuschlaege sofort.
@@ -73,6 +81,7 @@ export function berechneVorschau(
 
   const umlagen: NkUmlageInfo[] = nummeriert
     .filter(eintrag => eintrag.position.art === NkPositionsart.UMLAGE
+                    || eintrag.position.art === NkPositionsart.UMLAGE_PERSON
                     || eintrag.position.art === NkPositionsart.ANTEIL)
     .map(eintrag => ({
       positionId: umlageSchluessel(eintrag.position, eintrag.reihenfolge),
@@ -87,29 +96,42 @@ export function berechneVorschau(
 
   const bloecke: NkMieterAbrechnung[] = [];
   let summeTage = 0;
+  let summePersonenTage = 0;
 
-  for (const person of mieter) {
-    summeTage += person.tage;
-    bloecke.push(berechneMieter(person, nenner, nummeriert, zusaetze, akonto, umlagen));
+  for (const eintrag of mieter) {
+    const anzahlPersonen = personen.find(x => x.mieterId === eintrag.mieterId)?.anzahlPersonen
+      ?? PERSONEN_VORGABE;
+    summeTage += eintrag.tage;
+    summePersonenTage += eintrag.tage * anzahlPersonen;
+    bloecke.push(berechneMieter(eintrag, nenner, nennerPerson, anzahlPersonen,
+      nummeriert, zusaetze, akonto, umlagen));
   }
 
   for (const info of umlagen) {
     // Dieselbe Rechnung, nur mit anderer Bezugsgroesse: bei ANTEIL die Summe der Prozentsaetze,
-    // bei UMLAGE der Zeitanteil. Was uebrig bleibt, heisst dort "Prozente fehlen", hier "Leerstand".
-    const teil = info.art === NkPositionsart.ANTEIL
-      ? info.summeProzent / 100
-      : anteil(summeTage, nenner);
+    // bei UMLAGE der Zeitanteil, bei UMLAGE_PERSON der Personenanteil. Was uebrig bleibt, heisst
+    // dort "Prozente fehlen", hier "Leerstand".
+    let teil: number;
+    if (info.art === NkPositionsart.ANTEIL) {
+      teil = info.summeProzent / 100;
+    } else if (info.art === NkPositionsart.UMLAGE_PERSON) {
+      teil = anteil(summePersonenTage, nennerPerson);
+    } else {
+      teil = anteil(summeTage, nenner);
+    }
     const exaktVerteilbar = runde(info.totalbetrag * teil, 2);
     info.nichtVerteilt = runde(info.totalbetrag - exaktVerteilbar, 2);
     info.rundungsdifferenz = runde(exaktVerteilbar - info.summeVerteilt, 2);
   }
 
-  return { nenner, summeTage, mieter: bloecke, umlagen };
+  return { nenner, summeTage, nennerPerson, summePersonenTage, mieter: bloecke, umlagen };
 }
 
 function berechneMieter(
   person: NkMieterTage,
   nenner: number,
+  nennerPerson: number,
+  anzahlPersonen: number,
   nummeriert: { position: NkPosition; reihenfolge: number }[],
   zusaetze: NkZusatz[],
   akonto: NkAkonto[],
@@ -140,7 +162,8 @@ function berechneMieter(
 
   for (const quelle of quellen) {
     const zeile = quelle.art === 'position'
-      ? zeileAusPosition(quelle.position, quelle.reihenfolge, person, nenner, laufendeSumme, umlagen)
+      ? zeileAusPosition(quelle.position, quelle.reihenfolge, person, nenner,
+          person.tage * anzahlPersonen, nennerPerson, laufendeSumme, umlagen)
       : zeileAusZusatz(quelle.zusatz, quelle.reihenfolge);
     laufendeSumme = runde(laufendeSumme + zeile.betrag, 2);
     zeilen.push(zeile);
@@ -156,6 +179,8 @@ function berechneMieter(
     mieterId: person.mieterId,
     name: person.name,
     tage: person.tage,
+    anzahlPersonen,
+    personenTage: person.tage * anzahlPersonen,
     ohneWohnung: person.ohneWohnung,
     zeilen,
     kostentotal: laufendeSumme,
@@ -172,6 +197,8 @@ function zeileAusPosition(
   reihenfolge: number,
   person: NkMieterTage,
   nenner: number,
+  personenTage: number,
+  nennerPerson: number,
   laufendeSumme: number,
   umlagen: NkUmlageInfo[]
 ): NkZeile {
@@ -185,8 +212,12 @@ function zeileAusPosition(
   };
 
   switch (position.art) {
-    case NkPositionsart.UMLAGE: {
-      const teil = anteil(person.tage, nenner);
+    // Beide Umlagen rechnen identisch - nur der Verteilschluessel unterscheidet sich.
+    case NkPositionsart.UMLAGE:
+    case NkPositionsart.UMLAGE_PERSON: {
+      const teil = position.art === NkPositionsart.UMLAGE_PERSON
+        ? anteil(personenTage, nennerPerson)
+        : anteil(person.tage, nenner);
       if (position.gesamtmenge !== null && position.gesamtmenge !== undefined) {
         zeile.menge = runde(position.gesamtmenge * teil, 3);
       }

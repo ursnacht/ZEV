@@ -32,6 +32,15 @@ describe('nebenkosten-berechnung', () => {
     };
   }
 
+  function umlagePerson(id: number, bezeichnung: string, totalbetrag: number,
+                       gesamtmenge: number | null = null): NkPosition {
+    return {
+      id, art: NkPositionsart.UMLAGE_PERSON, bezeichnung,
+      einheit: Mengeneinheit.CHF, totalbetrag, gesamtmenge,
+      betragProEinheit: null, prozentsatz: null, verbraeuche: []
+    };
+  }
+
   function verbrauch(id: number, bezeichnung: string, betragProEinheit: number,
                      mengen: { mieterId: number; menge: number | null }[] = []): NkPosition {
     return {
@@ -425,6 +434,82 @@ describe('nebenkosten-berechnung', () => {
         3 * JAHR_TAGE, [mieter(1, JAHR_TAGE), mieter(2, 200)], [], [], []);
 
       expect(result.summeTage).toBe(JAHR_TAGE + 200);
+    });
+  });
+
+  describe('Umlage pro Person', () => {
+
+    it('should match the per-apartment allocation when nothing is recorded', () => {
+      // Der eigentliche Schutz: Vorschlag "Personen = Wohnungen" plus Vorgabe "1 Person je Mieter"
+      // muss dieselben Betraege ergeben - sonst aendert eine bestehende Abrechnung ihre Zahlen.
+      const nenner = 2 * JAHR_TAGE;
+      const mieterListe = [mieter(1, JAHR_TAGE), mieter(2, JAHR_TAGE)];
+
+      const result = berechneVorschau(
+        nenner, mieterListe,
+        [umlage(10, 'Strom', 1000), umlagePerson(11, 'Gruenabfuhr', 1000)],
+        [], [], nenner, []);
+
+      const block = result.mieter[0];
+      expect(block.zeilen[1].betrag).toBe(block.zeilen[0].betrag);
+      expect(block.zeilen[1].betrag).toBe(500);
+    });
+
+    it('should distribute by heads', () => {
+      const nennerPerson = 5 * JAHR_TAGE;
+
+      const result = berechneVorschau(
+        2 * JAHR_TAGE, [mieter(1, JAHR_TAGE), mieter(2, JAHR_TAGE)],
+        [umlagePerson(11, 'Gruenabfuhr', 1000)], [], [],
+        nennerPerson,
+        [{ mieterId: 1, anzahlPersonen: 3 }, { mieterId: 2, anzahlPersonen: 2 }]);
+
+      expect(result.mieter[0].zeilen[0].betrag).toBe(600);
+      expect(result.mieter[1].zeilen[0].betrag).toBe(400);
+      expect(result.nennerPerson).toBe(nennerPerson);
+      expect(result.summePersonenTage).toBe(nennerPerson);
+    });
+
+    it('should expose personenTage as tage times persons', () => {
+      const result = berechneVorschau(
+        2 * JAHR_TAGE, [mieter(1, JAHR_TAGE), mieter(2, JAHR_TAGE)],
+        [], [], [], 5 * JAHR_TAGE, [{ mieterId: 1, anzahlPersonen: 3 }]);
+
+      expect(result.mieter[0].anzahlPersonen).toBe(3);
+      expect(result.mieter[0].personenTage).toBe(3 * JAHR_TAGE);
+      // Ohne Eintrag gilt die Vorgabe 1.
+      expect(result.mieter[1].anzahlPersonen).toBe(1);
+      expect(result.mieter[1].personenTage).toBe(JAHR_TAGE);
+    });
+
+    it('should leave a share undistributed when fewer heads are recorded', () => {
+      const result = berechneVorschau(
+        2 * JAHR_TAGE, [mieter(1, JAHR_TAGE), mieter(2, JAHR_TAGE)],
+        [umlagePerson(11, 'Gruenabfuhr', 1000)], [], [],
+        5 * JAHR_TAGE,
+        [{ mieterId: 1, anzahlPersonen: 3 }, { mieterId: 2, anzahlPersonen: 1 }]);
+
+      expect(result.umlagen[0].summeVerteilt).toBe(800);
+      expect(result.umlagen[0].nichtVerteilt).toBe(200);
+    });
+
+    it('should distribute the quantity as well', () => {
+      const result = berechneVorschau(
+        2 * JAHR_TAGE, [mieter(1, JAHR_TAGE), mieter(2, JAHR_TAGE)],
+        [umlagePerson(11, 'Gruenabfuhr', 800, 40)], [], [],
+        4 * JAHR_TAGE,
+        [{ mieterId: 1, anzahlPersonen: 3 }, { mieterId: 2, anzahlPersonen: 1 }]);
+
+      expect(result.mieter[0].zeilen[0].menge).toBe(30);
+      expect(result.mieter[1].zeilen[0].menge).toBe(10);
+    });
+
+    it('should yield 0 instead of dividing by zero', () => {
+      const result = berechneVorschau(
+        2 * JAHR_TAGE, [mieter(1, JAHR_TAGE)],
+        [umlagePerson(11, 'Gruenabfuhr', 1000)], [], [], 0, []);
+
+      expect(result.mieter[0].zeilen[0].betrag).toBe(0);
     });
   });
 });
