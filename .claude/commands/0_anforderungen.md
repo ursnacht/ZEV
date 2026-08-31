@@ -25,7 +25,7 @@ $ARGUMENTS
 * **Akzeptanzkriterien** müssen konkret und testbar sein (mit Checkbox `[ ]`)
 * **Sicherheit (NFR-2):** Rollen explizit nennen (`zev` oder `zev_admin`)
 * **Multi-Tenancy:** Falls neue Daten gespeichert werden, auf Mandantenfähigkeit hinweisen (`org_id`)
-* **i18n:** Alle UI-Texte müssen via `TranslationService` kommen - als Abhängigkeit vermerken
+* **i18n:** Alle UI-Texte müssen via `TranslationService` kommen - als Abhängigkeit vermerken. Deutsche Texte in der Spec mit Umlauten schreiben (`ä`/`ö`/`ü`), damit sie so in die Migration übernommen werden können.
 * **Edge Cases:** Mindestens leere Listen, Netzwerkfehler und ungültige Eingaben behandeln
 * Abschnitte, für die keine Informationen vorliegen, mit sinnvollen Standardannahmen füllen und unter **8. Offene Fragen** vermerken
 

@@ -47,6 +47,7 @@ Erstelle einen strukturierten Bericht über Vollständigkeit, Korrektheit und Um
 **i18n:**
 - Sind alle UI-Texte via `TranslationService` gefordert?
 - Sind neue Translations als Abhängigkeit vermerkt?
+- Sind die deutschen Texte mit Umlauten geschrieben (nicht `ae`/`oe`/`ue`)? `ss` statt `ß` ist dagegen korrekt (Schweizer Schreibweise).
 
 **Persistierung:**
 - Sind alle Spalten mit Typ, Pflicht/Optional und Constraints spezifiziert?

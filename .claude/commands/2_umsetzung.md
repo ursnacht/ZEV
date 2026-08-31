@@ -27,6 +27,7 @@ Setze einen Umsetzungsplan schrittweise um.
   * **Flyway-Migrationen** in `backend-service/src/main/resources/db/migration/`
   * **Naming:** Migrations `V[nummer]__[beschreibung].sql`
   * **Spalten-Kommentare:** Jede neue Spalte mit `COMMENT ON COLUMN app.[tabelle].[spalte] IS '...'` dokumentieren
+  * **Übersetzungen:** mit `ON CONFLICT (key) DO NOTHING`; **deutsche Texte immer mit Umlauten** (`ä`/`ö`/`ü`) – nie `ae`/`oe`/`ue`. **Kein `ß`**: Schweizer Schreibweise, also `ss` („Strasse", „gemäss"). Betrifft nur die Textspalte `deutsch`, nicht die Keys. Details: `Specs/generell.md`, Abschnitt „Mehrsprachigkeit (i18n)"
 * **Code-Vorlagen:** Verwende die Vorlagen aus CLAUDE.md (Abschnitt "Code-Vorlagen für deterministische Generierung")
 
 ## Validierung nach jeder Phase

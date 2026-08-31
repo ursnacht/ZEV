@@ -112,6 +112,7 @@ Für jedes Akzeptanzkriterium systematisch prüfen:
 | "Validierung X muss gelten" | Service-Code, `@Valid`, Conditional Logic |
 | "Rolle X notwendig" | `@PreAuthorize`, `AuthGuard`, Route `data.roles` |
 | "Fehlermeldung anzeigen" | Exception-Handling, `.zev-message--error`, Translation-Key |
+| "Texte mehrsprachig" | Migration mit DE/EN und `ON CONFLICT (key) DO NOTHING`; deutsche Texte mit Umlauten statt `ae`/`oe`/`ue` (`ss` statt `ß` ist korrekt) |
 | "Daten in DB speichern" | Flyway-Migration, Entity, Repository |
 | "pro Mandant" | `org_id` in Entity/Migration, Hibernate-Filter |
 | "Konfiguration aus application.yml entfernt" | Prüfe ob YAML-Block und zugehörige Config-Klasse entfernt |

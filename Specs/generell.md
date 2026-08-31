@@ -85,6 +85,11 @@ Die folgende Tabelle ist ein **Überblick, nicht vollständig**. Massgeblich (Qu
 * Alle UI-Texte via `TranslationService` / `TranslatePipe` - keine hartcodierten Texte
 * Neue Übersetzungen als Flyway-Migration mit `ON CONFLICT (key) DO NOTHING`
 * Übersetzungen in Deutsch und Englisch
+* **Deutsche Texte immer mit Umlauten** (`ä`, `ö`, `ü`, `Ä`, `Ö`, `Ü`) – **nie** die Ersatzschreibung `ae`/`oe`/`ue`. Die Texte erscheinen unverändert auf dem Bildschirm und auf den PDF der Mieter; „lueckenhaft" oder „Gruenabfuhr" ist dort schlicht falsch geschrieben.
+  * **Kein `ß`:** Schweizer Schreibweise, also `ss` – „Strasse", „ausschliesslich", „gemäss". Das ist keine Ersatzschreibung, sondern richtig und bleibt so.
+  * Gilt für die Spalte `deutsch` in `zev.translation`, also für jede Übersetzungs-Migration. Die Dateien sind UTF-8; Umlaute sind darin unproblematisch.
+  * **Nicht** betroffen: Bezeichner (Übersetzungs-Keys, Spalten- und Tabellennamen, Enum-Konstanten) – die bleiben ASCII.
+  * Für Kommentare in SQL, Java und TypeScript gibt es keine Vorgabe; nur der ausgelieferte Text zählt.
 
 ### Fehleranzeige
 * Frontend: Fehlermeldungen als `.zev-message--error` anzeigen

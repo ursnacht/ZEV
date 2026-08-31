@@ -26,6 +26,7 @@ $ARGUMENTS
   `SELECT version, success FROM zev.flyway_schema_history WHERE version = '<NR>';`
 * Wurde die Migration bereits ausgeführt (Treffer in `flyway_schema_history`), lege **immer eine neue Migration** mit der nächsthöheren Versionsnummer an – auch für kleine Ergänzungen wie zusätzliche Übersetzungs-Keys.
 * Neue Übersetzungen immer mit `ON CONFLICT (key) DO NOTHING`.
+* **Deutsche Übersetzungstexte immer mit Umlauten** (`ä`/`ö`/`ü`) – nie `ae`/`oe`/`ue`. **Kein `ß`**: Schweizer Schreibweise, also `ss` („Strasse", „gemäss"). Betrifft nur die Textspalte `deutsch`, nicht die Keys. Details: `Specs/generell.md`, Abschnitt „Mehrsprachigkeit (i18n)".
 * Prüfe die höchste vergebene Versionsnummer, bevor du eine neue Migration anlegst (Dateien in `backend-service/src/main/resources/db/migration/`).
 
 ## Output
