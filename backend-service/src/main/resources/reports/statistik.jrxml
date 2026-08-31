@@ -48,6 +48,7 @@
     <field name="netzbezugsquoteGemessen" class="java.lang.Double"/>
     <field name="bilanzKennzahlenVerfuegbar" class="java.lang.Boolean"/>
     <field name="bilanzBezugLueckenhaft" class="java.lang.Boolean"/>
+    <field name="verteilungLueckenhaft" class="java.lang.Boolean"/>
     <field name="einspeisequote" class="java.lang.Double"/>
     <field name="zevEigenverbrauch" class="java.lang.Double"/>
     <field name="batterieNetto" class="java.lang.Double"/>
@@ -442,7 +443,7 @@
                  belastbarer, als sie sind. -->
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333384" x="0" y="408" width="290" height="20" forecolor="#999999" fontSize="7.0" italic="true">
                 <printWhenExpression><![CDATA[$F{bilanzKennzahlenVerfuegbar} && $F{bilanzBezugLueckenhaft}]]></printWhenExpression>
-                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_LUECKENHAFT") + ": " + $P{TRANSLATIONS}.get("KENNZAHL_LUECKENHAFT_HINWEIS")]]></expression>
+                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_LUECKENHAFT") + ": " + $P{TRANSLATIONS}.get($F{verteilungLueckenhaft} ? "KENNZAHL_LUECKE_VERTEILUNG_HINWEIS" : "KENNZAHL_LUECKE_MESSUNG_HINWEIS")]]></expression>
             </element>
 
             <!-- Batterie-KPIs (rechte Spalte; nur wenn Producer + Bilanz-Bezug + Rücklieferung vorhanden) -->

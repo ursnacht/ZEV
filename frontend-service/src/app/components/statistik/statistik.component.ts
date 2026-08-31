@@ -20,8 +20,10 @@ export interface KennzahlZeile {
   unit: string;
   /** Geschätzter Wert (Residuum der Energiebilanz) - wird als solcher gekennzeichnet. */
   berechnet: boolean;
-  /** Der zugrunde liegende Messwert hat Lücken - der Wert ist zu optimistisch. */
+  /** Der zugrunde liegende Messwert hat Lücken - der Wert ist verzerrt. */
   luecke?: boolean;
+  /** Erklärt die Verzerrung; die beiden Seiten kippen in **entgegengesetzte** Richtungen. */
+  lueckeHintKey?: string;
 }
 
 @Component({
@@ -262,7 +264,7 @@ export class StatistikComponent extends WithMessage implements OnInit {
    */
   getKennzahlen(monat: MonatsStatistik): KennzahlZeile[] {
     const zeilen: KennzahlZeile[] = [
-      this.percentZeile('KENNZAHL_AUTARKIEGRAD', monat.autarkiegrad, false)
+      this.gerechneteZeile('KENNZAHL_AUTARKIEGRAD', monat.autarkiegrad, monat.verteilungLueckenhaft)
     ];
     if (monat.bilanzKennzahlenVerfuegbar) {
       zeilen.push(this.gemesseneZeile('KENNZAHL_AUTARKIEGRAD_GEMESSEN',
@@ -270,7 +272,8 @@ export class StatistikComponent extends WithMessage implements OnInit {
     }
     zeilen.push(
       this.percentZeile('KENNZAHL_EIGENVERBRAUCHSQUOTE', monat.eigenverbrauchsquote, false),
-      this.percentZeile('KENNZAHL_NETZBEZUGSQUOTE', monat.netzbezugsquote, false)
+      this.gerechneteZeile('KENNZAHL_NETZBEZUGSQUOTE', monat.netzbezugsquote,
+        monat.verteilungLueckenhaft)
     );
     if (monat.bilanzKennzahlenVerfuegbar) {
       zeilen.push(this.gemesseneZeile('KENNZAHL_NETZBEZUGSQUOTE_GEMESSEN',
@@ -291,9 +294,30 @@ export class StatistikComponent extends WithMessage implements OnInit {
     return zeilen;
   }
 
-  /** Aus dem gemessenen Netzbezug abgeleitete Quote; bei Lücken in der Messung gekennzeichnet. */
+  /**
+   * Aus dem gemessenen Netzbezug abgeleitete Quote. Fehlen Intervalle, fehlt deren Netzbezug in
+   * der Summe - der Wert faellt **zu hoch** aus (bzw. die Netzbezugsquote zu tief).
+   */
   private gemesseneZeile(labelKey: string, value: number | null, luecke: boolean): KennzahlZeile {
-    return { ...this.percentZeile(labelKey, value, false), luecke };
+    return {
+      ...this.percentZeile(labelKey, value, false),
+      luecke,
+      lueckeHintKey: 'KENNZAHL_LUECKE_MESSUNG_HINWEIS'
+    };
+  }
+
+  /**
+   * Aus dem ZEV-Anteil der Konsumenten gerechnete Quote. Im Bilanzmodus stammt dieser Anteil
+   * ebenfalls aus den Bilanzdaten: Ein uebersprungenes Intervall laesst die Konsumenten ohne
+   * `zev` zurueck, ihr Verbrauch zaehlt aber weiter - er schlaegt **voll** als Netzbezug zu Buche.
+   * Der Wert faellt damit **zu tief** aus, und zwar staerker als der gemessene zu hoch.
+   */
+  private gerechneteZeile(labelKey: string, value: number | null, luecke: boolean): KennzahlZeile {
+    return {
+      ...this.percentZeile(labelKey, value, false),
+      luecke,
+      lueckeHintKey: 'KENNZAHL_LUECKE_VERTEILUNG_HINWEIS'
+    };
   }
 
   private percentZeile(labelKey: string, value: number | null, berechnet: boolean): KennzahlZeile {

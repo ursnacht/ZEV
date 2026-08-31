@@ -7,6 +7,7 @@ import ch.nacht.dto.TagMitAbweichungDTO;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Messwerte;
+import ch.nacht.entity.Verteilmodus;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
 import org.slf4j.Logger;
@@ -64,7 +65,9 @@ public class StatistikService {
 
         StatistikDTO statistik = new StatistikDTO();
         statistik.setToleranz(TOLERANZ);
-        statistik.setVerteilmodus(einstellungenService.getVerteilmodus(organizationContextService.getCurrentOrgId()));
+        Verteilmodus verteilmodus = einstellungenService.getVerteilmodus(
+                organizationContextService.getCurrentOrgId());
+        statistik.setVerteilmodus(verteilmodus);
 
         // Letztes Datum mit Messwerten ermitteln
         LocalDate letztesMessdatum = ermittleLetztesMessdatum();
@@ -74,7 +77,7 @@ public class StatistikService {
         pruefeDatenVollstaendigkeit(statistik, von, bis);
 
         // Monatsstatistiken berechnen
-        List<MonatsStatistikDTO> monatsStatistiken = berechneMonatsStatistiken(von, bis);
+        List<MonatsStatistikDTO> monatsStatistiken = berechneMonatsStatistiken(von, bis, verteilmodus);
         statistik.setMonate(monatsStatistiken);
 
         // Gesamtvollständigkeit basierend auf Monaten
@@ -136,7 +139,8 @@ public class StatistikService {
         }
     }
 
-    private List<MonatsStatistikDTO> berechneMonatsStatistiken(LocalDate von, LocalDate bis) {
+    private List<MonatsStatistikDTO> berechneMonatsStatistiken(LocalDate von, LocalDate bis,
+            Verteilmodus verteilmodus) {
         List<MonatsStatistikDTO> monatsStatistiken = new ArrayList<>();
 
         YearMonth startMonat = YearMonth.from(von);
@@ -144,7 +148,7 @@ public class StatistikService {
 
         YearMonth aktuellerMonat = startMonat;
         while (!aktuellerMonat.isAfter(endMonat)) {
-            MonatsStatistikDTO monatsStatistik = berechneMonatsStatistik(aktuellerMonat, von, bis);
+            MonatsStatistikDTO monatsStatistik = berechneMonatsStatistik(aktuellerMonat, von, bis, verteilmodus);
             monatsStatistiken.add(monatsStatistik);
             aktuellerMonat = aktuellerMonat.plusMonths(1);
         }
@@ -152,7 +156,8 @@ public class StatistikService {
         return monatsStatistiken;
     }
 
-    private MonatsStatistikDTO berechneMonatsStatistik(YearMonth yearMonth, LocalDate gesamtVon, LocalDate gesamtBis) {
+    private MonatsStatistikDTO berechneMonatsStatistik(YearMonth yearMonth, LocalDate gesamtVon,
+            LocalDate gesamtBis, Verteilmodus verteilmodus) {
         MonatsStatistikDTO dto = new MonatsStatistikDTO();
         dto.setJahr(yearMonth.getYear());
         dto.setMonat(yearMonth.getMonthValue());
@@ -230,7 +235,7 @@ public class StatistikService {
         berechneEinheitSummen(dto, vonDateTime, bisDateTime);
 
         // Statistik-Kennzahlen (Stufe 1: aus den Summen)
-        berechneKennzahlen(dto, vonDateTime, bisDateTime);
+        berechneKennzahlen(dto, vonDateTime, bisDateTime, verteilmodus);
         // Batterie geladen/entladen/Wirkungsgrad (Stufe 2: Pro-Intervall-Aggregation)
         berechneBatterieKennzahlen(dto, vonDateTime, bisDateTime);
 
@@ -249,7 +254,8 @@ public class StatistikService {
      * Verbrauchsanteil, der weder direkt aus der PV noch aus dem Netz kam (typischerweise
      * Batterie-Entladung).
      */
-    private void berechneKennzahlen(MonatsStatistikDTO dto, LocalDateTime von, LocalDateTime bis) {
+    private void berechneKennzahlen(MonatsStatistikDTO dto, LocalDateTime von, LocalDateTime bis,
+            Verteilmodus verteilmodus) {
         double p = dto.getSummeProducerTotal() != null ? dto.getSummeProducerTotal() : 0.0;
         double c = dto.getSummeConsumerTotal() != null ? dto.getSummeConsumerTotal() : 0.0;
         double cz = dto.getSummeConsumerZev() != null ? dto.getSummeConsumerZev() : 0.0;
@@ -269,23 +275,40 @@ public class StatistikService {
             double b = dto.getBilanzBezug() != null ? dto.getBilanzBezug() : 0.0;
             dto.setNetzbezugsquoteGemessen(b / c);
             dto.setAutarkiegradGemessen(1.0 - b / c);
-            // Lücken in der Bilanzmessung machen B zu klein und den Autarkiegrad zu optimistisch.
-            // Die Vollständigkeitsprüfung arbeitet tage- und einheitengenau und sieht fehlende
-            // Intervalle innerhalb eines Tages nicht - deshalb hier eine eigene Zählung.
+            // Lücken in der Bilanzmessung verzerren beide Seiten - aber unterschiedlich stark und
+            // in entgegengesetzte Richtung. Die Vollständigkeitsprüfung arbeitet tage- und
+            // einheitengenau und sieht fehlende Intervalle innerhalb eines Tages nicht, deshalb
+            // hier eine eigene Zählung.
             long intervalleBezug = messwerteRepository
                     .countDistinctZeitByEinheitTypAndZeitBetween(EinheitTyp.BEZUG, von, bis);
             long intervalleConsumer = messwerteRepository
                     .countDistinctZeitByEinheitTypAndZeitBetween(EinheitTyp.CONSUMER, von, bis);
-            dto.setBilanzBezugLueckenhaft(intervalleBezug < intervalleConsumer);
-            if (dto.isBilanzBezugLueckenhaft()) {
-                logger.warn("Monat {}/{}: Bilanz-Bezug deckt nur {} von {} Intervallen ab - "
-                        + "die gemessenen Kennzahlen sind zu optimistisch",
-                        dto.getJahr(), dto.getMonat(), intervalleBezug, intervalleConsumer);
+            boolean luecken = intervalleBezug < intervalleConsumer;
+
+            // Gemessen: es fehlt der Netzbezug der Lücken-Intervalle → B zu klein → zu optimistisch.
+            dto.setBilanzBezugLueckenhaft(luecken);
+
+            // Gerechnet: nur im Bilanzmodus stammt auch der ZEV-Anteil der Consumer aus den
+            // Bilanzdaten (S = max(0, Verbrauch − Bezug)). Ein übersprungenes Intervall lässt die
+            // Consumer ohne zev zurück, ihr Verbrauch zählt aber weiter - er schlägt also **voll**
+            // als Netzbezug zu Buche statt nur mit seinem Netzanteil. Der Fehler ist damit grösser
+            // als auf der gemessenen Seite und zeigt in die andere Richtung.
+            // Im Modus PRODUCER_MESSUNG kommt der ZEV-Anteil aus der Producer-Verteilung; fehlende
+            // BEZUG-Werte berühren ihn nicht.
+            dto.setVerteilungLueckenhaft(luecken && verteilmodus == Verteilmodus.BILANZ);
+
+            if (luecken) {
+                logger.warn("Monat {}/{}: Bilanz-Bezug deckt nur {} von {} Intervallen ab "
+                        + "(Modus {}) - die gemessenen Quoten fallen zu hoch aus{}",
+                        dto.getJahr(), dto.getMonat(), intervalleBezug, intervalleConsumer,
+                        verteilmodus,
+                        dto.isVerteilungLueckenhaft() ? ", die gerechneten zu tief" : "");
             }
         } else {
             dto.setNetzbezugsquoteGemessen(null);
             dto.setAutarkiegradGemessen(null);
             dto.setBilanzBezugLueckenhaft(false);
+            dto.setVerteilungLueckenhaft(false);
         }
 
         // Netto-Speicherfluss (berechnet/geschätzt): nur bei Producer + Bilanz-Bezug + Rücklieferung

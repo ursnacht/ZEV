@@ -148,3 +148,41 @@ der weder direkt aus der PV noch aus dem Netz kam — typischerweise die Batteri
   acht neue Fälle (Zeilenanzahl 5/7/11, Reihenfolge, Formatierung, Lücken-Kennzeichnung).
 * Ein bestehender Test griff die Batterie-Zeilen über `zeilen.slice(5)` ab und brach durch die zwei
   zusätzlichen Zeilen. Neu wird über den Key-Präfix gefiltert — beim nächsten Zusatz hält das.
+
+### Korrektur: Lücken verzerren beide Seiten, nicht nur die gemessene
+
+Der erste Wurf (V133) kennzeichnete nur die **gemessenen** Zeilen als „lückenhaft" — mit der
+Begründung, dem Netzbezug fehlten die übersprungenen Intervalle. Das stimmt, ist aber der kleinere
+der beiden Fehler, und im Bilanzmodus war auch die Herleitung des Zeilenpaars falsch.
+
+**Was übersehen wurde:** Im Modus `BILANZ` stammt der ZEV-Anteil der Konsumenten selbst aus den
+Bilanzdaten (`S = max(0, Verbrauch − Bezug)` je Intervall). Überspringt `distributeBilanz` ein
+Intervall, bleiben die Konsumenten dort ohne `zev`, ihr Verbrauch zählt aber weiter — er schlägt also
+**voll** als Netzbezug zu Buche statt nur mit seinem tatsächlichen Netzanteil.
+
+Über den Monat gerechnet: `Cz = C_ohneLücke − B`, also `C − Cz = C_Lücke + B`. Der Abstand der beiden
+angezeigten Autarkiegrade ist damit **exakt `C_Lücke / C`** — der Verbrauch während der Intervalle
+ohne Bilanz-Messwert. Der wahre Wert liegt dazwischen: die gemessene Zeile ist um `B_Lücke / C` zu
+günstig, die gerechnete um `(C_Lücke − B_Lücke) / C` zu ungünstig.
+
+**Folge für die Herleitung des Features:** Im Bilanzmodus enthält der gerechnete Autarkiegrad die
+Batterie-Entladung bereits (sie senkt den Bezug und erhöht damit `S`). Beide Zeilen sollten dort
+praktisch übereinstimmen; eine Differenz zeigt **keine Batterie**, sondern Lücken in der
+Bilanzmessung. Der ursprünglich genannte „Batterie-Effekt" gilt nur im Modus `PRODUCER_MESSUNG`, wo
+`Cz` die direkt verbrauchte Produktion ist. Das Zeilenpaar bleibt in beiden Modi nützlich — im einen
+als Batterie-Anzeige, im anderen als Datenqualitäts-Anzeige.
+
+* `MonatsStatistikDTO.verteilungLueckenhaft` — neu; wahr bei Lücken **und** Modus `BILANZ`.
+* `StatistikService`: Der Verteilmodus wird in `getStatistik` einmal ermittelt und über
+  `berechneMonatsStatistiken` → `berechneMonatsStatistik` → `berechneKennzahlen` durchgereicht
+  (statt je Monat neu abzufragen). Die WARN-Meldung nennt jetzt Modus und beide Richtungen.
+* `KennzahlZeile.lueckeHintKey` — die beiden Seiten brauchen **verschiedene** Hinweise, weil die
+  Verzerrung in entgegengesetzte Richtungen zeigt. Im Template wird `kz.luecke && kz.lueckeHintKey`
+  geprüft; die zweite Bedingung engt den Typ für die `TranslatePipe` ein (`string | undefined`).
+* `statistik.jrxml`: Der Fussnoten-Hinweis wählt den Text nach `verteilungLueckenhaft`.
+* `V134__Statistik_Kennzahlen_Luecken_Richtung.sql`: zwei neue Hinweis-Keys
+  (`KENNZAHL_LUECKE_MESSUNG_HINWEIS`, `KENNZAHL_LUECKE_VERTEILUNG_HINWEIS`) sowie `UPDATE`s auf die
+  beiden `_GEMESSEN_HINWEIS`-Texte, die bisher die Batterie als Grund der Differenz nannten. V133 war
+  bereits angewendet (via `zev-db` geprüft) und durfte nicht geändert werden.
+* Tests: `StatistikServiceTest` 42 (Bilanzmodus kennzeichnet beide Seiten, Producer-Messung nur die
+  gemessene), `statistik.component.spec.ts` um Richtung und Hinweis-Keys erweitert.

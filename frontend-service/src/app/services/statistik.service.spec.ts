@@ -58,7 +58,8 @@ describe('StatistikService', () => {
         autarkiegradGemessen: 0.8444,
         netzbezugsquoteGemessen: 0.1556,
         bilanzKennzahlenVerfuegbar: true,
-        bilanzBezugLueckenhaft: false
+        bilanzBezugLueckenhaft: false,
+        verteilungLueckenhaft: false
       }
     ],
     toleranz: 0.01

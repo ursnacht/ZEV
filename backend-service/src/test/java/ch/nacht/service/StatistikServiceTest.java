@@ -677,18 +677,23 @@ public class StatistikServiceTest {
         assertNull(monat.getNetzbezugsquoteGemessen());
     }
 
-    @Test
-    void berechneKennzahlen_BezugMitLuecken_WirdGekennzeichnet() {
-        // Der Netzbezug deckt nur 2000 von 2880 Intervallen ab: die Summe ist zu klein, der
-        // gemessene Autarkiegrad damit zu optimistisch. Das muss sichtbar sein.
-        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
-        stubBilanzEinheiten(38.0, 300.0);
-        when(messwerteRepository.sumBilanzKomponentenPerZeitBetween(any(), any()))
-                .thenReturn(Collections.emptyList());
+    /** Bilanz-Bezug deckt nur 2000 von 2880 Intervallen ab. */
+    private void stubBezugLuecken() {
         when(messwerteRepository.countDistinctZeitByEinheitTypAndZeitBetween(
                 eq(EinheitTyp.BEZUG), any(), any())).thenReturn(2000L);
         when(messwerteRepository.countDistinctZeitByEinheitTypAndZeitBetween(
                 eq(EinheitTyp.CONSUMER), any(), any())).thenReturn(2880L);
+    }
+
+    @Test
+    void berechneKennzahlen_BezugMitLuecken_GemesseneZeilenGekennzeichnet() {
+        // Den Luecken-Intervallen fehlt der Netzbezug in der Summe: B zu klein, der gemessene
+        // Autarkiegrad damit zu guenstig. Das muss sichtbar sein.
+        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
+        stubBilanzEinheiten(38.0, 300.0);
+        when(messwerteRepository.sumBilanzKomponentenPerZeitBetween(any(), any()))
+                .thenReturn(Collections.emptyList());
+        stubBezugLuecken();
 
         MonatsStatistikDTO monat = ersterMonat();
 
@@ -698,7 +703,42 @@ public class StatistikServiceTest {
     }
 
     @Test
+    void berechneKennzahlen_BezugMitLueckenImBilanzmodus_AuchGerechneteZeilenGekennzeichnet() {
+        // Im Bilanzmodus stammt auch der ZEV-Anteil der Consumer aus den Bilanzdaten. Ein
+        // uebersprungenes Intervall laesst sie ohne zev zurueck, ihr Verbrauch zaehlt aber weiter
+        // und schlaegt VOLL als Netzbezug zu Buche - der gerechnete Autarkiegrad faellt zu tief aus.
+        when(einstellungenService.getVerteilmodus(any())).thenReturn(Verteilmodus.BILANZ);
+        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
+        stubBilanzEinheiten(38.0, 300.0);
+        when(messwerteRepository.sumBilanzKomponentenPerZeitBetween(any(), any()))
+                .thenReturn(Collections.emptyList());
+        stubBezugLuecken();
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertTrue(monat.isVerteilungLueckenhaft());
+        assertTrue(monat.isBilanzBezugLueckenhaft());
+    }
+
+    @Test
+    void berechneKennzahlen_BezugMitLueckenImProducerModus_GerechneteZeilenUnberuehrt() {
+        // Ohne Bilanzmodus kommt der ZEV-Anteil aus der Producer-Verteilung; fehlende BEZUG-Werte
+        // beruehren ihn nicht (MesswerteService.distributeProducerMessung laedt keine Bilanz-Typen).
+        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
+        stubBilanzEinheiten(38.0, 300.0);
+        when(messwerteRepository.sumBilanzKomponentenPerZeitBetween(any(), any()))
+                .thenReturn(Collections.emptyList());
+        stubBezugLuecken();
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertFalse(monat.isVerteilungLueckenhaft());
+        assertTrue(monat.isBilanzBezugLueckenhaft());
+    }
+
+    @Test
     void berechneKennzahlen_BezugLueckenlos_NichtGekennzeichnet() {
+        when(einstellungenService.getVerteilmodus(any())).thenReturn(Verteilmodus.BILANZ);
         stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
         stubBilanzEinheiten(38.0, 300.0);
         when(messwerteRepository.sumBilanzKomponentenPerZeitBetween(any(), any()))
@@ -711,6 +751,8 @@ public class StatistikServiceTest {
         MonatsStatistikDTO monat = ersterMonat();
 
         assertFalse(monat.isBilanzBezugLueckenhaft());
+        // Auch im Bilanzmodus: ohne Luecken kein Hinweis.
+        assertFalse(monat.isVerteilungLueckenhaft());
     }
 
     @Test

@@ -72,6 +72,8 @@ export interface MonatsStatistik {
   bilanzKennzahlenVerfuegbar: boolean;
   /** Der Netzbezug deckt nicht alle Intervalle ab - die gemessenen Werte sind zu optimistisch. */
   bilanzBezugLueckenhaft: boolean;
+  /** Im Bilanzmodus zusätzlich: die gerechneten Quoten sind durch dieselben Lücken zu pessimistisch. */
+  verteilungLueckenhaft: boolean;
   // Batterie-Kennzahlen (berechnet/geschätzt), null = nicht ermittelbar
   batterieNetto: number | null;
   batterieGeladen: number | null;

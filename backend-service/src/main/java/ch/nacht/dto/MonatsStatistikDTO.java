@@ -40,6 +40,10 @@ public class MonatsStatistikDTO {
     private Double netzbezugsquoteGemessen;   // B / C
     private boolean bilanzKennzahlenVerfuegbar;   // BEZUG-Einheit vorhanden und C > 0
     private boolean bilanzBezugLueckenhaft;       // BEZUG deckt nicht alle Consumer-Intervalle ab
+    // Im Bilanzmodus stammt auch der ZEV-Anteil der Consumer aus den Bilanzdaten: Uebersprungene
+    // Intervalle bleiben ohne zev und zaehlen dadurch voll als Netzbezug. Die gerechneten Quoten
+    // sind dann staerker verzerrt als die gemessenen - und in die andere Richtung.
+    private boolean verteilungLueckenhaft;
     // Batterie-Kennzahlen (berechnet/geschätzt aus der Energiebilanz); null = nicht ermittelbar.
     private Double batterieNetto;             // P − C + B − R (kWh)
     private Double batterieGeladen;           // Σ max(0, Netto_i) (kWh, Stufe 2)
@@ -426,5 +430,13 @@ public class MonatsStatistikDTO {
 
     public void setBilanzBezugLueckenhaft(boolean bilanzBezugLueckenhaft) {
         this.bilanzBezugLueckenhaft = bilanzBezugLueckenhaft;
+    }
+
+    public boolean isVerteilungLueckenhaft() {
+        return verteilungLueckenhaft;
+    }
+
+    public void setVerteilungLueckenhaft(boolean verteilungLueckenhaft) {
+        this.verteilungLueckenhaft = verteilungLueckenhaft;
     }
 }

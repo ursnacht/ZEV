@@ -57,7 +57,8 @@ describe('StatistikComponent', () => {
     autarkiegradGemessen: 0.8444,
     netzbezugsquoteGemessen: 0.1556,
     bilanzKennzahlenVerfuegbar: true,
-    bilanzBezugLueckenhaft: false
+    bilanzBezugLueckenhaft: false,
+    verteilungLueckenhaft: false
   };
 
   const mockStatistik: Statistik = {
@@ -712,13 +713,44 @@ describe('StatistikComponent', () => {
 
       expect(zeilen.find(z => z.labelKey === 'KENNZAHL_AUTARKIEGRAD_GEMESSEN')?.luecke).toBe(true);
       expect(zeilen.find(z => z.labelKey === 'KENNZAHL_NETZBEZUGSQUOTE_GEMESSEN')?.luecke).toBe(true);
-      // Die gerechneten Werte haengen nicht am Bilanz-Messwert.
-      expect(zeilen.find(z => z.labelKey === 'KENNZAHL_AUTARKIEGRAD')?.luecke).toBeFalsy();
     });
 
-    it('should not mark the measured figures when the grid supply is complete', () => {
+    it('should mark the calculated figures too when the distribution skipped intervals', () => {
+      // Im Bilanzmodus stammt auch der ZEV-Anteil aus den Bilanzdaten - dieselbe Luecke verzerrt
+      // beide Seiten, in entgegengesetzte Richtungen.
+      const mitLuecke = { ...mockMonat, bilanzBezugLueckenhaft: true, verteilungLueckenhaft: true };
+      const zeilen = component.getKennzahlen(mitLuecke);
+
+      expect(zeilen.find(z => z.labelKey === 'KENNZAHL_AUTARKIEGRAD')?.luecke).toBe(true);
+      expect(zeilen.find(z => z.labelKey === 'KENNZAHL_NETZBEZUGSQUOTE')?.luecke).toBe(true);
+    });
+
+    it('should leave the calculated figures unmarked outside the balance mode', () => {
+      // Ohne Bilanzmodus kommt der ZEV-Anteil aus der Producer-Verteilung und ist von fehlenden
+      // BEZUG-Werten nicht betroffen.
+      const mitLuecke = { ...mockMonat, bilanzBezugLueckenhaft: true, verteilungLueckenhaft: false };
+      const zeilen = component.getKennzahlen(mitLuecke);
+
+      expect(zeilen.find(z => z.labelKey === 'KENNZAHL_AUTARKIEGRAD')?.luecke).toBe(false);
+      expect(zeilen.find(z => z.labelKey === 'KENNZAHL_AUTARKIEGRAD_GEMESSEN')?.luecke).toBe(true);
+    });
+
+    it('should explain each gap with its own direction', () => {
+      // Zwei Hinweise, weil die Verzerrung in entgegengesetzte Richtungen zeigt: gemessen zu
+      // guenstig, gerechnet zu unguenstig - der wahre Wert liegt dazwischen.
+      const mitLuecke = { ...mockMonat, bilanzBezugLueckenhaft: true, verteilungLueckenhaft: true };
+      const zeilen = component.getKennzahlen(mitLuecke);
+
+      expect(zeilen.find(z => z.labelKey === 'KENNZAHL_AUTARKIEGRAD')?.lueckeHintKey)
+        .toBe('KENNZAHL_LUECKE_VERTEILUNG_HINWEIS');
+      expect(zeilen.find(z => z.labelKey === 'KENNZAHL_AUTARKIEGRAD_GEMESSEN')?.lueckeHintKey)
+        .toBe('KENNZAHL_LUECKE_MESSUNG_HINWEIS');
+    });
+
+    it('should not mark anything when the grid supply is complete', () => {
       const zeilen = component.getKennzahlen(mockMonat);
       expect(zeilen.find(z => z.labelKey === 'KENNZAHL_AUTARKIEGRAD_GEMESSEN')?.luecke).toBe(false);
+      expect(zeilen.find(z => z.labelKey === 'KENNZAHL_AUTARKIEGRAD')?.luecke).toBe(false);
     });
 
     it('should include battery rows in order when available', () => {
