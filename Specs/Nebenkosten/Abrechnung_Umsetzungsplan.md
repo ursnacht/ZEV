@@ -623,3 +623,37 @@ Der gewünschte Ort ist also auch der beste: Er stellt die Zahl neben ihren Verg
   auch, dass sie einer Betragsänderung ohne Speichern folgt.
 * **Der E2E-Fall braucht einen Frontend-Rebuild**; gegen den alten Container fehlt
   `.nk-total--mieter` schlicht im DOM.
+
+## Nachtrag: Mieter ohne nebenkostenrelevante Wohnung weglassen (FR-9)
+
+Eine Zeile in `NkAbrechnungService.ladeMieter`: Wer keine gekennzeichnete `CONSUMER`-Einheit hat,
+kommt nicht in die Liste. Die Zählung dafür gab es bereits — sie speist auch `Tage(i)`.
+
+**Wirkt an beiden Stellen zugleich.** Der Rechnungslauf iteriert `detail.getBerechnung().getMieter()`
+(`NkRechnungService`), also dieselbe Liste. Ein Filter im Laden genügt; es braucht keine zweite
+Regel im Rechnungspfad, die man später auseinanderlaufen lassen könnte.
+
+**Was ich vor der Umsetzung geprüft habe:** Die Spec hielt ausdrücklich das Gegenteil fest — „er
+trägt keinen Umlageanteil, seine Verbrauchs- und Zusatzpositionen und sein Akonto rechnen aber normal
+weiter". Der Satz ist ersetzt, nicht ergänzt. Der Verlust ist real, aber theoretisch: Der betroffene
+Mieter ist in der Praxis der Eigentümer mit dem Allgemeinstrom-Messpunkt; Ladestrom läuft über
+Tarifpositionen und nicht über die Nebenkosten. Wer einen solchen Mieter doch braucht, setzt das
+Kennzeichen an einer seiner Einheiten — ein Hebel, der schon existiert.
+
+**Der Nenner bleibt unberührt:** Er kommt aus dem erfassten Feld, nicht aus den Mietern. Der Test
+prüft das mit (`3285` bleibt `3285`).
+
+* `ohneWohnung` bleibt im **reinen** `NkBerechnungService`: Der Service ist ohne Datenbank prüfbar,
+  der Fall ist dort mit Unit-Tests belegt, und die Verteidigung kostet nichts.
+* **Der Hinweis `NK_HINWEIS_OHNE_WOHNUNG` in der Maske wurde dadurch unerreichbar** und ist
+  entfernt — samt `hinweisOhneWohnungSichtbar`, `dismissHinweisOhneWohnung`, dem Set
+  `hinweisOhneWohnungAusgeblendet` und dem zugehörigen Unit-Test.
+* **Nicht** entfernt: das Feld `ohneWohnung` in `NkMieterAbrechnung` (Frontend) und
+  `NkMieterAbrechnungDTO` (Backend). Das Modell spiegelt das DTO, und das DTO trägt den Wert
+  weiterhin — es wird nur nicht mehr angezeigt. Ein Kommentar am Modellfeld sagt das.
+* Der Übersetzungs-Schlüssel `NK_HINWEIS_OHNE_WOHNUNG` bleibt in der Datenbank stehen: unbenutzt,
+  aber harmlos. Wer ihn los will, nimmt den Weg über `Specs/DeleteTranslations.md`.
+* Tests: drei Fälle in `NkAbrechnungServiceTest` (keine Einheit, nur abgewähltes Kennzeichen, nur
+  Einheit falschen Typs); der bestehende Fall zum Kennzeichen ist umbenannt und prüft jetzt die
+  Abwesenheit statt „0 Tage". Backend 1266 grün.
+* Keine Migration, kein Frontend-Code, kein CSS.

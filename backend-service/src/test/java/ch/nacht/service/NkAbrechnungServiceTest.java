@@ -261,11 +261,51 @@ public class NkAbrechnungServiceTest {
     }
 
     @Test
-    void getAbrechnungDetail_EinheitOhneKennzeichen_ZaehltNichtAlsWohnung() {
+    void getAbrechnungDetail_MieterGanzOhneEinheit_WirdNichtAufgefuehrt() {
+        // Auch der Fall ohne jede Zuordnung: Ohne Wohnung kein Block (FR-9).
+        featureFlagAn();
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(mieterRepository.findByZeitraumOverlapping(VON, BIS))
+                .thenReturn(List.of(mieter(1L, VON, null), mieter(2L, VON, null)));
+        when(mieterEinheitRepository.findByMieterIdIn(List.of(1L, 2L)))
+                .thenReturn(List.of(new MieterEinheit(ORG_ID, 1L, 100L)));
+        when(einheitRepository.findAllById(any()))
+                .thenReturn(List.of(einheit(100L, EinheitTyp.CONSUMER)));
+
+        NkAbrechnungDetailDTO detail = nkAbrechnungService.getAbrechnungDetail(1L).orElseThrow();
+
+        assertEquals(1, detail.getBerechnung().getMieter().size());
+        assertEquals(1L, detail.getBerechnung().getMieter().get(0).getMieterId());
+    }
+
+    @Test
+    void getAbrechnungDetail_NurEinheitFalschenTyps_WirdNichtAufgefuehrt() {
+        // Eine Ladestation oder ein Producer ist keine Wohnung - der Mieter gehoert nicht in die
+        // Nebenkostenabrechnung, auch wenn ihm eine Einheit zugeordnet ist.
+        featureFlagAn();
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(mieterRepository.findByZeitraumOverlapping(VON, BIS))
+                .thenReturn(List.of(mieter(1L, VON, null)));
+        when(mieterEinheitRepository.findByMieterIdIn(List.of(1L)))
+                .thenReturn(List.of(new MieterEinheit(ORG_ID, 1L, 200L)));
+        when(einheitRepository.findAllById(any()))
+                .thenReturn(List.of(einheit(200L, EinheitTyp.PRODUCER)));
+
+        NkAbrechnungDetailDTO detail = nkAbrechnungService.getAbrechnungDetail(1L).orElseThrow();
+
+        assertTrue(detail.getBerechnung().getMieter().isEmpty());
+    }
+
+    @Test
+    void getAbrechnungDetail_MieterOhneNebenkostenrelevanteWohnung_WirdNichtAufgefuehrt() {
         // Zaehler und Nenner MUESSEN dieselbe Regel verwenden: Der Nenner zaehlt nur Einheiten mit
         // gesetztem Kennzeichen. Zaehlte der Mieterblock auch abgewaehlte Einheiten mit, erhielte
         // der Eigentuemer fuer seinen Allgemeinstrom-Messpunkt einen Umlageanteil - und die Summe
         // der Miettage uebersteige den Nenner, worauf jedes Speichern abgewiesen wuerde.
+        //
+        // Seit FR-9 steht er gar nicht mehr in der Liste: Ein Block mit "0 Tage" und Betraegen von
+        // 0.00 ist kein Ergebnis, sondern Rauschen - und der Rechnungslauf erzeugte daraus eine
+        // Rechnung ueber 0.00.
         featureFlagAn();
         when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
         when(positionRepository.findByAbrechnungIdOrderByReihenfolge(1L))
@@ -283,14 +323,15 @@ public class NkAbrechnungServiceTest {
 
         NkAbrechnungDetailDTO detail = nkAbrechnungService.getAbrechnungDetail(1L).orElseThrow();
 
+        // Nur der Mieter mit Wohnung steht in der Liste.
+        assertEquals(1, detail.getBerechnung().getMieter().size());
+        assertEquals(1L, detail.getBerechnung().getMieter().get(0).getMieterId());
         assertEquals(365L, detail.getBerechnung().getMieter().get(0).getTage());
-        assertEquals(0L, detail.getBerechnung().getMieter().get(1).getTage());
-        assertTrue(detail.getBerechnung().getMieter().get(1).isOhneWohnung());
-        // Nur ein Mieter traegt: 900.00 x 365 / 3285 = 100.00, der Rest bleibt unverteilt.
+        // 900.00 x 365 / 3285 = 100.00, der Rest bleibt unverteilt.
         assertEquals(new BigDecimal("100.00"),
                 detail.getBerechnung().getMieter().get(0).getZeilen().get(0).getBetrag());
-        assertEquals(new BigDecimal("0.00"),
-                detail.getBerechnung().getMieter().get(1).getZeilen().get(0).getBetrag());
+        // Der Nenner bleibt unberuehrt: Er kommt aus dem erfassten Feld, nicht aus den Mietern.
+        assertEquals(3285L, detail.getBerechnung().getNenner());
     }
 
     // ==================== getVorlage ====================

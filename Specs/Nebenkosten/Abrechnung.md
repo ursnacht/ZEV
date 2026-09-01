@@ -141,9 +141,8 @@ den Nenner, und **jedes** Speichern wurde abgewiesen. Wäre die Prüfung `Σ Tag
 da gewesen, hätte der Eigentümer für seinen Allgemeinstrom-Messpunkt still einen Wohnungsanteil an
 jeder Umlage erhalten.
 
-Ein Mieter, dem nach dieser Regel keine Wohnung bleibt, erscheint mit **0 Tagen** und dem Hinweis
-„keine Wohnung zugeordnet" — er trägt keinen Umlageanteil, seine Verbrauchs- und Zusatzpositionen
-und sein Akonto rechnen aber normal weiter.
+**Ein Mieter, dem nach dieser Regel keine Wohnung bleibt, erscheint gar nicht** (revidiert, s.
+FR-9). Früher stand er mit **0 Tagen** und dem Hinweis „keine Wohnung zugeordnet" in der Liste.
 
 Gibt es **keine** so gekennzeichneten `CONSUMER`-Einheiten, bleibt das Feld **leer** (Entscheid) — nicht
 `0`. Eine vorgeschlagene `0` verstiesse gegen den eigenen CHECK-Constraint und liesse jede neue
@@ -802,6 +801,41 @@ erscheinen.
 | Mengeneinheit | Schlüssel für **`M3`** (die bestehenden `KWH`, `MONATE`, `STUECK` gibt es bereits) |
 
 Die Liste ist der Mindestumfang; beim Umsetzen ergänzte Schlüssel folgen derselben Migration.
+
+### FR-9: Nur Mieter mit einer nebenkostenrelevanten Wohnung
+
+Aufgeführt werden **ausschliesslich** Mieter mit mindestens einer zugeordneten Einheit vom Typ
+`CONSUMER` mit gesetztem Kennzeichen `nebenkosten_relevant`. Wer keine hat, erscheint **nicht** in
+der Maske und bekommt **keine Rechnung**.
+
+**Wer das in der Praxis ist:** der **Eigentümer**. Ihm sind die Messpunkte für Allgemeinstrom und
+PV-Eigenverbrauch zugeordnet, damit deren Stromverbrauch verrechnet wird — Wohnungen sind sie nicht.
+Er trug schon vorher keinen Umlageanteil, stand aber mit „0 Tage" in der Liste, und der
+Rechnungslauf erzeugte für ihn eine Rechnung über 0.00. Beides ist kein Ergebnis, sondern Rauschen.
+
+**Der Nenner bleibt unberührt.** Er kommt aus dem erfassten Feld „Anzahl Wohnungen" und nicht aus
+den Mietern; eine leer stehende Wohnung ohne Mieter ist weiterhin im Nenner und hinterlässt ihren
+Leerstandsanteil. Auch die Prüfung `Σ Tage(i) ≤ Nenner` ändert sich nicht: Die weggelassenen Mieter
+trugen ohnehin 0 Tage bei.
+
+**Was damit entfällt (Entscheid, revidiert):** Ein solcher Mieter kann in dieser Abrechnung auch
+keine Verbrauchsmenge, keine Zusatzposition und kein Akonto mehr tragen. Zuvor war das ausdrücklich
+möglich. Wird der Zeitraum gespeichert, verschwinden bereits erfasste Angaben eines solchen Mieters —
+das ist dieselbe Regel wie bei Mietern ausserhalb des Zeitraums (FR-8): Eine Abrechnung enthält nur
+Angaben zu den Mietern, die sie auch aufführt.
+
+**Der Hebel, wenn ein Mieter doch dazugehören soll,** ist das Kennzeichen an seiner Einheit: In der
+Einheiten-Maske `nebenkosten_relevant` setzen, dann erscheint er wieder. Das ist derselbe Schalter,
+der auch über den Nenner entscheidet — es gibt nur einen, und das ist Absicht.
+
+**Akzeptanzkriterien:**
+* [ ] Ein Mieter ohne zugeordnete Einheit erscheint nicht in der Abrechnung.
+* [ ] Ein Mieter, dessen Einheiten alle das Kennzeichen `nebenkosten_relevant` **nicht** tragen, erscheint nicht.
+* [ ] Ein Mieter, dem nur Einheiten anderen Typs zugeordnet sind (Ladestation, Producer), erscheint nicht.
+* [ ] Ein Mieter mit mindestens einer gekennzeichneten `CONSUMER`-Einheit erscheint unverändert.
+* [ ] Der Nenner (`Anzahl Wohnungen × Tage`) und die verteilten Beträge der übrigen Mieter ändern sich dadurch nicht.
+* [ ] Der Rechnungslauf erzeugt für einen nicht aufgeführten Mieter keine Rechnung.
+* [ ] Wird das Kennzeichen an einer seiner Einheiten gesetzt, erscheint er beim nächsten Öffnen der Abrechnung wieder.
 
 ### FR-8: Abrechnung kopieren
 

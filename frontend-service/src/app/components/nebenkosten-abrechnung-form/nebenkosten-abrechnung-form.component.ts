@@ -118,7 +118,6 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
 
   hinweisErstSpeichernSichtbar = true;
   hinweisAbgerechnetSichtbar = true;
-  private hinweisOhneWohnungAusgeblendet = new Set<number>();
 
   /**
    * Aufgeklappte Mieterblöcke. Anfangs leer — **alle geschlossen**: Bei dreissig Mietern wäre die
@@ -166,15 +165,6 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
     } else {
       this.offeneMieter.add(mieterId);
     }
-  }
-
-  hinweisOhneWohnungSichtbar(mieterId: number): boolean {
-    return !this.hinweisOhneWohnungAusgeblendet.has(mieterId);
-  }
-
-  /** Je Mieter einzeln: Wer einen Hinweis wegklickt, meint diesen einen Block. */
-  dismissHinweisOhneWohnung(mieterId: number): void {
-    this.hinweisOhneWohnungAusgeblendet.add(mieterId);
   }
 
   private leseHinweisAusgeblendet(): boolean {

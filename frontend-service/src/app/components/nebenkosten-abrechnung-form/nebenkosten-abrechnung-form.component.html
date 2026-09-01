@@ -330,14 +330,6 @@
             </div>
           }
 
-          @if (block.ohneWohnung && hinweisOhneWohnungSichtbar(block.mieterId)) {
-            <div class="zev-message zev-message--info zev-message--statisch zev-message--dismissible"
-              (click)="dismissHinweisOhneWohnung(block.mieterId)">
-              <span>{{ 'NK_HINWEIS_OHNE_WOHNUNG' | translate }}</span>
-              <span class="zev-message__dismiss">&times;</span>
-            </div>
-          }
-
           <table class="zev-table nk-mieterzeilen">
             <thead>
               <tr>

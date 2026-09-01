@@ -535,10 +535,24 @@ public class NkAbrechnungService {
             }
         }
 
+        // Nur Mieter mit mindestens einer nebenkostenrelevanten Wohnung (FR-9). Wer keine hat, ist
+        // in der Praxis der Eigentuemer mit dem Allgemeinstrom- oder PV-Messpunkt: Er trug schon
+        // vorher keinen Umlageanteil, stand aber mit "0 Tage" in der Liste und bekam beim
+        // Rechnungslauf eine Rechnung ueber 0.00. Beides ist kein Ergebnis, sondern Rauschen.
         List<NkMieterBasisDTO> basis = new ArrayList<>();
+        int uebersprungen = 0;
         for (Mieter m : mieter) {
+            int wohnungenDesMieters = anzahlJeMieter.getOrDefault(m.getId(), 0);
+            if (wohnungenDesMieters <= 0) {
+                uebersprungen++;
+                continue;
+            }
             basis.add(new NkMieterBasisDTO(m.getId(), m.getName(), m.getMietbeginn(), m.getMietende(),
-                    anzahlJeMieter.getOrDefault(m.getId(), 0), m.getAkontoProMonat()));
+                    wohnungenDesMieters, m.getAkontoProMonat()));
+        }
+        if (uebersprungen > 0) {
+            log.info("Nebenkostenabrechnung: {} Mieter ohne nebenkostenrelevante Wohnung "
+                    + "nicht aufgefuehrt", uebersprungen);
         }
         return basis;
     }

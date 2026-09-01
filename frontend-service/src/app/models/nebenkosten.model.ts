@@ -133,7 +133,14 @@ export interface NkMieterAbrechnung {
   anzahlPersonen: number;
   /** Zähler der Umlage pro Person: `tage x anzahlPersonen`. */
   personenTage: number;
-  /** Kein zugeordnetes Wohnobjekt — die Maske weist darauf hin, statt den Mieter zu verschweigen. */
+  /**
+   * Kein zugeordnetes Wohnobjekt.
+   *
+   * Spiegelt das Feld des DTO. **Wird nicht mehr angezeigt:** Seit FR-9 führt die Abrechnung nur
+   * Mieter mit einer nebenkostenrelevanten Wohnung auf, das Flag ist hier also immer `false`. Der
+   * reine Rechenservice im Backend setzt es weiterhin — er ist ohne Datenbank prüfbar und deckt den
+   * Fall mit Unit-Tests ab.
+   */
   ohneWohnung: boolean;
   zeilen: NkZeile[];
   kostentotal: number;

@@ -854,15 +854,9 @@ describe('NebenkostenAbrechnungFormComponent', () => {
       expect(component.hinweisAbgerechnetSichtbar).toBe(false);
     });
 
-    /** Je Mieter einzeln: Wer einen Hinweis wegklickt, meint diesen einen Block. */
-    it('should dismiss the no-flat hint per tenant', () => {
-      expect(component.hinweisOhneWohnungSichtbar(100)).toBe(true);
-
-      component.dismissHinweisOhneWohnung(100);
-
-      expect(component.hinweisOhneWohnungSichtbar(100)).toBe(false);
-      expect(component.hinweisOhneWohnungSichtbar(200)).toBe(true);
-    });
+    // Der Hinweis „keine Wohnung zugeordnet" und sein Wegklicken je Mieter sind mit FR-9 entfallen:
+    // Die Abrechnung fuehrt nur noch Mieter mit einer nebenkostenrelevanten Wohnung auf, der
+    // Hinweis konnte danach nicht mehr erscheinen.
   });
 
   // ==================== Positionen ====================
