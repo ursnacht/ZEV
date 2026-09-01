@@ -523,6 +523,222 @@ public class NkAbrechnungServiceTest {
         assertEquals(730, result.get().getBerechnung().getSummeTage());
     }
 
+    // ---------- Kopieren (FR-8) ----------
+
+    @Test
+    void kopiereAbrechnung_NichtVorhanden_ReturnsEmpty() {
+        featureFlagAn();
+        when(abrechnungRepository.findFirstById(99L)).thenReturn(Optional.empty());
+
+        assertTrue(nkAbrechnungService.kopiereAbrechnung(99L, "egal").isEmpty());
+        verify(abrechnungRepository, never()).save(any());
+    }
+
+    @Test
+    void kopiereAbrechnung_FeatureFlagAus_ThrowsFeatureDisabled() {
+        featureFlagAus();
+
+        assertThrows(FeatureDisabledException.class,
+                () -> nkAbrechnungService.kopiereAbrechnung(1L, "Kopie"));
+        verify(abrechnungRepository, never()).save(any());
+    }
+
+    @Test
+    void kopiereAbrechnung_UebernimmtKopfUndOeffnetDieKopie() {
+        featureFlagAn();
+        testAbrechnung1.setAbgerechnet(true);
+        testAbrechnung1.setAnzahlPersonen(7);
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        stubAbrechnungSave();
+
+        nkAbrechnungService.kopiereAbrechnung(1L, "Nebenkostenabrechnung 2026 (Kopie)");
+
+        ArgumentCaptor<NkAbrechnung> captor = ArgumentCaptor.forClass(NkAbrechnung.class);
+        verify(abrechnungRepository).save(captor.capture());
+        NkAbrechnung kopie = captor.getValue();
+        assertEquals("Nebenkostenabrechnung 2026 (Kopie)", kopie.getBezeichnung());
+        assertEquals(VON, kopie.getDatumVon());
+        assertEquals(BIS, kopie.getDatumBis());
+        assertEquals(9, kopie.getAnzahlWohnungen());
+        assertEquals(7, kopie.getAnzahlPersonen());
+        assertEquals(ORG_ID, kopie.getOrgId());
+        // Eine abgeschlossene Abrechnung ist der typische Ausgangspunkt - die Kopie muss offen sein,
+        // sonst waere sie erst wieder aufzuschliessen.
+        assertFalse(kopie.isAbgerechnet());
+    }
+
+    @Test
+    void kopiereAbrechnung_OhneBezeichnung_BehaeltDieDesOriginals() {
+        featureFlagAn();
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        stubAbrechnungSave();
+
+        nkAbrechnungService.kopiereAbrechnung(1L, null);
+
+        ArgumentCaptor<NkAbrechnung> captor = ArgumentCaptor.forClass(NkAbrechnung.class);
+        verify(abrechnungRepository).save(captor.capture());
+        assertEquals("Nebenkostenabrechnung 2025", captor.getValue().getBezeichnung());
+    }
+
+    @Test
+    void kopiereAbrechnung_ZuLangeBezeichnung_WirdGekuerzt() {
+        // nk_abrechnung.bezeichnung ist VARCHAR(150) - ungekuerzt scheiterte das Speichern erst in
+        // der Datenbank, mit einer Meldung, die niemandem hilft.
+        featureFlagAn();
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        stubAbrechnungSave();
+
+        nkAbrechnungService.kopiereAbrechnung(1L, "x".repeat(200));
+
+        ArgumentCaptor<NkAbrechnung> captor = ArgumentCaptor.forClass(NkAbrechnung.class);
+        verify(abrechnungRepository).save(captor.capture());
+        assertEquals(150, captor.getValue().getBezeichnung().length());
+    }
+
+    @Test
+    void kopiereAbrechnung_KopiertPositionenMitMengenAufDieNeueId() {
+        featureFlagAn();
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        stubAbrechnungSave();
+        stubPositionKopieSave();
+
+        NkPosition quelle = new NkPosition();
+        quelle.setId(500L);
+        quelle.setOrgId(ORG_ID);
+        quelle.setAbrechnungId(1L);
+        quelle.setArt(NkPositionsart.VERBRAUCH);
+        quelle.setBezeichnung("Warmwasser");
+        quelle.setReihenfolge(3);
+        quelle.setEinheit(Mengeneinheit.M3);
+        quelle.setBetragProEinheit(new BigDecimal("3.5000"));
+        when(positionRepository.findByAbrechnungIdOrderByReihenfolge(1L)).thenReturn(List.of(quelle));
+        when(verbrauchRepository.findByPositionId(500L)).thenReturn(
+                List.of(new NkVerbrauch(500L, 1L, new BigDecimal("12.000"))));
+
+        nkAbrechnungService.kopiereAbrechnung(1L, "Kopie");
+
+        ArgumentCaptor<NkPosition> pos = ArgumentCaptor.forClass(NkPosition.class);
+        verify(positionRepository).save(pos.capture());
+        assertEquals(KOPIE_ID, pos.getValue().getAbrechnungId());
+        assertEquals(NkPositionsart.VERBRAUCH, pos.getValue().getArt());
+        // Die Reihenfolge kommt hier aus der Vorlage - eine Kopie soll gleich rechnen wie das
+        // Original, und die Reihenfolge entscheidet ueber die Zuschlagskaskade.
+        assertEquals(3, pos.getValue().getReihenfolge());
+
+        ArgumentCaptor<NkVerbrauch> menge = ArgumentCaptor.forClass(NkVerbrauch.class);
+        verify(verbrauchRepository).save(menge.capture());
+        // Auf die NEUE Positions-ID: Sonst haenge die Menge weiter am Original.
+        assertEquals(POSITION_KOPIE_ID, menge.getValue().getPositionId());
+        assertEquals(1L, menge.getValue().getMieterId());
+    }
+
+    @Test
+    void kopiereAbrechnung_KopiertZusatzAkontoUndPersonen() {
+        featureFlagAn();
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        stubAbrechnungSave();
+
+        NkZusatz zusatz = new NkZusatz();
+        zusatz.setId(600L);
+        zusatz.setAbrechnungId(1L);
+        zusatz.setMieterId(1L);
+        zusatz.setReihenfolge(9);
+        zusatz.setBezeichnung("Schluessel");
+        zusatz.setEinheit(Mengeneinheit.STUECK);
+        zusatz.setMenge(new BigDecimal("2.000"));
+        zusatz.setBetragProEinheit(new BigDecimal("25.0000"));
+        when(zusatzRepository.findByAbrechnungIdOrderByMieterIdAscReihenfolgeAsc(1L))
+                .thenReturn(List.of(zusatz));
+
+        NkAkonto akonto = new NkAkonto();
+        akonto.setId(700L);
+        akonto.setAbrechnungId(1L);
+        akonto.setMieterId(2L);
+        akonto.setAnzahlMonate(new BigDecimal("12.00"));
+        akonto.setBetragProMonat(new BigDecimal("150.00"));
+        akonto.setKorrektur(new BigDecimal("-20.00"));
+        when(akontoRepository.findByAbrechnungId(1L)).thenReturn(List.of(akonto));
+
+        when(personRepository.findByAbrechnungId(1L))
+                .thenReturn(List.of(new NkPerson(ORG_ID, 1L, 1L, 4)));
+
+        nkAbrechnungService.kopiereAbrechnung(1L, "Kopie");
+
+        ArgumentCaptor<NkZusatz> z = ArgumentCaptor.forClass(NkZusatz.class);
+        verify(zusatzRepository).save(z.capture());
+        assertEquals(KOPIE_ID, z.getValue().getAbrechnungId());
+        assertEquals(9, z.getValue().getReihenfolge());
+
+        ArgumentCaptor<NkAkonto> a = ArgumentCaptor.forClass(NkAkonto.class);
+        verify(akontoRepository).save(a.capture());
+        assertEquals(KOPIE_ID, a.getValue().getAbrechnungId());
+        assertEquals(new BigDecimal("-20.00"), a.getValue().getKorrektur());
+
+        ArgumentCaptor<NkPerson> pe = ArgumentCaptor.forClass(NkPerson.class);
+        verify(personRepository).save(pe.capture());
+        assertEquals(KOPIE_ID, pe.getValue().getAbrechnungId());
+        assertEquals(4, pe.getValue().getAnzahlPersonen());
+    }
+
+    // ---------- Mieter ausserhalb des Zeitraums (FR-8) ----------
+
+    @Test
+    void saveAbrechnung_MieterAusserhalbDesZeitraums_AngabenVerschwinden() {
+        // Der Zeitraum entscheidet, wer zur Abrechnung gehoert. Mieter 3 liegt nicht darin - seine
+        // Angaben duerfen nicht mitgespeichert werden, sonst tauchten sie beim naechsten
+        // Ausweiten des Zeitraums wieder auf.
+        featureFlagAn();
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        zweiGanzjaehrigeMieter();
+
+        NkAbrechnungDetailDTO detail = detail();
+        NkAkontoDTO drin = new NkAkontoDTO();
+        drin.setMieterId(1L);
+        drin.setAnzahlMonate(new BigDecimal("12.00"));
+        drin.setBetragProMonat(new BigDecimal("100.00"));
+        NkAkontoDTO draussen = new NkAkontoDTO();
+        draussen.setMieterId(3L);
+        draussen.setAnzahlMonate(new BigDecimal("12.00"));
+        draussen.setBetragProMonat(new BigDecimal("100.00"));
+        detail.setAkonto(List.of(drin, draussen));
+        detail.setPersonen(List.of(new NkPersonDTO(3L, 5)));
+
+        NkZusatzDTO zusatz = new NkZusatzDTO();
+        zusatz.setMieterId(3L);
+        zusatz.setBezeichnung("Schluessel");
+        zusatz.setEinheit(Mengeneinheit.STUECK);
+        zusatz.setMenge(new BigDecimal("1.000"));
+        zusatz.setBetragProEinheit(new BigDecimal("25.0000"));
+        detail.setZusaetze(List.of(zusatz));
+
+        nkAbrechnungService.saveAbrechnung(1L, detail);
+
+        ArgumentCaptor<NkAkonto> a = ArgumentCaptor.forClass(NkAkonto.class);
+        verify(akontoRepository).save(a.capture());
+        assertEquals(1L, a.getValue().getMieterId());
+        verify(zusatzRepository, never()).save(any());
+        verify(personRepository, never()).save(any());
+    }
+
+    @Test
+    void saveAbrechnung_VerbrauchEinesFremdenMieters_WirdNichtGespeichert() {
+        featureFlagAn();
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        zweiGanzjaehrigeMieter();
+        stubPositionSave();
+
+        NkPositionDTO warmwasser = verbrauchDTO("Warmwasser", "3.5000", 1);
+        warmwasser.setVerbraeuche(List.of(
+                new NkVerbrauchDTO(1L, new BigDecimal("10.000")),
+                new NkVerbrauchDTO(3L, new BigDecimal("20.000"))));
+
+        nkAbrechnungService.saveAbrechnung(1L, detail(warmwasser));
+
+        ArgumentCaptor<NkVerbrauch> v = ArgumentCaptor.forClass(NkVerbrauch.class);
+        verify(verbrauchRepository).save(v.capture());
+        assertEquals(1L, v.getValue().getMieterId());
+    }
+
     // ---------- Umlage pro Person (FR-2) ----------
 
     @Test
@@ -870,16 +1086,18 @@ public class NkAbrechnungServiceTest {
     void saveAbrechnung_VerbrauchsmengeJeMieter_WirdMitDerPositionGespeichert() {
         featureFlagAn();
         when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        // Der Zeitraum entscheidet, wessen Angaben gespeichert werden (FR-8).
+        zweiGanzjaehrigeMieter();
         stubPositionSave();
 
         NkPositionDTO warmwasser = verbrauchDTO("Warmwasser", "3.5000", 1);
-        warmwasser.setVerbraeuche(List.of(new NkVerbrauchDTO(7L, new BigDecimal("12.500"))));
+        warmwasser.setVerbraeuche(List.of(new NkVerbrauchDTO(1L, new BigDecimal("12.500"))));
 
         nkAbrechnungService.saveAbrechnung(1L, detail(warmwasser));
 
         ArgumentCaptor<NkVerbrauch> captor = ArgumentCaptor.forClass(NkVerbrauch.class);
         verify(verbrauchRepository).save(captor.capture());
-        assertEquals(Long.valueOf(7L), captor.getValue().getMieterId());
+        assertEquals(Long.valueOf(1L), captor.getValue().getMieterId());
         assertEquals(new BigDecimal("12.500"), captor.getValue().getMenge());
         assertEquals(ORG_ID, captor.getValue().getOrgId());
     }
@@ -889,13 +1107,15 @@ public class NkAbrechnungServiceTest {
         // Eine nicht erfasste Menge ist kein Fehler - sonst liesse sich nicht zwischenspeichern.
         featureFlagAn();
         when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        // Der Zeitraum entscheidet, wessen Angaben gespeichert werden (FR-8).
+        zweiGanzjaehrigeMieter();
         stubPositionSave();
 
         NkPositionDTO warmwasser = verbrauchDTO("Warmwasser", "3.5000", 1);
         warmwasser.setVerbraeuche(List.of(
                 new NkVerbrauchDTO(7L, null),
                 new NkVerbrauchDTO(null, new BigDecimal("5.000")),
-                new NkVerbrauchDTO(8L, new BigDecimal("5.000"))));
+                new NkVerbrauchDTO(1L, new BigDecimal("5.000"))));
 
         nkAbrechnungService.saveAbrechnung(1L, detail(warmwasser));
 
@@ -920,9 +1140,11 @@ public class NkAbrechnungServiceTest {
     void saveAbrechnung_Zusatzposition_WirdMitOrgIdUndAbrechnungGespeichert() {
         featureFlagAn();
         when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        // Der Zeitraum entscheidet, wessen Angaben gespeichert werden (FR-8).
+        zweiGanzjaehrigeMieter();
 
         NkAbrechnungDetailDTO detail = detail();
-        detail.setZusaetze(List.of(zusatzDTO(7L, 1, "Saunagaenge")));
+        detail.setZusaetze(List.of(zusatzDTO(1L, 1, "Saunagaenge")));
 
         nkAbrechnungService.saveAbrechnung(1L, detail);
 
@@ -937,10 +1159,12 @@ public class NkAbrechnungServiceTest {
     void saveAbrechnung_ZusatzpositionOhneReihenfolge_NummeriertJeMieterDurch() {
         featureFlagAn();
         when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        // Der Zeitraum entscheidet, wessen Angaben gespeichert werden (FR-8).
+        zweiGanzjaehrigeMieter();
 
-        NkZusatzDTO erste = zusatzDTO(7L, null, "Sauna");
-        NkZusatzDTO zweite = zusatzDTO(7L, null, "Schluessel");
-        NkZusatzDTO andererMieter = zusatzDTO(8L, null, "Sauna");
+        NkZusatzDTO erste = zusatzDTO(1L, null, "Sauna");
+        NkZusatzDTO zweite = zusatzDTO(1L, null, "Schluessel");
+        NkZusatzDTO andererMieter = zusatzDTO(2L, null, "Sauna");
         NkAbrechnungDetailDTO detail = detail();
         detail.setZusaetze(List.of(erste, zweite, andererMieter));
 
@@ -972,9 +1196,11 @@ public class NkAbrechnungServiceTest {
     void saveAbrechnung_Akonto_WirdMitOrgIdGespeichert() {
         featureFlagAn();
         when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        // Der Zeitraum entscheidet, wessen Angaben gespeichert werden (FR-8).
+        zweiGanzjaehrigeMieter();
 
         NkAkontoDTO dto = new NkAkontoDTO();
-        dto.setMieterId(7L);
+        dto.setMieterId(1L);
         dto.setAnzahlMonate(new BigDecimal("4.50"));
         dto.setBetragProMonat(new BigDecimal("150.00"));
         dto.setKorrektur(new BigDecimal("-50.00"));
@@ -996,9 +1222,11 @@ public class NkAbrechnungServiceTest {
         // Fehlt das Stammdatum, bleibt das Feld leer und die Abrechnung ist trotzdem speicherbar.
         featureFlagAn();
         when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        // Der Zeitraum entscheidet, wessen Angaben gespeichert werden (FR-8).
+        zweiGanzjaehrigeMieter();
 
         NkAkontoDTO leer = new NkAkontoDTO();
-        leer.setMieterId(7L);
+        leer.setMieterId(1L);
         NkAbrechnungDetailDTO detail = detail();
         detail.setAkonto(List.of(leer));
 
@@ -1129,6 +1357,27 @@ public class NkAbrechnungServiceTest {
         abrechnung.setDatumBis(BIS);
         abrechnung.setAnzahlWohnungen(9);
         return abrechnung;
+    }
+
+    /** Die Kopie bekommt beim Speichern eine neue ID - sonst zeigten die Kinder auf die Vorlage. */
+    private static final Long KOPIE_ID = 4711L;
+    private static final Long POSITION_KOPIE_ID = 4712L;
+
+    private void stubAbrechnungSave() {
+        when(abrechnungRepository.save(any())).thenAnswer(aufruf -> {
+            NkAbrechnung a = aufruf.getArgument(0);
+            a.setId(KOPIE_ID);
+            return a;
+        });
+    }
+
+    /** Nur wo die Kopie Positionen hat - sonst meldet Mockito eine unnoetige Stubbung. */
+    private void stubPositionKopieSave() {
+        when(positionRepository.save(any())).thenAnswer(aufruf -> {
+            NkPosition pos = aufruf.getArgument(0);
+            pos.setId(POSITION_KOPIE_ID);
+            return pos;
+        });
     }
 
     private NkAbrechnungDetailDTO detail(NkPositionDTO... positionen) {

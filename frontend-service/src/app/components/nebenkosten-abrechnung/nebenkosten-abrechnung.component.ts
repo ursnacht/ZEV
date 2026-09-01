@@ -19,6 +19,9 @@ import { speichereBlob } from '../../utils/file-utils';
  * Es öffnet eine abgeschlossene Abrechnung wieder zur Bearbeitung; das Abschliessen selbst ist
  * jederzeit umkehrbar und braucht keine Rückfrage.
  */
+/** Spaltenbreite von `nk_abrechnung.bezeichnung`. */
+const BEZEICHNUNG_MAX_LAENGE = 150;
+
 @Component({
   selector: 'app-nebenkosten-abrechnung',
   standalone: true,
@@ -54,11 +57,15 @@ export class NebenkostenAbrechnungComponent implements OnInit {
    */
   private readonly menuOffen: KebabMenuItem[] = [
     { label: 'BEARBEITEN', action: 'edit', icon: 'edit-2' },
+    { label: 'NK_KOPIEREN', action: 'kopieren', icon: 'copy' },
     { label: 'LOESCHEN', action: 'delete', danger: true, icon: 'trash-2' }
   ];
 
+  // „Kopieren" steht auch hier: Eine abgeschlossene Abrechnung ist der typische Ausgangspunkt für
+  // die nächste - genau deshalb gibt es die Funktion.
   private readonly menuAbgerechnet: KebabMenuItem[] = [
     { label: 'BEARBEITEN', action: 'edit', icon: 'edit-2' },
+    { label: 'NK_KOPIEREN', action: 'kopieren', icon: 'copy' },
     { label: 'NK_RECHNUNGEN_ERSTELLEN', action: 'rechnungen', icon: 'file-text' },
     { label: 'LOESCHEN', action: 'delete', danger: true, icon: 'trash-2' }
   ];
@@ -102,6 +109,41 @@ export class NebenkostenAbrechnungComponent implements OnInit {
     this.showForm = true;
   }
 
+  /**
+   * Kopiert eine Abrechnung und öffnet die Kopie.
+   *
+   * <p>Die Maske geht direkt auf: An einer Kopie ist immer etwas zu ändern — mindestens der
+   * Zeitraum und die Bezeichnung. Ohne das Öffnen müsste der Benutzer die Kopie in der Liste
+   * suchen und ein zweites Mal klicken.
+   */
+  onKopieren(abrechnung: NkAbrechnung): void {
+    if (!abrechnung.id) return;
+
+    const bezeichnung = this.bezeichnungDerKopie(abrechnung.bezeichnung);
+    this.nebenkostenService.kopiereAbrechnung(abrechnung.id, bezeichnung).subscribe({
+      next: (kopie) => {
+        this.selectedId = kopie.abrechnung.id ?? null;
+        this.lauf = null;
+        this.showForm = true;
+        this.showMessage('NK_ABRECHNUNG_KOPIERT', 'success');
+      },
+      error: (error) => this.showMessage(error.error || 'NK_FEHLER_KOPIEREN', 'error')
+    });
+  }
+
+  /**
+   * Bezeichnung der Kopie: Original plus Zusatz, gekürzt auf die Spaltenbreite.
+   *
+   * <p>Gekürzt wird der **Name**, nicht der Zusatz — sonst stünde bei einer langen Bezeichnung ein
+   * abgeschnittenes „(Kop" am Ende und die Kopie wäre nicht mehr als solche erkennbar.
+   */
+  private bezeichnungDerKopie(original: string): string {
+    const zusatz = this.translationService.translate('NK_KOPIE_SUFFIX');
+    const platz = BEZEICHNUNG_MAX_LAENGE - zusatz.length - 1;
+    const name = original.length > platz ? original.substring(0, platz).trimEnd() : original;
+    return `${name} ${zusatz}`;
+  }
+
   onDelete(id: number | undefined): void {
     if (!id) return;
 
@@ -133,6 +175,9 @@ export class NebenkostenAbrechnungComponent implements OnInit {
     switch (action) {
       case 'edit':
         this.onEdit(abrechnung);
+        break;
+      case 'kopieren':
+        this.onKopieren(abrechnung);
         break;
       case 'rechnungen':
         this.onRechnungenErstellen(abrechnung);

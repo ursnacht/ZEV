@@ -46,6 +46,17 @@ export class NebenkostenService {
     return this.http.patch<NkAbrechnung>(`${this.apiUrl}/${id}/abgerechnet`, { abgerechnet });
   }
 
+  /**
+    * Kopiert eine Abrechnung samt Positionen, Mengen, Zusatzpositionen, Akonto und Personenzahlen.
+    *
+    * Die Bezeichnung geht als Parameter mit: Der Zusatz „(Kopie)" ist ein Anzeigetext und gehört
+    * damit hierhin, nicht ins Backend. Die Antwort ist die neue Abrechnung samt Berechnung.
+    */
+  kopiereAbrechnung(id: number, bezeichnung: string): Observable<NkAbrechnungDetail> {
+    return this.http.post<NkAbrechnungDetail>(`${this.apiUrl}/${id}/kopie`, null,
+      { params: { bezeichnung } });
+  }
+
   deleteAbrechnung(id: number): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
   }

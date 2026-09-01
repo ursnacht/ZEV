@@ -413,4 +413,22 @@ describe('NebenkostenService', () => {
       expect(status).toBe(404);
     });
   });
+
+  describe('kopiereAbrechnung', () => {
+    it('should post to the copy endpoint with the description as a parameter', () => {
+      let ergebnis: NkAbrechnungDetail | undefined;
+      service.kopiereAbrechnung(7, 'Nebenkosten 2026 (Kopie)')
+        .subscribe({ next: d => (ergebnis = d) });
+
+      const req = httpMock.expectOne(r => r.url === `${apiUrl}/7/kopie`);
+      expect(req.request.method).toBe('POST');
+      // Die Bezeichnung geht als Parameter mit - der Zusatz "(Kopie)" ist ein Anzeigetext und
+      // gehoert damit ins Frontend, nicht ins Backend.
+      expect(req.request.params.get('bezeichnung')).toBe('Nebenkosten 2026 (Kopie)');
+      expect(req.request.body).toBeNull();
+
+      req.flush(mockDetail);
+      expect(ergebnis).toEqual(mockDetail);
+    });
+  });
 });

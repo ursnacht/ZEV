@@ -775,6 +775,54 @@ erscheinen.
 
 Die Liste ist der Mindestumfang; beim Umsetzen ergänzte Schlüssel folgen derselben Migration.
 
+### FR-8: Abrechnung kopieren
+
+Das Kebab-Menü einer Abrechnung trägt den Eintrag **„Kopieren"**. Er erzeugt eine vollständige
+Kopie: Kopf, allgemeine Positionen, erfasste Mengen und Prozentsätze, Zusatzpositionen, Akonto und
+Personenzahlen — jeweils mit neuen IDs, damit Kopie und Original voneinander unabhängig sind.
+
+**Warum:** Am Jahreswechsel ist die Abrechnung des Vorjahres die Vorlage für die neue. Alles von
+Hand nachzubauen — bei dreissig Mietern mit Akonto, Mengen und Zusatzpositionen — ist die eigentliche
+Arbeit, und jede Zeile, die man dabei übersieht, fehlt still.
+
+**Auch eine abgeschlossene Abrechnung ist kopierbar (Entscheid).** Genau die ist der typische
+Ausgangspunkt; der Eintrag steht deshalb in **beiden** Kebab-Menüs. Die **Kopie selbst ist immer
+offen** — sonst wäre sie erst wieder aufzuschliessen, um sie bearbeiten zu können.
+
+**Die Kopie öffnet sich direkt (Entscheid).** An ihr ist immer etwas zu ändern — mindestens der
+Zeitraum und die Bezeichnung. Ohne das Öffnen müsste der Benutzer die Kopie in der Liste suchen und
+ein zweites Mal klicken.
+
+**Bezeichnung:** Die Kopie heisst wie das Original plus **„(Kopie)"**. Gekürzt wird bei Bedarf der
+**Name**, nicht der Zusatz (Spalte ist `VARCHAR(150)`) — sonst stünde am Ende ein abgeschnittenes
+„(Kop" und die Kopie wäre nicht mehr als solche erkennbar. Der Zusatz ist ein Anzeigetext und kommt
+deshalb aus dem Frontend; der Endpunkt nimmt ihn als Parameter und behält ohne Angabe den Namen des
+Originals.
+
+**Der Zeitraum entscheidet, wer zur Abrechnung gehört.** Wird er geändert — und das ist der Zweck
+einer Kopie — fallen Mieter heraus oder kommen hinzu. Für die Herausgefallenen werden Akonto,
+Personenzahl, erfasste Mengen und Zusatzpositionen **beim nächsten Speichern gelöscht**.
+
+Das ist keine Sonderregel des Kopierens, sondern gilt für **jedes** Speichern: Eine Abrechnung
+enthält nur Angaben zu Mietern in ihrem Zeitraum. Ohne diese Regel blieben verwaiste Zeilen liegen
+und tauchten wieder auf, sobald der Zeitraum erneut ausgeweitet wird — mit Zahlen, die niemand mehr
+erwartet. Umgesetzt ist es im Backend und nicht in der Maske: Der Server ist massgebend, und die
+Regel gilt damit unabhängig davon, was der Aufrufer schickt.
+
+Die Maske weist bei den Angaben zum Zeitraum darauf hin, **bevor** gespeichert wird.
+
+**Akzeptanzkriterien:**
+* [ ] Das Kebab-Menü einer offenen **und** einer abgeschlossenen Abrechnung enthält „Kopieren".
+* [ ] „Kopieren" erzeugt eine Abrechnung mit demselben Zeitraum, derselben Anzahl Wohnungen und Personen; sie ist **nicht** abgerechnet.
+* [ ] Alle Positionen, erfassten Mengen, Zusatzpositionen, Akonto-Angaben und Personenzahlen der Vorlage sind in der Kopie enthalten; die Beträge stimmen mit der Vorlage überein.
+* [ ] Die erfassten Mengen der Kopie hängen an deren **eigenen** Positionen — eine Änderung an der Kopie lässt das Original unberührt und umgekehrt.
+* [ ] Die Bezeichnung der Kopie trägt den Zusatz „(Kopie)" und ist höchstens 150 Zeichen lang.
+* [ ] Nach dem Kopieren ist die Kopie geöffnet.
+* [ ] Scheitert das Kopieren, bleibt die Liste stehen und es erscheint eine Fehlermeldung.
+* [ ] Wird der Zeitraum so geändert, dass ein Mieter herausfällt, sind dessen Akonto, Personenzahl, Mengen und Zusatzpositionen nach dem Speichern gelöscht — auch dann, wenn der Zeitraum später wieder ausgeweitet wird.
+* [ ] Die Maske nennt diese Folge beim Zeitraum, bevor gespeichert wird.
+* [ ] Berechtigung wie die übrigen Schreibzugriffe: `nebenkosten:manage`.
+
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
 **Liste**

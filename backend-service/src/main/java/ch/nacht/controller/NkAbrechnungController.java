@@ -75,6 +75,30 @@ public class NkAbrechnungController {
         }
     }
 
+    /**
+     * Kopiert eine Abrechnung samt allem, was zu ihr gehört (FR-8).
+     *
+     * <p>Die Bezeichnung kommt als Parameter und nicht aus dem Backend: Der Zusatz „(Kopie)" ist
+     * ein Anzeigetext und liegt damit bei den Übersetzungen im Frontend. Fehlt er, behält die Kopie
+     * den Namen des Originals.
+     */
+    @PostMapping("/{id}/kopie")
+    public ResponseEntity<?> kopiereAbrechnung(@PathVariable Long id,
+                                               @RequestParam(required = false) String bezeichnung) {
+        log.info("Copying Nebenkostenabrechnung with id: {}", id);
+        try {
+            return nkAbrechnungService.kopiereAbrechnung(id, bezeichnung)
+                    .<ResponseEntity<?>>map(kopie -> ResponseEntity.status(HttpStatus.CREATED).body(kopie))
+                    .orElseGet(() -> {
+                        log.warn("Cannot copy - Nebenkostenabrechnung not found with id: {}", id);
+                        return ResponseEntity.notFound().build();
+                    });
+        } catch (IllegalArgumentException e) {
+            log.warn("Failed to copy Nebenkostenabrechnung: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<?> updateAbrechnung(@PathVariable Long id,
                                               @RequestBody NkAbrechnungDetailDTO detail) {

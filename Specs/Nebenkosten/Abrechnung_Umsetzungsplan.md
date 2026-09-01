@@ -461,3 +461,69 @@ macht ihn sichtbar. Genau dafür ist der E2E-Test da.
   liegt nur im Arbeitsverzeichnis. Nach einem Frontend-Rebuild ist der Lauf zu wiederholen. Sinnvoll wäre ein Fall, der eine Position „Umlage pro Person"
   anlegt, bei zwei Mietern unterschiedliche Personenzahlen erfasst und die Beträge prüft. Braucht
   einen Stack-Rebuild.
+
+## Nachtrag: Abrechnung kopieren (FR-8)
+
+### Backend
+* `NkAbrechnungService.kopiereAbrechnung(id, bezeichnung)` — eine Transaktion: Kopf speichern, dann
+  `kopierePositionen` / `kopiereZusaetze` / `kopiereAkonto` / `kopierePersonen`. Bewusst **ohne**
+  `pruefeNichtAbgerechnet`: Die abgeschlossene Abrechnung des Vorjahres ist der Hauptfall. Die Kopie
+  ist immer `abgerechnet = false`.
+* Die erfassten Mengen hängen an der **Position**, nicht an der Abrechnung — sie müssen auf die neue
+  Positions-ID zeigen, sonst gehörten sie weiterhin zum Original. Ein Test hält genau das fest.
+* Serverseitig gekürzte Bezeichnung (`VARCHAR(150)`); ohne Kürzung scheiterte das Speichern erst in
+  der Datenbank, mit einer Meldung, die niemandem hilft.
+* `POST /{id}/kopie` mit optionalem Parameter `bezeichnung`, Antwort `201` und das vollständige
+  Detail — die Maske kann damit direkt öffnen, ohne zweiten Aufruf.
+
+### Mieter ausserhalb des Zeitraums
+`saveAbrechnung` bildet aus `ladeMieter` die Menge der Mieter im Zeitraum und gibt sie an alle vier
+`ersetze`-Methoden. Die löschen ohnehin alles und schreiben neu — was durch den Filter fällt, ist
+damit weg. Umgesetzt im **Backend** und nicht in der Maske: Der Server ist massgebend, und die Regel
+gilt damit unabhängig davon, was der Aufrufer schickt.
+
+**Sechs bestehende Tests fielen dadurch durch** — und zu Recht: Sie richteten überhaupt keine Mieter
+ein (`mieterRepository.findByZeitraumOverlapping` unstubbed → leere Liste) und speicherten Angaben
+für frei gewählte Mieter-IDs wie `7L`. Angepasst auf die eingerichteten Mieter; der Filter selbst
+blieb unverändert.
+
+### Frontend
+* Kebab-Eintrag `NK_KOPIEREN` mit Icon `copy` in **beiden** Menüs.
+* `onKopieren` ruft den Endpunkt, setzt `selectedId` auf die neue ID und öffnet die Maske.
+* `bezeichnungDerKopie` kürzt den **Namen**, nicht den Zusatz.
+* Hinweis `NK_HINWEIS_MIETER_AUSSERHALB` bei den Angaben zum Zeitraum — die Folge muss dastehen,
+  bevor gespeichert wird, nicht danach.
+* Kein neues CSS: `.zev-form-hint` und die Kebab-Komponente genügen.
+
+### i18n
+`V139__Add_Nk_Abrechnung_Kopieren_Translations.sql` — fünf Keys, `ON CONFLICT (key) DO NOTHING`,
+deutsche Texte mit Umlauten.
+
+### Tests
+* `NkAbrechnungServiceTest` 70 (8 neu: nicht vorhanden, Feature-Flag, Kopf inkl. „Kopie ist offen",
+  Bezeichnung ohne Angabe, Kürzung, Positionen mit Mengen auf der neuen ID, Zusatz/Akonto/Personen,
+  zwei Fälle zum Zeitraum-Filter).
+* `NkAbrechnungControllerTest` 26 (4 neu: 201, optionaler Parameter, 404, 400).
+* Frontend: Service-Spec (Parameter statt Rumpf), Listen-Spec (6 neu), Menü-Erwartungen angepasst.
+* E2E: zwei Fälle — vollständige Kopie samt Umlage und Akonto, sowie das Verschwinden der Angaben
+  nach dem Verschieben des Zeitraums.
+  * Die Kopie wird im Test **umbenannt**, bevor sie stehen bleibt: Ihre Bezeichnung enthält die des
+    Originals, und die Aufräumsuche `tr:has-text(...)` träfe beim Löschen beide Zeilen — der Lauf
+    hätte Testdaten hinterlassen. Nebenbei prüft das den Speichervorgang auf der Kopie.
+* Gesamt: 1260 Backend, 1613 Frontend.
+
+### Zwei Testfunde aus dem E2E-Lauf
+
+**Ein bestehender Test brach an der Menülänge.** `should offer the invoice run only on a closed
+billing` prüfte `eintraege.length === 3` und `eintraege[2]` — mit „Kopieren" sind es vier, und der
+gefährliche Eintrag steht auf Index 3. Der Test scheiterte damit an der *Anzahl* statt an seiner
+Aussage („der gefährliche bleibt unten"). Neu geprüft über die **letzte** Position; ein weiterer
+Eintrag im Menü bricht ihn nicht mehr. Dieselbe Sorte Brüchigkeit wie der frühere `ART_INDEX`.
+
+**Der Kopier-Test war flaky.** `#bezeichnung` ist sichtbar, bevor die Maske ihr Detail geladen hat —
+`inputValue()` las dann den leeren String. Behoben mit `toHaveValue(/^…/)`, das auf den **Wert**
+wartet statt auf das Feld. Genau die Falle, die `oeffneNeueAbrechnung` im Kopf der Datei schon
+dokumentiert; sie trifft jeden, der direkt nach dem Öffnen liest.
+
+E2E nach dem Rebuild: 23 von 23 Fällen dieser Datei grün, Gesamtsuite 480 passed, 0 failed. Der
+verbleibende Flake (`lizenzen.spec.ts`, Firefox, Suche) hat mit dieser Arbeit nichts zu tun.

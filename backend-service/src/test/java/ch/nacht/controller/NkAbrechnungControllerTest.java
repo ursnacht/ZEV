@@ -40,6 +40,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -307,6 +308,49 @@ public class NkAbrechnungControllerTest {
     }
 
     // ==================== DELETE /{id} ====================
+
+    // ---------- Kopieren (FR-8) ----------
+
+    @Test
+    void kopiereAbrechnung_Exists_ReturnsCreated() throws Exception {
+        NkAbrechnungDetailDTO kopie = new NkAbrechnungDetailDTO();
+        kopie.setAbrechnung(testAbrechnung1);
+        when(nkAbrechnungService.kopiereAbrechnung(1L, "Kopie 2026")).thenReturn(Optional.of(kopie));
+
+        mockMvc.perform(post("/api/nebenkosten/abrechnungen/1/kopie")
+                        .param("bezeichnung", "Kopie 2026"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.abrechnung.id", is(1)));
+    }
+
+    @Test
+    void kopiereAbrechnung_OhneBezeichnung_ReichtDenNullwertDurch() throws Exception {
+        // Der Parameter ist optional: Ohne ihn behaelt die Kopie den Namen des Originals.
+        NkAbrechnungDetailDTO kopie = new NkAbrechnungDetailDTO();
+        kopie.setAbrechnung(testAbrechnung1);
+        when(nkAbrechnungService.kopiereAbrechnung(1L, null)).thenReturn(Optional.of(kopie));
+
+        mockMvc.perform(post("/api/nebenkosten/abrechnungen/1/kopie"))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void kopiereAbrechnung_NotFound_Returns404() throws Exception {
+        when(nkAbrechnungService.kopiereAbrechnung(999L, null)).thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/api/nebenkosten/abrechnungen/999/kopie"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void kopiereAbrechnung_ServiceLehntAb_ReturnsBadRequest() throws Exception {
+        when(nkAbrechnungService.kopiereAbrechnung(1L, null))
+                .thenThrow(new IllegalArgumentException("NK_FEHLER_KOPIEREN"));
+
+        mockMvc.perform(post("/api/nebenkosten/abrechnungen/1/kopie"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("NK_FEHLER_KOPIEREN"));
+    }
 
     @Test
     void deleteAbrechnung_Exists_ReturnsNoContent() throws Exception {

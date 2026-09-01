@@ -1,5 +1,5 @@
 import { test, expect, Locator, Page } from '@playwright/test';
-import { clickKebabMenuItem, navigateViaMenu, waitForFormResult } from './helpers';
+import { clickKebabMenuItem, navigateViaMenu, openKebabMenu, waitForFormResult } from './helpers';
 
 /**
  * tests / nebenkosten-abrechnung.spec.ts
@@ -828,6 +828,99 @@ test.describe('Nebenkostenabrechnung - Positionen', () => {
 // Flag „abgerechnet"
 // ---------------------------------------------------------------------------
 
+test.describe('Nebenkostenabrechnung - Kopieren', () => {
+
+    test('should copy a billing with all its items', async ({ page }) => {
+        const bezeichnung = neueBezeichnung('Kopiervorlage');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+
+        // Eine Vorlage mit Inhalt: Umlage, Verbrauchsmenge und Akonto - alles muss mitkommen.
+        await fuegePositionHinzu(page, 'UMLAGE', 'E2E Kopie-Umlage');
+        await page.locator('.nk-positionen tbody tr').first()
+            .locator('input[type="number"]').first().fill('1200');
+
+        const vorlage = await oeffneErstenMieterblock(page);
+        await vorlage.locator('.nk-akonto input[type="number"]').nth(1).fill('80');
+
+        await clearMessages(page);
+        await speichernUnten(page).click();
+        await erwarteErfolg(page, 'Kopiervorlage speichern');
+
+        const umlageVorlage = await betragSobaldGesetzt(
+            verteiltFuer(page, 'E2E Kopie-Umlage'));
+
+        // Kopieren aus der Liste - die Kopie oeffnet sich direkt.
+        await navigateToListe(page);
+        const zeile = page.locator(`tr:has-text("${bezeichnung}")`).first();
+        await openKebabMenu(page, zeile);
+        await page.locator('.zev-kebab-menu__item', { hasText: /Kopieren|Copy/ }).first().click();
+
+        // Auf den WERT warten, nicht auf das sichtbare Feld: Die Maske ist eine Kindkomponente und
+        // laedt ihr Detail selbst nach. Vorher steht die Bezeichnung leer da - `inputValue()` las
+        // dann '' und der Test war flaky. Dieselbe Falle wie bei `oeffneNeueAbrechnung`.
+        const bezeichnungsfeld = page.locator('#bezeichnung');
+        await expect(bezeichnungsfeld).toHaveValue(new RegExp(`^${bezeichnung}`), { timeout: 15000 });
+
+        // Der Name traegt den Zusatz, alles andere ist uebernommen.
+        const kopieName = await bezeichnungsfeld.inputValue();
+        expect(kopieName).not.toBe(bezeichnung);
+
+        // Umbenennen wie im echten Ablauf - und noetig fuer das Aufraeumen: Die Bezeichnung der
+        // Kopie enthaelt die des Originals, und `tr:has-text(...)` traefe beim Loeschen beide
+        // Zeilen. Der Lauf haette dann Testdaten hinterlassen.
+        const eigenerName = neueBezeichnung('Kopie');
+        await bezeichnungsfeld.fill(eigenerName);
+        await clearMessages(page);
+        await speichernUnten(page).click();
+        await erwarteErfolg(page, 'Kopie umbenennen');
+        angelegteBezeichnungen.push(eigenerName);
+
+        await expect(page.locator('.nk-positionen tbody tr')).toHaveCount(1);
+        await expect(verteiltFuer(page, 'E2E Kopie-Umlage')).toHaveText(umlageVorlage);
+
+        const kopieBlock = await oeffneErstenMieterblock(page);
+        await expect(kopieBlock.locator('.nk-akonto input[type="number"]').nth(1))
+            .toHaveValue('80');
+    });
+
+    test('should drop the data of tenants outside a shifted period', async ({ page }) => {
+        // Der Zeitraum entscheidet, wer zur Abrechnung gehoert. Wird er auf einen Bereich ohne
+        // Mieter verschoben, verschwinden deren Angaben beim Speichern - und kommen auch beim
+        // Zurueckstellen nicht wieder.
+        const bezeichnung = neueBezeichnung('Zeitraum');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+
+        const block = await oeffneErstenMieterblock(page);
+        await block.locator('.nk-akonto input[type="number"]').nth(1).fill('95');
+        await clearMessages(page);
+        await speichernUnten(page).click();
+        await erwarteErfolg(page, 'Akonto speichern');
+
+        // Zeitraum weit in die Vergangenheit: Dort hat kein Mieter ein Mietverhaeltnis.
+        await page.locator('#datumVon').fill('1990-01-01');
+        await page.locator('#datumBis').fill('1990-12-31');
+        await clearMessages(page);
+        await speichernUnten(page).click();
+        await erwarteErfolg(page, 'Zeitraum verschieben');
+
+        // Keine Mieterbloecke mehr - und damit auch kein Akonto.
+        await expect(page.locator('.zev-collapsible__header')).toHaveCount(0);
+
+        // Zurueck in den alten Zeitraum: Der Block ist wieder da, das Akonto ist weg.
+        await page.locator('#datumVon').fill(DATUM_VON);
+        await page.locator('#datumBis').fill(DATUM_BIS);
+        await clearMessages(page);
+        await speichernUnten(page).click();
+        await erwarteErfolg(page, 'Zeitraum zuruecksetzen');
+
+        const wieder = await oeffneErstenMieterblock(page);
+        await expect(wieder.locator('.nk-akonto input[type="number"]').nth(1))
+            .not.toHaveValue('95');
+    });
+});
+
 test.describe('Nebenkostenabrechnung - abgerechnet', () => {
 
     test('should close a billing without asking back and lock the form', async ({ page }) => {
@@ -923,8 +1016,12 @@ test.describe('Nebenkostenabrechnung - Rechnungen', () => {
         await expect(zeileZu.locator('.zev-kebab-menu__item', { hasText: 'Rechnungen erstellen' }))
             .toBeVisible();
         const eintraege = await zeileZu.locator('.zev-kebab-menu__item').allInnerTexts();
-        expect(eintraege.length).toBe(3);
-        expect(eintraege[2]).toContain('Löschen');
+        expect(eintraege.some(e => e.includes('Kopieren'))).toBeTruthy();
+        // Der gefaehrliche Eintrag bleibt unten - geprueft ueber die LETZTE Position und nicht
+        // ueber einen festen Index: Ein neuer Eintrag im Menue verschob den sonst, und der Test
+        // scheiterte an der Anzahl statt an seiner Aussage. Genau das ist hier passiert, als
+        // "Kopieren" dazukam.
+        expect(eintraege[eintraege.length - 1]).toContain('Löschen');
         await page.keyboard.press('Escape');
     });
 

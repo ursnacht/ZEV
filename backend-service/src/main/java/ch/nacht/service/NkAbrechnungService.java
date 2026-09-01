@@ -60,6 +60,9 @@ public class NkAbrechnungService {
 
     private static final Logger log = LoggerFactory.getLogger(NkAbrechnungService.class);
 
+    /** Spaltenbreite von {@code nk_abrechnung.bezeichnung}. */
+    private static final int BEZEICHNUNG_MAX_LAENGE = 150;
+
     private final NkAbrechnungRepository abrechnungRepository;
     private final NkPositionRepository positionRepository;
     private final NkVerbrauchRepository verbrauchRepository;
@@ -212,15 +215,153 @@ public class NkAbrechnungService {
         pruefePositionen(detail.getPositionen());
 
         Long orgId = organizationContextService.getCurrentOrgId();
-        ersetzePositionen(abrechnung, detail.getPositionen(), orgId);
-        ersetzeZusaetze(abrechnung, detail.getZusaetze(), orgId);
-        ersetzeAkonto(abrechnung, detail.getAkonto(), orgId);
-        ersetzePersonen(abrechnung, detail.getPersonen(), orgId);
+        // Nur Mieter im Zeitraum der Abrechnung: Wird der Zeitraum verschoben, fallen Mieter heraus,
+        // und ihre Angaben verschwinden mit diesem Speichern (FR-8). Die ersetze-Methoden loeschen
+        // ohnehin alles und schreiben neu - was hier durchfaellt, ist damit weg.
+        Set<Long> imZeitraum = mieterIds(mieter);
+        ersetzePositionen(abrechnung, detail.getPositionen(), orgId, imZeitraum);
+        ersetzeZusaetze(abrechnung, detail.getZusaetze(), orgId, imZeitraum);
+        ersetzeAkonto(abrechnung, detail.getAkonto(), orgId, imZeitraum);
+        ersetzePersonen(abrechnung, detail.getPersonen(), orgId, imZeitraum);
 
         abrechnungRepository.save(abrechnung);
         log.info("Saved Nebenkostenabrechnung {} with {} positions", id, detail.getPositionen().size());
 
         return Optional.of(baueDetail(abrechnung));
+    }
+
+    /**
+     * Kopiert eine Abrechnung samt allem, was zu ihr gehört (FR-8).
+     *
+     * <p>Zweck ist der Jahreswechsel: Die Abrechnung des Vorjahres ist die Vorlage für die neue.
+     * Kopiert werden Kopf, Positionen, erfasste Mengen und Prozentsätze, Zusatzpositionen, Akonto
+     * und die Personenzahlen — mit neuen IDs, damit die Kopie vom Original unabhängig ist.
+     *
+     * <p><b>Auch eine abgeschlossene Abrechnung ist kopierbar</b> (kein
+     * {@link #pruefeNichtAbgerechnet}): Genau die ist der typische Ausgangspunkt. Die Kopie selbst
+     * ist immer <b>offen</b> — sonst müsste man sie erst wieder aufschliessen, um sie zu bearbeiten.
+     *
+     * <p>Der Zeitraum bleibt zunächst derselbe. Wird er in der Maske geändert und fällt dadurch ein
+     * Mieter heraus, verschwinden dessen Angaben beim nächsten Speichern (s.
+     * {@link #ersetzeAkonto} und die übrigen {@code ersetze}-Methoden).
+     *
+     * @param id ID der Vorlage
+     * @param bezeichnung Bezeichnung der Kopie; leer = die des Originals
+     * @return Die neue Abrechnung samt Berechnung, falls die Vorlage existiert
+     */
+    @Transactional
+    public Optional<NkAbrechnungDetailDTO> kopiereAbrechnung(Long id, String bezeichnung) {
+        pruefeFeatureFlag();
+        hibernateFilterService.enableOrgFilter();
+
+        Optional<NkAbrechnung> vorhanden = abrechnungRepository.findFirstById(id);
+        if (vorhanden.isEmpty()) {
+            log.warn("Nebenkostenabrechnung {} not found for copy", id);
+            return Optional.empty();
+        }
+
+        NkAbrechnung vorlage = vorhanden.get();
+        Long orgId = organizationContextService.getCurrentOrgId();
+
+        NkAbrechnung kopie = new NkAbrechnung();
+        kopie.setOrgId(orgId);
+        kopie.setBezeichnung(bezeichnungDerKopie(vorlage, bezeichnung));
+        kopie.setDatumVon(vorlage.getDatumVon());
+        kopie.setDatumBis(vorlage.getDatumBis());
+        kopie.setAnzahlWohnungen(vorlage.getAnzahlWohnungen());
+        kopie.setAnzahlPersonen(vorlage.getAnzahlPersonen());
+        kopie.setAbgerechnet(false);
+        NkAbrechnung gespeichert = abrechnungRepository.save(kopie);
+
+        int positionen = kopierePositionen(vorlage.getId(), gespeichert.getId(), orgId);
+        kopiereZusaetze(vorlage.getId(), gespeichert.getId(), orgId);
+        kopiereAkonto(vorlage.getId(), gespeichert.getId(), orgId);
+        kopierePersonen(vorlage.getId(), gespeichert.getId(), orgId);
+
+        log.info("Copied Nebenkostenabrechnung {} to {} with {} positions",
+                id, gespeichert.getId(), positionen);
+
+        return Optional.of(baueDetail(gespeichert));
+    }
+
+    /**
+     * Bezeichnung der Kopie — gekürzt auf die Spaltenbreite.
+     *
+     * <p>Der Text kommt vom Aufrufer und nicht aus dem Backend: Der Zusatz „(Kopie)" ist ein
+     * Anzeigetext und gehört damit zu den Übersetzungen im Frontend. Ohne Angabe behält die Kopie
+     * den Namen des Originals — dann sind zwei gleich benannte Abrechnungen sichtbar, was
+     * unschön aber nicht falsch ist; die Maske öffnet ohnehin direkt danach.
+     */
+    private String bezeichnungDerKopie(NkAbrechnung vorlage, String bezeichnung) {
+        String text = bezeichnung != null && !bezeichnung.isBlank()
+                ? bezeichnung.trim() : vorlage.getBezeichnung();
+        return text.length() > BEZEICHNUNG_MAX_LAENGE
+                ? text.substring(0, BEZEICHNUNG_MAX_LAENGE) : text;
+    }
+
+    /** Positionen samt erfasster Mengen; gibt die Anzahl kopierter Positionen zurück. */
+    private int kopierePositionen(Long vonAbrechnung, Long nachAbrechnung, Long orgId) {
+        List<NkPosition> positionen =
+                positionRepository.findByAbrechnungIdOrderByReihenfolge(vonAbrechnung);
+        for (NkPosition alt : positionen) {
+            NkPosition neu = new NkPosition();
+            neu.setOrgId(orgId);
+            neu.setAbrechnungId(nachAbrechnung);
+            neu.setArt(alt.getArt());
+            neu.setBezeichnung(alt.getBezeichnung());
+            neu.setReihenfolge(alt.getReihenfolge());
+            neu.setEinheit(alt.getEinheit());
+            neu.setTotalbetrag(alt.getTotalbetrag());
+            neu.setGesamtmenge(alt.getGesamtmenge());
+            neu.setBetragProEinheit(alt.getBetragProEinheit());
+            neu.setProzentsatz(alt.getProzentsatz());
+            NkPosition gespeichert = positionRepository.save(neu);
+
+            // Die Mengen haengen an der Position, nicht an der Abrechnung - sie muessen auf die
+            // NEUE Positions-ID zeigen, sonst gehoerten sie weiterhin zum Original.
+            for (NkVerbrauch v : verbrauchRepository.findByPositionId(alt.getId())) {
+                NkVerbrauch kopie = new NkVerbrauch(gespeichert.getId(), v.getMieterId(), v.getMenge());
+                kopie.setOrgId(orgId);
+                verbrauchRepository.save(kopie);
+            }
+        }
+        return positionen.size();
+    }
+
+    private void kopiereZusaetze(Long vonAbrechnung, Long nachAbrechnung, Long orgId) {
+        for (NkZusatz alt : zusatzRepository
+                .findByAbrechnungIdOrderByMieterIdAscReihenfolgeAsc(vonAbrechnung)) {
+            NkZusatz neu = new NkZusatz();
+            neu.setOrgId(orgId);
+            neu.setAbrechnungId(nachAbrechnung);
+            neu.setMieterId(alt.getMieterId());
+            neu.setReihenfolge(alt.getReihenfolge());
+            neu.setBezeichnung(alt.getBezeichnung());
+            neu.setEinheit(alt.getEinheit());
+            neu.setMenge(alt.getMenge());
+            neu.setBetragProEinheit(alt.getBetragProEinheit());
+            zusatzRepository.save(neu);
+        }
+    }
+
+    private void kopiereAkonto(Long vonAbrechnung, Long nachAbrechnung, Long orgId) {
+        for (NkAkonto alt : akontoRepository.findByAbrechnungId(vonAbrechnung)) {
+            NkAkonto neu = new NkAkonto();
+            neu.setOrgId(orgId);
+            neu.setAbrechnungId(nachAbrechnung);
+            neu.setMieterId(alt.getMieterId());
+            neu.setAnzahlMonate(alt.getAnzahlMonate());
+            neu.setBetragProMonat(alt.getBetragProMonat());
+            neu.setKorrektur(alt.getKorrektur());
+            akontoRepository.save(neu);
+        }
+    }
+
+    private void kopierePersonen(Long vonAbrechnung, Long nachAbrechnung, Long orgId) {
+        for (NkPerson alt : personRepository.findByAbrechnungId(vonAbrechnung)) {
+            personRepository.save(new NkPerson(orgId, nachAbrechnung,
+                    alt.getMieterId(), alt.getAnzahlPersonen()));
+        }
     }
 
     /**
@@ -417,7 +558,17 @@ public class NkAbrechnungService {
 
     // ===================== Schreiben =====================
 
-    private void ersetzePositionen(NkAbrechnung abrechnung, List<NkPositionDTO> dtos, Long orgId) {
+    /** IDs der Mieter, die im Zeitraum der Abrechnung liegen. */
+    private Set<Long> mieterIds(List<NkMieterBasisDTO> mieter) {
+        Set<Long> ids = new HashSet<>();
+        for (NkMieterBasisDTO m : mieter) {
+            ids.add(m.getMieterId());
+        }
+        return ids;
+    }
+
+    private void ersetzePositionen(NkAbrechnung abrechnung, List<NkPositionDTO> dtos, Long orgId,
+                                  Set<Long> imZeitraum) {
         for (NkPosition alt : positionRepository.findByAbrechnungIdOrderByReihenfolge(abrechnung.getId())) {
             verbrauchRepository.deleteByPositionId(alt.getId());
         }
@@ -445,7 +596,8 @@ public class NkAbrechnungService {
             // derselben Zeile, unterschieden allein durch die Art der Position.
             if (dto.getArt() == NkPositionsart.VERBRAUCH || dto.getArt() == NkPositionsart.ANTEIL) {
                 for (NkVerbrauchDTO v : dto.getVerbraeuche()) {
-                    if (v.getMieterId() == null || v.getMenge() == null) {
+                    if (v.getMieterId() == null || v.getMenge() == null
+                            || !imZeitraum.contains(v.getMieterId())) {
                         continue;
                     }
                     NkVerbrauch verbrauch = new NkVerbrauch(gespeichert.getId(), v.getMieterId(), v.getMenge());
@@ -456,13 +608,17 @@ public class NkAbrechnungService {
         }
     }
 
-    private void ersetzeZusaetze(NkAbrechnung abrechnung, List<NkZusatzDTO> dtos, Long orgId) {
+    private void ersetzeZusaetze(NkAbrechnung abrechnung, List<NkZusatzDTO> dtos, Long orgId,
+                                 Set<Long> imZeitraum) {
         zusatzRepository.deleteByAbrechnungId(abrechnung.getId());
         zusatzRepository.flush();
 
         // Die Reihenfolge wird je Mieter neu vergeben - sie ist je Abrechnung UND Mieter eindeutig.
         Map<Long, Integer> naechste = new HashMap<>();
         for (NkZusatzDTO dto : dtos) {
+            if (dto.getMieterId() != null && !imZeitraum.contains(dto.getMieterId())) {
+                continue;
+            }
             if (dto.getMieterId() == null) {
                 throw new IllegalArgumentException("Zusatzposition ohne Mieter");
             }
@@ -481,13 +637,17 @@ public class NkAbrechnungService {
         }
     }
 
-    private void ersetzeAkonto(NkAbrechnung abrechnung, List<NkAkontoDTO> dtos, Long orgId) {
+    private void ersetzeAkonto(NkAbrechnung abrechnung, List<NkAkontoDTO> dtos, Long orgId,
+                               Set<Long> imZeitraum) {
         akontoRepository.deleteByAbrechnungId(abrechnung.getId());
         akontoRepository.flush();
 
         for (NkAkontoDTO dto : dtos) {
             if (dto.getMieterId() == null) {
                 throw new IllegalArgumentException("Akonto ohne Mieter");
+            }
+            if (!imZeitraum.contains(dto.getMieterId())) {
+                continue;
             }
             NkAkonto akonto = new NkAkonto();
             akonto.setOrgId(orgId);
@@ -508,13 +668,17 @@ public class NkAbrechnungService {
      * mit {@code ON DELETE RESTRICT} auf den Mieter zeigt, wäre danach kein Mieter mehr löschbar,
      * der überhaupt in einer Abrechnung vorkommt.
      */
-    private void ersetzePersonen(NkAbrechnung abrechnung, List<NkPersonDTO> dtos, Long orgId) {
+    private void ersetzePersonen(NkAbrechnung abrechnung, List<NkPersonDTO> dtos, Long orgId,
+                                 Set<Long> imZeitraum) {
         personRepository.deleteByAbrechnungId(abrechnung.getId());
         personRepository.flush();
 
         for (NkPersonDTO dto : dtos) {
             if (dto.getMieterId() == null) {
                 throw new IllegalArgumentException("Anzahl Personen ohne Mieter");
+            }
+            if (!imZeitraum.contains(dto.getMieterId())) {
+                continue;
             }
             int personen = dto.getAnzahlPersonen() != null
                     ? dto.getAnzahlPersonen() : NkBerechnungService.PERSONEN_VORGABE;

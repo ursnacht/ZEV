@@ -5,7 +5,7 @@ import { fakeAsync, tick } from '../../../testing/fake-async';
 import { NebenkostenAbrechnungComponent } from './nebenkosten-abrechnung.component';
 import { NebenkostenService } from '../../services/nebenkosten.service';
 import { TranslationService } from '../../services/translation.service';
-import { NkAbrechnung, NkRechnungLauf } from '../../models/nebenkosten.model';
+import { NkAbrechnung, NkAbrechnungDetail, NkRechnungLauf } from '../../models/nebenkosten.model';
 
 /**
  * Tests der Abrechnungsliste (Specs/Nebenkosten/Abrechnung.md, FR-1 und FR-7).
@@ -73,7 +73,7 @@ describe('NebenkostenAbrechnungComponent', () => {
     nebenkostenServiceSpy = createSpyObj<NebenkostenService>('NebenkostenService', [
       'getAllAbrechnungen', 'getAbrechnungDetail', 'getVorlage',
       'createAbrechnung', 'updateAbrechnung', 'setAbgerechnet', 'deleteAbrechnung',
-      'erzeugeRechnungen', 'ladeRechnungPdf'
+      'erzeugeRechnungen', 'ladeRechnungPdf', 'kopiereAbrechnung'
     ]);
     nebenkostenServiceSpy.erzeugeRechnungen.mockReturnValue(of(lauf));
     nebenkostenServiceSpy.ladeRechnungPdf.mockReturnValue(of(new Blob(['%PDF'])));
@@ -337,12 +337,13 @@ describe('NebenkostenAbrechnungComponent', () => {
     });
 
     it('should keep the other entries on an open billing', () => {
-      expect(component.menuFuer(abrechnung2026).map(i => i.action)).toEqual(['edit', 'delete']);
+      expect(component.menuFuer(abrechnung2026).map(i => i.action))
+        .toEqual(['edit', 'kopieren', 'delete']);
     });
 
     it('should put the dangerous entry last', () => {
       expect(component.menuFuer(abrechnung2025).map(i => i.action))
-        .toEqual(['edit', 'rechnungen', 'delete']);
+        .toEqual(['edit', 'kopieren', 'rechnungen', 'delete']);
     });
 
     /**
@@ -600,6 +601,75 @@ describe('NebenkostenAbrechnungComponent', () => {
       component.onRechnungHerunterladen(45, 'egal.pdf');
 
       expect(nebenkostenServiceSpy.ladeRechnungPdf).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Kopieren', () => {
+
+    /** Antwort des Kopier-Endpunkts: die neue Abrechnung samt leeren Listen. */
+    function detailMit(id: number): NkAbrechnungDetail {
+      return {
+        abrechnung: { ...abrechnung2026, id },
+        positionen: [], zusaetze: [], akonto: [], personen: [],
+        anzahlWohnungenVorschlag: 9, anzahlPersonenVorschlag: 9
+      };
+    }
+
+    it('should offer copying on an open billing', () => {
+      const aktionen = component.menuFuer(abrechnung2026).map(e => e.action);
+      expect(aktionen).toContain('kopieren');
+    });
+
+    it('should offer copying on a closed billing too', () => {
+      // Genau die ist der typische Ausgangspunkt fuer die naechste Abrechnung.
+      const aktionen = component.menuFuer(abrechnung2025).map(e => e.action);
+      expect(aktionen).toContain('kopieren');
+    });
+
+    it('should copy and open the copy', () => {
+      nebenkostenServiceSpy.kopiereAbrechnung.mockReturnValue(of(detailMit(4711)));
+
+      component.onKopieren(abrechnung2026);
+
+      expect(component.selectedId).toBe(4711);
+      expect(component.showForm).toBe(true);
+      expect(component.messageType).toBe('success');
+    });
+
+    it('should append the copy suffix to the description', () => {
+      nebenkostenServiceSpy.kopiereAbrechnung.mockReturnValue(of(detailMit(4711)));
+
+      component.onKopieren(abrechnung2026);
+
+      expect(nebenkostenServiceSpy.kopiereAbrechnung).toHaveBeenCalledWith(
+        abrechnung2026.id, `${abrechnung2026.bezeichnung} NK_KOPIE_SUFFIX`);
+    });
+
+    it('should keep the description within the column width', () => {
+      // nk_abrechnung.bezeichnung ist VARCHAR(150). Gekuerzt wird der NAME, nicht der Zusatz -
+      // sonst stuende am Ende ein abgeschnittenes "(Kop" und die Kopie waere nicht erkennbar.
+      nebenkostenServiceSpy.kopiereAbrechnung.mockReturnValue(of(detailMit(4711)));
+
+      component.onKopieren({ ...abrechnung2026, bezeichnung: 'x'.repeat(200) });
+
+      const gesendet = nebenkostenServiceSpy.kopiereAbrechnung.mock.calls[0][1] as string;
+      expect(gesendet.length).toBeLessThanOrEqual(150);
+      expect(gesendet.endsWith('NK_KOPIE_SUFFIX')).toBe(true);
+    });
+
+    it('should report a failure and stay in the list', () => {
+      nebenkostenServiceSpy.kopiereAbrechnung.mockReturnValue(
+        throwError(() => ({ error: 'NK_FEHLER_KOPIEREN' })));
+
+      component.onKopieren(abrechnung2026);
+
+      expect(component.messageType).toBe('error');
+      expect(component.showForm).toBe(false);
+    });
+
+    it('should do nothing without an id', () => {
+      component.onKopieren({ ...abrechnung2026, id: undefined });
+      expect(nebenkostenServiceSpy.kopiereAbrechnung).not.toHaveBeenCalled();
     });
   });
 });
