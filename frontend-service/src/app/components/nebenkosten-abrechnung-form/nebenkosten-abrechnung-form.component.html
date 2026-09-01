@@ -286,6 +286,14 @@
 
   <!-- ==================== 3. Mieterbloecke ==================== -->
   @if (hatMieterbloecke && berechnung) {
+    <!-- Steht VOR den Bloecken und nicht dahinter: Sie sind zugeklappt und bei dreissig Mietern
+         mehrere Bildschirmseiten lang - eine Summe am Ende faende niemand. Und ihr
+         Vergleichspartner, die Kontrollzahlen je Position, steht direkt darueber. -->
+    <div class="nk-total nk-total--mieter">
+      <span>{{ 'NK_SUMME_KOSTENTOTAL' | translate }}</span>
+      <span class="number">{{ betrag(summeMietertotal) }} CHF</span>
+    </div>
+
     @for (block of berechnung.mieter; track block.mieterId) {
       <!-- Beim Oeffnen der Maske alle geschlossen: Bei dreissig Mietern waere sie sonst mehrere
            Bildschirmseiten lang. Die Kopfzeile zeigt deshalb den Saldo mit an - sonst waere die

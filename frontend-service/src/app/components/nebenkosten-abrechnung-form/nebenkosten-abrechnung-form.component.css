@@ -193,6 +193,12 @@
   font-weight: var(--font-weight-semibold);
 }
 
+/* Summe ueber alle Mieter: Sie steht zwischen zwei Panels und braucht Luft nach oben, waehrend
+   die Totale INNERHALB eines Mieterblocks direkt an ihrer Tabelle haengen. */
+.nk-total--mieter {
+  margin-top: var(--spacing-lg);
+}
+
 .nk-total--saldo {
   border-top: 1px solid var(--color-gray-300);
   font-size: var(--font-size-lg);

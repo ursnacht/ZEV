@@ -1589,4 +1589,52 @@ describe('NebenkostenAbrechnungFormComponent', () => {
       expect(component.berechnung?.mieter[0].personenTage).toBe(4 * 365);
     });
   });
+
+  describe('summeMietertotal', () => {
+
+    it('should be 0 without a calculation', () => {
+      component.berechnung = null;
+      expect(component.summeMietertotal).toBe(0);
+    });
+
+    it('should add up the tenant totals', () => {
+      component.berechnung = {
+        ...serverDetail.berechnung!,
+        mieter: [
+          { ...serverDetail.berechnung!.mieter[0], kostentotal: 1200.55 },
+          { ...serverDetail.berechnung!.mieter[0], mieterId: 101, kostentotal: 899.45 }
+        ]
+      };
+
+      expect(component.summeMietertotal).toBe(2100);
+    });
+
+    it('should round away floating point remnants', () => {
+      // Ohne Rundung stuende hier 0.30000000000000004 - die Zeilenbetraege sind Gleitkommazahlen.
+      component.berechnung = {
+        ...serverDetail.berechnung!,
+        mieter: [
+          { ...serverDetail.berechnung!.mieter[0], kostentotal: 0.1 },
+          { ...serverDetail.berechnung!.mieter[0], mieterId: 101, kostentotal: 0.2 }
+        ]
+      };
+
+      expect(component.summeMietertotal).toBe(0.3);
+    });
+
+    it('should follow a recalculation', () => {
+      // Die Summe ist abgeleitet und darf nicht zwischengespeichert werden: Eine Aenderung an
+      // einer Position muss sie sofort mitnehmen.
+      component.positionen = [{
+        ...leerePosition(NkPositionsart.UMLAGE), id: 55, bezeichnung: 'Strom', totalbetrag: 1000
+      }];
+      component.rechne();
+      const vorher = component.summeMietertotal;
+
+      component.positionen[0].totalbetrag = 2000;
+      component.rechne();
+
+      expect(component.summeMietertotal).toBeGreaterThan(vorher);
+    });
+  });
 });

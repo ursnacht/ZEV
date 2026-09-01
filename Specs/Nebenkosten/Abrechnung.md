@@ -50,7 +50,7 @@ Umsetzung; über sein Entfernen wird separat entschieden.
    Liste oder in der Maske. Damit ist sie **schreibgeschützt**.
 7. Das Zurücksetzen des Flags gibt sie wieder frei und wird **rückgefragt**.
 
-### FR-2: Die vier Positionsarten
+### FR-2: Die fünf Positionsarten
 
 | Art | Zweck | Erfasst wird | Je Mieter |
 |---|---|---|---|
@@ -260,6 +260,24 @@ kennt, bekommt damit dieselbe Rechnung wie vor der Erweiterung — deshalb träg
 **Darstellung:** „Anzahl Wohnungen" und „Anzahl Personen" stehen im Kopf **nebeneinander** in einer
 `.zev-form-row`. Das Feld je Mieter erscheint **nur**, wenn die Abrechnung eine Position dieser Art
 enthält — ein wirkungsloses Eingabefeld lädt zum Ausfüllen ein und weckt eine falsche Erwartung.
+
+**Summe der Mietertotale (Nachtrag):** Direkt **oberhalb** der Mieterblöcke steht rechtsbündig das
+**„Kostentotal aller Mieter"** — die Summe der Kostentotale über alle Mieter.
+
+Es ist eine **Kontrollzahl**, kein Zwischenergebnis: Wegen Leerstand und Rundung ist sie kleiner als
+die Summe der Totalbeträge aller Positionen, und genau diese Differenz macht sie nützlich. Sie
+umfasst **alle** Zeilen der Mieter — Umlagen, Verbrauch, Anteile, Zuschläge und Zusatzpositionen —
+und ist damit mehr als die Spalte „Summe verteilt" der Kontrollzahlen, die nur die verteilenden
+Positionsarten kennt.
+
+**Warum dort:** Der Vergleichspartner sind die Kontrollzahlen je Position, die unmittelbar darüber
+stehen. Hinter den Blöcken wäre die Zahl unbrauchbar — sie sind zugeklappt und bei dreissig Mietern
+mehrere Bildschirmseiten lang. Im Kopf der Abrechnung hätte sie nichts zu suchen: Dort stehen
+Eingaben, nicht Ergebnisse.
+
+* [ ] Oberhalb der Mieterblöcke erscheint rechtsbündig die Summe der Kostentotale aller Mieter.
+* [ ] Sie ist abgeleitet und folgt jeder Änderung sofort, ohne Speichern.
+* [ ] Ist keine Abrechnung geladen oder gibt es keine Mieterblöcke, erscheint sie nicht.
 
 **Spaltenbreiten der Positionstabelle (Nachtrag):** Die Bezeichnung darf 150 Zeichen lang sein und
 ist das Feld, das man beim Lesen zuerst braucht — ihre Spalte nimmt deshalb **den Rest der

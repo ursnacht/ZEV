@@ -941,6 +941,30 @@ test.describe('Nebenkostenabrechnung - Positionen', () => {
             .toHaveCount(0);
     });
 
+    test('should show the sum of all tenant totals above the tenants', async ({ page }) => {
+        // Mit einer einzigen Umlage als einziger Kostenposition muss die Summe der Mietertotale
+        // genau der verteilten Summe dieser Position entsprechen. Damit ist der Test exakt und
+        // unabhaengig davon, wie viele Wohnungen und Mieter die Umgebung kennt.
+        const bezeichnung = neueBezeichnung('Summe');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+
+        await fuegePositionHinzu(page, 'UMLAGE', 'E2E S-Umlage');
+        await page.locator('.nk-positionen tbody tr').first()
+            .locator('input[type="number"]').first().fill('1000');
+
+        const verteilt = await betragSobaldGesetzt(verteiltFuer(page, 'E2E S-Umlage'));
+        const summe = page.locator('.nk-total--mieter .number');
+        await expect(summe).toHaveText(`${verteilt} CHF`);
+
+        // Sie ist abgeleitet und folgt jeder Aenderung sofort, ohne Speichern.
+        await page.locator('.nk-positionen tbody tr').first()
+            .locator('input[type="number"]').first().fill('2000');
+        const verteiltDanach = await betragSobaldGesetzt(verteiltFuer(page, 'E2E S-Umlage'));
+        expect(verteiltDanach).not.toBe(verteilt);
+        await expect(summe).toHaveText(`${verteiltDanach} CHF`);
+    });
+
     test('should recalculate the allocation when the number of apartments changes',
         async ({ page }) => {
         // Der Nenner ist "Anzahl Wohnungen x Tage". Eine Aenderung wirkt SOFORT, ohne Speichern -

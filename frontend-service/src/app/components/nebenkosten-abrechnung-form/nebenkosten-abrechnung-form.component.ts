@@ -23,7 +23,7 @@ import {
   leerePosition
 } from '../../models/nebenkosten.model';
 import { Mengeneinheit } from '../../models/tarif.model';
-import { NkMieterTage, PERSONEN_VORGABE, berechneVorschau } from '../../utils/nebenkosten-berechnung';
+import { NkMieterTage, PERSONEN_VORGABE, berechneVorschau, runde } from '../../utils/nebenkosten-berechnung';
 import { formatSwissNumber } from '../../utils/number-utils';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
@@ -642,6 +642,25 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
         });
       }
     }
+  }
+
+  /**
+   * Summe der Kostentotale aller Mieter — was den Mietern zusammen belastet wird.
+   *
+   * <p>Eine **Kontrollzahl**, kein Zwischenergebnis: Sie ist wegen Leerstand und Rundung kleiner
+   * als die Summe der Totalbeträge aller Positionen. Genau diese Differenz macht sie nützlich —
+   * die Kontrollzahlen direkt darüber weisen sie je Position aus.
+   *
+   * <p>Umfasst **alle** Zeilen der Mieter: Umlagen, Verbrauch, Anteile, Zuschläge und
+   * Zusatzpositionen. Damit ist sie mehr als die Spalte „Summe verteilt" der Kontrollzahlen, die
+   * nur die verteilenden Positionsarten kennt.
+   *
+   * <p>Gerundet, weil die Zeilenbeträge Gleitkommazahlen sind: Ohne das stünde in einem Test
+   * schon mal `1234.5600000000002`.
+   */
+  get summeMietertotal(): number {
+    return runde((this.berechnung?.mieter ?? [])
+      .reduce((summe, block) => summe + block.kostentotal, 0), 2);
   }
 
   /**

@@ -588,3 +588,38 @@ Dreimal wiederholt und in zwei vollen Läufen stabil.
 * *Rundung, Zeitanteil, Kaskadenarithmetik* — Unit-Tests, dort ohne Stack und ohne Flake-Risiko.
 
 Stand: 28 Fälle in dieser Datei, zwei volle Läufe grün.
+
+## Nachtrag: Summe der Mietertotale
+
+* Getter `summeMietertotal` in der Maske — abgeleitet, nicht zwischengespeichert: Eine Änderung an
+  einer Position muss sie sofort mitnehmen. Gerundet mit `runde(…, 2)`, weil die Zeilenbeträge
+  Gleitkommazahlen sind; ohne das stünde dort schon mal `1234.5600000000002`.
+* Kein neues CSS-Muster: `.nk-total` gab es schon für die Totale **innerhalb** eines Mieterblocks
+  (rechtsbündig, abgesetzt, halbfett). Neu ist nur der Modifier `.nk-total--mieter` mit Abstand nach
+  oben — die Zeile steht zwischen zwei Panels, während die Totale im Block direkt an ihrer Tabelle
+  hängen.
+* `V140__Add_Nk_Summe_Kostentotal_Translation.sql`: ein Key, `NK_SUMME_KOSTENTOTAL` =
+  „Kostentotal aller Mieter". Die Beschriftung spiegelt bewusst `NK_KOSTENTOTAL` der Mieterzeile —
+  dieselbe Grösse, nur über alle Mieter summiert.
+
+### Ortswahl
+Gefragt war „oberhalb der Mieter, ganz rechts", mit der Rückfrage nach einem besseren Ort. Geprüft
+und verworfen:
+
+* **Als Fusszeile der Kontrollzahlen-Tabelle:** Deren Spalten bedeuten etwas *je Position*
+  („Totalbetrag", „Summe verteilt"). Eine Zeile, deren Zelle eine andere Grösse trägt, führte in die
+  Irre — die Summe der Mietertotale enthält auch Verbrauch, Zuschläge und Zusatzpositionen.
+* **Hinter den Mieterblöcken:** Sie starten zugeklappt und sind bei dreissig Mietern mehrere
+  Bildschirmseiten lang. Die Zahl fände dort niemand.
+* **Im Kopf der Abrechnung:** Dort stehen Eingaben, nicht Ergebnisse.
+
+Der gewünschte Ort ist also auch der beste: Er stellt die Zahl neben ihren Vergleichspartner.
+
+### Tests
+* Vier Unit-Tests (leer, Summenbildung, Rundung von Gleitkomma-Resten, folgt der Neuberechnung) —
+  Maske 131 Tests.
+* Ein E2E-Fall: Mit einer einzigen Umlage als einziger Kostenposition muss die Summe genau der
+  verteilten Summe dieser Position entsprechen — exakt und unabhängig von der Umgebung. Geprüft wird
+  auch, dass sie einer Betragsänderung ohne Speichern folgt.
+* **Der E2E-Fall braucht einen Frontend-Rebuild**; gegen den alten Container fehlt
+  `.nk-total--mieter` schlicht im DOM.
