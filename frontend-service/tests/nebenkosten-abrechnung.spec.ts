@@ -195,6 +195,30 @@ function betragAlsZahl(text: string): number {
     return Number(text.replace(/'/g, ''));
 }
 
+/**
+ * Zieht eine Positionszeile eine Stelle nach oben (Angular CDK Drag & Drop).
+ *
+ * CDK braucht **mehrere** Mausbewegungen: Ein einzelnes `move` unterschreitet die Schwelle, ab der
+ * das Ziehen beginnt, und es braucht Frames, damit die Vorschau folgt. Deshalb in Schritten und
+ * mit einem Zwischenhalt.
+ */
+async function ziehePositionNachOben(page: Page, index: number): Promise<void> {
+    const zeilen = page.locator('.nk-positionen tbody tr');
+    const griff = zeilen.nth(index).locator('.nk-positionen__griff');
+    const ziel = await zeilen.nth(index - 1).boundingBox();
+    const start = await griff.boundingBox();
+    if (!ziel || !start) {
+        throw new Error('Positionszeile nicht messbar - Drag & Drop nicht moeglich');
+    }
+
+    await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+    await page.mouse.down();
+    // Erst ein Stueck, damit CDK das Ziehen erkennt, dann ueber die Mitte der Zielzeile hinaus.
+    await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2 - 10, { steps: 5 });
+    await page.mouse.move(ziel.x + ziel.width / 2, ziel.y + ziel.height / 3, { steps: 10 });
+    await page.mouse.up();
+}
+
 /** Betrag einer Position im Totalbetrag der Kontrollzahlen (Spalte „Summe verteilt"). */
 function verteiltFuer(page: Page, bezeichnung: string): Locator {
     return page.locator('.nk-kontrolle tbody tr', { hasText: bezeichnung }).locator('td').nth(2);
@@ -786,6 +810,160 @@ test.describe('Nebenkostenabrechnung - Positionen', () => {
         await expect(personenfeld(blockNachher)).toHaveValue('4');
         await expect(betragImBlock(blockNachher, 'E2E Person-Umlage')).toHaveText(nachher);
         await expect(betragImBlock(blockNachher, 'E2E Wohnung-Umlage')).toHaveText(proWohnung);
+    });
+
+    test('should hide amount and unit on a surcharge and cascade on the line above',
+        async ({ page }) => {
+        // ZUSCHLAG erfasst nur den Prozentsatz. Der Betrag rechnet auf die Summe der Zeilen davor -
+        // damit ist er aus der Umlagezeile exakt ableitbar, ohne die Umgebung zu kennen.
+        const bezeichnung = neueBezeichnung('Zuschlag');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+
+        await fuegePositionHinzu(page, 'UMLAGE', 'E2E Z-Umlage');
+        await page.locator('.nk-positionen tbody tr').nth(0)
+            .locator('input[type="number"]').first().fill('1000');
+
+        await fuegePositionHinzu(page, 'ZUSCHLAG', 'E2E Verwaltung');
+        const zuschlagZeile = page.locator('.nk-positionen tbody tr').nth(1);
+        await zuschlagZeile.locator('input[type="number"]').first().fill('10');
+
+        // Nicht zutreffende Felder sind ausgeblendet, nicht bloss gesperrt: Genau ein Zahlenfeld
+        // (der Prozentsatz) und genau ein Auswahlfeld (die Positionsart, keine Mengeneinheit).
+        await expect(zuschlagZeile.locator('input[type="number"]')).toHaveCount(1);
+        await expect(zuschlagZeile.locator('select')).toHaveCount(1);
+
+        const block = await oeffneErstenMieterblock(page);
+        const umlage = await betragSobaldGesetzt(betragImBlock(block, 'E2E Z-Umlage'));
+        const zuschlag = await betragImBlock(block, 'E2E Verwaltung').textContent();
+
+        // 10 % der Zeile davor, auf den Rappen.
+        const erwartet = Math.round(betragAlsZahl(umlage) * 10) / 100;
+        expect(betragAlsZahl((zuschlag ?? '').trim())).toBeCloseTo(erwartet, 2);
+    });
+
+    test('should reorder positions by drag and drop and change the cascade',
+        async ({ page }) => {
+        // Die Reihenfolge kommt aus der Listenposition und entscheidet ueber die Zuschlagskaskade.
+        // Nur E2E kann das zeigen: Das Ziehen selbst ist Angular CDK, und die Wirkung ist der
+        // Betrag beim Mieter.
+        const bezeichnung = neueBezeichnung('Reihenfolge');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+
+        await fuegePositionHinzu(page, 'UMLAGE', 'E2E R-Umlage');
+        await page.locator('.nk-positionen tbody tr').nth(0)
+            .locator('input[type="number"]').first().fill('1000');
+        await fuegePositionHinzu(page, 'ZUSCHLAG', 'E2E R-Zuschlag');
+        await page.locator('.nk-positionen tbody tr').nth(1)
+            .locator('input[type="number"]').first().fill('10');
+
+        const block = await oeffneErstenMieterblock(page);
+        await betragSobaldGesetzt(betragImBlock(block, 'E2E R-Umlage'));
+        const zuschlagVorher = (await betragImBlock(block, 'E2E R-Zuschlag').textContent())!.trim();
+        expect(betragAlsZahl(zuschlagVorher)).toBeGreaterThan(0);
+
+        // Zuschlag nach oben ziehen: Dann steht keine Zeile mehr vor ihm, und er rechnet auf 0.
+        await ziehePositionNachOben(page, 1);
+
+        await expect(page.locator('.nk-positionen tbody tr').nth(0)
+            .locator('input[type="text"]')).toHaveValue('E2E R-Zuschlag');
+
+        const blockDanach = await oeffneErstenMieterblock(page);
+        await expect.poll(async () =>
+            (await betragImBlock(blockDanach, 'E2E R-Zuschlag').textContent())?.trim(),
+            { timeout: 10000 }).not.toBe(zuschlagVorher);
+        expect(betragAlsZahl(
+            (await betragImBlock(blockDanach, 'E2E R-Zuschlag').textContent())!.trim())).toBe(0);
+
+        // Und das Backend rechnet genauso: Beim Speichern wird die Reihenfolge aus der
+        // Listenposition neu vergeben.
+        await clearMessages(page);
+        await speichernUnten(page).click();
+        await erwarteErfolg(page, 'Umgeordnete Positionen speichern');
+
+        const blockGespeichert = await oeffneErstenMieterblock(page);
+        expect(betragAlsZahl(
+            (await betragImBlock(blockGespeichert, 'E2E R-Zuschlag').textContent())!.trim())).toBe(0);
+    });
+
+    test('should reject saving when the number of apartments is too small', async ({ page }) => {
+        // Waere der Nenner kleiner als die Belegung, zahlten die Mieter gemeinsam mehr als
+        // angefallen ist. Der Server weist ab und nennt beide Zahlen.
+        const bezeichnung = neueBezeichnung('Nenner');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+
+        await page.locator('#anzahlWohnungen').fill('1');
+        await clearMessages(page);
+        await speichernUnten(page).click();
+
+        // `waitForFormResult` liefert false, wenn eine FEHLERmeldung steht.
+        expect(await waitForFormResult(page, 20000)).toBe(false);
+        const meldung = await page.locator('.zev-message--error').first().textContent();
+        expect(meldung).toContain('Miettage');
+    });
+
+    test('should add and remove an additional item of a tenant', async ({ page }) => {
+        const bezeichnung = neueBezeichnung('Zusatz');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+
+        const block = await oeffneErstenMieterblock(page);
+        const zusatzzeilen = block.locator('.nk-zusatz tbody tr');
+        await expect(zusatzzeilen).toHaveCount(0);
+
+        await block.locator('.zev-button-row .zev-button--secondary').first().click();
+        await expect(zusatzzeilen).toHaveCount(1);
+
+        await zusatzzeilen.first().locator('input[type="text"]').fill('E2E Schluessel');
+        await zusatzzeilen.first().locator('input[type="number"]').nth(0).fill('2');
+        await zusatzzeilen.first().locator('input[type="number"]').nth(1).fill('25');
+
+        await clearMessages(page);
+        await speichernUnten(page).click();
+        await erwarteErfolg(page, 'Zusatzposition speichern');
+
+        // 2 x 25.00 = 50.00 in der Zeile des Mieters.
+        const nachSpeichern = await oeffneErstenMieterblock(page);
+        await expect(betragImBlock(nachSpeichern, 'E2E Schluessel')).toHaveText('50.00');
+
+        // Einzeln entfernbar - und nach dem Speichern auch wirklich weg.
+        await nachSpeichern.locator('.nk-zusatz .zev-button--icon').first().click();
+        await expect(nachSpeichern.locator('.nk-zusatz tbody tr')).toHaveCount(0);
+
+        await clearMessages(page);
+        await speichernUnten(page).click();
+        await erwarteErfolg(page, 'Zusatzposition entfernen');
+
+        const zumSchluss = await oeffneErstenMieterblock(page);
+        await expect(zumSchluss.locator('.nk-mieterzeilen tbody tr', { hasText: 'E2E Schluessel' }))
+            .toHaveCount(0);
+    });
+
+    test('should recalculate the allocation when the number of apartments changes',
+        async ({ page }) => {
+        // Der Nenner ist "Anzahl Wohnungen x Tage". Eine Aenderung wirkt SOFORT, ohne Speichern -
+        // das ist die Sofortberechnung der Maske.
+        const bezeichnung = neueBezeichnung('Nenner-Sofort');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+
+        await fuegePositionHinzu(page, 'UMLAGE', 'E2E N-Umlage');
+        await page.locator('.nk-positionen tbody tr').first()
+            .locator('input[type="number"]').first().fill('1000');
+
+        const block = await oeffneErstenMieterblock(page);
+        const vorher = await betragSobaldGesetzt(betragImBlock(block, 'E2E N-Umlage'));
+
+        // Halber Nenner, doppelter Anteil - ohne Speichern.
+        await page.locator('#anzahlWohnungen').fill('50');
+
+        await expect.poll(async () =>
+            (await betragImBlock(block, 'E2E N-Umlage').textContent())?.trim(),
+            { timeout: 10000 }).not.toBe(vorher);
+        expect(betragAlsZahl((await betragImBlock(block, 'E2E N-Umlage').textContent())!.trim()))
+            .toBeGreaterThan(betragAlsZahl(vorher));
     });
 
     test('should offer a quantity field for a consumption position right away', async ({ page }) => {

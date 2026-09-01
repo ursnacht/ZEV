@@ -555,3 +555,36 @@ alles und drückt die Nachbarn auf ihre **Minimalbreite**. Bei der Art ist die f
 Die Wertspalten waren nicht betroffen, und das bestätigt die Erklärung: Ihr Inhalt ist ein Grid mit
 **festen** Spurbreiten (`repeat(3, 8rem)`) und hat damit eine echte Mindestbreite. Wo eine Zelle
 ihre Breite aus dem Inhalt bezieht, greift der Effekt nicht.
+
+## Nachtrag: E2E-Lückenschluss
+
+Abgleich der Akzeptanzkriterien gegen die 23 bestehenden Fälle. Aufgenommen wurde, was **nur** E2E
+zeigen kann — Arithmetik (Rundung, Kaskade, Zeitanteil) ist Sache der Unit-Tests und bleibt dort.
+
+| Neuer Fall | Deckt ab |
+|---|---|
+| `should hide amount and unit on a surcharge and cascade on the line above` | ZUSCHLAG: nur Prozentsatz erfassbar, Betrag = 10 % der Zeile davor |
+| `should reorder positions by drag and drop and change the cascade` | Drag & Drop, neue `reihenfolge`, geänderte Kaskade — vor **und** nach dem Speichern |
+| `should reject saving when the number of apartments is too small` | `Σ Tage(i) > Nenner` wird abgewiesen, Meldung nennt die Miettage |
+| `should add and remove an additional item of a tenant` | Zusatzposition hinzufügen, Betrag `2 × 25.00`, einzeln entfernen, nach dem Speichern weg |
+| `should recalculate the allocation when the number of apartments changes` | Nenner-Änderung wirkt sofort, ohne Speichern |
+
+**Der Zuschlag-Fall ist bewusst umgebungsunabhängig gebaut:** Geprüft wird nicht ein absoluter
+Betrag, sondern das Verhältnis zur Umlagezeile derselben Abrechnung — 10 % davon. Damit ist der Test
+unabhängig davon, wie viele Wohnungen und Mieter die Umgebung kennt. Dieselbe Überlegung wie beim
+Vergleich Wohnungs- gegen Personenumlage.
+
+**Beim Umordnen wird der Zuschlag nach oben gezogen**, nicht die Umlage nach unten: Steht keine Zeile
+mehr vor ihm, rechnet er auf 0 — ein exakt prüfbarer Wert statt „irgendwie anders".
+
+**Drag & Drop** braucht mehrere Mausbewegungen (`ziehePositionNachOben`): Ein einzelnes `move`
+unterschreitet die Schwelle, ab der Angular CDK das Ziehen erkennt, und die Vorschau braucht Frames.
+Dreimal wiederholt und in zwei vollen Läufen stabil.
+
+**Nicht aufgenommen** und warum:
+* *Ein Mieter in einer Abrechnung ist nicht löschbar* — würde die Sperre erzeugen, die dieser Suite
+  schon Aufräumläufe gekostet hat (`ON DELETE RESTRICT` auf vier Tabellen). Backend-Tests deckt es ab.
+* *Leerstate ohne Abrechnungen* — setzte voraus, alle Abrechnungen des Mandanten zu löschen.
+* *Rundung, Zeitanteil, Kaskadenarithmetik* — Unit-Tests, dort ohne Stack und ohne Flake-Risiko.
+
+Stand: 28 Fälle in dieser Datei, zwei volle Läufe grün.
