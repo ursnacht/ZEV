@@ -68,9 +68,29 @@
  * wiederverwendbarer Baustein. Dieselbe Ueberlegung wie bei `griff-spalte` darueber; die
  * Tabellen-Komponente des Design Systems kennt nur `zev-table__checkbox-col` und
  * `zev-table__number`, beide passen hier nicht.
+ *
+ * **`min-width` und nicht nur `width`:** Bei automatischem Tabellenlayout ist `width` an einer
+ * Zelle bloss eine Praeferenz. Sobald eine andere Spalte `width: 100%` traegt (die Bezeichnung,
+ * s.u.), nimmt diese sich alles und drueckt die Nachbarn auf ihre **Minimalbreite** - und die ist
+ * hier fast null, weil `.zev-select` selbst `width: 100%` ist und aus seinem Inhalt keine
+ * Mindestbreite mitbringt. Genau daran ist diese Spalte einmal zusammengefallen. `min-width` ist
+ * die harte Untergrenze, die der Algorithmus einhalten muss.
  */
 .nk-positionen__art-spalte {
   width: 13rem;
+  min-width: 13rem;
+}
+
+/**
+ * Spalte der Bezeichnung - nimmt den Rest der Tabellenbreite.
+ *
+ * `width: 100%` auf einer Zelle heisst bei automatischem Tabellenlayout nicht "die ganze Tabelle",
+ * sondern "so viel wie uebrig ist": Die uebrigen Spalten behalten ihre Breite, diese eine absorbiert
+ * den Rest. Ohne das teilte der Browser die freie Breite auf alle Spalten auf, und das Textfeld der
+ * Bezeichnung blieb schmaler als sein Inhalt (150 Zeichen sind erlaubt).
+ */
+.nk-positionen__bezeichnung-spalte {
+  width: 100%;
 }
 
 .nk-positionen__griff {
@@ -97,10 +117,17 @@
  * zusammenfallen, und genau dieses Zusammenfallen war das Problem. Der Preis ist, dass eine
  * Anteil- oder Zuschlagszeile die volle Breite beansprucht, obwohl sie ein Feld zeigt - die
  * Spaltenbreite der Tabelle richtet sich ohnehin nach der breitesten Zeile.
+ *
+ * **Die Breite von 8rem ergibt sich aus der laengsten Beschriftung, nicht aus den Werten.** Die
+ * Zahlen brauchen viel weniger; die Titelzeile "Betrag pro Einheit" ist mit rund 7rem der Engpass
+ * (englisch "Unit of measure" knapp darunter). Waere die Spalte schmaler, bricht diese Zeile um -
+ * und dann sitzen die Eingaben benachbarter Spalten nicht mehr auf einer Linie, also genau der
+ * Fehler, den die Titelzeilen-Konstruktion oben vermeidet. Der Rest der Tabellenbreite geht an die
+ * Bezeichnung (`nk-positionen__bezeichnung-spalte`).
  */
 .nk-positionen__werte {
   display: grid;
-  grid-template-columns: repeat(3, 10rem);
+  grid-template-columns: repeat(3, 8rem);
   gap: var(--spacing-sm);
   align-items: start;
 }

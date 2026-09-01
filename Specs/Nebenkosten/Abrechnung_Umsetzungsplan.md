@@ -527,3 +527,31 @@ dokumentiert; sie trifft jeden, der direkt nach dem Öffnen liest.
 
 E2E nach dem Rebuild: 23 von 23 Fällen dieser Datei grün, Gesamtsuite 480 passed, 0 failed. Der
 verbleibende Flake (`lizenzen.spec.ts`, Firefox, Suche) hat mit dieser Arbeit nichts zu tun.
+
+## Nachtrag: Spaltenbreiten der Positionstabelle
+
+* `.nk-positionen__bezeichnung-spalte { width: 100% }` am `<th>`. Bei automatischem Tabellenlayout
+  heisst das nicht „die ganze Tabelle", sondern „so viel wie übrig ist": Die übrigen Spalten behalten
+  ihre Breite, diese eine absorbiert den Rest. Ohne das verteilte der Browser die freie Breite
+  gleichmässig, und das Feld blieb schmaler als sein möglicher Inhalt (150 Zeichen).
+* `.nk-positionen__werte`: `repeat(3, 10rem)` → `repeat(3, 8rem)`.
+* **Die Untergrenze setzen die Beschriftungen, nicht die Werte.** Gemessen an `--font-size-sm`
+  (13px): „Betrag pro Einheit" rund 7.1rem, „Unit of measure" 5.9rem, „Mengeneinheit" 5.1rem — die
+  Zahlen selbst brauchen weit weniger. Unter etwa 7.5rem bricht die längste Titelzeile um, und dann
+  sitzen die Eingaben benachbarter Spalten nicht mehr auf einer Linie: genau der Fehler, den die
+  Titelzeilen-Konstruktion (`nk-positionen__feld`) vermeidet. 8rem lässt rund 15px Reserve.
+* Kein Design-System-Anteil: Spaltengeometrie **dieser** Tabelle, wie `griff-spalte` und
+  `art-spalte`. Die Tabellen-Komponente kennt nur `zev-table__checkbox-col` und
+  `zev-table__number`.
+* Keine Migration, keine neuen Texte, keine Testanpassung — die E2E-Selektoren gehen über
+  `.nk-positionen tbody tr` und Feldtypen, nicht über Spaltenbreiten.
+
+**Nachgereicht: die Art-Spalte fiel dabei zusammen.** `width: 100%` an der Bezeichnung nimmt sich
+alles und drückt die Nachbarn auf ihre **Minimalbreite**. Bei der Art ist die fast null, weil
+`.zev-select` selbst `width: 100%` ist und aus seinem Inhalt keine Mindestbreite mitbringt — das
+`width: 13rem` von gestern war nur eine Präferenz und wurde überstimmt. Behoben mit zusätzlichem
+`min-width: 13rem`: Das ist die Untergrenze, die der Algorithmus einhalten muss.
+
+Die Wertspalten waren nicht betroffen, und das bestätigt die Erklärung: Ihr Inhalt ist ein Grid mit
+**festen** Spurbreiten (`repeat(3, 8rem)`) und hat damit eine echte Mindestbreite. Wo eine Zelle
+ihre Breite aus dem Inhalt bezieht, greift der Effekt nicht.

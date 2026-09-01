@@ -261,6 +261,16 @@ kennt, bekommt damit dieselbe Rechnung wie vor der Erweiterung — deshalb träg
 `.zev-form-row`. Das Feld je Mieter erscheint **nur**, wenn die Abrechnung eine Position dieser Art
 enthält — ein wirkungsloses Eingabefeld lädt zum Ausfüllen ein und weckt eine falsche Erwartung.
 
+**Spaltenbreiten der Positionstabelle (Nachtrag):** Die Bezeichnung darf 150 Zeichen lang sein und
+ist das Feld, das man beim Lesen zuerst braucht — ihre Spalte nimmt deshalb **den Rest der
+Tabellenbreite**. Die drei Wertspalten (Totalbetrag, Gesamtmenge, Mengeneinheit) sind demgegenüber
+schmal gehalten; ihre Breite richtet sich nicht nach den Zahlen, sondern nach der **längsten
+Beschriftung** („Betrag pro Einheit"). Wäre sie kleiner, bricht diese Titelzeile um, und die
+Eingaben benachbarter Spalten sitzen nicht mehr auf einer Linie.
+
+* [ ] Das Textfeld der Bezeichnung ist deutlich breiter als die einzelnen Wertfelder und wächst mit der Tabellenbreite.
+* [ ] Keine Titelzeile der Wertspalten bricht um — in Deutsch und Englisch.
+
 **Beschriftung und Spaltenbreite (Nachtrag):** Die Art `UMLAGE` heisst in der Auswahl
 **„Umlage pro Wohnung"** (englisch „Allocation per apartment"). „Umlage" allein sagt nicht mehr,
 wonach verteilt wird, sobald es die Umlage pro Person gibt; der Schlüssel `NK_ART_UMLAGE` und die
