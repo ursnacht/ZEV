@@ -32,6 +32,28 @@ public class NkZeileDTO {
     private BigDecimal betragProEinheit;
     private BigDecimal prozentsatz;
 
+    /**
+     * Betrag, auf den sich der {@link #prozentsatz} bezieht — die <b>Bezugsgrösse</b> der Zeile.
+     *
+     * <p>Je Art eine andere Grösse, aber immer dieselbe Rolle: {@code Bezugsbetrag × Prozentsatz =
+     * Betrag}.
+     * <ul>
+     *   <li>{@code UMLAGE} / {@code UMLAGE_PERSON}: der Totalbetrag der Position; der Prozentsatz
+     *       ist der Zeit- bzw. Personenanteil dieses Mieters.</li>
+     *   <li>{@code ANTEIL}: der Totalbetrag der Position.</li>
+     *   <li>{@code ZUSCHLAG}: das <b>Zwischentotal</b> der Zeilen davor, auf dem der Zuschlag
+     *       rechnet.</li>
+     *   <li>{@code VERBRAUCH} und Zusatzzeilen: {@code null} — dort ist
+     *       {@link #betragProEinheit} die Bezugsgrösse, und die Menge steht in einer eigenen
+     *       Spalte.</li>
+     * </ul>
+     *
+     * <p><b>Eigenes Feld und nicht {@link #betragProEinheit} mitbenutzt:</b> Das ist ein Preis je
+     * Einheit, nicht ein Gesamtbetrag. Beides in ein Feld zu legen hiesse, dass niemand mehr am
+     * Namen erkennt, was drinsteht.
+     */
+    private BigDecimal bezugsbetrag;
+
     /** Zeilenbetrag, bereits auf zwei Nachkommastellen gerundet (FR-5). */
     private BigDecimal betrag;
 
@@ -100,6 +122,14 @@ public class NkZeileDTO {
 
     public void setBetragProEinheit(BigDecimal betragProEinheit) {
         this.betragProEinheit = betragProEinheit;
+    }
+
+    public BigDecimal getBezugsbetrag() {
+        return bezugsbetrag;
+    }
+
+    public void setBezugsbetrag(BigDecimal bezugsbetrag) {
+        this.bezugsbetrag = bezugsbetrag;
     }
 
     public BigDecimal getProzentsatz() {

@@ -1,5 +1,5 @@
 import { test, expect, Locator, Page } from '@playwright/test';
-import { clickKebabMenuItem, navigateViaMenu, openKebabMenu, waitForFormResult } from './helpers';
+import { clickKebabMenuItem, navigateViaMenu, waitForFormResult } from './helpers';
 
 /**
  * tests / nebenkosten-abrechnung.spec.ts
@@ -201,14 +201,33 @@ function betragAlsZahl(text: string): number {
  * CDK braucht **mehrere** Mausbewegungen: Ein einzelnes `move` unterschreitet die Schwelle, ab der
  * das Ziehen beginnt, und es braucht Frames, damit die Vorschau folgt. Deshalb in Schritten und
  * mit einem Zwischenhalt.
+ *
+ * **Zuerst in den Viewport scrollen.** `page.mouse` arbeitet in Viewport-Koordinaten, und
+ * `boundingBox()` liefert sie auch fuer Elemente **oberhalb** des Fensters - dann negativ. Ein Zug
+ * auf eine negative Koordinate passiert einfach nicht, und der Test scheitert erst an der
+ * Reihenfolge, also weit weg von der Ursache. Genau das trat ein, als die Maske um die
+ * Positionsuebersicht und die Summenzeilen wuchs: Wer davor einen Mieterblock oeffnet, scrollt so
+ * weit, dass die Positionstabelle aus dem Bild rutscht (gemessen: y = -29).
+ *
+ * Gescrollt wird die **Zielzeile** und nicht die gezogene: Sie liegt darueber, ist also der obere
+ * Rand des Bereichs, der sichtbar sein muss.
  */
 async function ziehePositionNachOben(page: Page, index: number): Promise<void> {
     const zeilen = page.locator('.nk-positionen tbody tr');
+    await zeilen.nth(index - 1).scrollIntoViewIfNeeded();
+
     const griff = zeilen.nth(index).locator('.nk-positionen__griff');
     const ziel = await zeilen.nth(index - 1).boundingBox();
     const start = await griff.boundingBox();
     if (!ziel || !start) {
         throw new Error('Positionszeile nicht messbar - Drag & Drop nicht moeglich');
+    }
+    // Beide Zeilen MUESSEN im Bild liegen, sonst zieht die Maus ins Leere. Lieber hier mit klarer
+    // Meldung scheitern als spaeter an einer unveraenderten Reihenfolge.
+    const hoehe = page.viewportSize()!.height;
+    if (ziel.y < 0 || start.y + start.height > hoehe) {
+        throw new Error(`Positionszeilen ausserhalb des Viewports (Ziel y=${ziel.y}, `
+            + `Griff y=${start.y}+${start.height}, Viewport ${hoehe}) - Drag & Drop unmoeglich`);
     }
 
     await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
@@ -219,9 +238,23 @@ async function ziehePositionNachOben(page: Page, index: number): Promise<void> {
     await page.mouse.up();
 }
 
-/** Betrag einer Position im Totalbetrag der Kontrollzahlen (Spalte „Summe verteilt"). */
+/**
+ * Kosten einer Position in der Zusammenstellung (Spalte „Kosten").
+ *
+ * Die Spalte liegt an Index 4: Position, Totalbetrag, Menge, Mengeneinheit, Kosten.
+ */
 function verteiltFuer(page: Page, bezeichnung: string): Locator {
+    return page.locator('.nk-kontrolle tbody tr', { hasText: bezeichnung }).locator('td').nth(4);
+}
+
+/** Menge einer Position in der Zusammenstellung (Spalte „Menge"). */
+function mengeFuer(page: Page, bezeichnung: string): Locator {
     return page.locator('.nk-kontrolle tbody tr', { hasText: bezeichnung }).locator('td').nth(2);
+}
+
+/** Gesamtsumme der Kosten in der Fusszeile der Zusammenstellung. */
+function summeKosten(page: Page): Locator {
+    return page.locator('.nk-kontrolle tfoot th.zev-table__number');
 }
 
 /** Betrag einer Position in der Zeile eines Mieterblocks. */
@@ -321,8 +354,14 @@ async function loescheAbrechnung(page: Page, bezeichnung: string): Promise<boole
  * `clickKebabMenuItem` aus den Helpers kennt nur „erster" und „gefährlicher" Eintrag; für
  * „Rechnungen erstellen" in der Mitte wäre das ein Index — und der verschiebt sich, sobald ein
  * Eintrag dazukommt.
+ *
+ * **Immer über die Zeile suchen, nie über die Seite.** Die Kebab-Komponente hält die Einträge
+ * *jeder* Zeile im DOM; erst `.zev-kebab-menu--open` macht sie sichtbar (`visibility`). Ein
+ * seitenweiter Locator mit `.first()` trifft deshalb den unsichtbaren Eintrag der obersten
+ * Zeile, und Playwright wartet 3 Minuten auf ein Element, das nie sichtbar wird — solange die
+ * gesuchte Zeile zufällig oben stand, fiel das nicht auf.
  */
-async function klickeKebabEintrag(page: Page, zeile: Locator, text: string): Promise<void> {
+async function klickeKebabEintrag(page: Page, zeile: Locator, text: string | RegExp): Promise<void> {
     await zeile.locator('.zev-kebab-button').click();
     await zeile.locator('.zev-kebab-menu--open').waitFor({ state: 'visible', timeout: 5000 });
     await zeile.locator('.zev-kebab-menu__item', { hasText: text }).click();
@@ -941,6 +980,127 @@ test.describe('Nebenkostenabrechnung - Positionen', () => {
             .toHaveCount(0);
     });
 
+    test('should sum quantities and costs per position and match the tenant total',
+        async ({ page }) => {
+        // Das Kernversprechen der Uebersicht: Die Summe der Kosten MUSS dem Kostentotal aller
+        // Mieter entsprechen. Geprueft mit allen Quellen, die es dafuer gibt - Umlage mit
+        // Gesamtmenge, Verbrauch mit erfasster Menge und eine Zusatzposition.
+        const bezeichnung = neueBezeichnung('Uebersicht');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+
+        await fuegePositionHinzu(page, 'UMLAGE', 'E2E U-Strom');
+        const umlageZeile = page.locator('.nk-positionen tbody tr').nth(0);
+        await umlageZeile.locator('input[type="number"]').nth(0).fill('1000');
+        await umlageZeile.locator('input[type="number"]').nth(1).fill('500');
+
+        await fuegePositionHinzu(page, 'VERBRAUCH', 'E2E U-Wasser');
+        await page.locator('.nk-positionen tbody tr').nth(1)
+            .locator('input[type="number"]').first().fill('4');
+
+        const block = await oeffneErstenMieterblock(page);
+        // Menge der Verbrauchsposition beim ersten Mieter erfassen.
+        await block.locator('.nk-mieterzeilen tbody tr', { hasText: 'E2E U-Wasser' })
+            .locator('input[type="number"]').first().fill('7');
+        // Und eine Zusatzposition: Sie ist die zweite Quelle des Kostentotals.
+        await block.locator('.zev-button-row .zev-button--secondary').first().click();
+        const zusatzZeile = block.locator('.nk-zusatz tbody tr').first();
+        await zusatzZeile.locator('input[type="text"]').fill('E2E U-Schluessel');
+        await zusatzZeile.locator('input[type="number"]').nth(0).fill('2');
+        await zusatzZeile.locator('input[type="number"]').nth(1).fill('25');
+
+        // Die verteilte Gesamtmenge der Umlage steht in der Mengenspalte.
+        await expect(mengeFuer(page, 'E2E U-Strom')).not.toHaveText('');
+        // Verbrauch: 7 x 4.00 = 28.00
+        await expect(mengeFuer(page, 'E2E U-Wasser')).toHaveText('7.000');
+        await expect(verteiltFuer(page, 'E2E U-Wasser')).toHaveText('28.00');
+
+        // Die Sammelzeile der Zusatzpositionen: 2 x 25.00 = 50.00
+        const zusatzUebersicht = page.locator('.nk-kontrolle tbody tr').last();
+        await expect(zusatzUebersicht.locator('td').nth(4)).toHaveText('50.00');
+
+        // Und die Identitaet - vor dem Speichern aus der Vorschau ...
+        const mietertotal = await page.locator('.nk-total--mieter .number').textContent();
+        await expect(summeKosten(page)).toHaveText((mietertotal ?? '').replace(' CHF', '').trim());
+
+        // ... und danach aus der Antwort des Servers.
+        await clearMessages(page);
+        await speichernUnten(page).click();
+        await erwarteErfolg(page, 'Positionsuebersicht speichern');
+
+        const nachher = await page.locator('.nk-total--mieter .number').textContent();
+        await expect(summeKosten(page)).toHaveText((nachher ?? '').replace(' CHF', '').trim());
+    });
+
+    test('should show the prepayment total below the cost total and aggregate it',
+        async ({ page }) => {
+        // Geprueft wird die DELTA-Wirkung und nicht ein absoluter Betrag: Wie viel Akonto die
+        // uebrigen Mieter aus ihrem Stammdatum mitbringen, weiss der Test nicht - eine Erwartung
+        // wie "600.00" waere von der Umgebung abhaengig. Aendert sich die Zahl eines Mieters um
+        // 360.00, muss die Summe genau um 360.00 steigen.
+        //
+        // Die Beziehung "Kosten - Akonto = Summe der Salden" deckt der Unit-Test ab; hier waere
+        // sie nur ueber die je Block ABSOLUT angezeigten Salden pruefbar, deren Vorzeichen fehlt.
+        const bezeichnung = neueBezeichnung('Akonto');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+
+        await fuegePositionHinzu(page, 'UMLAGE', 'E2E A-Umlage');
+        await page.locator('.nk-positionen tbody tr').first()
+            .locator('input[type="number"]').first().fill('1000');
+
+        const block = await oeffneErstenMieterblock(page);
+        await block.locator('.nk-akonto input[type="number"]').nth(0).fill('12');
+        await block.locator('.nk-akonto input[type="number"]').nth(1).fill('50');
+
+        // Zwei Totalzeilen, die Akonto-Zeile unter der Kosten-Zeile. Bewusst ueber die
+        // DOM-Reihenfolge und nicht ueber eigene Klassen: Dass sie DIREKT darunter steht, ist Teil
+        // der Anforderung. `.form-container` ist die Wurzel der Maske - `.zev-container` gehoert
+        // zur Liste darum herum.
+        const totale = page.locator('.form-container > .nk-total');
+        await expect(totale).toHaveCount(2);
+        const akontoZeile = totale.nth(1).locator('.number');
+        await expect(totale.nth(0)).toContainText('CHF');
+
+        const vorher = betragAlsZahl((await akontoZeile.textContent())!.replace(' CHF', '').trim());
+        expect(vorher).toBeGreaterThanOrEqual(600);
+
+        // 12 x 80.00 statt 12 x 50.00 - also 360.00 mehr.
+        await block.locator('.nk-akonto input[type="number"]').nth(1).fill('80');
+
+        await expect.poll(async () =>
+            betragAlsZahl((await akontoZeile.textContent())!.replace(' CHF', '').trim()),
+            { timeout: 10000 }).toBeCloseTo(vorher + 360, 2);
+
+        // Und nach dem Speichern rechnet der Server dasselbe.
+        await clearMessages(page);
+        await speichernUnten(page).click();
+        await erwarteErfolg(page, 'Akonto speichern');
+
+        await expect.poll(async () =>
+            betragAlsZahl((await page.locator('.form-container > .nk-total').nth(1)
+                .locator('.number').textContent())!.replace(' CHF', '').trim()),
+            { timeout: 10000 }).toBeCloseTo(vorher + 360, 2);
+    });
+
+    test('should right-align the amounts in the position overview', async ({ page }) => {
+        // `class="number"` war app-weit nirgends definiert - die Zahlenspalten standen links.
+        // Getestet wird die WIRKUNG, nicht die Klasse: ein Klassenname allein sagt nichts darueber,
+        // ob eine Regel greift.
+        const bezeichnung = neueBezeichnung('Ausrichtung');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+
+        await fuegePositionHinzu(page, 'UMLAGE', 'E2E R-Umlage');
+        await page.locator('.nk-positionen tbody tr').first()
+            .locator('input[type="number"]').first().fill('1000');
+
+        const kostenzelle = verteiltFuer(page, 'E2E R-Umlage');
+        await expect(kostenzelle).not.toHaveText('');
+        await expect(kostenzelle).toHaveCSS('text-align', 'right');
+        await expect(summeKosten(page)).toHaveCSS('text-align', 'right');
+    });
+
     test('should show the sum of all tenant totals above the tenants', async ({ page }) => {
         // Mit einer einzigen Umlage als einziger Kostenposition muss die Summe der Mietertotale
         // genau der verteilten Summe dieser Position entsprechen. Damit ist der Test exakt und
@@ -1055,8 +1215,7 @@ test.describe('Nebenkostenabrechnung - Kopieren', () => {
         // Kopieren aus der Liste - die Kopie oeffnet sich direkt.
         await navigateToListe(page);
         const zeile = page.locator(`tr:has-text("${bezeichnung}")`).first();
-        await openKebabMenu(page, zeile);
-        await page.locator('.zev-kebab-menu__item', { hasText: /Kopieren|Copy/ }).first().click();
+        await klickeKebabEintrag(page, zeile, /Kopieren|Copy/);
 
         // Auf den WERT warten, nicht auf das sichtbare Feld: Die Maske ist eine Kindkomponente und
         // laedt ihr Detail selbst nach. Vorher steht die Bezeichnung leer da - `inputValue()` las

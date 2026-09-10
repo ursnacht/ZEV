@@ -10,7 +10,7 @@ import {
   NkAbrechnungDetail,
   NkPosition,
   NkPositionsart,
-  NkUmlageInfo,
+  NkPositionSumme,
   NkZeile,
   leerePosition
 } from '../../models/nebenkosten.model';
@@ -77,11 +77,12 @@ describe('NebenkostenAbrechnungFormComponent', () => {
       summeTage: 365,
       nennerPerson: 730,
       summePersonenTage: 365,
-      umlagen: [{
+      summeKosten: 450,
+      positionSummen: [{
         positionId: 10,
         bezeichnung: 'Allgemeinstrom',
         totalbetrag: 900,
-        summeVerteilt: 450,
+        summeKosten: 450,
         nichtVerteilt: 450,
         rundungsdifferenz: 0
       }],
@@ -289,9 +290,9 @@ describe('NebenkostenAbrechnungFormComponent', () => {
         prozentsatz: null,
         verbraeuche: prozent === null ? [] : [{ mieterId: 100, menge: prozent }]
       }];
-      detail.berechnung.umlagen = [{
+      detail.berechnung.positionSummen = [{
         positionId: 20, bezeichnung: 'Heizkosten', art: 'ANTEIL', totalbetrag: 2400,
-        summeVerteilt: prozent === null ? 0 : 2400 * prozent / 100,
+        summeKosten: prozent === null ? 0 : 2400 * prozent / 100,
         nichtVerteilt: 0, rundungsdifferenz: 0, summeProzent: prozent ?? 0
       }];
       detail.berechnung.mieter[0].zeilen = [{
@@ -340,7 +341,7 @@ describe('NebenkostenAbrechnungFormComponent', () => {
       mitAnteilsposition(60);
       await oeffneMieterblock();
 
-      const info = component.berechnung!.umlagen[0];
+      const info = component.berechnung!.positionSummen[0];
       expect(component.summeProzentStimmt(info)).toBe(false);
     });
 
@@ -644,10 +645,10 @@ describe('NebenkostenAbrechnungFormComponent', () => {
     });
   });
 
-  describe('umlageInfoFuer', () => {
+  describe('positionSummeFuer', () => {
     it('should find the control figures by database id, not by position in the list', () => {
       const umlageZeile = component.berechnung!.mieter[0].zeilen[0];
-      expect(component.umlageInfoFuer(umlageZeile)?.nichtVerteilt).toBe(450);
+      expect(component.positionSummeFuer(umlageZeile)?.nichtVerteilt).toBe(450);
     });
   });
 
@@ -1102,7 +1103,8 @@ describe('NebenkostenAbrechnungFormComponent', () => {
     it('should create a prepayment row from the server suggestion', () => {
       component.akonto = [];
       component.berechnung = {
-        nenner: 730, summeTage: 365, nennerPerson: 730, summePersonenTage: 365, umlagen: [],
+        nenner: 730, summeTage: 365, nennerPerson: 730, summePersonenTage: 365,
+        summeKosten: 0, positionSummen: [],
         mieter: [{
           mieterId: 100, name: 'Anna Beispiel', tage: 365, anzahlPersonen: 1,
           personenTage: 365, ohneWohnung: false, zeilen: [],
@@ -1264,7 +1266,7 @@ describe('NebenkostenAbrechnungFormComponent', () => {
 
   describe('summeProzentStimmt', () => {
 
-    const info = (summeProzent: number) => ({ summeProzent } as unknown as NkUmlageInfo);
+    const info = (summeProzent: number) => ({ summeProzent } as unknown as NkPositionSumme);
 
     it('should accept exactly one hundred percent', () => {
       expect(component.summeProzentStimmt(info(100))).toBe(true);
@@ -1629,6 +1631,100 @@ describe('NebenkostenAbrechnungFormComponent', () => {
       component.rechne();
 
       expect(component.summeMietertotal).toBeGreaterThan(vorher);
+    });
+  });
+
+  describe('summeAkontototal', () => {
+
+    it('should be 0 without a calculation', () => {
+      component.berechnung = null;
+      expect(component.summeAkontototal).toBe(0);
+    });
+
+    it('should add up the prepayment totals', () => {
+      component.berechnung = {
+        ...serverDetail.berechnung!,
+        mieter: [
+          { ...serverDetail.berechnung!.mieter[0], akontoTotal: 1200.55 },
+          { ...serverDetail.berechnung!.mieter[0], mieterId: 101, akontoTotal: 899.45 }
+        ]
+      };
+
+      expect(component.summeAkontototal).toBe(2100);
+    });
+
+    it('should round away floating point remnants', () => {
+      component.berechnung = {
+        ...serverDetail.berechnung!,
+        mieter: [
+          { ...serverDetail.berechnung!.mieter[0], akontoTotal: 0.1 },
+          { ...serverDetail.berechnung!.mieter[0], mieterId: 101, akontoTotal: 0.2 }
+        ]
+      };
+
+      expect(component.summeAkontototal).toBe(0.3);
+    });
+
+    it('should differ from the cost total by the sum of the balances', () => {
+      // Der Grund, warum die Zeile direkt unter dem Kostentotal steht: Die Differenz der beiden
+      // ist das, was insgesamt nachzuzahlen oder gutzuschreiben ist.
+      const saldenSumme = (component.berechnung?.mieter ?? [])
+        .reduce((s, b) => s + b.saldo, 0);
+
+      expect(component.summeMietertotal - component.summeAkontototal)
+        .toBeCloseTo(saldenSumme, 2);
+    });
+  });
+
+  describe('summenWeichenAb', () => {
+
+    it('should not warn when both totals agree', () => {
+      // Fixture: summeKosten 450 und ein Mieterblock mit kostentotal 504 - hier absichtlich
+      // gleichgesetzt, damit der Gutfall geprueft ist.
+      component.berechnung = {
+        ...serverDetail.berechnung!,
+        summeKosten: component.summeMietertotal
+      };
+
+      expect(component.summenWeichenAb).toBe(false);
+    });
+
+    it('should warn when the overview is missing a source', () => {
+      // Genau der Fall, den die Zahl aufdecken soll: Die Uebersicht kennt eine Quelle nicht.
+      component.berechnung = { ...serverDetail.berechnung!, summeKosten: 100 };
+
+      expect(component.summenWeichenAb).toBe(true);
+    });
+
+    it('should tolerate floating point noise', () => {
+      component.berechnung = {
+        ...serverDetail.berechnung!,
+        summeKosten: component.summeMietertotal + 0.001
+      };
+
+      expect(component.summenWeichenAb).toBe(false);
+    });
+
+    it('should not warn without a calculation', () => {
+      component.berechnung = null;
+      expect(component.summenWeichenAb).toBe(false);
+    });
+  });
+
+  describe('betragOderLeer', () => {
+
+    it('should render an empty cell for null', () => {
+      // Eine 0.00 bei einer Art ohne Gesamtbetrag saehe aus wie ein vergessener Wert.
+      expect(component.betragOderLeer(null)).toBe('');
+      expect(component.betragOderLeer(undefined)).toBe('');
+    });
+
+    it('should render a zero that was actually calculated', () => {
+      expect(component.betragOderLeer(0)).toBe('0.00');
+    });
+
+    it('should format like betrag', () => {
+      expect(component.betragOderLeer(1234.5)).toBe(component.betrag(1234.5));
     });
   });
 });

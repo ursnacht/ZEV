@@ -120,6 +120,15 @@ export interface NkZeile {
   menge?: number | null;
   betragProEinheit?: number | null;
   prozentsatz?: number | null;
+  /**
+   * Betrag, auf den sich `prozentsatz` bezieht — die **Bezugsgrösse** der Zeile:
+   * Totalbetrag bei Umlage und Anteil, Zwischentotal beim Zuschlag, `null` bei Verbrauch und
+   * Zusatzzeilen (dort ist `betragProEinheit` die Bezugsgrösse).
+   *
+   * Wird in der Maske **nicht** angezeigt; sie steht auf der PDF-Rechnung in der Spalte „Preis".
+   * Hier geführt, damit Vorschau und Backend dieselbe Zeile beschreiben.
+   */
+  bezugsbetrag?: number | null;
   betrag: number;
 }
 
@@ -152,20 +161,34 @@ export interface NkMieterAbrechnung {
 }
 
 /**
- * Kontrollzahlen einer Umlageposition. Leerstandsanteil und Rundungsdifferenz werden bewusst
- * getrennt geführt: Der eine ist fachlich begründet, die andere sind wenige Rappen aus dem Runden.
+ * Zusammenstellung **einer** Position über alle Mieter — eine Zeile der Positionsübersicht.
+ *
+ * Es gibt eine Zeile je allgemeiner Position, gleich welcher Art, plus **eine** Zeile für alle
+ * Zusatzpositionen zusammen (`zusatz`). Erst damit ergibt die Summe der `summeKosten` das
+ * Kostentotal aller Mieter.
+ *
+ * **Die Felder sind `null`-bar** und nicht mit `0` vorbelegt: Ein Totalbetrag von `0.00` bei einer
+ * Verbrauchsposition sähe aus wie ein vergessener Wert, obwohl die Art gar keinen kennt. Die Maske
+ * lässt die Zelle leer, statt eine Null zu behaupten. Deshalb hier durchgehend `== null` prüfen —
+ * das Backend schickt `null`, nicht `undefined`.
  */
-export interface NkUmlageInfo {
-  positionId: number;
-  bezeichnung: string;
-  /** UMLAGE oder ANTEIL — bestimmt, welche Kontrollzahlen etwas aussagen. */
-  art: NkPositionsart;
-  totalbetrag: number;
-  summeVerteilt: number;
-  nichtVerteilt: number;
-  rundungsdifferenz: number;
+export interface NkPositionSumme {
+  positionId?: number | null;
+  bezeichnung?: string | null;
+  /** `null` in der Zusatz-Zeile — sie ist keine einzelne Position. */
+  art?: NkPositionsart | null;
+  totalbetrag?: number | null;
+  /** Summe der Mengen; `null`, wo es keine gibt oder Einheiten gemischt sind. */
+  summeMenge?: number | null;
+  einheit?: Mengeneinheit | null;
+  /** Was den Mietern für diese Position belastet wird. */
+  summeKosten: number;
+  nichtVerteilt?: number | null;
+  rundungsdifferenz?: number | null;
   /** Nur bei ANTEIL: Summe der je Mieter erfassten Prozentsätze; sollte 100 ergeben. */
-  summeProzent: number;
+  summeProzent?: number | null;
+  /** Sammelzeile aller Zusatzpositionen; ihre Beschriftung liefert die Maske. */
+  zusatz?: boolean;
 }
 
 /** Ergebnis der Berechnung. */
@@ -177,7 +200,14 @@ export interface NkBerechnung {
   /** Summe `Miettage x Wohnungen x Personen` aller Mieter; muss `<= nennerPerson` sein. */
   summePersonenTage: number;
   mieter: NkMieterAbrechnung[];
-  umlagen: NkUmlageInfo[];
+  positionSummen: NkPositionSumme[];
+  /**
+   * Summe der `summeKosten` aller Zeilen der Positionsübersicht.
+   *
+   * **Muss dem Kostentotal aller Mieter entsprechen:** Beide zählen dieselben Zeilenbeträge, nur
+   * einmal je Position und einmal je Mieter gebündelt.
+   */
+  summeKosten: number;
 }
 
 /**

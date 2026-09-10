@@ -13,7 +13,7 @@ import {
   NkMieterAbrechnung,
   NkPosition,
   NkPositionsart,
-  NkUmlageInfo,
+  NkPositionSumme,
   NkZeile,
   NkZusatz,
   NK_ARTEN_MIT_EINGABE_JE_MIETER,
@@ -481,6 +481,28 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
 
   // ==================== Anzeige ====================
 
+  /**
+   * Betrag oder **leere** Zelle bei `null`.
+   *
+   * <p>Nicht dasselbe wie {@link betrag}: Dort wird `null` zu `0.00`, was bei einem Total stimmt
+   * (nichts verteilt ist null Franken), bei einer Art ohne Gesamtbetrag aber wie ein vergessener
+   * Wert aussieht.
+   */
+  betragOderLeer(wert: number | null | undefined): string {
+    return wert == null ? '' : this.betrag(wert);
+  }
+
+  /**
+   * Stabiler Schlüssel für eine Zeile der Positionsübersicht.
+   *
+   * <p>Die Sammelzeile der Zusatzpositionen hat keine `positionId` — ein `track info.positionId`
+   * lieferte für sie `null` und für eine zweite solche Zeile denselben Schlüssel. Den Index
+   * dazuzunehmen macht ihn eindeutig.
+   */
+  trackSumme(index: number, info: NkPositionSumme): string {
+    return `${info.positionId ?? 'z'}-${index}`;
+  }
+
   betrag(wert: number | null | undefined): string {
     return formatSwissNumber(wert ?? 0, 2);
   }
@@ -490,14 +512,14 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
   }
 
   /**
-   * Kontrollzahlen der Umlageposition, aus der eine Zeile stammt.
+   * Zusammenstellung der Position, aus der eine Zeile stammt.
    *
    * Gesucht wird über die Datenbank-ID der Zeile; eine noch nicht gespeicherte Position hat keine
    * und wird über die negierte Reihenfolge gefunden — derselbe Schlüssel, den die Vorschau vergibt.
    */
-  umlageInfoFuer(zeile: NkZeile): NkUmlageInfo | undefined {
+  positionSummeFuer(zeile: NkZeile): NkPositionSumme | undefined {
     const schluessel = zeile.positionId ?? -zeile.reihenfolge;
-    return this.berechnung?.umlagen.find(u => u.positionId === schluessel);
+    return this.berechnung?.positionSummen.find(u => u.positionId === schluessel);
   }
 
   /**
@@ -523,8 +545,8 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
    * ({@code nk_verbrauch.menge}, `NUMERIC(12,3)`), genau 100 % ist also erreichbar:
    * 33.334 + 33.333 + 33.333.
    */
-  summeProzentStimmt(info: NkUmlageInfo): boolean {
-    return Math.abs(info.summeProzent - 100) < 0.0005;
+  summeProzentStimmt(info: NkPositionSumme): boolean {
+    return Math.abs((info.summeProzent ?? 0) - 100) < 0.0005;
   }
 
   /**
@@ -648,6 +670,34 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
    * <p>Gerundet, weil die Zeilenbeträge Gleitkommazahlen sind: Ohne das stünde in einem Test
    * schon mal `1234.5600000000002`.
    */
+  /**
+   * Weicht die Summe der Positionsübersicht vom Kostentotal aller Mieter ab?
+   *
+   * <p>Beide zählen dieselben Zeilenbeträge, nur einmal je Position und einmal je Mieter
+   * gebündelt — sie **müssen** übereinstimmen. Tun sie es nicht, fehlt der Übersicht eine Quelle;
+   * die Maske sagt das, statt zwei Zahlen nebeneinander stehen zu lassen und den Leser rätseln zu
+   * lassen, welche stimmt.
+   *
+   * <p>Die Toleranz von einem halben Rappen fängt Gleitkomma-Rauschen der Vorschau ab, nicht eine
+   * echte Lücke.
+   */
+  get summenWeichenAb(): boolean {
+    return Math.abs((this.berechnung?.summeKosten ?? 0) - this.summeMietertotal) >= 0.005;
+  }
+
+  /**
+   * Summe der Akonto-Totale aller Mieter — was die Mieter im Zeitraum bereits bezahlt haben.
+   *
+   * <p>Gegenstück zu {@link summeMietertotal}: Die Differenz der beiden ist die Summe der Salden,
+   * also was insgesamt nachzuzahlen oder gutzuschreiben ist. Sie steht deshalb direkt darunter.
+   *
+   * <p>Gerundet wie die Kostensumme — die Zeilenbeträge sind Gleitkommazahlen.
+   */
+  get summeAkontototal(): number {
+    return runde((this.berechnung?.mieter ?? [])
+      .reduce((summe, block) => summe + block.akontoTotal, 0), 2);
+  }
+
   get summeMietertotal(): number {
     return runde((this.berechnung?.mieter ?? [])
       .reduce((summe, block) => summe + block.kostentotal, 0), 2);

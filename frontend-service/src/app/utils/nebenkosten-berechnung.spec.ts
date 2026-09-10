@@ -97,9 +97,9 @@ describe('nebenkosten-berechnung', () => {
         nenner, mieterListe, [umlage(10, 'Allgemeinstrom', 900)], [], []);
 
       expect(result.mieter[0].zeilen[0].betrag).toBe(100);
-      expect(result.umlagen[0].summeVerteilt).toBe(875.34);
-      expect(result.umlagen[0].nichtVerteilt).toBe(24.66);
-      expect(result.umlagen[0].rundungsdifferenz).toBe(0);
+      expect(result.positionSummen[0].summeKosten).toBe(875.34);
+      expect(result.positionSummen[0].nichtVerteilt).toBe(24.66);
+      expect(result.positionSummen[0].rundungsdifferenz).toBe(0);
     });
 
     it('should not charge the remaining tenants more for a vacancy', () => {
@@ -166,7 +166,7 @@ describe('nebenkosten-berechnung', () => {
       const result = berechneVorschau(0, [mieter(1, 0)], [umlage(10, 'Strom', 900)], [], []);
 
       expect(result.mieter[0].zeilen[0].betrag).toBe(0);
-      expect(result.umlagen[0].nichtVerteilt).toBe(900);
+      expect(result.positionSummen[0].nichtVerteilt).toBe(900);
     });
   });
 
@@ -290,8 +290,8 @@ describe('nebenkosten-berechnung', () => {
 
       expect(result.mieter[0].zeilen[0].betrag).toBe(1440);
       expect(result.mieter[1].zeilen[0].betrag).toBe(960);
-      expect(result.umlagen[0].summeProzent).toBe(100);
-      expect(result.umlagen[0].nichtVerteilt).toBe(0);
+      expect(result.positionSummen[0].summeProzent).toBe(100);
+      expect(result.positionSummen[0].nichtVerteilt).toBe(0);
     });
 
     it('should leave the rest undistributed below 100 percent', () => {
@@ -299,9 +299,9 @@ describe('nebenkosten-berechnung', () => {
         2 * JAHR_TAGE, [mieter(1, JAHR_TAGE), mieter(2, JAHR_TAGE)],
         [anteil(10, 'Heizkosten', 1000, [{ mieterId: 1, menge: 30 }])], [], []);
 
-      expect(result.umlagen[0].summeProzent).toBe(30);
-      expect(result.umlagen[0].summeVerteilt).toBe(300);
-      expect(result.umlagen[0].nichtVerteilt).toBe(700);
+      expect(result.positionSummen[0].summeProzent).toBe(30);
+      expect(result.positionSummen[0].summeKosten).toBe(300);
+      expect(result.positionSummen[0].nichtVerteilt).toBe(700);
     });
 
     it('should be independent of the rental days', () => {
@@ -311,7 +311,7 @@ describe('nebenkosten-berechnung', () => {
         [anteil(10, 'Heizkosten', 1000, [{ mieterId: 1, menge: 100 }])], [], []);
 
       expect(result.mieter[0].zeilen[0].betrag).toBe(1000);
-      expect(result.umlagen[0].nichtVerteilt).toBe(0);
+      expect(result.positionSummen[0].nichtVerteilt).toBe(0);
     });
   });
 
@@ -375,9 +375,9 @@ describe('nebenkosten-berechnung', () => {
         [mieter(1, JAHR_TAGE), mieter(2, JAHR_TAGE), mieter(3, JAHR_TAGE)],
         [umlage(10, 'Strom', 100)], [], []);
 
-      expect(result.umlagen[0].summeVerteilt).toBe(99.99);
-      expect(result.umlagen[0].nichtVerteilt).toBe(0);
-      expect(result.umlagen[0].rundungsdifferenz).toBe(0.01);
+      expect(result.positionSummen[0].summeKosten).toBe(99.99);
+      expect(result.positionSummen[0].nichtVerteilt).toBe(0);
+      expect(result.positionSummen[0].rundungsdifferenz).toBe(0.01);
     });
 
     it('should not compensate the rounding difference on any tenant', () => {
@@ -408,7 +408,7 @@ describe('nebenkosten-berechnung', () => {
 
       const result = berechneVorschau(JAHR_TAGE, [mieter(1, JAHR_TAGE)], [neu], [], []);
 
-      expect(result.umlagen[0].summeVerteilt).toBe(100);
+      expect(result.positionSummen[0].summeKosten).toBe(100);
     });
   });
 
@@ -418,7 +418,7 @@ describe('nebenkosten-berechnung', () => {
 
       expect(result.mieter.length).toBe(0);
       expect(result.summeTage).toBe(0);
-      expect(result.umlagen[0].nichtVerteilt).toBe(900);
+      expect(result.positionSummen[0].nichtVerteilt).toBe(900);
     });
 
     it('should handle an empty position list', () => {
@@ -489,8 +489,8 @@ describe('nebenkosten-berechnung', () => {
         5 * JAHR_TAGE,
         [{ mieterId: 1, anzahlPersonen: 3 }, { mieterId: 2, anzahlPersonen: 1 }]);
 
-      expect(result.umlagen[0].summeVerteilt).toBe(800);
-      expect(result.umlagen[0].nichtVerteilt).toBe(200);
+      expect(result.positionSummen[0].summeKosten).toBe(800);
+      expect(result.positionSummen[0].nichtVerteilt).toBe(200);
     });
 
     it('should distribute the quantity as well', () => {
@@ -510,6 +510,178 @@ describe('nebenkosten-berechnung', () => {
         [umlagePerson(11, 'Gruenabfuhr', 1000)], [], [], 0, []);
 
       expect(result.mieter[0].zeilen[0].betrag).toBe(0);
+    });
+  });
+
+  describe('Positionsuebersicht', () => {
+
+    function zusatz(mieterId: number, menge: number, preis: number,
+                    einheit: Mengeneinheit = Mengeneinheit.STUECK): NkZusatz {
+      return {
+        mieterId, reihenfolge: 1, bezeichnung: 'Schluessel', einheit,
+        menge, betragProEinheit: preis
+      };
+    }
+
+    it('should make the cost total match the sum of all tenant totals', () => {
+      // Das Kernversprechen - mit ALLEN Arten plus Zusatzposition. Fehlte der Uebersicht eine
+      // Quelle, faellt es genau hier auf.
+      const nenner = 2 * JAHR_TAGE;
+      const mieterListe = [mieter(1, JAHR_TAGE), mieter(2, JAHR_TAGE)];
+
+      const result = berechneVorschau(
+        nenner, mieterListe,
+        [umlage(10, 'Strom', 1000, 500),
+         verbrauch(11, 'Wasser', 3.5, [{ mieterId: 1, menge: 12 }, { mieterId: 2, menge: 8 }]),
+         zuschlag(12, 'Verwaltung', 5)],
+        [zusatz(1, 2, 25)], [], nenner, []);
+
+      const kostentotal = result.mieter.reduce((s, b) => s + b.kostentotal, 0);
+      expect(result.summeKosten).toBe(runde(kostentotal, 2));
+    });
+
+    it('should list every art plus one row for the additional items', () => {
+      const result = berechneVorschau(
+        2 * JAHR_TAGE, [mieter(1, JAHR_TAGE)],
+        [umlage(10, 'Strom', 1000), verbrauch(11, 'Wasser', 3.5), zuschlag(12, 'Verwaltung', 5)],
+        [zusatz(1, 2, 25)], []);
+
+      expect(result.positionSummen.length).toBe(4);
+      expect(result.positionSummen[3].zusatz).toBe(true);
+      // Die Beschriftung liefert die Maske, nicht die Berechnung.
+      expect(result.positionSummen[3].bezeichnung).toBeUndefined();
+      expect(result.positionSummen[3].summeKosten).toBe(50);
+    });
+
+    it('should omit the collection row without additional items', () => {
+      const result = berechneVorschau(
+        2 * JAHR_TAGE, [mieter(1, JAHR_TAGE)], [umlage(10, 'Strom', 1000)], [], []);
+
+      expect(result.positionSummen.length).toBe(1);
+      expect(result.positionSummen[0].zusatz).toBeFalsy();
+    });
+
+    it('should sum the distributed quantity of an allocation', () => {
+      const result = berechneVorschau(
+        2 * JAHR_TAGE, [mieter(1, JAHR_TAGE), mieter(2, JAHR_TAGE)],
+        [umlage(10, 'Wasser', 1000, 500)], [], []);
+
+      expect(result.positionSummen[0].summeMenge).toBe(500);
+      expect(result.positionSummen[0].einheit).toBe(Mengeneinheit.M3);
+    });
+
+    it('should sum the recorded quantity of a consumption item', () => {
+      const result = berechneVorschau(
+        2 * JAHR_TAGE, [mieter(1, JAHR_TAGE), mieter(2, JAHR_TAGE)],
+        [verbrauch(11, 'Warmwasser', 3.5,
+          [{ mieterId: 1, menge: 12 }, { mieterId: 2, menge: 8 }])], [], []);
+
+      const summe = result.positionSummen[0];
+      expect(summe.summeMenge).toBe(20);
+      expect(summe.summeKosten).toBe(70);
+      // Eine Verbrauchsposition kennt keinen Gesamtbetrag - die Zelle bleibt leer.
+      expect(summe.totalbetrag).toBeNull();
+      expect(summe.nichtVerteilt).toBeNull();
+    });
+
+    it('should leave the quantity empty when nothing was recorded', () => {
+      // Eine 0 saehe aus wie eine gemessene Null.
+      const result = berechneVorschau(
+        2 * JAHR_TAGE, [mieter(1, JAHR_TAGE)], [verbrauch(11, 'Warmwasser', 3.5)], [], []);
+
+      expect(result.positionSummen[0].summeMenge).toBeNull();
+      expect(result.positionSummen[0].summeKosten).toBe(0);
+    });
+
+    it('should leave quantity and unit empty for surcharge and share', () => {
+      const result = berechneVorschau(
+        2 * JAHR_TAGE, [mieter(1, JAHR_TAGE)],
+        [anteil(13, 'Heizkosten', 1000, [{ mieterId: 1, menge: 100 }]),
+         zuschlag(14, 'Verwaltung', 5)], [], []);
+
+      const anteilSumme = result.positionSummen[0];
+      expect(anteilSumme.summeMenge).toBeNull();
+      expect(anteilSumme.einheit).toBeNull();
+      expect(anteilSumme.summeProzent).toBe(100);
+
+      const zuschlagSumme = result.positionSummen[1];
+      expect(zuschlagSumme.summeMenge).toBeNull();
+      expect(zuschlagSumme.totalbetrag).toBeNull();
+      expect(zuschlagSumme.summeProzent).toBeNull();
+      expect(zuschlagSumme.summeKosten).toBe(50);
+    });
+
+    it('should sum quantities of additional items sharing one unit', () => {
+      const result = berechneVorschau(
+        2 * JAHR_TAGE, [mieter(1, JAHR_TAGE), mieter(2, JAHR_TAGE)], [],
+        [zusatz(1, 2, 25), zusatz(2, 3, 25)], []);
+
+      const zeile = result.positionSummen[0];
+      expect(zeile.summeMenge).toBe(5);
+      expect(zeile.einheit).toBe(Mengeneinheit.STUECK);
+      expect(zeile.summeKosten).toBe(125);
+    });
+
+    it('should leave the quantity empty when additional items mix units', () => {
+      // "2 Stueck plus 3 m3" ist keine Menge, sondern zwei. Die Kosten bleiben summierbar.
+      const result = berechneVorschau(
+        2 * JAHR_TAGE, [mieter(1, JAHR_TAGE), mieter(2, JAHR_TAGE)], [],
+        [zusatz(1, 2, 25), zusatz(2, 3, 10, Mengeneinheit.M3)], []);
+
+      const zeile = result.positionSummen[0];
+      expect(zeile.summeMenge).toBeNull();
+      expect(zeile.einheit).toBeNull();
+      expect(zeile.summeKosten).toBe(80);
+    });
+  });
+
+  describe('Bezugsgroesse je Zeile', () => {
+
+    it('should carry total and share on an allocation', () => {
+      // Rechenprobe: Bezugsbetrag x Prozentsatz muss den Zeilenbetrag ergeben.
+      const result = berechneVorschau(
+        2 * JAHR_TAGE, [mieter(1, JAHR_TAGE), mieter(2, JAHR_TAGE)],
+        [umlage(10, 'Strom', 1000)], [], []);
+
+      const zeile = result.mieter[0].zeilen[0];
+      expect(zeile.bezugsbetrag).toBe(1000);
+      expect(zeile.prozentsatz).toBe(50);
+      expect(zeile.betrag).toBe(500);
+    });
+
+    it('should carry the total on a share position', () => {
+      const result = berechneVorschau(
+        2 * JAHR_TAGE, [mieter(1, JAHR_TAGE)],
+        [anteil(13, 'Heizkosten', 2400, [{ mieterId: 1, menge: 60 }])], [], []);
+
+      const zeile = result.mieter[0].zeilen[0];
+      expect(zeile.bezugsbetrag).toBe(2400);
+      // Der ERFASSTE Prozentsatz bleibt stehen, nicht ein gerechneter.
+      expect(zeile.prozentsatz).toBe(60);
+      expect(zeile.betrag).toBe(1440);
+    });
+
+    it('should carry the running subtotal on a surcharge', () => {
+      const result = berechneVorschau(
+        2 * JAHR_TAGE, [mieter(1, JAHR_TAGE), mieter(2, JAHR_TAGE)],
+        [umlage(10, 'Strom', 1000), zuschlag(14, 'Verwaltung', 10)], [], []);
+
+      const zeilen = result.mieter[0].zeilen;
+      expect(zeilen[0].betrag).toBe(500);
+      // Zwischentotal = die Zeile davor
+      expect(zeilen[1].bezugsbetrag).toBe(500);
+      expect(zeilen[1].betrag).toBe(50);
+    });
+
+    it('should leave it empty on a consumption line', () => {
+      const result = berechneVorschau(
+        2 * JAHR_TAGE, [mieter(1, JAHR_TAGE)],
+        [verbrauch(11, 'Wasser', 3.5, [{ mieterId: 1, menge: 12 }])], [], []);
+
+      const zeile = result.mieter[0].zeilen[0];
+      // Dort ist der Preis je Einheit die Bezugsgroesse.
+      expect(zeile.bezugsbetrag).toBeUndefined();
+      expect(zeile.betragProEinheit).toBe(3.5);
     });
   });
 });

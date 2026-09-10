@@ -55,8 +55,10 @@
                 }
               </th>
               <!-- Ohne feste Einheit in der Ueberschrift: Grundgebuehr rechnet pro Monat,
-                   Zusatzleistungen je nach Tarif - die Einheit steht deshalb in der Zeile. -->
-              <th class="zev-table__header--sortable" (click)="onSort('preis')">
+                   Zusatzleistungen je nach Tarif - die Einheit steht deshalb in der Zeile.
+                   `zev-table__number` auch hier: Sonst stand der Titel links, waehrend die
+                   Zahlen darunter rechts standen. -->
+              <th class="zev-table__header--sortable zev-table__number" (click)="onSort('preis')">
                 {{ 'PREIS' | translate }} (CHF)
                 @if (sortColumn === 'preis') {
                   <span class="zev-table__sort-indicator">
@@ -93,7 +95,7 @@
                   </span>
                 </td>
                 <td>{{ tarif.bezeichnung }}</td>
-                <td class="number">
+                <td class="zev-table__number">
                   {{ formatPreis(tarif.preis) }}
                   <span class="zev-text--muted">/ {{ preisEinheit(tarif) | translate }}</span>
                 </td>

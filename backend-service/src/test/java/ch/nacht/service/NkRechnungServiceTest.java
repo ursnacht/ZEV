@@ -258,17 +258,82 @@ class NkRechnungServiceTest {
     }
 
     /**
-     * Eine Zeile ohne Mengeneinheit (Umlage, Zuschlag) traegt {@code null} und nicht etwa
-     * {@code KWH}: Sonst stuende auf der Rechnung eine Einheit, die nie erfasst wurde.
+     * Ein {@code ZUSCHLAG} traegt an der Position keine Mengeneinheit - der CHECK-Constraint
+     * verbietet sie. Auf der Rechnung steht in der Spalte „Preis" aber sein Zwischentotal, und
+     * das ist ein Frankenbetrag: Die Einheit ist deshalb {@code CHF} („Fr.").
+     *
+     * <p>Dieser Test behauptete zuvor das Gegenteil ({@code null}, „sonst stuende auf der Rechnung
+     * eine Einheit, die nie erfasst wurde"). Das Argument traegt nicht mehr, seit die Spalte
+     * „Preis" bei diesen Arten gefuellt ist: Die Einheit beschreibt jetzt eine Groesse, die
+     * tatsaechlich dasteht.
      */
     @Test
-    void baueRechnungen_ZeileOhneEinheit_MengeneinheitNull() {
+    void baueRechnungen_ZuschlagOhneEinheit_BekommtCHF() {
         when(nkAbrechnungService.getAbrechnungDetail(ABRECHNUNG_ID)).thenReturn(Optional.of(detail()));
 
         NkRechnungZeileDTO zuschlag = service.baueRechnungen(ABRECHNUNG_ID).get(0).getZeilen().get(1);
 
-        assertNull(zuschlag.getMengeneinheit());
+        assertEquals("CHF", zuschlag.getMengeneinheit(), "Uebersetzungsschluessel, nicht der Text");
         assertEquals(0, zuschlag.getProzentsatz().compareTo(new BigDecimal("3.00")));
+    }
+
+    @Test
+    void baueRechnungen_AnteilOhneEinheit_BekommtCHF() {
+        NkZeileDTO anteil = new NkZeileDTO();
+        anteil.setArt(NkPositionsart.ANTEIL);
+        anteil.setReihenfolge(1);
+        anteil.setBezeichnung("Heizkosten");
+        anteil.setProzentsatz(new BigDecimal("60.000"));
+        anteil.setBezugsbetrag(new BigDecimal("2400.00"));
+        anteil.setBetrag(new BigDecimal("1440.00"));
+
+        NkAbrechnungDetailDTO detail = detail();
+        detail.getBerechnung().getMieter().get(0).setZeilen(List.of(anteil));
+        when(nkAbrechnungService.getAbrechnungDetail(ABRECHNUNG_ID)).thenReturn(Optional.of(detail));
+
+        NkRechnungZeileDTO zeile = service.baueRechnungen(ABRECHNUNG_ID).get(0).getZeilen().get(0);
+
+        assertEquals("CHF", zeile.getMengeneinheit());
+    }
+
+    /**
+     * Eine Umlage fuehrt ihre Mengeneinheit selbst - sie wird NICHT durch {@code CHF} ersetzt.
+     * Sonst stuende bei einer Wasserumlage „Fr." statt „m³".
+     */
+    @Test
+    void baueRechnungen_UmlageBehaeltIhreEinheit() {
+        NkZeileDTO umlage = new NkZeileDTO();
+        umlage.setArt(NkPositionsart.UMLAGE);
+        umlage.setReihenfolge(1);
+        umlage.setBezeichnung("Wasser");
+        umlage.setEinheit(Mengeneinheit.M3);
+        umlage.setMenge(new BigDecimal("12.000"));
+        umlage.setBezugsbetrag(new BigDecimal("1000.00"));
+        umlage.setProzentsatz(new BigDecimal("50.000"));
+        umlage.setBetrag(new BigDecimal("500.00"));
+
+        NkAbrechnungDetailDTO detail = detail();
+        detail.getBerechnung().getMieter().get(0).setZeilen(List.of(umlage));
+        when(nkAbrechnungService.getAbrechnungDetail(ABRECHNUNG_ID)).thenReturn(Optional.of(detail));
+
+        NkRechnungZeileDTO zeile = service.baueRechnungen(ABRECHNUNG_ID).get(0).getZeilen().get(0);
+
+        assertEquals("M3", zeile.getMengeneinheit());
+    }
+
+    /**
+     * Die Bezugsgroesse gehoert auf die Rechnung: Ohne sie stand in der Spalte „Preis" bei einer
+     * Umlage oder einem Zuschlag nichts, und der Betrag war fuer den Mieter nicht nachvollziehbar.
+     */
+    @Test
+    void baueRechnungen_ReichtDenBezugsbetragDurch() {
+        when(nkAbrechnungService.getAbrechnungDetail(ABRECHNUNG_ID)).thenReturn(Optional.of(detail()));
+
+        List<NkRechnungZeileDTO> zeilen = service.baueRechnungen(ABRECHNUNG_ID).get(0).getZeilen();
+
+        // Verbrauchszeile: dort ist der Preis je Einheit die Bezugsgroesse, das Feld bleibt frei.
+        assertNull(zeilen.get(0).getBezugsbetrag());
+        assertEquals(0, zeilen.get(1).getBezugsbetrag().compareTo(new BigDecimal("63.83")));
     }
 
     @Test
@@ -362,6 +427,104 @@ class NkRechnungServiceTest {
         when(nkAbrechnungService.getAbrechnungDetail(ABRECHNUNG_ID)).thenReturn(Optional.of(detail));
 
         assertTrue(service.baueRechnungen(ABRECHNUNG_ID).isEmpty());
+    }
+
+    // ==================== Zeitraum auf der Rechnung (FR-8) ====================
+
+    /**
+     * Zieht ein Mieter mitten im Abrechnungszeitraum ein, nennt seine Rechnung den
+     * <b>Mietbeginn</b> — nicht den Beginn der Abrechnung. Seine Betraege sind ohnehin nur fuer
+     * die Miettage gerechnet; ein Zeitraum, in dem er noch nicht wohnte, waere ein Widerspruch
+     * auf demselben Blatt.
+     */
+    @Test
+    void baueRechnungen_MietbeginnNachAbrechnungsbeginn_ZeitraumAbMietbeginn() {
+        LocalDate mietbeginn = LocalDate.of(2026, 5, 1);
+        when(mieterRepository.findFirstById(45L))
+                .thenReturn(Optional.of(mieter(45L, mietbeginn, null)));
+        when(nkAbrechnungService.getAbrechnungDetail(ABRECHNUNG_ID)).thenReturn(Optional.of(detail()));
+
+        NkRechnungDTO rechnung = service.baueRechnungen(ABRECHNUNG_ID).get(0);
+
+        assertEquals(mietbeginn, rechnung.getZeitraumVon());
+        assertEquals(BIS, rechnung.getZeitraumBis(), "Das Mietende fehlt - laeuft weiter");
+    }
+
+    /** Auszug mitten im Zeitraum: Die Rechnung endet am Mietende. */
+    @Test
+    void baueRechnungen_MietendeVorAbrechnungsende_ZeitraumBisMietende() {
+        LocalDate mietende = LocalDate.of(2026, 9, 30);
+        when(mieterRepository.findFirstById(45L))
+                .thenReturn(Optional.of(mieter(45L, LocalDate.of(2025, 1, 1), mietende)));
+        when(nkAbrechnungService.getAbrechnungDetail(ABRECHNUNG_ID)).thenReturn(Optional.of(detail()));
+
+        NkRechnungDTO rechnung = service.baueRechnungen(ABRECHNUNG_ID).get(0);
+
+        assertEquals(VON, rechnung.getZeitraumVon(), "Der Mietbeginn liegt vor der Abrechnung");
+        assertEquals(mietende, rechnung.getZeitraumBis());
+    }
+
+    /**
+     * Umschliesst das Mietverhaeltnis den ganzen Zeitraum, bleibt es beim Zeitraum der
+     * Abrechnung — der haeufigste Fall, und er soll unveraendert aussehen.
+     */
+    @Test
+    void baueRechnungen_MietverhaeltnisUmschliesstZeitraum_ZeitraumDerAbrechnung() {
+        when(mieterRepository.findFirstById(45L)).thenReturn(Optional.of(
+                mieter(45L, LocalDate.of(2020, 1, 1), LocalDate.of(2030, 12, 31))));
+        when(nkAbrechnungService.getAbrechnungDetail(ABRECHNUNG_ID)).thenReturn(Optional.of(detail()));
+
+        NkRechnungDTO rechnung = service.baueRechnungen(ABRECHNUNG_ID).get(0);
+
+        assertEquals(VON, rechnung.getZeitraumVon());
+        assertEquals(BIS, rechnung.getZeitraumBis());
+    }
+
+    /** Ohne Mieter im Stamm bleibt der Zeitraum der Abrechnung stehen. */
+    @Test
+    void baueRechnungen_MieterNichtGefunden_ZeitraumDerAbrechnung() {
+        when(mieterRepository.findFirstById(45L)).thenReturn(Optional.empty());
+        when(nkAbrechnungService.getAbrechnungDetail(ABRECHNUNG_ID)).thenReturn(Optional.of(detail()));
+
+        NkRechnungDTO rechnung = service.baueRechnungen(ABRECHNUNG_ID).get(0);
+
+        assertEquals(VON, rechnung.getZeitraumVon());
+        assertEquals(BIS, rechnung.getZeitraumBis());
+    }
+
+    /**
+     * Der beschnittene Zeitraum steht <b>nur</b> auf dem Papier: {@code von}/{@code bis} tragen
+     * weiter den Zeitraum der Abrechnung.
+     *
+     * <p>Sie werden anderswo gebraucht — die gebuchte Forderung und die Kopfzeile des
+     * Rechnungslaufs beziehen sich auf den Lauf als Ganzes. Wuerden sie je Mieter beschnitten,
+     * nennte die Kopfzeile den Zeitraum des zuletzt verarbeiteten Mieters.
+     */
+    @Test
+    void baueRechnungen_KurzesMietverhaeltnis_VonUndBisBleibenDerAbrechnungszeitraum() {
+        when(mieterRepository.findFirstById(45L)).thenReturn(Optional.of(
+                mieter(45L, LocalDate.of(2026, 5, 1), LocalDate.of(2026, 9, 30))));
+        when(nkAbrechnungService.getAbrechnungDetail(ABRECHNUNG_ID)).thenReturn(Optional.of(detail()));
+
+        NkRechnungDTO rechnung = service.baueRechnungen(ABRECHNUNG_ID).get(0);
+
+        assertEquals(VON, rechnung.getVon());
+        assertEquals(BIS, rechnung.getBis());
+        assertEquals(LocalDate.of(2026, 5, 1), rechnung.getZeitraumVon());
+        assertEquals(LocalDate.of(2026, 9, 30), rechnung.getZeitraumBis());
+    }
+
+    /** Und die Forderung wird weiter auf den Zeitraum der Abrechnung gebucht. */
+    @Test
+    void erzeugeRechnungen_KurzesMietverhaeltnis_ForderungMitAbrechnungszeitraum() {
+        when(mieterRepository.findFirstById(45L)).thenReturn(Optional.of(
+                mieter(45L, LocalDate.of(2026, 5, 1), LocalDate.of(2026, 9, 30))));
+        when(nkAbrechnungService.getAbrechnungDetail(ABRECHNUNG_ID)).thenReturn(Optional.of(detail()));
+
+        service.erzeugeRechnungen(ABRECHNUNG_ID, "de");
+
+        verify(debitorService).upsertFromRechnung(eq(45L), any(),
+                eq(VON), eq(BIS), eq(Debitorherkunft.NK));
     }
 
     // ==================== erzeugeRechnungen: Buchung ====================
@@ -614,6 +777,8 @@ class NkRechnungServiceTest {
         zuschlag.setArt(NkPositionsart.ZUSCHLAG);
         zuschlag.setBezeichnung("Verwaltungskosten");
         zuschlag.setProzentsatz(new BigDecimal("3.00"));
+        // Zwischentotal, auf dem der Zuschlag rechnet - steht auf der Rechnung in der Spalte Preis.
+        zuschlag.setBezugsbetrag(new BigDecimal("63.83"));
         zuschlag.setBetrag(new BigDecimal("9.13"));
 
         NkMieterAbrechnungDTO block = new NkMieterAbrechnungDTO();
@@ -635,6 +800,14 @@ class NkRechnungServiceTest {
         mieter.setStrasse(strasse);
         mieter.setPlz(plz);
         mieter.setOrt(ort);
+        return mieter;
+    }
+
+    /** Mieter mit Mietdauer; {@code mietende} darf {@code null} sein ("laeuft weiter"). */
+    private Mieter mieter(Long id, LocalDate mietbeginn, LocalDate mietende) {
+        Mieter mieter = mieter(id, "Musterstrasse 1", "8000", "Zuerich");
+        mieter.setMietbeginn(mietbeginn);
+        mieter.setMietende(mietende);
         return mieter;
     }
 

@@ -12,6 +12,7 @@ import ch.nacht.dto.RechnungKonfigurationDTO;
 import ch.nacht.entity.Debitorherkunft;
 import ch.nacht.entity.FeatureFlag;
 import ch.nacht.entity.Mengeneinheit;
+import ch.nacht.entity.NkPositionsart;
 import ch.nacht.entity.Mieter;
 import ch.nacht.entity.NkAbrechnung;
 import ch.nacht.exception.FeatureDisabledException;
@@ -268,7 +269,11 @@ public class NkRechnungService {
 
         rechnung.setMieterId(block.getMieterId());
         rechnung.setMieterName(block.getName());
-        setzeAdresse(rechnung, block.getMieterId());
+
+        // Einmal geladen, zweimal gebraucht: Anschrift und Mietdauer.
+        Mieter mieter = ladeMieter(block.getMieterId());
+        setzeAdresse(rechnung, mieter);
+        setzeZeitraum(rechnung, abrechnung, mieter);
 
         for (NkZeileDTO zeile : block.getZeilen()) {
             rechnung.getZeilen().add(baueZeile(zeile));
@@ -309,11 +314,90 @@ public class NkRechnungService {
         ziel.setMenge(zeile.getMenge());
         ziel.setBetragProEinheit(zeile.getBetragProEinheit());
         ziel.setProzentsatz(zeile.getProzentsatz());
+        ziel.setBezugsbetrag(zeile.getBezugsbetrag());
         ziel.setBetrag(zeile.getBetrag());
-        ziel.setMengeneinheit(zeile.getEinheit() != null
-                ? MENGENEINHEIT_KEYS.get(zeile.getEinheit())
-                : null);
+        ziel.setMengeneinheit(mengeneinheitKey(zeile));
         return ziel;
+    }
+
+    /**
+     * Übersetzungsschlüssel für die Spalte „Einheit" einer Rechnungszeile.
+     *
+     * <p>{@code ANTEIL} und {@code ZUSCHLAG} tragen an der Position <b>keine</b> Mengeneinheit —
+     * der CHECK-Constraint verbietet sie dort, weil bei ihnen nichts gemessen wird. In der Spalte
+     * „Preis" steht bei ihnen aber der {@code bezugsbetrag}, und der ist ein <b>Frankenbetrag</b>:
+     * Deshalb {@code CHF} („Fr."). Ohne die Angabe blieb die Zelle leer und der Betrag daneben
+     * stand ohne Bezugsgrösse da.
+     *
+     * <p><b>Nur für die Rechnung</b> und nicht an der Zeile selbst gesetzt: Die Position hat
+     * wirklich keine Mengeneinheit, und die Web-Maske soll dort weiterhin nichts behaupten.
+     *
+     * <p>Die übrigen Arten kommen nicht in diesen Zweig: {@code UMLAGE}, {@code UMLAGE_PERSON},
+     * {@code VERBRAUCH} und Zusatzzeilen führen ihre Mengeneinheit selbst — und bei einer Umlage
+     * kann das durchaus auch {@code CHF} sein, wenn die verteilte Grösse ein Betrag ist.
+     */
+    private String mengeneinheitKey(NkZeileDTO zeile) {
+        if (zeile.getEinheit() != null) {
+            return MENGENEINHEIT_KEYS.get(zeile.getEinheit());
+        }
+        if (zeile.getArt() == NkPositionsart.ANTEIL || zeile.getArt() == NkPositionsart.ZUSCHLAG) {
+            return MENGENEINHEIT_KEYS.get(Mengeneinheit.CHF);
+        }
+        return null;
+    }
+
+    /**
+     * Der Mieter zum Block, oder {@code null}.
+     *
+     * <p>Fehlt er, entsteht die Rechnung trotzdem — ohne Anschrift und mit dem Zeitraum der
+     * Abrechnung. Ein Abbruch waere die schlechtere Wahl: Betraege und Zeilen stehen bereits fest,
+     * sie stammen aus der abgeschlossenen Abrechnung.
+     */
+    private Mieter ladeMieter(Long mieterId) {
+        if (mieterId == null) {
+            return null;
+        }
+        Mieter mieter = mieterRepository.findFirstById(mieterId).orElse(null);
+        if (mieter == null) {
+            log.warn("Mieter {} nicht gefunden - Rechnung ohne Adresse", mieterId);
+        }
+        return mieter;
+    }
+
+    /**
+     * Zeitraum, den die Rechnung nennt: der Abrechnungszeitraum, beschnitten auf das
+     * Mietverhaeltnis dieses Mieters (Specs/Nebenkosten/RechnungenGenerieren.md, FR-10).
+     *
+     * <p>Wer am 1. Mai einzog, soll auf seinem Beleg den 1. Mai lesen und nicht den 1. Januar —
+     * die Betraege sind ohnehin nur fuer seine Miettage gerechnet. Beschnitten wird mit derselben
+     * Regel, aus der die Miettage entstehen ({@code NkBerechnungService.mietbeginnImZeitraum}):
+     * Ein zweiter Rechenweg waere ein zweiter Zeitraum.
+     *
+     * <p>Reicht das Mietverhaeltnis ueber den ganzen Zeitraum, bleibt es beim Zeitraum der
+     * Abrechnung — die Fallunterscheidung steckt bereits in den beiden Regeln.
+     */
+    private void setzeZeitraum(NkRechnungDTO rechnung, NkAbrechnung abrechnung, Mieter mieter) {
+        LocalDate von = abrechnung.getDatumVon();
+        LocalDate bis = abrechnung.getDatumBis();
+
+        LocalDate zeitraumVon = NkBerechnungService.mietbeginnImZeitraum(
+                mieter != null ? mieter.getMietbeginn() : null, von);
+        LocalDate zeitraumBis = NkBerechnungService.mietendeImZeitraum(
+                mieter != null ? mieter.getMietende() : null, bis);
+
+        if (zeitraumVon.isAfter(zeitraumBis)) {
+            // Kann nur bei einem Mieter passieren, der den Zeitraum gar nicht beruehrt - die
+            // Abrechnung fuehrt ihn dann nicht auf (findByZeitraumOverlapping). Statt einen
+            // verdrehten Zeitraum zu drucken lieber den der Abrechnung.
+            log.warn("Mietzeitraum von Mieter {} liegt ausserhalb der Abrechnung {} - "
+                            + "Rechnung nennt den Zeitraum der Abrechnung",
+                    rechnung.getMieterId(), abrechnung.getId());
+            zeitraumVon = von;
+            zeitraumBis = bis;
+        }
+
+        rechnung.setZeitraumVon(zeitraumVon);
+        rechnung.setZeitraumBis(zeitraumBis);
     }
 
     /**
@@ -324,13 +408,8 @@ public class NkRechnungService {
      * {@code onErrorType="Blank"}), und das PDF entsteht trotzdem. Ein Abbruch waere die
      * schlechtere Wahl — die Rechnung ist auch ohne Einzahlungsschein ein gueltiger Beleg.
      */
-    private void setzeAdresse(NkRechnungDTO rechnung, Long mieterId) {
-        if (mieterId == null) {
-            return;
-        }
-        Mieter mieter = mieterRepository.findFirstById(mieterId).orElse(null);
+    private void setzeAdresse(NkRechnungDTO rechnung, Mieter mieter) {
         if (mieter == null) {
-            log.warn("Mieter {} nicht gefunden - Rechnung ohne Adresse", mieterId);
             return;
         }
         rechnung.setMieterStrasse(mieter.getStrasse());

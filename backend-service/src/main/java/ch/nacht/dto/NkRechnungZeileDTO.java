@@ -31,6 +31,13 @@ public class NkRechnungZeileDTO {
     /** Prozentsatz 0–100 (Zuschlag oder Anteil); {@code null} bei den uebrigen Arten. */
     private BigDecimal prozentsatz;
 
+    /**
+     * Bezugsgrösse des {@link #prozentsatz} — Totalbetrag der Position bzw. Zwischentotal beim
+     * Zuschlag. Steht auf der Rechnung in der Spalte „Preis", wo eine Verbrauchszeile ihren Preis
+     * je Einheit zeigt: In beiden Fällen die Grösse, aus der der Zeilenbetrag entsteht.
+     */
+    private BigDecimal bezugsbetrag;
+
     /** Zeilenbetrag, bereits auf zwei Nachkommastellen gerundet. */
     private BigDecimal betrag = BigDecimal.ZERO;
 
@@ -67,6 +74,14 @@ public class NkRechnungZeileDTO {
 
     public void setBetragProEinheit(BigDecimal betragProEinheit) {
         this.betragProEinheit = betragProEinheit;
+    }
+
+    public BigDecimal getBezugsbetrag() {
+        return bezugsbetrag;
+    }
+
+    public void setBezugsbetrag(BigDecimal bezugsbetrag) {
+        this.bezugsbetrag = bezugsbetrag;
     }
 
     public BigDecimal getProzentsatz() {

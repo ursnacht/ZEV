@@ -199,6 +199,23 @@
   margin-top: var(--spacing-lg);
 }
 
+/**
+ * Betrag einer Totalzeile.
+ *
+ * `justify-content: flex-end` an `.nk-total` schiebt den Betrag schon an den rechten Rand, seine
+ * RECHTE Kante sitzt also ueber mehrere Zeilen hinweg an derselben Stelle. Die Mindestbreite
+ * richtet zusaetzlich die LINKE aus - erst damit stehen die Betraege mehrerer Totalzeilen
+ * (Kostentotal, Akonto total) als Kolonne untereinander statt mit der Laenge der Beschriftung zu
+ * wandern.
+ *
+ * Bewusst hier und nicht im Design System: `.zev-table__number` gilt fuer Tabellenzellen, diese
+ * Zeilen sind Flex-Container.
+ */
+.nk-total .number {
+  min-width: 8rem;
+  text-align: right;
+}
+
 .nk-total--saldo {
   border-top: 1px solid var(--color-gray-300);
   font-size: var(--font-size-lg);

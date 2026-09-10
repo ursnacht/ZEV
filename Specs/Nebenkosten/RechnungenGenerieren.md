@@ -448,6 +448,92 @@ daneben.
 > Zierde. Wird die Regel auf `Nk` erweitert, ist er entweder ebenfalls zu prüfen oder ausdrücklich
 > auszunehmen — eine stumme Ausnahme wäre der schlechtere Weg.
 
+### FR-9: Nachvollziehbare Preis- und Prozentspalte
+
+Auf der Rechnung tragen die Spalten **Preis** und **%** je Positionsart die Grössen, aus denen der
+Zeilenbetrag entsteht — so lässt sich jede Zeile nachrechnen:
+
+| Art | Spalte „Preis" | Spalte „%" | Spalte „Einheit" |
+|---|---|---|---|
+| `UMLAGE` | Totalbetrag der Position | Zeitanteil dieses Mieters | Einheit der Position |
+| `UMLAGE_PERSON` | Totalbetrag der Position | Personenanteil dieses Mieters | Einheit der Position |
+| `ANTEIL` | Totalbetrag der Position | erfasster Prozentsatz | **`CHF` („Fr.")** |
+| `ZUSCHLAG` | **Zwischentotal** der Zeilen davor | Prozentsatz des Zuschlags | **`CHF` („Fr.")** |
+| `VERBRAUCH`, Zusatz | Preis je Einheit | leer | Einheit der Position |
+
+**`CHF` bei `ANTEIL` und `ZUSCHLAG` (Nachtrag).** Diese beiden Arten tragen an der Position
+**keine** Mengeneinheit — der CHECK-Constraint verbietet sie dort, weil bei ihnen nichts gemessen
+wird. In der Spalte „Preis" steht bei ihnen aber ein **Frankenbetrag**, und die Einheit beschreibt
+jetzt diesen. Vorher blieb die Zelle leer und der Betrag daneben stand ohne Bezugsgrösse.
+
+Gesetzt wird das **nur für die Rechnung**, nicht an der Zeile selbst: Die Position hat wirklich
+keine Mengeneinheit, und die Web-Maske soll dort weiterhin nichts behaupten.
+
+Die übrigen Arten führen ihre Mengeneinheit selbst und werden **nicht** überschrieben — sonst
+stünde bei einer Wasserumlage „Fr." statt „m³". Bei einer Umlage kann `CHF` durchaus die erfasste
+Einheit sein, wenn die verteilte Grösse selbst ein Betrag ist.
+
+Es gilt durchgehend **`Preis × % = Betrag`**. Vorher standen bei Umlage und Zuschlag **beide**
+Spalten leer; der Betrag war für den Mieter nicht überprüfbar.
+
+**Zwei Nachkommastellen in der Prozentspalte (Entscheid).** Vorher war es eine. Bei einem
+Neuntel-Anteil (`11.1111 %`) ergäbe „11.1 %" auf 900.00 nur 99.90, die Zeile nennt aber 100.00 — eine
+Rechnung, die sich selbst widerspricht. Mit „11.11 %" stimmt sie auf den Rappen. Nebenbei bleibt
+damit auch ein erfasster Anteil wie `33.33 %` lesbar, der zuvor auf `33.3 %` gekürzt wurde.
+
+**Der Betrag bleibt die verbindliche Zahl.** Ein aus der gerundeten Prozentangabe nachgerechneter
+Wert kann um einen Rappen abweichen — dieselbe Rundungsdifferenz, die die Abrechnung ohnehin
+getrennt ausweist.
+
+**Akzeptanzkriterien:**
+* [ ] Bei `UMLAGE` und `UMLAGE_PERSON` steht in „Preis" der Totalbetrag und in „%" der Zeit- bzw. Personenanteil dieses Mieters.
+* [ ] Bei `ANTEIL` steht in „Preis" der Totalbetrag; der Prozentsatz bleibt der **erfasste**.
+* [ ] Bei `ZUSCHLAG` steht in „Preis" das Zwischentotal, auf dem der Zuschlag rechnet.
+* [ ] Bei `VERBRAUCH` und Zusatzzeilen bleibt „Preis" der Preis je Einheit und „%" leer.
+* [ ] `Preis × % = Betrag` geht bei jeder dieser Arten auf — bis auf die bekannte Rundungsdifferenz.
+* [ ] Die Prozentspalte zeigt zwei Nachkommastellen.
+* [ ] Bei `ANTEIL` und `ZUSCHLAG` steht in der Spalte „Einheit" `Fr.` (Schlüssel `CHF`).
+* [ ] Bei `UMLAGE`, `UMLAGE_PERSON`, `VERBRAUCH` und Zusatzzeilen bleibt die **erfasste** Mengeneinheit stehen — eine Wasserumlage zeigt weiterhin `m³`.
+* [ ] In der Web-Maske bleibt die Einheit dieser Zeilen unverändert leer.
+* [ ] Menge und Mengeneinheit der Verbrauchszeilen sind unverändert.
+
+### FR-10: Zeitraum je Mieter
+
+Der Kopf der Rechnung nennt bei **„Zeitraum"** die Überschneidung des Abrechnungszeitraums mit dem
+**Mietverhältnis dieses Mieters**:
+
+| Fall | Zeitraum auf der Rechnung |
+|---|---|
+| Mietbeginn **nach** dem Beginn der Abrechnung | ab **Mietbeginn** |
+| Mietende **vor** dem Ende der Abrechnung | bis **Mietende** |
+| Mietende fehlt („läuft weiter") | bis Ende der Abrechnung |
+| Mietverhältnis umschliesst den Zeitraum | Zeitraum der Abrechnung (häufigster Fall, unverändert) |
+
+**Warum.** Die Beträge sind ohnehin nur für die Miettage gerechnet (`Abrechnung.md`, FR-2). Nannte
+der Kopf trotzdem den ganzen Abrechnungszeitraum, widersprach sich das Blatt: Ein Mieter, der am
+1. Mai einzog, las oben „01.01. – 31.12." und darunter Beträge für acht Monate. Für ihn war die
+Rechnung damit nicht prüfbar.
+
+**Beschnitten wird mit derselben Regel, aus der die Miettage entstehen**
+(`NkBerechnungService.mietbeginnImZeitraum` / `mietendeImZeitraum`, dort für FR-10 aus den beiden
+Kopien in `miettageImZeitraum` und `anzahlMonate` herausgezogen). Ein zweiter Rechenweg wäre ein
+zweiter Zeitraum — und die Zeile auf dem Papier soll denselben nennen, aus dem gerechnet wurde.
+
+**Nur auf dem PDF, nicht in der Buchung.** Die Rechnung trägt beides: `von`/`bis` bleiben der
+Zeitraum der **Abrechnung**, `zeitraumVon`/`zeitraumBis` sind der beschnittene. Die gebuchte
+Forderung (`Debitor`) und die Kopfzeile des Rechnungslaufs beziehen sich auf den Lauf als Ganzes;
+würden sie je Mieter beschnitten, nennte die Kopfzeile den Zeitraum des zuletzt verarbeiteten
+Mieters, und der Unique-Key der Debitoren (`mieter_id, datum_von, herkunft, org_id`) hinge am
+Einzugsdatum.
+
+**Akzeptanzkriterien:**
+* [ ] Zieht ein Mieter mitten im Abrechnungszeitraum ein, nennt seine Rechnung bei „Zeitraum" den **Mietbeginn**.
+* [ ] Zieht er mitten im Zeitraum aus, endet der Zeitraum am **Mietende**.
+* [ ] Ohne Mietende endet der Zeitraum am Ende der Abrechnung.
+* [ ] Umschliesst das Mietverhältnis den Zeitraum, steht unverändert der Zeitraum der Abrechnung.
+* [ ] Die gebuchte Forderung trägt weiterhin den Zeitraum der **Abrechnung**, nicht den beschnittenen.
+* [ ] Die Kopfzeile des Rechnungslaufs nennt weiterhin den Zeitraum der Abrechnung.
+
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
 **Auslösung**

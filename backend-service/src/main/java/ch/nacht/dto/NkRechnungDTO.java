@@ -27,6 +27,26 @@ public class NkRechnungDTO {
     private String bezeichnung;
     private LocalDate von;
     private LocalDate bis;
+
+    /**
+     * Zeitraum, den die Rechnung nennt: die Überschneidung des Abrechnungszeitraums mit dem
+     * Mietverhältnis dieses Mieters (FR-10).
+     *
+     * <p>Meist gleich {@link #von}/{@link #bis}. Zog der Mieter mitten im Zeitraum ein oder aus,
+     * steht hier sein Mietbeginn bzw. Mietende — er soll auf seinem Beleg die Tage sehen, für die
+     * er zahlt, und nicht einen Zeitraum, in dem er noch nicht oder nicht mehr wohnte.
+     *
+     * <p><b>Getrennt von {@link #von}/{@link #bis} und nicht an deren Stelle:</b> Jene tragen den
+     * Zeitraum der <i>Abrechnung</i> und werden anderswo gebraucht — die gebuchte Forderung
+     * ({@code Debitor}) und die Kopfzeile des Rechnungslaufs beziehen sich auf den Lauf als
+     * Ganzes. Würden sie je Mieter beschnitten, nennte die Kopfzeile den Zeitraum des zuletzt
+     * verarbeiteten Mieters.
+     */
+    private LocalDate zeitraumVon;
+
+    /** Ende des Zeitraums auf der Rechnung — siehe {@link #zeitraumVon}. */
+    private LocalDate zeitraumBis;
+
     private LocalDate erstellungsdatum;
 
     // Mieter
@@ -99,6 +119,22 @@ public class NkRechnungDTO {
 
     public void setBis(LocalDate bis) {
         this.bis = bis;
+    }
+
+    public LocalDate getZeitraumVon() {
+        return zeitraumVon;
+    }
+
+    public void setZeitraumVon(LocalDate zeitraumVon) {
+        this.zeitraumVon = zeitraumVon;
+    }
+
+    public LocalDate getZeitraumBis() {
+        return zeitraumBis;
+    }
+
+    public void setZeitraumBis(LocalDate zeitraumBis) {
+        this.zeitraumBis = zeitraumBis;
     }
 
     public LocalDate getErstellungsdatum() {

@@ -3,10 +3,12 @@ package ch.nacht.service;
 import ch.nacht.dto.NkBerechnungDTO;
 import ch.nacht.dto.NkMieterAbrechnungDTO;
 import ch.nacht.dto.NkMieterBasisDTO;
-import ch.nacht.dto.NkUmlageInfoDTO;
+import ch.nacht.dto.NkPositionSummeDTO;
 import ch.nacht.dto.NkZeileDTO;
 import ch.nacht.entity.NkAbrechnung;
 import ch.nacht.entity.NkAkonto;
+import ch.nacht.entity.Mengeneinheit;
+import ch.nacht.entity.Mengeneinheit;
 import ch.nacht.entity.NkPerson;
 import ch.nacht.entity.NkPosition;
 import ch.nacht.entity.NkPositionsart;
@@ -98,21 +100,35 @@ public class NkBerechnungService {
             personenJeMieter.put(p.getMieterId(), p.getAnzahlPersonen());
         }
 
-        // Kontrollzahlen je verteilender Position (UMLAGE und ANTEIL): gefuellt waehrend der
-        // Mieterschleife, damit die verteilten Betraege nur einmal gerechnet werden.
-        Map<Long, NkUmlageInfoDTO> umlagen = new LinkedHashMap<>();
+        // Zusammenstellung je Position - fuer JEDE Art, nicht nur die verteilenden (FR-10).
+        // Mengen und Kosten werden waehrend der Mieterschleife gefuellt, damit die Zeilenbetraege
+        // nur einmal gerechnet werden.
+        Map<Long, NkPositionSummeDTO> summen = new LinkedHashMap<>();
         for (NkPosition p : sortierte) {
-            if (p.getArt() == NkPositionsart.UMLAGE
-                    || p.getArt() == NkPositionsart.UMLAGE_PERSON
-                    || p.getArt() == NkPositionsart.ANTEIL) {
-                NkUmlageInfoDTO info = new NkUmlageInfoDTO();
-                info.setPositionId(p.getId());
-                info.setBezeichnung(p.getBezeichnung());
-                info.setArt(p.getArt());
-                info.setTotalbetrag(nullSicher(p.getTotalbetrag()).setScale(GELD_SCALE, RoundingMode.HALF_UP));
-                umlagen.put(p.getId(), info);
+            NkPositionSummeDTO summe = new NkPositionSummeDTO();
+            summe.setPositionId(p.getId());
+            summe.setBezeichnung(p.getBezeichnung());
+            summe.setArt(p.getArt());
+            // Nur wo die Art einen Gesamtbetrag kennt. Sonst bleibt die Zelle leer statt "0.00" zu
+            // behaupten - eine Verbrauchsposition hat keinen.
+            if (verteilendeArt(p.getArt())) {
+                summe.setTotalbetrag(nullSicher(p.getTotalbetrag())
+                        .setScale(GELD_SCALE, RoundingMode.HALF_UP));
+                summe.setSummeProzent(p.getArt() == NkPositionsart.ANTEIL
+                        ? BigDecimal.ZERO : null);
             }
+            // Bei ANTEIL steht in der Mengenspalte der Prozentsatz, bei ZUSCHLAG gibt es keine
+            // Menge - beide bleiben ohne Mengeneinheit.
+            if (p.getArt() != NkPositionsart.ANTEIL && p.getArt() != NkPositionsart.ZUSCHLAG) {
+                summe.setEinheit(p.getEinheit());
+            }
+            summen.put(p.getId(), summe);
         }
+
+        // Eine Sammelzeile fuer ALLE Zusatzpositionen. Ohne sie waere die Summe der Uebersicht
+        // kleiner als das Kostentotal aller Mieter - die Mieterzeilen speisen sich aus zwei
+        // Quellen, die Uebersicht kennte nur eine.
+        NkPositionSummeDTO zusatzSumme = zusatzZeile(zusaetze);
 
         NkBerechnungDTO ergebnis = new NkBerechnungDTO();
         ergebnis.setNenner(nenner);
@@ -125,7 +141,7 @@ public class NkBerechnungService {
                     basis, abrechnung, nenner, nennerPerson, sortierte,
                     mengeJePosition, zusatzJeMieter.getOrDefault(basis.getMieterId(), List.of()),
                     akontoJeMieter.get(basis.getMieterId()),
-                    personenJeMieter.get(basis.getMieterId()), umlagen);
+                    personenJeMieter.get(basis.getMieterId()), summen);
             summeTage += block.getTage();
             summePersonenTage += block.getPersonenTage();
             ergebnis.getMieter().add(block);
@@ -133,10 +149,21 @@ public class NkBerechnungService {
         ergebnis.setSummeTage(summeTage);
         ergebnis.setSummePersonenTage(summePersonenTage);
 
-        for (NkUmlageInfoDTO info : umlagen.values()) {
-            setzeAbweichungen(info, summeTage, nenner, summePersonenTage, nennerPerson);
+        for (NkPositionSummeDTO summe : summen.values()) {
+            if (verteilendeArt(summe.getArt())) {
+                setzeAbweichungen(summe, summeTage, nenner, summePersonenTage, nennerPerson);
+            }
         }
-        ergebnis.setUmlagen(new ArrayList<>(umlagen.values()));
+
+        List<NkPositionSummeDTO> uebersicht = new ArrayList<>(summen.values());
+        if (zusatzSumme != null) {
+            uebersicht.add(zusatzSumme);
+        }
+        ergebnis.setPositionSummen(uebersicht);
+        ergebnis.setSummeKosten(uebersicht.stream()
+                .map(NkPositionSummeDTO::getSummeKosten)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(GELD_SCALE, RoundingMode.HALF_UP));
 
         return ergebnis;
     }
@@ -153,6 +180,40 @@ public class NkBerechnungService {
     }
 
     /**
+     * Beginn des Mietverhältnisses <b>innerhalb</b> des Abrechnungszeitraums — der spätere der
+     * beiden Zeitpunkte.
+     *
+     * <p>Statisch und mit einzelnen Daten statt eines {@code NkMieterBasisDTO}, weil dieselbe
+     * Regel auch die Rechnung braucht: Dort steht der Mieter als Entity da, und auf der PDF soll
+     * im „Zeitraum" der Mietbeginn erscheinen, sobald er später liegt als der Abrechnungsbeginn
+     * (Specs/Nebenkosten/RechnungenGenerieren.md, FR-10). Zwei Kopien der Regel wären zwei
+     * Wahrheiten — die Zeile auf dem Papier soll denselben Zeitraum nennen, aus dem die Miettage
+     * gerechnet wurden.
+     *
+     * @param mietbeginn Mietbeginn des Mieters; {@code null} wird als „schon immer" gelesen
+     * @param von        Beginn des Abrechnungszeitraums
+     * @return der spätere der beiden Zeitpunkte
+     */
+    public static LocalDate mietbeginnImZeitraum(LocalDate mietbeginn, LocalDate von) {
+        return mietbeginn != null && mietbeginn.isAfter(von) ? mietbeginn : von;
+    }
+
+    /**
+     * Ende des Mietverhältnisses <b>innerhalb</b> des Abrechnungszeitraums — der frühere der
+     * beiden Zeitpunkte.
+     *
+     * <p>Ein fehlendes {@code mietende} heisst „läuft weiter" und ergibt das Ende des Zeitraums —
+     * nicht „nie".
+     *
+     * @param mietende Mietende des Mieters; {@code null} heisst „läuft weiter"
+     * @param bis      Ende des Abrechnungszeitraums
+     * @return der frühere der beiden Zeitpunkte
+     */
+    public static LocalDate mietendeImZeitraum(LocalDate mietende, LocalDate bis) {
+        return mietende != null && mietende.isBefore(bis) ? mietende : bis;
+    }
+
+    /**
      * Miettage eines Mieters im Zeitraum, <b>ohne</b> Multiplikation mit den Wohnungen.
      *
      * <p>Ein fehlendes {@code mietende} heisst „läuft weiter" und wird als Ende des Zeitraums
@@ -164,9 +225,8 @@ public class NkBerechnungService {
      * @return Überschneidungstage, mindestens 0
      */
     public long miettageImZeitraum(NkMieterBasisDTO basis, LocalDate von, LocalDate bis) {
-        LocalDate beginn = basis.getMietbeginn().isAfter(von) ? basis.getMietbeginn() : von;
-        LocalDate ende = basis.getMietende() == null || basis.getMietende().isAfter(bis)
-                ? bis : basis.getMietende();
+        LocalDate beginn = mietbeginnImZeitraum(basis.getMietbeginn(), von);
+        LocalDate ende = mietendeImZeitraum(basis.getMietende(), bis);
         if (beginn.isAfter(ende)) {
             return 0;
         }
@@ -186,9 +246,8 @@ public class NkBerechnungService {
      * @return Anzahl Monate, auf zwei Nachkommastellen gerundet
      */
     public BigDecimal anzahlMonate(NkMieterBasisDTO basis, LocalDate von, LocalDate bis) {
-        LocalDate beginn = basis.getMietbeginn().isAfter(von) ? basis.getMietbeginn() : von;
-        LocalDate ende = basis.getMietende() == null || basis.getMietende().isAfter(bis)
-                ? bis : basis.getMietende();
+        LocalDate beginn = mietbeginnImZeitraum(basis.getMietbeginn(), von);
+        LocalDate ende = mietendeImZeitraum(basis.getMietende(), bis);
         if (beginn.isAfter(ende)) {
             return BigDecimal.ZERO.setScale(GELD_SCALE, RoundingMode.HALF_UP);
         }
@@ -216,7 +275,7 @@ public class NkBerechnungService {
                                                  List<NkZusatz> zusaetze,
                                                  NkAkonto akonto,
                                                  Integer anzahlPersonen,
-                                                 Map<Long, NkUmlageInfoDTO> umlagen) {
+                                                 Map<Long, NkPositionSummeDTO> summen) {
 
         NkMieterAbrechnungDTO block = new NkMieterAbrechnungDTO();
         block.setMieterId(basis.getMieterId());
@@ -248,7 +307,7 @@ public class NkBerechnungService {
         for (Object quelle : zeilenQuellen) {
             NkZeileDTO zeile = quelle instanceof NkPosition p
                     ? zeileAusPosition(p, basis, tage, nenner, personenTage, nennerPerson,
-                            mengeJePosition, laufendeSumme, umlagen)
+                            mengeJePosition, laufendeSumme, summen)
                     : zeileAusZusatz((NkZusatz) quelle);
             laufendeSumme = laufendeSumme.add(zeile.getBetrag());
             block.getZeilen().add(zeile);
@@ -267,7 +326,7 @@ public class NkBerechnungService {
                                         long nennerPerson,
                                         Map<Long, Map<Long, BigDecimal>> mengeJePosition,
                                         BigDecimal laufendeSumme,
-                                        Map<Long, NkUmlageInfoDTO> umlagen) {
+                                        Map<Long, NkPositionSummeDTO> summen) {
         NkZeileDTO zeile = new NkZeileDTO();
         zeile.setPositionId(p.getId());
         zeile.setArt(p.getArt());
@@ -291,10 +350,15 @@ public class NkBerechnungService {
                         .setScale(GELD_SCALE, RoundingMode.HALF_UP);
                 zeile.setBetrag(betrag);
 
-                NkUmlageInfoDTO info = umlagen.get(p.getId());
-                if (info != null) {
-                    info.setSummeVerteilt(info.getSummeVerteilt().add(betrag));
-                }
+                // Damit der Betrag auf der Rechnung nachvollziehbar ist: Totalbetrag als
+                // Bezugsgroesse, Zeit- bzw. Personenanteil als Prozentsatz. In der Web-Maske
+                // aendert das nichts - sie liest den Prozentsatz nur bei ANTEIL.
+                zeile.setBezugsbetrag(nullSicher(p.getTotalbetrag())
+                        .setScale(GELD_SCALE, RoundingMode.HALF_UP));
+                zeile.setProzentsatz(anteil.multiply(HUNDERT)
+                        .setScale(MENGE_SCALE, RoundingMode.HALF_UP));
+
+                merke(summen.get(p.getId()), zeile.getMenge(), betrag);
             }
             case VERBRAUCH -> {
                 BigDecimal menge = mengeJePosition
@@ -306,6 +370,7 @@ public class NkBerechnungService {
                 // aber betraglich gleich. Unterschieden wird nur in der Anzeige.
                 zeile.setBetrag(nullSicher(menge).multiply(nullSicher(p.getBetragProEinheit()))
                         .setScale(GELD_SCALE, RoundingMode.HALF_UP));
+                merke(summen.get(p.getId()), menge, zeile.getBetrag());
             }
             case ANTEIL -> {
                 // Der Prozentsatz je Mieter steht dort, wo bei VERBRAUCH die Menge steht.
@@ -313,22 +378,30 @@ public class NkBerechnungService {
                         .getOrDefault(p.getId(), Map.of())
                         .get(basis.getMieterId());
                 zeile.setProzentsatz(prozent);
+                zeile.setBezugsbetrag(nullSicher(p.getTotalbetrag())
+                        .setScale(GELD_SCALE, RoundingMode.HALF_UP));
                 BigDecimal betrag = nullSicher(p.getTotalbetrag()).multiply(nullSicher(prozent))
                         .divide(HUNDERT, ZWISCHEN_SCALE, RoundingMode.HALF_UP)
                         .setScale(GELD_SCALE, RoundingMode.HALF_UP);
                 zeile.setBetrag(betrag);
 
-                NkUmlageInfoDTO info = umlagen.get(p.getId());
-                if (info != null) {
-                    info.setSummeVerteilt(info.getSummeVerteilt().add(betrag));
-                    info.setSummeProzent(info.getSummeProzent().add(nullSicher(prozent)));
+                NkPositionSummeDTO summe = summen.get(p.getId());
+                if (summe != null) {
+                    // Bei ANTEIL ist die Bezugsgroesse der Prozentsatz, nicht eine Menge.
+                    merke(summe, null, betrag);
+                    summe.setSummeProzent(nullSicher(summe.getSummeProzent())
+                            .add(nullSicher(prozent)));
                 }
             }
             case ZUSCHLAG -> {
                 zeile.setProzentsatz(p.getProzentsatz());
+                // Das Zwischentotal der Zeilen davor - genau die Groesse, auf der der Zuschlag
+                // rechnet (Kaskade, FR-2).
+                zeile.setBezugsbetrag(laufendeSumme.setScale(GELD_SCALE, RoundingMode.HALF_UP));
                 zeile.setBetrag(laufendeSumme.multiply(nullSicher(p.getProzentsatz()))
                         .divide(HUNDERT, ZWISCHEN_SCALE, RoundingMode.HALF_UP)
                         .setScale(GELD_SCALE, RoundingMode.HALF_UP));
+                merke(summen.get(p.getId()), null, zeile.getBetrag());
             }
             default -> zeile.setBetrag(BigDecimal.ZERO.setScale(GELD_SCALE, RoundingMode.HALF_UP));
         }
@@ -393,19 +466,85 @@ public class NkBerechnungService {
      * <p>Die Rundungsdifferenz ist in beiden Fällen der Rest zwischen dem exakt verteilbaren
      * Betrag und der Summe der gerundeten Zeilen.
      */
-    private void setzeAbweichungen(NkUmlageInfoDTO info, long summeTage, long nenner,
+    private void setzeAbweichungen(NkPositionSummeDTO summe, long summeTage, long nenner,
                                    long summePersonenTage, long nennerPerson) {
-        BigDecimal anteil = switch (info.getArt()) {
-            case ANTEIL -> info.getSummeProzent()
+        BigDecimal anteil = switch (summe.getArt()) {
+            case ANTEIL -> nullSicher(summe.getSummeProzent())
                     .divide(HUNDERT, ZWISCHEN_SCALE, RoundingMode.HALF_UP);
             case UMLAGE_PERSON -> anteil(summePersonenTage, nennerPerson);
             default -> anteil(summeTage, nenner);
         };
 
-        BigDecimal exaktVerteilbar = info.getTotalbetrag().multiply(anteil)
+        BigDecimal total = nullSicher(summe.getTotalbetrag());
+        BigDecimal exaktVerteilbar = total.multiply(anteil)
                 .setScale(GELD_SCALE, RoundingMode.HALF_UP);
-        info.setNichtVerteilt(info.getTotalbetrag().subtract(exaktVerteilbar));
-        info.setRundungsdifferenz(exaktVerteilbar.subtract(info.getSummeVerteilt()));
+        summe.setNichtVerteilt(total.subtract(exaktVerteilbar));
+        summe.setRundungsdifferenz(exaktVerteilbar.subtract(summe.getSummeKosten()));
+    }
+
+    /** Verteilt die Art einen erfassten Gesamtbetrag auf die Mieter? */
+    private static boolean verteilendeArt(NkPositionsart art) {
+        return art == NkPositionsart.UMLAGE
+                || art == NkPositionsart.UMLAGE_PERSON
+                || art == NkPositionsart.ANTEIL;
+    }
+
+    /**
+     * Nimmt Menge und Betrag einer Mieterzeile in die Zusammenstellung ihrer Position auf.
+     *
+     * <p>Eine <b>nicht erfasste</b> Menge lässt die Summe unangetastet: Sonst stünde bei einer
+     * Verbrauchsposition, für die noch niemand etwas eingetragen hat, eine 0 — und die sähe aus
+     * wie eine gemessene Null.
+     */
+    private static void merke(NkPositionSummeDTO summe, BigDecimal menge, BigDecimal betrag) {
+        if (summe == null) {
+            return;
+        }
+        summe.setSummeKosten(summe.getSummeKosten().add(nullSicher(betrag)));
+        if (menge != null) {
+            summe.setSummeMenge(nullSicher(summe.getSummeMenge()).add(menge)
+                    .setScale(MENGE_SCALE, RoundingMode.HALF_UP));
+        }
+    }
+
+    /**
+     * Sammelzeile aller Zusatzpositionen; {@code null}, wenn es keine gibt.
+     *
+     * <p>Die Mengeneinheit bleibt leer, sobald die Zusatzpositionen <b>verschiedene</b> Einheiten
+     * mischen — und dann auch die Menge: „2 Stück plus 3 m³" ist keine Menge, sondern zwei. Die
+     * Kosten bleiben in jedem Fall summierbar, denn Franken sind Franken.
+     */
+    private static NkPositionSummeDTO zusatzZeile(List<NkZusatz> zusaetze) {
+        if (zusaetze.isEmpty()) {
+            return null;
+        }
+
+        NkPositionSummeDTO summe = new NkPositionSummeDTO();
+        summe.setZusatz(true);
+
+        BigDecimal kosten = BigDecimal.ZERO;
+        BigDecimal menge = BigDecimal.ZERO;
+        Mengeneinheit einheit = null;
+        boolean einheitlich = true;
+
+        for (NkZusatz z : zusaetze) {
+            kosten = kosten.add(nullSicher(z.getMenge())
+                    .multiply(nullSicher(z.getBetragProEinheit()))
+                    .setScale(GELD_SCALE, RoundingMode.HALF_UP));
+            menge = menge.add(nullSicher(z.getMenge()));
+            if (einheit == null) {
+                einheit = z.getEinheit();
+            } else if (einheit != z.getEinheit()) {
+                einheitlich = false;
+            }
+        }
+
+        summe.setSummeKosten(kosten);
+        if (einheitlich) {
+            summe.setEinheit(einheit);
+            summe.setSummeMenge(menge.setScale(MENGE_SCALE, RoundingMode.HALF_UP));
+        }
+        return summe;
     }
 
     /** Zeitanteil {@code Tage / Nenner}; ein Nenner von 0 ergibt 0 statt einer Division durch 0. */

@@ -90,6 +90,8 @@ Die folgende Tabelle ist ein **Überblick, nicht vollständig**. Massgeblich (Qu
   * Gilt für die Spalte `deutsch` in `zev.translation`, also für jede Übersetzungs-Migration. Die Dateien sind UTF-8; Umlaute sind darin unproblematisch.
   * **Nicht** betroffen: Bezeichner (Übersetzungs-Keys, Spalten- und Tabellennamen, Enum-Konstanten) – die bleiben ASCII.
   * Für Kommentare in SQL, Java und TypeScript gibt es keine Vorgabe; nur der ausgelieferte Text zählt.
+* **Eine Änderung über die Übersetzungsverwaltung ersetzt keine Migration.** Sie wirkt in genau *einer* Datenbank; eine frisch aufgesetzte bekommt weiterhin den Text der Migration. Wer einen Text im Editor korrigiert, zieht ihn mit einem `UPDATE` nach — abgesichert über den **alten** Wert in der `WHERE`-Klausel, damit eine eigene Anpassung nicht überschrieben wird (Muster: V128, V138, V142).
+  * Umgekehrt gilt: Eine saubere laufende Datenbank ist **kein** Beweis, dass die Migrationen stimmen. Geprüft wird gegen den letzten in einer Migration deklarierten Wert je Key, nicht gegen `zev.translation`.
 
 ### Fehleranzeige
 * Frontend: Fehlermeldungen als `.zev-message--error` anzeigen

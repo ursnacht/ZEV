@@ -3,8 +3,16 @@
  * Alle Basis-Styles kommen aus dem Design System
  */
 
-.number {
-  text-align: right;
+/*
+ * Preisspalte in Monospace - die Ziffern stehen dadurch in einer Kolonne, auch wenn die
+ * Grundschrift proportional ist.
+ *
+ * Die RECHTSBUENDIGKEIT kommt aus `.zev-table__number` (Design System, Tabellen-Komponente); hier
+ * steht nur, was darueber hinausgeht. Vorher hatte diese Komponente eine eigene `.number`-Klasse
+ * mit beidem - sie sah wie die gleichnamige Klasse der Nebenkosten-Maske aus, wo dieselbe Klasse
+ * NICHT definiert war und die Betraege deshalb links standen.
+ */
+.zev-table__number {
   font-family: monospace;
 }
 

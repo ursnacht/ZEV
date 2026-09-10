@@ -230,7 +230,7 @@ describe('NebenkostenService', () => {
       ...mockDetail,
       berechnung: {
         nenner: 3285, summeTage: 3285, nennerPerson: 3285, summePersonenTage: 3285,
-        mieter: [], umlagen: []
+        mieter: [], positionSummen: [], summeKosten: 0
       }
     });
 

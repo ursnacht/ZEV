@@ -1,5 +1,6 @@
 package ch.nacht.dto;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,7 +27,16 @@ public class NkBerechnungDTO {
 
     private List<NkMieterAbrechnungDTO> mieter = new ArrayList<>();
 
-    private List<NkUmlageInfoDTO> umlagen = new ArrayList<>();
+    private List<NkPositionSummeDTO> positionSummen = new ArrayList<>();
+
+    /**
+     * Summe der {@code summeKosten} aller Zeilen der Positionsübersicht.
+     *
+     * <p><b>Muss dem Kostentotal aller Mieter entsprechen</b> (FR-10): Beide zählen dieselben
+     * Zeilenbeträge, nur einmal je Position und einmal je Mieter gebündelt. Weicht die eine von
+     * der anderen ab, fehlt der Übersicht eine Quelle — genau dafür steht die Zahl da.
+     */
+    private BigDecimal summeKosten = BigDecimal.ZERO;
 
     public NkBerechnungDTO() {
     }
@@ -71,11 +81,19 @@ public class NkBerechnungDTO {
         this.mieter = mieter != null ? mieter : new ArrayList<>();
     }
 
-    public List<NkUmlageInfoDTO> getUmlagen() {
-        return umlagen;
+    public List<NkPositionSummeDTO> getPositionSummen() {
+        return positionSummen;
     }
 
-    public void setUmlagen(List<NkUmlageInfoDTO> umlagen) {
-        this.umlagen = umlagen != null ? umlagen : new ArrayList<>();
+    public void setPositionSummen(List<NkPositionSummeDTO> positionSummen) {
+        this.positionSummen = positionSummen != null ? positionSummen : new ArrayList<>();
+    }
+
+    public BigDecimal getSummeKosten() {
+        return summeKosten;
+    }
+
+    public void setSummeKosten(BigDecimal summeKosten) {
+        this.summeKosten = summeKosten;
     }
 }

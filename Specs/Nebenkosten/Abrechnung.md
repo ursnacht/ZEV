@@ -274,9 +274,20 @@ stehen. Hinter den Blöcken wäre die Zahl unbrauchbar — sie sind zugeklappt u
 mehrere Bildschirmseiten lang. Im Kopf der Abrechnung hätte sie nichts zu suchen: Dort stehen
 Eingaben, nicht Ergebnisse.
 
+**Darunter die Summe der Akonto-Totale** („Akonto total aller Mieter"). Die **Differenz** der beiden
+ist die Summe der Salden — was insgesamt nachzuzahlen oder gutzuschreiben ist; deshalb stehen sie
+untereinander und nicht an getrennten Orten.
+
+**Alle Beträge stehen rechtsbündig** — in den Totalzeilen und in **jeder** Tabelle der Maske. In den
+Totalzeilen richtet zusätzlich eine Mindestbreite die linke Kante aus, damit die Beträge mehrerer
+Zeilen als Kolonne untereinander stehen statt mit der Länge der Beschriftung zu wandern.
+
 * [ ] Oberhalb der Mieterblöcke erscheint rechtsbündig die Summe der Kostentotale aller Mieter.
-* [ ] Sie ist abgeleitet und folgt jeder Änderung sofort, ohne Speichern.
-* [ ] Ist keine Abrechnung geladen oder gibt es keine Mieterblöcke, erscheint sie nicht.
+* [ ] Direkt darunter erscheint die Summe der Akonto-Totale; ihre Differenz zur Kostensumme entspricht der Summe der Salden.
+* [ ] Beide sind abgeleitet und folgen jeder Änderung sofort, ohne Speichern.
+* [ ] Ist keine Abrechnung geladen oder gibt es keine Mieterblöcke, erscheinen sie nicht.
+* [ ] Die Beträge der beiden Zeilen stehen als Kolonne untereinander.
+* [ ] In allen Tabellen der Maske — auch in der Zusammenstellung der Positionen — stehen Betrags- und Mengenspalten rechtsbündig.
 
 **Spaltenbreiten der Positionstabelle (Nachtrag):** Die Bezeichnung darf 150 Zeichen lang sein und
 ist das Feld, das man beim Lesen zuerst braucht — ihre Spalte nimmt deshalb **den Rest der
@@ -801,6 +812,56 @@ erscheinen.
 | Mengeneinheit | Schlüssel für **`M3`** (die bestehenden `KWH`, `MONATE`, `STUECK` gibt es bereits) |
 
 Die Liste ist der Mindestumfang; beim Umsetzen ergänzte Schlüssel folgen derselben Migration.
+
+### FR-10: Zusammenstellung der Positionen
+
+Zwischen den allgemeinen Positionen und den Mieterblöcken steht eine **Zusammenstellung je
+Position** über alle Mieter:
+
+| Position | Totalbetrag | Menge | Einheit | Kosten | Nicht verteilt | Rundungsdifferenz | Summe % |
+|---|---|---|---|---|---|---|---|
+
+* **Eine Zeile je allgemeiner Position**, gleich welcher Art — nicht mehr nur die verteilenden.
+  Die erste Spalte heisst deshalb „Position" und nicht mehr „Umlage".
+* **Menge** ist die Summe über alle Mieter: bei `UMLAGE`/`UMLAGE_PERSON` die verteilte Gesamtmenge,
+  bei `VERBRAUCH` die Summe der erfassten Mengen.
+* **Kosten** ist die Summe der Beträge, die den Mietern für diese Position belastet werden.
+* Darunter als Fusszeile die **Summe der Kosten** über alle Zeilen.
+
+**Die Summe der Kosten muss dem Kostentotal aller Mieter entsprechen.** Beide zählen dieselben
+Zeilenbeträge, nur einmal je Position und einmal je Mieter gebündelt. Damit das gilt, umfasst die
+Übersicht **beide Quellen** der Mieterzeilen: die allgemeinen Positionen **und** die
+Zusatzpositionen. Letztere erscheinen als **eine Sammelzeile** „Zusatzpositionen" — eine Zeile je
+Zusatzposition wäre die Mieterliste ein zweites Mal, denn dieselbe Bezeichnung kommt bei mehreren
+Mietern vor.
+
+**Weichen die beiden Zahlen ab, sagt die Maske das** (rot, mit erklärendem Hinweis) statt zwei
+Zahlen nebeneinander stehen zu lassen und den Leser rätseln zu lassen, welche stimmt. Eine
+Abweichung heisst: Der Übersicht fehlt eine Quelle — genau dafür steht die Zahl da.
+
+**Leere Zellen statt Nullen (Entscheid).** Wo eine Positionsart eine Grösse nicht kennt, bleibt die
+Zelle **leer**: Eine Verbrauchsposition hat keinen Totalbetrag, ein Zuschlag keine Menge. Ein
+`0.00` sähe dort aus wie ein vergessener Wert. Aus demselben Grund bleibt die Menge einer
+Verbrauchsposition leer, solange **niemand** etwas erfasst hat — eine `0` wirkte wie eine gemessene
+Null.
+
+**Gemischte Einheiten in der Sammelzeile.** Zusatzpositionen verschiedener Mieter können
+verschiedene Mengeneinheiten haben. Dann bleiben Menge **und** Einheit leer: „2 Stück plus 3 m³"
+ist keine Menge, sondern zwei. Die Kosten bleiben in jedem Fall summierbar.
+
+**Akzeptanzkriterien:**
+* [ ] Die Zusammenstellung führt **jede** allgemeine Position auf — auch `VERBRAUCH` und `ZUSCHLAG`.
+* [ ] Je Position erscheinen die Summe der Mengen (mit Einheit) und die Summe der Kosten.
+* [ ] Gibt es Zusatzpositionen, erscheint **eine** Sammelzeile „Zusatzpositionen" mit deren Summen.
+* [ ] Ohne Zusatzpositionen erscheint keine Sammelzeile.
+* [ ] Die Fusszeile zeigt die Summe der Kosten über alle Zeilen.
+* [ ] Diese Summe stimmt mit dem „Kostentotal aller Mieter" überein — vor und nach dem Speichern.
+* [ ] Weichen die beiden ab, wird die Summe hervorgehoben und nennt den Grund im Hinweis.
+* [ ] Bei einer Verbrauchsposition bleiben Totalbetrag, „nicht verteilt" und Rundungsdifferenz leer.
+* [ ] Bei einem Zuschlag bleiben zusätzlich Menge und Einheit leer.
+* [ ] Bei `ANTEIL` bleibt die Mengenspalte leer; der Prozentsatz steht in seiner eigenen Spalte.
+* [ ] Eine Verbrauchsposition ohne erfasste Menge zeigt eine **leere** Mengenzelle, keine `0`.
+* [ ] Mischen Zusatzpositionen die Mengeneinheiten, bleiben Menge und Einheit leer; die Kosten stimmen trotzdem.
 
 ### FR-9: Nur Mieter mit einer nebenkostenrelevanten Wohnung
 

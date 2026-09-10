@@ -162,3 +162,123 @@ gewählte Sprache nicht mit; das bleibt, wie es auf der Seite Rechnungen heute i
 ### Annahme 6: Migrationsnummer
 V126 ist beim Schreiben dieses Plans frei. Entsteht zwischenzeitlich eine andere Migration, wird
 die Nummer verschoben — eine **bereits ausgeführte** Migration wird nie geändert (CLAUDE.md).
+
+## Nachtrag: Preis- und Prozentspalte der Rechnung (FR-9)
+
+Bei Umlage und Zuschlag standen auf der Rechnung **beide** Spalten leer — der Zeilenbetrag war für
+den Mieter nicht überprüfbar. Jetzt trägt jede Zeile die Grössen, aus denen ihr Betrag entsteht.
+
+### Neues Feld statt Überladung
+`NkZeileDTO.bezugsbetrag` und `NkRechnungZeileDTO.bezugsbetrag`. Bewusst **nicht**
+`betragProEinheit` mitbenutzt: Das ist ein Preis je Einheit, kein Gesamtbetrag. Beides in ein Feld
+zu legen hiesse, dass niemand mehr am Namen erkennt, was drinsteht.
+
+Gesetzt in `NkBerechnungService.zeileAusPosition`, je Art eine andere Grösse mit derselben Rolle
+(`Bezugsbetrag × Prozentsatz = Betrag`): Totalbetrag bei den beiden Umlagen und bei `ANTEIL`,
+`laufendeSumme` beim `ZUSCHLAG` — genau das Zwischentotal der Kaskade.
+
+Bei den Umlagen wird zusätzlich der **Prozentsatz** gesetzt: `anteil × 100`, also der Zeit- bzw.
+Personenanteil. **In der Web-Maske ändert das nichts** — sie liest `zeile.prozentsatz` nur bei
+`ANTEIL` (Template-Zeile 388). Vor der Umsetzung geprüft, sonst hätte die Menge-Spalte der
+Umlagezeilen plötzlich einen Prozentsatz gezeigt.
+
+### Prozentspalte auf zwei Nachkommastellen
+Nicht Teil der wörtlichen Anforderung, aber ohne sie widerspricht sich der Beleg: Bei einem
+Neuntel-Anteil ergäbe „11.1 %" auf 900.00 nur 99.90, während die Zeile 100.00 nennt. Mit „11.11 %"
+stimmt es auf den Rappen. Nebenbei behebt es, dass ein erfasster Anteil von `33.33 %` bisher auf
+`33.3 %` gekürzt wurde — `nk_verbrauch.menge` speichert drei Nachkommastellen.
+
+### PDF
+`nk-rechnung.jrxml`: neues Feld, und die Spalte „Preis" fällt auf den Bezugsbetrag zurück, wenn kein
+Preis je Einheit da ist — `decimals(…, 4)` für den Einheitspreis, `chf(…)` für den Betrag. Geprüft
+mit `mvn test -Dtest=JasperTemplateCompileTest`.
+
+### Vorschau mitgezogen
+`nebenkosten-berechnung.ts` setzt dieselben Werte. Streng nötig ist es nicht — das PDF entsteht
+serverseitig — aber eine Vorschau, die eine andere Zeile beschreibt als das Backend, ist genau die
+Divergenz, die später jemand debuggen muss.
+
+### Tests
+* `NkBerechnungServiceTest` 69 (6 neu): Umlage mit Rechenprobe, Umlage mit Leerstand
+  (11.111 % auf 900.00 → 100.00), Umlage pro Person (Personen- statt Zeitanteil), Anteil behält den
+  erfassten Prozentsatz, Zuschlag trägt das Zwischentotal, Verbrauch bleibt ohne.
+* `NkRechnungServiceTest` 37 (1 neu): das Feld wird durchgereicht, bei Verbrauch bleibt es leer.
+* Vorschau-Spec 55 (4 neu) — dieselben Fälle.
+* Gesamt: 1282 Backend, 1640 Frontend.
+
+### Offen
+* **Sichtprüfung am PDF:** Die Zahlen sind durch Tests abgedeckt, das Layout nicht. Ob die Spalte
+  „Preis" mit einem vierstelligen Einheitspreis *und* einem Betrag wie `1'000.00` in 65 pt Breite
+  auskommt, zeigt erst ein erzeugtes PDF. Braucht einen Backend-Rebuild.
+
+## Nachtrag: Einheit `Fr.` bei Anteil und Zuschlag
+
+`NkRechnungService.mengeneinheitKey(zeile)` statt des bisherigen Inline-Ausdrucks: Ist an der Zeile
+eine Mengeneinheit erfasst, gilt sie; bei `ANTEIL` und `ZUSCHLAG` fällt sie auf `CHF` zurück; sonst
+bleibt sie leer.
+
+**Bewusst im Rechnungsbauer und nicht in der Berechnung.** Ein `zeile.setEinheit(CHF)` in
+`NkBerechnungService` wäre kürzer gewesen, hätte aber die Web-Maske mitverändert: Deren
+Einheitenspalte liest `zeile.einheit` direkt, ein Zuschlag hätte dort plötzlich „Fr." gezeigt.
+Gefragt war „auf der Rechnung". Ausserdem hat die Position wirklich keine Mengeneinheit — der
+CHECK-Constraint verbietet sie —, und das Modell soll nichts anderes behaupten.
+
+**Ein bestehender Test behauptete das Gegenteil.** `baueRechnungen_ZeileOhneEinheit_MengeneinheitNull`
+begründete das `null` mit „sonst stünde auf der Rechnung eine Einheit, die nie erfasst wurde". Das
+Argument trug, solange die Spalte „Preis" bei diesen Arten leer war — seit FR-9 steht dort ein
+Frankenbetrag, und die Einheit beschreibt eine Grösse, die tatsächlich dasteht. Test umbenannt
+(`..._ZuschlagOhneEinheit_BekommtCHF`) und die alte Begründung im Javadoc festgehalten, damit die
+Umkehr nachvollziehbar bleibt.
+
+Zwei Tests dazu: `ANTEIL` bekommt ebenfalls `CHF`, und eine Umlage mit `M3` behält ihre Einheit —
+letzterer ist der Wächter gegen ein zu breites Überschreiben.
+
+Keine Migration: Der Schlüssel `CHF` (= „Fr.") existiert und ist bereits die Mengeneinheit-Auswahl
+der Umlagen. Keine Änderung am `jrxml` — die Spalte übersetzt den Schlüssel schon.
+
+**Tests:** `NkRechnungServiceTest` 39 (2 neu, 1 umgekehrt), Gesamt 1284 Backend.
+
+### Offen
+* Die Sichtprüfung am erzeugten PDF steht weiterhin aus (s. FR-9) — jetzt zusätzlich für die
+  Einheitenspalte bei Anteil und Zuschlag.
+
+## Nachtrag: Zeitraum je Mieter (FR-10)
+
+Der Kopf der Rechnung nennt den Abrechnungszeitraum, beschnitten auf das Mietverhältnis des
+Mieters. Drei Schritte:
+
+1. **Die Regel einmal hinschreiben.** `NkBerechnungService.mietbeginnImZeitraum(mietbeginn, von)`
+   und `mietendeImZeitraum(mietende, bis)` — statisch, mit einzelnen Daten statt eines
+   `NkMieterBasisDTO`, weil auch der Rechnungsbauer sie braucht (dort steht der Mieter als Entity
+   da). Sie lag bereits **zweimal** inline vor, in `miettageImZeitraum` und `anzahlMonate`; beide
+   rufen jetzt die Helfer. Damit rechnet die Zeile auf dem Papier aus derselben Regel wie die
+   Miettage.
+2. **Zwei Felder auf `NkRechnungDTO`:** `zeitraumVon` / `zeitraumBis`. Bewusst **neben**
+   `von`/`bis` und nicht an deren Stelle — siehe FR-10: Debitor und Kopfzeile des Laufs brauchen
+   den Zeitraum der Abrechnung.
+3. **`NkRechnungService`:** Der Mieter wird jetzt **einmal** geladen und zweimal gebraucht
+   (`ladeMieter`), für die Anschrift und für die Mietdauer. `setzeAdresse` nimmt deshalb die Entity
+   statt der ID. `setzeZeitraum` beschneidet; liegt das Mietverhältnis ganz ausserhalb, bleibt es
+   beim Zeitraum der Abrechnung samt `log.warn` — statt einen verdrehten Zeitraum zu drucken. Der
+   Fall kann nur eintreten, wenn die Abrechnung den Mieter gar nicht führen dürfte
+   (`findByZeitraumOverlapping`).
+
+Im `jrxml` steht **keine** Fallunterscheidung: Der Ausdruck liest die beiden neuen Felder, das
+Beschneiden passiert im Service. Ein `Math.max` in einer Jasper-Expression wäre nicht testbar.
+
+Keine Migration — der Schlüssel `ZEITRAUM` existiert, nur der Wert daneben ändert sich.
+
+**Tests:** `NkRechnungServiceTest` 45 (6 neu): Einzug und Auszug mitten im Zeitraum, fehlendes
+Mietende, umschliessendes Mietverhältnis, fehlender Mieter im Stamm — dazu zwei Wächter dafür, dass
+`von`/`bis` und die gebuchte Forderung **nicht** mitwandern. `NkBerechnungServiceTest` 69
+unverändert grün (die Helfer sind nur herausgezogen), `JasperTemplateCompileTest` 10 grün.
+
+### Nachtrag: ein E2E-Fund
+
+`should copy a billing with all its items` lief 3 × in den Timeout. Der Test suchte den
+Kebab-Eintrag „Kopieren" **seitenweit** mit `.first()`. Die Kebab-Komponente hält die Einträge
+*jeder* Zeile im DOM; sichtbar macht sie erst `.zev-kebab-menu--open` (`visibility`). Der Locator
+traf also den unsichtbaren Eintrag der obersten Zeile, und Playwright wartete drei Minuten auf ein
+Element, das nie sichtbar wird. Solange die gesuchte Abrechnung zufällig oben stand, fiel das nicht
+auf. Jetzt über den bestehenden Helfer `klickeKebabEintrag(page, zeile, /Kopieren|Copy/)`, der über
+die Zeile sucht; seine Signatur nimmt zusätzlich eine `RegExp`.

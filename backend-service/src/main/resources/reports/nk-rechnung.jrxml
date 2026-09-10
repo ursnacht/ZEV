@@ -15,6 +15,7 @@
     <field name="menge" class="java.math.BigDecimal"/>
     <field name="betragProEinheit" class="java.math.BigDecimal"/>
     <field name="prozentsatz" class="java.math.BigDecimal"/>
+    <field name="bezugsbetrag" class="java.math.BigDecimal"/>
     <field name="betrag" class="java.math.BigDecimal"/>
 
     <!-- Title Band - Header with addresses -->
@@ -49,7 +50,10 @@
             <expression><![CDATA[$P{TRANSLATIONS}.get("ZEITRAUM") + ":"]]></expression>
         </element>
         <element kind="textField" uuid="22222222-2222-2222-2222-222222222219" x="120" y="30" width="200" height="15" fontSize="9.0">
-            <expression><![CDATA[$P{RECHNUNG}.getVon().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + " - " + $P{RECHNUNG}.getBis().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))]]></expression>
+            <!-- Der Zeitraum DIESES Mieters: bei Ein- oder Auszug mitten in der Abrechnung sein
+                 Mietbeginn bzw. Mietende, sonst der Zeitraum der Abrechnung. Beschnitten wird im
+                 Service (FR-10), damit hier keine Fallunterscheidung steht. -->
+            <expression><![CDATA[$P{RECHNUNG}.getZeitraumVon().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + " - " + $P{RECHNUNG}.getZeitraumBis().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))]]></expression>
         </element>
 
         <element kind="textField" uuid="22222222-2222-2222-2222-22222222221a" x="0" y="50" width="120" height="15" fontSize="9.0">
@@ -140,13 +144,22 @@
                 </box>
             </element>
             <element kind="textField" uuid="22222222-2222-2222-2222-222222222234" x="350" y="0" width="65" height="18" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
-                <expression><![CDATA[$F{betragProEinheit} != null ? ch.nacht.util.PdfNumberFormat.decimals($F{betragProEinheit}, 4) : null]]></expression>
+                <!-- Preis je Einheit mit 4 Stellen (Verbrauch, Zusatz), sonst die Bezugsgroesse
+                     des Prozentsatzes als Betrag: Totalbetrag der Umlage bzw. Zwischentotal des
+                     Zuschlags. Beides ist die Groesse, aus der der Zeilenbetrag entsteht. -->
+                <expression><![CDATA[$F{betragProEinheit} != null
+                    ? ch.nacht.util.PdfNumberFormat.decimals($F{betragProEinheit}, 4)
+                    : ($F{bezugsbetrag} != null ? ch.nacht.util.PdfNumberFormat.chf($F{bezugsbetrag}) : null)]]></expression>
                 <box>
                     <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
                 </box>
             </element>
             <element kind="textField" uuid="22222222-2222-2222-2222-222222222235" x="415" y="0" width="55" height="18" blankWhenNull="true" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
-                <expression><![CDATA[$F{prozentsatz} != null ? ch.nacht.util.PdfNumberFormat.decimals($F{prozentsatz}, 1) + " %" : null]]></expression>
+                <!-- ZWEI Nachkommastellen und nicht eine: Bei einem Neuntel-Anteil (11.1111 %)
+                     ergaebe "11.1 %" auf 900.00 nur 99.90, die Zeile nennt aber 100.00 - eine
+                     Rechnung, die sich selbst widerspricht. Mit 11.11 % stimmt sie auf den Rappen.
+                     Nebenbei bleibt damit auch ein erfasster Anteil wie 33.33 % lesbar. -->
+                <expression><![CDATA[$F{prozentsatz} != null ? ch.nacht.util.PdfNumberFormat.decimals($F{prozentsatz}, 2) + " %" : null]]></expression>
                 <box>
                     <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
                 </box>

@@ -3,7 +3,7 @@ package ch.nacht.service;
 import ch.nacht.dto.NkBerechnungDTO;
 import ch.nacht.dto.NkMieterAbrechnungDTO;
 import ch.nacht.dto.NkMieterBasisDTO;
-import ch.nacht.dto.NkUmlageInfoDTO;
+import ch.nacht.dto.NkPositionSummeDTO;
 import ch.nacht.dto.NkZeileDTO;
 import ch.nacht.entity.Mengeneinheit;
 import ch.nacht.entity.NkAbrechnung;
@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -181,9 +182,9 @@ public class NkBerechnungServiceTest {
         // Mieter mit 275 Tagen: 900.00 x 275 / 3285 = 75.34
         assertEquals(new BigDecimal("75.34"), result.getMieter().get(8).getZeilen().get(0).getBetrag());
 
-        NkUmlageInfoDTO info = result.getUmlagen().get(0);
+        NkPositionSummeDTO info = result.getPositionSummen().get(0);
         assertEquals(new BigDecimal("900.00"), info.getTotalbetrag());
-        assertEquals(new BigDecimal("875.34"), info.getSummeVerteilt());
+        assertEquals(new BigDecimal("875.34"), info.getSummeKosten());
         assertEquals(new BigDecimal("24.66"), info.getNichtVerteilt());
     }
 
@@ -199,7 +200,7 @@ public class NkBerechnungServiceTest {
 
         assertEquals(new BigDecimal("200.00"), result.getMieter().get(0).getZeilen().get(0).getBetrag());
         assertEquals(new BigDecimal("200.00"), result.getMieter().get(1).getZeilen().get(0).getBetrag());
-        assertEquals(new BigDecimal("0.00"), result.getUmlagen().get(0).getNichtVerteilt());
+        assertEquals(new BigDecimal("0.00"), result.getPositionSummen().get(0).getNichtVerteilt());
     }
 
     @Test
@@ -294,10 +295,10 @@ public class NkBerechnungServiceTest {
                         new NkVerbrauch(10L, 2L, new BigDecimal("40.000"))),
                 List.of(), List.of(), List.of(), List.of(testMieter1, testMieter2));
 
-        NkUmlageInfoDTO info = result.getUmlagen().get(0);
+        NkPositionSummeDTO info = result.getPositionSummen().get(0);
         assertEquals(NkPositionsart.ANTEIL, info.getArt());
         assertEquals(new BigDecimal("100.000"), info.getSummeProzent());
-        assertEquals(new BigDecimal("2400.00"), info.getSummeVerteilt());
+        assertEquals(new BigDecimal("2400.00"), info.getSummeKosten());
         assertEquals(new BigDecimal("0.00"), info.getNichtVerteilt());
     }
 
@@ -312,9 +313,9 @@ public class NkBerechnungServiceTest {
                 List.of(new NkVerbrauch(10L, 1L, new BigDecimal("30.000"))),
                 List.of(), List.of(), List.of(), List.of(testMieter1, testMieter2));
 
-        NkUmlageInfoDTO info = result.getUmlagen().get(0);
+        NkPositionSummeDTO info = result.getPositionSummen().get(0);
         assertEquals(new BigDecimal("30.000"), info.getSummeProzent());
-        assertEquals(new BigDecimal("300.00"), info.getSummeVerteilt());
+        assertEquals(new BigDecimal("300.00"), info.getSummeKosten());
         assertEquals(new BigDecimal("700.00"), info.getNichtVerteilt());
         assertEquals(new BigDecimal("0.00"), result.getMieter().get(1).getZeilen().get(0).getBetrag());
     }
@@ -331,7 +332,7 @@ public class NkBerechnungServiceTest {
                 List.of(), List.of(), List.of(), List.of(testMieter1));
 
         assertEquals(new BigDecimal("1000.00"), result.getMieter().get(0).getZeilen().get(0).getBetrag());
-        assertEquals(new BigDecimal("0.00"), result.getUmlagen().get(0).getNichtVerteilt());
+        assertEquals(new BigDecimal("0.00"), result.getPositionSummen().get(0).getNichtVerteilt());
     }
 
     @Test
@@ -547,9 +548,9 @@ public class NkBerechnungServiceTest {
                 abrechnung, List.of(position), List.of(), List.of(), List.of(), List.of(), mieter);
 
         assertEquals(new BigDecimal("33.33"), result.getMieter().get(0).getZeilen().get(0).getBetrag());
-        assertEquals(new BigDecimal("99.99"), result.getUmlagen().get(0).getSummeVerteilt());
+        assertEquals(new BigDecimal("99.99"), result.getPositionSummen().get(0).getSummeKosten());
         // Die Differenz wird ausgewiesen, nicht ausgeglichen.
-        assertEquals(new BigDecimal("0.01"), result.getUmlagen().get(0).getRundungsdifferenz());
+        assertEquals(new BigDecimal("0.01"), result.getPositionSummen().get(0).getRundungsdifferenz());
     }
 
     @Test
@@ -562,8 +563,8 @@ public class NkBerechnungServiceTest {
                 abrechnung, List.of(position), List.of(), List.of(), List.of(), List.of(),
                 List.of(testMieter1, testMieter2));
 
-        NkUmlageInfoDTO info = result.getUmlagen().get(0);
-        assertEquals(new BigDecimal("66.66"), info.getSummeVerteilt());
+        NkPositionSummeDTO info = result.getPositionSummen().get(0);
+        assertEquals(new BigDecimal("66.66"), info.getSummeKosten());
         assertEquals(new BigDecimal("33.33"), info.getNichtVerteilt());
         assertEquals(new BigDecimal("0.01"), info.getRundungsdifferenz());
     }
@@ -666,7 +667,7 @@ public class NkBerechnungServiceTest {
         assertTrue(result.getMieter().isEmpty());
         assertEquals(0, result.getSummeTage());
         // Alles bleibt unverteilt, aber es fliegt keine ArithmeticException.
-        assertEquals(new BigDecimal("900.00"), result.getUmlagen().get(0).getNichtVerteilt());
+        assertEquals(new BigDecimal("900.00"), result.getPositionSummen().get(0).getNichtVerteilt());
     }
 
     @Test
@@ -693,7 +694,7 @@ public class NkBerechnungServiceTest {
         assertEquals(2, result.getMieter().size());
         assertTrue(result.getMieter().get(0).getZeilen().isEmpty());
         assertEquals(new BigDecimal("0.00"), result.getMieter().get(0).getKostentotal());
-        assertTrue(result.getUmlagen().isEmpty());
+        assertTrue(result.getPositionSummen().isEmpty());
     }
 
     @Test
@@ -790,8 +791,8 @@ public class NkBerechnungServiceTest {
                 abrechnung, List.of(gruenabfuhr), List.of(), List.of(), List.of(),
                 List.of(person(1L, 3), person(2L, 1)), List.of(testMieter1, testMieter2));
 
-        NkUmlageInfoDTO info = result.getUmlagen().get(0);
-        assertEquals(new BigDecimal("800.00"), info.getSummeVerteilt());
+        NkPositionSummeDTO info = result.getPositionSummen().get(0);
+        assertEquals(new BigDecimal("800.00"), info.getSummeKosten());
         assertEquals(new BigDecimal("200.00"), info.getNichtVerteilt());
     }
 
@@ -836,6 +837,252 @@ public class NkBerechnungServiceTest {
         assertEquals(3 * 181, result.getMieter().get(0).getPersonenTage());
         // 1000.00 x 543 / 1825 = 297.53
         assertEquals(new BigDecimal("297.53"), result.getMieter().get(0).getZeilen().get(0).getBetrag());
+    }
+
+    // ==================== Bezugsgroesse je Zeile (Rechnung) ====================
+
+    @Test
+    void zeile_Umlage_TraegtTotalbetragUndZeitanteilAlsProzentsatz() {
+        // Fuer die Rechnung: Bezugsbetrag x Prozentsatz muss den Zeilenbetrag ergeben, sonst
+        // widerspricht sich der Beleg. Zwei ganzjaehrige Mieter von zwei Wohnungen: je 50 %.
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung(JAHR_VON, JAHR_BIS, 2), List.of(umlage(10L, 1, "Strom", "1000.00", null)),
+                List.of(), List.of(), List.of(), List.of(), List.of(testMieter1, testMieter2));
+
+        NkZeileDTO zeile = result.getMieter().get(0).getZeilen().get(0);
+        assertEquals(new BigDecimal("1000.00"), zeile.getBezugsbetrag());
+        assertEquals(new BigDecimal("50.000"), zeile.getProzentsatz());
+        // Die Rechenprobe: 1000.00 x 50 % = 500.00
+        assertEquals(new BigDecimal("500.00"), zeile.getBetrag());
+    }
+
+    @Test
+    void zeile_UmlageMitLeerstand_ProzentsatzEntsprichtDemZeitanteil() {
+        // Neun Wohnungen, ein ganzjaehriger Mieter: 365/3285 = 11.111 %.
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung(JAHR_VON, JAHR_BIS, 9), List.of(umlage(10L, 1, "Strom", "900.00", null)),
+                List.of(), List.of(), List.of(), List.of(), List.of(testMieter1));
+
+        NkZeileDTO zeile = result.getMieter().get(0).getZeilen().get(0);
+        assertEquals(new BigDecimal("11.111"), zeile.getProzentsatz());
+        assertEquals(new BigDecimal("900.00"), zeile.getBezugsbetrag());
+        assertEquals(new BigDecimal("100.00"), zeile.getBetrag());
+    }
+
+    @Test
+    void zeile_UmlagePerson_ProzentsatzEntsprichtDemPersonenanteil() {
+        // 5 Personen im Nenner, dieser Mieter mit 3 - also 60 %, nicht der Zeitanteil.
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung(JAHR_VON, JAHR_BIS, 2, 5),
+                List.of(umlagePerson(11L, 1, "Gruenabfuhr", "1000.00", null)),
+                List.of(), List.of(), List.of(),
+                List.of(person(1L, 3), person(2L, 2)), List.of(testMieter1, testMieter2));
+
+        NkZeileDTO zeile = result.getMieter().get(0).getZeilen().get(0);
+        assertEquals(new BigDecimal("60.000"), zeile.getProzentsatz());
+        assertEquals(new BigDecimal("600.00"), zeile.getBetrag());
+    }
+
+    @Test
+    void zeile_Anteil_TraegtDenTotalbetragAlsBezugsbetrag() {
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung(JAHR_VON, JAHR_BIS, 2), List.of(anteil(13L, 1, "Heizkosten", "2400.00")),
+                List.of(new NkVerbrauch(13L, 1L, new BigDecimal("60.000"))),
+                List.of(), List.of(), List.of(), List.of(testMieter1));
+
+        NkZeileDTO zeile = result.getMieter().get(0).getZeilen().get(0);
+        assertEquals(new BigDecimal("2400.00"), zeile.getBezugsbetrag());
+        // Der Prozentsatz bleibt der ERFASSTE, nicht ein gerechneter.
+        assertEquals(new BigDecimal("60.000"), zeile.getProzentsatz());
+        assertEquals(new BigDecimal("1440.00"), zeile.getBetrag());
+    }
+
+    @Test
+    void zeile_Zuschlag_TraegtDasZwischentotalAlsBezugsbetrag() {
+        // Der Zuschlag rechnet auf die Summe der Zeilen DAVOR - genau die muss auf der Rechnung
+        // stehen, sonst ist der Betrag nicht nachvollziehbar.
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung(JAHR_VON, JAHR_BIS, 2),
+                List.of(umlage(10L, 1, "Strom", "1000.00", null),
+                        zuschlag(14L, 2, "Verwaltung", "10.00")),
+                List.of(), List.of(), List.of(), List.of(), List.of(testMieter1, testMieter2));
+
+        List<NkZeileDTO> zeilen = result.getMieter().get(0).getZeilen();
+        assertEquals(new BigDecimal("500.00"), zeilen.get(0).getBetrag());
+        // Zwischentotal = die 500.00 der Zeile davor
+        assertEquals(new BigDecimal("500.00"), zeilen.get(1).getBezugsbetrag());
+        assertEquals(new BigDecimal("50.00"), zeilen.get(1).getBetrag());
+    }
+
+    @Test
+    void zeile_Verbrauch_OhneBezugsbetrag() {
+        // Dort ist der Preis je Einheit die Bezugsgroesse; die Spalte bleibt fuer ihn frei.
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung(JAHR_VON, JAHR_BIS, 2), List.of(verbrauch(11L, 1, "Wasser", "3.5000")),
+                List.of(new NkVerbrauch(11L, 1L, new BigDecimal("12.000"))),
+                List.of(), List.of(), List.of(), List.of(testMieter1));
+
+        NkZeileDTO zeile = result.getMieter().get(0).getZeilen().get(0);
+        assertNull(zeile.getBezugsbetrag());
+        assertEquals(new BigDecimal("3.5000"), zeile.getBetragProEinheit());
+        assertNull(zeile.getProzentsatz());
+    }
+
+    // ==================== Positionsuebersicht (FR-10) ====================
+
+    @Test
+    void positionSummen_SummeKosten_EntsprichtDemKostentotalAllerMieter() {
+        // Das Kernversprechen: Beide zaehlen dieselben Zeilenbetraege, nur einmal je Position und
+        // einmal je Mieter gebuendelt. Absichtlich mit ALLEN Arten plus Zusatzposition - fehlte
+        // eine Quelle in der Uebersicht, faellt es genau hier auf.
+        NkAbrechnung abrechnung = abrechnung(JAHR_VON, JAHR_BIS, 2, 4);
+        NkPosition strom = umlage(10L, 1, "Allgemeinstrom", "1000.00", "500.000");
+        NkPosition gruen = umlagePerson(11L, 2, "Gruenabfuhr", "400.00", null);
+        NkPosition wasser = verbrauch(12L, 3, "Warmwasser", "3.5000");
+        NkPosition heizung = anteil(13L, 4, "Heizkosten", "2000.00");
+        NkPosition verwaltung = zuschlag(14L, 5, "Verwaltung", "5.00");
+        NkZusatz schluessel = zusatz(20L, 1L, 6, "Schluessel", "2.000", "25.0000");
+
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung, List.of(strom, gruen, wasser, heizung, verwaltung),
+                List.of(new NkVerbrauch(12L, 1L, new BigDecimal("12.000")),
+                        new NkVerbrauch(12L, 2L, new BigDecimal("8.000")),
+                        new NkVerbrauch(13L, 1L, new BigDecimal("60.000")),
+                        new NkVerbrauch(13L, 2L, new BigDecimal("40.000"))),
+                List.of(schluessel), List.of(),
+                List.of(person(1L, 3), person(2L, 1)), List.of(testMieter1, testMieter2));
+
+        BigDecimal kostentotal = result.getMieter().stream()
+                .map(NkMieterAbrechnungDTO::getKostentotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertEquals(kostentotal, result.getSummeKosten());
+    }
+
+    @Test
+    void positionSummen_FuehrtJedeArtAuf_PlusEinerZusatzZeile() {
+        NkAbrechnung abrechnung = abrechnung(JAHR_VON, JAHR_BIS, 2);
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung,
+                List.of(umlage(10L, 1, "Strom", "1000.00", null),
+                        verbrauch(11L, 2, "Wasser", "3.5000"),
+                        zuschlag(12L, 3, "Verwaltung", "5.00")),
+                List.of(), List.of(zusatz(20L, 1L, 4, "Schluessel", "2.000", "25.0000")),
+                List.of(), List.of(), List.of(testMieter1));
+
+        // Drei Positionen und eine Sammelzeile - keine Zeile je Zusatzposition.
+        assertEquals(4, result.getPositionSummen().size());
+        assertFalse(result.getPositionSummen().get(0).isZusatz());
+        NkPositionSummeDTO zusatzZeile = result.getPositionSummen().get(3);
+        assertTrue(zusatzZeile.isZusatz());
+        // Die Beschriftung liefert die Maske, nicht der Server.
+        assertNull(zusatzZeile.getBezeichnung());
+        assertEquals(new BigDecimal("50.00"), zusatzZeile.getSummeKosten());
+    }
+
+    @Test
+    void positionSummen_OhneZusatzpositionen_KeineSammelzeile() {
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung(JAHR_VON, JAHR_BIS, 2), List.of(umlage(10L, 1, "Strom", "1000.00", null)),
+                List.of(), List.of(), List.of(), List.of(), List.of(testMieter1));
+
+        assertEquals(1, result.getPositionSummen().size());
+        assertFalse(result.getPositionSummen().get(0).isZusatz());
+    }
+
+    @Test
+    void positionSummen_Umlage_SummiertDieVerteilteMenge() {
+        // Gesamtmenge 500 auf zwei ganzjaehrige Mieter von zwei Wohnungen: je 250.
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung(JAHR_VON, JAHR_BIS, 2), List.of(umlage(10L, 1, "Wasser", "1000.00", "500.000")),
+                List.of(), List.of(), List.of(), List.of(), List.of(testMieter1, testMieter2));
+
+        NkPositionSummeDTO summe = result.getPositionSummen().get(0);
+        assertEquals(new BigDecimal("500.000"), summe.getSummeMenge());
+        assertEquals(Mengeneinheit.M3, summe.getEinheit());
+    }
+
+    @Test
+    void positionSummen_Verbrauch_SummiertDieErfassteMenge() {
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung(JAHR_VON, JAHR_BIS, 2), List.of(verbrauch(11L, 1, "Warmwasser", "3.5000")),
+                List.of(new NkVerbrauch(11L, 1L, new BigDecimal("12.000")),
+                        new NkVerbrauch(11L, 2L, new BigDecimal("8.000"))),
+                List.of(), List.of(), List.of(), List.of(testMieter1, testMieter2));
+
+        NkPositionSummeDTO summe = result.getPositionSummen().get(0);
+        assertEquals(new BigDecimal("20.000"), summe.getSummeMenge());
+        // 20 x 3.50 = 70.00
+        assertEquals(new BigDecimal("70.00"), summe.getSummeKosten());
+        // Eine Verbrauchsposition kennt keinen Gesamtbetrag - die Zelle bleibt leer.
+        assertNull(summe.getTotalbetrag());
+        assertNull(summe.getNichtVerteilt());
+    }
+
+    @Test
+    void positionSummen_VerbrauchOhneErfassteMenge_LaesstDieMengeLeer() {
+        // Eine 0 saehe aus wie eine gemessene Null - hier hat nur noch niemand etwas eingetragen.
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung(JAHR_VON, JAHR_BIS, 2), List.of(verbrauch(11L, 1, "Warmwasser", "3.5000")),
+                List.of(), List.of(), List.of(), List.of(), List.of(testMieter1));
+
+        assertNull(result.getPositionSummen().get(0).getSummeMenge());
+        assertEquals(new BigDecimal("0.00"), result.getPositionSummen().get(0).getSummeKosten());
+    }
+
+    @Test
+    void positionSummen_ZuschlagUndAnteil_OhneMengeUndOhneEinheit() {
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung(JAHR_VON, JAHR_BIS, 2),
+                List.of(anteil(13L, 1, "Heizkosten", "1000.00"), zuschlag(14L, 2, "Verwaltung", "5.00")),
+                List.of(new NkVerbrauch(13L, 1L, new BigDecimal("100.000"))),
+                List.of(), List.of(), List.of(), List.of(testMieter1));
+
+        NkPositionSummeDTO anteilSumme = result.getPositionSummen().get(0);
+        // Bei ANTEIL steht der Prozentsatz in der eigenen Spalte, nicht in der Mengenspalte.
+        assertNull(anteilSumme.getSummeMenge());
+        assertNull(anteilSumme.getEinheit());
+        assertEquals(new BigDecimal("100.000"), anteilSumme.getSummeProzent());
+
+        NkPositionSummeDTO zuschlagSumme = result.getPositionSummen().get(1);
+        assertNull(zuschlagSumme.getSummeMenge());
+        assertNull(zuschlagSumme.getEinheit());
+        assertNull(zuschlagSumme.getTotalbetrag());
+        assertNull(zuschlagSumme.getSummeProzent());
+        // 5 % auf die 1000.00 des Anteils
+        assertEquals(new BigDecimal("50.00"), zuschlagSumme.getSummeKosten());
+    }
+
+    @Test
+    void positionSummen_ZusatzpositionenMitGleicherEinheit_SummierenDieMenge() {
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung(JAHR_VON, JAHR_BIS, 2), List.of(),
+                List.of(),
+                List.of(zusatz(20L, 1L, 1, "Schluessel", "2.000", "25.0000"),
+                        zusatz(21L, 2L, 1, "Schluessel", "3.000", "25.0000")),
+                List.of(), List.of(), List.of(testMieter1, testMieter2));
+
+        NkPositionSummeDTO zusatzZeile = result.getPositionSummen().get(0);
+        assertEquals(new BigDecimal("5.000"), zusatzZeile.getSummeMenge());
+        assertEquals(Mengeneinheit.STUECK, zusatzZeile.getEinheit());
+        assertEquals(new BigDecimal("125.00"), zusatzZeile.getSummeKosten());
+    }
+
+    @Test
+    void positionSummen_ZusatzpositionenMitGemischtenEinheiten_LassenDieMengeLeer() {
+        // "2 Stueck plus 3 m3" ist keine Menge, sondern zwei. Die Kosten bleiben summierbar.
+        NkZusatz stueck = zusatz(20L, 1L, 1, "Schluessel", "2.000", "25.0000");
+        NkZusatz kubik = zusatz(21L, 2L, 1, "Wasser", "3.000", "10.0000");
+        kubik.setEinheit(Mengeneinheit.M3);
+
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung(JAHR_VON, JAHR_BIS, 2), List.of(), List.of(),
+                List.of(stueck, kubik), List.of(), List.of(),
+                List.of(testMieter1, testMieter2));
+
+        NkPositionSummeDTO zusatzZeile = result.getPositionSummen().get(0);
+        assertNull(zusatzZeile.getSummeMenge());
+        assertNull(zusatzZeile.getEinheit());
+        assertEquals(new BigDecimal("80.00"), zusatzZeile.getSummeKosten());
     }
 
     private NkAbrechnung abrechnung(LocalDate von, LocalDate bis, int anzahlWohnungen) {

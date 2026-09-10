@@ -243,29 +243,38 @@
         </button>
       </div>
 
-      <!-- Kontrollzahlen: Leerstandsanteil und Rundungsdifferenz getrennt, weil sie
-           verschiedene Ursachen haben und sonst nicht erklaerbar waeren. -->
-      @if (berechnung && berechnung.umlagen.length > 0) {
+      <!-- Zusammenstellung je Position: Mengen und Kosten ueber alle Mieter, dazu die
+           Kontrollzahlen der verteilenden Arten. Leerstandsanteil und Rundungsdifferenz stehen
+           getrennt, weil sie verschiedene Ursachen haben und sonst nicht erklaerbar waeren.
+           Zellen bleiben LEER, wo eine Art die Groesse nicht kennt - eine 0.00 saehe aus wie ein
+           vergessener Wert. -->
+      @if (berechnung && berechnung.positionSummen.length > 0) {
         <table class="zev-table nk-kontrolle">
           <thead>
             <tr>
-              <th>{{ 'NK_UMLAGE' | translate }}</th>
-              <th class="number">{{ 'NK_TOTALBETRAG' | translate }}</th>
-              <th class="number">{{ 'NK_SUMME_VERTEILT' | translate }}</th>
-              <th class="number">{{ 'NK_NICHT_VERTEILT' | translate }}</th>
-              <th class="number">{{ 'NK_RUNDUNGSDIFFERENZ' | translate }}</th>
-              <th class="number">{{ 'NK_SUMME_PROZENT' | translate }}</th>
+              <th>{{ 'NK_POSITION' | translate }}</th>
+              <th class="zev-table__number">{{ 'NK_TOTALBETRAG' | translate }}</th>
+              <th class="zev-table__number">{{ 'MENGE' | translate }}</th>
+              <th>{{ 'MENGENEINHEIT' | translate }}</th>
+              <th class="zev-table__number">{{ 'NK_SUMME_KOSTEN' | translate }}</th>
+              <th class="zev-table__number">{{ 'NK_NICHT_VERTEILT' | translate }}</th>
+              <th class="zev-table__number">{{ 'NK_RUNDUNGSDIFFERENZ' | translate }}</th>
+              <th class="zev-table__number">{{ 'NK_SUMME_PROZENT' | translate }}</th>
             </tr>
           </thead>
           <tbody>
-            @for (info of berechnung.umlagen; track info.positionId) {
+            @for (info of berechnung.positionSummen; track trackSumme($index, info)) {
               <tr>
-                <td>{{ info.bezeichnung }}</td>
-                <td class="number">{{ betrag(info.totalbetrag) }}</td>
-                <td class="number">{{ betrag(info.summeVerteilt) }}</td>
-                <td class="number">{{ betrag(info.nichtVerteilt) }}</td>
-                <td class="number">{{ betrag(info.rundungsdifferenz) }}</td>
-                <td class="number">
+                <!-- Die Beschriftung der Sammelzeile kommt aus den Uebersetzungen, nicht vom
+                     Server: Sie ist ein Anzeigetext. -->
+                <td>{{ info.zusatz ? ('NK_ZUSATZPOSITIONEN' | translate) : info.bezeichnung }}</td>
+                <td class="zev-table__number">{{ betragOderLeer(info.totalbetrag) }}</td>
+                <td class="zev-table__number">{{ menge(info.summeMenge) }}</td>
+                <td>{{ info.einheit ? (info.einheit | translate) : '' }}</td>
+                <td class="zev-table__number">{{ betrag(info.summeKosten) }}</td>
+                <td class="zev-table__number">{{ betragOderLeer(info.nichtVerteilt) }}</td>
+                <td class="zev-table__number">{{ betragOderLeer(info.rundungsdifferenz) }}</td>
+                <td class="zev-table__number">
                   @if (info.art === Positionsart.ANTEIL) {
                     <!-- Kontrollzahl: Die Summe der Anteile sollte 100% ergeben. Abweichungen
                          werden markiert, aber nicht abgewiesen - eine halb erfasste Abrechnung
@@ -279,6 +288,21 @@
               </tr>
             }
           </tbody>
+          <tfoot>
+            <!-- Die Summe MUSS dem Kostentotal aller Mieter entsprechen: Beide zaehlen dieselben
+                 Zeilenbetraege, nur anders gebuendelt. Weicht sie ab, fehlt der Uebersicht eine
+                 Quelle - und dann sagt die Maske das, statt es den Leser suchen zu lassen. -->
+            <tr>
+              <th colspan="4">{{ 'NK_SUMME_KOSTEN' | translate }}</th>
+              <th class="zev-table__number">
+                <span [class.zev-text--danger]="summenWeichenAb"
+                  [title]="(summenWeichenAb ? 'NK_SUMME_KOSTEN_ABWEICHUNG' : '') | translate">
+                  {{ betrag(berechnung.summeKosten) }}
+                </span>
+              </th>
+              <th colspan="3"></th>
+            </tr>
+          </tfoot>
         </table>
       }
     </div>
@@ -292,6 +316,12 @@
     <div class="nk-total nk-total--mieter">
       <span>{{ 'NK_SUMME_KOSTENTOTAL' | translate }}</span>
       <span class="number">{{ betrag(summeMietertotal) }} CHF</span>
+    </div>
+    <!-- Direkt darunter, weil die Differenz der beiden die Summe der Salden ist: was insgesamt
+         nachzuzahlen oder gutzuschreiben ist. -->
+    <div class="nk-total">
+      <span>{{ 'NK_SUMME_AKONTOTOTAL' | translate }}</span>
+      <span class="number">{{ betrag(summeAkontototal) }} CHF</span>
     </div>
 
     @for (block of berechnung.mieter; track block.mieterId) {
@@ -334,9 +364,9 @@
             <thead>
               <tr>
                 <th>{{ 'BEZEICHNUNG' | translate }}</th>
-                <th class="number">{{ 'MENGE' | translate }}</th>
+                <th class="zev-table__number">{{ 'MENGE' | translate }}</th>
                 <th>{{ 'MENGENEINHEIT' | translate }}</th>
-                <th class="number">{{ 'NK_BETRAG' | translate }} (CHF)</th>
+                <th class="zev-table__number">{{ 'NK_BETRAG' | translate }} (CHF)</th>
                 <th></th>
               </tr>
             </thead>
@@ -344,7 +374,7 @@
               @for (zeile of block.zeilen; track $index) {
                 <tr>
                   <td>{{ zeile.bezeichnung }}</td>
-                  <td class="number">
+                  <td class="zev-table__number">
                     @if (istEingebbareZeile(zeile) && positionZuZeile(zeile); as position) {
                       <!-- `ngModel` wie im ganzen uebrigen Formular, nicht [value]/(change):
                            So wird schon beim Tippen neu gerechnet statt erst beim Verlassen des
@@ -361,10 +391,10 @@
                   <!-- Bei ANTEIL ist die Bezugsgroesse immer Prozent; die Position traegt keine
                        Mengeneinheit, sonst muesste sie bei jeder Zeile erfasst werden. -->
                   <td>{{ zeile.art === Positionsart.ANTEIL ? '%' : (zeile.einheit ? (zeile.einheit | translate) : '') }}</td>
-                  <td class="number">{{ betrag(zeile.betrag) }}</td>
+                  <td class="zev-table__number">{{ betrag(zeile.betrag) }}</td>
                   <td>
                     @if ((zeile.art === Positionsart.UMLAGE
-                          || zeile.art === Positionsart.UMLAGE_PERSON) && umlageInfoFuer(zeile); as info) {
+                          || zeile.art === Positionsart.UMLAGE_PERSON) && positionSummeFuer(zeile); as info) {
                       <span class="zev-text--muted">
                         {{ 'NK_NICHT_VERTEILT' | translate }}: {{ betrag(info.nichtVerteilt) }}
                       </span>
@@ -382,8 +412,8 @@
                 <tr>
                   <th>{{ 'NK_ZUSATZPOSITION' | translate }}</th>
                   <th>{{ 'MENGENEINHEIT' | translate }}</th>
-                  <th class="number">{{ 'MENGE' | translate }}</th>
-                  <th class="number">{{ 'NK_BETRAG_PRO_EINHEIT' | translate }}</th>
+                  <th class="zev-table__number">{{ 'MENGE' | translate }}</th>
+                  <th class="zev-table__number">{{ 'NK_BETRAG_PRO_EINHEIT' | translate }}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -403,12 +433,12 @@
                         }
                       </select>
                     </td>
-                    <td class="number">
+                    <td class="zev-table__number">
                       <input type="number" class="zev-input" [(ngModel)]="zusatz.menge"
                         [name]="'zmenge' + block.mieterId + $index" min="0" step="0.001"
                         [disabled]="gesperrt" (ngModelChange)="rechne()" />
                     </td>
-                    <td class="number">
+                    <td class="zev-table__number">
                       <input type="number" class="zev-input" [(ngModel)]="zusatz.betragProEinheit"
                         [name]="'zpreis' + block.mieterId + $index" min="0" step="0.0001"
                         [disabled]="gesperrt" (ngModelChange)="rechne()" />

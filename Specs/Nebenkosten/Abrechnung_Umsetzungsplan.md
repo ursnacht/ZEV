@@ -657,3 +657,195 @@ prüft das mit (`3285` bleibt `3285`).
   Einheit falschen Typs); der bestehende Fall zum Kennzeichen ist umbenannt und prüft jetzt die
   Abwesenheit statt „0 Tage". Backend 1266 grün.
 * Keine Migration, kein Frontend-Code, kein CSS.
+
+## Nachtrag: Zusammenstellung der Positionen (FR-10)
+
+Die Tabelle zwischen den allgemeinen Positionen und den Mietern führt neu **jede** Positionsart auf,
+zeigt je Position die Summe der Mengen und der Kosten und darunter die Gesamtsumme.
+
+### Der Kern: die Identität mit dem Kostentotal
+Gefordert war „diese muss mit dem Kostentotal aller Mieter übereinstimmen". Das gilt nur, wenn die
+Übersicht **beide** Quellen der Mieterzeilen kennt: `kostentotal` summiert Positionen **und**
+Zusatzpositionen (`zeilenQuellen` in `berechneMieter`). Die alte Tabelle kannte nur die verteilenden
+Positionsarten — ihr fehlten `VERBRAUCH`, `ZUSCHLAG` und alle Zusatzpositionen.
+
+Deshalb: eine Zeile je Position für alle fünf Arten, plus **eine** Sammelzeile für die
+Zusatzpositionen. Eine Zeile je Zusatzposition wäre die Mieterliste ein zweites Mal — dieselbe
+Bezeichnung kommt bei mehreren Mietern vor, und die Übersicht soll Positionen zeigen, nicht Mieter.
+
+Die Identität gilt damit **per Konstruktion**, und je ein Test hält sie fest (Backend und Vorschau):
+Beide summieren `kostentotal` über die Mieterblöcke und vergleichen mit `summeKosten` — bewusst mit
+allen fünf Arten plus Zusatzposition im Aufbau. Zusätzlich zeigt die Maske eine Abweichung
+**an** (`summenWeichenAb`), statt zwei Zahlen nebeneinander stehen zu lassen.
+
+### Umbenennungen
+Die Liste enthält jetzt auch `ZUSCHLAG`-Zeilen und eine Zusatz-Sammelzeile — `umlagen` wäre als Name
+aktiv falsch und würde den nächsten Leser in die Irre führen. Deshalb durchgehend umbenannt:
+
+| alt | neu |
+|---|---|
+| `NkUmlageInfoDTO` / `NkUmlageInfo` | `NkPositionSummeDTO` / `NkPositionSumme` |
+| `NkBerechnung.umlagen` | `NkBerechnung.positionSummen` |
+| `summeVerteilt` | `summeKosten` |
+| `umlageInfoFuer` | `positionSummeFuer` |
+
+Neu dazu: `summeMenge`, `einheit`, `zusatz` je Zeile und `summeKosten` am Ergebnis.
+
+### Leer statt Null
+Die Felder sind **`null`-bar** und nicht mit `0` vorbelegt. Ein Totalbetrag von `0.00` bei einer
+Verbrauchsposition sähe aus wie ein vergessener Wert, obwohl die Art gar keinen kennt — dieselbe
+Überlegung, aus der die Maske nicht zutreffende Eingabefelder ausblendet statt sie zu sperren. Dafür
+gibt es `betragOderLeer()` neben dem bestehenden `betrag()`: Bei einem Total ist `null` → `0.00`
+richtig (nichts verteilt ist null Franken), bei einer Art ohne Gesamtbetrag ist es falsch.
+
+Aus demselben Grund lässt `merke()` eine **nicht erfasste** Menge unangetastet: Sonst stünde bei
+einer Verbrauchsposition, für die noch niemand etwas eingetragen hat, eine `0` — und die sähe aus
+wie eine gemessene Null.
+
+### Gemischte Einheiten in der Sammelzeile
+Zusatzpositionen verschiedener Mieter können verschiedene Mengeneinheiten tragen. `zusatzZeile()`
+verfolgt die Einheit mit und lässt Menge **und** Einheit leer, sobald eine zweite auftaucht: „2 Stück
+plus 3 m³" ist keine Menge, sondern zwei. Die Kosten bleiben summierbar, denn Franken sind Franken.
+Innerhalb **einer** Position stellt sich die Frage nicht — sie hat genau eine Einheit.
+
+### i18n — und ein eigener Regelbruch
+Ich habe `NK_SUMME_KOSTEN_ABWEICHUNG` in Ersatzschreibung erfasst („zaehlen", „Zeilenbetraege",
+„ueberein", „Uebersicht") — gegen die Regel, die ich in derselben Session in `generell.md` und die
+Commands geschrieben hatte. Der User hat es korrigiert.
+
+Ein anschliessender Abgleich **aller** Migrationen gegen die Regel fand fünf weitere Verstösse in
+altem Bestand (V14, V17, V120): `STATISTIK_UEBERSICHT`, `ZEITRAUM_WAEHLEN`,
+`WAEHLEN_SIE_EINEN_ZEITRAUM`, `ALLE_AUSWAEHLEN`, `NK_POSITION_HINZUFUEGEN`. Nachgezogen in
+`V142__Uebersetzungen_Mit_Umlauten_Bestand.sql`.
+
+**Die laufende Datenbank war sauber** — deshalb wäre der Fehler bei einer Prüfung gegen
+`zev.translation` unentdeckt geblieben. Die Texte waren über die Übersetzungsverwaltung angepasst,
+und das wirkt in genau einer Datenbank; eine frisch aufgesetzte bekäme weiterhin
+„Statistik-Uebersicht". Dieselbe Lücke wie bei V128 und V138 — beim dritten Mal ist sie eine Regel
+wert, und sie steht jetzt in `generell.md`: Geprüft wird gegen den letzten in einer Migration
+deklarierten Wert je Key, nicht gegen die Datenbank.
+
+Ein Suchmuster-Fehlalarm zum Merken: „ausschliesslich" enthält `schliess` und ist **korrekt**
+(Schweizer `ss` statt `ß`). Wer nach Ersatzschreibung sucht, darf `ss`-Wörter nicht mitfangen.
+
+`V141__Add_Nk_Positionsuebersicht_Translations.sql`: `NK_POSITION` (Spaltentitel, „Umlage" wäre jetzt
+falsch), `NK_SUMME_KOSTEN`, `NK_ZUSATZPOSITIONEN` (Anzeigetext der Sammelzeile — sie kommt aus der
+Maske, nicht vom Server, wie beim Zusatz „(Kopie)"), `NK_SUMME_KOSTEN_ABWEICHUNG` (Hinweis).
+`NK_SUMME_VERTEILT` und `NK_UMLAGE` werden nicht mehr verwendet; die Schlüssel bleiben in der
+Datenbank stehen (unbenutzt, aber harmlos — Weg dafür in `Specs/DeleteTranslations.md`).
+
+### Kein CSS
+`.nk-kontrolle`, `.zev-table` und `.number` genügen; `<tfoot>` ist Standard-HTML und erbt die
+Tabellenformatierung. `.zev-text--danger` gab es schon für die Prozent-Abweichung.
+
+### Tests
+* `NkBerechnungServiceTest` 63 (9 neu): Identität mit dem Kostentotal, alle Arten plus Sammelzeile,
+  keine Sammelzeile ohne Zusatzpositionen, Mengen bei Umlage und Verbrauch, leere Menge ohne
+  Erfassung, Zuschlag/Anteil ohne Menge, gleiche und gemischte Einheiten.
+* Vorschau-Spec 51 (10 neu) — dieselben Fälle, damit die beiden Seiten nicht auseinanderlaufen.
+* Komponenten-Spec 138 (7 neu): `summenWeichenAb` und `betragOderLeer`.
+* Gesamt: 1275 Backend, 1632 Frontend.
+
+### Offen
+* **E2E:** Der neue Fall `should sum quantities and costs per position and match the tenant total`
+  prüft beide Mengenspalten, die Sammelzeile und die Identität — vor und nach dem Speichern. Er
+  **scheitert gegen den laufenden Container**, weil dort die Verbrauchszeile in der Übersicht noch
+  gar nicht existiert („element(s) not found"). Dasselbe gilt für die bestehenden Fälle, die
+  `verteiltFuer` nutzen: Die Kostenspalte liegt jetzt an Index 4 statt 2. Die 17 Fälle, die die
+  Übersicht nicht anfassen, sind grün geprüft. Nach einem Rebuild von Backend und Frontend ist der
+  Lauf zu wiederholen.
+
+## Nachtrag: Summe der Akontozahlungen und rechtsbündige Beträge
+
+### Akonto total aller Mieter
+Getter `summeAkontototal`, gleiche Bauart wie `summeMietertotal` (abgeleitet, gerundet). Steht direkt
+unter der Kostensumme, weil die **Differenz** der beiden die Summe der Salden ist — was insgesamt
+nachzuzahlen oder gutzuschreiben ist. Ein Unit-Test hält genau diese Beziehung fest, statt nur die
+Summenbildung zu prüfen. `V143` bringt die Beschriftung.
+
+### `class="number"` war app-weit toter Code
+Die Beträge standen links, weil `.number` **nirgends** definiert ist — nicht im Design System, nicht
+in der Komponente. Die Klasse tat schlicht nichts. Richtig ist `.zev-table__number`, die genau dafür
+in der Tabellen-Komponente liegt und mit `th`/`td` qualifiziert ist, um die linksbündige Grundregel
+`.zev-table th, .zev-table td` zu schlagen (der Kommentar dort erklärt es).
+
+21 Tabellenzellen der NK-Maske umgestellt. **Kein neues CSS** für die Tabellen.
+
+Die vier `<span class="number">` in den Totalzeilen bleiben: Dort sind es Flex-Container, und
+`.zev-table__number` gilt für Tabellenzellen. Für sie gibt es jetzt eine **echte** Regel in der
+Komponente — `min-width` plus `text-align: right`. Rechtsbündig war durch `justify-content: flex-end`
+schon gegeben (die rechte Kante sass korrekt), die Mindestbreite richtet die **linke** aus. Erst
+damit stehen die Beträge der beiden Totalzeilen als Kolonne untereinander.
+
+**Korrektur einer eigenen Fehlmeldung:** Ich hatte gemeldet, `tarif-list.component.html` trage
+„dieselbe tote Klasse". Das war falsch — dort **definiert die Komponente `.number` selbst**
+(`text-align: right` plus `font-family: monospace`), die Ausrichtung funktionierte also. Dieselbe
+Klassenbezeichnung, gegenteiliger Befund: In der NK-Maske war sie nirgends definiert.
+
+Nachgezogen wurde die Tarifliste trotzdem, aber aus einem anderen Grund (s. eigener Nachtrag
+unten): Die Kopfzeile der Preisspalte stand links, während die Zahlen darunter rechts standen.
+
+### Tests
+* Komponenten-Spec 142 (4 neu): leer, Summenbildung, Rundung, und die Beziehung
+  „Kosten − Akonto = Σ Salden".
+* E2E: zwei Fälle — die Akonto-Zeile mit Prüfung gegen den Saldo des Mieterblocks, und die
+  Rechtsbündigkeit. Letztere prüft `toHaveCSS('text-align', 'right')`, also die **Wirkung**: Ein
+  Klassenname allein sagt nichts darüber, ob eine Regel greift — genau das war der Fehler.
+* Frontend 1636 grün; die 17 E2E-Fälle ohne Bezug zur Übersicht ebenfalls.
+
+### Offen
+* Die neuen E2E-Fälle brauchen den Rebuild — wie die Positionsübersicht aus FR-10.
+
+## Nachtrag: Preisspalte der Tarifliste
+
+Anlass war meine Fehlmeldung, die Tarifliste trage die tote `.number`-Klasse (s. oben). Beim
+Nachziehen zeigte sich der echte Mangel: Die **Kopfzeile** „PREIS (CHF)" stand linksbündig, die
+Zahlen darunter rechts.
+
+* `<th>` der Preisspalte trägt jetzt `zev-table__number` mit — Titel und Kolonne fluchten.
+* `<td>` von der lokalen `.number` auf `zev-table__number` umgestellt: Die Rechtsbündigkeit ist ein
+  geteiltes Anliegen und gehört ins Design System, nicht in jede Komponente.
+* Die lokale CSS-Regel behält **nur** noch das Monospace — die Ziffern stehen dadurch in einer
+  Kolonne, auch wenn die Grundschrift proportional ist. Das ist eine Eigenschaft *dieser* Spalte und
+  bleibt deshalb in der Komponente. Sie kommentarlos mit umzustellen hätte den Monospace-Satz still
+  entfernt.
+* Verifiziert: 53 Unit-Tests und **23 von 23** E2E-Fällen der Tarifverwaltung grün — diese laufen
+  gegen den Container und brauchen keinen Rebuild, weil nur Frontend-Styling betroffen ist. Die
+  Rechtsbündigkeit selbst ist erst nach einem Rebuild sichtbar.
+
+## Nachtrag: zwei Testfunde nach dem Rebuild
+
+Der erste Lauf gegen den neu gebauten Stack brachte zwei Fehlschläge — **beide in meinen Tests, nicht
+in der Anwendung**.
+
+### Drag & Drop zog ins Leere
+`should reorder positions by drag and drop` scheiterte an einer unveränderten Reihenfolge. Isoliert
+lief der Zug einwandfrei (dreimal wiederholt), im Suite-Lauf nie. Der Unterschied: Der Test öffnet
+vorher einen **Mieterblock**, und Playwright scrollt dafür hin.
+
+Gemessen: Nach dem Öffnen steht `scrollY = 829`, und die Positionszeilen liegen bei **y = −29** bzw.
+**−96** — über dem Viewport. `page.mouse` arbeitet in Viewport-Koordinaten; ein Zug auf eine negative
+Koordinate passiert einfach nicht. `boundingBox()` liefert solche Werte anstandslos, deshalb fiel es
+nicht am Helfer auf, sondern erst an der Reihenfolge — weit weg von der Ursache.
+
+Meine Änderungen haben die Maske länger gemacht (Übersicht mit `tfoot`, zwei Summenzeilen) und damit
+eine **latente** Schwäche des Helfers freigelegt: Vorher blieb die Tabelle knapp im Bild.
+
+Behoben mit `scrollIntoViewIfNeeded()` auf der **Zielzeile** (sie liegt oben, ist also der Rand des
+Bereichs, der sichtbar sein muss) plus einer Prüfung, die mit klarer Meldung scheitert, wenn eine der
+beiden Zeilen ausserhalb liegt. Dieselbe Falle wie beim ECharts-Zoom-Test, wo der Wheel-Event das
+Diagramm nicht erreichte.
+
+### Die Akonto-Summe prüfte eine falsche Beziehung
+`should show the prepayment total below the cost total` verglich `Σ Kosten − Σ Akonto` mit dem Saldo
+**eines** Mieterblocks. Das gilt nur bei genau einem Mieter; die Testumgebung hat mehrere, und die
+übrigen bringen ihr Akonto aus dem Stammdatum mit. Erwartet 589.90, erhalten 509.10 — beide Zahlen
+richtig, die Gleichung falsch gestellt.
+
+Zusätzlich stimmte der Selektor nicht: `.zev-container > .nk-total` — die Wurzel der Maske heisst
+`.form-container`, `.zev-container` gehört zur Liste darum herum.
+
+Neu geschrieben als **Delta-Prüfung**: Eine Änderung von 12 × 50.00 auf 12 × 80.00 muss die Summe um
+genau 360.00 erhöhen — unabhängig davon, was die übrigen Mieter mitbringen. Vor und nach dem
+Speichern. Die Beziehung „Kosten − Akonto = Σ Salden" bleibt beim Unit-Test: Dort sind die Salden
+**vorzeichenbehaftet**, während die Maske je Block den Betrag absolut mit Beschriftung zeigt.
