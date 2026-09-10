@@ -473,24 +473,44 @@ Die übrigen Arten führen ihre Mengeneinheit selbst und werden **nicht** übers
 stünde bei einer Wasserumlage „Fr." statt „m³". Bei einer Umlage kann `CHF` durchaus die erfasste
 Einheit sein, wenn die verteilte Grösse selbst ein Betrag ist.
 
-Es gilt durchgehend **`Preis × % = Betrag`**. Vorher standen bei Umlage und Zuschlag **beide**
-Spalten leer; der Betrag war für den Mieter nicht überprüfbar.
+Damit ist jede Zeile herleitbar: **`Preis × % = Betrag`**. Vorher standen bei Umlage und Zuschlag
+**beide** Spalten leer, und der Betrag war für den Mieter nicht überprüfbar. **Exakt** aufgehen tut
+die Probe bei einem *erfassten* Prozentsatz; beim *abgeleiteten* Anteil einer Umlage bleibt eine
+gewollte Ungenauigkeit — siehe „Genauigkeit der Prozentspalte".
 
-**Zwei Nachkommastellen in der Prozentspalte (Entscheid).** Vorher war es eine. Bei einem
-Neuntel-Anteil (`11.1111 %`) ergäbe „11.1 %" auf 900.00 nur 99.90, die Zeile nennt aber 100.00 — eine
-Rechnung, die sich selbst widerspricht. Mit „11.11 %" stimmt sie auf den Rappen. Nebenbei bleibt
-damit auch ein erfasster Anteil wie `33.33 %` lesbar, der zuvor auf `33.3 %` gekürzt wurde.
+#### Genauigkeit der Prozentspalte — Entscheid und bekannte Grenze
 
-**Der Betrag bleibt die verbindliche Zahl.** Ein aus der gerundeten Prozentangabe nachgerechneter
-Wert kann um einen Rappen abweichen — dieselbe Rundungsdifferenz, die die Abrechnung ohnehin
-getrennt ausweist.
+**Gedruckt werden zwei Nachkommastellen.** Ursprünglich war es eine: Bei einem Neuntel-Anteil
+(`11.1111 %`) ergäbe „11.1 %" auf 900.00 nur 99.90, während die Zeile 100.00 nennt. Zwei Stellen
+räumen das für *zweistellige* Anteile auf und halten die Spalte ruhig — und nur das. Der frühere
+Schluss „mit 11.11 % stimmt es auf den Rappen" gilt für jenes Beispiel, nicht allgemein.
+
+**Der Betrag ist die verbindliche Zahl, der Prozentsatz eine Angabe zur Herleitung.** Bei einem
+**erfassten** Prozentsatz (Anteil, Zuschlag) geht die Probe exakt auf. Beim **abgeleiteten** Zeit-
+bzw. Personenanteil einer Umlage weicht sie um mehrere Rappen ab — mehr als die
+Rundungsdifferenz, die die Abrechnung getrennt ausweist. Dort ist der Anteil oft einstellig, und
+dann beginnen die tragenden Stellen erst hinter der zweiten Nachkommastelle: Bei zwölf Wohnungen
+sind es `8.3333 %`, gedruckt `8.33 %`; auf einen Totalbetrag von 12'000 ergibt das 999.60, während
+die Zeile 1'000.00 nennt — **40 Rappen**.
+
+**Vier Nachkommastellen wurden erprobt und verworfen (Entscheid).** Sie beheben die Abweichung
+vollständig — `PROZENT_SCALE = 4` in der Berechnung und „mindestens zwei, höchstens vier" im Druck,
+womit ein erfasster Prozentsatz kurz bleibt — und standen an einem erzeugten PDF zur Ansicht
+(`1.0101 %` statt `1.01 %`, die Zeile ging damit auf den Rappen auf). Verworfen wurde es wegen des
+**Schriftbilds**: `1.0101 %` neben `33.33 %` liest sich unruhig, und die Genauigkeit hilft nur
+jemandem, der wirklich nachrechnet.
+
+Wer die Abweichung erneut findet: Sie ist **bekannt und in Kauf genommen**, nicht übersehen. Vor
+einem neuen Versuch, sie zu „beheben", gehört der Entscheid über das Schriftbild neu geführt — die
+Rechenseite ist geklärt.
 
 **Akzeptanzkriterien:**
 * [ ] Bei `UMLAGE` und `UMLAGE_PERSON` steht in „Preis" der Totalbetrag und in „%" der Zeit- bzw. Personenanteil dieses Mieters.
 * [ ] Bei `ANTEIL` steht in „Preis" der Totalbetrag; der Prozentsatz bleibt der **erfasste**.
 * [ ] Bei `ZUSCHLAG` steht in „Preis" das Zwischentotal, auf dem der Zuschlag rechnet.
 * [ ] Bei `VERBRAUCH` und Zusatzzeilen bleibt „Preis" der Preis je Einheit und „%" leer.
-* [ ] `Preis × % = Betrag` geht bei jeder dieser Arten auf — bis auf die bekannte Rundungsdifferenz.
+* [ ] `Preis × % = Betrag` geht bei `ANTEIL` und `ZUSCHLAG` exakt auf (erfasster Prozentsatz).
+* [ ] Bei `UMLAGE` und `UMLAGE_PERSON` weicht die Probe um wenige Rappen ab — bewusst, weil der abgeleitete Anteil auf zwei Nachkommastellen gedruckt wird; verbindlich ist der Betrag.
 * [ ] Die Prozentspalte zeigt zwei Nachkommastellen.
 * [ ] Bei `ANTEIL` und `ZUSCHLAG` steht in der Spalte „Einheit" `Fr.` (Schlüssel `CHF`).
 * [ ] Bei `UMLAGE`, `UMLAGE_PERSON`, `VERBRAUCH` und Zusatzzeilen bleibt die **erfasste** Mengeneinheit stehen — eine Wasserumlage zeigt weiterhin `m³`.
