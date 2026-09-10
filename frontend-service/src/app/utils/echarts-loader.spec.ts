@@ -11,7 +11,20 @@ import { ladeECharts, setzeEChartsZustandZurueck } from './echarts-loader';
  * <p>Gezeichnet wird nichts: `init()` bräuchte ein gemessenes Element mit Canvas, das jsdom nicht
  * hat. Registrierung und Merken lassen sich davon unabhängig prüfen.
  */
-describe('ladeECharts', () => {
+/**
+ * Grosszuegiges Zeitlimit fuer die ganze Datei statt der Vitest-Vorgabe von 5 s.
+ *
+ * <p>Jeder Test hier laedt ECharts **wirklich** - dynamische Imports einer grossen Bibliothek, die
+ * Vite beim ersten Zugriff noch transformiert. Allein gemessen dauert der kalte Ladevorgang gut
+ * 6 s; im vollen Lauf konkurriert er zusaetzlich mit den uebrigen 58 Testdateien. Die Datei war
+ * damit flaky: allein gruen, in der Suite gelegentlich `Test timed out in 5000ms`.
+ *
+ * <p><b>Nicht die Loesung: den echten Import durch einen Mock ersetzen.</b> Genau das echte Laden
+ * ist der Zweck dieser Tests - sie pruefen, dass die registrierten Module unter den erwarteten
+ * Namen existieren. Mit einem Mock wuerde ein umbenannter Export erst auffallen, wenn ein Diagramm
+ * stumm leer bleibt.
+ */
+describe('ladeECharts', { timeout: 20_000 }, () => {
 
   beforeEach(() => {
     setzeEChartsZustandZurueck();

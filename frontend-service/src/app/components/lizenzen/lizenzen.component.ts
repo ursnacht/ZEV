@@ -42,8 +42,13 @@ export class LizenzenComponent implements OnInit {
     this.lizenzenService.getBackendLizenzen().subscribe({
       next: (data) => {
         this.backendLizenzen = data;
-        this.filteredBackend = data;
         this.backendLoading = false;
+        // Bewusst NICHT `filteredBackend = data`: Wer waehrend des Ladens schon getippt hat,
+        // saehe sonst seinen Begriff im Suchfeld und darunter die ungefilterte Tabelle. Die
+        // Liste ist gross und braucht einen Moment - das Tippen davor ist der Normalfall, nicht
+        // die Ausnahme. `onBackendFilterChange` deckt beide Faelle ab: Ohne Begriff setzt es die
+        // volle Liste.
+        this.onBackendFilterChange();
       },
       error: () => {
         this.backendError = true;
@@ -58,8 +63,9 @@ export class LizenzenComponent implements OnInit {
     this.lizenzenService.getFrontendLizenzen().subscribe({
       next: (data) => {
         this.frontendLizenzen = data;
-        this.filteredFrontend = data;
         this.frontendLoading = false;
+        // Siehe loadBackendLizenzen: Ein bereits getippter Filter darf nicht verloren gehen.
+        this.onFrontendFilterChange();
       },
       error: () => {
         this.frontendError = true;

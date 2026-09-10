@@ -4,7 +4,7 @@ import { LizenzenComponent } from './lizenzen.component';
 import { LizenzenService } from '../../services/lizenzen.service';
 import { TranslationService } from '../../services/translation.service';
 import { Lizenz } from '../../models/lizenzen.model';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 
 describe('LizenzenComponent', () => {
   let component: LizenzenComponent;
@@ -124,6 +124,38 @@ describe('LizenzenComponent', () => {
       component.loadBackendLizenzen();
       expect(component.backendLoading).toBe(false); // false after synchronous completion
     });
+
+    /**
+     * Ein Filter, der WAEHREND des Ladens getippt wurde, muss die Antwort ueberleben.
+     *
+     * Vorher setzte der `next`-Zweig `filteredBackend = data` und warf ihn weg: Das Suchfeld zeigte
+     * den Begriff, die Tabelle darunter alles. Die Liste ist gross und braucht einen Moment -
+     * Tippen waehrend des Ladens ist der Normalfall. Gefunden hat das der E2E-Test
+     * `should show empty state when backend filter matches nothing`, und zwar als Flake: Ob der
+     * Filter die Antwort ueberlebte, entschied die Reihenfolge der beiden Anfragen.
+     */
+    it('should keep a filter that was typed while loading', () => {
+      const antwort = new Subject<Lizenz[]>();
+      lizenzenServiceSpy.getBackendLizenzen.mockReturnValue(antwort.asObservable());
+      component.loadBackendLizenzen();
+
+      component.backendFilter = 'jackson';
+      component.onBackendFilterChange();
+
+      antwort.next(mockBackendLizenzen);
+
+      expect(component.filteredBackend.map(l => l.name)).toEqual(['jackson-core']);
+    });
+
+    it('should show the full list when nothing was typed while loading', () => {
+      const antwort = new Subject<Lizenz[]>();
+      lizenzenServiceSpy.getBackendLizenzen.mockReturnValue(antwort.asObservable());
+      component.loadBackendLizenzen();
+
+      antwort.next(mockBackendLizenzen);
+
+      expect(component.filteredBackend).toEqual(mockBackendLizenzen);
+    });
   });
 
   describe('loadFrontendLizenzen', () => {
@@ -139,6 +171,20 @@ describe('LizenzenComponent', () => {
       lizenzenServiceSpy.getFrontendLizenzen.mockReturnValue(of([]));
       component.loadFrontendLizenzen();
       expect(component.frontendError).toBe(false);
+    });
+
+    /** Wie beim Backend-Panel: Der Filter darf nicht von der Antwort ueberschrieben werden. */
+    it('should keep a filter that was typed while loading', () => {
+      const antwort = new Subject<Lizenz[]>();
+      lizenzenServiceSpy.getFrontendLizenzen.mockReturnValue(antwort.asObservable());
+      component.loadFrontendLizenzen();
+
+      component.frontendFilter = 'kein-treffer-xyz';
+      component.onFrontendFilterChange();
+
+      antwort.next(mockFrontendLizenzen);
+
+      expect(component.filteredFrontend).toEqual([]);
     });
   });
 

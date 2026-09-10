@@ -17,10 +17,17 @@ async function navigateToLizenzen(page: Page): Promise<void> {
 /**
  * Wait for both license tables to finish loading (spinners gone)
  */
+/**
+ * Wartet, bis **beide** Panels geladen haben.
+ *
+ * `toHaveCount(0)` und nicht `waitFor({ state: 'hidden' })`: Die Seite zeigt zwei Spinner (Backend
+ * und Frontend). Ein `waitFor` auf den mehrdeutigen Locator verletzt den Strict Mode und wirft —
+ * der Fehler landete im angehaengten `.catch(() => {})`, die Wache war also wirkungslos. Danach
+ * wartete nur noch `waitForTableWithData`, und dem genuegte die Tabelle des *Frontend*-Panels:
+ * Die Filtertests tippten los, waehrend das Backend-Panel noch lud.
+ */
 async function waitForLizenzenLoaded(page: Page): Promise<void> {
-    // Wait for spinners to disappear (loading complete)
-    await page.locator('.zev-spinner').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
-    // Wait for at least one table to appear
+    await expect(page.locator('.zev-spinner')).toHaveCount(0, { timeout: 15000 });
     await waitForTableWithData(page, 15000);
 }
 
