@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Rechenregeln der Nebenkostenabrechnung (Specs/Nebenkosten/Abrechnung.md, FR-2 bis FR-4).
@@ -164,6 +165,14 @@ public class NkBerechnungService {
                 .map(NkPositionSummeDTO::getSummeKosten)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(GELD_SCALE, RoundingMode.HALF_UP));
+        // Analog zu den Kosten: Was keinem Mieter belastet wird, in einer Zahl. Zeilen ohne den
+        // Begriff (Verbrauch, Zuschlag, Zusatz) tragen null und werden uebersprungen - nicht als
+        // 0 gezaehlt, denn das waere dasselbe Ergebnis mit einer falschen Begruendung.
+        ergebnis.setSummeNichtVerteilt(uebersicht.stream()
+                .map(NkPositionSummeDTO::getNichtVerteilt)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(GELD_SCALE, RoundingMode.HALF_UP));
 
         return ergebnis;
     }
@@ -280,6 +289,7 @@ public class NkBerechnungService {
         NkMieterAbrechnungDTO block = new NkMieterAbrechnungDTO();
         block.setMieterId(basis.getMieterId());
         block.setName(basis.getName());
+        block.setEinheiten(basis.getEinheiten());
         block.setOhneWohnung(basis.getAnzahlWohnungen() <= 0);
 
         long miettage = miettageImZeitraum(basis, abrechnung.getDatumVon(), abrechnung.getDatumBis());

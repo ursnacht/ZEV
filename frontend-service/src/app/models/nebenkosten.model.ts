@@ -136,6 +136,11 @@ export interface NkZeile {
 export interface NkMieterAbrechnung {
   mieterId: number;
   name: string;
+  /**
+   * Namen der nebenkostenrelevanten Wohnungen dieses Mieters — im Kopf des Blocks in Klammern
+   * hinter dem Namen. Mehrere sind möglich; leer heisst: keine Klammer.
+   */
+  einheiten: string[];
   /** Miettage im Zeitraum, bereits mit der Zahl der Wohnungen multipliziert. */
   tage: number;
   /** Personen je Wohnung dieses Mieters; Vorgabe 1. */
@@ -208,6 +213,14 @@ export interface NkBerechnung {
    * einmal je Position und einmal je Mieter gebündelt.
    */
   summeKosten: number;
+  /**
+   * Summe der `nichtVerteilt` aller Zeilen der Positionsübersicht — der Betrag, der **keinem
+   * Mieter** belastet wird.
+   *
+   * Nie `null`, auch wenn keine Position etwas beisteuert: Hier ist die `0.00` eine gerechnete
+   * Aussage („es blieb nichts liegen") und nicht ein fehlender Wert wie in der einzelnen Zeile.
+   */
+  summeNichtVerteilt: number;
 }
 
 /**

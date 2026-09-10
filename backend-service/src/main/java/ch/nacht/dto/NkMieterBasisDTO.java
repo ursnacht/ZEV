@@ -2,6 +2,8 @@ package ch.nacht.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Eingabe der Berechnung je Mieter (Specs/Nebenkosten/Abrechnung.md, FR-2 und FR-4).
@@ -28,6 +30,19 @@ public class NkMieterBasisDTO {
 
     /** Stammdatum des Mieters; Vorbelegung des Akonto-Monatsbetrags, {@code null} zulässig. */
     private BigDecimal akontoProMonat;
+
+    /**
+     * Namen der nebenkostenrelevanten Wohnungen dieses Mieters — reine Anzeigeangabe für den Kopf
+     * seines Blocks (FR-11).
+     *
+     * <p><b>Nicht im Konstruktor</b>, anders als die übrigen Felder: Die Berechnung braucht sie
+     * nicht, sie reicht sie nur durch. Ein siebter Parameter hätte jede der rund dreissig
+     * Test-Vorbelegungen angefasst, ohne dass dort etwas zu prüfen wäre.
+     *
+     * <p>Die Zahl der Wohnungen ({@link #anzahlWohnungen}) bleibt das rechnende Feld — sie stammt
+     * aus derselben Quelle, ist aber die Grösse, mit der der Anteil multipliziert wird.
+     */
+    private List<String> einheiten = new ArrayList<>();
 
     public NkMieterBasisDTO() {
     }
@@ -80,6 +95,14 @@ public class NkMieterBasisDTO {
 
     public void setAnzahlWohnungen(int anzahlWohnungen) {
         this.anzahlWohnungen = anzahlWohnungen;
+    }
+
+    public List<String> getEinheiten() {
+        return einheiten;
+    }
+
+    public void setEinheiten(List<String> einheiten) {
+        this.einheiten = einheiten != null ? einheiten : new ArrayList<>();
     }
 
     public BigDecimal getAkontoProMonat() {

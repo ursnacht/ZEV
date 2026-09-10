@@ -521,17 +521,23 @@ public class NkAbrechnungService {
         for (MieterEinheit z : zuordnungen) {
             einheitIds.add(z.getEinheitId());
         }
-        Set<Long> wohnungen = new HashSet<>();
+        // Name je nebenkostenrelevanter Wohnung. Der Name wird fuer den Kopf des Mieterblocks
+        // gebraucht (FR-11) und ist nie null (`nullable = false`, `@NotBlank` an der Entity).
+        Map<Long, String> wohnungen = new HashMap<>();
         for (Einheit e : einheitRepository.findAllById(einheitIds)) {
             if (e.getTyp() == EinheitTyp.CONSUMER && e.isNebenkostenRelevant()) {
-                wohnungen.add(e.getId());
+                wohnungen.put(e.getId(), e.getName());
             }
         }
 
-        Map<Long, Integer> anzahlJeMieter = new HashMap<>();
+        // Eine Liste statt Liste UND Zaehler: Die Laenge IST die Zahl der Wohnungen. Zwei
+        // getrennte Strukturen koennten auseinanderlaufen, und der Nenner haengt an dieser Zahl.
+        Map<Long, List<String>> wohnungenJeMieter = new HashMap<>();
         for (MieterEinheit z : zuordnungen) {
-            if (wohnungen.contains(z.getEinheitId())) {
-                anzahlJeMieter.merge(z.getMieterId(), 1, Integer::sum);
+            String name = wohnungen.get(z.getEinheitId());
+            if (name != null) {
+                wohnungenJeMieter.computeIfAbsent(z.getMieterId(), id -> new ArrayList<>())
+                        .add(name);
             }
         }
 
@@ -542,13 +548,17 @@ public class NkAbrechnungService {
         List<NkMieterBasisDTO> basis = new ArrayList<>();
         int uebersprungen = 0;
         for (Mieter m : mieter) {
-            int wohnungenDesMieters = anzahlJeMieter.getOrDefault(m.getId(), 0);
-            if (wohnungenDesMieters <= 0) {
+            List<String> wohnungenDesMieters = wohnungenJeMieter.getOrDefault(m.getId(), List.of());
+            if (wohnungenDesMieters.isEmpty()) {
                 uebersprungen++;
                 continue;
             }
-            basis.add(new NkMieterBasisDTO(m.getId(), m.getName(), m.getMietbeginn(), m.getMietende(),
-                    wohnungenDesMieters, m.getAkontoProMonat()));
+            NkMieterBasisDTO dto = new NkMieterBasisDTO(m.getId(), m.getName(), m.getMietbeginn(),
+                    m.getMietende(), wohnungenDesMieters.size(), m.getAkontoProMonat());
+            // Sortiert, damit der Kopf eines Blocks nicht bei jedem Laden anders aussieht - die
+            // Reihenfolge der Zuordnungen aus der Datenbank ist nicht zugesichert.
+            dto.setEinheiten(wohnungenDesMieters.stream().sorted().toList());
+            basis.add(dto);
         }
         if (uebersprungen > 0) {
             log.info("Nebenkostenabrechnung: {} Mieter ohne nebenkostenrelevante Wohnung "

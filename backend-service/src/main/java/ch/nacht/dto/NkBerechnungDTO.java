@@ -38,6 +38,22 @@ public class NkBerechnungDTO {
      */
     private BigDecimal summeKosten = BigDecimal.ZERO;
 
+    /**
+     * Summe der {@code nichtVerteilt} aller Zeilen der Positionsübersicht — der Betrag, der
+     * <b>keinem Mieter</b> belastet wird (FR-10).
+     *
+     * <p>Er entsteht bei Leerstand: Deckt die Summe der Miettage den Nenner nicht, bleibt der
+     * entsprechende Anteil einer Umlage liegen; bei {@code ANTEIL} entsteht er, wenn die erfassten
+     * Prozente nicht 100 % ergeben. In der Praxis trägt ihn der Eigentümer, und die Summe sagt,
+     * wie viel das über alle Positionen zusammen ist.
+     *
+     * <p><b>Nie {@code null}, auch wenn keine Position einen Betrag beisteuert</b> — anders als in
+     * der einzelnen Zeile. Dort hiesse eine {@code 0.00} bei einer Verbrauchsposition „unverteilt
+     * nichts", obwohl die Art gar nichts unverteilt lassen kann; hier ist die {@code 0.00} eine
+     * gerechnete Aussage: Es blieb nichts liegen. Zeilen ohne den Begriff werden übersprungen.
+     */
+    private BigDecimal summeNichtVerteilt = BigDecimal.ZERO;
+
     public NkBerechnungDTO() {
     }
 
@@ -95,5 +111,13 @@ public class NkBerechnungDTO {
 
     public void setSummeKosten(BigDecimal summeKosten) {
         this.summeKosten = summeKosten;
+    }
+
+    public BigDecimal getSummeNichtVerteilt() {
+        return summeNichtVerteilt;
+    }
+
+    public void setSummeNichtVerteilt(BigDecimal summeNichtVerteilt) {
+        this.summeNichtVerteilt = summeNichtVerteilt;
     }
 }

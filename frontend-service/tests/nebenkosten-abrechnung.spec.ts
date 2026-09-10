@@ -247,14 +247,37 @@ function verteiltFuer(page: Page, bezeichnung: string): Locator {
     return page.locator('.nk-kontrolle tbody tr', { hasText: bezeichnung }).locator('td').nth(4);
 }
 
+/** Rundungsdifferenz einer Position in der Zusammenstellung (Spalte an Index 6). */
+function rundungFuer(page: Page, bezeichnung: string): Locator {
+    return page.locator('.nk-kontrolle tbody tr', { hasText: bezeichnung }).locator('td').nth(6);
+}
+
 /** Menge einer Position in der Zusammenstellung (Spalte „Menge"). */
 function mengeFuer(page: Page, bezeichnung: string): Locator {
     return page.locator('.nk-kontrolle tbody tr', { hasText: bezeichnung }).locator('td').nth(2);
 }
 
+/**
+ * Die Zahlen in der Fusszeile der Zusammenstellung, in der Reihenfolge ihrer Spalten:
+ * zuerst „Kosten", dann „Nicht verteilt".
+ *
+ * Ein `.first()` allein genuegt nicht mehr, seit die Fusszeile ZWEI Summen traegt: Ein
+ * mehrdeutiger Locator wirft im Strict Mode. Die Reihenfolge ist die der Spaltenkoepfe, und der
+ * Test `should total the undistributed amounts` prueft beide Zahlen zusammen - eine Verwechslung
+ * faellt dort als falscher Betrag auf, nicht stillschweigend.
+ */
+function fusszeileZahlen(page: Page): Locator {
+    return page.locator('.nk-kontrolle tfoot th.zev-table__number');
+}
+
 /** Gesamtsumme der Kosten in der Fusszeile der Zusammenstellung. */
 function summeKosten(page: Page): Locator {
-    return page.locator('.nk-kontrolle tfoot th.zev-table__number');
+    return fusszeileZahlen(page).nth(0);
+}
+
+/** Gesamtsumme der nicht verteilten Betraege in der Fusszeile. */
+function summeNichtVerteilt(page: Page): Locator {
+    return fusszeileZahlen(page).nth(1);
 }
 
 /** Betrag einer Position in der Zeile eines Mieterblocks. */
@@ -1030,6 +1053,59 @@ test.describe('Nebenkostenabrechnung - Positionen', () => {
 
         const nachher = await page.locator('.nk-total--mieter .number').textContent();
         await expect(summeKosten(page)).toHaveText((nachher ?? '').replace(' CHF', '').trim());
+    });
+
+    /**
+     * Die Fusszeile summiert auch die Spalte „Nicht verteilt" — was keinem Mieter belastet wird.
+     *
+     * Gerechnet wird gegen einen **bekannten** Nenner: 99 Wohnungen (`ANZAHL_WOHNUNGEN`) bei
+     * wenigen tatsaechlichen Mietern lassen den Grossteil einer Umlage liegen. Der genaue Betrag
+     * haengt von der Umgebung ab, die **Identitaet** aber nicht: Zwei Umlagen ueber je 1'000.00
+     * lassen zusammen genau doppelt so viel liegen wie eine allein.
+     *
+     * <p><b>Die Gleichung hat drei Terme</b>, nicht zwei:
+     * `Kosten + Nicht verteilt + Rundungsdifferenz = Totalbetrag`. `nichtVerteilt` rechnet gegen
+     * den *exakt* verteilbaren Betrag, `summeKosten` ist die Summe der **einzeln gerundeten**
+     * Mieterbetraege - genau dafuer hat die Uebersicht ihre eigene Spalte. Eine erste Fassung
+     * dieses Tests liess sie weg und scheiterte an einem Rappen (999.99 statt 1'000.00): Das war
+     * die Pruefung, die die Gleichung richtiggestellt hat.
+     */
+    test('should total the undistributed amounts', async ({ page }) => {
+        const bezeichnung = neueBezeichnung('Unverteilt');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+
+        await fuegePositionHinzu(page, 'UMLAGE', 'E2E N-Umlage');
+        await page.locator('.nk-positionen tbody tr').nth(0)
+            .locator('input[type="number"]').first().fill('1000');
+
+        await expect(summeNichtVerteilt(page)).not.toHaveText('');
+        const eine = betragAlsZahl((await summeNichtVerteilt(page).textContent())!.trim());
+        const kostenEine = betragAlsZahl((await summeKosten(page).textContent())!.trim());
+        const rundung = betragAlsZahl(
+            (await rundungFuer(page, 'E2E N-Umlage').textContent())!.trim());
+
+        // Verteilt plus unverteilt plus Rundungsdifferenz ist der Totalbetrag - auf den Rappen.
+        expect(kostenEine + eine + rundung).toBeCloseTo(1000, 2);
+        expect(eine).toBeGreaterThan(0);
+
+        // Zweite Umlage desselben Betrags: Beide Summen muessen sich verdoppeln.
+        await fuegePositionHinzu(page, 'UMLAGE', 'E2E N-Umlage-2');
+        await page.locator('.nk-positionen tbody tr').nth(1)
+            .locator('input[type="number"]').first().fill('1000');
+
+        await expect
+            .poll(async () => betragAlsZahl((await summeNichtVerteilt(page).textContent())!.trim()))
+            .toBeCloseTo(eine * 2, 2);
+
+        // Und nach dem Speichern dasselbe aus der Antwort des Servers.
+        await clearMessages(page);
+        await speichernUnten(page).click();
+        await erwarteErfolg(page, 'Summe nicht verteilt speichern');
+
+        await expect
+            .poll(async () => betragAlsZahl((await summeNichtVerteilt(page).textContent())!.trim()))
+            .toBeCloseTo(eine * 2, 2);
     });
 
     test('should show the prepayment total below the cost total and aggregate it',

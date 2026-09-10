@@ -1,17 +1,21 @@
 # Nebenkosten
 
 > **Basis-Spec.** Dieses Dokument beschreibt ausschliesslich das **Grundgerüst** der
-> Nebenkostenabrechnung (NK): Feature-Flag, Menüpunkt mit Untermenü, zwei noch leere Unterseiten
-> und die neue Permission. Die eigentliche Fachlichkeit folgt als eigene Specs mit dem Präfix
-> `NK-<Feature>` — siehe Abschnitt 7.
+> Nebenkostenabrechnung (NK): Feature-Flag, Menüpunkt, zwei noch leere Unterseiten und die neue
+> Permission. Die eigentliche Fachlichkeit folgt als eigene Specs mit dem Präfix `NK-<Feature>`
+> — siehe Abschnitt 7.
+>
+> **Nachtrag:** Der Menüpunkt trug ursprünglich ein **Untermenü**. Es ist entfernt, seit klar war,
+> dass nur eine der beiden Unterseiten Inhalt bekommt (FR-3); die Untermenü-Fähigkeit selbst
+> bleibt erhalten.
 
 ## 1. Ziel & Kontext - Warum wird das Feature benötigt?
 
 * **Was soll erreicht werden:** Die Nebenkosten einer Liegenschaft (Heizung, Wasser, Kehricht,
   Verwaltung, Allgemeinstrom, …) sollen künftig den Mietern in Rechnung gestellt werden können —
   getrennt von der bestehenden Stromabrechnung. Diese Basis schafft dafür den Platz in der
-  Anwendung: einen Schalter, einen Menüpunkt mit Untermenü und zwei Unterseiten, die in
-  Folge-Specs gefüllt werden.
+  Anwendung: einen Schalter, einen Menüpunkt und zwei Unterseiten, die in Folge-Specs gefüllt
+  werden. (Ursprünglich mit Untermenü — siehe FR-3.)
 * **Warum machen wir das:** Die Anwendung rechnet heute ausschliesslich Strom ab; Nebenkosten
   werden ausserhalb geführt und manuell verteilt. Weil die Fachlichkeit umfangreich wird und
   schrittweise entsteht, muss sie von Anfang an hinter einem Schalter liegen: Mandanten ohne
@@ -62,28 +66,41 @@
   deshalb ist hier nichts zu schützen; die Regel ist trotzdem hier festgehalten, damit sie beim
   ersten Endpunkt nicht vergessen wird.
 
-### FR-3: Navigation mit Untermenü
+### FR-3: Navigation — ein Eintrag „Nebenkosten"
 
-* Der übergeordnete Eintrag **Nebenkosten** ist **kein Navigationsziel**, sondern ausschliesslich
-  Aufklapper (Entscheid). Eine Übersichtsseite hätte in dieser Ausbaustufe nichts zu zeigen, und
-  „Abrechnung" ist ohnehin der natürliche Landeplatz. Eine Übersicht lässt sich später nachrüsten,
-  ohne die Menüstruktur erneut zu ändern.
-* Neue Fähigkeit im Design System (`design-system/src/components/navigation/`): ein Menüeintrag,
-  der Untereinträge trägt und sie auf Klick auf-/zuklappt.
-* **Design System verwenden.** `design-system/src/components/collapsible/` liefert die Optik des
-  Auf-/Zuklappens (`collapsible.css` mit `.zev-collapsible` und `.zev-collapsible--open`) — es ist
-  **reines CSS**, keine fertige Mechanik: Der Auf-/Zu-Zustand bleibt Sache der Komponente. Die
-  Klassen sind wiederzuverwenden, statt neue einzuführen; alles, was darüber hinaus an Styling
-  nötig ist, gehört als Untermenü-Variante in `design-system/src/components/navigation/` und nicht
-  in das Komponenten-CSS der Navigation (`Specs/generell.md`, Abschnitt Design System).
-* **Sichtbarkeit: Flag UND Permission.** Der Menüpunkt erscheint nur, wenn der Flag gesetzt ist
-  **und** der Benutzer `nebenkosten:manage` besitzt (Entscheid). Sonst sähe ein Benutzer ohne
+**Geändert (Entscheid).** Der Eintrag **Nebenkosten** ist ein gewöhnlicher Menüeintrag und führt
+direkt auf `/nebenkosten/abrechnung`. Das Untermenü ist entfernt.
+
+**Warum.** Es trug zwei Einträge, von denen nur einer eine Seite mit Inhalt war: „Tarifpositionen"
+ist bis heute eine Gerüstseite (FR-4). Das Untermenü verbarg damit die eine echte Seite hinter
+einem zusätzlichen Klick und versprach eine Struktur, die es nicht gibt. Die Route
+`/nebenkosten/tarifpositionen` bleibt erreichbar und behält ihre Absicherung — sie steht nur nicht
+mehr im Menü.
+
+* **Beschriftung „Nebenkosten"**, nicht „Nebenkostenabrechnung": Der Eintrag steht für den ganzen
+  Bereich, und die Zielseite trägt ihren eigenen Titel („Nebenkostenabrechnung"). Symbol bleibt
+  `calculator` — es gehört zur Beschriftung, nicht zur Zielseite.
+* **Ziel `/nebenkosten/abrechnung`** und nicht `/nebenkosten`: Der Umweg über die Weiterleitung
+  spart nichts und `routerLinkActive` müsste auf einer Route hervorheben, auf der niemand steht.
+* **Sichtbarkeit unverändert: Flag UND Permission.** Der Menüpunkt erscheint nur, wenn der Flag
+  gesetzt ist **und** der Benutzer `nebenkosten:manage` besitzt. Sonst sähe ein Benutzer ohne
   Berechtigung einen Eintrag, der ihn beim Klick nur auf die Startseite zurückwirft.
-* Der aktive Untereintrag wird wie bisher über `routerLinkActive` hervorgehoben. Befindet man sich
-  auf einer NK-Seite, ist das Untermenü **aufgeklappt**.
-* Das Untermenü funktioniert auch im Hamburger-Menü der schmalen Ansicht
-  (`Specs/Hamburgermenü.md`).
-* Der Design-System-Showcase wird um die neue Variante ergänzt.
+* Hervorhebung wie bei jedem anderen Eintrag über `routerLinkActive`.
+
+**Die Untermenü-Fähigkeit bleibt bestehen** — entfernt wird das Untermenü, nicht die Mechanik:
+* Die Variante im Design System (`design-system/src/components/navigation/`) samt
+  Showcase-Eintrag bleibt unangetastet.
+* `isNebenkostenOpen` und `toggleNebenkosten()` in der Navigationskomponente bleiben, ebenso das
+  Aufklappen beim Betreten einer NK-Seite. Sie sind derzeit von keinem Eintrag genutzt und im
+  Code als solche ausgewiesen; ein künftiges Untermenü ist damit nur wieder anzuschliessen.
+* Der E2E-Helfer `oeffneUntermenue` (`tests/helpers.ts`) bleibt und erkennt von sich aus, dass
+  kein Untermenü mehr vorhanden ist.
+
+**Historie (galt bis zu dieser Änderung):** Der Elterneintrag war ausschliesslich Aufklapper und
+kein Navigationsziel; die Untereinträge waren „Tarifpositionen" und „Abrechnung", und beim
+Betreten einer NK-Seite klappte das Untermenü auf. Die Optik stammte aus
+`design-system/src/components/collapsible/` (reines CSS, Zustand in der Komponente), die
+Untermenü-Variante liegt in `design-system/src/components/navigation/`.
 
 ### FR-3a: Permission-Prüfung im Template (neu im Frontend)
 
@@ -158,13 +175,15 @@ Baustein:
       Beschreibung.
 
 **Navigation**
-* [ ] Der Menüpunkt „Nebenkosten" zeigt die Untereinträge „Tarifpositionen" und „Abrechnung".
-* [ ] Ein Klick auf „Nebenkosten" **navigiert nicht**, sondern klappt nur auf und wieder zu.
-* [ ] Steht man auf einer NK-Seite, ist das Untermenü aufgeklappt und der aktive Untereintrag
-      markiert.
-* [ ] Das Untermenü lässt sich auch im Hamburger-Menü bedienen.
+* [ ] Der Menüpunkt „Nebenkosten" führt mit einem Klick auf `/nebenkosten/abrechnung`.
+* [ ] Das Menü zeigt **kein** Untermenü unter „Nebenkosten" und keinen Aufklapp-Pfeil.
+* [ ] Steht man auf der Abrechnung, ist der Eintrag „Nebenkosten" hervorgehoben.
+* [ ] `/nebenkosten/tarifpositionen` bleibt über die URL erreichbar und behält Flag- und
+      Permission-Prüfung, erscheint aber nicht im Menü.
+* [ ] Die Untermenü-Fähigkeit bleibt vorhanden: Design-System-Variante samt Showcase,
+      `toggleNebenkosten()` in der Navigationskomponente und der E2E-Helfer `oeffneUntermenue`.
 * [ ] Der bestehende Menüpunkt „Tarifpositionen" (`/tarifpositionen`) bleibt unverändert
-      erhalten und ist von den NK-Einträgen unterscheidbar.
+      erhalten und ist vom NK-Eintrag unterscheidbar.
 * [ ] Die übrigen Menüpunkte verhalten sich unverändert (kein Aufklapper, direkte Navigation)
       und werden **nicht** nach Berechtigung ausgeblendet.
 * [ ] Bei eingeschaltetem Flag, aber **fehlender** Permission `nebenkosten:manage` erscheint der

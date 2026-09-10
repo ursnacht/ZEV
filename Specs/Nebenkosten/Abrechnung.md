@@ -771,9 +771,9 @@ Bildschirmseiten lang; die Angaben zur Abrechnung und die allgemeinen Positionen
 man beim Erfassen zuerst braucht — verschwinden dann nach oben aus dem Blick.
 
 Damit die geschlossene Liste trotzdem aussagekräftig bleibt, zeigt die **Kopfzeile jedes Blocks**
-den Namen, die Miettage und den **Saldo** als Nachzahlung oder Guthaben. Ohne den Saldo wäre die
-geschlossene Ansicht eine reine Namensliste, und man müsste jeden Block einzeln öffnen, um das
-Ergebnis zu sehen.
+den Namen, die **Wohnung** (FR-11), die Miettage und den **Saldo** als Nachzahlung oder Guthaben.
+Ohne den Saldo wäre die geschlossene Ansicht eine reine Namensliste, und man müsste jeden Block
+einzeln öffnen, um das Ergebnis zu sehen.
 
 Der Aufklappzustand gilt nur für die geöffnete Maske und wird nicht gespeichert.
 
@@ -826,7 +826,9 @@ Position** über alle Mieter:
 * **Menge** ist die Summe über alle Mieter: bei `UMLAGE`/`UMLAGE_PERSON` die verteilte Gesamtmenge,
   bei `VERBRAUCH` die Summe der erfassten Mengen.
 * **Kosten** ist die Summe der Beträge, die den Mietern für diese Position belastet werden.
-* Darunter als Fusszeile die **Summe der Kosten** über alle Zeilen.
+* Darunter als Fusszeile die **Summe der Kosten** und die **Summe „Nicht verteilt"** über alle
+  Zeilen. Die Zeile ist mit **„Total"** beschriftet und nicht mehr mit „Kosten": Sie trägt zwei
+  Zahlen, und die Spaltenköpfe darüber sagen ohnehin, welche welche ist.
 
 **Die Summe der Kosten muss dem Kostentotal aller Mieter entsprechen.** Beide zählen dieselben
 Zeilenbeträge, nur einmal je Position und einmal je Mieter gebündelt. Damit das gilt, umfasst die
@@ -838,6 +840,27 @@ Mietern vor.
 **Weichen die beiden Zahlen ab, sagt die Maske das** (rot, mit erklärendem Hinweis) statt zwei
 Zahlen nebeneinander stehen zu lassen und den Leser rätseln zu lassen, welche stimmt. Eine
 Abweichung heisst: Der Übersicht fehlt eine Quelle — genau dafür steht die Zahl da.
+
+**Die Summe „Nicht verteilt" ist die Gegenrechnung:** Sie nennt in einer Zahl, was **keinem
+Mieter** belastet wird. Der Betrag entsteht bei Leerstand — deckt die Summe der Miettage den Nenner
+nicht, bleibt der entsprechende Anteil einer Umlage liegen — und bei `ANTEIL`, wenn die erfassten
+Prozente nicht 100 % ergeben. In der Praxis trägt ihn der Eigentümer; bisher stand er nur je
+Position da und musste im Kopf addiert werden.
+
+Zusammen mit der Kostensumme und der Rundungsdifferenz ergibt sie die eingesetzten Totalbeträge:
+**Kosten + Nicht verteilt + Rundungsdifferenz = Totalbetrag** — je Position und in der Summe. Das
+macht die Zusammenstellung von beiden Seiten prüfbar.
+
+**Der dritte Term ist nicht wegzulassen**, und genau dafür steht die Spalte „Rundungsdifferenz":
+`Nicht verteilt` rechnet gegen den *exakt* verteilbaren Betrag, `Kosten` ist die Summe der
+**einzeln gerundeten** Mieterbeträge. Bei mehreren Mietern liegt dazwischen typischerweise ein
+Rappen. Eine Zwei-Term-Gleichung wäre also fast immer knapp falsch.
+
+**Die Fusszeile zeigt hier `0.00`, die einzelne Zelle bleibt leer.** Kein Widerspruch, sondern
+derselbe Grundsatz: In der Zeile einer Verbrauchsposition wäre eine `0.00` die Behauptung, es sei
+nichts liegen geblieben — obwohl die Art gar nichts liegen lassen kann. In der Fusszeile ist die
+`0.00` eine gerechnete Aussage über alle Zeilen: Es blieb nichts liegen. Zeilen ohne den Begriff
+werden dabei übersprungen, nicht als Null mitgezählt.
 
 **Leere Zellen statt Nullen (Entscheid).** Wo eine Positionsart eine Grösse nicht kennt, bleibt die
 Zelle **leer**: Eine Verbrauchsposition hat keinen Totalbetrag, ein Zuschlag keine Menge. Ein
@@ -856,6 +879,11 @@ ist keine Menge, sondern zwei. Die Kosten bleiben in jedem Fall summierbar.
 * [ ] Ohne Zusatzpositionen erscheint keine Sammelzeile.
 * [ ] Die Fusszeile zeigt die Summe der Kosten über alle Zeilen.
 * [ ] Diese Summe stimmt mit dem „Kostentotal aller Mieter" überein — vor und nach dem Speichern.
+* [ ] Die Fusszeile zeigt zusätzlich die Summe der Spalte „Nicht verteilt", in derselben Spalte und rechtsbündig.
+* [ ] `Summe Kosten + Summe Nicht verteilt + Rundungsdifferenz` ergibt die Summe der Totalbeträge der verteilenden Positionen — der dritte Term gehört dazu.
+* [ ] Positionen ohne den Begriff (Verbrauch, Zuschlag, Zusatzzeile) verändern diese Summe nicht.
+* [ ] Bleibt nichts liegen, steht in der Fusszeile `0.00` — nicht eine leere Zelle.
+* [ ] Die Fusszeile ist mit „Total" beschriftet.
 * [ ] Weichen die beiden ab, wird die Summe hervorgehoben und nennt den Grund im Hinweis.
 * [ ] Bei einer Verbrauchsposition bleiben Totalbetrag, „nicht verteilt" und Rundungsdifferenz leer.
 * [ ] Bei einem Zuschlag bleiben zusätzlich Menge und Einheit leer.
@@ -945,6 +973,46 @@ Die Maske weist bei den Angaben zum Zeitraum darauf hin, **bevor** gespeichert w
 * [ ] Wird der Zeitraum so geändert, dass ein Mieter herausfällt, sind dessen Akonto, Personenzahl, Mengen und Zusatzpositionen nach dem Speichern gelöscht — auch dann, wenn der Zeitraum später wieder ausgeweitet wird.
 * [ ] Die Maske nennt diese Folge beim Zeitraum, bevor gespeichert wird.
 * [ ] Berechtigung wie die übrigen Schreibzugriffe: `nebenkosten:manage`.
+
+### FR-11: Wohnung im Kopf des Mieterblocks
+
+Hinter dem Mieternamen steht seine **Wohnung in Klammern**, in normaler Schriftstärke:
+
+```
+Anna Beispiel (Wohnung 3)        365 Tage        Nachzahlung: 312.50 CHF
+```
+
+**Warum.** Der Name allein genügt nicht, sobald zwei Mieter gleich heissen oder man die Zuordnung
+Mieter → Wohnung nicht im Kopf hat. Beim Prüfen einer Abrechnung liest man von der Wohnung her
+(„was zahlt Wohnung 3?"), die Maske ordnet aber nach Mietern. Die Klammer schlägt die Brücke, ohne
+eine Spalte zu kosten.
+
+**Nicht fett.** Der Name führt, die Wohnung ordnet ihn nur ein. Verwendet wird
+`zev-text--normal` aus dem Design System — die Kopfzeile selbst steht auf `font-weight: 500`, ein
+Element ohne eigene Angabe wäre also weiterhin halbfett.
+
+**Mehrere Wohnungen** werden mit Komma aneinandergereiht (`Wohnung 3, Wohnung 4`) und **sortiert**
+ausgegeben; die Reihenfolge der Zuordnungen in der Datenbank ist nicht zugesichert, und ein Kopf,
+der bei jedem Laden anders aussieht, wirkt wie ein Fehler.
+
+**Es sind dieselben Einheiten, die den Anteil bestimmen** — `CONSUMER` **mit** Kennzeichen
+`nebenkostenRelevant` (FR-2, FR-9). Eine Ladestation oder ein Allgemeinstrom-Messpunkt steht
+deshalb nicht in der Klammer, ganz gleich, wie er zugeordnet ist. Die Zahl der Wohnungen, mit der
+der Anteil multipliziert wird, ist genau die **Länge dieser Liste**: eine Quelle statt zweier, die
+auseinanderlaufen könnten.
+
+**Keine Klammer ohne Inhalt.** Ist keine Wohnung bekannt, entfällt sie samt Zeichen. In der
+Anwendung tritt das nicht auf — seit FR-9 wird ein Mieter ohne nebenkostenrelevante Wohnung gar
+nicht aufgeführt —, wohl aber im reinen Rechenservice ohne Datenbank.
+
+**Akzeptanzkriterien:**
+* [ ] Hinter dem Mieternamen steht der Name seiner Wohnung in Klammern.
+* [ ] Die Klammer ist **nicht** fett, der Name bleibt halbfett.
+* [ ] Bei mehreren Wohnungen stehen alle Namen, mit Komma getrennt und sortiert.
+* [ ] Nicht nebenkostenrelevante Einheiten und Einheiten anderen Typs erscheinen **nicht**.
+* [ ] Ohne bekannte Wohnung erscheint keine leere Klammer.
+* [ ] Die Klammer überlebt eine Eingabe in der Maske — die clientseitige Vorschau reicht die Namen durch.
+* [ ] Die Miettage bleiben unverändert: zwei Wohnungen ergeben weiterhin doppelte Tage.
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
@@ -1118,7 +1186,7 @@ Die Maske weist bei den Angaben zum Zeitraum darauf hin, **bevor** gespeichert w
 **Mieterblöcke aufklappen**
 * [ ] Beim Öffnen der Maske sind **alle** Mieterblöcke geschlossen.
 * [ ] Ein Klick auf die Kopfzeile öffnet den Block, ein weiterer schliesst ihn.
-* [ ] Die Kopfzeile zeigt auch im geschlossenen Zustand Name, Miettage und den Saldo als
+* [ ] Die Kopfzeile zeigt auch im geschlossenen Zustand Name, Wohnung, Miettage und den Saldo als
       Nachzahlung oder Guthaben.
 * [ ] Mehrere Blöcke lassen sich gleichzeitig offen halten.
 * [ ] Eine Eingabe in einem offenen Block verändert den Saldo in der Kopfzeile eines anderen

@@ -35,9 +35,11 @@ export const routes: Routes = [
   { path: 'tarife', component: TarifListComponent, canActivate: [AuthGuard], data: { permissions: ['tarife:manage'] } },
   { path: 'mieter', component: MieterListComponent, canActivate: [AuthGuard], data: { permissions: ['mieter:manage'] } },
   { path: 'tarifpositionen', component: TarifpositionListComponent, canActivate: [AuthGuard], data: { permissions: ['rechnungen:manage'] } },
-  // Nebenkostenabrechnung (Specs/Nebenkosten/). Der Elterneintrag im Menue ist nur Aufklapper;
-  // /nebenkosten wird trotzdem beantwortet, weil die URL getippt und verlinkt wird - es gibt
-  // keine Wildcard-Route, ein unbekannter Pfad ergaebe einen Router-Fehler.
+  // Nebenkostenabrechnung (Specs/Nebenkosten/). Das Menue verweist direkt auf die Abrechnung
+  // (FR-3); /nebenkosten wird weiterhin beantwortet, weil die URL getippt und verlinkt wird - es
+  // gibt keine Wildcard-Route, ein unbekannter Pfad ergaebe einen Router-Fehler.
+  // /nebenkosten/tarifpositionen bleibt erreichbar, steht aber nicht mehr im Menue: Die Seite ist
+  // ein Geruest ohne Inhalt (FR-4).
   { path: 'nebenkosten', redirectTo: '/nebenkosten/abrechnung', pathMatch: 'full' },
   { path: 'nebenkosten/tarifpositionen', component: NebenkostenTarifpositionenComponent, canActivate: [AuthGuard, FeatureFlagGuard], data: { permissions: ['nebenkosten:manage'], featureFlag: 'NEBENKOSTENABRECHNUNG' } },
   { path: 'nebenkosten/abrechnung', component: NebenkostenAbrechnungComponent, canActivate: [AuthGuard, FeatureFlagGuard], data: { permissions: ['nebenkosten:manage'], featureFlag: 'NEBENKOSTENABRECHNUNG' } },

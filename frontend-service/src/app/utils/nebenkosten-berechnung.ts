@@ -33,6 +33,13 @@ export interface NkMieterTage {
   /** Miettage im Zeitraum, bereits mit der Zahl der Wohnungen multipliziert. */
   tage: number;
   ohneWohnung: boolean;
+  /**
+   * Namen der Wohnungen — nur zum Durchreichen an den Blockkopf.
+   *
+   * Muss die Vorschau überleben: Sie baut die Blöcke bei jeder Eingabe neu auf, und ohne dieses
+   * Feld verschwände die Klammer beim ersten Tastendruck, um nach dem Speichern wiederzukehren.
+   */
+  einheiten: string[];
 }
 
 /** Personen je Wohnung, wenn nichts erfasst ist - wie `PERSONEN_VORGABE` im Backend. */
@@ -140,7 +147,11 @@ export function berechneVorschau(
 
   return {
     nenner, summeTage, nennerPerson, summePersonenTage, mieter: bloecke, positionSummen,
-    summeKosten: runde(positionSummen.reduce((s, z) => s + z.summeKosten, 0), 2)
+    summeKosten: runde(positionSummen.reduce((s, z) => s + z.summeKosten, 0), 2),
+    // `?? 0` und nicht `zahl(...)`: Zeilen ohne den Begriff tragen null und sollen die Summe
+    // nicht anfassen - gezaehlt wird nur, was wirklich liegen bleibt.
+    summeNichtVerteilt: runde(
+      positionSummen.reduce((s, z) => s + (z.nichtVerteilt ?? 0), 0), 2)
   };
 }
 
@@ -262,6 +273,7 @@ function berechneMieter(
   return {
     mieterId: person.mieterId,
     name: person.name,
+    einheiten: person.einheiten ?? [],
     tage: person.tage,
     anzahlPersonen,
     personenTage: person.tage * anzahlPersonen,

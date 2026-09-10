@@ -19,9 +19,40 @@ describe('nebenkosten-berechnung', () => {
 
   const JAHR_TAGE = 365;
 
-  function mieter(mieterId: number, tage: number): NkMieterTage {
-    return { mieterId, name: 'Mieter ' + mieterId, tage, ohneWohnung: tage === 0 };
+  function mieter(mieterId: number, tage: number, einheiten: string[] = []): NkMieterTage {
+    return { mieterId, name: 'Mieter ' + mieterId, tage, ohneWohnung: tage === 0, einheiten };
   }
+
+  /**
+   * Die Wohnungsnamen muessen die Vorschau ueberleben.
+   *
+   * Sie baut die Bloecke bei jeder Eingabe neu auf. Reichte sie das Feld nicht durch, verschwaende
+   * die Klammer im Blockkopf beim ersten Tastendruck und kaeme nach dem Speichern wieder - ein
+   * Flackern, das nach einem Fehler aussieht.
+   */
+  /**
+   * Die Summe der nicht verteilten Betraege - Gegenstueck zur Kostensumme in der Fusszeile.
+   *
+   * Zeilen ohne den Begriff (hier der Verbrauch) tragen `null` und duerfen die Summe nicht
+   * anfassen; `null + Zahl` waere in JavaScript stillschweigend die Zahl, `undefined` dagegen
+   * `NaN` - und ein NaN in der Fusszeile faellt erst auf dem Bildschirm auf.
+   */
+  it('should total the amounts that stay undistributed', () => {
+    const ergebnis = berechneVorschau(
+      730, [mieter(1, 365)],
+      [umlage(10, 'Strom', 1000), umlage(11, 'Wasser', 400),
+        verbrauch(12, 'Warmwasser', 3.5)],
+      [], [], 730, []);
+
+    expect(ergebnis.summeNichtVerteilt).toBe(700);
+  });
+
+  it('should carry the unit names into the preview block', () => {
+    const ergebnis = berechneVorschau(
+      730, [mieter(1, 365, ['Wohnung 3', 'Wohnung 4'])], [], [], [], 730, []);
+
+    expect(ergebnis.mieter[0].einheiten).toEqual(['Wohnung 3', 'Wohnung 4']);
+  });
 
   function umlage(id: number, bezeichnung: string, totalbetrag: number,
                   gesamtmenge: number | null = null): NkPosition {

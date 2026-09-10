@@ -289,18 +289,22 @@
             }
           </tbody>
           <tfoot>
-            <!-- Die Summe MUSS dem Kostentotal aller Mieter entsprechen: Beide zaehlen dieselben
-                 Zeilenbetraege, nur anders gebuendelt. Weicht sie ab, fehlt der Uebersicht eine
-                 Quelle - und dann sagt die Maske das, statt es den Leser suchen zu lassen. -->
+            <!-- Die Summe der Kosten MUSS dem Kostentotal aller Mieter entsprechen: Beide zaehlen
+                 dieselben Zeilenbetraege, nur anders gebuendelt. Weicht sie ab, fehlt der
+                 Uebersicht eine Quelle - und dann sagt die Maske das, statt es den Leser suchen zu
+                 lassen.
+                 Die Zeile traegt zwei Summen, deshalb "Total" als Beschriftung und nicht mehr
+                 "Kosten": Die Spaltenkoepfe darueber sagen ohnehin, welche Zahl welche ist. -->
             <tr>
-              <th colspan="4">{{ 'NK_SUMME_KOSTEN' | translate }}</th>
+              <th colspan="4">{{ 'TOTAL' | translate }}</th>
               <th class="zev-table__number">
                 <span [class.zev-text--danger]="summenWeichenAb"
                   [title]="(summenWeichenAb ? 'NK_SUMME_KOSTEN_ABWEICHUNG' : '') | translate">
                   {{ betrag(berechnung.summeKosten) }}
                 </span>
               </th>
-              <th colspan="3"></th>
+              <th class="zev-table__number">{{ betrag(berechnung.summeNichtVerteilt) }}</th>
+              <th colspan="2"></th>
             </tr>
           </tfoot>
         </table>
@@ -332,6 +336,12 @@
         <button type="button" class="zev-collapsible__header" (click)="toggleMieter(block.mieterId)">
           <span class="nk-mieterkopf">
             <span class="nk-mieterkopf__name">{{ block.name }}</span>
+            <!-- Wohnung(en) des Mieters, bewusst NICHT fett: Der Name fuehrt, die Wohnung ordnet
+                 ihn nur ein. `zev-text--normal` aus dem Design System - der Kopf selbst steht auf
+                 `font-weight: 500`, ein blankes span waere also immer noch halbfett. -->
+            @if (einheitenText(block)) {
+              <span class="zev-text--normal">({{ einheitenText(block) }})</span>
+            }
             <span class="zev-text--muted">{{ block.tage }} {{ 'NK_TAGE' | translate }}</span>
           </span>
           <span class="nk-mieterkopf__saldo">

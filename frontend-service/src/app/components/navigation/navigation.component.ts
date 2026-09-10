@@ -36,7 +36,19 @@ export class NavigationComponent implements OnInit, OnDestroy {
   isMenuOpen = false;
   isCompact = false;
 
-  /** Aufklapp-Zustand des Nebenkosten-Untermenues. */
+  /**
+   * Aufklapp-Zustand eines Untermenues.
+   *
+   * <p><b>Derzeit von keinem Menueeintrag verwendet</b> und dennoch mit Absicht hier: Seit FR-3
+   * fuehrt "Nebenkosten" direkt auf die Abrechnung, das Untermenue ist weg. Die Mechanik bleibt
+   * auf ausdrueckliche Weisung erhalten, damit ein kuenftiges Untermenue nur wieder angeschlossen
+   * werden muss, statt neu geschrieben zu werden.
+   *
+   * <p>Dasselbe gilt fuer die Umgebung: Die Untermenue-Variante im Design System
+   * (`design-system/src/components/navigation/`) samt Showcase und der E2E-Helfer
+   * `oeffneUntermenue` in `tests/helpers.ts` sind unangetastet. Der Helfer merkt von sich aus,
+   * dass kein Untermenue mehr da ist, und tut nichts.
+   */
   isNebenkostenOpen = false;
 
   @HostListener('window:scroll')
@@ -77,7 +89,8 @@ export class NavigationComponent implements OnInit, OnDestroy {
       this.isMenuOpen = true;
     }
     // Steht man auf einer Nebenkosten-Seite, ist das Untermenue aufgeklappt - sonst waere der
-    // aktive Eintrag nicht sichtbar (Specs/Nebenkosten/Nebenkosten.md, FR-3).
+    // aktive Eintrag nicht sichtbar. Ohne Untermenue im Menue bleibt das ohne Wirkung; die Zeile
+    // gehoert zur erhaltenen Mechanik (siehe isNebenkostenOpen).
     if (url.startsWith('/nebenkosten')) {
       this.isNebenkostenOpen = true;
     }
@@ -145,8 +158,10 @@ export class NavigationComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Klappt das Nebenkosten-Untermenue auf/zu. Der Elterneintrag navigiert bewusst nicht
-   * (Specs/Nebenkosten/Nebenkosten.md, FR-3) - deshalb ein Button und kein Link.
+   * Klappt ein Untermenue auf/zu.
+   *
+   * <p>Zurzeit ruft es niemand - siehe {@link isNebenkostenOpen}. Ein Elterneintrag, der nur
+   * aufklappt, braucht einen Button und keinen Link; ein Eintrag, der navigiert, einen Link.
    */
   toggleNebenkosten(): void {
     this.isNebenkostenOpen = !this.isNebenkostenOpen;

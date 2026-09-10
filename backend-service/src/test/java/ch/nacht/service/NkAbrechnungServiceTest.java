@@ -2,6 +2,7 @@ package ch.nacht.service;
 
 import ch.nacht.dto.NkAbrechnungDetailDTO;
 import ch.nacht.dto.NkAkontoDTO;
+import ch.nacht.dto.NkMieterAbrechnungDTO;
 import ch.nacht.dto.NkPersonDTO;
 import ch.nacht.dto.NkPositionDTO;
 import ch.nacht.dto.NkVerbrauchDTO;
@@ -258,6 +259,78 @@ public class NkAbrechnungServiceTest {
         // 900.00 x 365 / 3285 = 100.00
         assertEquals(new BigDecimal("100.00"),
                 detail.getBerechnung().getMieter().get(0).getZeilen().get(0).getBetrag());
+    }
+
+    /**
+     * Der Kopf eines Mieterblocks nennt seine Wohnung (FR-11) — die Namen kommen als Liste, das
+     * Zusammenfuegen ist Sache der Anzeige.
+     */
+    @Test
+    void getAbrechnungDetail_EineWohnung_BlockTraegtIhrenNamen() {
+        featureFlagAn();
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(mieterRepository.findByZeitraumOverlapping(VON, BIS))
+                .thenReturn(List.of(mieter(1L, VON, null)));
+        when(mieterEinheitRepository.findByMieterIdIn(List.of(1L)))
+                .thenReturn(List.of(new MieterEinheit(ORG_ID, 1L, 100L)));
+        when(einheitRepository.findAllById(any()))
+                .thenReturn(List.of(einheit(100L, EinheitTyp.CONSUMER)));
+
+        NkAbrechnungDetailDTO detail = nkAbrechnungService.getAbrechnungDetail(1L).orElseThrow();
+
+        assertEquals(List.of("Einheit 100"), detail.getBerechnung().getMieter().get(0).getEinheiten());
+    }
+
+    /**
+     * Zwei Wohnungen: <b>beide</b> Namen, sortiert — und die Miettage bleiben verdoppelt.
+     *
+     * <p>Die zweite Zusicherung ist der Waechter fuer den Umbau: Die Zahl der Wohnungen stammt
+     * jetzt aus der <b>Laenge</b> dieser Liste statt aus einem eigenen Zaehler. Liefe das
+     * auseinander, waere der Umlageanteil des Mieters falsch, und das faellt an einem Namen im
+     * Blockkopf nicht auf.
+     */
+    @Test
+    void getAbrechnungDetail_ZweiWohnungen_BeideNamenUndDoppelteTage() {
+        featureFlagAn();
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(mieterRepository.findByZeitraumOverlapping(VON, BIS))
+                .thenReturn(List.of(mieter(1L, VON, null)));
+        when(mieterEinheitRepository.findByMieterIdIn(List.of(1L)))
+                .thenReturn(List.of(new MieterEinheit(ORG_ID, 1L, 101L),
+                        new MieterEinheit(ORG_ID, 1L, 100L)));
+        when(einheitRepository.findAllById(any()))
+                .thenReturn(List.of(einheit(101L, EinheitTyp.CONSUMER),
+                        einheit(100L, EinheitTyp.CONSUMER)));
+
+        NkMieterAbrechnungDTO block = nkAbrechnungService.getAbrechnungDetail(1L).orElseThrow()
+                .getBerechnung().getMieter().get(0);
+
+        assertEquals(List.of("Einheit 100", "Einheit 101"), block.getEinheiten(),
+                "Sortiert, damit der Kopf nicht bei jedem Laden anders aussieht");
+        assertEquals(730L, block.getTage(), "Zwei Wohnungen, ganzes Jahr");
+    }
+
+    /** Eine nicht nebenkostenrelevante Einheit steht auch nicht im Kopf. */
+    @Test
+    void getAbrechnungDetail_NichtRelevanteEinheit_NichtImKopf() {
+        featureFlagAn();
+        when(abrechnungRepository.findFirstById(1L)).thenReturn(Optional.of(testAbrechnung1));
+        when(mieterRepository.findByZeitraumOverlapping(VON, BIS))
+                .thenReturn(List.of(mieter(1L, VON, null)));
+        when(mieterEinheitRepository.findByMieterIdIn(List.of(1L)))
+                .thenReturn(List.of(new MieterEinheit(ORG_ID, 1L, 100L),
+                        new MieterEinheit(ORG_ID, 1L, 101L)));
+
+        Einheit wohnung = einheit(100L, EinheitTyp.CONSUMER);
+        Einheit ladestation = einheit(101L, EinheitTyp.CONSUMER);
+        ladestation.setNebenkostenRelevant(false);
+        when(einheitRepository.findAllById(any())).thenReturn(List.of(wohnung, ladestation));
+
+        NkMieterAbrechnungDTO block = nkAbrechnungService.getAbrechnungDetail(1L).orElseThrow()
+                .getBerechnung().getMieter().get(0);
+
+        assertEquals(List.of("Einheit 100"), block.getEinheiten());
+        assertEquals(365L, block.getTage(), "Nur die Wohnung zaehlt");
     }
 
     @Test

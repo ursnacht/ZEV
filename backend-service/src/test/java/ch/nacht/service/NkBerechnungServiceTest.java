@@ -841,6 +841,35 @@ public class NkBerechnungServiceTest {
 
     // ==================== Bezugsgroesse je Zeile (Rechnung) ====================
 
+    /**
+     * Die Wohnungsnamen reicht der Rechenservice nur durch — er braucht sie nicht.
+     *
+     * <p>Trotzdem ein Test: Ohne das Durchreichen bliebe die Klammer im Blockkopf leer, und der
+     * Fehler waere in der Maske zu suchen statt hier.
+     */
+    @Test
+    void berechne_BlockTraegtDieWohnungsnamenDerBasis() {
+        NkMieterBasisDTO basis = new NkMieterBasisDTO(1L, "Anna Beispiel", JAHR_VON, null, 2, null);
+        basis.setEinheiten(List.of("Wohnung 3", "Wohnung 4"));
+
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung(JAHR_VON, JAHR_BIS, 2), List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(basis));
+
+        assertEquals(List.of("Wohnung 3", "Wohnung 4"), result.getMieter().get(0).getEinheiten());
+    }
+
+    /** Ohne gesetzte Namen eine leere Liste und kein {@code null} — die Maske prueft die Laenge. */
+    @Test
+    void berechne_OhneWohnungsnamen_LeereListe() {
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung(JAHR_VON, JAHR_BIS, 2), List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(testMieter1));
+
+        assertNotNull(result.getMieter().get(0).getEinheiten());
+        assertTrue(result.getMieter().get(0).getEinheiten().isEmpty());
+    }
+
     @Test
     void zeile_Umlage_TraegtTotalbetragUndZeitanteilAlsProzentsatz() {
         // Fuer die Rechnung: Bezugsbetrag x Prozentsatz muss den Zeilenbetrag ergeben, sonst
@@ -956,6 +985,59 @@ public class NkBerechnungServiceTest {
                 .map(NkMieterAbrechnungDTO::getKostentotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         assertEquals(kostentotal, result.getSummeKosten());
+    }
+
+    /**
+     * Die Summe der nicht verteilten Betraege — was keinem Mieter belastet wird.
+     *
+     * <p>Zwei Umlagen bei doppeltem Nenner: Jede laesst die Haelfte liegen, zusammen also
+     * {@code 500.00 + 200.00}. Der Verbrauch bleibt aussen vor, er kennt den Begriff nicht.
+     */
+    @Test
+    void positionSummen_SummeNichtVerteilt_ZaehltNurWasLiegenBleibt() {
+        // Nenner 2 Wohnungen x 365 Tage, aber nur ein Mieter mit einer Wohnung: die Haelfte
+        // bleibt unverteilt.
+        NkAbrechnung abrechnung = abrechnung(JAHR_VON, JAHR_BIS, 2);
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung,
+                List.of(umlage(10L, 1, "Strom", "1000.00", null),
+                        umlage(11L, 2, "Wasser", "400.00", null),
+                        verbrauch(12L, 3, "Warmwasser", "3.5000")),
+                List.of(new NkVerbrauch(12L, 1L, new BigDecimal("10.000"))),
+                List.of(), List.of(), List.of(), List.of(testMieter1));
+
+        assertEquals(new BigDecimal("700.00"), result.getSummeNichtVerteilt());
+    }
+
+    /**
+     * Ohne eine Zeile, die etwas liegen lassen KANN, steht {@code 0.00} — nicht {@code null}.
+     *
+     * <p>In der einzelnen Zeile bleibt die Zelle leer, weil eine {@code 0.00} dort wie ein
+     * vergessener Wert aussaehe. In der Fusszeile ist die {@code 0.00} eine gerechnete Aussage:
+     * Es blieb nichts liegen.
+     */
+    @Test
+    void positionSummen_SummeNichtVerteilt_OhneUmlage_IstNull_NichtLeer() {
+        NkAbrechnung abrechnung = abrechnung(JAHR_VON, JAHR_BIS, 1);
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung, List.of(verbrauch(12L, 1, "Warmwasser", "3.5000")),
+                List.of(new NkVerbrauch(12L, 1L, new BigDecimal("10.000"))),
+                List.of(), List.of(), List.of(), List.of(testMieter1));
+
+        assertNotNull(result.getSummeNichtVerteilt());
+        assertEquals(new BigDecimal("0.00"), result.getSummeNichtVerteilt());
+    }
+
+    /** Voll belegt: Es bleibt nichts liegen, obwohl Umlagen im Spiel sind. */
+    @Test
+    void positionSummen_SummeNichtVerteilt_VollBelegt_IstNull() {
+        NkAbrechnung abrechnung = abrechnung(JAHR_VON, JAHR_BIS, 2);
+        NkBerechnungDTO result = berechnungService.berechne(
+                abrechnung, List.of(umlage(10L, 1, "Strom", "1000.00", null)),
+                List.of(), List.of(), List.of(), List.of(),
+                List.of(testMieter1, testMieter2));
+
+        assertEquals(new BigDecimal("0.00"), result.getSummeNichtVerteilt());
     }
 
     @Test

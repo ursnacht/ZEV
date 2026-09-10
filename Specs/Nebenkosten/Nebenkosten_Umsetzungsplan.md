@@ -130,3 +130,41 @@ diese Umsetzung nicht:
 * Die Akzeptanzkriterien zur Sichtbarkeit sind erst **nach Phase 13** prüfbar. Vorher verhält
   sich die Anwendung wie bei einem nicht umgesetzten Feature: Menüpunkt unsichtbar, Route
   abgewiesen — ohne Fehlermeldung.
+
+## Nachtrag: Untermenü entfernt, Nebenkosten führt direkt auf die Abrechnung (FR-3)
+
+Der Menüeintrag **Nebenkosten** ist jetzt ein gewöhnlicher Link auf `/nebenkosten/abrechnung` —
+Beschriftung `NEBENKOSTEN`, Symbol `calculator` wie zuvor am Elterneintrag, Sichtbarkeit
+unverändert über Flag **und** Permission.
+
+**Warum das Untermenü überflüssig war:** Es trug „Tarifpositionen" und „Abrechnung", und die
+Tarifpositionen sind bis heute eine Gerüstseite ohne Inhalt (FR-4). Das Untermenü verbarg damit die
+eine echte Seite hinter einem zusätzlichen Klick und versprach eine Struktur, die es nicht gibt.
+
+**Was bewusst NICHT gelöscht wurde** (Weisung: „Submenü-Funktionalität nicht löschen, nur das Menü
+selber anpassen"):
+* Die Untermenü-Variante im Design System (`design-system/src/components/navigation/`) samt
+  Showcase-Eintrag — unangetastet.
+* `isNebenkostenOpen`, `toggleNebenkosten()` und das Aufklappen beim Betreten einer NK-Seite in
+  `navigation.component.ts`. Sie werden derzeit von keinem Eintrag genutzt; das steht als
+  Begründung am Feld, damit es nicht wie ein Übersehen aussieht. Ein künftiges Untermenü ist damit
+  nur wieder anzuschliessen statt neu zu schreiben.
+* Der E2E-Helfer `oeffneUntermenue` in `tests/helpers.ts`.
+
+**Kein Test war anzupassen** — und das ist die eigentliche Prüfung dieser Änderung:
+* `oeffneUntermenue` steigt aus, wenn kein `.zev-navbar__submenu` den gesuchten Eintrag enthält
+  (`count() === 0`). Nach dem Umbau greift genau dieser Zweig, und `navigateViaMenu` klickt den
+  Eintrag direkt.
+* Der Ziel-`href` bleibt `/nebenkosten/abrechnung`; alle E2E-Aufrufe
+  (`navigateViaMenu(page, '/nebenkosten/abrechnung')`) treffen weiter denselben Selektor.
+* Für die Navigationskomponente gibt es keine Unit-Tests (`navigation.component.spec.ts` existiert
+  nicht) — es fällt also auch keiner weg.
+
+**Route unverändert.** `/nebenkosten/tarifpositionen` bleibt erreichbar und behält Flag- und
+Permission-Prüfung; sie steht nur nicht mehr im Menü. Die Weiterleitung
+`/nebenkosten → /nebenkosten/abrechnung` bleibt für getippte und verlinkte URLs; ihr Kommentar in
+`app.routes.ts` nannte den Elterneintrag als „nur Aufklapper" und ist nachgezogen.
+
+Keine Migration: `NEBENKOSTEN` existiert als Schlüssel, und `NK_ABRECHNUNG` wie
+`NK_TARIFPOSITIONEN` bleiben als Seitentitel in Gebrauch — es entstehen keine verwaisten
+Übersetzungen.

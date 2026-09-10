@@ -8,6 +8,7 @@ import { TranslationService } from '../../services/translation.service';
 import { CdkDragDrop } from '@angular/cdk/drag-drop';
 import {
   NkAbrechnungDetail,
+  NkMieterAbrechnung,
   NkPosition,
   NkPositionsart,
   NkPositionSumme,
@@ -1104,10 +1105,10 @@ describe('NebenkostenAbrechnungFormComponent', () => {
       component.akonto = [];
       component.berechnung = {
         nenner: 730, summeTage: 365, nennerPerson: 730, summePersonenTage: 365,
-        summeKosten: 0, positionSummen: [],
+        summeKosten: 0, summeNichtVerteilt: 0, positionSummen: [],
         mieter: [{
-          mieterId: 100, name: 'Anna Beispiel', tage: 365, anzahlPersonen: 1,
-          personenTage: 365, ohneWohnung: false, zeilen: [],
+          mieterId: 100, name: 'Anna Beispiel', einheiten: ['Wohnung 3'], tage: 365,
+          anzahlPersonen: 1, personenTage: 365, ohneWohnung: false, zeilen: [],
           kostentotal: 0, akontoAnzahlMonate: 11, akontoBetragProMonat: 150,
           akontoKorrektur: -20, akontoTotal: 0, saldo: 0
         }]
@@ -1725,6 +1726,43 @@ describe('NebenkostenAbrechnungFormComponent', () => {
 
     it('should format like betrag', () => {
       expect(component.betragOderLeer(1234.5)).toBe(component.betrag(1234.5));
+    });
+  });
+
+  describe('einheitenText', () => {
+
+    /** Ein Block, von dem nur die Wohnungsnamen interessieren. */
+    function block(einheiten: string[]): NkMieterAbrechnung {
+      return {
+        mieterId: 1, name: 'Anna Beispiel', einheiten, tage: 365, anzahlPersonen: 1,
+        personenTage: 365, ohneWohnung: false, zeilen: [], kostentotal: 0,
+        akontoAnzahlMonate: 0, akontoBetragProMonat: 0, akontoKorrektur: 0,
+        akontoTotal: 0, saldo: 0
+      };
+    }
+
+    it('should name a single unit', () => {
+      expect(component.einheitenText(block(['Wohnung 3']))).toBe('Wohnung 3');
+    });
+
+    it('should join several units', () => {
+      expect(component.einheitenText(block(['Wohnung 3', 'Wohnung 4'])))
+        .toBe('Wohnung 3, Wohnung 4');
+    });
+
+    /** Leerer Text heisst fuer die Maske: keine Klammer. Ein leeres Paar waere schlimmer. */
+    it('should return an empty text when no unit is known', () => {
+      expect(component.einheitenText(block([]))).toBe('');
+    });
+
+    /**
+     * Auch wenn das Feld ganz fehlt - etwa bei einer Antwort, die noch vor dieser Erweiterung
+     * entstanden ist und im Browser-Cache liegt.
+     */
+    it('should tolerate a missing field', () => {
+      const ohneFeld = { ...block([]) } as Partial<NkMieterAbrechnung>;
+      delete ohneFeld.einheiten;
+      expect(component.einheitenText(ohneFeld as NkMieterAbrechnung)).toBe('');
     });
   });
 });

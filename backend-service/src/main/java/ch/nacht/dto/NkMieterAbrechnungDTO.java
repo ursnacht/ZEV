@@ -16,6 +16,16 @@ public class NkMieterAbrechnungDTO {
     private String name;
 
     /**
+     * Namen der nebenkostenrelevanten Wohnungen dieses Mieters — im Kopf seines Blocks in Klammern
+     * hinter dem Namen (FR-11).
+     *
+     * <p>Eine <b>Liste</b> und kein fertiger Text: Ein Mieter kann mehrere Wohnungen haben, und wie
+     * sie aneinandergereiht werden, ist Sache der Anzeige. Leer, wenn keine bekannt ist — dann
+     * entfällt die Klammer, statt ein leeres Paar zu zeigen.
+     */
+    private List<String> einheiten = new ArrayList<>();
+
+    /**
      * Miettage im Zeitraum, bereits mit der Zahl der Wohnungen multipliziert — der Zähler der
      * Umlage. Wird auch für die Prüfung {@code Σ Tage(i) <= Nenner} gebraucht (FR-2).
      */
@@ -68,6 +78,14 @@ public class NkMieterAbrechnungDTO {
 
     public void setPersonenTage(long personenTage) {
         this.personenTage = personenTage;
+    }
+
+    public List<String> getEinheiten() {
+        return einheiten;
+    }
+
+    public void setEinheiten(List<String> einheiten) {
+        this.einheiten = einheiten != null ? einheiten : new ArrayList<>();
     }
 
     public Long getMieterId() {

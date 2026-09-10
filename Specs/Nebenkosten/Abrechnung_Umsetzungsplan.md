@@ -849,3 +849,87 @@ Neu geschrieben als **Delta-Prüfung**: Eine Änderung von 12 × 50.00 auf 12 ×
 genau 360.00 erhöhen — unabhängig davon, was die übrigen Mieter mitbringen. Vor und nach dem
 Speichern. Die Beziehung „Kosten − Akonto = Σ Salden" bleibt beim Unit-Test: Dort sind die Salden
 **vorzeichenbehaftet**, während die Maske je Block den Betrag absolut mit Beschriftung zeigt.
+
+## Nachtrag: Wohnung im Kopf des Mieterblocks (FR-11)
+
+Hinter dem Mieternamen steht seine Wohnung in Klammern, in normaler Schriftstärke.
+
+**Kein neues CSS.** `zev-text--normal` gibt es im Design System (`typography.css`) bereits. Nötig
+ist es trotzdem: Die Kopfzeile steht auf `font-weight: 500`, ein `span` ohne eigene Angabe wäre
+also weiterhin halbfett — „nicht fett" heisst hier ausdrücklich 400.
+
+**Der Weg der Daten.** Die Namen entstehen dort, wo die Wohnungen ohnehin geprüft werden
+(`NkAbrechnungService.ladeMieter` — `CONSUMER` **mit** `nebenkostenRelevant`), und reisen über
+`NkMieterBasisDTO` → `NkMieterAbrechnungDTO` in den Block. Als **Liste**, nicht als fertiger Text:
+Wie mehrere Namen aneinandergereiht werden, ist Sache der Anzeige (`einheitenText()` in der Maske).
+
+Auf `NkMieterBasisDTO` bewusst **nicht** als Konstruktor-Parameter: Die Berechnung braucht die
+Namen nicht, sie reicht sie nur durch. Ein siebter Parameter hätte rund dreissig
+Test-Vorbelegungen angefasst, ohne dass dort etwas zu prüfen wäre.
+
+**Eine Vereinfachung nebenbei.** `ladeMieter` führte zwei Strukturen: ein `Set` der relevanten
+Einheiten und eine `Map` mit der Anzahl je Mieter. Jetzt gibt es **eine** `Map<Long, List<String>>`
+— die Länge der Liste *ist* die Zahl der Wohnungen. Zwei Quellen für dieselbe Zahl könnten
+auseinanderlaufen, und an dieser Zahl hängt der Umlageanteil. Ein Test hält beides zusammen:
+`getAbrechnungDetail_ZweiWohnungen_BeideNamenUndDoppelteTage` prüft die Namen **und** die 730 Tage.
+
+**Sortiert ausgegeben.** Die Reihenfolge der Zuordnungen aus der Datenbank ist nicht zugesichert;
+ein Kopf, der bei jedem Laden anders aussieht, wirkt wie ein Fehler.
+
+**Die Vorschau muss die Namen durchreichen.** Sie baut die Mieterblöcke bei jeder Eingabe neu auf
+(`nebenkosten-berechnung.ts`). Ohne das Feld in `NkMieterTage` verschwände die Klammer beim ersten
+Tastendruck und käme nach dem Speichern wieder — ein Flackern, das nach einem Fehler aussieht.
+Deshalb liegt das Feld auch in der Projektion in `uebernehme()`.
+
+Keine Migration: Die Klammer braucht keinen Text, und die Einheitennamen sind Stammdaten.
+
+**Tests:** `NkAbrechnungServiceTest` 75 (3 neu: eine Wohnung, zwei Wohnungen samt Tagen, nicht
+relevante Einheit bleibt draussen), `NkBerechnungServiceTest` 71 (2 neu: Durchreichen und leere
+Liste statt `null`), Maskentests 145 (4 neu für `einheitenText`), Vorschau-Spec um den
+Durchreich-Test erweitert. Das Typsystem erzwang die Ergänzung zweier Test-Vorbelegungen — genau
+deshalb ist das Feld **nicht** optional deklariert.
+
+## Nachtrag: Summe „Nicht verteilt" in der Fusszeile (FR-10)
+
+Analog zur Kostensumme: `NkBerechnungDTO.summeNichtVerteilt`, gerechnet über die Zeilen der
+Positionsübersicht.
+
+**Nullen werden übersprungen, nicht als 0 gezählt.** `nichtVerteilt` ist in der einzelnen Zeile
+`null`, wo die Positionsart den Begriff nicht kennt (Verbrauch, Zuschlag, Zusatzzeile). Im Backend
+deshalb `.filter(Objects::nonNull)`, im Frontend-Spiegel `?? 0` statt `zahl(...)`. Das Ergebnis wäre
+dasselbe — die Begründung nicht, und in JavaScript ist der Unterschied nicht nur akademisch:
+`undefined` im `reduce` ergibt `NaN`, und ein `NaN` in der Fusszeile fällt erst auf dem Bildschirm
+auf.
+
+**Die Fusszeile zeigt `0.00`, die einzelne Zelle bleibt leer.** Kein Widerspruch zum Entscheid
+„leere Zellen statt Nullen": In der Zeile einer Verbrauchsposition wäre `0.00` die Behauptung, es
+sei nichts liegen geblieben, obwohl die Art nichts liegen lassen kann. In der Fusszeile ist es eine
+gerechnete Aussage über alle Zeilen.
+
+**Beschriftung der Fusszeile auf „Total" geändert.** Sie stand auf `NK_SUMME_KOSTEN` („Kosten") —
+mit zwei Zahlen in der Zeile wäre das eine falsche Überschrift für die zweite. `TOTAL` existiert in
+beiden Sprachen, also keine Migration.
+
+**E2E: ein mehrdeutiger Locator war die eigentliche Falle.** `summeKosten(page)` gab
+`.nk-kontrolle tfoot th.zev-table__number` zurück — mit der zweiten Summe trifft das zwei Zellen,
+und `toHaveText` wirft im Strict Mode. Jetzt liefert `fusszeileZahlen(page)` beide, und
+`summeKosten` / `summeNichtVerteilt` greifen `nth(0)` / `nth(1)`. Ein Index bleibt ein Index —
+deshalb prüft der neue Test **beide** Zahlen zusammen: `Kosten + Nicht verteilt = 1'000.00`. Eine
+Verwechslung fällt damit als falscher Betrag auf und nicht stillschweigend.
+
+Der Test rechnet bewusst mit **Verhältnissen** statt absoluten Beträgen: Wie viele Mieter die
+Umgebung kennt, weiss er nicht. Geprüft wird die Identität je Position und dass eine zweite Umlage
+desselben Betrags beide Summen verdoppelt — vor und nach dem Speichern.
+
+**Und die Identität hat drei Terme.** Die erste Fassung dieses Tests behauptete
+`Kosten + Nicht verteilt = Totalbetrag` und scheiterte an einem Rappen: `999.99` statt `1'000.00`.
+Richtig ist `Kosten + Nicht verteilt + Rundungsdifferenz = Totalbetrag`. `nichtVerteilt` rechnet
+gegen den *exakt* verteilbaren Betrag, `summeKosten` ist die Summe der **einzeln gerundeten**
+Mieterbeträge — genau dafür hat die Übersicht ihre dritte Spalte, die ich beim Aufschreiben der
+Gleichung zwei Zellen weiter rechts stehen liess. Der Fehler lag in Test und Spec, nicht im Code;
+beide sind richtiggestellt.
+
+**Tests:** `NkBerechnungServiceTest` 74 (3 neu: Summe über zwei Umlagen bei halbem Nenner, `0.00`
+statt `null` ohne Umlage, `0.00` bei voller Belegung), Vorschau-Spec 56 (1 neu), Maskentest-Fixture
+um das Feld ergänzt. E2E-Test angelegt, aber noch nicht gelaufen — er braucht den neuen Stand im
+Container.

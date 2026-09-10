@@ -631,7 +631,8 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
       mieterId: m.mieterId,
       name: m.name,
       tage: m.tage,
-      ohneWohnung: m.ohneWohnung
+      ohneWohnung: m.ohneWohnung,
+      einheiten: m.einheiten ?? []
     }));
 
     // Personenzahl je Mieter: Der Server speichert nur Abweichungen von der Vorgabe, die Maske
@@ -726,6 +727,20 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
       this.personen.push(eintrag);
     }
     return eintrag;
+  }
+
+  /**
+   * Wohnungen eines Mieters als Klammerzusatz zum Namen, z.B. „Wohnung 3, Wohnung 4".
+   *
+   * <p>Leerer Text heisst: keine Klammer zeichnen. Das trifft nur den Rechenservice ohne Datenbank
+   * — die Abrechnung führt seit FR-9 nur Mieter mit mindestens einer nebenkostenrelevanten Wohnung
+   * auf. Die Prüfung steht trotzdem hier: Eine Klammer mit nichts darin wäre schlimmer als keine.
+   *
+   * <p>Das Zusammenfügen gehört in die Anzeige und nicht ins DTO: Das Backend liefert die Namen
+   * einzeln, damit hier über die Darstellung entschieden werden kann.
+   */
+  einheitenText(block: NkMieterAbrechnung): string {
+    return (block.einheiten ?? []).join(', ');
   }
 
   /** Vorschau neu rechnen — bei jeder Änderung in der Maske. */
