@@ -977,3 +977,37 @@ ist eine Beschreibung, die beim nächsten Knopf in „Angaben zur Abrechnung" ki
 korrigiert), neuer E2E-Test `should collapse the positions and their overview together` — beide
 Tabellen verschwinden zusammen, die Mieterblöcke bleiben unberührt, und im zugeklappten Zustand
 gespeicherte Eingaben stehen nach dem Aufklappen unverändert da.
+
+## Nachtrag: Mengeneinheit `M2` (Quadratmeter)
+
+Anlass ist die **Kehrichtgrundgebühr**, die nach Wohnfläche verrechnet wird. Fachlich derselbe Fall
+wie `M3`: eine gemessene Grösse je Wohnung, kein Pauschalbetrag — deshalb genau dieselben Stellen
+wie bei `M3` und `CHF`, und keine einzige mehr.
+
+**Die DDL ist der Teil, den man vergisst.** Drei CHECK-Constraints zählen die erlaubten Werte auf
+(`ck_tarif_mengeneinheit`, `ck_nk_position_einheit`, `ck_nk_zusatz_einheit`). Ohne sie kompiliert
+alles, die Auswahl erscheint in der Maske, und erst das Speichern scheitert — an genau der Stelle,
+an der die neue Einheit gebraucht wird. V144 ersetzt alle drei (V117/V118/V121 bleiben unberührt)
+und legt die Übersetzung `M2` = `m²` an — mit hochgestellter Zwei wie `m³` bei `M3`, nicht als
+„m2".
+
+**Nicht am Tarif wählbar**, wie `M3` und `CHF`: Die Tarifmaske bietet nur `KWH`, `MONAT`, `STUECK`
+an. Der Constraint auf `zev.tarif` lässt `M2` trotzdem zu — der Wertebereich der Spalte folgt dem
+Enum, nicht der Maske.
+
+### Ein Wächter statt fünf Einzeltests
+
+`NkRechnungService.MENGENEINHEIT_KEYS` ist eine `Map.of` **ohne Rückfall**. Fehlt ein Eintrag,
+liefert `get` still `null`: Die Einheitenspalte der Rechnung bleibt leer, der Betrag daneben steht
+ohne Bezugsgrösse da, und niemand meldet es. Statt eines Tests je Wert prüft jetzt einer **alle**
+Enum-Werte — die nächste Einheit ist damit schon abgesichert, bevor jemand sie einbaut.
+
+Der Test hat sofort etwas gefunden: `MONAT` trägt den Schlüssel `MONATE`, weil die Rechnung die
+Mehrzahl zeigt („12 Monate"). Meine erste Fassung setzte Schlüssel und Enum-Namen gleich und hätte
+diese bewusste Abweichung als Regel festgeschrieben. Geprüft wird jetzt, **dass** ein Schlüssel da
+ist, nicht welcher.
+
+**Tests:** `NkRechnungServiceTest` 47 (2 neu: der Wächter über alle Einheiten, dazu `M2` an einer
+Umlage), Maskentests 150 (2 neu: `M2` steht zur Auswahl und direkt neben `M3`). Keine E2E-Ergänzung
+— die Einheitenauswahl ist eine Liste ohne Verhalten, und die Speicherstrecke deckt der
+Constraint-Test der Migration beim nächsten Start ab.

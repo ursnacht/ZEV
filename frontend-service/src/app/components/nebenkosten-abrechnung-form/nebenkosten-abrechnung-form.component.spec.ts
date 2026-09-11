@@ -203,6 +203,27 @@ describe('NebenkostenAbrechnungFormComponent', () => {
     });
   });
 
+  describe('mengeneinheiten', () => {
+
+    /**
+     * Die Flaecheneinheit steht zur Auswahl - Anlass ist die Kehrichtgrundgebuehr, die nach
+     * Wohnflaeche verrechnet wird.
+     */
+    it('should offer square metres', () => {
+      expect(component.mengeneinheiten).toContain(Mengeneinheit.M2);
+    });
+
+    /**
+     * Und sie steht neben den Kubikmetern: Beides sind gemessene Groessen einer Wohnung, wer die
+     * eine sucht, sucht die andere gleich mit.
+     */
+    it('should list area next to volume', () => {
+      const m3 = component.mengeneinheiten.indexOf(Mengeneinheit.M3);
+      const m2 = component.mengeneinheiten.indexOf(Mengeneinheit.M2);
+      expect(m2).toBe(m3 + 1);
+    });
+  });
+
   describe('togglePositionen', () => {
     it('should collapse and expand the positions section', () => {
       component.togglePositionen();

@@ -16,6 +16,11 @@ export enum Mengeneinheit {
   /** Kubikmeter — für die Nebenkostenabrechnung (Wasser, Abwasser). */
   M3 = 'M3',
   /**
+   * Quadratmeter — für die Nebenkostenabrechnung; Anlass ist die Kehrichtgrundgebühr, die nach
+   * Wohnfläche verrechnet wird. Nicht an einem ZUSATZ-Tarif wählbar.
+   */
+  M2 = 'M2',
+  /**
    * Betrag in Franken — für Umlagen, deren verteilte Grösse selbst ein Betrag ist
    * (Grünabfuhr, Versicherungsprämie). Nicht an einem ZUSATZ-Tarif wählbar.
    */
@@ -83,6 +88,7 @@ const MENGENEINHEIT_KEYS: Record<Mengeneinheit, string> = {
   [Mengeneinheit.MONAT]: 'MONATE',
   [Mengeneinheit.STUECK]: 'STUECK',
   [Mengeneinheit.M3]: 'M3',
+  [Mengeneinheit.M2]: 'M2',
   [Mengeneinheit.CHF]: 'CHF'
 };
 

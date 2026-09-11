@@ -62,6 +62,7 @@ public class NkRechnungService {
             Mengeneinheit.MONAT, "MONATE",
             Mengeneinheit.STUECK, "STUECK",
             Mengeneinheit.M3, "M3",
+            Mengeneinheit.M2, "M2",
             Mengeneinheit.CHF, "CHF"
     );
 

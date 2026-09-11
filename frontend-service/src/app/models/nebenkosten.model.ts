@@ -296,6 +296,9 @@ export const NK_POSITIONSARTEN: NkPositionsart[] = [
  */
 export const NK_MENGENEINHEITEN: Mengeneinheit[] = [
   Mengeneinheit.M3,
+  // Direkt neben M3: beides gemessene Groessen einer Wohnung, und wer eine sucht, sucht die
+  // andere gleich mit.
+  Mengeneinheit.M2,
   Mengeneinheit.CHF,
   Mengeneinheit.KWH,
   Mengeneinheit.STUECK,

@@ -322,6 +322,61 @@ class NkRechnungServiceTest {
     }
 
     /**
+     * <b>Jede</b> Mengeneinheit hat einen Uebersetzungsschluessel — auch eine kuenftig ergaenzte.
+     *
+     * <p>Der Waechter statt eines Tests je Wert: {@code MENGENEINHEIT_KEYS} ist eine
+     * {@code Map.of} ohne Rueckfall. Fehlt ein Eintrag, liefert {@code get} still {@code null},
+     * die Einheitenspalte der Rechnung bleibt leer und der Betrag daneben steht ohne Bezugsgroesse
+     * da — ein Fehler, den niemand meldet. Genau das drohte beim Ergaenzen von {@code M2}.
+     *
+     * <p>Geprueft wird, DASS ein Schluessel da ist, nicht WELCHER: {@code MONAT} traegt
+     * {@code MONATE}, weil die Rechnung die Mehrzahl zeigt („12 Monate"). Eine Gleichsetzung mit
+     * dem Enum-Namen schriebe diese Abweichung als Regel fest, die sie nicht ist.
+     */
+    @Test
+    void baueRechnungen_JedeMengeneinheit_HatEinenSchluessel() {
+        for (Mengeneinheit einheit : Mengeneinheit.values()) {
+            NkZeileDTO zeile = new NkZeileDTO();
+            zeile.setArt(NkPositionsart.UMLAGE);
+            zeile.setReihenfolge(1);
+            zeile.setBezeichnung("Position " + einheit);
+            zeile.setEinheit(einheit);
+            zeile.setBetrag(new BigDecimal("10.00"));
+
+            NkAbrechnungDetailDTO detail = detail();
+            detail.getBerechnung().getMieter().get(0).setZeilen(List.of(zeile));
+            when(nkAbrechnungService.getAbrechnungDetail(ABRECHNUNG_ID))
+                    .thenReturn(Optional.of(detail));
+
+            String schluessel = service.baueRechnungen(ABRECHNUNG_ID)
+                    .get(0).getZeilen().get(0).getMengeneinheit();
+            assertNotNull(schluessel, "Kein Uebersetzungsschluessel fuer " + einheit);
+            assertFalse(schluessel.isBlank(), "Leerer Uebersetzungsschluessel fuer " + einheit);
+        }
+    }
+
+    /** Die Flaecheneinheit der Kehrichtgrundgebuehr erscheint als eigener Schluessel. */
+    @Test
+    void baueRechnungen_UmlageNachFlaeche_TraegtM2() {
+        NkZeileDTO umlage = new NkZeileDTO();
+        umlage.setArt(NkPositionsart.UMLAGE);
+        umlage.setReihenfolge(1);
+        umlage.setBezeichnung("Kehrichtgrundgebuehr");
+        umlage.setEinheit(Mengeneinheit.M2);
+        umlage.setMenge(new BigDecimal("84.500"));
+        umlage.setBetrag(new BigDecimal("120.00"));
+
+        NkAbrechnungDetailDTO detail = detail();
+        detail.getBerechnung().getMieter().get(0).setZeilen(List.of(umlage));
+        when(nkAbrechnungService.getAbrechnungDetail(ABRECHNUNG_ID)).thenReturn(Optional.of(detail));
+
+        NkRechnungZeileDTO zeile = service.baueRechnungen(ABRECHNUNG_ID).get(0).getZeilen().get(0);
+
+        assertEquals("M2", zeile.getMengeneinheit());
+        assertEquals(new BigDecimal("84.500"), zeile.getMenge());
+    }
+
+    /**
      * Die Bezugsgroesse gehoert auf die Rechnung: Ohne sie stand in der Spalte „Preis" bei einer
      * Umlage oder einem Zuschlag nichts, und der Betrag war fuer den Mieter nicht nachvollziehbar.
      */

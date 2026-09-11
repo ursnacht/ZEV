@@ -416,14 +416,26 @@ denselben Wert wie die Betragsspalte. Das ist gewollt: Es macht sichtbar, dass h
 und keine gemessene Menge verteilt wird, und die Zeile bleibt gegen den Beleg des Lieferanten
 prüfbar.
 
-`CHF` und `M3` stehen **nur** in der Nebenkostenabrechnung zur Auswahl, nicht am Tarif: Ein Preis
-„CHF pro Fr." wäre keine sinnvolle Angabe.
+**`M2` („m²") ist die Einheit einer Umlage nach Fläche (Nachtrag).** Anlass ist die
+**Kehrichtgrundgebühr**, die nach Wohnfläche verrechnet wird. Wie `M3` eine gemessene Grösse und
+keine Pauschale: Die Fläche je Wohnung wird erfasst, der Betrag folgt daraus. Sie steht in der
+Auswahl **direkt neben `M3`** — beides sind gemessene Grössen einer Wohnung, und wer die eine
+sucht, sucht die andere gleich mit.
+
+`CHF`, `M3` und `M2` stehen **nur** in der Nebenkostenabrechnung zur Auswahl, nicht am Tarif: Ein
+Preis „CHF pro Fr." wäre keine sinnvolle Angabe, und die Tarifmaske bietet ohnehin nur die
+Einheiten der Stromabrechnung an (`KWH`, `MONAT`, `STUECK`).
 
 > **Achtung, DDL:** `ck_tarif_mengeneinheit` auf `zev.tarif` zaehlt die erlaubten Werte auf
 > (`KWH`, `MONAT`, `STUECK`). Der Constraint ist in derselben Migration anzupassen, sonst
 > schlaegt jeder Tarif mit der neuen Einheit fehl. In den NK-Tabellen gilt fuer `einheit`
 > derselbe Wertebereich per eigenem CHECK-Constraint; `MONAT` ist dort fachlich sinnlos, wird
 > aber nicht ausgeschlossen - die Einschraenkung waere Willkuer ohne Nutzen.
+>
+> **Es sind DREI Constraints**, und jede weitere Einheit braucht sie alle:
+> `ck_tarif_mengeneinheit`, `ck_nk_position_einheit`, `ck_nk_zusatz_einheit`. Bereits ausgefuehrte
+> Migrationen werden dabei nie geaendert, sondern in einer neuen ersetzt — so geschehen fuer `CHF`
+> (V121) und `M2` (V144).
 
 > **Achtung, Frontend:** Es gibt ein **zweites** Enum `Mengeneinheit` in
 > `frontend-service/src/app/models/tarif.model.ts`. Kritisch ist dort `mengeneinheitKey()`:
@@ -469,7 +481,7 @@ prüfbar.
 | `art` | VARCHAR(20) | ✅ | `UMLAGE` \| `UMLAGE_PERSON` \| `VERBRAUCH` \| `ANTEIL` \| `ZUSCHLAG`, CHECK-Constraint |
 | `bezeichnung` | VARCHAR(150) | ✅ | |
 | `reihenfolge` | INTEGER | ✅ | Anzeigereihenfolge |
-| `einheit` | VARCHAR(20) | ❌ | `M3` \| `CHF` \| `KWH` \| `STUECK`; bei `ZUSCHLAG` und `ANTEIL` leer |
+| `einheit` | VARCHAR(20) | ❌ | `M3` \| `M2` \| `CHF` \| `KWH` \| `STUECK`; bei `ZUSCHLAG` und `ANTEIL` leer |
 | `totalbetrag` | NUMERIC(12,2) | ❌ | `UMLAGE`, `UMLAGE_PERSON` und `ANTEIL` |
 | `gesamtmenge` | NUMERIC(12,3) | ❌ | nur `UMLAGE` und `UMLAGE_PERSON`, optional |
 | `betrag_pro_einheit` | NUMERIC(12,4) | ❌ | nur `VERBRAUCH` |
@@ -514,7 +526,7 @@ CHECK (
 | `mieter_id` | BIGINT | ✅ | FK `zev.mieter`, `ON DELETE RESTRICT` (Loeschschutz, s.o.) |
 | `reihenfolge` | INTEGER | ✅ | gleicher Nummernraum wie `nk_position` (FR-2) |
 | `bezeichnung` | VARCHAR(150) | ✅ | |
-| `einheit` | VARCHAR(20) | ✅ | `M3` \| `KWH` \| `STUECK` |
+| `einheit` | VARCHAR(20) | ✅ | `M3` \| `M2` \| `KWH` \| `STUECK` |
 | `menge` | NUMERIC(12,3) | ✅ | `CHECK (menge >= 0)` |
 | `betrag_pro_einheit` | NUMERIC(12,4) | ✅ | Zeilenbetrag = `menge × betrag_pro_einheit` |
 
@@ -825,7 +837,7 @@ erscheinen.
 | Mieterblock | `NK_POSITION_HINZUFUEGEN`, `NK_KOSTENTOTAL`, `NK_KEINE_MIETER`, `NK_MIETER_OHNE_EINHEIT` |
 | Akonto und Saldo | `NK_AKONTO`, `NK_AKONTO_PRO_MONAT`, `NK_ANZAHL_MONATE`, `NK_KORREKTUR`, `NK_AKONTO_TOTAL`, `NK_NACHZAHLUNG`, `NK_GUTHABEN` |
 | Sperre | `NK_GESPERRT_HINWEIS`, `NK_FEHLER_ABGERECHNET` |
-| Mengeneinheit | Schlüssel für **`M3`** (die bestehenden `KWH`, `MONATE`, `STUECK` gibt es bereits) |
+| Mengeneinheit | Schlüssel für **`M3`** und **`M2`** (die bestehenden `KWH`, `MONATE`, `STUECK` gibt es bereits) |
 
 Die Liste ist der Mindestumfang; beim Umsetzen ergänzte Schlüssel folgen derselben Migration.
 

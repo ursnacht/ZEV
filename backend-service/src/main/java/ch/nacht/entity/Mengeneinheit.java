@@ -28,6 +28,18 @@ public enum Mengeneinheit {
     M3,
 
     /**
+     * Fläche in Quadratmetern — für die Nebenkostenabrechnung.
+     *
+     * <p>Anlass ist die <b>Kehrichtgrundgebühr</b>, die nach Wohnfläche verrechnet wird. Wie
+     * {@link #M3} eine gemessene Grösse und keine Pauschale: Die Fläche je Wohnung wird erfasst,
+     * der Betrag folgt daraus.
+     *
+     * <p>Wie {@code M3} und {@code CHF} <b>nicht</b> an einem {@link TarifTyp#ZUSATZ}-Tarif
+     * wählbar — die Tarifmaske bietet dort nur die Einheiten der Stromabrechnung an.
+     */
+    M2,
+
+    /**
      * Betrag in Schweizer Franken; angezeigt als „Fr.".
      *
      * <p>Nur für die Nebenkostenabrechnung und dort für <b>Umlagen</b>, deren verteilte Grösse
