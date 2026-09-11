@@ -86,9 +86,19 @@
   </div>
 
   <!-- ==================== 2. Allgemeine Positionen ==================== -->
-  <div class="zev-panel">
-    <h3 class="zev-panel__title">{{ 'NK_ALLGEMEINE_POSITIONEN' | translate }}</h3>
-    <div class="zev-panel__content">
+  <!-- Positionen UND ihre Zusammenstellung in einem aufklappbaren Panel: Sind die Positionen
+       erfasst, arbeitet man an den Mietern weiter, und die beiden Tabellen kosten dann nur
+       noch Platz. Aufgeklappt beim Oeffnen - anders als die Mieterbloecke: Hier wird zuerst
+       erfasst, und ein zugeklappter Erfassungsteil saehe aus wie eine leere Maske.
+       `zev-collapsible` liegt AUF dem Panel und nicht darin: Sonst haette der Abschnitt zwei
+       Rahmen und zwei Innenabstaende. Das Panel bringt nur den Abstand nach oben mit. -->
+  <div class="zev-panel zev-collapsible nk-positionen-panel">
+    <button type="button" class="zev-collapsible__header" (click)="togglePositionen()">
+      <span>{{ 'NK_ALLGEMEINE_POSITIONEN' | translate }}</span>
+      <span class="zev-collapsible__icon">{{ positionenOffen ? '▼' : '▶' }}</span>
+    </button>
+    @if (positionenOffen) {
+    <div class="zev-collapsible__content">
       @if (positionen.length > 0) {
         <table class="zev-table nk-positionen">
           <thead>
@@ -310,6 +320,7 @@
         </table>
       }
     </div>
+    }
   </div>
 
   <!-- ==================== 3. Mieterbloecke ==================== -->

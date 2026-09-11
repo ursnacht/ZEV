@@ -646,7 +646,23 @@ Service sichtbar und folgt dem bestehenden Muster des Org-Filters.
    „abgerechnet". Die Anzahl Wohnungen ist mit der Zahl der als Wohnung gekennzeichneten
    `CONSUMER`-Einheiten vorbelegt und überschreibbar; ein Hinweis nennt ihre Wirkung („bildet den
    Nenner der Umlage").
-2. **Allgemeine Positionen** — Tabelle mit Auswahl der Art je Zeile. Die Eingabefelder richten
+2. **Allgemeine Positionen** — **aufklappbarer Abschnitt** (`zev-collapsible`), der die Tabelle
+   der Positionen **und** ihre Zusammenstellung (FR-10) zusammen trägt. Die beiden gehören
+   zusammen: Die Zusammenstellung ist die Kontrollrechnung zu den Positionen darüber.
+   * **Beim Öffnen der Maske aufgeklappt** — anders als die Mieterblöcke. Dort sind es bis zu
+     dreissig Stück; hier ist es ein Abschnitt, und er ist der Ort, an dem erfasst wird. Zugeklappt
+     sähe die Maske nach dem Öffnen wie eine leere Seite aus.
+   * **Zuklappen lohnt sich später:** Stehen die Positionen, arbeitet man an den Mietern weiter,
+     und die beiden Tabellen kosten nur noch Platz — bei vielen Positionen mehrere
+     Bildschirmseiten, bevor der erste Mieter kommt.
+   * Wie bei den Mieterblöcken gilt der Zustand nur für die geöffnete Maske und wird **nicht
+     gespeichert**. Zugeklappt gehen **keine Eingaben verloren**: Die Positionen leben im
+     Komponentenzustand, nicht im DOM — Speichern ist auch im zugeklappten Zustand vollständig.
+   * `zev-collapsible` liegt **auf** dem Panel (`class="zev-panel zev-collapsible"`) und nicht
+     darin: Sonst hätte der Abschnitt zwei Rahmen und zwei Innenabstände. Das Panel bringt nur
+     den Abstand nach oben mit.
+
+   Inhalt des Abschnitts: Tabelle mit Auswahl der Art je Zeile. Die Eingabefelder richten
    sich nach der Art: Bei `UMLAGE` erscheinen Totalbetrag, Gesamtmenge und Einheit, bei
    `VERBRAUCH` Einheit und Betrag pro Einheit, bei `ANTEIL` nur der Totalbetrag, bei `ZUSCHLAG`
    nur der Prozentsatz. Nicht
@@ -1182,6 +1198,12 @@ nicht aufgeführt —, wohl aber im reinen Rechenservice ohne Datenbank.
       Fehlermeldung — und sie verschwindet nicht nach fünf Sekunden von selbst.
 * [ ] Bei abgeschlossener Abrechnung ist nur **Speichern** gesperrt; beide Wege zurück bleiben
       bedienbar.
+
+**Allgemeine Positionen aufklappen**
+* [ ] Beim Öffnen der Maske ist der Abschnitt „Allgemeine Positionen" **aufgeklappt**.
+* [ ] Ein Klick auf die Kopfzeile klappt Positionstabelle **und** Zusammenstellung zusammen zu, ein weiterer wieder auf.
+* [ ] Die Mieterblöcke bleiben davon unberührt — sie sind ein eigener Abschnitt.
+* [ ] Im zugeklappten Zustand gespeicherte Daten sind vollständig: Positionen und Werte stehen nach dem Aufklappen unverändert da.
 
 **Mieterblöcke aufklappen**
 * [ ] Beim Öffnen der Maske sind **alle** Mieterblöcke geschlossen.

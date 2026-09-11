@@ -180,8 +180,9 @@ async function waehleArt(select: Locator, art: Positionsart): Promise<void> {
 async function fuegePositionHinzu(page: Page, art: Positionsart,
                                   bezeichnung: string): Promise<void> {
     const zeilenVorher = await page.locator('.nk-positionen tbody tr').count();
-    // „Position hinzufuegen" ist die erste sekundaere Schaltflaeche im Positionen-Panel.
-    await page.locator('.zev-panel .zev-button--secondary').first().click();
+    // „Position hinzufuegen" ist die erste sekundaere Schaltflaeche im Positionen-Panel. Das
+    // Panel ausdruecklich benannt: `.zev-panel` allein traefe auch „Angaben zur Abrechnung".
+    await page.locator('.nk-positionen-panel .zev-button--secondary').first().click();
     const zeilen = page.locator('.nk-positionen tbody tr');
     await expect(zeilen).toHaveCount(zeilenVorher + 1, { timeout: 10000 });
 
@@ -304,6 +305,19 @@ async function betragSobaldGesetzt(feld: Locator): Promise<string> {
 }
 
 /**
+ * Die aufklappbaren Blöcke der Mieter — und **nur** sie.
+ *
+ * Seit die „Allgemeinen Positionen" ebenfalls in einem `zev-collapsible` liegen, trifft ein
+ * blosses `.zev-collapsible` auch jenes Panel — und zwar zuerst: Es steht im DOM **vor** den
+ * Mieterblöcken, ein `.first()` landete also dort. Unterschieden wird über `.nk-mieterkopf`, die
+ * Kopfzeile, die nur ein Mieterblock trägt. Bewusst kein Index: Der hinge an der Reihenfolge der
+ * Abschnitte und bräche beim nächsten neuen Abschnitt wieder.
+ */
+function mieterbloecke(page: Page): Locator {
+    return page.locator('.zev-collapsible:has(.nk-mieterkopf)');
+}
+
+/**
  * Öffnet den ersten Mieterblock und gibt dessen Inhalt zurück.
  *
  * Idempotent: Der Aufklappzustand überlebt das Speichern (er ist Zustand der Maske, nicht der
@@ -311,10 +325,11 @@ async function betragSobaldGesetzt(feld: Locator): Promise<string> {
  * Test scheiterte an einem Inhalt, den er selbst zugeklappt hat.
  */
 async function oeffneErstenMieterblock(page: Page) {
-    const kopf = page.locator('.zev-collapsible__header').first();
+    const block = mieterbloecke(page).first();
+    const kopf = block.locator('.zev-collapsible__header');
     await expect(kopf).toBeVisible({ timeout: 10000 });
 
-    const inhalt = page.locator('.zev-collapsible__content').first();
+    const inhalt = block.locator('.zev-collapsible__content');
     if (!await inhalt.isVisible().catch(() => false)) {
         await kopf.click();
     }
@@ -710,15 +725,61 @@ test.describe('Nebenkostenabrechnung - Maske', () => {
         await expect(page.locator('.zev-message--error')).toBeVisible({ timeout: 10000 });
     });
 
+    /**
+     * Positionen und Zusammenstellung liegen in **einem** aufklappbaren Abschnitt.
+     *
+     * Anfangs offen - anders als die Mieterbloecke: Hier wird erfasst, und ein zugeklappter
+     * Erfassungsteil saehe nach dem Oeffnen wie eine leere Maske aus. Zugeklappt verschwinden
+     * BEIDE Tabellen, und die Eingaben ueberleben es: Sie leben im Komponentenzustand, nicht im
+     * DOM.
+     */
+    test('should collapse the positions and their overview together', async ({ page }) => {
+        const bezeichnung = neueBezeichnung('Aufklappen');
+        await navigateToListe(page);
+        await erstelleAbrechnung(page, bezeichnung);
+
+        await fuegePositionHinzu(page, 'UMLAGE', 'E2E A-Umlage');
+        await page.locator('.nk-positionen tbody tr').first()
+            .locator('input[type="number"]').first().fill('1000');
+
+        const panel = page.locator('.nk-positionen-panel');
+        const kopf = panel.locator('.zev-collapsible__header');
+
+        // Offen: beide Tabellen da.
+        await expect(page.locator('.nk-positionen')).toBeVisible();
+        await expect(page.locator('.nk-kontrolle')).toBeVisible();
+
+        // Zuklappen: beide weg, in einem Zug.
+        await kopf.click();
+        await expect(panel.locator('.zev-collapsible__content')).toHaveCount(0);
+        await expect(page.locator('.nk-positionen')).toHaveCount(0);
+        await expect(page.locator('.nk-kontrolle')).toHaveCount(0);
+
+        // Die Mieterbloecke bleiben davon unberuehrt - sie sind ein eigener Abschnitt.
+        await expect(mieterbloecke(page).first()).toBeVisible();
+
+        // Zugeklappt speichern: Die Eingaben sind nicht verloren.
+        await clearMessages(page);
+        await speichernUnten(page).click();
+        await erwarteErfolg(page, 'Zugeklappt speichern');
+
+        await kopf.click();
+        await expect(page.locator('.nk-positionen tbody tr')).toHaveCount(1);
+        await expect(page.locator('.nk-positionen tbody tr').first()
+            .locator('input[type="number"]').first()).toHaveValue('1000');
+        await expect(verteiltFuer(page, 'E2E A-Umlage')).not.toHaveText('');
+    });
+
     test('should keep tenant blocks collapsed after loading', async ({ page }) => {
         const bezeichnung = neueBezeichnung('Zugeklappt');
         await navigateToListe(page);
         await erstelleAbrechnung(page, bezeichnung);
 
-        // Nach dem Speichern erscheinen die Bloecke - alle geschlossen.
-        await expect(page.locator('.zev-collapsible__header').first())
+        // Nach dem Speichern erscheinen die Bloecke - alle geschlossen. Geprueft werden die
+        // MIETERbloecke: Das Positionen-Panel ist ebenfalls ein Collapsible und ist offen.
+        await expect(mieterbloecke(page).first().locator('.zev-collapsible__header'))
             .toBeVisible({ timeout: 15000 });
-        await expect(page.locator('.zev-collapsible__content')).toHaveCount(0);
+        await expect(mieterbloecke(page).locator('.zev-collapsible__content')).toHaveCount(0);
     });
 });
 
@@ -1342,8 +1403,9 @@ test.describe('Nebenkostenabrechnung - Kopieren', () => {
         await speichernUnten(page).click();
         await erwarteErfolg(page, 'Zeitraum verschieben');
 
-        // Keine Mieterbloecke mehr - und damit auch kein Akonto.
-        await expect(page.locator('.zev-collapsible__header')).toHaveCount(0);
+        // Keine Mieterbloecke mehr - und damit auch kein Akonto. Das Positionen-Panel bleibt
+        // stehen, es haengt nicht am Zeitraum.
+        await expect(mieterbloecke(page)).toHaveCount(0);
 
         // Zurueck in den alten Zeitraum: Der Block ist wieder da, das Akonto ist weg.
         await page.locator('#datumVon').fill(DATUM_VON);

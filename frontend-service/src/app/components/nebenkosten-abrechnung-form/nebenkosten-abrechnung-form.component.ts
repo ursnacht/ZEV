@@ -126,6 +126,20 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
    */
   private offeneMieter = new Set<number>();
 
+  /**
+   * Aufklappzustand des Abschnitts „Allgemeine Positionen" samt seiner Zusammenstellung.
+   *
+   * <p><b>Anfangs offen</b> — anders als die Mieterblöcke. Dort sind es bis zu dreissig Stück,
+   * hier ein einziger Abschnitt, und er ist der Ort, an dem erfasst wird: Zugeklappt sähe die
+   * Maske nach dem Öffnen leer aus. Zuklappen lohnt sich, sobald die Positionen stehen und man an
+   * den Mietern weiterarbeitet — die beiden Tabellen kosten dann nur noch Platz.
+   *
+   * <p>Wie bei den Mieterblöcken gilt der Zustand nur für die geöffnete Maske und wird nicht
+   * gespeichert. Zugeklappt gehen <b>keine Eingaben verloren</b>: Die Positionen leben im
+   * Komponentenzustand, nicht im DOM.
+   */
+  positionenOffen = true;
+
   constructor(
     private nebenkostenService: NebenkostenService,
     private translationService: TranslationService
@@ -153,6 +167,11 @@ export class NebenkostenAbrechnungFormComponent implements OnInit {
   /** Blendet den Sperrhinweis für die geöffnete Maske aus; beim nächsten Öffnen ist er zurück. */
   dismissHinweisAbgerechnet(): void {
     this.hinweisAbgerechnetSichtbar = false;
+  }
+
+  /** Klappt „Allgemeine Positionen" samt Zusammenstellung auf oder zu. */
+  togglePositionen(): void {
+    this.positionenOffen = !this.positionenOffen;
   }
 
   istMieterOffen(mieterId: number): boolean {

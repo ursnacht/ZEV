@@ -184,7 +184,42 @@ describe('NebenkostenAbrechnungFormComponent', () => {
 
     it('should keep all tenant blocks collapsed', () => {
       expect(component.istMieterOffen(100)).toBe(false);
-      expect(fixture.nativeElement.querySelector('.zev-collapsible__content')).toBeNull();
+      // Geprueft wird die Mieterzeilen-Tabelle und nicht `.zev-collapsible__content`: Seit die
+      // „Allgemeinen Positionen" ebenfalls ein Collapsible sind - und ein OFFENES -, faende ein
+      // globales `__content` jenes Panel und der Test scheiterte an der falschen Stelle.
+      // `.nk-mieterzeilen` gibt es nur im Inhalt eines Mieterblocks.
+      expect(fixture.nativeElement.querySelector('.nk-mieterzeilen')).toBeNull();
+    });
+
+    /**
+     * Der Abschnitt „Allgemeine Positionen" ist anfangs OFFEN - anders als die Mieterbloecke.
+     *
+     * Hier wird erfasst; zugeklappt saehe die Maske nach dem Oeffnen wie eine leere Seite aus.
+     * Der Test haelt die Asymmetrie fest, damit sie nicht als Versehen „korrigiert" wird.
+     */
+    it('should keep the positions section expanded', () => {
+      expect(component.positionenOffen).toBe(true);
+      expect(fixture.nativeElement.querySelector('.nk-positionen-panel')).not.toBeNull();
+    });
+  });
+
+  describe('togglePositionen', () => {
+    it('should collapse and expand the positions section', () => {
+      component.togglePositionen();
+      expect(component.positionenOffen).toBe(false);
+
+      component.togglePositionen();
+      expect(component.positionenOffen).toBe(true);
+    });
+
+    /** Zugeklappt gehen keine Eingaben verloren: Die Positionen leben im Komponentenzustand. */
+    it('should not touch the positions when collapsed', () => {
+      const vorher = component.positionen.length;
+      component.togglePositionen();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.nk-positionen')).toBeNull();
+      expect(component.positionen.length).toBe(vorher);
     });
   });
 

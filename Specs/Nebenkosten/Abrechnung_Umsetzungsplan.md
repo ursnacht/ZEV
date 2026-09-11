@@ -933,3 +933,47 @@ beide sind richtiggestellt.
 statt `null` ohne Umlage, `0.00` bei voller Belegung), Vorschau-Spec 56 (1 neu), Maskentest-Fixture
 um das Feld ergänzt. E2E-Test angelegt, aber noch nicht gelaufen — er braucht den neuen Stand im
 Container.
+
+## Nachtrag: Positionen und Zusammenstellung in einem aufklappbaren Abschnitt (FR-7)
+
+`class="zev-panel zev-collapsible nk-positionen-panel"` — die Collapsible-Klasse liegt **auf** dem
+Panel, nicht darin. Verschachtelt hätte der Abschnitt zwei Rahmen und zwei Innenabstände; `zev-panel`
+bringt für sich nur `margin-top` mit, `zev-collapsible` Rahmen und Kopfzeile. Kein neues CSS: Die
+Klassen und die Kopfzeilen-Optik stehen im Design System, das Pfeilzeichen (`▼`/`▶`) folgt der
+Bauart der Mieterblöcke.
+
+Das hat als Nebenwirkung, dass der bisherige Inhalt **nicht neu eingerückt** werden musste — die
+Verschachtelungstiefe bleibt gleich (Panel → Content). Ein Reindent über 220 Zeilen hätte die
+eigentliche Änderung im Diff verschwinden lassen.
+
+**Aufgeklappt beim Öffnen** — anders als die Mieterblöcke. Dort sind es bis zu dreissig Stück; hier
+ist es der Ort, an dem erfasst wird, und zugeklappt sähe die Maske nach dem Öffnen wie eine leere
+Seite aus. Ein Unit-Test hält die Asymmetrie fest, damit sie nicht als Versehen „korrigiert" wird.
+
+### Der teure Teil: `.zev-collapsible` war nicht mehr eindeutig
+
+Das Positionen-Panel steht im DOM **vor** den Mieterblöcken. Jeder Locator der Form
+`.zev-collapsible__header` oder `.zev-collapsible__content` mit `.first()` landete damit im neuen
+Panel statt beim ersten Mieter — und weil das Panel offen ist, schlug auch jede Zählung auf 0 fehl.
+Betroffen waren vier Stellen, alle stumm falsch statt laut:
+
+| Ort | Vorher | Jetzt |
+|---|---|---|
+| `oeffneErstenMieterblock` | `.zev-collapsible__header` `.first()` | über `mieterbloecke(page)` |
+| „tenant blocks collapsed" (E2E) | `__content` `toHaveCount(0)` | im Mieterblock gezählt |
+| „keine Blöcke mehr" (E2E) | `__header` `toHaveCount(0)` | `mieterbloecke(page)` |
+| `should keep all tenant blocks collapsed` (Unit) | `querySelector('.zev-collapsible__content')` | `.nk-mieterzeilen` |
+
+Neuer Helfer `mieterbloecke(page)` = `.zev-collapsible:has(.nk-mieterkopf)` — unterschieden wird
+über die Kopfzeile, die **nur** ein Mieterblock trägt. Bewusst kein Index: Der hinge an der
+Reihenfolge der Abschnitte und bräche beim nächsten neuen Abschnitt wieder. Im Unit-Test steht
+statt `:has()` die Mieterzeilen-Tabelle, weil jsdom `:has()` nicht überall unterstützt.
+
+`fuegePositionHinzu` greift jetzt `.nk-positionen-panel .zev-button--secondary` statt
+`.zev-panel …` — funktioniert hätte beides, aber „die erste sekundäre Schaltfläche im ersten Panel"
+ist eine Beschreibung, die beim nächsten Knopf in „Angaben zur Abrechnung" kippt.
+
+**Tests:** Maskentests 148 (2 neu für `togglePositionen`, 1 neu für den Vorgabezustand, 1
+korrigiert), neuer E2E-Test `should collapse the positions and their overview together` — beide
+Tabellen verschwinden zusammen, die Mieterblöcke bleiben unberührt, und im zugeklappten Zustand
+gespeicherte Eingaben stehen nach dem Aufklappen unverändert da.
