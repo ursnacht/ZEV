@@ -1,5 +1,23 @@
 # Batteriespeicher
 
+> **Zum Zuschnitt vor der Umsetzung lesen.** Diese Spec beschreibt zwei sehr verschiedene Teile:
+>
+> * **Sichtbarkeit** — Einheiten-Typ (FR-1), Messung und Aggregation (FR-2), Statistik-Zeilen
+>   (FR-4.2), keine Verrechnung (FR-5), Übersetzungen (FR-6). Gilt in **beiden** Verteilmodi und
+>   ist das, was gebraucht wird, damit die Batterie in den Daten überhaupt vorkommt.
+> * **Umbau der Solarverteilung** — FR-3 und die angepassten Vergleichswerte in FR-4.3. Sie
+>   betreffen **ausschliesslich** den Verteilmodus `PRODUCER_MESSUNG`.
+>
+> **Der zweite Teil nützt heute keinem Mandanten mit Batterie:** Die Batterie steht bei Hene, und
+> dort gilt `BILANZ` (FR-3a). Längerfristig soll ohnehin **nur noch der Bilanzmodus** unterstützt
+> werden (Absicht, Stand 13.09.2026; beide Mandanten haben bereits Bezugs- und
+> Rücklieferungs-Einheiten, der Umstieg wäre ein Konfigurationswert). FR-3 und FR-4.3 wären damit
+> Arbeit an einem Pfad, der verschwindet.
+>
+> **Empfehlung:** Zuerst — und womöglich ausschliesslich — den Sichtbarkeitsteil umsetzen. Er ist
+> auch die Grundlage dafür, die Wirkung der Steuerung aus `Specs/Einspeisesteuerung.md` zu
+> beurteilen.
+
 ## 1. Ziel & Kontext - Warum wird das Feature benötigt?
 * **Was soll erreicht werden:** Ein Batteriespeicher wird als neuer Einheiten-Typ **`SPEICHER`** in den ZEV eingebunden. Sein Zähler liefert Ladung und Entladung über den bestehenden MQTT-Pfad (zwei Register). Die Solarverteilung berücksichtigt den Speicher **nachrangig**: Consumer werden zuerst bedient, nur der verbleibende PV-Überschuss gilt als ZEV-Ladung; entladener Strom wird wie Produktion auf die Consumer verteilt. Statistik und Bilanz-Vergleiche werden um Ladung/Entladung erweitert. Die Speicher-Einheit selbst wird **nicht verrechnet**.
 * **Warum machen wir das:** Ein Speicher erhöht die Eigenverbrauchsquote des ZEV (PV-Überschuss wird gespeichert statt rückgeliefert und später im ZEV konsumiert). Damit Abrechnung und Plausibilisierung (Bilanz-Vergleiche) korrekt bleiben, muss der Speicher energetisch sauber modelliert sein.
@@ -40,6 +58,10 @@
 
 > **Gilt ausschliesslich für den Verteilmodus `PRODUCER_MESSUNG`.** Für `BILANZ` siehe FR-3a — dort
 > ändert sich an der Verteilung **nichts**.
+>
+> **Vor dem Bauen den Zuschnitt prüfen** (Kasten am Dokumentanfang): Dieser Abschnitt ist der
+> aufwendigste der Spec, nützt aber keinem Mandanten, der heute eine Batterie hat — und der Modus,
+> auf den er zielt, soll längerfristig entfallen.
 
 Pro Zeitintervall mit den Grössen `P` = PV-Produktion (Betrag), `E` = Entladung (Betrag, bei `total < 0`), `L` = Ladung (bei `total > 0`), `V` = Summe Consumer-Verbrauch:
 1. **Verteilbare Energie:** `Q = P + E`. Die Entladung wird der verteilbaren Produktion zugeschlagen (gespeicherter PV-Strom).
@@ -99,7 +121,7 @@ dieses Features.
    > **Ladung und Entladung erscheinen in beiden Verteilmodi** — sie kommen unmittelbar aus den Messwerten der Speicher-Einheit (FR-3a).
    > **Die Netzladung dagegen nur bei `PRODUCER_MESSUNG`:** Sie ist als `Ladung − ZEV-Ladung` definiert, und eine ZEV-Ladung entsteht nur in der Verteilung nach FR-3.3. Im Modus `BILANZ` gibt es sie nicht — dort entfällt die Zeile. Eine Näherung wäre denkbar (§8), ist aber nicht Teil dieser Spec: Eine gerechnete Zahl, die anders zustande kommt als die gleichnamige im anderen Modus, wäre schlimmer als keine.
    - Alle drei mit Balken (gleiche Skala), Web + PDF.
-3. **Angepasste Vergleichswerte** (Summen-Vergleich gegen die Bilanz-Einheiten) — **nur im Modus `PRODUCER_MESSUNG`**. Im Modus `BILANZ` ist `zev(Producer)` als `|Produktion| − |Rücklieferung|` definiert (`Bilanzmodell.md` FR-2.4) und damit eine andere Grösse; die Formeln unten würden dort nicht aufgehen. Dort bleiben die Vergleichswerte unverändert:
+3. **Angepasste Vergleichswerte** (Summen-Vergleich gegen die Bilanz-Einheiten) — **nur im Modus `PRODUCER_MESSUNG`**, und damit wie FR-3 an einem auslaufenden Pfad (Kasten am Dokumentanfang). Im Modus `BILANZ` ist `zev(Producer)` als `|Produktion| − |Rücklieferung|` definiert (`Bilanzmodell.md` FR-2.4) und damit eine andere Grösse; die Formeln unten würden dort nicht aufgehen. Dort bleiben die Vergleichswerte unverändert:
    - `Rücklieferung (berechnet) = |ProducerTotal| + Entladung − zev(Producer) − Σ|zev(Speicher)|` — Produktion und Entladung, die weder von Consumern konsumiert noch (als PV) in den Speicher geladen wurden. **`Σ|zev(Speicher)|` = die je Intervall absolut genommene und dann summierte zev(Speicher)-Grösse** (nicht `|Σ zev|`): über Ladungs-Intervalle ergibt das die ZEV-Ladung, über Entlade-Intervalle `Σ(D × E/Q)`. Beide Anteile mindern die Rücklieferung (PV in die Batterie geladen bzw. entladener Strom im ZEV konsumiert). Da die ZEV-Ladung nur im zev(Speicher) steht (FR-3.4) und **nicht** im zev(Producer) (FR-3.5), wird sie genau einmal abgezogen. Kontrolle Ladungs-Intervall (E=0): `P − D − ZEV-Ladung` ✓ (z.B. `P=10, V=6, L=5`: `10 − 6 − 4 = 0`); Entladungs-Intervall (L=0): `P + E − D` ✓.
    - `Bezug von VNB (berechnet) = ConsumerTotal − zev(Consumer) + Netzladung` mit `Netzladung = Ladung − ZEV-Ladung` (= `Ladung − zev(Speicher geladen)` über die Ladungs-Intervalle).
    - Toleranz unverändert 0.1 kWh; ohne Speicher-Einheit sind die Formeln identisch zu heute (`L = E = 0`).
