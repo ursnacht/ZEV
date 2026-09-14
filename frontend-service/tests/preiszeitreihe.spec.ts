@@ -88,6 +88,18 @@ function spannenButton(page: Page, text: string) {
 }
 
 /**
+ * Ein Datum als `yyyy-MM-dd` in **Ortszeit**, um `tage` verschoben.
+ *
+ * Bewusst nicht `toISOString()`: Das rechnet nach UTC und liefert vor 02:00 Ortszeit den Vortag.
+ */
+function isoTag(tage = 0): string {
+    const d = new Date();
+    d.setDate(d.getDate() + tage);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        + `-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
  * Zahl der gezeichneten Pixel im Diagramm.
  *
  * Der einzige Weg, „das Diagramm zeichnet etwas" ohne Bildvergleich zu prüfen: Ein leeres Canvas
@@ -334,6 +346,24 @@ test.describe('Preiszeitreihe - Abruf und Darstellung', () => {
 
         const geladen = await holePreise(page);
         test.skip(!geladen, 'Quelle der Einspeisepreise nicht erreichbar - kein Datenbestand');
+
+        // NICHT auf der Vorgabespanne (heute) pruefen: Die Quelle liefert nicht fuer jeden Tag
+        // Preise - am 12. und 14.09.2026 fehlten sie vollstaendig, und der Test scheiterte an einem
+        // leeren Diagramm, obwohl die Anwendung korrekt den Hinweis zeigte. Geprueft werden soll,
+        // OB gezeichnet wird, nicht ob eine fremde Quelle heute geliefert hat. Ein Fenster ueber
+        // 30 Tage trifft die Historie zuverlaessig.
+        const von = isoTag(-30);
+        const bis = isoTag();
+        const antwort = antwortFuer(page, von, bis);
+        await page.locator('#preisVon').fill(von);
+        await page.locator('#preisBis').fill(bis);
+        await antwort;
+
+        // Auch 30 Tage koennen leer sein (frische Datenbank). Dann ist nichts zu zeichnen und der
+        // Test hat keine Grundlage - ein Fehlschlag wuerde hier nichts ueber den Code aussagen.
+        const hinweis = page.locator(`${PANEL}__hinweis`);
+        test.skip(await hinweis.isVisible().catch(() => false),
+            'Keine Preise in den letzten 30 Tagen - kein Datenbestand zum Zeichnen');
 
         await expect(page.locator(`${DIAGRAMM} canvas`)).toBeVisible({ timeout: 20000 });
         const alsLinie = await gezeichnetePixel(page);
