@@ -25,6 +25,25 @@ export interface ChartFarben {
   sekundaer: string;
   /** Fläche unter der ersten Reihe, wo verwendet */
   flaeche: string;
+  /**
+   * Dritte Datenreihe — kräftiges Rot, deutlich abgesetzt von Grün und Blau.
+   *
+   * Für Diagramme mit **drei** Reihen: `primaer` und `flaeche` stammen aus derselben Farbfamilie
+   * (Grün und Hellgrün) und sind nebeneinander kaum zu unterscheiden. Wer eine dritte Reihe
+   * braucht, nimmt diese statt `flaeche`.
+   */
+  akzent: string;
+  /**
+   * Erstes **Zustandsband** — Orange, ausserhalb der Farbfamilien der Datenreihen.
+   *
+   * Zustandsbänder zeigen keine Messgrösse, sondern einen Sollzustand. Sie dürfen deshalb **nicht**
+   * die Farben der Kurven tragen: In der Einspeisesteuerung waren Band und Kurve zuerst beide grün
+   * bzw. beide blau — in der Legende standen „Produktion" und „Batterieladung" ununterscheidbar
+   * nebeneinander.
+   */
+  bandEins: string;
+  /** Zweites Zustandsband — neutrales Grau, klar abgesetzt von {@link bandEins}. */
+  bandZwei: string;
 }
 
 /**
@@ -41,6 +60,9 @@ export function chartFarben(): ChartFarben {
     gitter: token('--color-gray-300', '#e0e0e0'),
     primaer: token('--color-primary', '#4CAF50'),
     sekundaer: token('--color-secondary', '#2196F3'),
-    flaeche: token('--color-primary-light', '#81C784')
+    flaeche: token('--color-primary-light', '#81C784'),
+    akzent: token('--color-danger', '#f44336'),
+    bandEins: token('--color-warning', '#FF9800'),
+    bandZwei: token('--color-gray-600', '#666666')
   };
 }

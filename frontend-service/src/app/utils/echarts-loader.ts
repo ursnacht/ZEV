@@ -48,6 +48,12 @@ export async function ladeECharts(): Promise<EChartsCore | null> {
       komponenten.TooltipComponent,
       komponenten.DataZoomComponent,
       komponenten.LegendComponent,
+      // Zustandsbänder der Einspeisesteuerung. Balken taugen dafür nicht: Auf einer Zeitachse
+      // zentriert ECharts sie auf den Datenpunkt und ordnet mehrere Balkenserien NEBENeinander
+      // an — zwei Bänder lagen dadurch eine Viertelstunde auseinander, obwohl sie dasselbe
+      // Intervall beschrieben. markArea zeichnet exakte Von-bis-Rechtecke und kostet hier
+      // nichts: `echarts/components` liegt ohnehin als ganzer Chunk vor.
+      komponenten.MarkAreaComponent,
       renderer.CanvasRenderer
     ]);
     echarts = core;

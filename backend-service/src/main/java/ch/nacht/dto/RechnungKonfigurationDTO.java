@@ -31,6 +31,24 @@ public class RechnungKonfigurationDTO {
      */
     private Verteilmodus verteilmodus;
 
+    /**
+     * Konfiguration der Einspeisesteuerung (Specs/Einspeisesteuerung.md, FR-7). Nullable:
+     * Bestandsmandanten haben den Block nicht, dann gelten die Vorgaben.
+     *
+     * <p><b>Dieses Feld MUSS hier stehen, sonst geht der Block verloren.</b>
+     * {@code EinstellungenService.toJson()} schreibt mit {@code writeValueAsString(dto)} die
+     * <b>gesamte</b> {@code konfiguration}-Spalte neu — aus diesem DTO. Was es nicht als Feld
+     * kennt, überlebt das erste Speichern der Rechnungsdaten nicht: Die Steuerungswerte wären weg,
+     * der Job liefe still mit den Vorgaben weiter, und im Protokoll stünde ein plausibel
+     * aussehender Schwellwert. Dasselbe gilt für {@link #verteilmodus} und für jeden künftigen
+     * Block.
+     *
+     * <p>Der Klassenname passt damit nicht mehr zum Inhalt — die Spalte trägt längst mehr als die
+     * Rechnungskonfiguration. Das ist hinzunehmen, aber beim Lesen zu wissen.
+     */
+    @Valid
+    private SteuerKonfigurationDTO steuerung;
+
     public RechnungKonfigurationDTO() {
     }
 
@@ -70,6 +88,14 @@ public class RechnungKonfigurationDTO {
 
     public void setVerteilmodus(Verteilmodus verteilmodus) {
         this.verteilmodus = verteilmodus;
+    }
+
+    public SteuerKonfigurationDTO getSteuerung() {
+        return steuerung;
+    }
+
+    public void setSteuerung(SteuerKonfigurationDTO steuerung) {
+        this.steuerung = steuerung;
     }
 
     /**

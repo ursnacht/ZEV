@@ -60,6 +60,8 @@ describe('ladeECharts', { timeout: 20_000 }, () => {
     expect(komponenten.TooltipComponent).toBeDefined();
     expect(komponenten.DataZoomComponent).toBeDefined();
     expect(komponenten.LegendComponent).toBeDefined();
+    // Zustandsbaender der Einspeisesteuerung - fehlte die Registrierung, blieben sie stumm leer.
+    expect(komponenten.MarkAreaComponent).toBeDefined();
     expect(renderer.CanvasRenderer).toBeDefined();
   });
 

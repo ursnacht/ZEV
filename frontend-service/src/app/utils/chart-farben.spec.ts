@@ -64,4 +64,22 @@ describe('chartFarben', () => {
     // Zwei Reihen im selben Diagramm muessen unterscheidbar bleiben.
     expect(farben.primaer).not.toBe(farben.sekundaer);
   });
+
+  it('should keep every colour of one chart distinguishable', () => {
+    const farben = chartFarben();
+
+    // Die Einspeisesteuerung zeigt FUENF Farben nebeneinander: drei Kurven und zwei
+    // Zustandsbaender. Zwei davon waren gleich - in der Legende standen "Produktion" und
+    // "Batterieladung" beide gruen, "Verbrauch" und "Einspeisung" beide blau. Der bisherige Test
+    // verglich nur zwei Farben und sah das nicht.
+    const verwendet = [
+      farben.primaer,    // Produktion
+      farben.sekundaer,  // Verbrauch
+      farben.akzent,     // Preis
+      farben.bandEins,   // Batterieladung
+      farben.bandZwei    // Einspeisung
+    ];
+
+    expect(new Set(verwendet).size).toBe(verwendet.length);
+  });
 });

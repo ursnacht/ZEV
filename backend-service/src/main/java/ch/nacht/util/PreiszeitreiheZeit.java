@@ -48,10 +48,35 @@ public final class PreiszeitreiheZeit {
     }
 
     /**
-     * Gespeicherten UTC-Zeitpunkt als Ortszeit.
+     * Ortszeit (Europe/Zurich) nach <b>UTC</b> — die Gegenrichtung zu
+     * {@link #nachOrtszeit(LocalDateTime)}.
      *
-     * @param utc Zeitpunkt in UTC, darf {@code null} sein
-     * @return derselbe Zeitpunkt in Europe/Zurich, oder {@code null}
+     * <p>Gebraucht, sobald Daten in Ortszeit auf die Preiszeitreihe treffen: {@code messwerte.zeit}
+     * und {@code steuerentscheid.zeit_von} sind Ortszeit, {@code preiszeitreihe.zeit_von} dagegen
+     * UTC. Ohne ausdrückliche Umrechnung entsteht ein stiller Versatz von ein bis zwei Stunden —
+     * die Zahlen sehen plausibel aus, gehören aber zu verschiedenen Zeitpunkten.
+     *
+     * <p><b>An der Zeitumstellung nicht eindeutig:</b> In der Nacht der Rückstellung tritt eine
+     * Ortszeit zweimal auf; {@code atZone} wählt dann den <b>früheren</b> Zeitpunkt. Das System
+     * nimmt das in Kauf — {@code messwerte} und {@code zaehler_rohdaten} führen ihre Zeitstempel
+     * seit jeher so, und eine abweichende Konvention für eine einzelne Tabelle hat schon einmal
+     * mehr gekostet, als sie wert war (Specs/Einspeisesteuerung.md, §5).
+     *
+     * @param ortszeit Zeitpunkt in Europe/Zurich; {@code null} ergibt {@code null}
+     * @return derselbe Zeitpunkt in UTC
+     */
+    public static LocalDateTime nachUtc(LocalDateTime ortszeit) {
+        return ortszeit == null
+                ? null
+                : ortszeit.atZone(ZONE).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
+    }
+
+    /**
+     * Gespeicherten UTC-Zeitpunkt als Ortszeit — die Gegenrichtung zu
+     * {@link #nachUtc(LocalDateTime)}. Diese Richtung ist immer eindeutig.
+     *
+     * @param utc Zeitpunkt in UTC; {@code null} ergibt {@code null}
+     * @return derselbe Zeitpunkt in Europe/Zurich
      */
     public static LocalDateTime nachOrtszeit(LocalDateTime utc) {
         return utc == null

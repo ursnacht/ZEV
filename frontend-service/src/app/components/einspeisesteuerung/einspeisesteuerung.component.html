@@ -1,0 +1,152 @@
+<div class="zev-container">
+  <h1>
+    <app-icon name="zap" size="lg"></app-icon>
+    {{ 'EINSPEISESTEUERUNG' | translate }}
+  </h1>
+
+  <!-- Die Steuerung schaltet nichts. Der Hinweis steht dauerhaft da, damit niemand das Protokoll
+       fuer eine Aufzeichnung tatsaechlicher Schaltvorgaenge haelt. -->
+  <div class="zev-message zev-message--info zev-message--statisch">
+    <span>{{ 'STEUERUNG_TROCKENLAUF_HINWEIS' | translate }}</span>
+  </div>
+
+  <!-- `WithMessage` kennt kein `messagePersistent`: Erfolgsmeldungen verschwinden dort nach
+       5 Sekunden von selbst, Fehler bleiben stehen und werden weggeklickt. -->
+  @if (message) {
+    <div class="zev-message zev-message--dismissible"
+      [ngClass]="'zev-message--' + messageType" (click)="dismissMessage()">
+      <span>{{ message | translate }}</span>
+      <span class="zev-message__dismiss">&times;</span>
+    </div>
+  }
+
+  <div class="zev-date-range-row">
+    <div class="zev-form-group">
+      <label for="datum">{{ 'DATUM' | translate }}</label>
+      <input type="date" id="datum" class="zev-input" [(ngModel)]="datum" (change)="ladeTag()" />
+    </div>
+    <button type="button" class="zev-button zev-button--secondary" (click)="vorherigerTag()">
+      <app-icon name="chevron-left"></app-icon>
+    </button>
+    <button type="button" class="zev-button zev-button--secondary" (click)="naechsterTag()">
+      <app-icon name="chevron-right"></app-icon>
+    </button>
+    <div class="zev-form-group">
+      <label for="simSchwellwert">{{ 'STEUERUNG_SCHWELLWERT' | translate }}</label>
+      <input type="number" id="simSchwellwert" class="zev-input" step="0.00001"
+        [(ngModel)]="simulationSchwellwert" />
+    </div>
+    <button type="button" class="zev-button zev-button--primary"
+      [disabled]="simulationSchwellwert == null || simulationLaeuft" (click)="rechneNach()">
+      <app-icon name="check"></app-icon>
+      {{ 'STEUERUNG_NACHRECHNEN' | translate }}
+    </button>
+    @if (simuliertMitSchwellwert != null) {
+      <button type="button" class="zev-button zev-button--secondary" (click)="zeigeAufzeichnung()">
+        <app-icon name="refresh-cw"></app-icon>
+        {{ 'STEUERUNG_AUFZEICHNUNG_ZEIGEN' | translate }}
+      </button>
+    }
+  </div>
+
+  <!-- Diagramm und Tabelle zeigen dann eine RECHNUNG, kein Protokoll. Ohne diesen Hinweis liesse
+       sich beides nicht unterscheiden - die Darstellung ist identisch. Der Schwellwert steht
+       ausdruecklich darin, weil er beim Blaettern erhalten bleibt. -->
+  @if (simuliertMitSchwellwert != null) {
+    <div class="zev-message zev-message--warning zev-message--statisch">
+      <span>{{ 'STEUERUNG_SIMULIERTE_ANSICHT' | translate }}
+        {{ preis(simuliertMitSchwellwert) }}</span>
+    </div>
+  }
+
+  <!-- Der Behaelter bleibt IMMER im DOM: ECharts braucht ein gemessenes Element. Steht er hinter
+       einem `@if`, existiert er im Moment des Zeichnens noch nicht - `zeichne()` bricht dann still
+       ab, und die Seite zeigt Tabelle ohne Diagramm. Genau das ist hier passiert. Ladezustand und
+       Leermeldung liegen deshalb NEBEN dem Behaelter, nicht an seiner Stelle. -->
+  <div class="zev-panel zev-panel--chart">
+    <div class="zev-panel__content">
+      <div #diagramm class="steuerung-diagramm"></div>
+      @if (loading) {
+        <div class="zev-spinner"></div>
+      }
+      @if (!loading && entscheide.length === 0) {
+        <p class="zev-empty-state">{{ 'STEUERUNG_KEINE_ENTSCHEIDE' | translate }}</p>
+      }
+    </div>
+  </div>
+
+  @if (!loading && entscheide.length > 0) {
+    <!-- Das Entscheidungsprotokoll: je Intervall eine Zeile mit den Eingangsgroessen. Bei einer
+         Steuerung ist das WARUM wichtiger als das WAS. -->
+    <table class="zev-table">
+      <thead>
+        <tr>
+          <th>{{ 'ZEIT' | translate }}</th>
+          <th class="zev-table__number">{{ 'PREIS_CHF_KWH' | translate }}</th>
+          <th class="zev-table__number">{{ 'STEUERUNG_TIEFSTPREIS_REST' | translate }}</th>
+          <th class="zev-table__number">{{ 'PRODUKTION' | translate }}</th>
+          <th class="zev-table__number">{{ 'VERBRAUCH' | translate }}</th>
+          <th class="zev-table__number">{{ 'STEUERUNG_UEBERSCHUSS' | translate }}</th>
+          <th>{{ 'STEUERUNG_REGEL' | translate }}</th>
+          <th>{{ 'STEUERUNG_BATTERIELADUNG' | translate }}</th>
+          <th>{{ 'STEUERUNG_EINSPEISUNG' | translate }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (entscheid of entscheide; track entscheid.zeit) {
+          <tr>
+            <td>{{ uhrzeit(entscheid) }}</td>
+            <td class="zev-table__number">{{ preis(entscheid.preis) }}</td>
+            <td class="zev-table__number">{{ preis(entscheid.preisTiefRest) }}</td>
+            <td class="zev-table__number">{{ menge(entscheid.produktion) }}</td>
+            <td class="zev-table__number">{{ menge(entscheid.verbrauch) }}</td>
+            <td class="zev-table__number">{{ menge(entscheid.ueberschuss) }}</td>
+            <td>{{ regelKey(entscheid.regel) | translate }}</td>
+            <td>{{ ('STEUERUNG_' + entscheid.batterieladung) | translate }}</td>
+            <td>{{ ('STEUERUNG_' + entscheid.einspeisung) | translate }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+
+  <!-- Ergebnis der Rueckrechnung. Bewusst ohne Ertrag in Franken: Der braeuchte ein
+       Batteriemodell und gemessene Lade-/Entladedaten. -->
+  @if (simulation) {
+    <div class="zev-panel">
+      <h3 class="zev-panel__title">{{ 'STEUERUNG_SIMULATION_ERGEBNIS' | translate }}</h3>
+      <div class="zev-panel__content">
+        <table class="zev-table">
+          <tbody>
+            <tr>
+              <td>{{ 'STEUERUNG_TAGE' | translate }}</td>
+              <td class="zev-table__number">{{ simulation.tage }}</td>
+            </tr>
+            <tr>
+              <td>{{ 'STEUERUNG_INTERVALLE' | translate }}</td>
+              <td class="zev-table__number">{{ simulation.intervalle }}</td>
+            </tr>
+            @for (regel of regeln; track regel) {
+              <tr>
+                <td>{{ regelKey(regel) | translate }}</td>
+                <td class="zev-table__number">{{ anzahlJeRegel(regel) }}</td>
+              </tr>
+            }
+            <tr>
+              <td>{{ 'STEUERUNG_STUNDEN_LADUNG_GESPERRT' | translate }}</td>
+              <td class="zev-table__number">{{ menge(simulation.stundenLadungGesperrt) }}</td>
+            </tr>
+            <tr>
+              <td>{{ 'STEUERUNG_STUNDEN_EINSPEISUNG_GESPERRT' | translate }}</td>
+              <td class="zev-table__number">{{ menge(simulation.stundenEinspeisungGesperrt) }}</td>
+            </tr>
+            <tr>
+              <td>{{ 'STEUERUNG_ENERGIE_VERSCHOBEN' | translate }}</td>
+              <td class="zev-table__number">{{ menge(simulation.energieVerschoben) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+</div>

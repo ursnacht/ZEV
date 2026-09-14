@@ -79,6 +79,17 @@
           </a>
         </li>
       </ng-container>
+      <!-- Einspeisesteuerung: Trockenlauf der Batterie- und Einspeisesteuerung. Flag UND
+           Permission, wie beim Nebenkosten-Eintrag. -->
+      <ng-container *appFeature="'EINSPEISESTEUERUNG'">
+        <li *appPermission="'tarife:manage'">
+          <a routerLink="/einspeisesteuerung" routerLinkActive="zev-navbar__link--active"
+            class="zev-navbar__link" (click)="closeMenu()">
+            <app-icon name="zap"></app-icon>
+            {{ 'EINSPEISESTEUERUNG' | translate }}
+          </a>
+        </li>
+      </ng-container>
       <li *appFeature="'MESSWERTE_UPLOAD'">
         <a routerLink="/upload" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
          (click)="closeMenu()">

@@ -114,6 +114,37 @@
           </div>
         </div>
 
+        <!-- Einspeisesteuerung (Specs/Einspeisesteuerung.md, FR-7). Nur bei aktivem Flag: Sonst
+             stuenden hier Felder, die nichts bewirken. Die Werte haengen an der Anlage -
+             Batteriegroesse, PV-Leistung, Verbrauchsprofil -, deshalb je Mandant und nicht in
+             einer Umgebungsvariablen. -->
+        <div class="zev-form-section" *appFeature="'EINSPEISESTEUERUNG'">
+          <h3 class="zev-form-section__title">{{ 'EINSPEISESTEUERUNG' | translate }}</h3>
+
+          @if (formData.steuerung) {
+            <div class="zev-form-group">
+              <label for="schwellwert">{{ 'STEUERUNG_SCHWELLWERT' | translate }}:</label>
+              <input type="number" id="schwellwert" class="zev-input" step="0.00001"
+                [(ngModel)]="formData.steuerung.schwellwert" name="schwellwert" />
+              <small class="zev-form-hint">{{ 'STEUERUNG_SCHWELLWERT_HINWEIS' | translate }}</small>
+            </div>
+
+            <div class="zev-form-group">
+              <label for="speicherwert">{{ 'STEUERUNG_SPEICHERWERT' | translate }}:</label>
+              <input type="number" id="speicherwert" class="zev-input" step="0.00001"
+                [(ngModel)]="formData.steuerung.speicherwert" name="speicherwert" />
+              <small class="zev-form-hint">{{ 'STEUERUNG_SPEICHERWERT_HINWEIS' | translate }}</small>
+            </div>
+
+            <div class="zev-form-group">
+              <label for="batteriekapazitaet">{{ 'STEUERUNG_BATTERIEKAPAZITAET' | translate }}:</label>
+              <input type="number" id="batteriekapazitaet" class="zev-input" step="0.1" min="0"
+                [(ngModel)]="formData.steuerung.batteriekapazitaet" name="batteriekapazitaet" />
+              <small class="zev-form-hint">{{ 'STEUERUNG_BATTERIEKAPAZITAET_HINWEIS' | translate }}</small>
+            </div>
+          }
+        </div>
+
         <div class="zev-form-actions">
           <button type="submit" class="zev-button zev-button--primary" [disabled]="!isFormValid()">
             <app-icon name="check"></app-icon>

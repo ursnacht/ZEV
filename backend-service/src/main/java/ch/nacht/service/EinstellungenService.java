@@ -2,6 +2,7 @@ package ch.nacht.service;
 
 import ch.nacht.dto.EinstellungenDTO;
 import ch.nacht.dto.RechnungKonfigurationDTO;
+import ch.nacht.dto.SteuerKonfigurationDTO;
 import ch.nacht.entity.Organisation;
 import ch.nacht.entity.Verteilmodus;
 import ch.nacht.repository.OrganisationRepository;
@@ -95,6 +96,30 @@ public class EinstellungenService {
             return Verteilmodus.PRODUCER_MESSUNG;
         }
         return dto.getRechnung().getVerteilmodus();
+    }
+
+    /**
+     * Konfiguration der Einspeisesteuerung eines Mandanten; nie {@code null}
+     * (Specs/Einspeisesteuerung.md, FR-7).
+     *
+     * <p>Fehlt der Block {@code steuerung} — Bestandsmandanten, altes JSON —, kommt ein leeres DTO
+     * zurück, dessen {@code …OderVorgabe()}-Methoden die Vorgaben liefern. Ein Mandant, der den
+     * Flag einschaltet, muss also nicht zuerst konfigurieren, und der Job scheitert nicht an einer
+     * fehlenden Einstellung.
+     *
+     * <p>Org-explizit wie {@link #getVerteilmodus(Long)}: Der viertelstündliche Job läuft ohne
+     * Request-Kontext und löste sonst eine {@code NoOrganizationException} aus.
+     *
+     * @param orgId Mandant
+     * @return Konfiguration, ggf. leer
+     */
+    @Transactional(readOnly = true)
+    public SteuerKonfigurationDTO getSteuerKonfiguration(Long orgId) {
+        EinstellungenDTO dto = getEinstellungenForOrg(orgId);
+        if (dto == null || dto.getRechnung() == null || dto.getRechnung().getSteuerung() == null) {
+            return new SteuerKonfigurationDTO();
+        }
+        return dto.getRechnung().getSteuerung();
     }
 
     /**

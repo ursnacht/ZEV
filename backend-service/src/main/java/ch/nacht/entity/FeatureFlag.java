@@ -26,7 +26,15 @@ public enum FeatureFlag {
      * Default {@code false}: Die Reihe ist Vorbereitung auf dynamische Tarife und wird je Mandant
      * freigeschaltet. Der taegliche Abruf laeuft nur, wenn mindestens ein Mandant sie aktiv hat.
      */
-    PREISZEITREIHE(false, "FEATURE_FLAG_PREISZEITREIHE");
+    PREISZEITREIHE(false, "FEATURE_FLAG_PREISZEITREIHE"),
+
+    /**
+     * Steuert den Trockenlauf der Einspeisesteuerung (Specs/Einspeisesteuerung.md).
+     * Default {@code false}: Die Steuerung zeichnet nur auf und schaltet nichts; sie wird je
+     * Mandant freigeschaltet. Der viertelstuendliche Job laeuft nur fuer Mandanten mit aktivem
+     * Flag — ohne einen solchen entsteht keine einzige Abfrage.
+     */
+    EINSPEISESTEUERUNG(false, "FEATURE_FLAG_EINSPEISESTEUERUNG");
 
     private final boolean defaultEnabled;
     private final String beschreibungKey;

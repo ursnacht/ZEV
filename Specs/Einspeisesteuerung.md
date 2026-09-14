@@ -81,10 +81,14 @@ Knappheitssituationen kommt das vor. Wird der Massstab später auf den ZEV-Tarif
 ### FR-1: Ablauf / Flow
 
 **Laufende Auswertung (Trockenlauf)**
-1. Ein geplanter Job läuft **alle 15 Minuten, jeweils eine Minute nach Intervallende**
-   (`0 1,16,31,46 * * * *`, über `application.yml` konfigurierbar). Der Versatz gibt den
-   MQTT-Werten Zeit, einzutreffen — ohne ihn wertet der Job ein Intervall aus, dessen Messwerte
-   noch unterwegs sind.
+1. Ein geplanter Job läuft **alle 15 Minuten, jeweils eine Minute nach der Aggregierung**
+   (`0 6,21,36,51 * * * *`, über `application.yml` konfigurierbar).
+   > **Der Zeitpunkt hängt an der Aggregierung, nicht am Intervallende.**
+   > `ZaehlerAggregationService.aggregiere()` läuft um `:05/:20/:35/:50` und schreibt **erst dort**
+   > die Messwerte des gerade abgeschlossenen Quartals. Ein Lauf um `:01` — die erste Fassung —
+   > liest Daten, die es noch nicht gibt: Der Entscheid bezieht sich faktisch auf ein älteres
+   > Intervall, und von aussen sieht es aus, als hinke die Steuerung um eine Viertelstunde nach.
+   > Ändert sich der Takt der Aggregierung, ist dieser hier mitzuziehen.
 2. Er ermittelt die Organisationen mit aktivem Feature-Flag `EINSPEISESTEUERUNG`. Ist es bei
    keiner aktiv, endet er ohne Arbeit (Log auf `debug`).
 3. Je Organisation wertet er das **zuletzt abgeschlossene** 15-Minuten-Intervall aus: Er liest die
@@ -111,12 +115,31 @@ Knappheitssituationen kommt das vor. Wird der Massstab später auf den ZEV-Tarif
 
 ### FR-2: Die Regel
 
-Zwei voneinander **unabhängige** Sollzustände je Intervall:
+Zwei voneinander **unabhängige** Sollzustände je Intervall. Beide beziehen sich ausschliesslich
+auf den **PV-Überschuss** dieses Intervalls — also auf die Energie, die weder verbraucht noch
+anderweitig gebunden ist:
 
-| Sollzustand | Werte |
-|---|---|
-| `batterieladung` | `FREI` \| `GESPERRT` |
-| `einspeisung` | `FREI` \| `GESPERRT` |
+| Sollzustand | Wert | Bedeutung |
+|---|---|---|
+| `batterieladung` | `FREI` | Der Überschuss **darf** in die Batterie geladen werden. |
+| | **`GESPERRT`** | Der Überschuss soll **nicht** in die Batterie; er geht stattdessen ins Netz. |
+| `einspeisung` | `FREI` | Der Überschuss **darf** ins Netz eingespiesen werden. |
+| | **`GESPERRT`** | Es soll **nicht** eingespiesen werden. |
+
+`GESPERRT` bei der Batterieladung ist damit kein Abschalten, sondern eine **Umlenkung**: nicht
+jetzt speichern, sondern einspeisen. In beiden Fällen, in denen die Sperre auftritt (Regeln 3 und
+4), steht `einspeisung` folgerichtig auf `FREI`.
+
+> **Was die Zustände ausdrücklich nicht sagen:**
+> * Nichts über das **Entladen** der Batterie. Die Steuerung entscheidet nur über das Laden.
+> * Nichts über den **Füllstand**. Die Batterie ist in den Daten nicht erfasst — es gibt keine
+>   Einheit vom Typ `SPEICHER` und damit keinen Ladezustand (§1, §8). Die Regel entscheidet **ohne
+>   Rückkopplung**: Sie weiss nicht, ob die Batterie längst voll ist. Ein `FREI` heisst deshalb
+>   „von der Regel her erlaubt", nicht „es wird geladen".
+> * Nichts über tatsächliche Schaltvorgänge. Diese Ausbaustufe ist ein Trockenlauf (§7).
+
+Die Kennzahl `energie_verschoben` (FR-6) zählt genau die Überschuss-Kilowattstunden aus Intervallen
+mit gesperrter Ladung — die Menge also, die die Regel vom Speicher weg ins Netz lenken würde.
 
 Ausgewertet in dieser Reihenfolge; die erste zutreffende Regel bestimmt den Entscheid und wird als
 `regel` protokolliert:
@@ -126,7 +149,7 @@ Ausgewertet in dieser Reihenfolge; die erste zutreffende Regel bestimmt den Ents
 | 1 | Preis **jetzt** < 0 | `FREI` | **`GESPERRT`** | `PREIS_NEGATIV` |
 | 2 | kein PV-Überschuss (Produktion ≤ Verbrauch) | `FREI` | `FREI` | `KEIN_UEBERSCHUSS` |
 | 3 | Preis **jetzt** ≥ Speicherwert | **`GESPERRT`** | `FREI` | `EINSPEISEN_LOHNT` |
-| 4 | erwarteter Tiefstpreis **heute noch** < Schwellwert | **`GESPERRT`** | `FREI` | `WARTEN_AUF_TAL` |
+| 4 | erwarteter Tiefstpreis **heute noch** < Schwellwert **und** < Preis **jetzt** | **`GESPERRT`** | `FREI` | `WARTEN_AUF_TAL` |
 | 5 | sonst | `FREI` | `FREI` | `LADEN` |
 
 **Regel 1 — negativer Preis.** Einspeisen kostet dann Geld. Die Batterie darf laden (sie nimmt
@@ -141,9 +164,23 @@ Verlusten), ist Einspeisen die bessere Verwendung. **Mit dieser Vorgabe löst di
 nie aus** (höchster gemessener Preis `0.238`); sie ist der Wächter für Knappheitspreise und für
 einen später geänderten Massstab — siehe §1.
 
-**Regel 4 — auf das Tal warten.** Das ist der Kern. Ist **heute noch** ein Intervall mit einem
-Preis unter dem Schwellwert zu erwarten, wird die knappe Batteriekapazität dafür freigehalten,
-statt sie jetzt mit teurerem Strom zu füllen.
+**Regel 4 — auf das Tal warten.** Das ist der Kern. Ist **heute noch** ein Intervall zu erwarten,
+das **billiger als jetzt** ist und unter dem Schwellwert liegt, wird die knappe Batteriekapazität
+dafür freigehalten, statt sie jetzt mit teurerem Strom zu füllen.
+
+> **Beide Bedingungen sind nötig — die zweite fehlte zuerst.** Der Schwellwert sagt, ob sich das
+> Warten überhaupt lohnt; der Vergleich mit dem aktuellen Preis sagt, ob es etwas gibt, worauf sich
+> warten lässt. Ohne ihn sperrte die Regel weiter, sobald das Tal **erreicht** war: Am 14.09.2026
+> stand bei Hene von 13:00 bis 14:30 der aktuelle Preis (0.161) gleich dem Tiefstpreis des
+> Resttages — die Steuerung wartete auf sich selbst. 27.9 kWh Überschuss, mehr als die Batterie
+> fasst, gingen im Preistal ins Netz; geladen wurde ab 14:45, als der Preis auf 0.170 gestiegen
+> war. Die Regel bewirkte damit das Gegenteil ihrer Absicht.
+>
+> Der gefährliche Fall ist nicht die Preisdifferenz, sondern die **leere Batterie**: Liegt das
+> Tagestief am späten Nachmittag und folgt kein Überschuss mehr, sperrt die Regel bis zum Tal und
+> hat dann nichts mehr zu laden.
+>
+> **Ohne Preis wird nicht gesperrt** — ein Vergleich ohne die eine Seite ist keiner.
 
 **Regel 5 — laden.** Kommt kein Tal mehr, wird geladen, sobald Überschuss da ist. Das deckt den
 bewölkten Tag ab: Ein **hoher** Mittagspreis bedeutet, dass der ganze Markt wenig Solarstrom
@@ -160,6 +197,30 @@ laufenden Tages (Ortszeit Europe/Zurich), deren Beginn **nach** dem ausgewertete
 Bewusst nicht ein festes Mittagsfenster: Die Frage ist „kommt noch etwas Billigeres?", und die
 Antwort darauf ist am Nachmittag eine andere als am Morgen. Liegen für den Rest des Tages **keine**
 Preise vor, gilt Regel 4 als nicht erfüllt (§5).
+
+**Zeitbezüge** — die Steuerung rechnet durchgehend in **Ortszeit**:
+
+| Quelle | Zone | Bedeutung von `zeit` |
+|---|---|---|
+| `messwerte.zeit` | **Ortszeit** (die Aggregierung rechnet mit `LocalDateTime.now()`) | Intervall**ende** |
+| `zaehler_rohdaten.zeit` | **Ortszeit** | Zeitpunkt der Messung |
+| `steuerentscheid.zeit_von` | **Ortszeit** | Intervall**beginn** |
+| `preiszeitreihe.zeit_von` | **UTC** | Intervall**beginn** |
+
+> **Wer die Zonen gleichsetzt, erhält Zahlen, die plausibel aussehen und zu verschiedenen
+> Zeitpunkten gehören:** bis zu zwei Stunden Zonenversatz plus eine Viertelstunde
+> Anfang-gegen-Ende. Genau das ist in der ersten Umsetzung passiert — ein Entscheid trug den Preis
+> von 11:45 Ortszeit neben der Produktion von 09:30–09:45. Nichts daran wirkte falsch.
+
+**Deshalb gilt seit V147 eine Konvention statt zweier:** `steuerentscheid.zeit_von` liegt in
+Ortszeit wie die beiden anderen Zeitreihen des Systems. Die Preiszeitreihe bleibt der einzige
+Fremdkörper — sie wird verbatim von der Börse übernommen und gehört nicht der Steuerung. Umgerechnet
+wird deshalb **nur noch der Preis**, an drei Stellen: `preisFuer`, `tiefstpreisRestDesTages` und —
+einmalig beim Bündeln — `preiseJeOrtstag`. Dahinter ist alles Ortszeit.
+
+> **Warum nicht umgekehrt alles nach UTC?** Weil `messwerte` und `zaehler_rohdaten` bereits
+> Ortszeit führen und nicht zur Disposition stehen. Eine dritte Konvention für eine einzelne neue
+> Tabelle hat mehr gekostet, als sie wert war.
 
 **Überschuss** — und hier ist das Vorzeichen entscheidend:
 
@@ -215,7 +276,7 @@ Neue Tabelle `zev.steuerentscheid` (Flyway `V<nächste freie>__Create_Steuerents
 |---|---|---|---|
 | `id` | `bigserial` | ja | Technischer Schlüssel |
 | `org_id` | `bigint` | ja | Mandant — serverseitig gesetzt, nie aus dem Request |
-| `zeit_von` | `timestamp` | ja | Beginn des ausgewerteten Intervalls, **UTC** |
+| `zeit_von` | `timestamp` | ja | Beginn des ausgewerteten Intervalls, **Ortszeit** |
 | `preis` | `numeric(10,5)` | **nein** | Einspeisepreis des Intervalls; leer, wenn kein Preis vorlag |
 | `preis_tief_rest` | `numeric(10,5)` | **nein** | Erwarteter Tiefstpreis für den Rest des Tages |
 | `produktion` | `numeric(12,3)` | ja | Summe der `PRODUCER` im Intervall, kWh |
@@ -243,14 +304,28 @@ Neue Tabelle `zev.steuerentscheid` (Flyway `V<nächste freie>__Create_Steuerents
   Änderung der Konfiguration nicht mehr erklärbar — man sähe die Wirkung und wüsste die Ursache
   nicht. Da die Werte jetzt je Mandant in der Datenbank stehen und über die Maske änderbar sind,
   wiegt das schwerer als bei einer Umgebungsvariablen, die selten angefasst wird.
-* **Zeitzone: UTC**, verbatim wie in `zev.preiszeitreihe`. Die Umrechnung auf Europe/Zurich
-  passiert erst bei der Darstellung. Bei lokaler Zeit bräche der Unique-Schlüssel an der
-  Zeitumstellung.
-  > **Achtung bei jeder Auswertung:** `zeit_von` ist `timestamp without time zone` und enthält
-  > **UTC**. Ein `AT TIME ZONE 'Europe/Zurich'` allein interpretiert den Wert *als* Ortszeit und
-  > verschiebt ihn um zwei Stunden — beim Schreiben dieser Spec ist genau das passiert und hat das
-  > Preistal scheinbar in den Morgen verlegt. Richtig ist
-  > `zeit_von AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Zurich'`.
+* **Zeitzone: Ortszeit** (Europe/Zurich, seit V147) — wie `zev.messwerte.zeit` und
+  `zev.zaehler_rohdaten.zeit`. Eine Umrechnung für die Darstellung entfällt damit.
+  > **Der Preis dieser Wahl, ausdrücklich benannt:** An der Umstellung auf Winterzeit (nächstes Mal
+  > **25.10.2026**) gibt es die Stunde 02:00–03:00 zweimal. Beide Durchgänge tragen denselben
+  > `zeit_von`; der Upsert auf `(org_id, zeit_von)` überschreibt daher die vier Entscheide des
+  > ersten. Der Tag hat 96 statt 100 Entscheide.
+  >
+  > Das ist hingenommen, weil es fachlich folgenlos ist — nachts um 2 Uhr gibt es keinen
+  > Solarüberschuss, und die Steuerung schaltet ohnehin nichts. `zev.messwerte` kann dieselben vier
+  > Intervalle ohnehin nicht abbilden, auf **beiden** Eingangswegen:
+  > * **CSV** (`MesswerteService`) zählt die Zeit ab Mitternacht in 96 Schritten hoch; die Datei
+  >   enthält gar keine Zeitstempel. Am 26.10.2025 stehen dort folgerichtig 96 statt 100 Messwerte.
+  > * **MQTT** (`ZaehlerAggregationService.upsertMesswert`) sucht per `findByEinheitAndZeit` und
+  >   überschreibt den gefundenen Wert — der zweite Durchgang verdrängt den ersten.
+  >
+  > Anders zu verfahren als die beiden bestehenden Zeitreihen hätte die Steuerung zur Ausnahme
+  > gemacht, ohne den Verlust irgendwo zu verhindern.
+  >
+  > **Vor jeder Auswertung in SQL:** `zeit_von` ist `timestamp without time zone` und enthält
+  > **Ortszeit** — also direkt lesbar, ohne `AT TIME ZONE`. Wer hier umrechnet, verschiebt den Wert
+  > um zwei Stunden. (Für `preiszeitreihe.zeit_von` gilt weiterhin das Gegenteil: dort ist
+  > `zeit_von AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Zurich'` nötig.)
 * **Keine Retention in dieser Ausbaustufe:** 35'040 Zeilen je Mandant und Jahr sind für PostgreSQL
   vernachlässigbar. Entscheide sind Betriebsdaten, keine Personendaten.
 
@@ -262,13 +337,15 @@ Neue Tabelle `zev.steuerentscheid` (Flyway `V<nächste freie>__Create_Steuerents
 | Methode | Pfad | Zweck | Antwort |
 |---|---|---|---|
 | `GET` | `/entscheide?datum=` | Entscheide **eines Tages** samt Preis, Produktion, Verbrauch | `List<SteuerentscheidDTO>` |
+| `GET` | `/entscheide/simuliert?datum=&schwellwert=&speicherwert=` | derselbe Tag, **nachgerechnet** mit abweichenden Schwellen (FR-6a) | `List<SteuerentscheidDTO>` |
 | `POST` | `/simulation` | Nachrechnen mit abweichendem Schwellwert | `SimulationDTO` |
 
 * Beide Endpunkte prüfen das Feature-Flag und antworten bei deaktiviertem Flag mit `403`.
 * `GET` ohne Treffer liefert `200` und eine leere Liste (kein `404`).
-* `datum` ist ein Datum in **Europe/Zurich**; der Server bildet es auf `00:00`–`24:00` Ortszeit ab
-  und rechnet beide Grenzen nach UTC um. An den Umstellungstagen ergibt das korrekt **92** bzw.
-  **100** Intervalle.
+* `datum` ist ein Datum in **Europe/Zurich** und wird direkt auf `00:00`–`24:00` desselben Tages
+  abgebildet — keine Umrechnung mehr nötig, da die Entscheide in Ortszeit liegen. Am Umstellungstag
+  im Herbst ergibt das **96** statt 100 Entscheide (siehe FR-3 zur doppelten Stunde), im Frühling
+  **92**.
 * `POST /simulation` nimmt `von`, `bis`, `schwellwert` und optional `speicherwert`. Der Zeitraum
   ist auf **366 Tage** begrenzt (`400` darüber), `von` nach `bis` ergibt `400` mit lesbarem Text.
 * Fehlerrümpfe immer **Klartext**, kein Objekt — ein Objekt erscheint in der Maske als
@@ -293,16 +370,29 @@ wie der NK-Eintrag).
      ein durchgehender Balken über die Zeitachse, eingefärbt nach Zustand. Sie sind der Kern der
      ganzen Ansicht — auf einen Blick liest man „ab 09:15 Ladung gesperrt, ab 11:30 frei,
      12:00–13:15 Einspeisung gesperrt".
-     > **Umgesetzt als Balkenserie, nicht als `markArea`.** Je Intervall ein Balken fester Höhe auf
-     > einer eigenen, ausgeblendeten y-Achse, eingefärbt nach Zustand; bei 96 Intervallen ergibt
-     > das ein geschlossenes Band. `BarChart` ist im gemeinsamen Loader
-     > (`utils/echarts-loader.ts`) **bereits registriert** — `markArea` bräuchte zusätzlich
-     > `MarkAreaComponent`, und der Loader ist für **alle** Diagramme derselbe: Jedes zusätzliche
-     > Modul vergrössert auch den Chunk für Messwerte und Preiszeitreihe.
+     > **Umgesetzt als `markArea`, nicht als Balkenserie.** Je Block gesperrter Intervalle ein
+     > Rechteck von `zeit` bis `zeit + 15min`, auf einer festen Ebene unterhalb der Nulllinie.
      >
-     > **Wird doch ein neues Modul nötig, muss es in `ladeECharts()` registriert werden.** Ein
-     > nicht registrierter Serientyp zeichnet **stumm nichts**; ECharts meldet ihn nicht als
-     > Fehler. Man sähe ein Diagramm ohne Bänder und suchte den Fehler in den Daten.
+     > **Balken taugen dafür nicht** — das war die erste Umsetzung und sie zeigte falsche Zeiten:
+     > * Auf einer Zeitachse **zentriert** ECharts den Balken auf seinen Datenpunkt. Das Band lag
+     >   damit 7½ Minuten zu früh, während die Preislinie (`step: 'end'`) das Intervall korrekt
+     >   ab seinem Beginn abdeckte.
+     > * Mehrere Balkenserien ordnet ECharts **nebeneinander** an, nicht übereinander. Die beiden
+     >   Bänder beschrieben dasselbe Intervall, wurden aber eine **Viertelstunde** auseinander
+     >   gezeichnet — aufgefallen ist es nur, weil beide Zustände einmal gleichzeitig gesperrt
+     >   waren.
+     >
+     > **`MarkAreaComponent` ist in `ladeECharts()` zu registrieren.** Der Einwand gegen das
+     > zusätzliche Modul hat sich in der Messung nicht bestätigt: `echarts/components` wird als
+     > **ganzer** Chunk nachgeladen (642 kB, vorher wie nachher identisch) — registriert wird nur,
+     > was davon benutzt wird. Das Modul kostet null Bytes.
+     >
+     > **Ein nicht registriertes Modul zeichnet stumm nichts**; ECharts meldet es nicht als Fehler.
+     > Man sähe ein Diagramm ohne Bänder und suchte den Fehler in den Daten. Deshalb prüft
+     > `echarts-loader.spec.ts` die Existenz jedes registrierten Exports.
+     >
+     > **Die Mengen-Achse braucht ein festes `min`.** Anders als eine Datenserie spannt `markArea`
+     > die Skala **nicht** auf: Ohne `min` endete die Achse bei 0 und die Bänder wären unsichtbar.
    * Farben aus den Design-Tokens, **nicht** hart kodiert (`Specs/DarkMode.md`).
    * Tooltip mit Zeitpunkt (`dd.MM.yyyy HH:mm`), Preis und beiden Zuständen; Zahlen über
      `formatSwissNumber()`, **kein** `toLocaleString()`.
@@ -342,6 +432,39 @@ gemessene Lade-/Entladedaten — und beides fehlt heute (§1, §8). Eine Zahl in
 geratener Kapazität beruht, sähe belastbarer aus als sie ist. Die oben genannten Grössen genügen,
 um den Schwellwert einzugrenzen: Sie zeigen, **wie oft** und **wie lange** die Regel greift und
 **wie viel Energie** sie bewegt.
+
+### FR-6a: Der angezeigte Tag wird mitgerechnet
+
+Die Kennzahlen aus FR-6 sagen, **wie oft** ein Schwellwert gesperrt hätte — nicht **wann**. Genau
+das ist aber die Frage, an der man einen Schwellwert beurteilt: Trifft er das Preistal, oder sperrt
+er morgens um 8?
+
+Deshalb wird beim Nachrechnen **auch der gerade angezeigte Tag** mit demselben Schwellwert
+gerechnet und im Diagramm samt Tabelle gezeigt. Die Zustandsbänder (FR-5) zeigen dann, wann
+Batterieladung und Einspeisung gesperrt **wären**.
+
+* **Es wird nichts gespeichert.** Die Aufzeichnung bleibt unberührt; gerechnet wird aus Preisen und
+  Messwerten, wie in FR-6.
+* **Derselbe Rechenweg wie die Kennzahlen.** Tagesansicht und Zählung dürfen sich nicht
+  widersprechen — beide gehen durch dieselbe Methode (`SteuerungService.rechneNach`).
+* **Anders als die Zählung enthält die Tagesansicht alle Intervalle**, auch die ohne Überschuss:
+  Sie zeichnet einen Verlauf, und eine Lücke darin wäre irreführend (FR-5).
+* **Der Zustand bleibt beim Blättern erhalten.** Wer nach dem Nachrechnen einen Tag zurückgeht,
+  sieht auch diesen nachgerechnet. Sonst fiele die Ansicht unbemerkt auf die Aufzeichnung zurück
+  und widerspräche der Auswertung darunter.
+* **Die Ansicht ist gekennzeichnet.** Ein stehender Hinweis nennt den erprobten Schwellwert und
+  sagt, dass nichts gespeichert wird — Diagramm und Tabelle sehen sonst genauso aus wie beim
+  Protokoll und wären nicht zu unterscheiden.
+* **Ein Weg zurück:** Die Schaltfläche „Aufzeichnung zeigen" holt die gespeicherten Entscheide
+  zurück. Die Kennzahlen bleiben dabei stehen — sie beziehen sich auf die ganze Historie, nicht auf
+  den angezeigten Tag.
+
+> **Eigener Endpunkt statt eines optionalen Parameters auf `/entscheide`:** Beide liefern dieselbe
+> Form, meinen aber Verschiedenes — Protokoll gegen Hypothese. Wer den Parameter übersieht, hielte
+> eine Rechnung für eine Aufzeichnung.
+>
+> **Und nicht als Teil der Antwort von `/simulation`:** Beim Blättern müsste sonst die ganze
+> Rückrechnung über bis zu 366 Tage erneut laufen, um einen einzelnen Tag zu zeigen.
 
 ### FR-7: Einstellungen je Mandant
 
@@ -397,6 +520,8 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 | `EINSPEISESTEUERUNG` | Einspeisesteuerung | Feed-in control |
 | `STEUERUNG_SCHWELLWERT` | Schwellwert | Threshold |
 | `STEUERUNG_NACHRECHNEN` | Nachrechnen | Recalculate |
+| `STEUERUNG_SIMULIERTE_ANSICHT` | Nachgerechnete Ansicht — keine Aufzeichnung. Es wird nichts gespeichert. Schwellwert: | Recalculated view — not a recording. Nothing is stored. Threshold: |
+| `STEUERUNG_AUFZEICHNUNG_ZEIGEN` | Aufzeichnung zeigen | Show recording |
 | `STEUERUNG_BATTERIELADUNG` | Batterieladung | Battery charging |
 | `STEUERUNG_EINSPEISUNG` | Einspeisung | Feed-in |
 | `STEUERUNG_FREI` | Frei | Enabled |
@@ -432,7 +557,8 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 **Persistierung**
 * [ ] Ein zweiter Lauf über dasselbe Intervall erzeugt **keinen** zweiten Datensatz, sondern überschreibt (Upsert auf `org_id, zeit_von`).
 * [ ] Jeder Entscheid trägt den beim Entscheid geltenden Schwellwert.
-* [ ] `zeit_von` ist in UTC gespeichert; die Tagesansicht zeigt Ortszeit.
+* [ ] `zeit_von` ist in **Ortszeit** gespeichert und wird von der Tagesansicht unverändert angezeigt.
+* [ ] Ein SQL-`SELECT` auf `steuerentscheid.zeit_von` liefert ohne `AT TIME ZONE` die Ortszeit, die auch in der Maske steht.
 * [ ] Am Tag der Zeitumstellung liefert die Tagesansicht 92 bzw. 100 Intervalle, ohne dass ein Schlüssel kollidiert.
 * [ ] Entscheide eines Mandanten sind für einen anderen Mandanten nicht abrufbar.
 
@@ -440,6 +566,10 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 * [ ] Die Seite zeigt beim Öffnen den heutigen Tag.
 * [ ] Das Diagramm zeigt Preis, Produktion, Verbrauch und **zwei** Zustandsbänder.
 * [ ] Ein Wechsel des Zustands ist im Band an der richtigen Viertelstunde sichtbar.
+* [ ] **Beide Bänder decken dieselbe Zeitspanne deckungsgleich ab**, wenn beide Zustände im selben Intervall `GESPERRT` sind — kein horizontaler Versatz zwischen ihnen.
+* [ ] Ein Band beginnt am **Beginn** seines ersten Intervalls und endet am **Ende** seines letzten (`zeit + 15min`), deckungsgleich mit dem Stufenverlauf der Preislinie.
+* [ ] Jedes Band liegt auf seiner **festen Ebene**, unabhängig davon, ob das andere gesetzt ist.
+* [ ] Eine Lücke in den Entscheiden unterbricht das Band, statt überbrückt zu werden.
 * [ ] Die Protokolltabelle nennt je Intervall die Regel im Klartext, nicht den Schlüssel.
 * [ ] Ein Tag ohne Entscheide zeigt den Hinweis statt einer leeren Tabelle.
 * [ ] Beträge erscheinen im Schweizer Format (`0.05`, `1'234.50`), unabhängig von der Browser-Locale.
@@ -447,8 +577,17 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 **Nachrechnen**
 * [ ] Ein abweichender Schwellwert verändert die gespeicherten Entscheide **nicht**.
 * [ ] Ein tieferer Schwellwert führt zu **weniger** Intervallen mit `WARTEN_AUF_TAL` (monoton).
+* [ ] **Steht der aktuelle Preis bereits auf dem Tiefstpreis des Resttages, wird `LADEN` entschieden, nicht `WARTEN_AUF_TAL`** — es gibt nichts, worauf sich warten liesse.
+* [ ] Liegt der Tiefstpreis des Resttages **über** dem aktuellen Preis, wird geladen, auch wenn er unter dem Schwellwert liegt.
+* [ ] Fehlt der aktuelle Preis, greift Regel 4 **nicht**.
 * [ ] Das Ergebnis nennt Tage, Intervalle, Auslösungen je Regel und die verschobene Energie.
 * [ ] Ein Zeitraum über 366 Tage wird mit `400` abgewiesen.
+* [ ] **Nach dem Nachrechnen zeigen Diagramm und Tabelle denselben Tag mit dem erprobten Schwellwert** — die Zustandsbänder sagen, *wann* gesperrt worden wäre.
+* [ ] Die nachgerechnete Ansicht ist als solche **gekennzeichnet** und nennt den erprobten Schwellwert.
+* [ ] Ein Tageswechsel (Datumsfeld oder ‹ / ›) behält die nachgerechnete Ansicht bei.
+* [ ] „Aufzeichnung zeigen" holt die gespeicherten Entscheide zurück; die Kennzahlen bleiben stehen.
+* [ ] Tagesansicht und Kennzahlen widersprechen sich nicht: Beide entstehen aus **einem** Rechenweg.
+* [ ] Die nachgerechnete Tagesansicht enthält auch Intervalle **ohne** Überschuss — anders als die Zählung.
 
 **Verhalten ohne Daten** (aus §5)
 * [ ] Fehlt der Preis für das ausgewertete Intervall, wird der Entscheid trotzdem geschrieben, `preis` bleibt leer, und **keine** Sperre wird gesetzt.
@@ -464,7 +603,11 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 * [ ] Zwei Mandanten mit verschiedenen Schwellwerten erhalten für dasselbe Intervall verschiedene Entscheide.
 * [ ] Jeder Entscheid trägt den zum Zeitpunkt geltenden Schwellwert **und** Speicherwert.
 * [ ] Der Abschnitt in den Einstellungen erscheint nur bei aktivem Feature-Flag.
-* [ ] Der Job läuft eine Minute nach Intervallende (`0 1,16,31,46 * * * *`).
+* [ ] Der Job läuft eine Minute **nach der Aggregierung** (`0 6,21,36,51 * * * *`), nicht nach dem Intervallende.
+* [ ] Der ausgewertete Zeitraum ist das Intervall, das die Aggregierung soeben geschrieben hat — um 12:06 also 11:45–12:00.
+* [ ] Die Messwerte werden über das Intervall**ende** gesucht, der Entscheid trägt den Intervall**beginn** — beide in Ortszeit, ohne Zonenrechnung.
+* [ ] Der **Preis** ist die einzige Grösse, die umgerechnet wird (`PreiszeitreiheZeit.nachUtc`); im Job an zwei, in der Rückrechnung an einer Stelle.
+* [ ] Preis und Messwerte eines Entscheids gehören zum **selben** Zeitpunkt — prüfbar, indem ein Entscheid gegen `messwerte` und `preiszeitreihe` gegengerechnet wird.
 
 **Sicherheit und Flag**
 * [ ] Ohne `tarife:manage` sind beide Endpunkte nicht aufrufbar (403), auch bei aktivem Flag.
@@ -504,6 +647,31 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 * Die Tabelle lässt sich rückstandslos löschen: Kein anderer Datensatz verweist auf sie.
 * `zev.messwerte` und `zev.preiszeitreihe` werden **nur gelesen**.
 
+### NFR-4: Nachvollziehbarkeit im Log
+
+Der Job protokolliert auf `INFO` nach demselben Muster wie `ZaehlerAggregationService.aggregiere()`
+— Start, ein Eintrag je bearbeitetem Mandant, Abschluss mit Anzahl:
+
+| Ereignis | Stufe | Inhalt |
+|---|---|---|
+| Lauf beginnt | `INFO` | `Steuerung start` |
+| je Mandant | `INFO` | Org, Intervall in Ortszeit |
+| je Entscheid | `INFO` | Preis, Tiefstpreis, Produktion, Verbrauch, Überschuss, Regel, beide Zustände |
+| keine Messwerte | `WARN` | Intervall in Ortszeit — die Lücke wird gemeldet, nicht nur als `0` abgebildet |
+| kein Preis | `WARN` | Intervall, mit dem Hinweis, dass die Regeln 1 und 3 nicht greifen |
+| Lauf je Mandant fehlgeschlagen | `ERROR` | Org, Intervall, Meldung samt Stacktrace |
+| Abschluss | `INFO` | Anzahl erzeugter Entscheide |
+
+> **Warum die Eingangsgrössen im Log stehen:** Ein Entscheid ohne die Zahlen, aus denen er
+> entstand, lässt sich im Nachhinein nicht prüfen — und genau diese Prüfung war nötig, um den
+> Zeitversatz zu finden (§2, FR-1). Seit alle Zeitangaben in Ortszeit stehen, genügt **ein**
+> Zeitbezug im Log; vorher mussten UTC und Ortszeit nebeneinander stehen, um einen Versatz
+> überhaupt sichtbar zu machen.
+
+> **Warum `INFO` und nicht `DEBUG`:** Bei 96 Läufen am Tag und einem Eintrag je Mandant bleibt das
+> Volumen weit unter dem der Aggregierung, die je Einheit **und** Intervall auf `INFO` schreibt. Auf
+> `DEBUG` wäre im Betrieb nicht zu sehen, ob die Steuerung überhaupt läuft.
+
 ## 5. Edge Cases & Fehlerbehandlung
 
 | Fall | Verhalten |
@@ -511,12 +679,14 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 | **Keine Preise für das Intervall** | Entscheid wird trotzdem geschrieben, `preis` bleibt leer, Regel `KEIN_UEBERSCHUSS` bzw. `LADEN` je nach Überschuss. Ohne Preis darf die Steuerung nicht sperren — Nichtstun ist der sichere Zustand. |
 | **Keine Preise für den Rest des Tages** | Regel 4 gilt als **nicht** erfüllt (`preis_tief_rest` leer). Ein fehlender Blick nach vorne ist kein Grund zu warten. |
 | **Keine Messwerte für das Intervall** | Produktion und Verbrauch `0`, Überschuss `0` → Regel 2. Der Entscheid wird geschrieben, damit die Lücke **sichtbar** ist statt unsichtbar. |
+| **Nachrechnen für einen Tag ohne Messwerte** | Leere Liste; die Ansicht zeigt den Hinweis „keine Entscheide“ wie bei einem Tag ohne Aufzeichnung. Kein Fehler — der Tag hat schlicht keine Grundlage. |
 | **Messwerte treffen verspätet ein** (MQTT-Ausfall) | Der nächste Lauf überschreibt den Entscheid des betroffenen Intervalls per Upsert. Ein Nachlauf über ältere Intervalle ist **nicht** vorgesehen (§7). |
 | **Leerer Tag in der Ansicht** | Hinweis `STEUERUNG_KEINE_ENTSCHEIDE`, kein leeres Diagrammgerüst. |
 | **Datum in der Zukunft** | Leere Liste mit demselben Hinweis, kein Fehler. |
 | **`von` nach `bis`** beim Nachrechnen | `400` mit lesbarem Klartext. |
 | **Zeitraum über 366 Tage** | `400`. |
-| **Zeitumstellung** | Auswertung und Anzeige rechnen über UTC; der Ortstag hat 92 bzw. 100 Intervalle. |
+| **Zeitumstellung Frühling** | Die Stunde 02:00–03:00 entfällt; der Ortstag hat 92 Intervalle. Es entsteht eine Lücke, sonst nichts. |
+| **Zeitumstellung Herbst** | Die Stunde 02:00–03:00 tritt zweimal auf. Beide Durchgänge tragen denselben `zeit_von`, der zweite überschreibt den ersten per Upsert: **96 statt 100 Entscheide**. Bewusst hingenommen — nachts gibt es keinen Überschuss, und `zev.messwerte` verliert dieselben vier Intervalle (nachgeprüft am 26.10.2025). Siehe FR-3. |
 | **Job-Lauf überschneidet sich** | Der Job ist nicht reentrant; ein zweiter Lauf desselben Intervalls ist durch das Upsert folgenlos. |
 | **Datenbank nicht erreichbar** | Der Job protokolliert den Fehler und endet; der nächste Lauf versucht es erneut. Keine Systemmeldung je Lauf — bei 96 Läufen am Tag wäre das eine Flut. |
 | **Flag mitten am Tag eingeschaltet** | Die Entscheide beginnen ab dem nächsten Lauf; der Tag ist unvollständig, und die Ansicht zeigt das, ohne zu behaupten, es sei nichts passiert. |

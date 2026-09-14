@@ -11,11 +11,13 @@ import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { IconComponent } from '../icon/icon.component';
 import { DatenbankAnsichtComponent } from '../datenbank-ansicht/datenbank-ansicht.component';
+import { FeatureFlagDirective } from '../../directives/feature-flag.directive';
 
 @Component({
   selector: 'app-einstellungen',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe, IconComponent, DatenbankAnsichtComponent],
+  imports: [CommonModule, FormsModule, TranslatePipe, IconComponent, DatenbankAnsichtComponent,
+    FeatureFlagDirective],
   templateUrl: './einstellungen.component.html',
   styleUrls: ['./einstellungen.component.css']
 })
@@ -111,6 +113,10 @@ export class EinstellungenComponent extends WithMessage implements OnInit {
             this.formData.steller = { name: '', strasse: '', plz: '', ort: '' };
           }
           // Bestandsmandanten ohne Feld → Default PRODUCER_MESSUNG
+          // Ohne Objekt haette ngModel nichts zum Binden und die Felder blieben gesperrt.
+          if (!this.formData.steuerung) {
+            this.formData.steuerung = {};
+          }
           if (!this.formData.verteilmodus) {
             this.formData.verteilmodus = 'PRODUCER_MESSUNG';
           }

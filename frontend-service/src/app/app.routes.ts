@@ -20,6 +20,7 @@ import { AuthGuard } from './guards/auth.guard';
 import { FeatureFlagGuard } from './guards/feature-flag.guard';
 import { NebenkostenTarifpositionenComponent } from './components/nebenkosten-tarifpositionen/nebenkosten-tarifpositionen.component';
 import { NebenkostenAbrechnungComponent } from './components/nebenkosten-abrechnung/nebenkosten-abrechnung.component';
+import { EinspeisesteuerungComponent } from './components/einspeisesteuerung/einspeisesteuerung.component';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/startseite', pathMatch: 'full' },
@@ -43,6 +44,9 @@ export const routes: Routes = [
   { path: 'nebenkosten', redirectTo: '/nebenkosten/abrechnung', pathMatch: 'full' },
   { path: 'nebenkosten/tarifpositionen', component: NebenkostenTarifpositionenComponent, canActivate: [AuthGuard, FeatureFlagGuard], data: { permissions: ['nebenkosten:manage'], featureFlag: 'NEBENKOSTENABRECHNUNG' } },
   { path: 'nebenkosten/abrechnung', component: NebenkostenAbrechnungComponent, canActivate: [AuthGuard, FeatureFlagGuard], data: { permissions: ['nebenkosten:manage'], featureFlag: 'NEBENKOSTENABRECHNUNG' } },
+  // Einspeisesteuerung (Specs/Einspeisesteuerung.md): Trockenlauf, schaltet nichts. Dieselbe
+  // Permission wie die Preiszeitreihe, mit der sie sich die Datengrundlage teilt.
+  { path: 'einspeisesteuerung', component: EinspeisesteuerungComponent, canActivate: [AuthGuard, FeatureFlagGuard], data: { permissions: ['tarife:manage'], featureFlag: 'EINSPEISESTEUERUNG' } },
   { path: 'design-system', component: DesignSystemShowcaseComponent, canActivate: [AuthGuard] },
   { path: 'einstellungen', component: EinstellungenComponent, canActivate: [AuthGuard], data: { permissions: ['einstellungen:write'] } },
   { path: 'translations', component: TranslationEditorComponent, canActivate: [AuthGuard], data: { permissions: ['translations:manage'] } },

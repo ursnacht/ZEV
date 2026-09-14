@@ -134,6 +134,14 @@ preiszeitreihe:
     verbindung: 5s
     lesen: 10s
 
+# Einspeisesteuerung (Specs/Einspeisesteuerung.md): viertelstuendlicher Trockenlauf.
+# Eine Minute NACH DER AGGREGIERUNG (:05/:20/:35/:50), nicht nach dem Intervallende: Erst dort
+# entstehen die Messwerte des abgeschlossenen Quartals. Ein frueherer Lauf liest Daten, die es
+# noch nicht gibt, und die Steuerung scheint eine Viertelstunde nachzuhinken.
+einspeisesteuerung:
+  job:
+    cron: "${ZEV_STEUERUNG_CRON:0 6,21,36,51 * * * *}"
+
 # Logging Configuration
 logging:
   level:
