@@ -157,6 +157,11 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
    * **Keine** Meldung bei einzelnen ausgefallenen Messungen *innerhalb* eines Intervalls (z.B. 1 von 3 bei `publish_interval: 5m`): Da **absolute** Zählerstände übertragen werden, ist das Delta identisch – der Ausfall ist folgenlos und darf kein Rauschen erzeugen.
    * Meldungstext/Kategorie via `TranslationService`; der Parameter nennt Einheit, Zeitraum und Anzahl fehlender Intervalle. Deduplizierung je Mandant + Meldungs-Key durch den bestehenden Zähler-Mechanismus (`erfasse`); **kein** Auto-Resolve – die Meldung dokumentiert ein vergangenes Ereignis und wird vom Betreiber als erledigt markiert.
 
+4. **Rücksprung eines Zählerstands als Systemmeldung** (`MQTT_ZAEHLER_RUECKSPRUNG`, **`WARN`**): Ein Zählerstand kann nicht sinken. Sinkt er doch — Zählertausch ohne Seriennummernwechsel, Überlauf, fehlerhafte Übertragung —, wird das Delta des betroffenen Registers auf `0` gesetzt.
+   * **Die Energie dieses Intervalls geht dabei verloren**, anders als bei einer Datenlücke: Dort fällt der Verbrauch gebündelt ins Folgeintervall, hier fehlt er dauerhaft.
+   * Bei einem `PRODUCER` sinkt damit die **ausgewiesene Produktion**, ohne dass der Anlage etwas fehlt. Genau das ist der Grund für die Meldung: Bis dahin stand der Fall nur in einer Logzeile und war im Betrieb unsichtbar — eine zu tief erscheinende Produktion liess sich nicht davon unterscheiden, dass die Anlage wirklich weniger lieferte.
+   * Der Parameter nennt Einheit, Register, Intervall und die **verworfene Menge**. Ohne den Betrag liesse sich nicht abschätzen, ob es um Rundung oder um Kilowattstunden geht.
+   * Eine fehlgeschlagene Meldung bricht die Aggregation **nicht** ab — dieselbe Abwägung wie beim Zählerwechsel.
 ### FR-9: Anpassung Solarverteilung (`zev`-Fallback)
 1. Die Solarverteilung (`SolarDistribution`) berechnet wie bisher `zev_calculated` pro Consumer/Intervall.
 2. **Neu:** Nach der Berechnung wird `zev = zev_calculated` gesetzt, **sofern `zev = 0`** (Sentinel für „nicht gemessen", von MQTT-importierten Consumer-Werten). Bereits gesetzte `zev`-Werte (z. B. aus CSV oder MQTT-**Producer**-Werte mit `zev = total`, `zev ≠ 0`) bleiben unverändert.
@@ -186,7 +191,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 * [ ] Leeres Intervall (keine neue Meldung) → kein `messwerte`-Eintrag (kein Nullwert).
 * [ ] Verlorene Zwischen-Nachricht → Gesamtsumme über die betroffenen Intervalle bleibt korrekt (verlusttolerant).
 * [ ] **Wiederaufnahme nach mehrtägigem Unterbruch** → die Differenz zum letzten Vor-Unterbruch-Stand deckt den gesamten Zeitraum; **keine kWh gehen verloren**, der Gesamtbetrag erscheint gebündelt im ersten Intervall mit Meldung nach Wiederaufnahme (Referenz wird unabhängig vom `verarbeitet`-Flag über den Zeitstempel aufgelöst).
-* [ ] Zähler-Reset/Rücksprung **pro Register** (`ΔBezug` bzw. `ΔEinspeisung` < 0) → betroffenes Delta auf 0, Referenz neu gesetzt, WARN. (Ein negatives `total` aus Einspeisung ist dagegen legitim und wird übernommen.)
+* [ ] Zähler-Reset/Rücksprung **pro Register** (`ΔBezug` bzw. `ΔEinspeisung` < 0) → betroffenes Delta auf 0, Referenz neu gesetzt, WARN **und Systemmeldung `MQTT_ZAEHLER_RUECKSPRUNG` mit der verworfenen Menge**. (Ein negatives `total` aus Einspeisung ist dagegen legitim und wird übernommen.)
 * [ ] `zev_calculated` wird durch den Ingest nicht verändert; Solarverteilung funktioniert unverändert.
 * [ ] Nach der Solarverteilung gilt `zev = zev_calculated`, wo `zev = 0` war (MQTT-Werte); gemessene CSV-Werte (`zev ≠ 0`) bleiben unverändert (FR-9).
 * [ ] Nach jedem Aggregationslauf wird je betroffenem Mandant die Solarverteilung für den behandelten Zeitraum automatisch ausgeführt (`calculateSolarDistributionForOrg`, `orgFilter` explizit gesetzt); ohne verarbeitetes Intervall erfolgt kein Verteilungsaufruf. Ein Fehler bei einem Mandanten bricht die übrigen nicht ab.

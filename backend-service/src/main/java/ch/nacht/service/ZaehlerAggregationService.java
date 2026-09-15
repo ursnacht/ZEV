@@ -194,10 +194,10 @@ public class ZaehlerAggregationService {
 
         BigDecimal deltaBezug = nichtNegativ(
                 letzter.getZaehlerstandBezug().subtract(referenz.getZaehlerstandBezug()),
-                einheitId, "Bezug", ende);
+                einheit, "Bezug", ende);
         BigDecimal deltaEinspeisung = nichtNegativ(
                 letzter.getZaehlerstandEinspeisung().subtract(referenz.getZaehlerstandEinspeisung()),
-                einheitId, "Einspeisung", ende);
+                einheit, "Einspeisung", ende);
 
         double total = deltaBezug.subtract(deltaEinspeisung).doubleValue();
         upsertMesswert(einheit, ende, total);
@@ -294,10 +294,36 @@ public class ZaehlerAggregationService {
         }
     }
 
-    private BigDecimal nichtNegativ(BigDecimal delta, Long einheitId, String register, LocalDateTime ende) {
+    /**
+     * Verwirft ein negatives Delta — ein Zählerstand kann nicht sinken.
+     *
+     * <p><b>Die Energie dieses Intervalls geht dabei verloren.</b> Bei einem Producer sinkt damit
+     * die ausgewiesene Produktion, ohne dass der Anlage etwas fehlt. Deshalb erzeugt der Fall eine
+     * <b>Systemmeldung</b> und nicht nur eine Logzeile: Als reines Log blieb er im Betrieb
+     * unsichtbar, und eine zu tief erscheinende Produktion liesse sich nicht davon unterscheiden,
+     * dass die Anlage wirklich weniger liefert.
+     *
+     * <p>Der verworfene Betrag steht <b>in</b> der Meldung — ohne ihn liesse sich nicht abschätzen,
+     * ob es um Rundung oder um Kilowattstunden geht.
+     */
+    private BigDecimal nichtNegativ(BigDecimal delta, Einheit einheit, String register,
+                                    LocalDateTime ende) {
         if (delta.signum() < 0) {
-            log.warn("Aggregation: Rücksprung bei {} (einheit={}, ende={}) – Delta auf 0 gesetzt",
-                    register, einheitId, ende);
+            log.warn("Aggregation: Rücksprung bei {} (einheit={}, ende={}, delta={}) –"
+                            + " Delta auf 0 gesetzt, Energie geht verloren",
+                    register, einheit.getId(), ende, delta);
+            try {
+                systemmeldungService.erfasse(einheit.getOrgId(), MeldungLevel.WARN,
+                        SystemmeldungService.KATEGORIE_MQTT,
+                        SystemmeldungService.KEY_ZAEHLER_RUECKSPRUNG,
+                        String.format("%s (%s): %s, %s kWh verworfen", einheit.getName(), register,
+                                ZEIT_FORMAT.format(ende), delta.abs().toPlainString()));
+            } catch (RuntimeException e) {
+                // Eine fehlgeschlagene Meldung darf die Aggregation nicht abbrechen - dieselbe
+                // Abwaegung wie beim Zaehlerwechsel.
+                log.warn("Systemmeldung zum Rücksprung konnte nicht erfasst werden (einheit={}): {}",
+                        einheit.getId(), e.getMessage());
+            }
             return BigDecimal.ZERO;
         }
         return delta;

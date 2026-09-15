@@ -49,6 +49,14 @@ public class SystemmeldungService {
     public static final String KEY_ZAEHLER_AUSFALL = "MQTT_ZAEHLER_AUSFALL";
     /** Meldungs-Key (INFO, Audit): Zählerwechsel über die Seriennummer erkannt. */
     public static final String KEY_ZAEHLERTAUSCH = "MQTT_ZAEHLERTAUSCH";
+    /**
+     * Meldungs-Key (WARN): Ein Zählerstand ist gesunken; das Delta wurde auf 0 gesetzt.
+     *
+     * <p>Die Energie dieses Intervalls geht dabei <b>verloren</b> — bei einem Producer sinkt damit
+     * die ausgewiesene Produktion. Bislang stand das nur in einer Logzeile und blieb im Betrieb
+     * unsichtbar; genau danach wurde gesucht, als die Produktion zu tief erschien.
+     */
+    public static final String KEY_ZAEHLER_RUECKSPRUNG = "MQTT_ZAEHLER_RUECKSPRUNG";
 
     /** Kategorie-Übersetzungs-Key für Meldungen zur Solar-Verteilung. */
     public static final String KATEGORIE_VERTEILUNG = "SYSTEMMELDUNG_KATEGORIE_VERTEILUNG";
