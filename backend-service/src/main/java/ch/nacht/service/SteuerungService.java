@@ -131,7 +131,8 @@ public class SteuerungService {
                 schwellwert, speicherwert);
 
         steuerentscheidRepository.upsert(orgId, zeitVon, preis, preisTiefRest,
-                messung.produktion(), messung.verbrauch(), entscheid.ueberschuss(),
+                messung.produktion(), messung.verbrauch(), messung.bezug(),
+                messung.ruecklieferung(), entscheid.ueberschuss(),
                 entscheid.regel().name(), entscheid.batterieladung().name(),
                 entscheid.einspeisung().name(), schwellwert, speicherwert);
 
@@ -287,8 +288,7 @@ public class SteuerungService {
 
     /** Ein nachgerechnetes Intervall — Eingangsgrössen und das Ergebnis der Regel. */
     private record Nachgerechnet(LocalDateTime zeit, BigDecimal preis, BigDecimal preisTiefRest,
-                                 BigDecimal produktion, BigDecimal verbrauch,
-                                 SteuerRegelService.Entscheid entscheid) {
+                                 Messung messung, SteuerRegelService.Entscheid entscheid) {
     }
 
     /**
@@ -321,8 +321,8 @@ public class SteuerungService {
             // und Entscheide gefuehrt werden.
             LocalDateTime endeOrtszeit = (LocalDateTime) zeile[0];
             LocalDateTime zeit = endeOrtszeit.minusMinutes(INTERVALL_MINUTEN);
-            BigDecimal produktion = alsBigDecimal(zeile[1]);
-            BigDecimal verbrauch = alsBigDecimal(zeile[2]);
+            Messung messung = new Messung(alsBigDecimal(zeile[1]), alsBigDecimal(zeile[2]),
+                    alsBigDecimal(zeile[3]), alsBigDecimal(zeile[4]));
 
             TreeMap<LocalDateTime, BigDecimal> preiseDesTages =
                     preiseJeTag.getOrDefault(zeit.toLocalDate(), new TreeMap<>());
@@ -331,11 +331,11 @@ public class SteuerungService {
             BigDecimal preisTiefRest = tiefstpreisNach(preiseDesTages, zeit);
 
             SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
-                    new SteuerRegelService.Eingabe(preis, preisTiefRest, produktion, verbrauch),
+                    new SteuerRegelService.Eingabe(preis, preisTiefRest,
+                            messung.produktion(), messung.verbrauch()),
                     schwellwert, speicherwert);
 
-            verbraucher.accept(new Nachgerechnet(zeit, preis, preisTiefRest,
-                    produktion, verbrauch, entscheid));
+            verbraucher.accept(new Nachgerechnet(zeit, preis, preisTiefRest, messung, entscheid));
         }
         return preiseJeTag.size();
     }
@@ -347,8 +347,18 @@ public class SteuerungService {
                 : einstellungenService.getSteuerKonfiguration(orgId).speicherwertOderVorgabe();
     }
 
-    /** Produktion (als Betrag) und Verbrauch eines Intervalls. */
-    private record Messung(BigDecimal produktion, BigDecimal verbrauch) {
+    /**
+     * Die vier Bilanzkomponenten eines Intervalls.
+     *
+     * <p>{@code produktion} und {@code ruecklieferung} sind <b>Betraege</b> — in
+     * {@code messwerte.total} stehen beide negativ.
+     *
+     * <p>Bezug und Ruecklieferung gehen in <b>keine</b> Regel ein; sie machen die Energiebilanz
+     * pruefbar: {@code Produktion + Bezug − Verbrauch − Ruecklieferung} ist der Netto-Batteriefluss
+     * (FR-5). Ohne sie liess sich nicht feststellen, ob die Zahlen ueberhaupt zusammenpassen.
+     */
+    private record Messung(BigDecimal produktion, BigDecimal verbrauch,
+                           BigDecimal bezug, BigDecimal ruecklieferung) {
     }
 
     /**
@@ -369,13 +379,14 @@ public class SteuerungService {
         LocalDateTime endeOrtszeit = zeitVon.plusMinutes(INTERVALL_MINUTEN);
         for (Object[] zeile : messwerteRepository.sumBilanzKomponentenPerZeitBetween(
                 endeOrtszeit, endeOrtszeit.plusMinutes(INTERVALL_MINUTEN))) {
-            return new Messung(alsBigDecimal(zeile[1]), alsBigDecimal(zeile[2]));
+            return new Messung(alsBigDecimal(zeile[1]), alsBigDecimal(zeile[2]),
+                    alsBigDecimal(zeile[3]), alsBigDecimal(zeile[4]));
         }
         // Die Lücke wird gemeldet, nicht nur in Nullen abgebildet: Ein Entscheid mit Produktion 0
         // sieht aus wie Nacht. Ortszeit im Text, weil das Messraster in Ortszeit liegt.
         log.warn("Steuerung: keine Messwerte fuer das Intervall (Ortszeit {} - {}) - Entscheid mit 0",
                 endeOrtszeit.minusMinutes(INTERVALL_MINUTEN), endeOrtszeit);
-        return new Messung(BigDecimal.ZERO, BigDecimal.ZERO);
+        return new Messung(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
     }
 
     /**
@@ -479,8 +490,13 @@ public class SteuerungService {
         dto.setZeit(n.zeit());
         dto.setPreis(n.preis());
         dto.setPreisTiefRest(n.preisTiefRest());
-        dto.setProduktion(n.produktion().setScale(MENGE_SCALE, java.math.RoundingMode.HALF_UP));
-        dto.setVerbrauch(n.verbrauch().setScale(MENGE_SCALE, java.math.RoundingMode.HALF_UP));
+        dto.setProduktion(n.messung().produktion()
+                .setScale(MENGE_SCALE, java.math.RoundingMode.HALF_UP));
+        dto.setVerbrauch(n.messung().verbrauch()
+                .setScale(MENGE_SCALE, java.math.RoundingMode.HALF_UP));
+        dto.setBezug(n.messung().bezug().setScale(MENGE_SCALE, java.math.RoundingMode.HALF_UP));
+        dto.setRuecklieferung(n.messung().ruecklieferung()
+                .setScale(MENGE_SCALE, java.math.RoundingMode.HALF_UP));
         dto.setUeberschuss(n.entscheid().ueberschuss()
                 .setScale(MENGE_SCALE, java.math.RoundingMode.HALF_UP));
         dto.setRegel(n.entscheid().regel());
@@ -499,6 +515,8 @@ public class SteuerungService {
         dto.setPreisTiefRest(entscheid.getPreisTiefRest());
         dto.setProduktion(entscheid.getProduktion());
         dto.setVerbrauch(entscheid.getVerbrauch());
+        dto.setBezug(entscheid.getBezug());
+        dto.setRuecklieferung(entscheid.getRuecklieferung());
         dto.setUeberschuss(entscheid.getUeberschuss());
         dto.setRegel(entscheid.getRegel());
         dto.setBatterieladung(entscheid.getBatterieladung());

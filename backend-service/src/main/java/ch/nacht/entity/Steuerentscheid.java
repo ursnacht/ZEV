@@ -89,6 +89,22 @@ public class Steuerentscheid {
     @Column(name = "verbrauch", precision = 12, scale = 3, nullable = false)
     private BigDecimal verbrauch;
 
+    /**
+     * Summe der {@code BEZUG}-Einheiten in kWh; {@code null} bei Entscheiden vor V149.
+     *
+     * <p>Geht in <b>keine</b> Regel ein — zusammen mit {@link #ruecklieferung} macht dieser Wert
+     * die Energiebilanz prüfbar (FR-5).
+     */
+    @Column(name = "bezug", precision = 12, scale = 3)
+    private BigDecimal bezug;
+
+    /**
+     * Summe der {@code RUECKLIEFERUNG}-Einheiten in kWh, <b>als Betrag</b>; {@code null} bei
+     * Entscheiden vor V149.
+     */
+    @Column(name = "ruecklieferung", precision = 12, scale = 3)
+    private BigDecimal ruecklieferung;
+
     /** {@code max(0, produktion − verbrauch)} in kWh. */
     @NotNull
     @Column(name = "ueberschuss", precision = 12, scale = 3, nullable = false)
@@ -180,6 +196,22 @@ public class Steuerentscheid {
 
     public void setVerbrauch(BigDecimal verbrauch) {
         this.verbrauch = verbrauch;
+    }
+
+    public BigDecimal getBezug() {
+        return bezug;
+    }
+
+    public void setBezug(BigDecimal bezug) {
+        this.bezug = bezug;
+    }
+
+    public BigDecimal getRuecklieferung() {
+        return ruecklieferung;
+    }
+
+    public void setRuecklieferung(BigDecimal ruecklieferung) {
+        this.ruecklieferung = ruecklieferung;
     }
 
     public BigDecimal getUeberschuss() {

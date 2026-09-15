@@ -18,9 +18,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * prüfen, ohne dass ein einziger Messwert existieren muss.
  *
  * <p><b>Warum diese Klasse dringend war:</b> Auf der Entwicklungsumgebung entsteht nie ein
- * Überschuss — dort greift immer Regel 2, und die Regeln 1, 3, 4 und 5 lassen sich durch Zusehen
- * nicht prüfen. Der Fehler in Regel 4 (siehe unten) fiel erst im Produktivbetrieb auf, an einer
- * Tabelle mit echten Preisen.
+ * Überschuss. Solange {@code KEIN_UEBERSCHUSS} vor den Preisregeln stand, liess sich dort keine
+ * einzige von ihnen durch Zusehen prüfen — beide bis heute gefundenen Fehler der Regel fielen erst
+ * im Produktivbetrieb auf, an einer Tabelle mit echten Preisen.
+ *
+ * <p>Die Abschnitte sind nach <b>Regelnamen</b> benannt, nicht nach Nummern: Die
+ * Auswertungsreihenfolge hat sich schon einmal geändert, und Nummern in Kommentaren veralten
+ * stillschweigend.
  */
 public class SteuerRegelServiceTest {
 
@@ -28,7 +32,7 @@ public class SteuerRegelServiceTest {
     private static final BigDecimal SCHWELLWERT = new BigDecimal("0.165");
     private static final BigDecimal SPEICHERWERT = new BigDecimal("0.31");
 
-    /** Produktion deutlich über Verbrauch — damit die Regeln 3 bis 5 überhaupt erreicht werden. */
+    /** Produktion deutlich über Verbrauch — für die Fälle, in denen ein Überschuss gebraucht wird. */
     private static final BigDecimal PRODUKTION = new BigDecimal("4.000");
     private static final BigDecimal VERBRAUCH = new BigDecimal("0.300");
 
@@ -39,7 +43,7 @@ public class SteuerRegelServiceTest {
         steuerRegelService = new SteuerRegelService();
     }
 
-    // ==================== Regel 1: PREIS_NEGATIV ====================
+    // ==================== PREIS_NEGATIV ====================
 
     @Test
     void entscheide_NegativerPreis_SperrtEinspeisungUndLaesstLadungFrei() {
@@ -63,12 +67,14 @@ public class SteuerRegelServiceTest {
         assertEquals(Steuerzustand.FREI, entscheid.einspeisung());
     }
 
-    // ==================== Regel 2: KEIN_UEBERSCHUSS ====================
+    // ==================== KEIN_UEBERSCHUSS und der Ueberschuss selbst ====================
 
     @Test
     void entscheide_ProduktionUnterVerbrauch_KeinUeberschussUndBeideFrei() {
+        // Damit KEIN_UEBERSCHUSS ueberhaupt greift, darf KEINE Preisregel zutreffen: Der Preis liegt
+        // im Normalbereich und der Rest des Tages bringt nichts Guenstigeres.
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
-                new SteuerRegelService.Eingabe(new BigDecimal("0.100"), new BigDecimal("0.010"),
+                new SteuerRegelService.Eingabe(new BigDecimal("0.100"), new BigDecimal("0.200"),
                         new BigDecimal("1.000"), new BigDecimal("2.000")),
                 SCHWELLWERT, SPEICHERWERT);
 
@@ -76,6 +82,40 @@ public class SteuerRegelServiceTest {
         assertEquals(Steuerzustand.FREI, entscheid.batterieladung());
         assertEquals(Steuerzustand.FREI, entscheid.einspeisung());
         assertEquals(0, BigDecimal.ZERO.compareTo(entscheid.ueberschuss()));
+    }
+
+    /**
+     * <b>Der Regressionstest zur umgestellten Reihenfolge (15.09.2026).</b>
+     *
+     * <p>Ohne gemessenen Überschuss greift die Preisregel <b>trotzdem</b>. Das ist der Fall, der die
+     * Steuerung vorher wirkungslos machte: Solange die Batterie lädt, wird ihre Ladeleistung am
+     * Zähler des Produzenten als Bezug gegengerechnet, der Überschuss erscheint als 0 — und
+     * {@code KEIN_UEBERSCHUSS} blockierte alle Preisregeln. Entschieden wurde erst, wenn die
+     * Batterie voll war und es nichts mehr zu entscheiden gab.
+     */
+    @Test
+    void entscheide_OhneUeberschussAberTalInSicht_SperrtLadungTrotzdem() {
+        SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
+                new SteuerRegelService.Eingabe(new BigDecimal("0.190"), new BigDecimal("0.100"),
+                        new BigDecimal("1.000"), new BigDecimal("2.000")),
+                SCHWELLWERT, SPEICHERWERT);
+
+        assertEquals(Steuerregel.WARTEN_AUF_TAL, entscheid.regel());
+        assertEquals(Steuerzustand.GESPERRT, entscheid.batterieladung());
+        assertEquals(Steuerzustand.FREI, entscheid.einspeisung());
+        // Der Ueberschuss bleibt 0 - er wird protokolliert, steuert den Entscheid aber nicht mehr.
+        assertEquals(0, BigDecimal.ZERO.compareTo(entscheid.ueberschuss()));
+    }
+
+    @Test
+    void entscheide_OhneUeberschussUndEinspeisenLohnt_SperrtLadungTrotzdem() {
+        SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
+                new SteuerRegelService.Eingabe(new BigDecimal("0.320"), new BigDecimal("0.300"),
+                        BigDecimal.ZERO, new BigDecimal("2.000")),
+                SCHWELLWERT, SPEICHERWERT);
+
+        assertEquals(Steuerregel.EINSPEISEN_LOHNT, entscheid.regel());
+        assertEquals(Steuerzustand.GESPERRT, entscheid.batterieladung());
     }
 
     @Test
@@ -89,7 +129,7 @@ public class SteuerRegelServiceTest {
         assertEquals(0, new BigDecimal("6").compareTo(entscheid.ueberschuss()));
     }
 
-    // ==================== Regel 3: EINSPEISEN_LOHNT ====================
+    // ==================== EINSPEISEN_LOHNT ====================
 
     @Test
     void entscheide_PreisUeberSpeicherwert_SperrtLadung() {
@@ -108,7 +148,7 @@ public class SteuerRegelServiceTest {
         assertEquals(Steuerregel.EINSPEISEN_LOHNT, entscheid.regel());
     }
 
-    // ==================== Regel 4: WARTEN_AUF_TAL ====================
+    // ==================== WARTEN_AUF_TAL ====================
 
     @Test
     void entscheide_SpaeterGuenstigerUndUnterSchwellwert_SperrtLadung() {
@@ -191,7 +231,7 @@ public class SteuerRegelServiceTest {
         assertEquals(Steuerregel.WARTEN_AUF_TAL, entscheid.regel());
     }
 
-    // ==================== Regel 5: LADEN ====================
+    // ==================== LADEN ====================
 
     @Test
     void entscheide_KeinTalInSicht_LaedtUndLaesstBeidesFrei() {
@@ -205,9 +245,11 @@ public class SteuerRegelServiceTest {
     // ==================== Reihenfolge der Regeln ====================
 
     @Test
-    void entscheide_NegativerPreisOhneUeberschuss_SchlaegtRegelZwei() {
-        // Die Reihenfolge ist Fachlichkeit: Regel 1 greift VOR der Ueberschusspruefung und
-        // deshalb auch nachts. Genau darum zaehlt die Rueckrechnung nur Intervalle mit Ueberschuss.
+    void entscheide_NegativerPreisOhneUeberschuss_BleibtPreisNegativ() {
+        // Seit der Umstellung greift JEDE Preisregel auch ohne Ueberschuss - also auch nachts.
+        // Genau darum zaehlt die Rueckrechnung ausschliesslich Intervalle mit Ueberschuss: Sonst
+        // staenden die Preisregeln vielfach ueber den Faellen, in denen wirklich etwas zu
+        // entscheiden war.
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(new BigDecimal("-0.010"), new BigDecimal("0.010"),
                         BigDecimal.ZERO, new BigDecimal("2.000")),

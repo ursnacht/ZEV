@@ -13,14 +13,6 @@ public enum Steuerregel {
     /** Preis unter 0: Einspeisen kostet Geld. Laden bleibt frei, eingespiesen wird nichts. */
     PREIS_NEGATIV,
 
-    /**
-     * Produktion deckt den Verbrauch nicht — es gibt nichts zu entscheiden.
-     *
-     * <p>Wird trotzdem protokolliert: Eine Lücke im Protokoll liesse später offen, ob die
-     * Steuerung überhaupt lief.
-     */
-    KEIN_UEBERSCHUSS,
-
     /** Die Vergütung liegt über dem Wert einer gespeicherten kWh — einspeisen lohnt mehr. */
     EINSPEISEN_LOHNT,
 
@@ -31,6 +23,20 @@ public enum Steuerregel {
      * statt sie jetzt mit teurerem Strom zu füllen.
      */
     WARTEN_AUF_TAL,
+
+    /**
+     * Kein Überschuss gemessen — keine Sperre.
+     *
+     * <p><b>Steht bewusst NACH den Preisregeln.</b> Davor machte sie die Steuerung wirkungslos:
+     * Solange die Batterie lädt, wird ihre Ladeleistung am Zähler des Produzenten als Bezug
+     * gegengerechnet und der Überschuss erscheint als 0 — die Preisregeln wurden nie erreicht, und
+     * entschieden wurde erst, wenn die Batterie voll war.
+     *
+     * <p>Sie wird trotzdem protokolliert: Eine Lücke im Protokoll liesse später offen, ob die
+     * Steuerung überhaupt lief. Der Entscheid ist derselbe wie bei {@link #LADEN}
+     * ({@code FREI}/{@code FREI}); unterschiedlich ist nur die Begründung.
+     */
+    KEIN_UEBERSCHUSS,
 
     /**
      * Laden, sobald Überschuss da ist.

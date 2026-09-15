@@ -69,9 +69,9 @@ Das macht die Steuerung nicht überflüssig, sondern schärft sie: Die Frage ist
 gespeichert wird, sondern **wann**. Die Batterie fasst 20 kWh; wer sie morgens mit Strom zu `0.15`
 füllt, muss mittags zu `0.02` einspeisen, weil kein Platz mehr ist. Umgekehrt herum verdient
 dieselbe Anlage an denselben Kilowattstunden mehr. **Die knappe Ressource ist die Kapazität, nicht
-die Gelegenheit** — und genau darauf zielt Regel 4.
+die Gelegenheit** — und genau darauf zielt `WARTEN_AUF_TAL`.
 
-Regel 3 („Einspeisen lohnt mehr") wird mit diesem Massstab **praktisch nie auslösen**. Sie bleibt
+`EINSPEISEN_LOHNT` wird mit diesem Massstab **praktisch nie auslösen**. Sie bleibt
 als Wächter für den Fall, dass Einspeisepreise über den Bezugspreis steigen — in
 Knappheitssituationen kommt das vor. Wird der Massstab später auf den ZEV-Tarif umgestellt
 (`speicherwert` = `0.18`), greift sie regelmässig; dafür ist der Wert konfigurierbar.
@@ -147,24 +147,35 @@ Ausgewertet in dieser Reihenfolge; die erste zutreffende Regel bestimmt den Ents
 | # | Bedingung | `batterieladung` | `einspeisung` | Schlüssel |
 |---|---|---|---|---|
 | 1 | Preis **jetzt** < 0 | `FREI` | **`GESPERRT`** | `PREIS_NEGATIV` |
-| 2 | kein PV-Überschuss (Produktion ≤ Verbrauch) | `FREI` | `FREI` | `KEIN_UEBERSCHUSS` |
-| 3 | Preis **jetzt** ≥ Speicherwert | **`GESPERRT`** | `FREI` | `EINSPEISEN_LOHNT` |
-| 4 | erwarteter Tiefstpreis **heute noch** < Schwellwert **und** < Preis **jetzt** | **`GESPERRT`** | `FREI` | `WARTEN_AUF_TAL` |
+| 2 | Preis **jetzt** ≥ Speicherwert | **`GESPERRT`** | `FREI` | `EINSPEISEN_LOHNT` |
+| 3 | erwarteter Tiefstpreis **heute noch** < Schwellwert **und** < Preis **jetzt** | **`GESPERRT`** | `FREI` | `WARTEN_AUF_TAL` |
+| 4 | kein PV-Überschuss (Produktion ≤ Verbrauch) | `FREI` | `FREI` | `KEIN_UEBERSCHUSS` |
 | 5 | sonst | `FREI` | `FREI` | `LADEN` |
 
-**Regel 1 — negativer Preis.** Einspeisen kostet dann Geld. Die Batterie darf laden (sie nimmt
+> **Der Überschuss steht am Ende — und das ist der Kern dieser Reihenfolge.** In einer früheren
+> Fassung stand `KEIN_UEBERSCHUSS` an zweiter Stelle und blockierte alle Preisregeln. Das machte die
+> Steuerung **wirkungslos**: Solange die Batterie lädt, wird ihre Ladeleistung am Zähler des
+> Produzenten als Bezug gegengerechnet (`total = ΔBezug − ΔEinspeisung`, §1), der Überschuss
+> erscheint als `0` — und entschieden wurde erst, wenn die Batterie voll war und es nichts mehr zu
+> entscheiden gab.
+>
+> **Für den Entscheid ist der Überschuss nicht nötig.** Die Frage „laden oder einspeisen?" hängt am
+> **Preis**, nicht an der Menge. Ist gerade kein Überschuss da, läuft eine Sperre ins Leere — schaden
+> kann sie nicht, denn der Anlagenregler entscheidet ohnehin, ob tatsächlich geladen wird.
+>
+> Die Zeilen 4 und 5 ergeben **denselben** Entscheid (`FREI`/`FREI`) und unterscheiden sich nur in
+> der Begründung. Beide bleiben im Protokoll, weil eine Lücke offenliesse, ob die Steuerung lief.
+
+**`PREIS_NEGATIV` — negativer Preis.** Einspeisen kostet dann Geld. Die Batterie darf laden (sie nimmt
 Energie auf, die sonst abgeregelt würde); eingespiesen wird nichts.
 
-**Regel 2 — kein Überschuss.** Ohne Überschuss gibt es nichts zu entscheiden. Der Fall wird
-trotzdem protokolliert: Eine Lücke im Protokoll liesse später offen, ob die Steuerung lief.
-
-**Regel 3 — Einspeisen lohnt mehr.** Liegt die Vergütung über dem Wert, den eine gespeicherte
+**`EINSPEISEN_LOHNT` — Einspeisen lohnt mehr.** Liegt die Vergütung über dem Wert, den eine gespeicherte
 Kilowattstunde später bringt (`speicherwert`, Vorgabe **`0.31`** = vermiedener Netzbezug abzüglich
 Verlusten), ist Einspeisen die bessere Verwendung. **Mit dieser Vorgabe löst die Regel praktisch
 nie aus** (höchster gemessener Preis `0.238`); sie ist der Wächter für Knappheitspreise und für
 einen später geänderten Massstab — siehe §1.
 
-**Regel 4 — auf das Tal warten.** Das ist der Kern. Ist **heute noch** ein Intervall zu erwarten,
+**`WARTEN_AUF_TAL` — auf das Tal warten.** Das ist der Kern. Ist **heute noch** ein Intervall zu erwarten,
 das **billiger als jetzt** ist und unter dem Schwellwert liegt, wird die knappe Batteriekapazität
 dafür freigehalten, statt sie jetzt mit teurerem Strom zu füllen.
 
@@ -182,7 +193,11 @@ dafür freigehalten, statt sie jetzt mit teurerem Strom zu füllen.
 >
 > **Ohne Preis wird nicht gesperrt** — ein Vergleich ohne die eine Seite ist keiner.
 
-**Regel 5 — laden.** Kommt kein Tal mehr, wird geladen, sobald Überschuss da ist. Das deckt den
+**`KEIN_UEBERSCHUSS` — nichts gemessen.** Rein beschreibend: Es wurde kein Überschuss gemessen,
+und keine Preisregel hat gegriffen. Der Fall wird protokolliert, weil eine Lücke später offenliesse,
+ob die Steuerung überhaupt lief — er **blockiert aber nichts mehr** (siehe Kasten oben).
+
+**`LADEN` — laden.** Überschuss ist da und kein Tal mehr in Sicht. Das deckt den
 bewölkten Tag ab: Ein **hoher** Mittagspreis bedeutet, dass der ganze Markt wenig Solarstrom
 erwartet — dann ist die Gelegenheit knapp, nicht die Kapazität, und jede Kilowattstunde gehört in
 die Batterie.
@@ -196,7 +211,7 @@ die Batterie.
 laufenden Tages (Ortszeit Europe/Zurich), deren Beginn **nach** dem ausgewerteten Intervall liegt.
 Bewusst nicht ein festes Mittagsfenster: Die Frage ist „kommt noch etwas Billigeres?", und die
 Antwort darauf ist am Nachmittag eine andere als am Morgen. Liegen für den Rest des Tages **keine**
-Preise vor, gilt Regel 4 als nicht erfüllt (§5).
+Preise vor, gilt `WARTEN_AUF_TAL` als nicht erfüllt (§5).
 
 **Zeitbezüge** — die Steuerung rechnet durchgehend in **Ortszeit**:
 
@@ -252,8 +267,8 @@ das, was nach der Steuerung übrig bleibt, nicht ihre Eingangsgrösse.
 
 | Feld | Vorgabe | Bedeutung |
 |---|---|---|
-| `schwellwert` | `0.05` | Schwellwert für Regel 4, CHF/kWh |
-| `speicherwert` | `0.31` | Wert einer gespeicherten kWh, CHF/kWh (Regel 3) |
+| `schwellwert` | `0.05` | Schwellwert für `WARTEN_AUF_TAL`, CHF/kWh |
+| `speicherwert` | `0.31` | Wert einer gespeicherten kWh, CHF/kWh (`EINSPEISEN_LOHNT`) |
 | `batteriekapazitaet` | — | Nutzbare Kapazität in kWh; **nur dokumentierend** in dieser Ausbaustufe (keine Regel wertet sie aus), aber Voraussetzung jeder späteren Ertragsrechnung |
 
 **Warum je Mandant und nicht in `.env`:** Der Schwellwert hängt an der Anlage — an Batteriegrösse,
@@ -281,6 +296,8 @@ Neue Tabelle `zev.steuerentscheid` (Flyway `V<nächste freie>__Create_Steuerents
 | `preis_tief_rest` | `numeric(10,5)` | **nein** | Erwarteter Tiefstpreis für den Rest des Tages |
 | `produktion` | `numeric(12,3)` | ja | Summe der `PRODUCER` im Intervall, kWh |
 | `verbrauch` | `numeric(12,3)` | ja | Summe der `CONSUMER` im Intervall, kWh |
+| `bezug` | `numeric(12,3)` | nein | Summe der `BEZUG`-Einheiten in kWh; leer vor V149 |
+| `ruecklieferung` | `numeric(12,3)` | nein | Summe der `RUECKLIEFERUNG`-Einheiten in kWh, als Betrag; leer vor V149 |
 | `ueberschuss` | `numeric(12,3)` | ja | `max(0, produktion − verbrauch)`, kWh |
 | `regel` | `varchar(30)` | ja | Ausgelöste Regel (`PREIS_NEGATIV`, …, `LADEN`) |
 | `batterieladung` | `varchar(10)` | ja | `FREI` \| `GESPERRT` |
@@ -418,11 +435,12 @@ Das Ergebnis nennt je Schwellwert:
 | `stunden_einspeisung_gesperrt` | dito für die Einspeisung |
 | `energie_verschoben` | Überschuss-kWh in Intervallen mit gesperrter Ladung — die Energie, die die Regel vom Speicher weg in die Einspeisung lenkt |
 
-> **Warum nur Intervalle mit Überschuss gezählt werden:** Regel 1 (`PREIS_NEGATIV`) wird vor der
-> Überschussprüfung ausgewertet und greift deshalb auch nachts — in jeder Viertelstunde mit
-> negativem Preis, obwohl gar nichts einzuspeisen ist. Das Verhalten ist folgenlos und bleibt so
-> (die Sperre ist dann wirkungslos), aber in einer Zählung, mit der ein Schwellwert kalibriert
-> werden soll, wäre es irreführend: `PREIS_NEGATIV` stünde vielfach über den Fällen, in denen die
+> **Warum nur Intervalle mit Überschuss gezählt werden:** **Jede** Preisregel wird vor der
+> Überschussprüfung ausgewertet und greift deshalb auch nachts — in jeder Viertelstunde, obwohl gar
+> nichts einzuspeisen ist. Das Verhalten ist gewollt und folgenlos (die Sperre ist dann wirkungslos,
+> und genau darauf beruht die Reihenfolge, siehe FR-2), aber in einer Zählung, mit der ein
+> Schwellwert kalibriert werden soll, wäre es irreführend: Die Preisregeln stünden vielfach über den
+> Fällen, in denen die
 > Steuerung tatsächlich etwas entschieden hat. **Die Tagesansicht (FR-5) zeigt weiterhin alle
 > Intervalle** — dort ist die Vollständigkeit der Zweck, hier die Aussagekraft.
 
@@ -465,6 +483,34 @@ Batterieladung und Einspeisung gesperrt **wären**.
 >
 > **Und nicht als Teil der Antwort von `/simulation`:** Beim Blättern müsste sonst die ganze
 > Rückrechnung über bis zu 366 Tage erneut laufen, um einen einzelnen Tag zu zeigen.
+
+### FR-6b: Die Energiebilanz ist prüfbar
+
+Der Entscheid hält **alle vier** Bilanzkomponenten fest — Produktion, Verbrauch, Bezug und
+Rücklieferung. Die Protokolltabelle zeigt sie und daneben die Differenz:
+
+```
+Produktion + Bezug  −  Verbrauch − Rücklieferung  =  Netto-Batteriefluss
+```
+
+Positiv heisst laden, negativ entladen. **Damit wird die Batterie sichtbar, obwohl sie keinen
+eigenen Zähler hat** — einen Einheiten-Typ `SPEICHER` gibt es bis heute nicht (§1, §8).
+
+* **Bezug und Rücklieferung gehen in keine Regel ein.** Sie sind Diagnose, nicht Entscheidungsgrundlage.
+* **Die Differenz wird nicht gespeichert,** sondern aus den vier Spalten abgeleitet: Ein
+  gespeicherter Ableitungswert kann von seiner Grundlage abweichen.
+* **Beide Spalten sind optional.** Entscheide aus der Zeit vor V149 haben sie nicht; eine `0` wäre
+  dort eine Falschaussage und sähe aus wie „kein Bezug gemessen".
+
+> **Was in der Differenz sonst noch steckt:** Jeder Verbraucher, der nicht als Einheit erfasst ist.
+> Eine dauerhaft grosse Differenz bei stillstehender Batterie ist genau dieser Fall — und damit der
+> Hinweis, dass Einheiten fehlen. Der Hinweistext an der Spalte sagt das ausdrücklich, damit die
+> Zahl nicht als „Batterie" missverstanden wird.
+
+> **Warum das nötig wurde:** Produktion und Verbrauch standen bis dahin ohne Gegenprobe da. Der
+> Verdacht, sie seien falsch summiert, liess sich weder bestätigen noch entkräften — die Ansicht
+> zeigte die Hälfte der Bilanz. Die Summierung selbst ist nachweislich dieselbe wie in der
+> Statistik (`SUM(total)` je Einheiten-Typ, `abs()` für Producer).
 
 ### FR-7: Einstellungen je Mandant
 
@@ -522,6 +568,10 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 | `STEUERUNG_NACHRECHNEN` | Nachrechnen | Recalculate |
 | `STEUERUNG_SIMULIERTE_ANSICHT` | Nachgerechnete Ansicht — keine Aufzeichnung. Es wird nichts gespeichert. Schwellwert: | Recalculated view — not a recording. Nothing is stored. Threshold: |
 | `STEUERUNG_AUFZEICHNUNG_ZEIGEN` | Aufzeichnung zeigen | Show recording |
+| `STEUERUNG_BEZUG` | Bezug | Grid supply |
+| `STEUERUNG_RUECKLIEFERUNG` | Rücklieferung | Feed-in to grid |
+| `STEUERUNG_BILANZ_DIFFERENZ` | Batterie (aus Bilanz) | Battery (from balance) |
+| `STEUERUNG_BILANZ_HINWEIS` | Produktion + Bezug − Verbrauch − Rücklieferung. … | Production + grid supply − consumption − feed-in. … |
 | `STEUERUNG_BATTERIELADUNG` | Batterieladung | Battery charging |
 | `STEUERUNG_EINSPEISUNG` | Einspeisung | Feed-in |
 | `STEUERUNG_FREI` | Frei | Enabled |
@@ -544,7 +594,9 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 
 **Regel**
 * [ ] Bei negativem Preis ist `einspeisung = GESPERRT` und `batterieladung = FREI`.
-* [ ] Ohne Überschuss (Produktion ≤ Verbrauch) sind **beide** Zustände `FREI`, und der Entscheid wird trotzdem geschrieben.
+* [ ] Ohne Überschuss **und ohne greifende Preisregel** sind beide Zustände `FREI`, und der Entscheid wird trotzdem geschrieben.
+* [ ] **Ohne gemessenen Überschuss greift eine zutreffende Preisregel trotzdem** — `WARTEN_AUF_TAL` und `EINSPEISEN_LOHNT` sperren die Ladung auch dann, wenn `ueberschuss = 0` protokolliert wird.
+* [ ] `KEIN_UEBERSCHUSS` wird nur vergeben, wenn **keine** Preisregel zutrifft.
 * [ ] Liegt der Preis über dem Speicherwert, ist `batterieladung = GESPERRT` und `einspeisung = FREI`.
 * [ ] Ist für den Rest des Tages ein Preis unter dem Schwellwert zu erwarten, ist `batterieladung = GESPERRT`.
 * [ ] Ist kein solcher Preis mehr zu erwarten, ist `batterieladung = FREI` — auch bei hohem aktuellem Preis unterhalb des Speicherwerts.
@@ -571,6 +623,10 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 * [ ] Jedes Band liegt auf seiner **festen Ebene**, unabhängig davon, ob das andere gesetzt ist.
 * [ ] Eine Lücke in den Entscheiden unterbricht das Band, statt überbrückt zu werden.
 * [ ] Die Protokolltabelle nennt je Intervall die Regel im Klartext, nicht den Schlüssel.
+* [ ] Die Tabelle zeigt **alle vier** Bilanzkomponenten: Produktion, Verbrauch, Bezug, Rücklieferung.
+* [ ] Die Spalte „Batterie (aus Bilanz)" zeigt `Produktion + Bezug − Verbrauch − Rücklieferung`.
+* [ ] Fehlen Bezug oder Rücklieferung (Entscheid vor V149), bleibt die Differenz **leer** statt `0`.
+* [ ] Bezug und Rücklieferung beeinflussen **keinen** Entscheid — dieselben Messwerte ergeben mit und ohne sie dieselbe Regel.
 * [ ] Ein Tag ohne Entscheide zeigt den Hinweis statt einer leeren Tabelle.
 * [ ] Beträge erscheinen im Schweizer Format (`0.05`, `1'234.50`), unabhängig von der Browser-Locale.
 
@@ -579,7 +635,7 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 * [ ] Ein tieferer Schwellwert führt zu **weniger** Intervallen mit `WARTEN_AUF_TAL` (monoton).
 * [ ] **Steht der aktuelle Preis bereits auf dem Tiefstpreis des Resttages, wird `LADEN` entschieden, nicht `WARTEN_AUF_TAL`** — es gibt nichts, worauf sich warten liesse.
 * [ ] Liegt der Tiefstpreis des Resttages **über** dem aktuellen Preis, wird geladen, auch wenn er unter dem Schwellwert liegt.
-* [ ] Fehlt der aktuelle Preis, greift Regel 4 **nicht**.
+* [ ] Fehlt der aktuelle Preis, greift `WARTEN_AUF_TAL` **nicht**.
 * [ ] Das Ergebnis nennt Tage, Intervalle, Auslösungen je Regel und die verschobene Energie.
 * [ ] Ein Zeitraum über 366 Tage wird mit `400` abgewiesen.
 * [ ] **Nach dem Nachrechnen zeigen Diagramm und Tabelle denselben Tag mit dem erprobten Schwellwert** — die Zustandsbänder sagen, *wann* gesperrt worden wäre.
@@ -591,7 +647,7 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 
 **Verhalten ohne Daten** (aus §5)
 * [ ] Fehlt der Preis für das ausgewertete Intervall, wird der Entscheid trotzdem geschrieben, `preis` bleibt leer, und **keine** Sperre wird gesetzt.
-* [ ] Liegen für den Rest des Tages keine Preise vor, bleibt `preis_tief_rest` leer und Regel 4 greift **nicht**.
+* [ ] Liegen für den Rest des Tages keine Preise vor, bleibt `preis_tief_rest` leer und `WARTEN_AUF_TAL` greift **nicht**.
 * [ ] Fehlen die Messwerte des Intervalls, wird der Entscheid mit Produktion, Verbrauch und Überschuss `0` geschrieben — die Lücke ist damit sichtbar statt unsichtbar.
 * [ ] Ein Datum in der Zukunft liefert eine leere Liste mit dem Hinweis, keinen Fehler.
 * [ ] Wird das Flag mitten am Tag eingeschaltet, beginnen die Entscheide beim nächsten Lauf; die Ansicht zeigt den unvollständigen Tag, ohne Vollständigkeit zu behaupten.
@@ -658,7 +714,7 @@ Der Job protokolliert auf `INFO` nach demselben Muster wie `ZaehlerAggregationSe
 | je Mandant | `INFO` | Org, Intervall in Ortszeit |
 | je Entscheid | `INFO` | Preis, Tiefstpreis, Produktion, Verbrauch, Überschuss, Regel, beide Zustände |
 | keine Messwerte | `WARN` | Intervall in Ortszeit — die Lücke wird gemeldet, nicht nur als `0` abgebildet |
-| kein Preis | `WARN` | Intervall, mit dem Hinweis, dass die Regeln 1 und 3 nicht greifen |
+| kein Preis | `WARN` | Intervall, mit dem Hinweis, dass `PREIS_NEGATIV` und `EINSPEISEN_LOHNT` nicht greifen |
 | Lauf je Mandant fehlgeschlagen | `ERROR` | Org, Intervall, Meldung samt Stacktrace |
 | Abschluss | `INFO` | Anzahl erzeugter Entscheide |
 
@@ -677,8 +733,8 @@ Der Job protokolliert auf `INFO` nach demselben Muster wie `ZaehlerAggregationSe
 | Fall | Verhalten |
 |---|---|
 | **Keine Preise für das Intervall** | Entscheid wird trotzdem geschrieben, `preis` bleibt leer, Regel `KEIN_UEBERSCHUSS` bzw. `LADEN` je nach Überschuss. Ohne Preis darf die Steuerung nicht sperren — Nichtstun ist der sichere Zustand. |
-| **Keine Preise für den Rest des Tages** | Regel 4 gilt als **nicht** erfüllt (`preis_tief_rest` leer). Ein fehlender Blick nach vorne ist kein Grund zu warten. |
-| **Keine Messwerte für das Intervall** | Produktion und Verbrauch `0`, Überschuss `0` → Regel 2. Der Entscheid wird geschrieben, damit die Lücke **sichtbar** ist statt unsichtbar. |
+| **Keine Preise für den Rest des Tages** | `WARTEN_AUF_TAL` gilt als **nicht** erfüllt (`preis_tief_rest` leer). Ein fehlender Blick nach vorne ist kein Grund zu warten. |
+| **Keine Messwerte für das Intervall** | Produktion und Verbrauch `0`, Überschuss `0` → `KEIN_UEBERSCHUSS`, sofern keine Preisregel greift. Der Entscheid wird geschrieben, damit die Lücke **sichtbar** ist statt unsichtbar. |
 | **Nachrechnen für einen Tag ohne Messwerte** | Leere Liste; die Ansicht zeigt den Hinweis „keine Entscheide“ wie bei einem Tag ohne Aufzeichnung. Kein Fehler — der Tag hat schlicht keine Grundlage. |
 | **Messwerte treffen verspätet ein** (MQTT-Ausfall) | Der nächste Lauf überschreibt den Entscheid des betroffenen Intervalls per Upsert. Ein Nachlauf über ältere Intervalle ist **nicht** vorgesehen (§7). |
 | **Leerer Tag in der Ansicht** | Hinweis `STEUERUNG_KEINE_ENTSCHEIDE`, kein leeres Diagrammgerüst. |
@@ -746,7 +802,7 @@ Lücke nicht**, es rechnet nur und speichert nichts.
 
 | Frage | Entscheid | Wirkung |
 |---|---|---|
-| Massstab für `speicherwert` | **Netzbezug minimieren, Einspeiseertrag maximieren** → `0.31` | §1, FR-2; Regel 3 löst praktisch nie aus |
+| Massstab für `speicherwert` | **Netzbezug minimieren, Einspeiseertrag maximieren** → `0.31` | §1, FR-2; `EINSPEISEN_LOHNT` löst praktisch nie aus |
 | Schwellwert `0.05` brauchbar? | **empirisch aus der Aufzeichnung ermitteln** | bestätigt FR-6 als Zweck |
 | Batterie und Ladezustand | **Pylontech 20 kWh, Wechselrichter MHT-30K-100**; Anbindung wird geklärt | §1, Kapazität konfigurierbar |
 | Reicht `tarife:manage`? | **ja** | NFR-2 |
@@ -761,7 +817,7 @@ Lücke nicht**, es rechnet nur und speichert nichts.
   offen, ob ein „Ladung gesperrt" gewirkt hat oder ins Leere lief, weil die Batterie ohnehin voll
   war.
 
-* **Ist die Kapazität bei Hene überhaupt knapp?** Das ist die Frage, an der die ganze Regel 4
+* **Ist die Kapazität bei Hene überhaupt knapp?** Das ist die Frage, an der `WARTEN_AUF_TAL`
   hängt: Sie verschiebt Ladung in die billigste Stunde, weil 20 kWh nicht für den ganzen
   Tagesüberschuss reichen. Bleibt der tägliche Überschuss **unter** 20 kWh, ist nie eine
   Entscheidung nötig — dann lädt die Batterie ohnehin alles, und die Steuerung hätte nichts zu

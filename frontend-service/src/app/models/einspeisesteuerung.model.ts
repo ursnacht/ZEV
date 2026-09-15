@@ -14,17 +14,17 @@ export type Steuerzustand = 'FREI' | 'GESPERRT';
  */
 export type Steuerregel =
   | 'PREIS_NEGATIV'
-  | 'KEIN_UEBERSCHUSS'
   | 'EINSPEISEN_LOHNT'
   | 'WARTEN_AUF_TAL'
+  | 'KEIN_UEBERSCHUSS'
   | 'LADEN';
 
 /** Alle Regeln in Auswertungsreihenfolge — für Tabellen und Legenden. */
 export const STEUERREGELN: Steuerregel[] = [
   'PREIS_NEGATIV',
-  'KEIN_UEBERSCHUSS',
   'EINSPEISEN_LOHNT',
   'WARTEN_AUF_TAL',
+  'KEIN_UEBERSCHUSS',
   'LADEN'
 ];
 
@@ -53,6 +53,15 @@ export interface Steuerentscheid {
   /** Produktion in kWh, als Betrag. */
   produktion: number;
   verbrauch: number;
+  /**
+   * Bezug am Bilanzmesspunkt in kWh; `null` bei Entscheiden vor V149.
+   *
+   * Geht in **keine** Regel ein — zusammen mit `ruecklieferung` macht der Wert die Energiebilanz
+   * prüfbar: `produktion + bezug − verbrauch − ruecklieferung` ist der Netto-Batteriefluss.
+   */
+  bezug: number | null;
+  /** Rücklieferung in kWh, als Betrag; `null` bei Entscheiden vor V149. */
+  ruecklieferung: number | null;
   ueberschuss: number;
   regel: Steuerregel;
   batterieladung: Steuerzustand;

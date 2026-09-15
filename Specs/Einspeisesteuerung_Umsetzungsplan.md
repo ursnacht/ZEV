@@ -367,3 +367,133 @@ Grenzfälle „später teurer", „später günstiger aber über Schwellwert" un
 **Geprüft:** 1315 Backend-Tests grün. **Rebuild nötig**, damit die Regel greift; bereits
 geschriebene Entscheide der betroffenen Intervalle bleiben falsch und werden erst beim nächsten
 Lauf für neue Intervalle korrekt.
+
+### Nachtrag 7 — Energiebilanz sichtbar machen (15.09.2026, FR-6b)
+
+**Auslöser:** Der Verdacht, Produktion und Verbrauch seien falsch summiert, möglicherweise im
+Zusammenhang mit der Batterieladung.
+
+**Zuerst geprüft, ob die Summierung wirklich falsch ist — sie ist es nicht:**
+
+| Prüfung | Ergebnis |
+|---|---|
+| Vergleich mit `StatistikService` | **Identische Formel**: `SUM(m.total)` je Einheiten-Typ, `Math.abs()` für Producer. Ein Summierungsfehler wäre auch dort sichtbar. |
+| Doppelte Messwerte | 8 Intervalle, **eine** Einheit, Typ `BEZUG`, Mandant Mut13 — weder Produktion noch Verbrauch, nicht Hene. |
+| `LADESTATION` als stiller Verbraucher | Scheidet aus: Ladestationen erhalten laut `EinheitTyp` **keine** Messwerte. |
+
+**Der eigentliche Mangel war ein anderer: Die Ansicht zeigte die halbe Bilanz.** Produktion und
+Verbrauch standen ohne Gegenprobe da; der Verdacht liess sich weder bestätigen noch entkräften.
+`sumBilanzKomponentenPerZeitBetween` liefert Bezug und Rücklieferung längst mit — sie wurden
+weggeworfen (`zeile[3]`, `zeile[4]`).
+
+**Umgesetzt:** V149 ergänzt `bezug` und `ruecklieferung` in `steuerentscheid` (nullable — Bestands-
+entscheide haben sie nicht, und eine `0` wäre dort eine Falschaussage). Die Tabelle zeigt beide und
+daneben `Produktion + Bezug − Verbrauch − Rücklieferung` als **Netto-Batteriefluss**. Damit wird die
+Batterie sichtbar, obwohl es keinen Einheiten-Typ `SPEICHER` gibt.
+
+Die Differenz wird **abgeleitet, nicht gespeichert** — ein gespeicherter Ableitungswert kann von
+seiner Grundlage abweichen.
+
+> **Die Zahl heisst „Batterie (aus Bilanz)", enthält aber mehr:** jeden Verbraucher, der nicht als
+> Einheit erfasst ist. Eine dauerhaft grosse Differenz bei stillstehender Batterie ist genau dieser
+> Fall — und damit der Hinweis, dass Einheiten fehlen. Der Hinweistext an der Spalte sagt das.
+
+**Beinahe-Fehler bei den Übersetzungen:** Der Key `RUECKLIEFERUNG` ist bereits vergeben und trägt
+„Rücklieferung: Produktion (Total) - C" — ein Label der Statistik samt Spaltenbuchstabe. Wegen
+`ON CONFLICT (key) DO NOTHING` wäre der neue Eintrag **stillschweigend verworfen** worden und die
+Spalte trüge diesen Text. Vor dem Schreiben der Migration geprüft; die Keys heissen deshalb
+`STEUERUNG_BEZUG` und `STEUERUNG_RUECKLIEFERUNG`. Bei V146 war dieselbe Annahme schon einmal in die
+andere Richtung falsch.
+
+**Geprüft:** 1315 Backend-Tests grün, Frontend baut. **Rebuild nötig** für V149 und V150; erst
+danach füllen sich die neuen Spalten — für zurückliegende Intervalle bleiben sie leer.
+
+### Nachtrag 8 — Produktion erscheint zu tief (15.09.2026)
+
+**Auslöser:** „Die Sonne scheint voll und trotzdem ist die Produktion tiefer als der Verbrauch. Die
+App der Anlage belegt dies ebenfalls." Damit gibt es erstmals eine **unabhängige Referenz** — das
+ist keine Anzeigefrage mehr.
+
+**Der gesamte Pfad wurde geprüft, Schritt für Schritt:**
+
+| Schritt | Befund |
+|---|---|
+| MQTT-Payload | Zwei Register (`zaehlerstandBezug`, `zaehlerstandEinspeisung`), absolute Zählerstände |
+| `MqttIngestService.upsertRohdaten` | `PRODUCER` erhält **beide** Register unverändert; genullt wird nur bei `BEZUG`/`RUECKLIEFERUNG` |
+| `verarbeiteIntervall` | `total = ΔBezug − ΔEinspeisung`; einspeisende Anlage ergibt negatives `total` — wie spezifiziert |
+| Aggregation → `messwerte` | Delta aus letztem Stand vor Intervallbeginn und letztem Stand bis Intervallende |
+| Summierung | `SUM(total)` je Typ mit `ABS()` für Producer — identisch zur Statistik |
+
+**Ein Rechenfehler liess sich nicht finden.** Aber eine stille Verlustquelle: `nichtNegativ()` setzt
+ein negatives Delta auf `0` und protokollierte das **nur als Logzeile**. Anders als bei einer
+Datenlücke geht die Energie dabei **dauerhaft verloren** — bei einem Producer sinkt genau dadurch
+die ausgewiesene Produktion, ohne dass der Anlage etwas fehlt.
+
+**Umgesetzt:** Der Fall erzeugt jetzt eine Systemmeldung (`MQTT_ZAEHLER_RUECKSPRUNG`, `WARN`, V151)
+mit Einheit, Register, Intervall und **verworfener Menge**. Ohne den Betrag liesse sich nicht
+abschätzen, ob es um Rundung oder um Kilowattstunden geht.
+
+**Offen — und nur am Objekt zu klären:** Die wahrscheinlichste Erklärung ist nicht die Software,
+sondern der **Messpunkt**. Bei einem Hybrid-Wechselrichter mit DC-gekoppelter Batterie (Hene fährt
+MHT-30K-100 mit Pylontech) fliesst PV-Energie direkt DC-seitig in den Speicher und passiert den
+AC-seitigen Zähler **nie**. Die Anlagen-App zeigt dann die DC-Produktion, unser Zähler die
+AC-Abgabe nach Batterieladung — bei voller Sonne und ladender Batterie kann diese unter dem
+Hausverbrauch liegen. Das ist mit Software nicht zu beheben, sondern nur durch einen zusätzlichen
+Messpunkt oder das Auslesen des Wechselrichters.
+
+Zu unterscheiden sind die beiden Fälle an den **Rohdaten**: Steigt `zaehlerstandEinspeisung` der
+PV-Einheit langsamer, als die App an Produktion ausweist, kommt bereits am Zähler zu wenig an.
+
+**Geprüft:** 1315 Backend-Tests grün.
+
+### Nachtrag 9 — Der Überschuss blockiert die Preisregeln nicht mehr (15.09.2026)
+
+**Auslöser:** „So bringt die Einspeisesteuerung nichts, wenn erst Überschuss vorhanden ist, wenn die
+Batterie voll geladen ist."
+
+**Die Wirkungskette, die das erklärt:**
+
+1. `messwerte.total` ist ein Saldo — `ΔBezug − ΔEinspeisung` des Messpunkts.
+2. Lädt die Batterie über denselben Messpunkt, wird ihre Ladeleistung von der Produktion abgezogen.
+3. Die ausgewiesene Produktion sinkt unter den Verbrauch, der Überschuss erscheint als `0`.
+4. `KEIN_UEBERSCHUSS` stand an **zweiter** Stelle und blockierte alle Preisregeln.
+5. Entschieden wurde erst, wenn die Batterie voll war — und es nichts mehr zu entscheiden gab.
+
+Der Produktionsverlauf vom 14.09. stützt das: bis 11:15 rund `0.19` kWh, ab 11:30 sprunghaft `1.94`
+und `4.10`. Das sah nach aufreissendem Hochnebel aus, passt aber genauso zu einer Batterie, die um
+11:15 voll war.
+
+**Umgestellt:** `KEIN_UEBERSCHUSS` steht jetzt **nach** den Preisregeln.
+
+| alt | neu |
+|---|---|
+| 1 `PREIS_NEGATIV` | 1 `PREIS_NEGATIV` |
+| 2 `KEIN_UEBERSCHUSS` ← blockierte | 2 `EINSPEISEN_LOHNT` |
+| 3 `EINSPEISEN_LOHNT` | 3 `WARTEN_AUF_TAL` |
+| 4 `WARTEN_AUF_TAL` | 4 `KEIN_UEBERSCHUSS` ← beschreibt nur noch |
+| 5 `LADEN` | 5 `LADEN` |
+
+**Warum das trägt:** Die Frage „laden oder einspeisen?" hängt am **Preis**, nicht an der Menge. Ist
+kein Überschuss da, läuft eine Sperre ins Leere — schaden kann sie nicht, denn der Anlagenregler
+entscheidet ohnehin, ob tatsächlich geladen wird. Die Zeilen 4 und 5 ergeben denselben Entscheid
+(`FREI`/`FREI`) und unterscheiden sich nur in der Begründung.
+
+**Folge für die Rückrechnung:** Jetzt greift **jede** Preisregel auch nachts. Dass die Zählung
+ausschliesslich Intervalle mit Überschuss berücksichtigt, wird damit wichtiger, nicht unwichtiger —
+die Begründung in FR-6 ist entsprechend nachgezogen.
+
+**Die Enum-Reihenfolge trägt die Fachlichkeit** und wurde mitgezogen (Backend und Frontend-Modell).
+Persistenzrelevant ist sie nicht: `@Enumerated(EnumType.STRING)`, und der CHECK-Constraint zählt
+Werte auf, keine Positionen.
+
+**Spec durchgängig auf Regelnamen umgestellt.** Die Nummern in Fliesstexten waren nach der
+Umstellung teils falsch — dieselbe Falle wie bei Migrationsnummern: Sie veralten stillschweigend.
+`grep "Regel [1-5]"` liefert jetzt null Treffer.
+
+**Geprüft:** 1317 Backend-Tests grün (zwei neue Regressionstests: Preisregel greift ohne
+Überschuss), Frontend baut.
+
+> **Was damit NICHT gelöst ist:** Die Produktion bleibt eine Netto-Grösse. Die Steuerung entscheidet
+> jetzt zwar über den ganzen Tag, aber `ueberschuss` und `energie_verschoben` im Protokoll sind
+> weiterhin zu klein, solange die Batterieladung am Zähler des Produzenten gegengerechnet wird.
+> Das ist der zweite Weg (Bruttoproduktion beschaffen) und noch offen.

@@ -207,6 +207,26 @@ export class EinspeisesteuerungComponent extends WithMessage
     return wert == null ? '' : formatSwissNumber(wert, 3);
   }
 
+  /**
+   * Netto-Batteriefluss aus der Energiebilanz — `null`, wenn die Bilanzwerte fehlen.
+   *
+   * <p>`produktion + bezug − verbrauch − ruecklieferung`. Positiv heisst laden, negativ entladen.
+   *
+   * <p><b>Abgeleitet, nicht gespeichert:</b> Der Wert ergibt sich jederzeit aus den vier Spalten;
+   * eine eigene Spalte könnte von ihrer Grundlage abweichen.
+   *
+   * <p><b>Was er mit enthält:</b> Die Batterie hat keinen Zähler (kein Einheiten-Typ `SPEICHER`).
+   * In der Differenz stecken deshalb auch Verbraucher, die nicht als Einheit erfasst sind. Eine
+   * dauerhaft grosse Differenz bei stillstehender Batterie ist genau dieser Fall — und damit der
+   * Hinweis, dass Einheiten fehlen.
+   */
+  bilanzDifferenz(e: Steuerentscheid): number | null {
+    if (e.bezug == null || e.ruecklieferung == null) {
+      return null;
+    }
+    return e.produktion + e.bezug - e.verbrauch - e.ruecklieferung;
+  }
+
   /** Uhrzeit `HH:mm` des Intervalls. */
   uhrzeit(entscheid: Steuerentscheid): string {
     return formatSwissDateTime(new Date(entscheid.zeit)).slice(-5);

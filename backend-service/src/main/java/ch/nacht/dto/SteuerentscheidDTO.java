@@ -24,6 +24,10 @@ public class SteuerentscheidDTO {
     private BigDecimal preisTiefRest;
     private BigDecimal produktion;
     private BigDecimal verbrauch;
+    /** Summe der BEZUG-Einheiten in kWh; `null` bei Entscheiden vor V149. */
+    private BigDecimal bezug;
+    /** Summe der RUECKLIEFERUNG-Einheiten in kWh, als Betrag; `null` vor V149. */
+    private BigDecimal ruecklieferung;
     private BigDecimal ueberschuss;
     private Steuerregel regel;
     private Steuerzustand batterieladung;
@@ -72,6 +76,34 @@ public class SteuerentscheidDTO {
 
     public void setVerbrauch(BigDecimal verbrauch) {
         this.verbrauch = verbrauch;
+    }
+
+
+    public BigDecimal getBezug() {
+
+        return bezug;
+
+    }
+
+
+    public void setBezug(BigDecimal bezug) {
+
+        this.bezug = bezug;
+
+    }
+
+
+    public BigDecimal getRuecklieferung() {
+
+        return ruecklieferung;
+
+    }
+
+
+    public void setRuecklieferung(BigDecimal ruecklieferung) {
+
+        this.ruecklieferung = ruecklieferung;
+
     }
 
     public BigDecimal getUeberschuss() {

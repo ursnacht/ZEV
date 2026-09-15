@@ -59,12 +59,18 @@ public class SteuerRegelService {
      * der Steuerung:
      * <ol>
      *   <li>{@code PREIS_NEGATIV} — Einspeisen kostet Geld. Laden bleibt frei.</li>
-     *   <li>{@code KEIN_UEBERSCHUSS} — nichts zu entscheiden, wird aber protokolliert.</li>
      *   <li>{@code EINSPEISEN_LOHNT} — die Vergütung übertrifft den Wert einer gespeicherten kWh.</li>
      *   <li>{@code WARTEN_AUF_TAL} — heute kommt noch etwas <b>Billigeres als jetzt</b>, und es
      *       liegt unter dem Schwellwert; Kapazität dafür freihalten.</li>
-     *   <li>{@code LADEN} — kein Tal mehr in Sicht, also jetzt.</li>
+     *   <li>{@code KEIN_UEBERSCHUSS} / {@code LADEN} — keine Sperre. Beide ergeben
+     *       {@code FREI}/{@code FREI} und unterscheiden sich nur in der Begründung.</li>
      * </ol>
+     *
+     * <p><b>Der Überschuss steht bewusst am Ende.</b> Stand er vorn, war die Steuerung wirkungslos:
+     * Solange die Batterie lädt, wird ihre Ladeleistung am Zähler des Produzenten als Bezug
+     * gegengerechnet und der Überschuss erscheint als 0 — die Preisregeln wurden nie erreicht, und
+     * entschieden wurde erst, wenn die Batterie voll war. Für den Entscheid ist die Menge auch
+     * nicht nötig: Eine Sperre ohne Überschuss läuft ins Leere, schadet aber nicht.
      *
      * <p><b>Zum Vorzeichen:</b> {@code eingabe.produktion()} ist ein <b>Betrag</b>. In
      * {@code messwerte.total} steht die Produktion negativ ({@code ΔBezug − ΔEinspeisung}); wer sie
@@ -73,8 +79,9 @@ public class SteuerRegelService {
      * .sumBilanzKomponentenPerZeitBetween} liefert die Produktion bereits mit {@code ABS()} — das
      * ist die Quelle der Wahl.
      *
-     * <p><b>Ohne Preis wird nicht gesperrt.</b> Fehlt {@code preis}, greifen die Regeln 1 und 3
-     * nicht; fehlt {@code preisTiefRest}, greift Regel 4 nicht. Nichtstun ist der sichere Zustand:
+     * <p><b>Ohne Preis wird nicht gesperrt.</b> Fehlt {@code preis}, greifen {@code PREIS_NEGATIV}
+     * und {@code EINSPEISEN_LOHNT} nicht; fehlt {@code preisTiefRest}, greift {@code WARTEN_AUF_TAL}
+     * nicht. Nichtstun ist der sichere Zustand:
      * Eine Steuerung, die mangels Daten sperrt, richtet mehr Schaden an als eine, die zusieht.
      *
      * @param eingabe      Messwerte und Preise des Intervalls
@@ -92,21 +99,14 @@ public class SteuerRegelService {
                     Steuerzustand.FREI, Steuerzustand.GESPERRT, ueberschuss);
         }
 
-        // 2. Kein Ueberschuss: nichts zu entscheiden. Trotzdem protokolliert - eine Luecke im
-        //    Protokoll liesse offen, ob die Steuerung ueberhaupt lief.
-        if (ueberschuss.signum() <= 0) {
-            return new Entscheid(Steuerregel.KEIN_UEBERSCHUSS,
-                    Steuerzustand.FREI, Steuerzustand.FREI, ueberschuss);
-        }
-
-        // 3. Einspeisen lohnt mehr als speichern. Mit dem Massstab "vermiedener Netzbezug" loest
+        // 2. Einspeisen lohnt mehr als speichern. Mit dem Massstab "vermiedener Netzbezug" loest
         //    das praktisch nie aus - die Regel ist der Waechter fuer Knappheitspreise.
         if (eingabe.preis() != null && eingabe.preis().compareTo(speicherwert) >= 0) {
             return new Entscheid(Steuerregel.EINSPEISEN_LOHNT,
                     Steuerzustand.GESPERRT, Steuerzustand.FREI, ueberschuss);
         }
 
-        // 4. Der Kern: Kommt heute noch ein guenstigeres Intervall, bleibt die knappe
+        // 3. Der Kern: Kommt heute noch ein guenstigeres Intervall, bleibt die knappe
         //    Batteriekapazitaet dafuer frei, statt sie jetzt mit teurerem Strom zu fuellen.
         //
         //    ZWEI Bedingungen, und die zweite fehlte zuerst:
@@ -129,9 +129,26 @@ public class SteuerRegelService {
                     Steuerzustand.GESPERRT, Steuerzustand.FREI, ueberschuss);
         }
 
-        // 5. Kein Tal mehr in Sicht - laden, solange Ueberschuss da ist. Das deckt den bewoelkten
-        //    Tag ab: Ein hoher Mittagspreis heisst, dass der ganze Markt wenig Solarstrom
-        //    erwartet; dann ist die Gelegenheit knapp, nicht die Kapazitaet.
+        // 4. Keine Sperre. Bleibt noch die Frage, WARUM nicht - beide Faelle ergeben denselben
+        //    Entscheid (FREI/FREI) und unterscheiden sich nur in der Begruendung:
+        //
+        //    a) Kein Ueberschuss gemessen. Fruehere Fassungen prueften das VOR den Preisregeln und
+        //       machten die Steuerung damit wirkungslos: Solange die Batterie laedt, wird ihre
+        //       Ladeleistung am Zaehler des Produzenten als Bezug gegengerechnet, der Ueberschuss
+        //       erscheint als 0 - und die Regeln 1 bis 3 wurden nie erreicht. Entschieden wurde erst,
+        //       wenn die Batterie voll war und es nichts mehr zu entscheiden gab.
+        //
+        //       Fuer den Entscheid ist der Ueberschuss auch gar nicht noetig: Eine Sperre ohne
+        //       Ueberschuss laeuft ins Leere, schadet aber nicht. Der Anlagenregler entscheidet
+        //       ohnehin, ob tatsaechlich geladen wird.
+        //
+        //    b) Ueberschuss ist da und kein Tal mehr in Sicht - laden. Das deckt den bewoelkten Tag
+        //       ab: Ein hoher Mittagspreis heisst, dass der ganze Markt wenig Solarstrom erwartet;
+        //       dann ist die Gelegenheit knapp, nicht die Kapazitaet.
+        if (ueberschuss.signum() <= 0) {
+            return new Entscheid(Steuerregel.KEIN_UEBERSCHUSS,
+                    Steuerzustand.FREI, Steuerzustand.FREI, ueberschuss);
+        }
         return new Entscheid(Steuerregel.LADEN,
                 Steuerzustand.FREI, Steuerzustand.FREI, ueberschuss);
     }
