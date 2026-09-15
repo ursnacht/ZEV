@@ -67,10 +67,11 @@ public class SteuerRegelService {
      * </ol>
      *
      * <p><b>Der Überschuss steht bewusst am Ende.</b> Stand er vorn, war die Steuerung wirkungslos:
-     * Solange die Batterie lädt, wird ihre Ladeleistung am Zähler des Produzenten als Bezug
-     * gegengerechnet und der Überschuss erscheint als 0 — die Preisregeln wurden nie erreicht, und
-     * entschieden wurde erst, wenn die Batterie voll war. Für den Entscheid ist die Menge auch
-     * nicht nötig: Eine Sperre ohne Überschuss läuft ins Leere, schadet aber nicht.
+     * Solange die Batterie lädt, gibt der Wechselrichter über den Zähler nur den Hausbedarf ab —
+     * die übrige PV-Energie fliesst DC-seitig in den Speicher und passiert den Zähler nie. Der
+     * Überschuss erscheint als 0, die Preisregeln wurden nie erreicht, und entschieden wurde erst,
+     * wenn die Batterie voll war. Für den Entscheid ist die Menge auch nicht nötig: Eine Sperre
+     * ohne Überschuss läuft ins Leere, schadet aber nicht.
      *
      * <p><b>Zum Vorzeichen:</b> {@code eingabe.produktion()} ist ein <b>Betrag</b>. In
      * {@code messwerte.total} steht die Produktion negativ ({@code ΔBezug − ΔEinspeisung}); wer sie
@@ -133,10 +134,12 @@ public class SteuerRegelService {
         //    Entscheid (FREI/FREI) und unterscheiden sich nur in der Begruendung:
         //
         //    a) Kein Ueberschuss gemessen. Fruehere Fassungen prueften das VOR den Preisregeln und
-        //       machten die Steuerung damit wirkungslos: Solange die Batterie laedt, wird ihre
-        //       Ladeleistung am Zaehler des Produzenten als Bezug gegengerechnet, der Ueberschuss
-        //       erscheint als 0 - und die Regeln 1 bis 3 wurden nie erreicht. Entschieden wurde erst,
-        //       wenn die Batterie voll war und es nichts mehr zu entscheiden gab.
+        //       machten die Steuerung damit wirkungslos: Solange die Batterie laedt, gibt der
+        //       Wechselrichter ueber den Zaehler nur den Hausbedarf ab - bei Hene am 15.09.2026
+        //       drei Stunden lang konstant rund 0.8 kW, dann um 11:30 der Sprung auf das Zwoelffache,
+        //       als die Batterie voll war. Der Ueberschuss erscheint bis dahin als 0, die Regeln 1
+        //       bis 3 wurden nie erreicht, und entschieden wurde erst, als es nichts mehr zu
+        //       entscheiden gab.
         //
         //       Fuer den Entscheid ist der Ueberschuss auch gar nicht noetig: Eine Sperre ohne
         //       Ueberschuss laeuft ins Leere, schadet aber nicht. Der Anlagenregler entscheidet

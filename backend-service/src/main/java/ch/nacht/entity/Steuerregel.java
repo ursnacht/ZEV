@@ -28,9 +28,9 @@ public enum Steuerregel {
      * Kein Überschuss gemessen — keine Sperre.
      *
      * <p><b>Steht bewusst NACH den Preisregeln.</b> Davor machte sie die Steuerung wirkungslos:
-     * Solange die Batterie lädt, wird ihre Ladeleistung am Zähler des Produzenten als Bezug
-     * gegengerechnet und der Überschuss erscheint als 0 — die Preisregeln wurden nie erreicht, und
-     * entschieden wurde erst, wenn die Batterie voll war.
+     * Solange die Batterie lädt, gibt der Wechselrichter über den Zähler nur den Hausbedarf ab; der
+     * Überschuss erscheint als 0 — die Preisregeln wurden nie erreicht, und entschieden wurde erst,
+     * wenn die Batterie voll war.
      *
      * <p>Sie wird trotzdem protokolliert: Eine Lücke im Protokoll liesse später offen, ob die
      * Steuerung überhaupt lief. Der Entscheid ist derselbe wie bei {@link #LADEN}

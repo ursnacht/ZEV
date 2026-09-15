@@ -88,8 +88,8 @@ public class SteuerRegelServiceTest {
      * <b>Der Regressionstest zur umgestellten Reihenfolge (15.09.2026).</b>
      *
      * <p>Ohne gemessenen Überschuss greift die Preisregel <b>trotzdem</b>. Das ist der Fall, der die
-     * Steuerung vorher wirkungslos machte: Solange die Batterie lädt, wird ihre Ladeleistung am
-     * Zähler des Produzenten als Bezug gegengerechnet, der Überschuss erscheint als 0 — und
+     * Steuerung vorher wirkungslos machte: Solange die Batterie lädt, gibt der Wechselrichter über
+     * den Zähler nur den Hausbedarf ab, der Überschuss erscheint als 0 — und
      * {@code KEIN_UEBERSCHUSS} blockierte alle Preisregeln. Entschieden wurde erst, wenn die
      * Batterie voll war und es nichts mehr zu entscheiden gab.
      */

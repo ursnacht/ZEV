@@ -453,15 +453,11 @@ Batterie voll geladen ist."
 
 **Die Wirkungskette, die das erklärt:**
 
-1. `messwerte.total` ist ein Saldo — `ΔBezug − ΔEinspeisung` des Messpunkts.
-2. Lädt die Batterie über denselben Messpunkt, wird ihre Ladeleistung von der Produktion abgezogen.
-3. Die ausgewiesene Produktion sinkt unter den Verbrauch, der Überschuss erscheint als `0`.
+1. Solange die Batterie lädt, gibt der Wechselrichter über den Zähler nur den **Hausbedarf** ab.
+2. Die übrige PV-Energie fliesst DC-seitig in den Speicher und passiert den Zähler **nie**.
+3. Produktion ≈ Verbrauch, der Überschuss erscheint als `0`.
 4. `KEIN_UEBERSCHUSS` stand an **zweiter** Stelle und blockierte alle Preisregeln.
 5. Entschieden wurde erst, wenn die Batterie voll war — und es nichts mehr zu entscheiden gab.
-
-Der Produktionsverlauf vom 14.09. stützt das: bis 11:15 rund `0.19` kWh, ab 11:30 sprunghaft `1.94`
-und `4.10`. Das sah nach aufreissendem Hochnebel aus, passt aber genauso zu einer Batterie, die um
-11:15 voll war.
 
 **Umgestellt:** `KEIN_UEBERSCHUSS` steht jetzt **nach** den Preisregeln.
 
@@ -493,7 +489,42 @@ Umstellung teils falsch — dieselbe Falle wie bei Migrationsnummern: Sie veralt
 **Geprüft:** 1317 Backend-Tests grün (zwei neue Regressionstests: Preisregel greift ohne
 Überschuss), Frontend baut.
 
-> **Was damit NICHT gelöst ist:** Die Produktion bleibt eine Netto-Grösse. Die Steuerung entscheidet
-> jetzt zwar über den ganzen Tag, aber `ueberschuss` und `energie_verschoben` im Protokoll sind
-> weiterhin zu klein, solange die Batterieladung am Zähler des Produzenten gegengerechnet wird.
-> Das ist der zweite Weg (Bruttoproduktion beschaffen) und noch offen.
+> **Was damit NICHT gelöst ist:** `ueberschuss` und `energie_verschoben` im Protokoll bleiben zu
+> klein, solange die Batterie DC-seitig lädt — die Energie erreicht den Zähler nicht, und keine
+> Auswertung kann sie herbeirechnen. Abhilfe schafft nur das Auslesen des Wechselrichters; das
+> lieferte zugleich den Ladezustand, der der Regel bis heute fehlt (§8).
+
+
+### Nachtrag 10 — Die Ursache ist belegt, und sie liegt vor dem Zähler (15.09.2026)
+
+Nachtrag 8 nannte zwei mögliche Ursachen für die zu tiefe Produktion. Die Rohdaten des
+Producer-Zählers bei Hene entscheiden zugunsten der zweiten — **meine zuerst vertretene Hypothese
+ist widerlegt**.
+
+| Zeit | `produktion_brutto` | `bezug_am_pv_zaehler` |
+|---|---|---|
+| 08:15–11:15 | 0.17 – 0.27 (konstant) | **0.000** |
+| 11:30 | **2.606** | 0.000 |
+| 11:45–13:30 | 4.0 – 4.5 | 0.000 |
+
+**Das Bezugsregister des PV-Zählers bleibt bei null.** Die Batterieladung wird also *nicht*
+gegengerechnet; `total` entspricht praktisch exakt der gemessenen Einspeisung. Der in Nachtrag 8
+vorgeschlagene zweite Weg — `ΔEinspeisung` als Bruttoproduktion durchreichen — ist damit
+**gegenstandslos**: Es ist derselbe Wert, den die Auswertung bereits verwendet.
+
+**Was die Zahlen stattdessen zeigen:** drei Stunden Plateau bei rund 0.8 kW — ungefähr die
+Hausgrundlast —, dann um 11:30 ein Sprung auf das Zwölffache. Das ist kein Solarverlauf, sondern ein
+Hybrid-Wechselrichter, der AC-seitig nur den Hausbedarf abgibt und alles übrige DC-seitig in die
+Batterie schiebt. Um 11:30 war sie voll.
+
+**Folgerungen:**
+* Die Software rechnet korrekt; der Zähler misst korrekt, was er messen kann. Die Differenz zur
+  Anlagen-App ist real und entsteht **vor** dem Zähler.
+* Der Sprung um 11:15/11:30, den ich zuerst für aufreissenden Hochnebel gehalten habe, ist die volle
+  Batterie — an zwei aufeinanderfolgenden Tagen dasselbe Muster.
+* **Nachtrag 9 war die richtige Antwort auf diese Lage.** Morgens ist der Überschuss tatsächlich
+  null, nicht wegen eines Messfehlers. Genau dann muss die Steuerung trotzdem entscheiden können.
+* Die echte PV-Produktion **und** der Ladezustand sind nur über den Wechselrichter zu bekommen. Das
+  bleibt die einzige offene Baustelle dieser Frage (§8).
+
+Code-Kommentare, Enum-Javadoc, Testdoku und FR-2 tragen die widerlegte Begründung nicht mehr.

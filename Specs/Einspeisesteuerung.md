@@ -154,10 +154,16 @@ Ausgewertet in dieser Reihenfolge; die erste zutreffende Regel bestimmt den Ents
 
 > **Der Überschuss steht am Ende — und das ist der Kern dieser Reihenfolge.** In einer früheren
 > Fassung stand `KEIN_UEBERSCHUSS` an zweiter Stelle und blockierte alle Preisregeln. Das machte die
-> Steuerung **wirkungslos**: Solange die Batterie lädt, wird ihre Ladeleistung am Zähler des
-> Produzenten als Bezug gegengerechnet (`total = ΔBezug − ΔEinspeisung`, §1), der Überschuss
-> erscheint als `0` — und entschieden wurde erst, wenn die Batterie voll war und es nichts mehr zu
-> entscheiden gab.
+> Steuerung **wirkungslos**: Solange die Batterie lädt, gibt der Wechselrichter über den Zähler nur
+> den Hausbedarf ab — die übrige PV-Energie fliesst DC-seitig in den Speicher und passiert den
+> Zähler nie. Der Überschuss erscheint als `0`, und entschieden wurde erst, wenn die Batterie voll
+> war und es nichts mehr zu entscheiden gab.
+>
+> **An den Daten belegt** (Hene, 15.09.2026, Rohdaten des Producer-Zählers): von 08:15 bis 11:15
+> konstant 0.17–0.27 kWh je Viertelstunde — ungefähr die Hausgrundlast —, um 11:30 ein Sprung auf
+> 2.606 und danach 4.0–4.5. Kein Solarverlauf, sondern eine volle Batterie. Das Bezugsregister des
+> PV-Zählers blieb dabei durchgehend bei `0`: **gegengerechnet wird nichts**, die Energie erreicht
+> den Zähler gar nicht erst.
 >
 > **Für den Entscheid ist der Überschuss nicht nötig.** Die Frage „laden oder einspeisen?" hängt am
 > **Preis**, nicht an der Menge. Ist gerade kein Überschuss da, läuft eine Sperre ins Leere — schaden
