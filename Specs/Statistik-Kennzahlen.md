@@ -121,11 +121,11 @@ Beim Speicher gilt `total = ΔLadung − ΔEntladung`; über den Zeitraum getren
 * [ ] Beide Zeilen erscheinen auch im **PDF-Export**, mit demselben Lücken-Hinweis.
 * [x] Fehlt Bilanz-Bezug oder Rücklieferung → nur die Batterie-KPIs (Netto-Speicherfluss, geladen/entladen/Wirkungsgrad) werden als **„–"** angezeigt; die Quoten-KPIs bleiben verfügbar.
 * [x] Batterie-Kennzahlen (inkl. Netto-Speicherfluss) sind als **„berechnet/geschätzt"** gekennzeichnet und werden nur bei vorhandenen Producer- **und** Bilanz-Daten (Bezug + Rücklieferung) gezeigt — **sofern keine `SPEICHER`-Einheit existiert**.
-* [ ] **Mit `SPEICHER`-Einheit** stammen Ladung, Entladung, Netto und Wirkungsgrad aus deren Messwerten; Beispiel `geladen 100, entladen 92` → Netto `+8`, Wirkungsgrad `92.0 %`.
-* [ ] Bei gemessenen Werten entfällt die Kennzeichnung **berechnet** — in der Web-Ansicht **und** im PDF.
-* [ ] Eine `SPEICHER`-Einheit genügt: Die Kennzahlen erscheinen auch **ohne** Bilanz-Bezug und Rücklieferung.
-* [ ] Eine `SPEICHER`-Einheit **ohne Messwerte** ergibt `0`/`0` und einen leeren Wirkungsgrad statt einer Division durch null.
-* [ ] Ohne `SPEICHER`-Einheit bleibt das Verhalten **unverändert** (Residuum der Bilanz, Kennzeichnung berechnet).
+* [x] **Mit `SPEICHER`-Einheit** stammen Ladung, Entladung, Netto und Wirkungsgrad aus deren Messwerten; Beispiel `geladen 100, entladen 92` → Netto `+8`, Wirkungsgrad `92.0 %`.
+* [x] Bei gemessenen Werten entfällt die Kennzeichnung **berechnet** — in der Web-Ansicht **und** im PDF.
+* [x] Eine `SPEICHER`-Einheit genügt: Die Kennzahlen erscheinen auch **ohne** Bilanz-Bezug und Rücklieferung.
+* [x] Eine `SPEICHER`-Einheit **ohne Messwerte** ergibt `0`/`0` und einen leeren Wirkungsgrad statt einer Division durch null.
+* [x] Ohne `SPEICHER`-Einheit bleibt das Verhalten **unverändert** (Residuum der Bilanz, Kennzeichnung berechnet).
 * [x] Im **Producer-Messung**-Modus bleibt der bestehende Summen-Vergleich erhalten; im **Bilanzmodus** wird er ausgeblendet und durch das Kennzahlen-Panel ersetzt.
 * [x] Die Kennzahlen erscheinen auch im **Statistik-PDF** (`statistik.jrxml`) je Monat mit derselben Modus-Logik wie am Bildschirm.
 * [x] Alle Texte via `TranslationService` (DE/EN); Prozentwerte mit `%`, kWh-Werte in kWh.

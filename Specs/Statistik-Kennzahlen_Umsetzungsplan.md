@@ -222,6 +222,6 @@ war; nur `signedKwhZeile` hatte ihn hart auf `true`. Das Template blieb unberüh
 **Geprüft:** 1325 Backend-Tests (vier neue: gemessen, ohne Bilanzdaten, ohne Messwerte, Regression
 ohne Speicher), 1659 Frontend-Tests (zwei neue zur Kennzeichnung), `JasperTemplateCompileTest` grün.
 
-> **Noch nicht am PDF geprüft:** Der Test kompiliert die Vorlage, sieht aber nicht, ob der Hinweis
-> tatsächlich verschwindet. Eine Sichtprüfung am erzeugten PDF steht aus — ein zu kleines Band oder
-> eine falsche `printWhenExpression` fällt sonst erst im Betrieb auf.
+> **Am PDF sichtgeprüft (16.09.2026):** Der Hinweis verschwindet bei gemessenen Werten
+> tatsächlich. Nötig war die Prüfung, weil `JasperTemplateCompileTest` nur die Kompilierbarkeit
+> feststellt — eine falsche `printWhenExpression` oder ein zu kleines Band fiele dort nicht auf.
