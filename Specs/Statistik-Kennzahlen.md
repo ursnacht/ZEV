@@ -53,6 +53,32 @@ Pro Intervall `i`: `Netto_i = P_i − C_i + B_i − R_i`, dann über den Zeitrau
 * **Kennzeichnung als Schätzwert:** Alle Batterie-Kennzahlen sind ein **Residuum** der Energiebilanz und enthalten damit auch Messfehler, Wandlungs-/Leitungsverluste und nicht gemessene Lasten. Sie werden **explizit als „berechnet"/„geschätzt"** gekennzeichnet (Hinweis/Tooltip).
 * Nur anzeigen, wenn Producer **und** Bilanz-Bezug **und** Rücklieferung im Zeitraum vorhanden sind; sonst entfällt der Batterie-Block.
 
+### FR-2a: Gemessene Batterie-Kennzahlen aus der Einheit `SPEICHER`
+
+Existiert eine Einheit vom Typ **`SPEICHER`** (`Specs/Batteriespeicher.md`), stammen die
+Batterie-Kennzahlen **aus deren Messwerten** statt aus der Energiebilanz. Die gemessene Quelle hat
+**Vorrang**.
+
+Beim Speicher gilt `total = ΔLadung − ΔEntladung`; über den Zeitraum getrennt summiert:
+1. **Batterie geladen** = `Σ total` über die Intervalle mit `total > 0`
+2. **Batterie entladen** = `Σ |total|` über die Intervalle mit `total < 0`
+3. **Netto-Speicherfluss** = `geladen − entladen`
+4. **Round-Trip-Wirkungsgrad** = `entladen / geladen` (nur wenn `geladen > 0`)
+
+> **Eine schlichte Summe über `total` wäre nutzlos:** Sie ergäbe den Saldo, und der liegt über einen
+> Monat nahe null. Getrennt summiert werden beide Mengen lesbar — und der Wirkungsgrad wird zur
+> Kontrollgrösse: Ein Wert über 100 % ist der stille Hinweis auf vertauschte Register.
+
+* **Kein „berechnet"-Hinweis.** Ein Zählerstand ist kein Residuum der Bilanz und enthält weder
+  Messfehler noch nicht gemessene Lasten. Die Kennzeichnung entfällt in Web **und** PDF.
+* **Keine Bilanz-Daten nötig.** Der Zähler der Batterie genügt: Weder Producer noch Bilanz-Bezug
+  noch Rücklieferung werden vorausgesetzt. Ohne Speicher-Einheit gelten unverändert die Bedingungen
+  aus FR-2.
+* **Eine Abfrage statt eines Intervall-Loops:** Die Trennung in Ladung und Entladung erledigt die
+  Datenbank (`sumLadungEntladungByEinheitTypAndZeitBetween`).
+* **Einheit ohne Messwerte:** Ladung und Entladung sind `0`, der Wirkungsgrad bleibt leer — kein
+  Fehler, nur nichts zu zeigen.
+
 ### FR-3: Anzeige & Verhältnis zum bestehenden Summen-Vergleich
 1. Das **Kennzahlen-Panel** wird je Monat angezeigt (in **beiden** Verteilmodi – die KPIs sind generell nützlich).
 2. Im **Bilanzmodus** tritt das Kennzahlen-Panel an die Stelle des wenig aussagekräftigen Summen-Vergleichs: der **Summen-Vergleich wird im Bilanzmodus ausgeblendet**, das Kennzahlen-Panel ersetzt ihn.
@@ -94,7 +120,12 @@ Pro Intervall `i`: `Netto_i = P_i − C_i + B_i − R_i`, dann über den Zeitrau
 * [ ] Die gemessenen Zeilen sind **nicht** als „berechnet/geschätzt" gekennzeichnet – sie stammen aus einer Messung, nicht aus einem Residuum.
 * [ ] Beide Zeilen erscheinen auch im **PDF-Export**, mit demselben Lücken-Hinweis.
 * [x] Fehlt Bilanz-Bezug oder Rücklieferung → nur die Batterie-KPIs (Netto-Speicherfluss, geladen/entladen/Wirkungsgrad) werden als **„–"** angezeigt; die Quoten-KPIs bleiben verfügbar.
-* [x] Batterie-Kennzahlen (inkl. Netto-Speicherfluss) sind als **„berechnet/geschätzt"** gekennzeichnet und werden nur bei vorhandenen Producer- **und** Bilanz-Daten (Bezug + Rücklieferung) gezeigt.
+* [x] Batterie-Kennzahlen (inkl. Netto-Speicherfluss) sind als **„berechnet/geschätzt"** gekennzeichnet und werden nur bei vorhandenen Producer- **und** Bilanz-Daten (Bezug + Rücklieferung) gezeigt — **sofern keine `SPEICHER`-Einheit existiert**.
+* [ ] **Mit `SPEICHER`-Einheit** stammen Ladung, Entladung, Netto und Wirkungsgrad aus deren Messwerten; Beispiel `geladen 100, entladen 92` → Netto `+8`, Wirkungsgrad `92.0 %`.
+* [ ] Bei gemessenen Werten entfällt die Kennzeichnung **berechnet** — in der Web-Ansicht **und** im PDF.
+* [ ] Eine `SPEICHER`-Einheit genügt: Die Kennzahlen erscheinen auch **ohne** Bilanz-Bezug und Rücklieferung.
+* [ ] Eine `SPEICHER`-Einheit **ohne Messwerte** ergibt `0`/`0` und einen leeren Wirkungsgrad statt einer Division durch null.
+* [ ] Ohne `SPEICHER`-Einheit bleibt das Verhalten **unverändert** (Residuum der Bilanz, Kennzeichnung berechnet).
 * [x] Im **Producer-Messung**-Modus bleibt der bestehende Summen-Vergleich erhalten; im **Bilanzmodus** wird er ausgeblendet und durch das Kennzahlen-Panel ersetzt.
 * [x] Die Kennzahlen erscheinen auch im **Statistik-PDF** (`statistik.jrxml`) je Monat mit derselben Modus-Logik wie am Bildschirm.
 * [x] Alle Texte via `TranslationService` (DE/EN); Prozentwerte mit `%`, kWh-Werte in kWh.

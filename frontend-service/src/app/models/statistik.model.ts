@@ -80,6 +80,12 @@ export interface MonatsStatistik {
   batterieEntladen: number | null;
   batterieWirkungsgrad: number | null;
   batterieKennzahlenVerfuegbar: boolean;
+  /**
+   * `true`, wenn die Batteriewerte aus der Einheit vom Typ `SPEICHER` stammen statt aus der
+   * Energiebilanz. Dann entfaellt die Kennzeichnung „berechnet": Ein Zaehlerstand ist kein
+   * Residuum und enthaelt weder Messfehler noch nicht gemessene Lasten.
+   */
+  batterieGemessen: boolean;
 }
 
 export interface Statistik {

@@ -56,6 +56,9 @@
     <field name="batterieEntladen" class="java.lang.Double"/>
     <field name="batterieWirkungsgrad" class="java.lang.Double"/>
     <field name="batterieKennzahlenVerfuegbar" class="java.lang.Boolean"/>
+    <!-- true = Werte aus der SPEICHER-Einheit (gemessen); false = aus der Energiebilanz
+         (Residuum). Steuert nur den "berechnet"-Hinweis, nicht die Zahlen selbst. -->
+    <field name="batterieGemessen" class="java.lang.Boolean"/>
 
     <!-- Variable: Maximum of all sums for bar scaling -->
     <variable name="maxSumme" calculation="Nothing" resetType="None" class="java.lang.Double">
@@ -446,7 +449,8 @@
                 <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_LUECKENHAFT") + ": " + $P{TRANSLATIONS}.get($F{verteilungLueckenhaft} ? "KENNZAHL_LUECKE_VERTEILUNG_HINWEIS" : "KENNZAHL_LUECKE_MESSUNG_HINWEIS")]]></expression>
             </element>
 
-            <!-- Batterie-KPIs (rechte Spalte; nur wenn Producer + Bilanz-Bezug + Rücklieferung vorhanden) -->
+            <!-- Batterie-KPIs (rechte Spalte). Quelle: SPEICHER-Einheit, sonst Energiebilanz
+                 (dann Producer + Bilanz-Bezug + Rücklieferung noetig). -->
             <element kind="textField" uuid="33333333-3333-3333-3333-33333333336b" x="300" y="296" width="180" height="15" fontSize="9.0">
                 <printWhenExpression><![CDATA[$F{batterieKennzahlenVerfuegbar}]]></printWhenExpression>
                 <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_BATTERIE_NETTO") + ":"]]></expression>
@@ -479,8 +483,10 @@
                 <printWhenExpression><![CDATA[$F{batterieKennzahlenVerfuegbar}]]></printWhenExpression>
                 <expression><![CDATA[ch.nacht.util.PdfNumberFormat.percent($F{batterieWirkungsgrad})]]></expression>
             </element>
+            <!-- Der "berechnet"-Hinweis entfaellt bei gemessenen Werten: Ein Zaehlerstand ist kein
+                 Residuum der Bilanz, der Hinweis waere dort falsch (FR-2a). -->
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333373" x="300" y="360" width="255" height="24" forecolor="#999999" fontSize="7.0" italic="true">
-                <printWhenExpression><![CDATA[$F{batterieKennzahlenVerfuegbar}]]></printWhenExpression>
+                <printWhenExpression><![CDATA[$F{batterieKennzahlenVerfuegbar} && !Boolean.TRUE.equals($F{batterieGemessen})]]></printWhenExpression>
                 <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_BERECHNET_HINWEIS")]]></expression>
             </element>
 

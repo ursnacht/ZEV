@@ -38,6 +38,25 @@ public interface MesswerteRepository extends JpaRepository<Messwerte, Long> {
     @Query("SELECT COALESCE(SUM(m.total), 0) FROM Messwerte m WHERE m.einheit.typ = :typ AND m.zeit >= :dateFrom AND m.zeit < :dateTo")
     Double sumTotalByEinheitTypAndZeitBetween(@Param("typ") EinheitTyp typ, @Param("dateFrom") LocalDateTime dateFrom, @Param("dateTo") LocalDateTime dateTo);
 
+    /**
+     * Ladung und Entladung einer {@code SPEICHER}-Einheit, <b>getrennt</b> summiert
+     * (Specs/Statistik-Kennzahlen.md, FR-2a). Rückgabe: {@code [ladung, entladung]}, beide positiv.
+     *
+     * <p>Beim Speicher ist {@code total = ΔLadung − ΔEntladung}: positive Intervalle sind Ladung,
+     * negative Entladung. Eine schlichte Summe ergäbe den Saldo — über einen Monat nahe null und
+     * damit nutzlos. Getrennt summiert lassen sich beide Mengen und daraus der Wirkungsgrad lesen.
+     *
+     * <p>JPQL → der Hibernate-orgFilter greift (Mandanten-Isolation).
+     */
+    @Query("SELECT COALESCE(SUM(CASE WHEN m.total > 0 THEN m.total ELSE 0 END), 0), "
+            + "COALESCE(SUM(CASE WHEN m.total < 0 THEN -m.total ELSE 0 END), 0) "
+            + "FROM Messwerte m WHERE m.einheit.typ = :typ "
+            + "AND m.zeit >= :dateFrom AND m.zeit < :dateTo")
+    List<Object[]> sumLadungEntladungByEinheitTypAndZeitBetween(
+            @Param("typ") EinheitTyp typ,
+            @Param("dateFrom") LocalDateTime dateFrom,
+            @Param("dateTo") LocalDateTime dateTo);
+
     @Query("SELECT COALESCE(SUM(m.zev), 0) FROM Messwerte m WHERE m.einheit.typ = :typ AND m.zeit >= :dateFrom AND m.zeit < :dateTo")
     Double sumZevByEinheitTypAndZeitBetween(@Param("typ") EinheitTyp typ, @Param("dateFrom") LocalDateTime dateFrom, @Param("dateTo") LocalDateTime dateTo);
 

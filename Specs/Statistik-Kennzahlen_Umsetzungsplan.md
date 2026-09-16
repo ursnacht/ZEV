@@ -186,3 +186,42 @@ als Batterie-Anzeige, im anderen als Datenqualitäts-Anzeige.
   bereits angewendet (via `zev-db` geprüft) und durfte nicht geändert werden.
 * Tests: `StatistikServiceTest` 42 (Bilanzmodus kennzeichnet beide Seiten, Producer-Messung nur die
   gemessene), `statistik.component.spec.ts` um Richtung und Hinweis-Keys erweitert.
+
+### Nachtrag — Batterie-Kennzahlen aus der Einheit `SPEICHER` (16.09.2026, FR-2a)
+
+**Auslöser:** Seit dem Einheiten-Typ `SPEICHER` (`Specs/Batteriespeicher.md`) liefert der
+Wechselrichter Ladung und Entladung gemessen. Bis dahin waren die Batterie-Kennzahlen ein Residuum
+der Energiebilanz — mit allem, was sonst noch darin steckt.
+
+**Die gemessene Quelle hat Vorrang.** Existiert eine `SPEICHER`-Einheit, kommen Ladung, Entladung,
+Netto und Wirkungsgrad aus deren Messwerten; sonst bleibt alles wie bisher.
+
+| | mit `SPEICHER` | ohne |
+|---|---|---|
+| Quelle | Messwerte der Einheit | `P − C + B − R` je Intervall |
+| Voraussetzung | nur die Einheit | Producer **und** Bilanz-Bezug **und** Rücklieferung |
+| Kennzeichnung „berechnet" | **entfällt** | bleibt |
+| Aufwand | **eine** Abfrage | Intervall-Loop |
+
+**Zwei Dinge, die dabei wichtig waren:**
+
+Eine schlichte `SUM(total)` wäre nutzlos gewesen — beim Speicher ist `total` der Saldo aus Ladung
+und Entladung und liegt über einen Monat nahe null. Die neue Abfrage
+`sumLadungEntladungByEinheitTypAndZeitBetween` trennt beide Richtungen in der Datenbank.
+
+Die Kennzeichnung **„berechnet" entfällt nur bei gemessenen Werten** — in Web und PDF. Sie ist kein
+Schmuck: Sie sagt, dass die Zahl auch Messfehler und nicht gemessene Lasten enthält. Bei einem
+Zählerstand wäre der Hinweis schlicht falsch.
+
+**Nebenbei fällt eine Kontrollgrösse ab:** Ein Round-Trip-Wirkungsgrad über 100 % ist unmöglich —
+er wäre der stille Hinweis auf vertauschte Register. Bei Hene zeigt der echte Speicher 92.3 %.
+
+**Im Frontend** war die Änderung minimal, weil `berechnet` schon ein Parameter der Zeilen-Helfer
+war; nur `signedKwhZeile` hatte ihn hart auf `true`. Das Template blieb unberührt.
+
+**Geprüft:** 1325 Backend-Tests (vier neue: gemessen, ohne Bilanzdaten, ohne Messwerte, Regression
+ohne Speicher), 1659 Frontend-Tests (zwei neue zur Kennzeichnung), `JasperTemplateCompileTest` grün.
+
+> **Noch nicht am PDF geprüft:** Der Test kompiliert die Vorlage, sieht aber nicht, ob der Hinweis
+> tatsächlich verschwindet. Eine Sichtprüfung am erzeugten PDF steht aus — ein zu kleines Band oder
+> eine falsche `printWhenExpression` fällt sonst erst im Betrieb auf.

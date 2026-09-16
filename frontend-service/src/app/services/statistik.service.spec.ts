@@ -55,6 +55,7 @@ describe('StatistikService', () => {
         batterieEntladen: 50,
         batterieWirkungsgrad: 0.1667,
         batterieKennzahlenVerfuegbar: true,
+        batterieGemessen: false,
         autarkiegradGemessen: 0.8444,
         netzbezugsquoteGemessen: 0.1556,
         bilanzKennzahlenVerfuegbar: true,

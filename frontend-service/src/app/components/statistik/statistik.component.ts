@@ -284,11 +284,15 @@ export class StatistikComponent extends WithMessage implements OnInit {
       this.kwhZeile('KENNZAHL_ZEV_EIGENVERBRAUCH', monat.zevEigenverbrauch, false)
     );
     if (monat.batterieKennzahlenVerfuegbar) {
+      // Stammen die Werte aus der Speicher-Einheit, sind sie gemessen und NICHT berechnet - die
+      // Kennzeichnung entfaellt. Sie waere dort schlicht falsch: Ein Zaehlerstand ist kein
+      // Residuum der Bilanz.
+      const berechnet = !monat.batterieGemessen;
       zeilen.push(
-        this.signedKwhZeile('KENNZAHL_BATTERIE_NETTO', monat.batterieNetto),
-        this.kwhZeile('KENNZAHL_BATTERIE_GELADEN', monat.batterieGeladen, true),
-        this.kwhZeile('KENNZAHL_BATTERIE_ENTLADEN', monat.batterieEntladen, true),
-        this.percentZeile('KENNZAHL_BATTERIE_WIRKUNGSGRAD', monat.batterieWirkungsgrad, true)
+        this.signedKwhZeile('KENNZAHL_BATTERIE_NETTO', monat.batterieNetto, berechnet),
+        this.kwhZeile('KENNZAHL_BATTERIE_GELADEN', monat.batterieGeladen, berechnet),
+        this.kwhZeile('KENNZAHL_BATTERIE_ENTLADEN', monat.batterieEntladen, berechnet),
+        this.percentZeile('KENNZAHL_BATTERIE_WIRKUNGSGRAD', monat.batterieWirkungsgrad, berechnet)
       );
     }
     return zeilen;
@@ -340,7 +344,7 @@ export class StatistikComponent extends WithMessage implements OnInit {
     };
   }
 
-  private signedKwhZeile(labelKey: string, value: number | null): KennzahlZeile {
+  private signedKwhZeile(labelKey: string, value: number | null, berechnet: boolean): KennzahlZeile {
     return {
       labelKey,
       hintKey: labelKey + '_HINWEIS',
@@ -348,7 +352,7 @@ export class StatistikComponent extends WithMessage implements OnInit {
         ? '–'
         : (value >= 0 ? '+' : '') + this.formatSwissNumber(value),
       unit: value === null || value === undefined ? '' : 'kWh',
-      berechnet: true
+      berechnet
     };
   }
 

@@ -54,6 +54,7 @@ describe('StatistikComponent', () => {
     batterieEntladen: 20,
     batterieWirkungsgrad: 0.1667,
     batterieKennzahlenVerfuegbar: true,
+    batterieGemessen: false,
     autarkiegradGemessen: 0.8444,
     netzbezugsquoteGemessen: 0.1556,
     bilanzKennzahlenVerfuegbar: true,
@@ -640,6 +641,7 @@ describe('StatistikComponent', () => {
     const monatOhneBatterie: MonatsStatistik = {
       ...mockMonat,
       batterieKennzahlenVerfuegbar: false,
+      batterieGemessen: false,
       batterieNetto: null,
       batterieGeladen: null,
       batterieEntladen: null,
@@ -663,6 +665,25 @@ describe('StatistikComponent', () => {
 
     it('should return 11 rows when battery and measured grid supply are available', () => {
       expect(component.getKennzahlen(mockMonat).length).toBe(11);
+    });
+
+    it('should mark the battery figures as calculated when they come from the balance', () => {
+      const batterie = component.getKennzahlen(mockMonat)
+        .filter(z => z.labelKey.startsWith('KENNZAHL_BATTERIE'));
+
+      expect(batterie.length).toBe(4);
+      expect(batterie.every(z => z.berechnet)).toBe(true);
+    });
+
+    it('should not mark the battery figures when they are measured at the storage unit', () => {
+      // Ein Zaehlerstand ist kein Residuum der Bilanz - der Hinweis "berechnet" waere falsch.
+      const monat = { ...mockMonat, batterieGemessen: true };
+
+      const batterie = component.getKennzahlen(monat)
+        .filter(z => z.labelKey.startsWith('KENNZAHL_BATTERIE'));
+
+      expect(batterie.length).toBe(4);
+      expect(batterie.some(z => z.berechnet)).toBe(false);
     });
 
     it('should not include any battery rows when not available', () => {

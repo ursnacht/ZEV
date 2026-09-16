@@ -818,6 +818,79 @@ public class StatistikServiceTest {
         assertEquals(3.0 / 7.0, monat.getBatterieWirkungsgrad(), 1e-9); // ≈ 42.9 %
     }
 
+    // ========== Batterie aus der SPEICHER-Einheit (gemessen, FR-2a) ==========
+
+    @Test
+    void batterie_MitSpeicherEinheit_NimmtGemesseneWerte() {
+        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
+        stubBilanzEinheiten(400.0, 300.0);
+        when(einheitRepository.existsByTyp(EinheitTyp.SPEICHER)).thenReturn(true);
+        when(messwerteRepository.sumLadungEntladungByEinheitTypAndZeitBetween(
+                eq(EinheitTyp.SPEICHER), any(), any()))
+                .thenReturn(List.<Object[]>of(new Object[]{100.0, 92.0}));
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertTrue(monat.isBatterieKennzahlenVerfuegbar());
+        assertTrue(monat.isBatterieGemessen());
+        assertEquals(100.0, monat.getBatterieGeladen(), 1e-9);
+        assertEquals(92.0, monat.getBatterieEntladen(), 1e-9);
+        assertEquals(8.0, monat.getBatterieNetto(), 1e-9);          // Ladung − Entladung
+        assertEquals(0.92, monat.getBatterieWirkungsgrad(), 1e-9);  // Round-Trip
+        // Die Bilanz-Aggregation wird dann NICHT mehr gebraucht.
+        verify(messwerteRepository, never()).sumBilanzKomponentenPerZeitBetween(any(), any());
+    }
+
+    @Test
+    void batterie_MitSpeicherEinheitOhneBilanzdaten_TrotzdemVerfuegbar() {
+        // Der Zaehler der Batterie genuegt - Bilanz-Bezug und Ruecklieferung braucht es nur fuer
+        // das Residuum. Vorher blieb der ganze Block hier leer.
+        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
+        when(einheitRepository.findFirstByTyp(EinheitTyp.BEZUG)).thenReturn(Optional.empty());
+        when(einheitRepository.findFirstByTyp(EinheitTyp.RUECKLIEFERUNG)).thenReturn(Optional.empty());
+        when(einheitRepository.existsByTyp(EinheitTyp.SPEICHER)).thenReturn(true);
+        when(messwerteRepository.sumLadungEntladungByEinheitTypAndZeitBetween(
+                eq(EinheitTyp.SPEICHER), any(), any()))
+                .thenReturn(List.<Object[]>of(new Object[]{50.0, 45.0}));
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertTrue(monat.isBatterieKennzahlenVerfuegbar());
+        assertTrue(monat.isBatterieGemessen());
+        assertEquals(50.0, monat.getBatterieGeladen(), 1e-9);
+    }
+
+    @Test
+    void batterie_SpeicherEinheitOhneMesswerte_NullenUndKeinWirkungsgrad() {
+        // Einheit angelegt, Zaehler noch stumm: keine Division durch 0, kein Fehler.
+        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
+        stubBilanzEinheiten(400.0, 300.0);
+        when(einheitRepository.existsByTyp(EinheitTyp.SPEICHER)).thenReturn(true);
+        when(messwerteRepository.sumLadungEntladungByEinheitTypAndZeitBetween(
+                eq(EinheitTyp.SPEICHER), any(), any()))
+                .thenReturn(List.<Object[]>of(new Object[]{0.0, 0.0}));
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertEquals(0.0, monat.getBatterieGeladen(), 1e-9);
+        assertNull(monat.getBatterieWirkungsgrad());
+    }
+
+    @Test
+    void batterie_OhneSpeicherEinheit_BleibtBerechnet() {
+        // Regression: Ohne Speicher-Einheit unveraendert das Residuum der Bilanz.
+        stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);
+        stubBilanzEinheiten(400.0, 300.0);
+        when(messwerteRepository.sumBilanzKomponentenPerZeitBetween(any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        MonatsStatistikDTO monat = ersterMonat();
+
+        assertTrue(monat.isBatterieKennzahlenVerfuegbar());
+        assertFalse(monat.isBatterieGemessen());
+        assertEquals(300.0, monat.getBatterieNetto(), 1e-9);
+    }
+
     @Test
     void berechneBatterieKennzahlen_GeladenNull_WirkungsgradNull() {
         stubKpiRun(-1200.0, 1000.0, -900.0, 600.0, 600.0);

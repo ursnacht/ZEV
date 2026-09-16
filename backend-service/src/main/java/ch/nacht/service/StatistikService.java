@@ -311,29 +311,58 @@ public class StatistikService {
             dto.setVerteilungLueckenhaft(false);
         }
 
-        // Netto-Speicherfluss (berechnet/geschätzt): nur bei Producer + Bilanz-Bezug + Rücklieferung
-        boolean producerVorhanden = p > 0;
-        boolean bezugVorhanden = dto.getBilanzBezugName() != null;
-        boolean ruecklieferungVorhanden = dto.getBilanzRuecklieferungName() != null;
-        boolean batterieVerfuegbar = producerVorhanden && bezugVorhanden && ruecklieferungVorhanden;
-        dto.setBatterieKennzahlenVerfuegbar(batterieVerfuegbar);
-        if (batterieVerfuegbar) {
-            double b = dto.getBilanzBezug() != null ? dto.getBilanzBezug() : 0.0;
-            double r = dto.getBilanzRuecklieferung() != null ? dto.getBilanzRuecklieferung() : 0.0;
-            dto.setBatterieNetto(p - c + b - r);
+        // Netto-Speicherfluss. ZWEI QUELLEN, und die gemessene hat Vorrang:
+        //
+        //   1. Einheit vom Typ SPEICHER  -> gemessen. Braucht WEDER Producer NOCH Bilanz-Daten;
+        //      der Zaehler der Batterie genuegt.
+        //   2. sonst Energiebilanz       -> P − C + B − R, ein Residuum. Setzt Producer,
+        //      Bilanz-Bezug und Ruecklieferung voraus.
+        //
+        // Das Residuum enthaelt auch Messfehler, Wandlungsverluste und nicht gemessene Lasten -
+        // deshalb die Kennzeichnung "berechnet". Bei einem Zaehlerstand waere dieser Hinweis
+        // schlicht falsch, und er entfaellt (FR-2a).
+        boolean speicherVorhanden = einheitRepository.existsByTyp(EinheitTyp.SPEICHER);
+        dto.setBatterieGemessen(speicherVorhanden);
+
+        if (speicherVorhanden) {
+            dto.setBatterieKennzahlenVerfuegbar(true);
+            // Netto = Ladung − Entladung; gefuellt wird beides in berechneBatterieKennzahlen().
+            // Hier nur der Platzhalter, damit die Reihenfolge der beiden Methoden egal bleibt.
         } else {
-            dto.setBatterieNetto(null);
+            boolean producerVorhanden = p > 0;
+            boolean bezugVorhanden = dto.getBilanzBezugName() != null;
+            boolean ruecklieferungVorhanden = dto.getBilanzRuecklieferungName() != null;
+            boolean batterieVerfuegbar = producerVorhanden && bezugVorhanden && ruecklieferungVorhanden;
+            dto.setBatterieKennzahlenVerfuegbar(batterieVerfuegbar);
+            if (batterieVerfuegbar) {
+                double b = dto.getBilanzBezug() != null ? dto.getBilanzBezug() : 0.0;
+                double r = dto.getBilanzRuecklieferung() != null ? dto.getBilanzRuecklieferung() : 0.0;
+                dto.setBatterieNetto(p - c + b - r);
+            } else {
+                dto.setBatterieNetto(null);
+            }
         }
     }
 
     /**
-     * Batterie-Kennzahlen (Spec Statistik-Kennzahlen.md, Stufe 2): geladen/entladen/Wirkungsgrad
-     * aus der Pro-Intervall-Aggregation. Je Intervall {@code Netto_i = P_i − C_i + B_i − R_i};
-     * geladen = Σ max(0, Netto_i), entladen = Σ max(0, −Netto_i), Wirkungsgrad = entladen/geladen
-     * (nur wenn geladen > 0). Nur wenn Producer + Bilanz-Bezug + Rücklieferung vorhanden.
+     * Batterie-Kennzahlen: geladen, entladen, Wirkungsgrad (Spec Statistik-Kennzahlen.md, FR-2/2a).
+     *
+     * <p><b>Gemessen, wenn eine {@code SPEICHER}-Einheit existiert</b> — dann kommen die Mengen
+     * direkt aus deren Messwerten: positive Intervalle sind Ladung, negative Entladung. Der
+     * Wirkungsgrad ist damit ein echter Round-Trip-Wert.
+     *
+     * <p><b>Sonst aus der Energiebilanz</b> je Intervall: {@code Netto_i = P_i − C_i + B_i − R_i},
+     * geladen = Σ max(0, Netto_i), entladen = Σ max(0, −Netto_i). Ein Residuum, das auch Messfehler
+     * und nicht gemessene Lasten enthält — deshalb als „berechnet" gekennzeichnet.
+     *
+     * <p>Wirkungsgrad in beiden Fällen {@code entladen / geladen}, nur wenn {@code geladen > 0}.
      */
     private void berechneBatterieKennzahlen(MonatsStatistikDTO dto, LocalDateTime vonDateTime, LocalDateTime bisDateTime) {
         if (!dto.isBatterieKennzahlenVerfuegbar()) {
+            return;
+        }
+        if (dto.isBatterieGemessen()) {
+            batterieAusSpeicherEinheit(dto, vonDateTime, bisDateTime);
             return;
         }
         double geladen = 0.0;
@@ -352,6 +381,31 @@ public class StatistikService {
         }
         dto.setBatterieGeladen(geladen);
         dto.setBatterieEntladen(entladen);
+        dto.setBatterieWirkungsgrad(geladen > 0 ? entladen / geladen : null);
+    }
+
+    /**
+     * Ladung, Entladung und Netto aus der <b>gemessenen</b> Speicher-Einheit.
+     *
+     * <p>Eine einzige Abfrage statt eines Intervall-Loops: Die Trennung in Ladung und Entladung
+     * erledigt die Datenbank. Ein reines {@code SUM(total)} ergäbe den Saldo — über einen Monat
+     * nahe null und damit nutzlos.
+     *
+     * <p>Liegen keine Messwerte vor (Einheit angelegt, Zähler noch stumm), stehen überall Nullen
+     * und der Wirkungsgrad bleibt {@code null} — kein Fehler, nur nichts zu zeigen.
+     */
+    private void batterieAusSpeicherEinheit(MonatsStatistikDTO dto,
+                                            LocalDateTime vonDateTime, LocalDateTime bisDateTime) {
+        double geladen = 0.0;
+        double entladen = 0.0;
+        for (Object[] row : messwerteRepository.sumLadungEntladungByEinheitTypAndZeitBetween(
+                EinheitTyp.SPEICHER, vonDateTime, bisDateTime)) {
+            geladen = ((Number) row[0]).doubleValue();
+            entladen = ((Number) row[1]).doubleValue();
+        }
+        dto.setBatterieGeladen(geladen);
+        dto.setBatterieEntladen(entladen);
+        dto.setBatterieNetto(geladen - entladen);
         dto.setBatterieWirkungsgrad(geladen > 0 ? entladen / geladen : null);
     }
 

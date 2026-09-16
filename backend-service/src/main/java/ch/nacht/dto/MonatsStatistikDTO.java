@@ -49,7 +49,16 @@ public class MonatsStatistikDTO {
     private Double batterieGeladen;           // Σ max(0, Netto_i) (kWh, Stufe 2)
     private Double batterieEntladen;          // Σ max(0, −Netto_i) (kWh, Stufe 2)
     private Double batterieWirkungsgrad;      // entladen / geladen
-    private boolean batterieKennzahlenVerfuegbar; // Producer + Bezug + Rücklieferung vorhanden
+    private boolean batterieKennzahlenVerfuegbar; // Producer + Bezug + Rücklieferung, ODER Speicher-Einheit
+    /**
+     * {@code true}, wenn die Werte aus der Einheit vom Typ {@code SPEICHER} stammen statt aus der
+     * Energiebilanz.
+     *
+     * <p>Steuert die Kennzeichnung „berechnet": Ein Residuum der Bilanz enthält auch Messfehler und
+     * nicht gemessene Lasten, ein Zählerstand nicht. Der Hinweis wäre bei gemessenen Werten
+     * schlicht falsch.
+     */
+    private boolean batterieGemessen;
 
     // Bilanzmesspunkte (Netzanschluss): Summen der Typen BEZUG (positiv) / RUECKLIEFERUNG (Betrag)
     private Double bilanzBezug;
@@ -358,6 +367,14 @@ public class MonatsStatistikDTO {
 
     public void setZevEigenverbrauch(Double zevEigenverbrauch) {
         this.zevEigenverbrauch = zevEigenverbrauch;
+    }
+
+    public boolean isBatterieGemessen() {
+        return batterieGemessen;
+    }
+
+    public void setBatterieGemessen(boolean batterieGemessen) {
+        this.batterieGemessen = batterieGemessen;
     }
 
     public Double getBatterieNetto() {
