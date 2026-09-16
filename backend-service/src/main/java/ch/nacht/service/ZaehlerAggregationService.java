@@ -221,6 +221,11 @@ public class ZaehlerAggregationService {
         // (= verteilte Menge, Rest ist Rücklieferung), Consumer zev = zev_calculated (FR-9,
         // Sentinel zev = 0). Bilanz-Typen (BEZUG/RUECKLIEFERUNG) bleiben dauerhaft bei
         // zev = 0 – sie nehmen nicht an der Verteilung teil.
+        //
+        // SPEICHER faellt hier ebenfalls auf zev = 0, aber aus einem anderen Grund: Er nimmt im
+        // Bilanzmodus nicht an der Verteilung teil (Specs/Batteriespeicher.md, FR-3a). Kaeme die
+        // Verteilung nach FR-3 dazu, traegt der Speicher dort die ZEV-Ladung - dann ist diese
+        // Zeile anzupassen. "Dauerhaft" gilt also nur fuer die Bilanz-Typen.
         messwert.setZev(einheit.getTyp() == EinheitTyp.PRODUCER ? total : 0.0);
         messwert.setQuelle(Quelle.MQTT); // zev_calculated bleibt null bis zur Solarverteilung
         messwerteRepository.save(messwert);

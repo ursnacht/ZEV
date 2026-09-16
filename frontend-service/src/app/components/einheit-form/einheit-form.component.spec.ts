@@ -52,13 +52,12 @@ describe('EinheitFormComponent', () => {
       expect(component.formData.messpunkt).toBe('MP-001');
     });
 
-    it('should have five einheit type options', () => {
-      expect(component.einheitTypOptions.length).toBe(5);
-      expect(component.einheitTypOptions[0].value).toBe(EinheitTyp.PRODUCER);
-      expect(component.einheitTypOptions[1].value).toBe(EinheitTyp.CONSUMER);
-      expect(component.einheitTypOptions[2].value).toBe(EinheitTyp.BEZUG);
-      expect(component.einheitTypOptions[3].value).toBe(EinheitTyp.RUECKLIEFERUNG);
-      expect(component.einheitTypOptions[4].value).toBe(EinheitTyp.LADESTATION);
+    it('should offer every einheit type exactly once', () => {
+      // Gegen die Enum-Werte statt gegen eine feste Zahl: Ein neuer Typ, der im Dropdown
+      // vergessen wird, faellt so auf - und ein bestehender, der herausfaellt, ebenfalls.
+      const werte = component.einheitTypOptions.map(o => o.value);
+      expect(werte).toEqual(Object.values(EinheitTyp));
+      expect(new Set(werte).size).toBe(werte.length);
     });
 
     it('should label the ladestation option with its own translation key', () => {

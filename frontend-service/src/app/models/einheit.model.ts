@@ -4,7 +4,14 @@ export enum EinheitTyp {
   BEZUG = 'BEZUG',
   RUECKLIEFERUNG = 'RUECKLIEFERUNG',
   /** Ladestation; `messpunkt` traegt die RFID (Specs/Ladestationen.md). */
-  LADESTATION = 'LADESTATION'
+  LADESTATION = 'LADESTATION',
+  /**
+   * Batteriespeicher am Hybrid-Wechselrichter (Specs/Batteriespeicher.md).
+   *
+   * Die beiden Register tragen hier **Ladung** und **Entladung**; `total` ist entsprechend
+   * positiv beim Laden und negativ beim Entladen. Nimmt nicht an der Solarverteilung teil.
+   */
+  SPEICHER = 'SPEICHER'
 }
 
 export interface Einheit {

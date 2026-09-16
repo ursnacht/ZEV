@@ -9,13 +9,25 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
 import java.util.Set;
 
 @Service
 public class EinheitService {
 
-    /** Bilanz-Typen (Netzanschluss): je Mandant höchstens eine Einheit pro Typ. */
-    private static final Set<EinheitTyp> BILANZ_TYPEN = Set.of(EinheitTyp.BEZUG, EinheitTyp.RUECKLIEFERUNG);
+    /**
+     * Typen, von denen es je Mandant höchstens <b>eine</b> Einheit geben darf — samt der Meldung,
+     * die der Benutzer dann sieht.
+     *
+     * <p>Die Bilanz-Typen messen den Netzanschluss, der Speicher die eine Batterie der Anlage. In
+     * beiden Fällen wäre eine zweite Einheit keine zusätzliche Messstelle, sondern eine
+     * Doppelzählung. Eigene Meldung je Fall: „Bilanz-Typ existiert bereits" hülfe bei einem
+     * Speicher nicht weiter.
+     */
+    private static final Map<EinheitTyp, String> EINMALIG_JE_MANDANT = Map.of(
+            EinheitTyp.BEZUG, "EINHEIT_BILANZ_TYP_EXISTIERT",
+            EinheitTyp.RUECKLIEFERUNG, "EINHEIT_BILANZ_TYP_EXISTIERT",
+            EinheitTyp.SPEICHER, "EINHEIT_SPEICHER_EXISTIERT");
 
     private final EinheitRepository einheitRepository;
     private final MieterEinheitRepository mieterEinheitRepository;
@@ -47,8 +59,9 @@ public class EinheitService {
     @Transactional
     public Einheit createEinheit(Einheit einheit) {
         hibernateFilterService.enableOrgFilter();
-        if (BILANZ_TYPEN.contains(einheit.getTyp()) && einheitRepository.existsByTyp(einheit.getTyp())) {
-            throw new IllegalStateException("EINHEIT_BILANZ_TYP_EXISTIERT");
+        String fehlerKey = EINMALIG_JE_MANDANT.get(einheit.getTyp());
+        if (fehlerKey != null && einheitRepository.existsByTyp(einheit.getTyp())) {
+            throw new IllegalStateException(fehlerKey);
         }
         pruefeLadestationMesspunkt(einheit, -1L);
         einheit.setOrgId(organizationContextService.getCurrentOrgId());
@@ -62,8 +75,9 @@ public class EinheitService {
         if (existingEinheit.isEmpty()) {
             return Optional.empty();
         }
-        if (BILANZ_TYPEN.contains(einheit.getTyp()) && einheitRepository.existsByTypAndIdNot(einheit.getTyp(), id)) {
-            throw new IllegalStateException("EINHEIT_BILANZ_TYP_EXISTIERT");
+        String fehlerKey = EINMALIG_JE_MANDANT.get(einheit.getTyp());
+        if (fehlerKey != null && einheitRepository.existsByTypAndIdNot(einheit.getTyp(), id)) {
+            throw new IllegalStateException(fehlerKey);
         }
         pruefeLadestationMesspunkt(einheit, id);
         einheit.setId(id);

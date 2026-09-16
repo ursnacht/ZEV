@@ -47,6 +47,20 @@ describe('EinheitTypPipe', () => {
       expect(pipe.transform(EinheitTyp.LADESTATION)).toBe('TYP_LADESTATION');
     });
 
+    it('should map SPEICHER to TYP_SPEICHER', () => {
+      expect(pipe.transform(EinheitTyp.SPEICHER)).toBe('TYP_SPEICHER');
+    });
+
+    it('should give every known type its own label', () => {
+      // Der Default-Zweig faengt PRODUCER UND alles Unbekannte ab. Ein neuer Enum-Wert ohne
+      // eigenen case erscheint dadurch stillschweigend als "Produzent" - dieser Test faellt
+      // in dem Moment, statt es der Anzeige zu ueberlassen.
+      const nichtProducer = Object.values(EinheitTyp).filter(t => t !== EinheitTyp.PRODUCER);
+      for (const typ of nichtProducer) {
+        expect(pipe.transform(typ)).not.toBe('PRODUZENT');
+      }
+    });
+
     it('should not label a LADESTATION as PRODUZENT', () => {
       // Der Default-Zweig faengt PRODUCER und alles Unbekannte ab - ein neuer Typ ohne
       // eigenen Fall erschiene faelschlich als "Produzent" (Specs/Ladestationen.md).

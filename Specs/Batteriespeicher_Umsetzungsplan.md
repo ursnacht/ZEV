@@ -57,17 +57,17 @@ vor, und die Wirkung der Steuerung aus `Specs/Einspeisesteuerung.md` liesse sich
 
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
-| [ ] | 1. Enum Backend | `EinheitTyp.SPEICHER` mit Javadoc (Ladung positiv, Entladung negativ). Keine Migration — `einheit.typ` ist `VARCHAR` |
-| [ ] | 2. Eindeutigkeit | `EinheitService`: höchstens **eine** `SPEICHER`-Einheit je Mandant, Fehler-Key `EINHEIT_SPEICHER_EXISTIERT`, HTTP 400. **Umbau nötig:** Heute prüft eine Bedingung über `BILANZ_TYPEN` und wirft den gemeinsamen Key (Zeilen 50/65); für einen eigenen Key braucht es einen zweiten Zweig oder eine Zuordnung Typ → Key |
-| [ ] | 3. Übersetzungen | Migration mit `TYP_SPEICHER`, `EINHEIT_SPEICHER_EXISTIERT`, `STATISTIK_LADUNG` („Ladung, gemessen"), `STATISTIK_ENTLADUNG` („Entladung, gemessen"), `TOOLTIP_SPEICHER_GEMESSEN`. **Nächste freie Nummer prüfen** — `Specs/Einspeisesteuerung.md` braucht ebenfalls welche |
-| [ ] | 4. Typ-Anzeige | `einheit-typ.pipe.ts` (eigener `case`) und `einheit-summen.jrxml` (Ausdruck um `SPEICHER` **und** `LADESTATION` erweitern). Siehe Kasten oben |
-| [ ] | 5. Frontend-Enum & Formular | `einheit.model.ts`, Typ-Option im `einheit-form` |
-| [ ] | 6. Aggregation | `ZaehlerAggregationService`: **nur den Kommentar** über `setZev(...)` ergänzen. Der Code setzt `SPEICHER` bereits auf `zev = 0`; die Erläuterung behauptet heute, Bilanz-Typen blieben „dauerhaft" bei 0 — das gilt für den Speicher nicht, sobald Phase 10 käme |
+| [x] | 1. Enum Backend | `EinheitTyp.SPEICHER` mit Javadoc (Ladung positiv, Entladung negativ). Keine Migration — `einheit.typ` ist `VARCHAR` |
+| [x] | 2. Eindeutigkeit | `EinheitService`: höchstens **eine** `SPEICHER`-Einheit je Mandant, Fehler-Key `EINHEIT_SPEICHER_EXISTIERT`, HTTP 400. **Umbau nötig:** Heute prüft eine Bedingung über `BILANZ_TYPEN` und wirft den gemeinsamen Key (Zeilen 50/65); für einen eigenen Key braucht es einen zweiten Zweig oder eine Zuordnung Typ → Key |
+| [~] | 3. Übersetzungen | Migration mit `TYP_SPEICHER`, `EINHEIT_SPEICHER_EXISTIERT`, `STATISTIK_LADUNG` („Ladung, gemessen"), `STATISTIK_ENTLADUNG` („Entladung, gemessen"), `TOOLTIP_SPEICHER_GEMESSEN`. **Teilweise (V152):** `TYP_SPEICHER` und `EINHEIT_SPEICHER_EXISTIERT` sind da. `STATISTIK_LADUNG`, `STATISTIK_ENTLADUNG` und `TOOLTIP_SPEICHER_GEMESSEN` folgen mit Phase 7/8 — ohne die Statistik-Zeilen wären es Karteileichen |
+| [x] | 4. Typ-Anzeige | `einheit-typ.pipe.ts` (eigener `case`) und `einheit-summen.jrxml` (Ausdruck um `SPEICHER` **und** `LADESTATION` erweitern). Siehe Kasten oben |
+| [x] | 5. Frontend-Enum & Formular | `einheit.model.ts`, Typ-Option im `einheit-form` |
+| [x] | 6. Aggregation | `ZaehlerAggregationService`: **nur den Kommentar** über `setZev(...)` ergänzen. Der Code setzt `SPEICHER` bereits auf `zev = 0`; die Erläuterung behauptet heute, Bilanz-Typen blieben „dauerhaft" bei 0 — das gilt für den Speicher nicht, sobald Phase 10 käme |
 | [ ] | 7. Statistik Backend | `MonatsStatistikDTO` um `speicherName`, `speicherLadung`, `speicherEntladung`; `StatistikService` füllt sie aus einer neuen Repository-Abfrage (Summe der positiven bzw. negativen `total` der `SPEICHER`-Einheit im Zeitraum). Nur wenn eine Speicher-Einheit existiert, sonst `null` |
 | [ ] | 8. Statistik Frontend | Zwei Zeilen mit Balken nach dem Muster von `bilanzBezugName` (`statistik.component.html` ab Zeile 218), Tooltip `TOOLTIP_SPEICHER_GEMESSEN`; `statistik.model.ts` nachziehen |
 | [ ] | 9. Statistik PDF | Zwei Zeilen in `statistik.jrxml` **und die Bandhöhe von 502 erhöhen**. `JasperTemplateCompileTest` prüft nur, ob das Template kompiliert — ein zu kleines Band schneidet still ab. Sichtprüfung am erzeugten PDF (PDFBox-Weg, s. `Specs/Nebenkosten/RechnungenGenerieren_Umsetzungsplan.md`) |
-| [ ] | 10. Simulator | `sim_reader.py`: Modus `"speicher"` (Name enthält „speicher") mit wechselnden Lade-/Entladephasen, analog den bestehenden Modi; Beispiel in `config.sim.example.yaml` |
-| [ ] | 11. Tests | Backend: Eindeutigkeit (beide Zweige), Aggregation `zev = 0`, Statistik-Summen mit und ohne Speicher-Einheit. Frontend: Pipe mit **erwartetem Text**, Statistik-Zeilen. Regression: Statistik ohne Speicher unverändert |
+| [x] | 10. Simulator | `sim_reader.py`: Modus `"speicher"` (Name enthält „speicher") mit wechselnden Lade-/Entladephasen, analog den bestehenden Modi; Beispiel in `config.sim.example.yaml` |
+| [~] | 11. Tests | Backend: Eindeutigkeit (beide Zweige), Aggregation `zev = 0`, Statistik-Summen mit und ohne Speicher-Einheit. Frontend: Pipe mit **erwartetem Text**, Statistik-Zeilen. Regression: Statistik ohne Speicher unverändert. **Erledigt:** Eindeutigkeit (beide Zweige plus die Gegenprobe, dass PRODUCER ungeprüft bleibt), Pipe mit erwartetem Text. **Offen:** alles zur Statistik (Phase 7/8) |
 
 ### Zurückgestellt — nur bei Verteilmodus `PRODUCER_MESSUNG`
 
@@ -116,3 +116,51 @@ bereits. `existsByTyp` ist damit automatisch mandantenbezogen.
 * **Reihenfolge-Hinweis:** Die Phasen 1–5 sind in sich abgeschlossen und liefern eine anlegbare,
   korrekt beschriftete Speicher-Einheit. Erst ab Phase 7 braucht es Messwerte, also entweder den
   Simulator (Phase 10) oder einen echten Zähler.
+
+
+### Nachtrag — Teilumsetzung für die Einspeisesteuerung (16.09.2026)
+
+**Auslöser:** Der Pi liefert seit heute Ladung und Entladung des Solinteg MHT via MQTT
+(`zev/1/Batterie-Hene/messwert`, Register 31108/31110). Ohne den Einheiten-Typ wurden die
+Nachrichten mit „unbekannter Messpunkt" verworfen.
+
+**Umgesetzt sind die Phasen 1, 2, 4, 5 und 6** — genug, damit die Messwerte ankommen und in der
+Bilanz auftauchen. Die Statistik-Phasen 7 bis 9 bleiben offen; sie brauchen die Zeilen in Web und
+PDF und sind ein eigenes Stück Arbeit.
+
+**Vor der Migration geprüft:** `zev.einheit.typ` ist `VARCHAR(20)` **ohne** CHECK-Constraint — die
+Enum-Erweiterung braucht keine DDL, wie der Plan annahm. Bei anderen Enums im Projekt zählt ein
+CHECK die erlaubten Werte auf; dort wäre es beim ersten Insert gescheitert.
+
+**Die Eindeutigkeit** ist als Zuordnung `Typ → Fehlerkey` umgesetzt, nicht als zweiter Zweig: Ein
+weiterer einmaliger Typ ist damit eine Zeile, und jeder behält seine eigene Meldung.
+
+**Zwei Tests, die mehr prüfen als verlangt:**
+* `einheit-form.component.spec.ts` verglich die Typauswahl gegen die **feste Zahl 5** und fiel
+  sofort um. Er vergleicht jetzt gegen `Object.values(EinheitTyp)` — ein künftig vergessener Typ
+  fällt damit auf, statt nur einen Zähler zu verschieben.
+* `einheit-typ.pipe.spec.ts` prüft neu, dass **jeder** Enum-Wert ausser `PRODUCER` eine eigene
+  Beschriftung bekommt. Der `default`-Zweig der Pipe fängt `PRODUCER` und alles Unbekannte ab; ein
+  neuer Typ ohne eigenen `case` erschiene sonst stillschweigend als „Produzent" — genau davor warnt
+  der Kommentar dort, und jetzt fällt der Test statt der Anzeige.
+
+**`LADESTATION` im PDF-Subreport mitgenommen** (Phase 4 verlangt es): Der Ausdruck kannte sie nicht
+und hätte sie als „Konsument" beschriftet. Praktisch trat das nie auf, weil Ladestationen keine
+Messwerte erhalten — es blieb ein latenter Fehler.
+
+**Geprüft:** 1321 Backend-Tests, 1657 Frontend-Tests, `JasperTemplateCompileTest` grün.
+
+**Nötig:** Rebuild für V152, danach die Einheit `Batterie-Hene` vom Typ Speicher anlegen.
+
+**Nachtrag Simulator (Phase 10, 16.09.2026):** Lokal kam nichts an — der Simulator kannte keinen
+Speicher. Ergänzt als Modus `speicher`, erkannt an **„speicher" oder „batterie"** im Messpunkt: In
+der Praxis heisst der Messpunkt nach dem Gerät, nicht nach seinem Einheiten-Typ (bei Hene
+`Batterie-Hene`).
+
+Der Modus unterscheidet sich als einziger grundlegend von den übrigen: Er erzeugt **wechselnde
+Phasen**, weil ein Speicher lädt *oder* entlädt, nie beides. Liessen beide Register gleichzeitig
+wachsen, wäre `total` dauerhaft nahe null und die Aggregation zeigte eine Batterie, die nichts tut.
+
+Geprüft über 40 Lesevorgänge: klare Phasen (`LLLLLLLLLLLEEEEEEELLLLLLLEEEEEEEEEEEELLL`), nie beide
+Register zugleich, Wirkungsgrad **91.8 %** — praktisch identisch mit den 92.3 %, die der echte
+Speicher bei Hene zeigt. Ein Wert über 100 % wäre der stille Hinweis auf vertauschte Register.

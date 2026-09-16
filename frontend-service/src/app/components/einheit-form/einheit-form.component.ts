@@ -29,7 +29,8 @@ export class EinheitFormComponent implements OnInit {
     { value: EinheitTyp.CONSUMER, label: 'KONSUMENT' },
     { value: EinheitTyp.BEZUG, label: 'TYP_BEZUG' },
     { value: EinheitTyp.RUECKLIEFERUNG, label: 'TYP_RUECKLIEFERUNG' },
-    { value: EinheitTyp.LADESTATION, label: 'TYP_LADESTATION' }
+    { value: EinheitTyp.LADESTATION, label: 'TYP_LADESTATION' },
+    { value: EinheitTyp.SPEICHER, label: 'TYP_SPEICHER' }
   ];
 
   readonly EinheitTyp = EinheitTyp;

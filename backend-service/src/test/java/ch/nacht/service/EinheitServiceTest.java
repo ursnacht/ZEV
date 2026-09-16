@@ -331,6 +331,65 @@ public class EinheitServiceTest {
         verify(einheitRepository).save(neu);
     }
 
+    // ==================== Speicher: hoechstens einer je Mandant ====================
+
+    @Test
+    void createEinheit_ErsterSpeicher_SavesSuccessfully() {
+        Einheit neu = new Einheit("Batterie", EinheitTyp.SPEICHER);
+        neu.setMesspunkt("Batterie-Hene");
+        when(einheitRepository.existsByTyp(EinheitTyp.SPEICHER)).thenReturn(false);
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(einheitRepository.save(neu)).thenReturn(neu);
+
+        einheitService.createEinheit(neu);
+
+        verify(einheitRepository).save(neu);
+    }
+
+    @Test
+    void createEinheit_ZweiterSpeicher_ThrowsMitEigenemKey() {
+        // Eigener Fehler-Key: "Bilanz-Typ existiert bereits" hilft beim Anlegen einer zweiten
+        // Batterie nicht weiter (Specs/Batteriespeicher.md, FR-1.3).
+        Einheit neu = new Einheit("Batterie 2", EinheitTyp.SPEICHER);
+        when(einheitRepository.existsByTyp(EinheitTyp.SPEICHER)).thenReturn(true);
+
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> einheitService.createEinheit(neu));
+
+        assertEquals("EINHEIT_SPEICHER_EXISTIERT", e.getMessage());
+        verify(einheitRepository, never()).save(any());
+    }
+
+    @Test
+    void updateEinheit_SpeicherNebenAnderemSpeicher_ThrowsMitEigenemKey() {
+        Einheit bestehend = new Einheit("Batterie", EinheitTyp.SPEICHER);
+        bestehend.setId(7L);
+        bestehend.setOrgId(testOrgId);
+        Einheit geaendert = new Einheit("Batterie", EinheitTyp.SPEICHER);
+        when(einheitRepository.findFirstById(7L)).thenReturn(Optional.of(bestehend));
+        when(einheitRepository.existsByTypAndIdNot(EinheitTyp.SPEICHER, 7L)).thenReturn(true);
+
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> einheitService.updateEinheit(7L, geaendert));
+
+        assertEquals("EINHEIT_SPEICHER_EXISTIERT", e.getMessage());
+        verify(einheitRepository, never()).save(any());
+    }
+
+    @Test
+    void createEinheit_Producer_PruefteKeineEinmaligkeit() {
+        // Von PRODUCER und CONSUMER darf es beliebig viele geben - die Zuordnung Typ -> Fehlerkey
+        // enthaelt sie nicht, und die Existenzpruefung unterbleibt.
+        Einheit neu = new Einheit("PV 2", EinheitTyp.PRODUCER);
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(einheitRepository.save(neu)).thenReturn(neu);
+
+        einheitService.createEinheit(neu);
+
+        verify(einheitRepository, never()).existsByTyp(any());
+        verify(einheitRepository).save(neu);
+    }
+
     @Test
     void updateEinheit_LadestationBehaeltEigeneRfid_SavesSuccessfully() {
         Einheit bestehend = ladestation("Ladestation 1", "RFID-001");

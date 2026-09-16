@@ -20,6 +20,8 @@ export class EinheitTypPipe implements PipeTransform {
         return this.translationService.translate('TYP_RUECKLIEFERUNG');
       case EinheitTyp.LADESTATION:
         return this.translationService.translate('TYP_LADESTATION');
+      case EinheitTyp.SPEICHER:
+        return this.translationService.translate('TYP_SPEICHER');
       default:
         // PRODUCER und alles Unbekannte. Neue Typen brauchen hier einen eigenen Fall,
         // sonst erscheinen sie faelschlich als "Produzent".

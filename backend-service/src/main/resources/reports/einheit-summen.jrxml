@@ -69,6 +69,8 @@
                 <expression><![CDATA[$F{einheitTyp}.name().equals("PRODUCER") ? $P{TRANSLATIONS}.get("PRODUZENT")
                     : $F{einheitTyp}.name().equals("BEZUG") ? $P{TRANSLATIONS}.get("TYP_BEZUG")
                     : $F{einheitTyp}.name().equals("RUECKLIEFERUNG") ? $P{TRANSLATIONS}.get("TYP_RUECKLIEFERUNG")
+                    : $F{einheitTyp}.name().equals("SPEICHER") ? $P{TRANSLATIONS}.get("TYP_SPEICHER")
+                    : $F{einheitTyp}.name().equals("LADESTATION") ? $P{TRANSLATIONS}.get("TYP_LADESTATION")
                     : $P{TRANSLATIONS}.get("KONSUMENT")]]></expression>
                 <box leftPadding="4" rightPadding="4">
                     <pen lineWidth="0.5" lineColor="#DDDDDD"/>
