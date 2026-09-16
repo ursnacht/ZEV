@@ -51,6 +51,36 @@ zaehler:
       bezug:       { addr: "600C", typ: float32, wortfolge: big, skalierung: 1.0 }  # OBIS 1.8.0
       einspeisung: { addr: "6018", typ: float32, wortfolge: big, skalierung: 1.0 }  # OBIS 2.8.0
 
+  # BATTERIESPEICHER am Hybrid-Wechselrichter (Einheiten-Typ SPEICHER im Backend).
+  # Die beiden Register des Wire-Contracts tragen hier Ladung und Entladung:
+  #   bezug       = Total Battery Charging Energy
+  #   einspeisung = Total Battery Discharging Energy
+  # Damit rechnet die Aggregation unveraendert: total = ΔLadung − ΔEntladung
+  # (positiv = laedt, negativ = entlaedt). Siehe Specs/Batteriespeicher.md.
+  #
+  # 'typ: uint32' statt float32: Der Solinteg MHT fuehrt kumulative Energie als
+  # vorzeichenlose Ganzzahl in kWh MAL 10 - daher skalierung 0.1.
+  #
+  # Zugang ueber das LAN-/WiFi-Kommunikationsmodul des Wechselrichters (Modbus TCP,
+  # Port 502, unit_id 255). Adressen aus "Solinteg Hybrid Inverter MODBUS RTU Protocol"
+  # V00.02, Funktionscode 0x03:
+  #   31108 = 0x7984  Total Battery Charging Energy     U32, kWh x10
+  #   31110 = 0x7986  Total Battery Discharging Energy  U32, kWh x10
+  #   31112 = 0x7988  Total PV Generation               U32, kWh x10  (DC-seitig!)
+  #   33000 = 0x80E8  SOC                               U16, %  x100
+  #
+  # VOR DEM PRODUKTIVBETRIEB PRUEFEN: ob die Adresse 1:1 gilt oder um eins versetzt
+  # (Registernummer gegen PDU-Adresse). Ein mbpoll-Aufruf gegen 0x7988 und der Vergleich
+  # mit dem Tagesertrag in der Anlagen-App klaeren das.
+  # - messpunkt: "Batterie-Hene"
+  #   protokoll: modbus-tcp
+  #   host: 192.168.10.20
+  #   port: 502
+  #   unit_id: 255
+  #   register:
+  #     bezug:       { addr: "7984", typ: uint32, wortfolge: big, skalierung: 0.1 }
+  #     einspeisung: { addr: "7986", typ: uint32, wortfolge: big, skalierung: 0.1 }
+
   # Konsument ohne Einspeisung: nur 'bezug' konfiguriert -> einspeisung wird als 0 publiziert.
   - messpunkt: "ID742-Wohnung-2"
     seriennummer: "WAGO-8791235"

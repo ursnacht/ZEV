@@ -20,7 +20,7 @@ class RegisterSpec:
     """Ein Modbus-Register für einen Zählerstand (z. B. Bezug oder Einspeisung)."""
 
     addr: int
-    typ: str = "float32"          # aktuell nur float32 unterstützt
+    typ: str = "float32"          # "float32" (IEEE 754) oder "uint32" (vorzeichenlos)
     wortfolge: str = "big"        # "big" (AB CD) oder "little" (CD AB)
     skalierung: float = 1.0       # gelesener Rohwert * skalierung = kWh
 

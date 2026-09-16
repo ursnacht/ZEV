@@ -19,7 +19,9 @@ from .base import Reader
 log = logging.getLogger(__name__)
 
 # float32 belegt zwei aufeinanderfolgende 16-bit-Register.
-_REGISTERS_PER_FLOAT32 = 2
+# Beide unterstuetzten Typen sind 32 Bit breit und belegen damit zwei Modbus-Register.
+# Kaeme je ein schmalerer Typ dazu, wird daraus eine Zuordnung Typ -> Anzahl.
+_REGISTERS_PER_WERT = 2
 
 
 class ModbusReader(Reader):
@@ -84,7 +86,7 @@ class ModbusReader(Reader):
     def _read_float(self, register: RegisterSpec, rolle: str) -> float:
         response = self._client.read_holding_registers(
             address=register.addr,
-            count=_REGISTERS_PER_FLOAT32,
+            count=_REGISTERS_PER_WERT,
             slave=self.config.unit_id,
         )
         if response.isError():
@@ -102,17 +104,55 @@ class ModbusReader(Reader):
             )
 
         registers = response.registers
-        if len(registers) < _REGISTERS_PER_FLOAT32:
+        if len(registers) < _REGISTERS_PER_WERT:
             raise ReadError(
                 f"'{self.messpunkt}' {rolle}: unvollständiger Read "
-                f"({len(registers)} statt {_REGISTERS_PER_FLOAT32} Register)."
+                f"({len(registers)} statt {_REGISTERS_PER_WERT} Register)."
             )
 
-        value = _decode_float32(registers, register.wortfolge)
+        value = _decode(registers, register.typ, register.wortfolge)
         return value * register.skalierung
 
     def close(self) -> None:
         self._client.close()
+
+
+def _decode(registers: list[int], typ: str, word_order: str) -> float:
+    """Wählt den Decoder anhand des konfigurierten Typs.
+
+    Ein unbekannter Typ kann hier nicht mehr ankommen: ``config.py`` prüft ihn beim Laden
+    gegen ``_SUPPORTED_REGISTER_TYPES`` und bricht sonst schon beim Start ab. Der Fehler
+    hier ist die zweite Sicherung, falls die beiden Listen auseinanderlaufen.
+    """
+    if typ == "float32":
+        return _decode_float32(registers, word_order)
+    if typ == "uint32":
+        return _decode_uint32(registers, word_order)
+    raise ReadError(f"Registertyp '{typ}' wird vom Reader nicht unterstützt.")
+
+
+def _woerter(registers: list[int], word_order: str) -> tuple[int, int]:
+    """Bringt die beiden Register in die Reihenfolge (höherwertig, niederwertig)."""
+    return (
+        (registers[0], registers[1])
+        if word_order == "big"
+        else (registers[1], registers[0])
+    )
+
+
+def _decode_uint32(registers: list[int], word_order: str) -> float:
+    """Setzt zwei 16-bit-Register zu einer vorzeichenlosen 32-bit-Ganzzahl zusammen.
+
+    Für Geräte, die kumulative Energie als Ganzzahl führen statt als Fliesskomma — etwa der
+    Solinteg MHT (``Total Battery Charging Energy`` u. a. als U32 in kWh × 10). Die
+    Skalierung erledigt der Aufrufer über ``register.skalierung``.
+
+    Rückgabe als ``float``, damit die Skalierung im selben Rechenweg landet wie bei
+    ``float32``. Bei kumulativen Zählerständen ist das unkritisch: Ein ``double`` bildet
+    ganze Zahlen bis 2^53 exakt ab, der Wertebereich eines U32 endet bei rund 4.3 Milliarden.
+    """
+    high, low = _woerter(registers, word_order)
+    return float((high << 16) | low)
 
 
 def _decode_float32(registers: list[int], word_order: str) -> float:
@@ -121,10 +161,6 @@ def _decode_float32(registers: list[int], word_order: str) -> float:
     ``big`` = höherwertiges Wort zuerst (AB CD), ``little`` = niederwertiges
     Wort zuerst (CD AB). Innerhalb eines Registers gilt Big-Endian (Modbus-Standard).
     """
-    high, low = (
-        (registers[0], registers[1])
-        if word_order == "big"
-        else (registers[1], registers[0])
-    )
+    high, low = _woerter(registers, word_order)
     packed = struct.pack(">HH", high, low)
     return struct.unpack(">f", packed)[0]

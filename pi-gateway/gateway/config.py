@@ -27,7 +27,9 @@ _ENV_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 _INTERVAL_UNITS = {"s": 1, "m": 60, "h": 3600}
 
 _SUPPORTED_PROTOCOLS = {"modbus-tcp", "sim"}  # "gplug" folgt später; "sim" = Publisher-Simulator
-_SUPPORTED_REGISTER_TYPES = {"float32"}
+# float32: Wago-Zaehler (IEEE 754). uint32: Wechselrichter, die kumulative Energie als
+# vorzeichenlose Ganzzahl fuehren - der Solinteg MHT liefert kWh mal 10, also skalierung: 0.1.
+_SUPPORTED_REGISTER_TYPES = {"float32", "uint32"}
 _SUPPORTED_WORD_ORDERS = {"big", "little"}
 
 # Platzhalter-Register für den Simulator (liest keine echten Register).

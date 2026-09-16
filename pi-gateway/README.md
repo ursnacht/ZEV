@@ -27,7 +27,8 @@ config.yaml ─► config.py ─► main.py (Read-Loop)
 
 - `gateway/config.py` – Laden/Validieren der Konfiguration (Zähler-Liste beliebiger Länge)
 - `gateway/readers/factory.py` – erzeugt je `protokoll` den passenden Reader (erweiterbar)
-- `gateway/readers/modbus_reader.py` – Wago (Modbus TCP), float32-Wirkenergie
+- `gateway/readers/modbus_reader.py` – Modbus TCP; Registertypen **`float32`** (Wago-Zähler)
+  und **`uint32`** (Wechselrichter mit kumulativer Ganzzahl-Energie, z. B. Solinteg MHT)
 - `gateway/readers/gplug_reader.py` – BKW/gPlug (**Platzhalter, folgt später**)
 - `gateway/publisher.py` – MQTT-Publish der absoluten Stände (Topic/Payload gemäss Vertrag)
 - `gateway/main.py` – Orchestrierung, Read-Loop, Signal-Handling, Heartbeat
