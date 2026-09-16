@@ -11,6 +11,7 @@ target/
 .settings/
 /backend-service/logs/
 node_modules/
+.venv/
 
 # Environment files with secrets
 .env
