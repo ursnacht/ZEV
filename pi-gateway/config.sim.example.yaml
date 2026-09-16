@@ -29,3 +29,8 @@ zaehler:
   - { messpunkt: "MP-Wohnung-2",   protokoll: sim, seriennummer: "SIM-0002" }
   - { messpunkt: "MP-Producer",    protokoll: sim, seriennummer: "SIM-0003" }
   - { messpunkt: "Bilanz",         protokoll: sim, seriennummer: "SIM-0004" }
+  # Batteriespeicher: wechselnde Lade- und Entladephasen (Specs/Batteriespeicher.md).
+  # Der Modus wird am Namen erkannt - "speicher" ODER "batterie" genuegt.
+  # Im Backend braucht es dazu eine Einheit vom Typ SPEICHER mit GENAU diesem messpunkt,
+  # sonst verwirft der Ingest die Meldungen als "unbekannter Messpunkt".
+  - { messpunkt: "Batterie",       protokoll: sim, seriennummer: "SIM-0005" }

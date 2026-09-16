@@ -11,6 +11,9 @@ Verhalten je Zähler wird über den `messpunkt` gesteuert:
                                                        splittet sie auf die Einheiten Bezug/Rücklieferung)
 - enthält der Name "rücklieferung"/"ruecklieferung"  → nur Einspeisung wächst (negatives `total`)
 - enthält der Name "bezug"                           → nur Bezug wächst (positives `total`)
+- enthält der Name "speicher"/"batterie"             → Batteriespeicher: WECHSELNDE Lade- und
+                                                       Entladephasen, nie beides gleichzeitig
+                                                       (`total` mal positiv, mal negativ)
 - sonst (Consumer)                                   → Bezug wächst, kaum Einspeisung (positives `total`)
 """
 
@@ -21,6 +24,11 @@ from datetime import datetime, timezone
 
 from ..models import MeterConfig, MeterReading
 from .base import Reader
+
+# Laenge einer Lade- bzw. Entladephase des Speichers, in Lesevorgaengen. Lang genug, dass die
+# 15-Minuten-Aggregation ganze Intervalle mit eindeutigem Vorzeichen sieht.
+_PHASE_MIN = 6
+_PHASE_MAX = 12
 
 
 class SimReader(Reader):
@@ -38,10 +46,17 @@ class SimReader(Reader):
             self._mode = "ruecklieferung"
         elif "bezug" in name:
             self._mode = "bezug"
+        elif "speicher" in name or "batterie" in name:
+            # Auch "batterie": Der Messpunkt heisst in der Praxis nach dem Geraet, nicht nach
+            # seinem Einheiten-Typ - bei Hene "Batterie-Hene".
+            self._mode = "speicher"
         else:
             self._mode = "consumer"
         self._bezug = start_bezug
         self._einspeisung = start_einspeisung
+        # Speicher: laufende Phase und ihre Restlaenge in Lesevorgaengen.
+        self._laedt = True
+        self._phase_rest = random.randint(_PHASE_MIN, _PHASE_MAX)
 
     def read(self) -> MeterReading:
         if self._mode == "producer":
@@ -57,6 +72,24 @@ class SimReader(Reader):
         elif self._mode == "bezug":
             # Bilanzmesspunkt Netzanschluss: Bezug vom VNB (nur Bezug wächst)
             self._bezug += random.uniform(0.30, 0.90)
+        elif self._mode == "speicher":
+            # Ein Speicher laedt ODER entlaedt - nie beides gleichzeitig. Genau das unterscheidet
+            # ihn von allen anderen Modi und ist der Grund fuer die Phasen: Wuerden beide Register
+            # zugleich wachsen, waere `total` dauerhaft nahe 0 und die Aggregation zeigte eine
+            # Batterie, die nichts tut.
+            #
+            # bezug = Ladung, einspeisung = Entladung (Specs/Batteriespeicher.md, FR-2).
+            if self._phase_rest <= 0:
+                self._laedt = not self._laedt
+                self._phase_rest = random.randint(_PHASE_MIN, _PHASE_MAX)
+            self._phase_rest -= 1
+            if self._laedt:
+                self._bezug += random.uniform(0.30, 0.80)
+            else:
+                # Etwas weniger als die Ladung: ergibt ueber die Zeit einen Round-Trip-
+                # Wirkungsgrad um 90 %, wie ihn ein Lithiumspeicher tatsaechlich zeigt. Ein
+                # Wirkungsgrad ueber 100 % waere ein stiller Hinweis auf vertauschte Register.
+                self._einspeisung += random.uniform(0.25, 0.75)
         else:
             self._bezug += random.uniform(0.20, 0.60)
             self._einspeisung += random.uniform(0.0, 0.05)
