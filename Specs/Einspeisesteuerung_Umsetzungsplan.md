@@ -568,3 +568,86 @@ zurückliegende Intervalle bleibt sie leer, und ohne Speicher-Einheit bleibt sie
 > **Noch nicht am Bildschirm geprüft:** Ob die drei Achsen nebeneinander tatsächlich lesbar sind und
 > der rechte Rand reicht. Das zeigt erst die Ansicht mit echten Daten — die Tests prüfen die
 > Farben und die Daten, nicht die Lesbarkeit.
+
+---
+
+## Nachtrag 12 — „Heute“ und „Aktualisieren“ (17.09.2026)
+
+Zwei Schaltflächen in der Steuerzeile. Beide betreffen nur die Ansicht; Backend und Datenmodell
+bleiben unangetastet.
+
+**„Heute“** setzt das Datum auf den heutigen Tag. Vorher führte der Weg zurück nur über
+wiederholtes Blättern oder über das Datumsfeld. Deaktiviert, solange der heutige Tag schon
+angezeigt wird — sonst wäre der Klick folgenlos, ohne dass man das vorher sähe.
+
+**„Aktualisieren“** lädt den angezeigten Tag neu. Der Job schreibt alle 15 Minuten einen weiteren
+Entscheid; eine offene Tagesansicht merkt davon nichts, weil sie nur beim Öffnen und beim
+Tageswechsel lädt. Beides ruft `ladeTag()` auf — damit bleibt die **Betriebsart** erhalten: Wird
+ein Schwellwert erprobt, wird derselbe Tag erneut nachgerechnet, sonst die Aufzeichnung gelesen.
+Ein „Aktualisieren“, das stillschweigend auf die Aufzeichnung zurückfällt, wäre genau die
+Verwechslung, gegen die FR-6a schon einmal angetreten ist.
+
+**Keine neue Migration für „Heute“:** Der Schlüssel `HEUTE` besteht seit V65 (Debitor-Schnellaktion)
+mit derselben Bedeutung — in der Datenbank geprüft, nicht angenommen.
+
+**Wohl aber für „Aktualisieren“ (V157, `ANSICHT_AKTUALISIEREN`).** Der vorhandene Schlüssel
+`AKTUALISIEREN` trägt englisch „Update“ und ist in fünf Formularen das Submit-Label. Auf einem
+Knopf, der nur neu lädt, hiesse das im englischen UI „Daten ändern“. Deutsch sind beide Texte
+identisch — die Kollision wäre im deutschen UI unsichtbar geblieben und erst einem englischen
+Benutzer aufgefallen. Ohne `STEUERUNG_`-Präfix, weil der Text an kein Feature gebunden ist.
+
+**Ein Icon musste weichen.** `refresh-cw` trug bisher „Aufzeichnung zeigen“. Es gehört semantisch
+zu „Aktualisieren“, und zwei gleiche Icons in derselben Zeile wären nicht auseinanderzuhalten.
+„Aufzeichnung zeigen“ trägt jetzt `database` — passender, denn es holt die **gespeicherten**
+Entscheide zurück, statt neu zu laden. „Heute“ bekam `calendar`. Alle drei Namen gegen
+`icons.ts` geprüft: Ein unbekannter Name zeichnet nichts und meldet es nur auf der Konsole — in
+diesem Feature schon zweimal passiert.
+
+**Platzierung vor dem Schwellwert-Block,** nicht am Zeilenende: Dort sitzt „Aufzeichnung zeigen“,
+das nur zeitweise erscheint; Nachbarn am Zeilenende würden bei jedem Nachrechnen ihre Position
+wechseln.
+
+**Geprüft:** Frontend gebaut, 1659 Frontend-Tests grün.
+
+**Nötig:** Rebuild für V157 — sonst zeigt die Schaltfläche den Schlüssel `ANSICHT_AKTUALISIEREN`
+statt des Textes.
+
+---
+
+## Nachtrag 13 — Die Zustandsbänder waren zu hoch (17.09.2026)
+
+Am Bildschirm aufgefallen: Das Band „Batterieladung gesperrt“ belegte knapp die halbe
+Diagrammhöhe und drückte Produktion und Verbrauch in einen schmalen Streifen oben.
+
+**Ursache.** Die Bandkanten standen als **feste kWh-Werte** im Code (−0.1 bis −1.0 für Ebene 1,
+−1.3 bis −2.2 für Ebene 2, Achsen-`min` −2.4). Gewählt waren sie für eine Mengen-Achse bis etwa
+25 kWh — dort nehmen sie rund 4 % der Höhe ein. Die Achse skaliert aber mit den Daten. Am
+gezeigten Tag reichte sie bis 1 kWh: Der Bandbereich von 2.4 kWh war damit **mehr als doppelt so
+hoch wie der gesamte Datenbereich**.
+
+Der Fehler war von Anfang an da; er wurde erst sichtbar, als ein Tag mit kleinen Mengen auftrat.
+Bei den Testdaten und den bisherigen Screenshots lagen die Mengen hoch genug, dass die festen Werte
+zufällig passten — ein Maß, das nur in einem Teil seines Wertebereichs stimmt.
+
+**Behebung.** Höhe und Abstände sind jetzt **Anteile der höchsten dargestellten Menge**: 4 % je
+Band, 1.5 % Abstand. Achsen-`min` und Bandkanten kommen aus derselben Bezugsgrösse, also bleibt das
+Verhältnis bei jeder Skalierung gleich. Bei 25 kWh entspricht das fast genau den bisherigen Werten
+— die Darstellung, die vorher richtig aussah, ändert sich praktisch nicht.
+
+**Ersatzwert für den Tag ohne Mengen.** Ist die höchste Menge 0, wäre jede Bandhöhe 0 und beide
+Bänder unsichtbar — an genau den Tagen, an denen sie die einzige Aussage des Diagramms sind.
+Deshalb tritt dort 1 kWh an ihre Stelle.
+
+**Nebenbefund: die Achsenbeschriftung.** Sie lief über `String(w)`. Das genügte, solange die Achse
+ganze kWh zeigte; bei einer Achse bis 1 kWh liefert die Gleitkommarechnung Striche wie
+„0.30000000000000004“. Jetzt `formatSwissNumber` mit einer Stellenzahl nach Grössenordnung (ab
+10 keine, ab 1 eine, ab 0.1 zwei, sonst drei) — sonst trügen zwei Striche dieselbe Beschriftung.
+
+**Geprüft:** Frontend gebaut, 1659 Frontend-Tests grün.
+
+> **Kein Test deckt das ab.** Die Komponente hat keine Unit-Tests (Phase 14 ist offen), und die
+> Proportion wäre genau das, was einer prüfen könnte: Bandhöhe gegen Achsenbereich, bei kleinen
+> und bei grossen Mengen. Gefunden hat den Fehler ein Blick auf den Bildschirm.
+
+**Am Bildschirm bestätigt** (17.09.2026): 4 % sind bei einem Tag mit 1 kWh gut lesbar; die Bänder
+wirken weder zu hoch noch zu dünn. Der Anteil bleibt, wie er ist.

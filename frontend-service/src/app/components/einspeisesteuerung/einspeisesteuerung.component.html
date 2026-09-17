@@ -31,6 +31,19 @@
     <button type="button" class="zev-button zev-button--secondary" (click)="naechsterTag()">
       <app-icon name="chevron-right"></app-icon>
     </button>
+    <!-- Beide Schaltflaechen stehen VOR dem Schwellwert-Block und nicht am Zeilenende: Dort sitzt
+         "Aufzeichnung zeigen", das nur zeitweise da ist - Nachbarn am Zeilenende wuerden bei jedem
+         Nachrechnen springen. -->
+    <button type="button" class="zev-button zev-button--secondary"
+      [disabled]="zeigtHeute || loading" (click)="heute()">
+      <app-icon name="calendar"></app-icon>
+      {{ 'HEUTE' | translate }}
+    </button>
+    <button type="button" class="zev-button zev-button--secondary"
+      [disabled]="loading" (click)="aktualisieren()">
+      <app-icon name="refresh-cw"></app-icon>
+      {{ 'ANSICHT_AKTUALISIEREN' | translate }}
+    </button>
     <div class="zev-form-group">
       <label for="simSchwellwert">{{ 'STEUERUNG_SCHWELLWERT' | translate }}</label>
       <input type="number" id="simSchwellwert" class="zev-input" step="0.00001"
@@ -42,8 +55,11 @@
       {{ 'STEUERUNG_NACHRECHNEN' | translate }}
     </button>
     @if (simuliertMitSchwellwert != null) {
+      <!-- `database` statt `refresh-cw`: Dieses Icon traegt jetzt "Aktualisieren", und zwei gleiche
+           Icons in derselben Zeile waeren nicht auseinanderzuhalten. `database` passt hier ohnehin
+           besser - die Schaltflaeche holt die GESPEICHERTEN Entscheide zurueck, sie laedt nicht neu. -->
       <button type="button" class="zev-button zev-button--secondary" (click)="zeigeAufzeichnung()">
-        <app-icon name="refresh-cw"></app-icon>
+        <app-icon name="database"></app-icon>
         {{ 'STEUERUNG_AUFZEICHNUNG_ZEIGEN' | translate }}
       </button>
     }

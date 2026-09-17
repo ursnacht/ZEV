@@ -24,11 +24,26 @@ type EChartsCore = Awaited<ReturnType<typeof ladeECharts>>;
 const INTERVALL_MS = 15 * 60 * 1000;
 
 /**
- * Untere Grenze der Mengen-Achse, damit die beiden Zustandsbänder unterhalb der Nulllinie Platz
- * haben. Nötig, weil `markArea` die Skala — anders als eine Datenserie — **nicht** aufspannt:
- * Ohne diesen Wert endete die Achse bei 0 und die Bänder wären unsichtbar.
+ * Höhe **eines** Zustandsbandes als Anteil der höchsten dargestellten Menge.
+ *
+ * <p><b>Warum relativ und nicht in kWh:</b> Zuerst standen hier feste Werte (Band von −0.1 bis
+ * −1.0 kWh), ausgelegt für eine Achse bis etwa 25 kWh. Die Achse skaliert aber mit den Daten: An
+ * einem Tag mit höchstens 1 kWh je Viertelstunde war ein Band mehr als doppelt so hoch wie der
+ * ganze Datenbereich und drückte die Kurven in das obere Drittel. Ein Band soll immer denselben
+ * *Anteil* der Höhe einnehmen, nicht dieselbe *Menge*.
  */
-const ACHSE_MIN_MIT_BAENDERN = -2.4;
+const BAND_HOEHE_ANTEIL = 0.04;
+
+/** Abstand über, zwischen und unter den Bändern — ebenfalls als Anteil der höchsten Menge. */
+const BAND_ABSTAND_ANTEIL = 0.015;
+
+/**
+ * Ersatz für die Bezugsgrösse, wenn alle Mengen 0 sind (Tag ohne Messwerte).
+ *
+ * <p>Ohne ihn wäre jede Bandhöhe 0 und beide Bänder unsichtbar — und zwar genau an den Tagen, an
+ * denen die Bänder die einzige Aussage des Diagramms sind.
+ */
+const MENGE_ERSATZ = 1;
 
 /**
  * Die Einspeisesteuerung im Trockenlauf (Specs/Einspeisesteuerung.md, FR-5).
@@ -150,6 +165,40 @@ export class EinspeisesteuerungComponent extends WithMessage
   /** Einen Tag vor. */
   naechsterTag(): void {
     this.datum = this.verschiebe(1);
+    this.ladeTag();
+  }
+
+  /**
+   * Zurück auf den heutigen Tag.
+   *
+   * <p>Ohne diese Schaltfläche führte der Weg zurück nur über wiederholtes Blättern oder über das
+   * Datumsfeld — bei einem Vergleich über zwei Wochen hinweg ein Dutzend Klicks.
+   *
+   * <p>Die nachgerechnete Ansicht bleibt erhalten: Ein Sprung im Datum ist ein Tageswechsel wie
+   * jeder andere (FR-6a), kein Wechsel der Betriebsart.
+   */
+  heute(): void {
+    this.datum = this.heuteIso();
+    this.ladeTag();
+  }
+
+  /** `true`, wenn der angezeigte Tag der heutige ist — dann ist „Heute" wirkungslos. */
+  get zeigtHeute(): boolean {
+    return this.datum === this.heuteIso();
+  }
+
+  /**
+   * Die angezeigten Daten neu holen.
+   *
+   * <p>Der Job schreibt alle 15 Minuten einen weiteren Entscheid. Eine offene Tagesansicht merkt
+   * davon nichts — sie lädt nur beim Öffnen und beim Tageswechsel. Ohne diese Schaltfläche bliebe
+   * nur ein Neuladen der Seite.
+   *
+   * <p>Die Betriebsart bleibt: `ladeTag()` rechnet nach, wenn ein Schwellwert erprobt wird, und
+   * liest sonst die Aufzeichnung. Ein „Aktualisieren" soll dieselbe Ansicht erneuern, nicht eine
+   * andere zeigen.
+   */
+  aktualisieren(): void {
     this.ladeTag();
   }
 
@@ -314,12 +363,20 @@ export class EinspeisesteuerungComponent extends WithMessage
         {
           type: 'value',
           name: 'kWh',
-          min: ACHSE_MIN_MIT_BAENDERN,
+          // `markArea` spannt die Skala - anders als eine Datenserie - NICHT auf: Ohne ein
+          // gesetztes `min` endete die Achse bei 0 und die Baender waeren unsichtbar.
+          min: this.achseMinMitBaendern(),
           nameTextStyle: { color: farben.text },
           axisLine: { lineStyle: { color: farben.achse } },
           // Negative Werte gehoeren zu den Baendern, nicht zu einer Menge - als Achsenbeschriftung
-          // waeren sie irrefuehrend.
-          axisLabel: { color: farben.text, formatter: (w: number) => (w < 0 ? '' : String(w)) },
+          // waeren sie irrefuehrend. `String(w)` stand hier zuerst und taugt nicht: Bei einer
+          // kleinteiligen Achse liefert die Gleitkommarechnung Beschriftungen wie
+          // "0.30000000000000004".
+          axisLabel: {
+            color: farben.text,
+            formatter: (w: number) =>
+              (w < 0 ? '' : formatSwissNumber(w, this.mengenNachkommastellen()))
+          },
           splitLine: { show: false }
         },
         {
@@ -416,7 +473,7 @@ export class EinspeisesteuerungComponent extends WithMessage
     // Eigene Farbfamilie, NICHT die der Kurven: Band und Kurve waren zuerst beide gruen bzw. beide
     // blau - in der Legende standen "Produktion" und "Batterieladung" ununterscheidbar nebeneinander.
     const farbe = ebene === 1 ? farben.bandEins : farben.bandZwei;
-    const [oben, unten] = ebene === 1 ? [-0.1, -1.0] : [-1.3, -2.2];
+    const [oben, unten] = this.bandKanten(ebene);
 
     return {
       name: this.translationService.translate(nameKey),
@@ -439,6 +496,57 @@ export class EinspeisesteuerungComponent extends WithMessage
         ])
       }
     };
+  }
+
+  /**
+   * Höchste dargestellte Menge — die Bezugsgrösse für alles unterhalb der Nulllinie.
+   *
+   * <p>Die Mengen-Achse skaliert mit den Daten. Damit ein Zustandsband immer denselben Anteil der
+   * Höhe einnimmt, müssen seine Kanten aus derselben Grösse abgeleitet sein, an der sich auch die
+   * Achse ausrichtet.
+   */
+  private hoechsteMenge(): number {
+    let hoechste = 0;
+    for (const e of this.entscheide) {
+      hoechste = Math.max(hoechste, e.produktion ?? 0, e.verbrauch ?? 0);
+    }
+    return hoechste > 0 ? hoechste : MENGE_ERSATZ;
+  }
+
+  /**
+   * Ober- und Unterkante eines Zustandsbandes auf der Mengen-Achse.
+   *
+   * <p>Ebene 1 liegt direkt unter der Nulllinie, Ebene 2 darunter — jede auf ihrer festen Position,
+   * unabhängig davon, ob die andere gesetzt ist. So bedeutet dieselbe Höhe immer dieselbe Grösse.
+   */
+  private bandKanten(ebene: number): [number, number] {
+    const bezug = this.hoechsteMenge();
+    const hoehe = bezug * BAND_HOEHE_ANTEIL;
+    const abstand = bezug * BAND_ABSTAND_ANTEIL;
+    const oben = -(abstand + (ebene - 1) * (hoehe + abstand));
+    return [oben, oben - hoehe];
+  }
+
+  /** Untere Grenze der Mengen-Achse: knapp unter dem tiefsten Band. */
+  private achseMinMitBaendern(): number {
+    return this.bandKanten(2)[1] - this.hoechsteMenge() * BAND_ABSTAND_ANTEIL;
+  }
+
+  /**
+   * Nachkommastellen der Mengen-Achse, abgeleitet aus der Grössenordnung.
+   *
+   * <p>Eine Achse bis 25 kWh braucht keine, eine bis 1 kWh zwei — sonst trügen mehrere Striche
+   * dieselbe Beschriftung.
+   */
+  private mengenNachkommastellen(): number {
+    const bezug = this.hoechsteMenge();
+    if (bezug >= 10) {
+      return 0;
+    }
+    if (bezug >= 1) {
+      return 1;
+    }
+    return bezug >= 0.1 ? 2 : 3;
   }
 
   /**

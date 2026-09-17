@@ -384,7 +384,24 @@ wie der NK-Eintrag).
 **Aufbau von oben nach unten:**
 1. Titel **Einspeisesteuerung** mit Icon.
 2. **Eine Steuerzeile** (`zev-date-range-row`, wie bei der Preiszeitreihe): Datumswahl,
-   **‹ / ›** zum Blättern um je einen Tag, Feld **Schwellwert** und Schaltfläche **Nachrechnen**.
+   **‹ / ›** zum Blättern um je einen Tag, **Heute**, **Aktualisieren**, Feld **Schwellwert**
+   und Schaltfläche **Nachrechnen**.
+   * **Heute** (Icon `calendar`) springt auf den heutigen Tag. Deaktiviert, solange dieser schon
+     angezeigt wird — sonst wäre der Klick folgenlos, ohne dass man es vorher sähe.
+     > Ohne sie führte der Weg zurück nur über wiederholtes Blättern oder über das Datumsfeld.
+   * **Aktualisieren** (Icon `refresh-cw`) holt die Daten des angezeigten Tages neu.
+     > **Wozu:** Der Job schreibt alle 15 Minuten einen weiteren Entscheid; eine offene
+     > Tagesansicht merkt davon nichts, weil sie nur beim Öffnen und beim Tageswechsel lädt.
+     > Ohne die Schaltfläche bliebe nur ein Neuladen der Seite.
+     >
+     > **Die Betriebsart bleibt:** Wird ein Schwellwert erprobt, rechnet *Aktualisieren* denselben
+     > Tag erneut nach; sonst liest es die Aufzeichnung. Es erneuert die Ansicht, es wechselt sie
+     > nicht.
+   * Beide stehen **vor** dem Schwellwert-Block. Am Zeilenende sitzt *Aufzeichnung zeigen*, das nur
+     zeitweise erscheint — dort würden die Nachbarn bei jedem Nachrechnen ihre Position wechseln.
+   * *Aufzeichnung zeigen* trägt das Icon `database`, nicht mehr `refresh-cw`: Zwei gleiche Icons in
+     derselben Zeile wären nicht auseinanderzuhalten, und die Schaltfläche holt die **gespeicherten**
+     Entscheide zurück, statt neu zu laden.
 3. **Diagramm** in `zev-panel--chart` (ECharts, dynamisch nachgeladen wie
    `preiszeitreihe-chart`):
    * **Stufenlinie** Einspeisepreis (CHF/kWh, linke y-Achse) — `step: 'end'`, ohne Flächenfüllung:
@@ -426,7 +443,18 @@ wie der NK-Eintrag).
      >
      > **Die Mengen-Achse braucht ein festes `min`.** Anders als eine Datenserie spannt `markArea`
      > die Skala **nicht** auf: Ohne `min` endete die Achse bei 0 und die Bänder wären unsichtbar.
-
+     >
+     > **Die Höhe eines Bandes ist ein Anteil der höchsten dargestellten Menge (4 %), keine feste
+     > kWh-Zahl.** Zuerst standen dort feste Werte (Band von −0.1 bis −1.0 kWh), ausgelegt für eine
+     > Achse bis etwa 25 kWh. Die Achse skaliert aber mit den Daten: An einem Tag mit höchstens
+     > 1 kWh je Viertelstunde war ein Band **höher als der ganze Datenbereich** und drückte die
+     > Kurven in das obere Drittel. Das Achsen-`min` und die Bandkanten leiten sich deshalb aus
+     > derselben Bezugsgrösse ab. Sind alle Mengen 0, tritt ein Ersatzwert an ihre Stelle — sonst
+     > wären die Bänder genau an den Tagen unsichtbar, an denen sie die einzige Aussage sind.
+     >
+     > **Die Beschriftung der Mengen-Achse braucht `formatSwissNumber`.** Mit `String(w)` liefert
+     > eine kleinteilige Achse Werte wie „0.30000000000000004“; die Stellenzahl richtet sich nach der
+     > Grössenordnung, damit nicht zwei Striche dieselbe Beschriftung tragen.
    * Farben aus den Design-Tokens, **nicht** hart kodiert (`Specs/DarkMode.md`).
    * Tooltip mit Zeitpunkt (`dd.MM.yyyy HH:mm`), Preis und beiden Zuständen; Zahlen über
      `formatSwissNumber()`, **kein** `toLocaleString()`.
@@ -585,6 +613,7 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 | `STEUERUNG_NACHRECHNEN` | Nachrechnen | Recalculate |
 | `STEUERUNG_SIMULIERTE_ANSICHT` | Nachgerechnete Ansicht — keine Aufzeichnung. Es wird nichts gespeichert. Schwellwert: | Recalculated view — not a recording. Nothing is stored. Threshold: |
 | `STEUERUNG_AUFZEICHNUNG_ZEIGEN` | Aufzeichnung zeigen | Show recording |
+| `ANSICHT_AKTUALISIEREN` | Aktualisieren | Refresh |
 | `STEUERUNG_BEZUG` | Bezug | Grid supply |
 | `STEUERUNG_RUECKLIEFERUNG` | Rücklieferung | Feed-in to grid |
 | `STEUERUNG_BILANZ_DIFFERENZ` | Batterie (aus Bilanz) | Battery (from balance) |
@@ -607,6 +636,15 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 | `STEUERUNG_SPEICHERWERT` | Wert einer gespeicherten kWh | Value of a stored kWh |
 | `STEUERUNG_BATTERIEKAPAZITAET` | Batteriekapazität | Battery capacity |
 | `FEATURE_FLAG_EINSPEISESTEUERUNG` | Einspeisesteuerung (Trockenlauf) | Feed-in control (dry run) |
+
+**Wiederverwendet, nicht neu angelegt:** `HEUTE` („Heute“ / „Today“) besteht seit V65
+(Debitor-Schnellaktion) mit genau dieser Bedeutung.
+
+**Nicht wiederverwendet:** Der vorhandene Schlüssel `AKTUALISIEREN` trägt englisch „Update“ und
+ist in fünf Formularen das Submit-Label. Auf einer Schaltfläche, die nur neu lädt, hiesse das im
+englischen UI „Daten ändern“ — das Gegenteil dessen, was sie tut. Deutsch sind beide Texte gleich;
+erst die Übersetzung trennt sie. `ANSICHT_AKTUALISIEREN` trägt bewusst **kein** `STEUERUNG_`-Präfix:
+Der Text ist an kein Feature gebunden.
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
@@ -639,6 +677,11 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 * [ ] **Beide Bänder decken dieselbe Zeitspanne deckungsgleich ab**, wenn beide Zustände im selben Intervall `GESPERRT` sind — kein horizontaler Versatz zwischen ihnen.
 * [ ] Ein Band beginnt am **Beginn** seines ersten Intervalls und endet am **Ende** seines letzten (`zeit + 15min`), deckungsgleich mit dem Stufenverlauf der Preislinie.
 * [ ] Jedes Band liegt auf seiner **festen Ebene**, unabhängig davon, ob das andere gesetzt ist.
+* [ ] Ein Band nimmt bei **kleinen** Mengen (Achse bis 1 kWh) denselben Anteil der Höhe ein wie bei
+  grossen (Achse bis 25 kWh) — es überdeckt die Kurven in keinem Fall.
+* [ ] Sind alle Mengen eines Tages 0, sind beide Bänder trotzdem sichtbar.
+* [ ] Die Mengen-Achse trägt keine Beschriftung wie „0.30000000000000004“, und keine zwei Striche
+  tragen dieselbe.
 * [ ] Eine Lücke in den Entscheiden unterbricht das Band, statt überbrückt zu werden.
 * [ ] Das Diagramm zeigt den **Ladezustand** auf einer eigenen Achse (0–100 %); die Mengenkurven behalten ihre Skalierung.
 * [ ] Fehlt der Ladezustand für ein Intervall, setzt die Linie **aus** — sie wird nicht über die Lücke gezogen.
@@ -650,6 +693,13 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 * [ ] Fehlen Bezug oder Rücklieferung (Entscheid vor V149), bleibt die Differenz **leer** statt `0`.
 * [ ] Bezug und Rücklieferung beeinflussen **keinen** Entscheid — dieselben Messwerte ergeben mit und ohne sie dieselbe Regel.
 * [ ] Ein Tag ohne Entscheide zeigt den Hinweis statt einer leeren Tabelle.
+* [ ] „Heute“ setzt den angezeigten Tag auf den heutigen und lädt ihn.
+* [ ] „Heute“ ist deaktiviert, solange der heutige Tag bereits angezeigt wird.
+* [ ] „Aktualisieren“ lädt den angezeigten Tag neu, ohne das Datum zu ändern.
+* [ ] „Aktualisieren“ behält die **nachgerechnete** Ansicht bei — es rechnet denselben Tag mit
+  demselben Schwellwert erneut, statt auf die Aufzeichnung zurückzufallen.
+* [ ] Beide Schaltflächen sind während eines laufenden Ladevorgangs deaktiviert.
+* [ ] Keine zwei Schaltflächen der Steuerzeile tragen dasselbe Icon.
 * [ ] Beträge erscheinen im Schweizer Format (`0.05`, `1'234.50`), unabhängig von der Browser-Locale.
 
 **Nachrechnen**
