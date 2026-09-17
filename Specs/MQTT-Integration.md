@@ -49,6 +49,7 @@ Der Pi publiziert die **absoluten kumulativen Zählerstände** zum Messzeitpunkt
   "timestamp": "2026-06-19T14:30:00+02:00",
   "zaehlerstandBezug": 12345.678,
   "zaehlerstandEinspeisung": 4321.000,
+  "zustand": { "soc": 87.5 },
   "seriennummer": "WAGO-8791234"
 }
 ```
@@ -57,7 +58,15 @@ Der Pi publiziert die **absoluten kumulativen Zählerstände** zum Messzeitpunkt
 | `timestamp` | ISO 8601 (lokale Zeit mit Offset) | Ja | Zeitpunkt der Messung, z. B. `2026-06-19T14:30:00+02:00` |
 | `zaehlerstandBezug` | Decimal (kWh, kumulativ) | Ja | Absoluter Zählerstand Bezug/Verbrauch (monoton steigend) |
 | `zaehlerstandEinspeisung` | Decimal (kWh, kumulativ) | Ja | Absoluter Zählerstand Einspeisung (monoton steigend) |
+| `zustand` | Objekt: Grössenname → Zahl | **Nein** | **Momentanwerte** des Geräts, z. B. `{"soc": 87.5}` (`Specs/Gerätezustand.md`). Wird nur gesendet, wenn konfiguriert — **nie als leeres Objekt**. Welche Grössen es gibt, entscheidet das Backend; ein unbekannter Name wird dort verworfen, ohne die Nachricht zu kosten |
 | `seriennummer` | String (max. 64) | **Nein** | Seriennummer des liefernden Zählers (aus der Pi-Config je `messpunkt`); Signal für die **Zählertausch-Erkennung** (`Specs/Zaehlertausch-Erkennung.md`). Wird nur gesendet, wenn konfiguriert; fehlt sie, gilt das bisherige Verhalten |
+
+> **`zustand` ist kein Zählerstand** und wird nirgends aggregiert. Die Pflichtfelder sind kumulativ,
+> das Backend bildet daraus Deltas je 15-Minuten-Intervall; ein Ladezustand beschreibt einen
+> Zeitpunkt. Er landet in einer eigenen Tabelle und rührt weder Aggregation noch Abrechnung an.
+>
+> **Ein ungültiger Wert darin verwirft die Nachricht nicht.** Die Zählerstände sind die Hauptsache;
+> der Zustandswert wird verworfen, gemeldet — und die Energiemengen gespeichert.
 
 > **Vertrags-Regel:** Die **Pflichtfelder** sind bindend und dürfen sich nicht ändern. **Additive
 > optionale Felder** (wie `seriennummer`) sind erlaubt: Der Backend-Parser toleriert unbekannte

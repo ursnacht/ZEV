@@ -3,8 +3,12 @@ package ch.nacht.service;
 import ch.nacht.dto.ZaehlerMesswertPayloadDTO;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
+import ch.nacht.entity.Geraetezustand;
+import ch.nacht.entity.MeldungLevel;
 import ch.nacht.entity.ZaehlerRohdaten;
+import ch.nacht.entity.Zustandsgroesse;
 import ch.nacht.repository.EinheitRepository;
+import ch.nacht.repository.GeraetezustandRepository;
 import ch.nacht.repository.ZaehlerRohdatenRepository;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,7 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Verarbeitet eingehende MQTT-Messwert-Nachrichten (FR-4): Topic/Payload parsen, validieren,
@@ -30,6 +37,10 @@ import java.util.List;
  * <p>Kein Request-Scope/JWT: die Mandanten-ID stammt aus dem Topic und wird explizit gesetzt
  * (kein {@code OrganizationContextService}, kein {@code orgFilter}). Fehler werden geloggt und
  * die Nachricht verworfen – niemals nach aussen geworfen (der Adapter gilt als konsumiert).
+ *
+ * <p>Neben den Zählerständen trägt eine Nachricht optional <b>Zustandswerte</b> (Ladezustand u.a.,
+ * {@code Specs/Gerätezustand.md}). Sie sind <b>Beiwerk</b>: Ein ungültiger Wert verwirft weder die
+ * Nachricht noch die Zählerstände und berührt {@link MqttMetrics} nicht.
  */
 @Service
 @Profile("mqtt")
@@ -42,15 +53,21 @@ public class MqttIngestService {
 
     private final EinheitRepository einheitRepository;
     private final ZaehlerRohdatenRepository rohdatenRepository;
+    private final GeraetezustandRepository geraetezustandRepository;
+    private final SystemmeldungService systemmeldungService;
     private final ObjectMapper objectMapper;
     private final MqttMetrics metrics;
 
     public MqttIngestService(EinheitRepository einheitRepository,
                              ZaehlerRohdatenRepository rohdatenRepository,
+                             GeraetezustandRepository geraetezustandRepository,
+                             SystemmeldungService systemmeldungService,
                              ObjectMapper objectMapper,
                              MqttMetrics metrics) {
         this.einheitRepository = einheitRepository;
         this.rohdatenRepository = rohdatenRepository;
+        this.geraetezustandRepository = geraetezustandRepository;
+        this.systemmeldungService = systemmeldungService;
         // Offset-behaftete Zeit NICHT auf die Kontext-Zeitzone normalisieren, damit die vom Pi
         // gesendete lokale Wanduhrzeit verbatim erhalten bleibt (OffsetDateTime.toLocalDateTime()).
         this.objectMapper = objectMapper.copy()
@@ -124,12 +141,129 @@ public class MqttIngestService {
                 upsertRohdaten(orgId, einheit, zeit, p);
             }
 
+            // 5) Zustandswerte (Specs/Gerätezustand.md). Beiwerk: Ein ungueltiger Wert darf weder
+            //    die Zaehlerstaende noch die Metriken beruehren - die Nachricht war gueltig.
+            schreibeZustandswerte(orgId, einheiten, zeit, p);
+
             metrics.recordProcessed();
             log.debug("MQTT: Rohdaten gespeichert (org={}, messpunkt={}, zeit={}, einheiten={})",
                     orgId, messpunkt, zeit, einheiten.size());
         } catch (Exception e) {
             metrics.recordFailed();
             log.warn("MQTT: Nachricht verworfen (Topic {}): {}", topic, e.getMessage());
+        }
+    }
+
+    /**
+     * Schreibt die Zustandswerte einer Nachricht (Specs/Gerätezustand.md, FR-3 und FR-4).
+     *
+     * <p><b>Jeder Eintrag wird einzeln geprüft.</b> Ein ungültiger lässt die übrigen unberührt —
+     * bei mehreren Grössen soll nicht eine falsche die richtigen mitnehmen. Und keiner von ihnen
+     * berührt die Zählerstände oder {@link MqttMetrics}: Die Nachricht war gültig, nur ein Beiwerk
+     * nicht.
+     *
+     * <p>Geprüft wird in dieser Reihenfolge — sie ist Fachlichkeit, nicht Stil:
+     * <ol>
+     *   <li>{@code null} → <b>nicht gemeldet</b>. Keine Zeile, keine Meldung. Ein Gerät, das eine
+     *       Grösse gerade nicht liefern kann, ist kein Störfall — und erzeugte sonst im Minutentakt
+     *       Meldungen.</li>
+     *   <li>nicht in eine Zahl umwandelbar → verworfen mit Meldung.</li>
+     *   <li>unbekannter Schlüssel → verworfen, <b>ohne</b> Meldung (wie ein unbekanntes Feld). Der
+     *       Pi darf eine Grösse senden, die dieses Backend noch nicht kennt.</li>
+     *   <li>Einheiten-Typ führt die Grösse nicht → verworfen mit eigenem Meldungs-Key.</li>
+     *   <li>Wert ausserhalb des Bereichs → verworfen mit Meldung.</li>
+     * </ol>
+     */
+    private void schreibeZustandswerte(long orgId, List<Einheit> einheiten, LocalDateTime zeit,
+                                       ZaehlerMesswertPayloadDTO p) {
+        Map<String, Object> zustand = p.getZustand();
+        if (zustand == null || zustand.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, Object> eintrag : zustand.entrySet()) {
+            if (eintrag.getValue() == null) {
+                continue;   // nicht gemeldet - kein Stoerfall
+            }
+            BigDecimal wert = alsZahl(eintrag.getValue());
+            if (wert == null) {
+                meldeZustandsfehler(orgId, SystemmeldungService.KEY_GERAETEZUSTAND_WERT_UNGUELTIG,
+                        String.format("%s: '%s' ist keine Zahl", eintrag.getKey(),
+                                eintrag.getValue()));
+                continue;
+            }
+            Optional<Zustandsgroesse> groesseOpt = Zustandsgroesse.fromKey(eintrag.getKey());
+            if (groesseOpt.isEmpty()) {
+                log.debug("MQTT: unbekannte Zustandsgroesse '{}' (org={}) - ignoriert",
+                        eintrag.getKey(), orgId);
+                continue;
+            }
+            Zustandsgroesse groesse = groesseOpt.get();
+
+            // Nur Einheiten, deren Typ die Groesse fuehrt. Lassen mehrere sie zu, gewinnt die mit
+            // der kleinsten id - willkuerlich, aber deterministisch: Ohne diese Wahl haenge das
+            // Ergebnis an der Sortierreihenfolge der Abfrage, und an einem geteilten
+            // Bilanzmesspunkt entstuenden zwei identische Zeilen.
+            Optional<Einheit> zielOpt = einheiten.stream()
+                    .filter(e -> groesse.giltFuer(e.getTyp()))
+                    .min(Comparator.comparing(Einheit::getId));
+            if (zielOpt.isEmpty()) {
+                meldeZustandsfehler(orgId, SystemmeldungService.KEY_GERAETEZUSTAND_TYP_UNGUELTIG,
+                        String.format("%s (%s): %s", einheiten.get(0).getName(),
+                                einheiten.get(0).getTyp(), groesse.name()));
+                continue;
+            }
+            if (!groesse.istImBereich(wert)) {
+                meldeZustandsfehler(orgId, SystemmeldungService.KEY_GERAETEZUSTAND_WERT_UNGUELTIG,
+                        String.format("%s (%s): %s, erlaubt %s", zielOpt.get().getName(),
+                                groesse.name(), wert.toPlainString(), groesse.getBereich()));
+                continue;
+            }
+            upsertZustand(orgId, zielOpt.get().getId(), zeit, groesse, wert);
+        }
+    }
+
+    /**
+     * Wandelt einen Payload-Wert in eine Zahl; {@code null}, wenn das nicht geht.
+     *
+     * <p>Jackson liefert je nach JSON-Literal {@code Integer}, {@code Double} oder {@code String}.
+     * Der Umweg über {@code toString()} deckt alle drei ab und vermeidet den Genauigkeitsverlust
+     * von {@code BigDecimal.valueOf(double)}.
+     */
+    private BigDecimal alsZahl(Object roh) {
+        try {
+            return new BigDecimal(roh.toString().trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /** Upsert auf {@code (einheit_id, zeit, groesse)} - eine wiederholte Nachricht aktualisiert. */
+    private void upsertZustand(long orgId, Long einheitId, LocalDateTime zeit,
+                               Zustandsgroesse groesse, BigDecimal wert) {
+        Geraetezustand zustand = geraetezustandRepository
+                .findByEinheitIdAndZeitAndGroesse(einheitId, zeit, groesse)
+                .orElseGet(() -> new Geraetezustand(orgId, einheitId, zeit, groesse, wert));
+        zustand.setWert(wert);
+        // Aus der Anwendung, nicht aus dem DB-DEFAULT: Sonst haenge der Wert an der Zeitzone der
+        // Datenbank-Session, und das System haette seine vierte Zeitkonvention.
+        zustand.setEmpfangenAm(LocalDateTime.now());
+        geraetezustandRepository.save(zustand);
+    }
+
+    /**
+     * Meldet einen verworfenen Zustandswert.
+     *
+     * <p><b>Bricht den Ingest nicht ab</b> — dieselbe Abwägung wie beim Zählerwechsel: Eine
+     * fehlgeschlagene Meldung darf die Nachricht nicht kosten.
+     */
+    private void meldeZustandsfehler(long orgId, String key, String parameter) {
+        log.warn("MQTT: Zustandswert verworfen (org={}, {}): {}", orgId, key, parameter);
+        try {
+            systemmeldungService.erfasse(orgId, MeldungLevel.WARN,
+                    SystemmeldungService.KATEGORIE_MQTT, key, parameter);
+        } catch (RuntimeException e) {
+            log.warn("MQTT: Systemmeldung zum Zustandswert konnte nicht erfasst werden: {}",
+                    e.getMessage());
         }
     }
 

@@ -29,7 +29,9 @@ _INTERVAL_UNITS = {"s": 1, "m": 60, "h": 3600}
 _SUPPORTED_PROTOCOLS = {"modbus-tcp", "sim"}  # "gplug" folgt später; "sim" = Publisher-Simulator
 # float32: Wago-Zaehler (IEEE 754). uint32: Wechselrichter, die kumulative Energie als
 # vorzeichenlose Ganzzahl fuehren - der Solinteg MHT liefert kWh mal 10, also skalierung: 0.1.
-_SUPPORTED_REGISTER_TYPES = {"float32", "uint32"}
+# uint16: Momentanwerte in EINEM Register - der Ladezustand desselben Geraets (Register 33000),
+# Rohwert mal 0.01 = Prozent.
+_SUPPORTED_REGISTER_TYPES = {"float32", "uint32", "uint16"}
 _SUPPORTED_WORD_ORDERS = {"big", "little"}
 
 # Platzhalter-Register für den Simulator (liest keine echten Register).
@@ -192,12 +194,14 @@ def _parse_meters(data, read_timeout: float) -> list[MeterConfig]:
             host = entry.get("host")
             register_bezug = _DUMMY_REGISTER
             register_einspeisung = _DUMMY_REGISTER
+            register_zustand = {}
         else:
             host = _require(entry, "host", str, ctx=f"zaehler[{index}] '{messpunkt}'")
             register = _require(entry, "register", dict, ctx=f"zaehler[{index}] '{messpunkt}'")
             register_bezug = _parse_register(register.get("bezug"), messpunkt, "bezug")
             register_einspeisung = _parse_register_optional(
                 register.get("einspeisung"), messpunkt, "einspeisung")
+            register_zustand = _parse_zustand_register(entry.get("zustand"), messpunkt)
 
         meters.append(
             MeterConfig(
@@ -208,6 +212,7 @@ def _parse_meters(data, read_timeout: float) -> list[MeterConfig]:
                 unit_id=int(entry.get("unit_id", 1)),
                 register_bezug=register_bezug,
                 register_einspeisung=register_einspeisung,
+                register_zustand=register_zustand,
                 seriennummer=_parse_seriennummer(entry.get("seriennummer"), messpunkt),
                 # Gleicher Schlüsselname wie global (`read_timeout`), nur enger gültig:
                 # je Zähler überschreibbar (z. B. ein langsamer Slave am Hub).
@@ -217,6 +222,32 @@ def _parse_meters(data, read_timeout: float) -> list[MeterConfig]:
         )
 
     return meters
+
+
+def _parse_zustand_register(data, messpunkt: str) -> dict:
+    """Optionale Zustandsregister: Grössenname -> Register.
+
+    Fehlt der Block, meldet das Gerät keine Momentanwerte und der Payload trägt kein
+    ``zustand``-Objekt — der bisherige Vertrag bleibt unverändert.
+
+    Die Grössennamen werden hier **nicht** gegen eine Liste geprüft: Welche es gibt, entscheidet
+    das Backend (``Zustandsgroesse``), und der Pi soll eine Grösse senden dürfen, die ein älteres
+    Backend noch nicht kennt. Ein unbekannter Name wird dort verworfen, ohne die Nachricht zu
+    kosten.
+
+    Kleingeschrieben, weil der Payload-Vertrag es so vorsieht (``{"soc": 87.5}``).
+    """
+    if data is None:
+        return {}
+    ctx = f"zaehler '{messpunkt}' zustand"
+    if not isinstance(data, dict):
+        raise ConfigError(f"{ctx}: muss ein Mapping 'groesse: register' sein.")
+    zustand = {}
+    for name, spec in data.items():
+        if not isinstance(name, str) or not name.strip():
+            raise ConfigError(f"{ctx}: leerer Grössenname.")
+        zustand[name.strip().lower()] = _parse_register(spec, messpunkt, f"zustand.{name}")
+    return zustand
 
 
 def _parse_seriennummer(value, messpunkt: str) -> str | None:

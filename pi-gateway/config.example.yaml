@@ -80,6 +80,14 @@ zaehler:
   #   register:
   #     bezug:       { addr: "7984", typ: uint32, wortfolge: big, skalierung: 0.1 }
   #     einspeisung: { addr: "7986", typ: uint32, wortfolge: big, skalierung: 0.1 }
+  #   # Momentanwerte (Specs/Geraetezustand.md). Getrennt von 'register', weil es etwas anderes
+  #   # ist: bezug/einspeisung sind kumulative Zaehlerstaende, aus denen das Backend Deltas
+  #   # bildet - ein Ladezustand ist ein Momentanwert und wird nie aggregiert.
+  #   #
+  #   # 'typ: uint16': SOC steht in EINEM Register. skalierung 0.01, weil der Rohwert
+  #   # Prozent mal 100 traegt (8750 -> 87.5 %).
+  #   zustand:
+  #     soc: { addr: "80E8", typ: uint16, skalierung: 0.01 }
 
   # Konsument ohne Einspeisung: nur 'bezug' konfiguriert -> einspeisung wird als 0 publiziert.
   - messpunkt: "ID742-Wohnung-2"

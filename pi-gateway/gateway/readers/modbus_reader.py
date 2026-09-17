@@ -19,9 +19,13 @@ from .base import Reader
 log = logging.getLogger(__name__)
 
 # float32 belegt zwei aufeinanderfolgende 16-bit-Register.
-# Beide unterstuetzten Typen sind 32 Bit breit und belegen damit zwei Modbus-Register.
-# Kaeme je ein schmalerer Typ dazu, wird daraus eine Zuordnung Typ -> Anzahl.
-_REGISTERS_PER_WERT = 2
+# Wie viele Modbus-Register ein Typ belegt. Frueher eine Konstante 2 - der Ladezustand des
+# Wechselrichters (Register 33000, U16) passte als erster Wert nicht in dieses Raster.
+_REGISTERS_PER_TYP = {
+    "float32": 2,
+    "uint32": 2,
+    "uint16": 1,
+}
 
 
 class ModbusReader(Reader):
@@ -61,6 +65,12 @@ class ModbusReader(Reader):
                 0.0 if self.config.register_einspeisung is None
                 else self._read_float(self.config.register_einspeisung, rolle="einspeisung")
             )
+            # Momentanwerte (Ladezustand u.a.). Je konfigurierter Groesse ein Zugriff - wer
+            # keine konfiguriert, zahlt nichts dafuer.
+            zustand = {
+                name: round(self._read_float(spec, rolle=name), 3)
+                for name, spec in self.config.register_zustand.items()
+            }
         finally:
             # An einem RTU->TCP-Hub mit wenigen erlaubten Sockets darf immer nur EINE
             # Verbindung offen sein. Da die Zähler sequenziell gelesen werden, hält das
@@ -81,12 +91,14 @@ class ModbusReader(Reader):
             zaehlerstand_bezug=bezug,
             zaehlerstand_einspeisung=einspeisung,
             seriennummer=self.config.seriennummer,
+            zustand=zustand or None,
         )
 
     def _read_float(self, register: RegisterSpec, rolle: str) -> float:
+        anzahl = _REGISTERS_PER_TYP[register.typ]
         response = self._client.read_holding_registers(
             address=register.addr,
-            count=_REGISTERS_PER_WERT,
+            count=anzahl,
             slave=self.config.unit_id,
         )
         if response.isError():
@@ -104,10 +116,10 @@ class ModbusReader(Reader):
             )
 
         registers = response.registers
-        if len(registers) < _REGISTERS_PER_WERT:
+        if len(registers) < anzahl:
             raise ReadError(
                 f"'{self.messpunkt}' {rolle}: unvollständiger Read "
-                f"({len(registers)} statt {_REGISTERS_PER_WERT} Register)."
+                f"({len(registers)} statt {anzahl} Register)."
             )
 
         value = _decode(registers, register.typ, register.wortfolge)
@@ -128,6 +140,8 @@ def _decode(registers: list[int], typ: str, word_order: str) -> float:
         return _decode_float32(registers, word_order)
     if typ == "uint32":
         return _decode_uint32(registers, word_order)
+    if typ == "uint16":
+        return _decode_uint16(registers)
     raise ReadError(f"Registertyp '{typ}' wird vom Reader nicht unterstützt.")
 
 
@@ -138,6 +152,19 @@ def _woerter(registers: list[int], word_order: str) -> tuple[int, int]:
         if word_order == "big"
         else (registers[1], registers[0])
     )
+
+
+def _decode_uint16(registers: list[int]) -> float:
+    """Ein einzelnes 16-bit-Register als vorzeichenlose Ganzzahl.
+
+    Ohne Wortfolge: Bei einem Register gibt es nichts zu ordnen. Der Parameter fehlt deshalb
+    ganz, statt ignoriert zu werden — sonst liesse eine Konfiguration mit ``wortfolge: little``
+    glauben, sie bewirke etwas.
+
+    Für Momentanwerte, die in ein Register passen: Der Ladezustand des Solinteg MHT steht in
+    Register ``33000`` (``U16``), Rohwert × ``0.01`` = Prozent.
+    """
+    return float(registers[0])
 
 
 def _decode_uint32(registers: list[int], word_order: str) -> float:

@@ -13,7 +13,8 @@ Verhalten je Zähler wird über den `messpunkt` gesteuert:
 - enthält der Name "bezug"                           → nur Bezug wächst (positives `total`)
 - enthält der Name "speicher"/"batterie"             → Batteriespeicher: WECHSELNDE Lade- und
                                                        Entladephasen, nie beides gleichzeitig
-                                                       (`total` mal positiv, mal negativ)
+                                                       (`total` mal positiv, mal negativ); dazu ein
+                                                       Ladezustand (`soc`), der der Phase folgt
 - sonst (Consumer)                                   → Bezug wächst, kaum Einspeisung (positives `total`)
 """
 
@@ -29,6 +30,11 @@ from .base import Reader
 # 15-Minuten-Aggregation ganze Intervalle mit eindeutigem Vorzeichen sieht.
 _PHASE_MIN = 6
 _PHASE_MAX = 12
+
+# Grenzen des simulierten Ladezustands. Das Backend weist alles ausserhalb 0-100 ab
+# (Specs/Geraetezustand.md, FR-3) - ein Simulator, der das reizt, erzeugte nur Systemmeldungen.
+_SOC_MIN = 0.0
+_SOC_MAX = 100.0
 
 
 class SimReader(Reader):
@@ -57,6 +63,8 @@ class SimReader(Reader):
         # Speicher: laufende Phase und ihre Restlaenge in Lesevorgaengen.
         self._laedt = True
         self._phase_rest = random.randint(_PHASE_MIN, _PHASE_MAX)
+        # Ladezustand in Prozent. Startet halbvoll, damit beide Richtungen sofort sichtbar sind.
+        self._soc = 50.0
 
     def read(self) -> MeterReading:
         if self._mode == "producer":
@@ -85,14 +93,24 @@ class SimReader(Reader):
             self._phase_rest -= 1
             if self._laedt:
                 self._bezug += random.uniform(0.30, 0.80)
+                self._soc = min(_SOC_MAX, self._soc + random.uniform(1.0, 3.0))
             else:
                 # Etwas weniger als die Ladung: ergibt ueber die Zeit einen Round-Trip-
                 # Wirkungsgrad um 90 %, wie ihn ein Lithiumspeicher tatsaechlich zeigt. Ein
                 # Wirkungsgrad ueber 100 % waere ein stiller Hinweis auf vertauschte Register.
                 self._einspeisung += random.uniform(0.25, 0.75)
+                self._soc = max(_SOC_MIN, self._soc - random.uniform(1.0, 3.0))
         else:
             self._bezug += random.uniform(0.20, 0.60)
             self._einspeisung += random.uniform(0.0, 0.05)
+
+        # Der Ladezustand kommt NUR vom Speicher - an einem Zaehler hat er keine Bedeutung, und
+        # das Backend verwuerfe ihn mit einer Systemmeldung (falscher Einheiten-Typ).
+        #
+        # Er wird aus der LAUFENDEN PHASE abgeleitet, nicht unabhaengig gewuerfelt: Ein SOC, der
+        # faellt waehrend die Ladung steigt, widerspraeche den Zaehlerstaenden derselben Nachricht -
+        # und genau diese Art Widerspruch soll der Simulator aufdecken, nicht erzeugen.
+        zustand = {"soc": round(self._soc, 1)} if self._mode == "speicher" else None
 
         return MeterReading(
             messpunkt=self.messpunkt,
@@ -100,4 +118,5 @@ class SimReader(Reader):
             zaehlerstand_bezug=round(self._bezug, 4),
             zaehlerstand_einspeisung=round(self._einspeisung, 4),
             seriennummer=self.config.seriennummer,
+            zustand=zustand,
         )

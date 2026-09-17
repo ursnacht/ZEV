@@ -50,6 +50,23 @@ public class SystemmeldungService {
     /** Meldungs-Key (INFO, Audit): Zählerwechsel über die Seriennummer erkannt. */
     public static final String KEY_ZAEHLERTAUSCH = "MQTT_ZAEHLERTAUSCH";
     /**
+     * Meldungs-Key (WARN): Zustandswert ausserhalb des Bereichs oder nicht als Zahl lesbar.
+     *
+     * <p>Häufigste Ursache ist eine falsche Skalierung am Messpunkt — ein SOC von 8750 statt 87.5
+     * entsteht, wenn der Rohwert ohne Faktor übernommen wird.
+     */
+    public static final String KEY_GERAETEZUSTAND_WERT_UNGUELTIG = "GERAETEZUSTAND_WERT_UNGUELTIG";
+    /**
+     * Meldungs-Key (WARN): Zustandswert an einer Einheit gemeldet, die diese Grösse nicht führt.
+     *
+     * <p><b>Eigener Key neben dem Wertfehler</b>, weil {@link #erfasse} nach
+     * {@code (orgId, meldungKey)} dedupliziert und dabei den Parameter des offenen Eintrags
+     * überschreibt: Unter einem gemeinsamen Key zeigte die Meldung abwechselnd zwei Ursachen, die
+     * verschiedene Gegenmassnahmen verlangen — einmal die Skalierung im Pi, einmal die Zuordnung
+     * des Messpunkts.
+     */
+    public static final String KEY_GERAETEZUSTAND_TYP_UNGUELTIG = "GERAETEZUSTAND_TYP_UNGUELTIG";
+    /**
      * Meldungs-Key (WARN): Ein Zählerstand ist gesunken; das Delta wurde auf 0 gesetzt.
      *
      * <p>Die Energie dieses Intervalls geht dabei <b>verloren</b> — bei einem Producer sinkt damit

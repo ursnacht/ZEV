@@ -114,10 +114,15 @@ def _to_payload(reading: MeterReading) -> dict:
         "zaehlerstandBezug": round(reading.zaehlerstand_bezug, _KWH_DECIMALS),
         "zaehlerstandEinspeisung": round(reading.zaehlerstand_einspeisung, _KWH_DECIMALS),
     }
-    # Optionales Feld (Zählertausch-Erkennung): nur aufnehmen, wenn konfiguriert – so bleibt
-    # der Payload für Zähler ohne Seriennummer unverändert zum bisherigen Vertrag.
+    # Optionale Felder: nur aufnehmen, wenn vorhanden – so bleibt der Payload für Zähler ohne
+    # Seriennummer bzw. ohne Zustandswerte unverändert zum bisherigen Vertrag.
     if reading.seriennummer:
         payload["seriennummer"] = reading.seriennummer
+    # Ein LEERES Objekt waere kein neutraler Zusatz: Jede Nachricht truege dann ein Feld, das
+    # nichts aussagt, und ein Leser muesste zwischen "nichts gemeldet" und "nichts vorhanden"
+    # raten.
+    if reading.zustand:
+        payload["zustand"] = reading.zustand
     return payload
 
 

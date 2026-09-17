@@ -45,6 +45,13 @@ class MeterConfig:
     # Lese-Timeout in Sekunden für diesen Zähler. Wird von der Konfiguration aufgelöst:
     # zaehler[].read_timeout, sonst der globale read_timeout (Default s. config.py).
     read_timeout_seconds: float = 5.0
+    # Zustandsregister: Groessenname (klein, z. B. "soc") -> Register. Leer = das Geraet meldet
+    # keine Momentanwerte, der Payload traegt dann kein 'zustand'-Objekt.
+    #
+    # Getrennt von bezug/einspeisung, weil es etwas anderes ist: Die beiden sind kumulative
+    # Zaehlerstaende, aus denen das Backend Deltas bildet. Ein Ladezustand ist ein Momentanwert -
+    # er wird nie aggregiert (Specs/Geraetezustand.md).
+    register_zustand: dict[str, RegisterSpec] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -82,3 +89,8 @@ class MeterReading:
     zaehlerstand_bezug: float      # kWh, kumulativ, >= 0
     zaehlerstand_einspeisung: float  # kWh, kumulativ, >= 0
     seriennummer: str | None = None  # aus der Config; None -> Feld wird nicht publiziert
+    # Momentanwerte des Geraets (Ladezustand u.a.), Groessenname -> Wert. Leer/None -> das Feld
+    # 'zustand' wird NICHT publiziert, der Payload bleibt fuer Zaehler ohne solche Werte
+    # unveraendert. Anders als die Zaehlerstaende sind das KEINE kumulativen Groessen: Das Backend
+    # legt sie getrennt ab und aggregiert sie nie (Specs/Geraetezustand.md).
+    zustand: dict[str, float] | None = None

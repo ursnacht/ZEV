@@ -4,6 +4,7 @@ import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.ZaehlerRohdaten;
 import ch.nacht.repository.EinheitRepository;
+import ch.nacht.repository.GeraetezustandRepository;
 import ch.nacht.repository.ZaehlerRohdatenRepository;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -50,6 +51,12 @@ public class MqttIngestServiceTest {
     private ZaehlerRohdatenRepository rohdatenRepository;
 
     @Mock
+    private GeraetezustandRepository geraetezustandRepository;
+
+    @Mock
+    private SystemmeldungService systemmeldungService;
+
+    @Mock
     private MqttMetrics metrics;
 
     private ObjectMapper objectMapper;
@@ -60,7 +67,8 @@ public class MqttIngestServiceTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
-        service = new MqttIngestService(einheitRepository, rohdatenRepository, objectMapper, metrics);
+        service = new MqttIngestService(einheitRepository, rohdatenRepository,
+                geraetezustandRepository, systemmeldungService, objectMapper, metrics);
 
         einheit = new Einheit("Wohnung 1", EinheitTyp.CONSUMER);
         einheit.setId(EINHEIT_ID);
@@ -544,6 +552,7 @@ public class MqttIngestServiceTest {
         // FAIL_ON_UNKNOWN_PROPERTIES = false; hier nachgestellt, damit der Deploy-Reihenfolge-
         // Vertrag (Pi sendet ein Feld, das das Backend noch nicht kennt) geprüft wird.
         MqttIngestService toleranterService = new MqttIngestService(einheitRepository, rohdatenRepository,
+                geraetezustandRepository, systemmeldungService,
                 new ObjectMapper().registerModule(new JavaTimeModule())
                         .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES),
                 metrics);
