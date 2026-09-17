@@ -77,7 +77,8 @@ describe('chartFarben', () => {
       farben.sekundaer,  // Verbrauch
       farben.akzent,     // Preis
       farben.bandEins,   // Batterieladung
-      farben.bandZwei    // Einspeisung
+      farben.bandZwei,   // Einspeisung
+      farben.soc         // Ladezustand
     ];
 
     expect(new Set(verwendet).size).toBe(verwendet.length);

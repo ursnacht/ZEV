@@ -62,6 +62,13 @@ export interface Steuerentscheid {
   bezug: number | null;
   /** Rücklieferung in kWh, als Betrag; `null` bei Entscheiden vor V149. */
   ruecklieferung: number | null;
+  /**
+   * Ladezustand des Speichers in Prozent am Intervallende; `null` ohne Speicher-Einheit.
+   *
+   * Geht in **keine** Regel ein — er erklärt den Entscheid: Eine Sperre bei 95 % war wirkungslos,
+   * eine bei 40 % hat Kapazität freigehalten.
+   */
+  soc: number | null;
   ueberschuss: number;
   regel: Steuerregel;
   batterieladung: Steuerzustand;

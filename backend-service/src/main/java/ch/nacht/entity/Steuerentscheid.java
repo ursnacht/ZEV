@@ -105,6 +105,17 @@ public class Steuerentscheid {
     @Column(name = "ruecklieferung", precision = 12, scale = 3)
     private BigDecimal ruecklieferung;
 
+    /**
+     * Ladezustand des Speichers in Prozent am <b>Ende</b> des Intervalls; {@code null}, wenn kein
+     * Speicher erfasst ist oder kein Wert vorlag.
+     *
+     * <p>Geht in <b>keine</b> Regel ein — er erklärt den Entscheid im Nachhinein: „Ladung gesperrt
+     * bei 95 %" ist eine andere Aussage als „bei 40 %". Die erste Sperre war wirkungslos, die
+     * zweite hat Kapazität freigehalten.
+     */
+    @Column(name = "soc", precision = 5, scale = 1)
+    private BigDecimal soc;
+
     /** {@code max(0, produktion − verbrauch)} in kWh. */
     @NotNull
     @Column(name = "ueberschuss", precision = 12, scale = 3, nullable = false)
@@ -212,6 +223,14 @@ public class Steuerentscheid {
 
     public void setRuecklieferung(BigDecimal ruecklieferung) {
         this.ruecklieferung = ruecklieferung;
+    }
+
+    public BigDecimal getSoc() {
+        return soc;
+    }
+
+    public void setSoc(BigDecimal soc) {
+        this.soc = soc;
     }
 
     public BigDecimal getUeberschuss() {

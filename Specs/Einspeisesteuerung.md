@@ -304,6 +304,7 @@ Neue Tabelle `zev.steuerentscheid` (Flyway `V<nächste freie>__Create_Steuerents
 | `verbrauch` | `numeric(12,3)` | ja | Summe der `CONSUMER` im Intervall, kWh |
 | `bezug` | `numeric(12,3)` | nein | Summe der `BEZUG`-Einheiten in kWh; leer vor V149 |
 | `ruecklieferung` | `numeric(12,3)` | nein | Summe der `RUECKLIEFERUNG`-Einheiten in kWh, als Betrag; leer vor V149 |
+| `soc` | `numeric(5,1)` | nein | Ladezustand des Speichers in % am Intervall**ende**; leer ohne Speicher-Einheit (V155) |
 | `ueberschuss` | `numeric(12,3)` | ja | `max(0, produktion − verbrauch)`, kWh |
 | `regel` | `varchar(30)` | ja | Ausgelöste Regel (`PREIS_NEGATIV`, …, `LADEN`) |
 | `batterieladung` | `varchar(10)` | ja | `FREI` \| `GESPERRT` |
@@ -389,6 +390,15 @@ wie der NK-Eintrag).
    * **Stufenlinie** Einspeisepreis (CHF/kWh, linke y-Achse) — `step: 'end'`, ohne Flächenfüllung:
      Ein Preis gilt für die ganze Viertelstunde.
    * **Flächen** Produktion und Verbrauch (kWh, rechte y-Achse).
+   * **Ladezustand** (%, gestrichelt) auf einer **dritten** y-Achse rechts aussen.
+     > **Eigene Achse, nicht die Mengen-Achse.** 0–100 % gegen 0–25 kWh: Auf einer gemeinsamen
+     > Skala wären die Mengenkurven an den unteren Rand gedrückt und nicht mehr lesbar. Die Achse
+     > steht rechts mit Versatz, der rechte Rand des Diagramms wächst entsprechend.
+     >
+     > **Gestrichelt und ohne Fläche:** Der Ladezustand ist eine Zustandsgrösse, keine Menge — die
+     > Linienart sagt das, bevor jemand die Legende liest. Fehlende Werte werden **nicht**
+     > verbunden (`connectNulls: false`), sonst zöge die Linie eine Gerade über eine Lücke, die es
+     > so nie gab.
    * **Zwei Zustandsbänder** unter der x-Achse, je eines für `batterieladung` und `einspeisung`:
      ein durchgehender Balken über die Zeitachse, eingefärbt nach Zustand. Sie sind der Kern der
      ganzen Ansicht — auf einen Blick liest man „ab 09:15 Ladung gesperrt, ab 11:30 frei,
@@ -416,6 +426,7 @@ wie der NK-Eintrag).
      >
      > **Die Mengen-Achse braucht ein festes `min`.** Anders als eine Datenserie spannt `markArea`
      > die Skala **nicht** auf: Ohne `min` endete die Achse bei 0 und die Bänder wären unsichtbar.
+
    * Farben aus den Design-Tokens, **nicht** hart kodiert (`Specs/DarkMode.md`).
    * Tooltip mit Zeitpunkt (`dd.MM.yyyy HH:mm`), Preis und beiden Zuständen; Zahlen über
      `formatSwissNumber()`, **kein** `toLocaleString()`.
@@ -577,6 +588,7 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 | `STEUERUNG_BEZUG` | Bezug | Grid supply |
 | `STEUERUNG_RUECKLIEFERUNG` | Rücklieferung | Feed-in to grid |
 | `STEUERUNG_BILANZ_DIFFERENZ` | Batterie (aus Bilanz) | Battery (from balance) |
+| `STEUERUNG_SOC` | Ladezustand | State of charge |
 | `STEUERUNG_BILANZ_HINWEIS` | Produktion + Bezug − Verbrauch − Rücklieferung. … | Production + grid supply − consumption − feed-in. … |
 | `STEUERUNG_BATTERIELADUNG` | Batterieladung | Battery charging |
 | `STEUERUNG_EINSPEISUNG` | Einspeisung | Feed-in |
@@ -628,6 +640,10 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 * [ ] Ein Band beginnt am **Beginn** seines ersten Intervalls und endet am **Ende** seines letzten (`zeit + 15min`), deckungsgleich mit dem Stufenverlauf der Preislinie.
 * [ ] Jedes Band liegt auf seiner **festen Ebene**, unabhängig davon, ob das andere gesetzt ist.
 * [ ] Eine Lücke in den Entscheiden unterbricht das Band, statt überbrückt zu werden.
+* [ ] Das Diagramm zeigt den **Ladezustand** auf einer eigenen Achse (0–100 %); die Mengenkurven behalten ihre Skalierung.
+* [ ] Fehlt der Ladezustand für ein Intervall, setzt die Linie **aus** — sie wird nicht über die Lücke gezogen.
+* [ ] Ohne Speicher-Einheit bleibt `soc` leer, die Tabellenspalte zeigt nichts, und das Diagramm zeichnet die Kurve nicht.
+* [ ] Die sechs Reihen des Diagramms tragen **sechs verschiedene** Farben.
 * [ ] Die Protokolltabelle nennt je Intervall die Regel im Klartext, nicht den Schlüssel.
 * [ ] Die Tabelle zeigt **alle vier** Bilanzkomponenten: Produktion, Verbrauch, Bezug, Rücklieferung.
 * [ ] Die Spalte „Batterie (aus Bilanz)" zeigt `Produktion + Bezug − Verbrauch − Rücklieferung`.

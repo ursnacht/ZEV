@@ -202,6 +202,11 @@ export class EinspeisesteuerungComponent extends WithMessage
     return wert == null ? '' : formatSwissNumber(wert, 5);
   }
 
+  /** Ladezustand in Prozent, eine Nachkommastelle; leer bei `null` (kein Speicher erfasst). */
+  prozent(wert: number | null): string {
+    return wert == null ? '' : formatSwissNumber(wert, 1);
+  }
+
   /** Energiemenge im Schweizer Format. */
   menge(wert: number | null): string {
     return wert == null ? '' : formatSwissNumber(wert, 3);
@@ -285,7 +290,8 @@ export class EinspeisesteuerungComponent extends WithMessage
 
     return {
       animation: false,
-      grid: { left: 60, right: 60, top: 20, bottom: 110 },
+      // Rechts mehr Platz als links: Dort liegen ZWEI Achsen nebeneinander (kWh und Ladezustand).
+      grid: { left: 60, right: 115, top: 20, bottom: 110 },
       tooltip: {
         trigger: 'axis',
         formatter: (params: { dataIndex: number }[]) => this.tooltip(params[0]?.dataIndex ?? 0)
@@ -314,6 +320,21 @@ export class EinspeisesteuerungComponent extends WithMessage
           // Negative Werte gehoeren zu den Baendern, nicht zu einer Menge - als Achsenbeschriftung
           // waeren sie irrefuehrend.
           axisLabel: { color: farben.text, formatter: (w: number) => (w < 0 ? '' : String(w)) },
+          splitLine: { show: false }
+        },
+        {
+          // Ladezustand auf EIGENER Achse, nach aussen versetzt. Ohne sie muesste er sich eine
+          // Skala mit den Mengen teilen: 0-100 % gegen 0-25 kWh - die Mengenkurven waeren an den
+          // unteren Rand gedrueckt und nicht mehr lesbar.
+          type: 'value',
+          name: '%',
+          min: 0,
+          max: 100,
+          position: 'right',
+          offset: 55,
+          nameTextStyle: { color: farben.soc },
+          axisLine: { show: true, lineStyle: { color: farben.soc } },
+          axisLabel: { color: farben.soc },
           splitLine: { show: false }
         }
       ],
@@ -353,6 +374,20 @@ export class EinspeisesteuerungComponent extends WithMessage
           itemStyle: { color: farben.sekundaer },
           lineStyle: { color: farben.sekundaer },
           data: this.entscheide.map((e, i) => [zeiten[i], e.verbrauch])
+        },
+        {
+          name: this.translationService.translate('STEUERUNG_SOC'),
+          type: 'line',
+          // Gestrichelt und ohne Flaeche: Der Ladezustand ist eine Zustandsgroesse, keine Menge -
+          // die Linienart sagt das, noch bevor jemand die Legende liest.
+          lineStyle: { color: farben.soc, width: 2, type: 'dashed' },
+          itemStyle: { color: farben.soc },
+          showSymbol: false,
+          yAxisIndex: 2,
+          // Luecken NICHT verbinden: Fehlt der Wert fuer ein Intervall, soll die Linie aussetzen
+          // statt eine Gerade ueber die Luecke zu ziehen, die es so nie gab.
+          connectNulls: false,
+          data: this.entscheide.map((e, i) => [zeiten[i], e.soc])
         },
         this.band('STEUERUNG_BATTERIELADUNG', e => e.batterieladung === 'GESPERRT', 1),
         this.band('STEUERUNG_EINSPEISUNG', e => e.einspeisung === 'GESPERRT', 2)
@@ -458,6 +493,7 @@ export class EinspeisesteuerungComponent extends WithMessage
       + `${t('VERBRAUCH')}: ${this.menge(e.verbrauch)} kWh<br>`
       + `${t('STEUERUNG_UEBERSCHUSS')}: ${this.menge(e.ueberschuss)} kWh<br>`
       + `<b>${t(this.regelKey(e.regel))}</b><br>`
+      + (e.soc == null ? '' : `${t('STEUERUNG_SOC')}: ${formatSwissNumber(e.soc, 1)} %<br>`)
       + `${t('STEUERUNG_BATTERIELADUNG')}: ${t('STEUERUNG_' + e.batterieladung)}<br>`
       + `${t('STEUERUNG_EINSPEISUNG')}: ${t('STEUERUNG_' + e.einspeisung)}`;
   }

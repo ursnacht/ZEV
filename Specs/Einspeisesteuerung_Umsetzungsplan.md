@@ -528,3 +528,43 @@ Batterie schiebt. Um 11:30 war sie voll.
   bleibt die einzige offene Baustelle dieser Frage (§8).
 
 Code-Kommentare, Enum-Javadoc, Testdoku und FR-2 tragen die widerlegte Begründung nicht mehr.
+
+### Nachtrag 11 — Ladezustand im Diagramm (17.09.2026)
+
+**Auslöser:** Der SOC soll in der Grafik erscheinen, „mit entsprechender Skalierung, so dass alle
+Kurven gut sichtbar sind".
+
+**Der Wert musste zuerst in den Entscheid.** `Specs/Gerätezustand.md` §8 hatte das als nächsten
+Schritt benannt: `V155` ergänzt `steuerentscheid.soc`, gefüllt mit dem **letzten Wert vor dem
+Intervallende** — der Entscheid beschreibt das abgeschlossene Intervall, also zählt der Zustand an
+dessen Ende. Ohne Speicher-Einheit wird gar nicht erst gesucht.
+
+Der SOC geht in **keine Regel** ein. Er erklärt den Entscheid im Nachhinein: „Ladung gesperrt bei
+95 %" war wirkungslos, „bei 40 %" hat Kapazität freigehalten. Dass die Regel ihn auswerten sollte,
+bleibt die offene Frage aus §8.
+
+**Zur Skalierung — der eigentliche Punkt der Anforderung:**
+
+Eine **dritte** y-Achse rechts aussen, 0–100 %, mit Versatz; der rechte Rand des Diagramms wächst
+von 60 auf 115. Auf der Mengen-Achse hätte der SOC nicht funktioniert: 0–100 % gegen 0–25 kWh
+drückte die Mengenkurven an den unteren Rand.
+
+Gestrichelt und ohne Fläche, weil es eine **Zustands**grösse ist — die Linienart sagt das, bevor
+jemand die Legende liest. Und `connectNulls: false`: Eine Lücke bleibt eine Lücke, statt dass die
+Linie eine Gerade darüber zieht, die es nie gab.
+
+**Die Farbpalette war erschöpft.** Fünf Diagrammfarben waren belegt (Produktion grün, Verbrauch
+blau, Preis rot, Batterieladung orange, Einspeisung grau); alles Übrige im Design System sind
+Abstufungen derselben Familien. Eine sechste Reihe in einem vorhandenen Ton hiesse, dass zwei
+Kurven in der Legende gleich aussehen — **genau der Fehler, der bei Band und Kurve schon einmal
+auftrat**. Deshalb ein neues Token `--color-chart-purple` in allen vier Theme-Blöcken (hell
+`#7E57C2`, dunkel `#b197fc`), und der Farbtest vergleicht jetzt **sechs** statt fünf.
+
+**Geprüft:** 1325 Backend-Tests, 1659 Frontend-Tests, Design System gebaut, Frontend gebaut.
+
+**Nötig:** Rebuild für V155 und V156. Die Spalte füllt sich ab dem nächsten Job-Lauf; für
+zurückliegende Intervalle bleibt sie leer, und ohne Speicher-Einheit bleibt sie es ganz.
+
+> **Noch nicht am Bildschirm geprüft:** Ob die drei Achsen nebeneinander tatsächlich lesbar sind und
+> der rechte Rand reicht. Das zeigt erst die Ansicht mit echten Daten — die Tests prüfen die
+> Farben und die Daten, nicht die Lesbarkeit.

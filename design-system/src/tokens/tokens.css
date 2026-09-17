@@ -38,6 +38,11 @@
   --color-warning: #FF9800;
   --color-error: #f44336;
 
+  /* Chart series colour outside the green/blue/red families. The five colours used by
+     charts (primary, secondary, danger, warning, gray) were exhausted; a sixth series
+     needs a hue of its own, otherwise two lines share one colour in the legend. */
+  --color-chart-purple: #7E57C2;
+
   /* Neutral Colors */
   --color-white: #ffffff;
   --color-gray-50: #f8f8f8;
@@ -164,6 +169,9 @@
   --color-warning: #ffd43b;
   --color-error: #ff6b6b;
 
+  /* Chart series colour, see light theme */
+  --color-chart-purple: #b197fc;
+
   /* Shadows */
   --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.6);
@@ -208,6 +216,7 @@
     --color-success: #69db7c;
     --color-warning: #ffd43b;
     --color-error: #ff6b6b;
+    --color-chart-purple: #b197fc;
     --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.5);
     --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.6);
   }
@@ -249,6 +258,7 @@
     --color-success: #4CAF50;
     --color-warning: #FF9800;
     --color-error: #f44336;
+    --color-chart-purple: #7E57C2;
     --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
   }

@@ -44,6 +44,15 @@ export interface ChartFarben {
   bandEins: string;
   /** Zweites Zustandsband — neutrales Grau, klar abgesetzt von {@link bandEins}. */
   bandZwei: string;
+  /**
+   * Sechste Reihe — Violett, ausserhalb der Grün-/Blau-/Rot-Familien.
+   *
+   * Die Einspeisesteuerung zeigt Preis, Produktion, Verbrauch, zwei Zustandsbänder **und** den
+   * Ladezustand. Nach fünf Reihen war die Palette erschöpft; eine sechste in einem vorhandenen
+   * Ton hiesse, dass zwei Kurven in der Legende gleich aussehen — der Fehler, der bei Band und
+   * Kurve schon einmal auftrat.
+   */
+  soc: string;
 }
 
 /**
@@ -63,6 +72,7 @@ export function chartFarben(): ChartFarben {
     flaeche: token('--color-primary-light', '#81C784'),
     akzent: token('--color-danger', '#f44336'),
     bandEins: token('--color-warning', '#FF9800'),
-    bandZwei: token('--color-gray-600', '#666666')
+    bandZwei: token('--color-gray-600', '#666666'),
+    soc: token('--color-chart-purple', '#7E57C2')
   };
 }

@@ -88,6 +88,7 @@
           <th class="zev-table__number">{{ 'VERBRAUCH' | translate }}</th>
           <th class="zev-table__number">{{ 'STEUERUNG_BEZUG' | translate }}</th>
           <th class="zev-table__number">{{ 'STEUERUNG_RUECKLIEFERUNG' | translate }}</th>
+          <th class="zev-table__number">{{ 'STEUERUNG_SOC' | translate }}</th>
           <th class="zev-table__number" [title]="'STEUERUNG_BILANZ_HINWEIS' | translate">
             {{ 'STEUERUNG_BILANZ_DIFFERENZ' | translate }}
           </th>
@@ -107,6 +108,7 @@
             <td class="zev-table__number">{{ menge(entscheid.verbrauch) }}</td>
             <td class="zev-table__number">{{ menge(entscheid.bezug) }}</td>
             <td class="zev-table__number">{{ menge(entscheid.ruecklieferung) }}</td>
+            <td class="zev-table__number">{{ prozent(entscheid.soc) }}</td>
             <td class="zev-table__number">{{ menge(bilanzDifferenz(entscheid)) }}</td>
             <td class="zev-table__number">{{ menge(entscheid.ueberschuss) }}</td>
             <td>{{ regelKey(entscheid.regel) | translate }}</td>

@@ -28,6 +28,8 @@ public class SteuerentscheidDTO {
     private BigDecimal bezug;
     /** Summe der RUECKLIEFERUNG-Einheiten in kWh, als Betrag; `null` vor V149. */
     private BigDecimal ruecklieferung;
+    /** Ladezustand in Prozent am Intervallende; `null` ohne Speicher-Einheit. */
+    private BigDecimal soc;
     private BigDecimal ueberschuss;
     private Steuerregel regel;
     private Steuerzustand batterieladung;
@@ -103,6 +105,26 @@ public class SteuerentscheidDTO {
     public void setRuecklieferung(BigDecimal ruecklieferung) {
 
         this.ruecklieferung = ruecklieferung;
+
+    }
+
+
+
+    public BigDecimal getSoc() {
+
+
+        return soc;
+
+
+    }
+
+
+
+    public void setSoc(BigDecimal soc) {
+
+
+        this.soc = soc;
+
 
     }
 

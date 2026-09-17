@@ -3,12 +3,17 @@ package ch.nacht.service;
 import ch.nacht.dto.SimulationDTO;
 import ch.nacht.dto.SteuerKonfigurationDTO;
 import ch.nacht.dto.SteuerentscheidDTO;
+import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.FeatureFlag;
+import ch.nacht.entity.Geraetezustand;
 import ch.nacht.entity.Preiszeitreihe;
 import ch.nacht.entity.Steuerentscheid;
 import ch.nacht.entity.Steuerregel;
 import ch.nacht.entity.Steuerzustand;
+import ch.nacht.entity.Zustandsgroesse;
 import ch.nacht.exception.FeatureDisabledException;
+import ch.nacht.repository.EinheitRepository;
+import ch.nacht.repository.GeraetezustandRepository;
 import ch.nacht.repository.MesswerteRepository;
 import ch.nacht.repository.PreiszeitreiheRepository;
 import ch.nacht.repository.SteuerentscheidRepository;
@@ -73,6 +78,8 @@ public class SteuerungService {
 
     private final SteuerentscheidRepository steuerentscheidRepository;
     private final MesswerteRepository messwerteRepository;
+    private final EinheitRepository einheitRepository;
+    private final GeraetezustandRepository geraetezustandRepository;
     private final PreiszeitreiheRepository preiszeitreiheRepository;
     private final SteuerRegelService steuerRegelService;
     private final EinstellungenService einstellungenService;
@@ -82,6 +89,8 @@ public class SteuerungService {
 
     public SteuerungService(SteuerentscheidRepository steuerentscheidRepository,
                             MesswerteRepository messwerteRepository,
+                            EinheitRepository einheitRepository,
+                            GeraetezustandRepository geraetezustandRepository,
                             PreiszeitreiheRepository preiszeitreiheRepository,
                             SteuerRegelService steuerRegelService,
                             EinstellungenService einstellungenService,
@@ -90,6 +99,8 @@ public class SteuerungService {
                             HibernateFilterService hibernateFilterService) {
         this.steuerentscheidRepository = steuerentscheidRepository;
         this.messwerteRepository = messwerteRepository;
+        this.einheitRepository = einheitRepository;
+        this.geraetezustandRepository = geraetezustandRepository;
         this.preiszeitreiheRepository = preiszeitreiheRepository;
         this.steuerRegelService = steuerRegelService;
         this.einstellungenService = einstellungenService;
@@ -124,6 +135,7 @@ public class SteuerungService {
         Messung messung = messungFuer(zeitVon);
         BigDecimal preis = preisFuer(zeitVon);
         BigDecimal preisTiefRest = tiefstpreisRestDesTages(zeitVon);
+        BigDecimal soc = socAmIntervallende(orgId, zeitVon);
 
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(preis, preisTiefRest,
@@ -132,7 +144,7 @@ public class SteuerungService {
 
         steuerentscheidRepository.upsert(orgId, zeitVon, preis, preisTiefRest,
                 messung.produktion(), messung.verbrauch(), messung.bezug(),
-                messung.ruecklieferung(), entscheid.ueberschuss(),
+                messung.ruecklieferung(), soc, entscheid.ueberschuss(),
                 entscheid.regel().name(), entscheid.batterieladung().name(),
                 entscheid.einspeisung().name(), schwellwert, speicherwert);
 
@@ -390,6 +402,31 @@ public class SteuerungService {
     }
 
     /**
+     * Ladezustand des Speichers am <b>Ende</b> des Intervalls; {@code null}, wenn kein Speicher
+     * erfasst ist oder kein Wert vorliegt.
+     *
+     * <p><b>Geht in keine Regel ein</b> — er erklärt den Entscheid im Nachhinein und erscheint im
+     * Diagramm. Dass die Regel ihn auswerten sollte, ist die offene Frage aus §8: Eine Sperre bei
+     * 95 % Ladestand war wirkungslos, eine bei 40 % hat Kapazität freigehalten.
+     *
+     * <p><b>Das Ende, nicht der Beginn:</b> Der Entscheid beschreibt das abgeschlossene Intervall,
+     * also zählt der Zustand an dessen Ende. Genommen wird der letzte Wert <b>vor</b> diesem
+     * Zeitpunkt — einer genau darauf gehört bereits zum nächsten Intervall.
+     *
+     * <p>Ohne Speicher-Einheit wird gar nicht erst gesucht: Dann gibt es keinen Ladezustand, und
+     * eine Abfrage je Intervall wäre verschenkt.
+     */
+    private BigDecimal socAmIntervallende(Long orgId, LocalDateTime zeitVon) {
+        return einheitRepository.findFirstByTyp(EinheitTyp.SPEICHER)
+                .flatMap(speicher -> geraetezustandRepository
+                        .findFirstByEinheitIdAndGroesseAndZeitLessThanOrderByZeitDesc(
+                                speicher.getId(), Zustandsgroesse.SOC,
+                                zeitVon.plusMinutes(INTERVALL_MINUTEN)))
+                .map(Geraetezustand::getWert)
+                .orElse(null);
+    }
+
+    /**
      * Preis eines Intervalls; {@code null}, wenn keiner vorliegt.
      *
      * <p><b>Hier wird umgerechnet</b> — die Preiszeitreihe ist die einzige Quelle in UTC.
@@ -517,6 +554,7 @@ public class SteuerungService {
         dto.setVerbrauch(entscheid.getVerbrauch());
         dto.setBezug(entscheid.getBezug());
         dto.setRuecklieferung(entscheid.getRuecklieferung());
+        dto.setSoc(entscheid.getSoc());
         dto.setUeberschuss(entscheid.getUeberschuss());
         dto.setRegel(entscheid.getRegel());
         dto.setBatterieladung(entscheid.getBatterieladung());
