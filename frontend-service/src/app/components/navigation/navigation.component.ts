@@ -37,6 +37,15 @@ export class NavigationComponent implements OnInit, OnDestroy {
   isCompact = false;
 
   /**
+   * Ob das erste `NavigationEnd` noch aussteht.
+   *
+   * <p>Beim Laden der Seite fuehrt der Router eine erste Navigation aus, die genauso ein
+   * `NavigationEnd` ausloest wie ein Klick im Menue. Beides liesse sich sonst nicht
+   * auseinanderhalten - und genau daran haengt, ob das Menue beim Neuladen aufspringt.
+   */
+  private ersteNavigationSteht = true;
+
+  /**
    * Aufklapp-Zustand eines Untermenues.
    *
    * <p><b>Derzeit von keinem Menueeintrag verwendet</b> und dennoch mit Absicht hier: Seit FR-3
@@ -67,14 +76,15 @@ export class NavigationComponent implements OnInit, OnDestroy {
     }
     this.currentLang = this.translationService.currentLang();
 
-    // Open menu on startseite
-    this.checkAndOpenMenuForStartseite(this.router.url);
+    // Beim Laden der Seite NUR das Untermenue - das Hauptmenue bleibt zu (siehe
+    // oeffneMenueBeiNavigation).
+    this.oeffneUntermenueFuer(this.router.url);
 
     // Listen for route changes
     this.routerSubscription = this.router.events.pipe(
       filter(event => event instanceof NavigationEnd)
     ).subscribe((event: NavigationEnd) => {
-      this.checkAndOpenMenuForStartseite(event.urlAfterRedirects || event.url);
+      this.oeffneMenueBeiNavigation(event.urlAfterRedirects || event.url);
     });
   }
 
@@ -84,13 +94,39 @@ export class NavigationComponent implements OnInit, OnDestroy {
     }
   }
 
-  private checkAndOpenMenuForStartseite(url: string): void {
+  /**
+   * Klappt auf der Startseite das Menue auf - aber <b>nicht</b> beim Laden der Seite.
+   *
+   * <p>Auf der Startseite soll das Menue offen sein: Sie hat nichts als den Weg weiter
+   * (`Specs/Startseite_Umsetzungsplan.md`). Beim <b>Neuladen</b> stoert das jedoch - man will die
+   * Seite sehen, nicht ein Menue wegklicken, und vor allem verschwindet es beim Reload nicht,
+   * sondern kommt zurueck.
+   *
+   * <p><b>Warum ein Merker und keine Pruefung in `ngOnInit`:</b> Der Router fuehrt beim Laden
+   * selbst eine erste Navigation aus, die hier ankommt wie ein Klick. Es genuegt also nicht, den
+   * Aufruf in `ngOnInit` wegzulassen - das erste `NavigationEnd` haette das Menue trotzdem
+   * geoeffnet.
+   */
+  private oeffneMenueBeiNavigation(url: string): void {
+    this.oeffneUntermenueFuer(url);
+
+    if (this.ersteNavigationSteht) {
+      this.ersteNavigationSteht = false;
+      return;
+    }
     if (url === '/' || url === '/startseite') {
       this.isMenuOpen = true;
     }
-    // Steht man auf einer Nebenkosten-Seite, ist das Untermenue aufgeklappt - sonst waere der
-    // aktive Eintrag nicht sichtbar. Ohne Untermenue im Menue bleibt das ohne Wirkung; die Zeile
-    // gehoert zur erhaltenen Mechanik (siehe isNebenkostenOpen).
+  }
+
+  /**
+   * Klappt das Untermenue auf, in dem die aufgerufene Seite liegt.
+   *
+   * <p>Anders als das Hauptmenue auch beim <b>Laden</b>: Sonst waere der aktive Eintrag nach einem
+   * Reload nicht sichtbar. Ohne Untermenue im Menue bleibt das ohne Wirkung; die Zeile gehoert zur
+   * erhaltenen Mechanik (siehe isNebenkostenOpen).
+   */
+  private oeffneUntermenueFuer(url: string): void {
     if (url.startsWith('/nebenkosten')) {
       this.isNebenkostenOpen = true;
     }

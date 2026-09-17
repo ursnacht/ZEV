@@ -181,3 +181,31 @@ ON CONFLICT (key) DO NOTHING;
 4. **Entschieden:** Ein Home-Icon wird als erster Link in der Navigation hinzugefügt
 5. **Entschieden:** Das Bild wird als SVG-Illustration erstellt (passend zum ZEV-Thema)
 6. **Annahme:** Das SVG-Bild ist responsiv und passt sich der Bildschirmgrösse an
+
+---
+
+## Nachtrag — Beim Laden der Seite bleibt das Menü zu (17.09.2026)
+
+Das Menü klappt auf der Startseite weiterhin auf, **aber nicht beim Laden oder Neuladen der
+Seite**. Ein Reload soll die Seite zeigen, nicht ein Menü, das man erst wegklickt — und das nach
+jedem weiteren Reload wiederkommt.
+
+**Es genügte nicht, den Aufruf in `ngOnInit` wegzulassen.** Der Router führt beim Laden selbst eine
+erste Navigation aus, und die löst dasselbe `NavigationEnd` aus wie ein Klick im Menü. Der Aufruf
+in `ngOnInit` war also nur der eine von **zwei** Auslösern; ohne den zweiten wäre die Änderung
+wirkungslos geblieben und hätte am Bildschirm genauso ausgesehen wie vorher.
+
+Gelöst über einen Merker (`ersteNavigationSteht`), der das erste `NavigationEnd` überspringt.
+Danach gilt die ursprüngliche Regel unverändert: Navigation zur Startseite klappt das Menü auf.
+
+**Das Untermenü bleibt davon unberührt** und klappt auch beim Laden auf — sonst wäre der aktive
+Eintrag nach einem Reload nicht sichtbar.
+
+**Nebenwirkung auf die E2E-Tests:** `navigateViaMenu` ruft `navigateToHome` und danach
+`openHamburgerMenu`, das den Hamburger **umschaltet**. Bisher war das Menü nach `goto('/')` bereits
+offen, der Klick schloss es also — der Helfer fängt das über seinen `goto`-Rueckfall ab
+(`helpers.ts`). Jetzt öffnet derselbe Klick das Menü wirklich.
+
+**Nachgewiesen** (17.09.2026): Die vollständige E2E-Suite lief nach dem Rebuild durch — 492 Tests
+grün, 90 übersprungen, keiner gescheitert. Der `goto`-Rückfall in `navigateViaMenu` wird damit
+nicht mehr gebraucht, um die Menünavigation zu retten; er bleibt als Absicherung stehen.
