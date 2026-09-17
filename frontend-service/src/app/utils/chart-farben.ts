@@ -34,6 +34,14 @@ export interface ChartFarben {
    */
   akzent: string;
   /**
+   * **Solarproduktion** — Gelb, die übliche Zuordnung für Sonnenenergie.
+   *
+   * Bewusst **nicht** `--color-warning`: Das ist eine Statusfarbe und im Dark Mode selbst gelb
+   * (`#ffd43b`) — dort trug das Zustandsband bereits genau diesen Ton. Produktion und Band hätten
+   * sich im dunklen Thema nicht mehr unterschieden.
+   */
+  solar: string;
+  /**
    * Erstes **Zustandsband** — Orange, ausserhalb der Farbfamilien der Datenreihen.
    *
    * Zustandsbänder zeigen keine Messgrösse, sondern einen Sollzustand. Sie dürfen deshalb **nicht**
@@ -71,7 +79,10 @@ export function chartFarben(): ChartFarben {
     sekundaer: token('--color-secondary', '#2196F3'),
     flaeche: token('--color-primary-light', '#81C784'),
     akzent: token('--color-danger', '#f44336'),
-    bandEins: token('--color-warning', '#FF9800'),
+    solar: token('--color-chart-yellow', '#EAB308'),
+    // Eigener Chart-Token statt `--color-warning`: Jenes wechselt mit dem Thema den Farbton
+    // (hell orange, dunkel gelb) und kollidierte im Dark Mode mit der gelben Produktionslinie.
+    bandEins: token('--color-chart-orange', '#F97316'),
     bandZwei: token('--color-gray-600', '#666666'),
     soc: token('--color-chart-purple', '#7E57C2')
   };

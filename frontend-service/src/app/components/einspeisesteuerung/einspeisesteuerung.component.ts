@@ -484,9 +484,11 @@ export class EinspeisesteuerungComponent extends WithMessage
           areaStyle: { opacity: 0.2 },
           showSymbol: false,
           yAxisIndex: 1,
-          // Gruen fuer die Solarproduktion - die naheliegende Zuordnung.
-          itemStyle: { color: farben.primaer },
-          lineStyle: { color: farben.primaer },
+          // GELB fuer die Solarproduktion - die uebliche Zuordnung fuer Sonnenenergie. Vorher
+          // gruen; der Ton kommt aus einem eigenen Chart-Token und nicht aus `--color-warning`,
+          // das im Dark Mode selbst gelb ist und dort das Zustandsband faerbt.
+          itemStyle: { color: farben.solar },
+          lineStyle: { color: farben.solar },
           data: this.entscheide.map((e, i) => [zeiten[i], this.produktionVerrechnet(e)])
         },
         {

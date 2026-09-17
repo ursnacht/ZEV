@@ -747,3 +747,32 @@ liefert. Das tut er (`ORDER BY zeitVon`), aber die Tabelle hätte damit an einer
 sie selbst nicht prüfen kann. Bei 96 Zeilen kostet das Sortieren nichts.
 
 **Geprüft:** Frontend gebaut, 1659 Frontend-Tests grün. Keine Migration, keine neuen Übersetzungen.
+
+---
+
+## Nachtrag 16 — Solarproduktion gelb (17.09.2026)
+
+Die Produktionskurve ist gelb statt grün. Zwei neue Tokens, in allen vier Theme-Blöcken:
+`--color-chart-yellow` (hell `#EAB308`, dunkel `#FFE066`) und `--color-chart-orange`
+(hell `#F97316`, dunkel `#FB923C`).
+
+**Warum zwei und nicht eines.** Das Zustandsband „Batterieladung gesperrt“ bezog seine Farbe aus
+`--color-warning`. Das ist eine **Statusfarbe** und wechselt mit dem Thema den Farbton: hell
+`#FF9800` (orange), dunkel `#ffd43b` (**gelb**). Im dunklen Thema war das Band also schon gelb —
+im Screenshot gut zu sehen. Hätte nur die Produktion Gelb bekommen, wären beide dort
+ununterscheidbar gewesen: derselbe Fehler wie zu Beginn dieses Features, als Band und Kurve beide
+grün bzw. beide blau waren. Das Band trägt deshalb jetzt einen eigenen Ton, der in beiden Themes
+orange bleibt.
+
+**Ein Test, der genau das abfaengt.** `chart-farben.spec.ts` setzt `--color-warning` auf einen
+Erkennungswert und prüft, dass weder `solar` noch `bandEins` ihn übernimmt. Der bisherige
+Set-Test hätte die Kollision **nicht** gefunden: Er vergleicht die Rückfallwerte, weil in jsdom
+keine Tokens geladen sind — und die Fallbacks waren nie gleich. Sichtbar war der Fehler nur im
+dunklen Thema im Browser.
+
+**Geprüft:** Design System gebaut, Frontend gebaut, 1660 Frontend-Tests grün (einer mehr als zuvor).
+Keine Migration, keine neuen Übersetzungen.
+
+> **Noch nicht am Bildschirm geprüft:** Ob Gelb und Orange in der Legende nebeneinander gut genug
+> auseinanderzuhalten sind — sie liegen im Farbkreis nur etwa 20° auseinander. Das zeigt erst die
+> Ansicht, in beiden Themes.

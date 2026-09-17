@@ -406,7 +406,13 @@ wie der NK-Eintrag).
    `preiszeitreihe-chart`):
    * **Stufenlinie** Einspeisepreis (CHF/kWh, linke y-Achse) — `step: 'end'`, ohne Flächenfüllung:
      Ein Preis gilt für die ganze Viertelstunde.
-   * **Flächen** Produktion und Verbrauch (kWh, rechte y-Achse).
+   * **Flächen** Produktion und Verbrauch (kWh, rechte y-Achse). Die Produktion ist **gelb** — die
+     übliche Zuordnung für Sonnenenergie.
+     > **Der Gelbton kommt aus einem eigenen Chart-Token, nicht aus `--color-warning`.** Jenes ist
+     > eine Statusfarbe und im Dark Mode selbst gelb (`#ffd43b`) — genau der Ton, den dort das
+     > Zustandsband trug. Produktion und Band wären im dunklen Thema ununterscheidbar gewesen.
+     > Deshalb trägt auch das Band jetzt einen eigenen Token (`--color-chart-orange`) statt der
+     > Statusfarbe, die mit dem Thema den Farbton wechselte.
    * **Ladezustand** (%, gestrichelt) auf einer **dritten** y-Achse rechts aussen.
      > **Eigene Achse, nicht die Mengen-Achse.** 0–100 % gegen 0–25 kWh: Auf einer gemeinsamen
      > Skala wären die Mengenkurven an den unteren Rand gedrückt und nicht mehr lesbar. Die Achse
@@ -750,6 +756,9 @@ Der Text ist an kein Feature gebunden.
 * [ ] Fehlt der Ladezustand für ein Intervall, setzt die Linie **aus** — sie wird nicht über die Lücke gezogen.
 * [ ] Ohne Speicher-Einheit bleibt `soc` leer, die Tabellenspalte zeigt nichts, und das Diagramm zeichnet die Kurve nicht.
 * [ ] Die sechs Reihen des Diagramms tragen **sechs verschiedene** Farben.
+* [ ] Die Solarproduktion ist **gelb**, in **beiden** Themes.
+* [ ] Produktion und Zustandsband unterscheiden sich auch im **Dark Mode** — keines der beiden
+  bezieht seine Farbe aus `--color-warning`.
 * [ ] Die Protokolltabelle nennt je Intervall die Regel im Klartext, nicht den Schlüssel.
 * [ ] Die Tabelle zeigt **alle vier** Bilanzkomponenten: Produktion, Verbrauch, Bezug, Rücklieferung.
 * [ ] Die Spalte „Batterie (aus Bilanz)" zeigt `Produktion + Bezug − Verbrauch − Rücklieferung`.

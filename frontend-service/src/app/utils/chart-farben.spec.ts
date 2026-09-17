@@ -12,7 +12,7 @@ describe('chartFarben', () => {
   afterEach(() => {
     // Gesetzte Eigenschaften wieder entfernen, sonst faerbt ein Test den naechsten.
     ['--color-gray-500', '--color-gray-700', '--color-gray-300',
-      '--color-primary', '--color-secondary', '--color-primary-light']
+      '--color-primary', '--color-secondary', '--color-primary-light', '--color-warning']
       .forEach(name => document.documentElement.style.removeProperty(name));
   });
 
@@ -23,6 +23,7 @@ describe('chartFarben', () => {
     expect(farben.text).toBeTruthy();
     expect(farben.gitter).toBeTruthy();
     expect(farben.primaer).toBeTruthy();
+    expect(farben.solar).toBeTruthy();
     expect(farben.sekundaer).toBeTruthy();
     expect(farben.flaeche).toBeTruthy();
   });
@@ -68,12 +69,12 @@ describe('chartFarben', () => {
   it('should keep every colour of one chart distinguishable', () => {
     const farben = chartFarben();
 
-    // Die Einspeisesteuerung zeigt FUENF Farben nebeneinander: drei Kurven und zwei
+    // Die Einspeisesteuerung zeigt SECHS Farben nebeneinander: drei Kurven und zwei
     // Zustandsbaender. Zwei davon waren gleich - in der Legende standen "Produktion" und
     // "Batterieladung" beide gruen, "Verbrauch" und "Einspeisung" beide blau. Der bisherige Test
     // verglich nur zwei Farben und sah das nicht.
     const verwendet = [
-      farben.primaer,    // Produktion
+      farben.solar,      // Produktion (gelb, vorher gruen)
       farben.sekundaer,  // Verbrauch
       farben.akzent,     // Preis
       farben.bandEins,   // Batterieladung
@@ -82,5 +83,17 @@ describe('chartFarben', () => {
     ];
 
     expect(new Set(verwendet).size).toBe(verwendet.length);
+  });
+
+  it('should keep production and the state band off the status colour', () => {
+    // `--color-warning` ist eine STATUSfarbe: hell orange, im Dark Mode gelb (#ffd43b). Solange
+    // das Band daraus kam, trug es im dunklen Thema genau den Ton, den die Solarproduktion jetzt
+    // hat - beide waren gelb. Greift wieder jemand zu diesem Token, faellt es hier auf.
+    document.documentElement.style.setProperty('--color-warning', 'rgb(7, 7, 7)');
+
+    const farben = chartFarben();
+
+    expect(farben.solar).not.toBe('rgb(7, 7, 7)');
+    expect(farben.bandEins).not.toBe('rgb(7, 7, 7)');
   });
 });
