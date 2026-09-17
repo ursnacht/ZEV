@@ -281,6 +281,34 @@ export class EinspeisesteuerungComponent extends WithMessage
     return e.produktion + e.bezug - e.verbrauch - e.ruecklieferung;
   }
 
+  /**
+   * `true`, sobald für **ein** Intervall des Tages Speichermengen vorliegen.
+   *
+   * <p>Entscheidet, ob die Produktionskurve verrechnet gezeichnet und entsprechend benannt wird.
+   * Ein Tag ohne Speicherdaten sieht damit aus wie zuvor — und trägt auch dieselbe Beschriftung.
+   */
+  get hatSpeicherdaten(): boolean {
+    return this.entscheide.some(e => e.speicherLadung != null || e.speicherEntladung != null);
+  }
+
+  /**
+   * Erzeugung einschliesslich dessen, was in den Speicher ging — `produktion + Ladung − Entladung`.
+   *
+   * <p><b>Warum das nötig ist:</b> Der Hybrid-Wechselrichter gibt wechselstromseitig nur ab, was
+   * das Haus braucht. Was aus der Erzeugung direkt in die Batterie fliesst, läuft über keinen
+   * Erzeugungszähler und fehlt in `produktion` — bei voller Sonne stand dort weniger als der
+   * Verbrauch. Umgekehrt erscheint eine Entladung dort als Erzeugung, obwohl sie keine ist.
+   *
+   * <p><b>Nur für die Darstellung.</b> Überschuss, Regel und die gespeicherten Zustände bleiben auf
+   * den gemessenen Werten — die Tabelle zeigt deshalb weiterhin die gemessene Produktion.
+   *
+   * <p><b>Grenze:</b> Lädt die Batterie aus dem **Netz** statt aus der Erzeugung, zählt die Ladung
+   * hier fälschlich zur Produktion. Der Fall tritt bei negativen Preisen auf.
+   */
+  produktionVerrechnet(e: Steuerentscheid): number {
+    return e.produktion + (e.speicherLadung ?? 0) - (e.speicherEntladung ?? 0);
+  }
+
   /** Uhrzeit `HH:mm` des Intervalls. */
   uhrzeit(entscheid: Steuerentscheid): string {
     return formatSwissDateTime(new Date(entscheid.zeit)).slice(-5);
@@ -343,6 +371,13 @@ export class EinspeisesteuerungComponent extends WithMessage
       grid: { left: 60, right: 115, top: 20, bottom: 110 },
       tooltip: {
         trigger: 'axis',
+        // Kleiner als der ECharts-Standard (14 px): Der Tooltip nennt DREIZEHN Groessen - Zeit,
+        // zwei Preise, gemessene und verrechnete Produktion, Ladung, Entladung, Verbrauch,
+        // Ueberschuss, Regel, Ladezustand und die beiden Zustaende. Bei 14 px war er hoeher als
+        // das Diagramm, und ECharts schneidet oben ab statt zu scrollen: Zeit und Preise, also
+        // gerade die Fuehrungsgroessen, waren nicht mehr zu sehen.
+        textStyle: { fontSize: 11 },
+        padding: [6, 10],
         formatter: (params: { dataIndex: number }[]) => this.tooltip(params[0]?.dataIndex ?? 0)
       },
       legend: { bottom: 60, textStyle: { color: farben.text } },
@@ -411,7 +446,11 @@ export class EinspeisesteuerungComponent extends WithMessage
           data: this.entscheide.map((e, i) => [zeiten[i], e.preis])
         },
         {
-          name: this.translationService.translate('PRODUKTION'),
+          // Der Name wechselt mit der Datenlage: Ohne Speicherdaten zeigt die Kurve die gemessene
+          // Produktion und heisst so. Liegen sie vor, ist sie verrechnet - und muss das auch sagen,
+          // sonst stuende in der Legende "Produktion" ueber einer Zahl, die in keiner Tabelle steht.
+          name: this.translationService.translate(
+            this.hatSpeicherdaten ? 'STEUERUNG_PRODUKTION_VERRECHNET' : 'PRODUKTION'),
           type: 'line',
           areaStyle: { opacity: 0.2 },
           showSymbol: false,
@@ -419,7 +458,7 @@ export class EinspeisesteuerungComponent extends WithMessage
           // Gruen fuer die Solarproduktion - die naheliegende Zuordnung.
           itemStyle: { color: farben.primaer },
           lineStyle: { color: farben.primaer },
-          data: this.entscheide.map((e, i) => [zeiten[i], e.produktion])
+          data: this.entscheide.map((e, i) => [zeiten[i], this.produktionVerrechnet(e)])
         },
         {
           name: this.translationService.translate('VERBRAUCH'),
@@ -508,7 +547,9 @@ export class EinspeisesteuerungComponent extends WithMessage
   private hoechsteMenge(): number {
     let hoechste = 0;
     for (const e of this.entscheide) {
-      hoechste = Math.max(hoechste, e.produktion ?? 0, e.verbrauch ?? 0);
+      // Die VERRECHNETE Produktion, weil genau sie gezeichnet wird - sonst liefe die Kurve an
+      // Tagen mit viel Ladung ueber den oberen Rand der Achse hinaus.
+      hoechste = Math.max(hoechste, this.produktionVerrechnet(e), e.verbrauch ?? 0);
     }
     return hoechste > 0 ? hoechste : MENGE_ERSATZ;
   }
@@ -598,6 +639,13 @@ export class EinspeisesteuerungComponent extends WithMessage
       + `${t('PREIS_CHF_KWH')}: ${this.preis(e.preis) || '–'}<br>`
       + `${t('STEUERUNG_TIEFSTPREIS_REST')}: ${this.preis(e.preisTiefRest) || '–'}<br>`
       + `${t('PRODUKTION')}: ${this.menge(e.produktion)} kWh<br>`
+      // Beide Werte, nicht nur der verrechnete: Die Differenz ist genau das, was der
+      // Erzeugungszaehler nicht sieht - und der Grund, warum die Kurve hoeher laeuft als die Spalte.
+      + (e.speicherLadung == null && e.speicherEntladung == null ? ''
+        : `${t('STEUERUNG_PRODUKTION_VERRECHNET')}: `
+          + `${this.menge(this.produktionVerrechnet(e))} kWh<br>`
+        + `${t('STEUERUNG_LADUNG')}: ${this.menge(e.speicherLadung)} kWh<br>`
+        + `${t('STEUERUNG_ENTLADUNG')}: ${this.menge(e.speicherEntladung)} kWh<br>`)
       + `${t('VERBRAUCH')}: ${this.menge(e.verbrauch)} kWh<br>`
       + `${t('STEUERUNG_UEBERSCHUSS')}: ${this.menge(e.ueberschuss)} kWh<br>`
       + `<b>${t(this.regelKey(e.regel))}</b><br>`

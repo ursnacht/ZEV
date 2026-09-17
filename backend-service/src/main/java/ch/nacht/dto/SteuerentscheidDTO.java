@@ -30,6 +30,10 @@ public class SteuerentscheidDTO {
     private BigDecimal ruecklieferung;
     /** Ladezustand in Prozent am Intervallende; `null` ohne Speicher-Einheit. */
     private BigDecimal soc;
+    /** Gemessene Ladung des Speichers im Intervall in kWh; `null` ohne Speicher-Einheit. */
+    private BigDecimal speicherLadung;
+    /** Gemessene Entladung des Speichers im Intervall in kWh, als Betrag; `null` ohne Speicher. */
+    private BigDecimal speicherEntladung;
     private BigDecimal ueberschuss;
     private Steuerregel regel;
     private Steuerzustand batterieladung;
@@ -126,6 +130,22 @@ public class SteuerentscheidDTO {
         this.soc = soc;
 
 
+    }
+
+    public BigDecimal getSpeicherLadung() {
+        return speicherLadung;
+    }
+
+    public void setSpeicherLadung(BigDecimal speicherLadung) {
+        this.speicherLadung = speicherLadung;
+    }
+
+    public BigDecimal getSpeicherEntladung() {
+        return speicherEntladung;
+    }
+
+    public void setSpeicherEntladung(BigDecimal speicherEntladung) {
+        this.speicherEntladung = speicherEntladung;
     }
 
     public BigDecimal getUeberschuss() {

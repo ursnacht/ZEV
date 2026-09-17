@@ -136,6 +136,7 @@ public class SteuerungService {
         BigDecimal preis = preisFuer(zeitVon);
         BigDecimal preisTiefRest = tiefstpreisRestDesTages(zeitVon);
         BigDecimal soc = socAmIntervallende(orgId, zeitVon);
+        Speicher speicher = speicherFuer(zeitVon);
 
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(preis, preisTiefRest,
@@ -144,7 +145,8 @@ public class SteuerungService {
 
         steuerentscheidRepository.upsert(orgId, zeitVon, preis, preisTiefRest,
                 messung.produktion(), messung.verbrauch(), messung.bezug(),
-                messung.ruecklieferung(), soc, entscheid.ueberschuss(),
+                messung.ruecklieferung(), soc, speicher.ladung(), speicher.entladung(),
+                entscheid.ueberschuss(),
                 entscheid.regel().name(), entscheid.batterieladung().name(),
                 entscheid.einspeisung().name(), schwellwert, speicherwert);
 
@@ -290,6 +292,7 @@ public class SteuerungService {
         List<SteuerentscheidDTO> dtos = new ArrayList<>();
         rechneNach(datum, datum, schwellwert, wirksamerSpeicherwert,
                 n -> dtos.add(zuDto(n, schwellwert, wirksamerSpeicherwert)));
+        reichereSpeicherAn(dtos, datum);
 
         log.info("Steuerung nachgerechnet: org={} tag={} schwellwert={} -> {} Intervalle",
                 orgId, datum, schwellwert, dtos.size());
@@ -427,6 +430,105 @@ public class SteuerungService {
     }
 
     /**
+     * Gemessene Lade- und Entlademenge eines Intervalls, beide als <b>Betrag</b>.
+     *
+     * <p>{@code null} in beiden Feldern heisst <b>nicht gemessen</b> — kein Speicher erfasst oder
+     * kein Messwert für das Intervall. Eine 0 hiesse „Speicher stand still"; das ist eine andere
+     * Aussage.
+     */
+    private record Speicher(BigDecimal ladung, BigDecimal entladung) {
+        static final Speicher LEER = new Speicher(null, null);
+    }
+
+    /**
+     * Ladung und Entladung des Speichers im Intervall, das bei {@code zeitVon} <b>beginnt</b>.
+     *
+     * <p><b>Geht in keine Regel ein</b> (FR-5b): Die Mengen erklären den Entscheid und erlauben es,
+     * die wirkliche Erzeugung darzustellen — entschieden wird weiter auf den gemessenen Werten von
+     * Produktion und Verbrauch.
+     *
+     * <p>Ohne Speicher-Einheit wird gar nicht erst abgefragt, wie beim Ladezustand.
+     */
+    private Speicher speicherFuer(LocalDateTime zeitVon) {
+        if (!einheitRepository.existsByTyp(EinheitTyp.SPEICHER)) {
+            return Speicher.LEER;
+        }
+        LocalDateTime ende = zeitVon.plusMinutes(INTERVALL_MINUTEN);
+        for (Object[] zeile : messwerteRepository.sumLadungEntladungPerZeitBetween(
+                EinheitTyp.SPEICHER, ende, ende.plusMinutes(INTERVALL_MINUTEN))) {
+            return new Speicher(alsBigDecimal(zeile[1]), alsBigDecimal(zeile[2]));
+        }
+        return Speicher.LEER;
+    }
+
+    /**
+     * Ergänzt nachgerechnete Entscheide um Speichermengen und Ladezustand.
+     *
+     * <p><b>Warum hier und nicht in {@link #rechneNach}:</b> Jener Weg trägt auch die Rückrechnung
+     * über bis zu 366 Tage, und beides wird dort nicht gebraucht — die Kennzahlen zählen Regeln.
+     * Der Ladezustand käme aus einer Zeitreihe mit mehreren tausend Werten je Tag; über ein Jahr
+     * geladen wäre das die eigentliche Laufzeit (NFR-1). Die Tagesansicht fragt einen Tag ab.
+     *
+     * <p><b>Warum überhaupt:</b> Ohne das zeigte die nachgerechnete Ansicht weder Speichermengen
+     * noch Ladezustand, die Aufzeichnung aber schon — beim Umschalten verschwänden Spalten und
+     * Kurve, ohne dass sich an den Daten etwas geändert hätte.
+     *
+     * <p>Der <b>Anfangswert</b> des Ladezustands wird eigens geholt: Für das erste Intervall des
+     * Tages liegt der letzte Wert davor im Vortag. Ohne ihn bliebe 00:00–00:15 als einziges
+     * Intervall leer, obwohl ein Wert existiert.
+     */
+    private void reichereSpeicherAn(List<SteuerentscheidDTO> dtos, LocalDate datum) {
+        if (dtos.isEmpty()) {
+            return;
+        }
+        var speicherEinheit = einheitRepository.findFirstByTyp(EinheitTyp.SPEICHER);
+        if (speicherEinheit.isEmpty()) {
+            return;
+        }
+        Long einheitId = speicherEinheit.get().getId();
+        LocalDateTime tagesbeginn = datum.atStartOfDay();
+        LocalDateTime tagesende = datum.plusDays(1).atStartOfDay();
+
+        // Mengen je Intervall. messwerte.zeit traegt das Intervall-ENDE, die Entscheide den Beginn.
+        Map<LocalDateTime, Speicher> mengen = new java.util.HashMap<>();
+        for (Object[] zeile : messwerteRepository.sumLadungEntladungPerZeitBetween(
+                EinheitTyp.SPEICHER, tagesbeginn.plusMinutes(INTERVALL_MINUTEN),
+                tagesende.plusMinutes(INTERVALL_MINUTEN))) {
+            LocalDateTime beginn = ((LocalDateTime) zeile[0]).minusMinutes(INTERVALL_MINUTEN);
+            mengen.put(beginn, new Speicher(alsBigDecimal(zeile[1]), alsBigDecimal(zeile[2])));
+        }
+
+        TreeMap<LocalDateTime, BigDecimal> zustaende = new TreeMap<>();
+        geraetezustandRepository.findFirstByEinheitIdAndGroesseAndZeitLessThanOrderByZeitDesc(
+                        einheitId, Zustandsgroesse.SOC, tagesbeginn)
+                .ifPresent(z -> zustaende.put(z.getZeit(), z.getWert()));
+        for (Geraetezustand zustand : geraetezustandRepository
+                .findByEinheitIdAndGroesseAndZeitGreaterThanEqualAndZeitLessThanOrderByZeitAsc(
+                        einheitId, Zustandsgroesse.SOC, tagesbeginn, tagesende)) {
+            zustaende.put(zustand.getZeit(), zustand.getWert());
+        }
+
+        for (SteuerentscheidDTO dto : dtos) {
+            Speicher speicher = mengen.get(dto.getZeit());
+            if (speicher != null) {
+                dto.setSpeicherLadung(skaliere(speicher.ladung()));
+                dto.setSpeicherEntladung(skaliere(speicher.entladung()));
+            }
+            // Der letzte Wert VOR dem Intervallende - einer genau darauf gehoert zum naechsten
+            // Intervall. Dieselbe Regel wie im Job (socAmIntervallende).
+            var eintrag = zustaende.lowerEntry(dto.getZeit().plusMinutes(INTERVALL_MINUTEN));
+            if (eintrag != null) {
+                dto.setSoc(eintrag.getValue());
+            }
+        }
+    }
+
+    /** Menge auf die Stellenzahl der Spalte bringen; {@code null} bleibt {@code null}. */
+    private BigDecimal skaliere(BigDecimal wert) {
+        return wert == null ? null : wert.setScale(MENGE_SCALE, java.math.RoundingMode.HALF_UP);
+    }
+
+    /**
      * Preis eines Intervalls; {@code null}, wenn keiner vorliegt.
      *
      * <p><b>Hier wird umgerechnet</b> — die Preiszeitreihe ist die einzige Quelle in UTC.
@@ -555,6 +657,8 @@ public class SteuerungService {
         dto.setBezug(entscheid.getBezug());
         dto.setRuecklieferung(entscheid.getRuecklieferung());
         dto.setSoc(entscheid.getSoc());
+        dto.setSpeicherLadung(entscheid.getSpeicherLadung());
+        dto.setSpeicherEntladung(entscheid.getSpeicherEntladung());
         dto.setUeberschuss(entscheid.getUeberschuss());
         dto.setRegel(entscheid.getRegel());
         dto.setBatterieladung(entscheid.getBatterieladung());

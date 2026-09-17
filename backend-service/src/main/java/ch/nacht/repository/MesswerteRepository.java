@@ -57,6 +57,31 @@ public interface MesswerteRepository extends JpaRepository<Messwerte, Long> {
             @Param("dateFrom") LocalDateTime dateFrom,
             @Param("dateTo") LocalDateTime dateTo);
 
+    /**
+     * Ladung und Entladung einer {@code SPEICHER}-Einheit <b>je Intervall</b>
+     * (Specs/Einspeisesteuerung.md, FR-5b). Rückgabe je Zeile: {@code [zeit, ladung, entladung]},
+     * beide Mengen positiv; {@code zeit} ist wie überall in {@code messwerte} das Intervall<b>ende</b>.
+     *
+     * <p>Getrennt von {@link #sumLadungEntladungByEinheitTypAndZeitBetween}, die über den ganzen
+     * Zeitraum summiert: Die Tagesansicht braucht den Verlauf, nicht die Summe.
+     *
+     * <p><b>Nicht in {@code sumBilanzKomponentenPerZeitBetween} aufgenommen</b>, obwohl das eine
+     * Abfrage spart: Der Speicher ist keine Bilanzkomponente, und diese Abfrage trägt die
+     * Statistik-Kennzahlen mit — eine zusätzliche Spalte dort verschöbe die Indizes für einen
+     * Aufrufer, den diese Änderung nichts angeht.
+     *
+     * <p>JPQL → der Hibernate-orgFilter greift (Mandanten-Isolation).
+     */
+    @Query("SELECT m.zeit, "
+            + "COALESCE(SUM(CASE WHEN m.total > 0 THEN m.total ELSE 0 END), 0), "
+            + "COALESCE(SUM(CASE WHEN m.total < 0 THEN -m.total ELSE 0 END), 0) "
+            + "FROM Messwerte m WHERE m.einheit.typ = :typ "
+            + "AND m.zeit >= :dateFrom AND m.zeit < :dateTo GROUP BY m.zeit ORDER BY m.zeit")
+    List<Object[]> sumLadungEntladungPerZeitBetween(
+            @Param("typ") EinheitTyp typ,
+            @Param("dateFrom") LocalDateTime dateFrom,
+            @Param("dateTo") LocalDateTime dateTo);
+
     @Query("SELECT COALESCE(SUM(m.zev), 0) FROM Messwerte m WHERE m.einheit.typ = :typ AND m.zeit >= :dateFrom AND m.zeit < :dateTo")
     Double sumZevByEinheitTypAndZeitBetween(@Param("typ") EinheitTyp typ, @Param("dateFrom") LocalDateTime dateFrom, @Param("dateTo") LocalDateTime dateTo);
 

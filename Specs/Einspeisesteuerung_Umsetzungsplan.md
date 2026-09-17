@@ -651,3 +651,78 @@ ganze kWh zeigte; bei einer Achse bis 1 kWh liefert die Gleitkommarechnung Stric
 
 **Am Bildschirm bestätigt** (17.09.2026): 4 % sind bei einem Tag mit 1 kWh gut lesbar; die Bänder
 wirken weder zu hoch noch zu dünn. Der Anteil bleibt, wie er ist.
+
+---
+
+## Nachtrag 14 — Speichermengen in Tabelle und Kurve (17.09.2026)
+
+Die Anlage hat seit dem Typ `SPEICHER` einen Zähler für Ladung und Entladung. Beides steht jetzt
+je Intervall im Entscheid (V158, `speicher_ladung` / `speicher_entladung`, beide nullable) und
+erscheint als eigene Spalten in der Protokolltabelle. Die **Produktionskurve** zeigt
+`produktion + Ladung − Entladung`.
+
+**Das behebt einen Anzeigefehler, keinen Rechenfehler.** Der Hybrid-Wechselrichter gibt
+wechselstromseitig nur ab, was das Haus braucht; was in die Batterie geht, läuft über keinen
+Erzeugungszähler. Deshalb stand bei voller Sonne weniger Produktion als Verbrauch — die Frage, die
+diese Arbeit ausgelöst hat.
+
+**Überschuss und Regel bleiben unberührt** (so entschieden). Ein Entscheid vor und nach dieser
+Änderung ist derselbe, die Rückrechnung liefert unveränderte Zahlen. Das ursprüngliche Problem —
+Steuerung greift erst bei voller Batterie — ist bereits über die Regelreihenfolge behoben.
+
+**Der Verbrauch bleibt, wie er ist.** Angenommen, der Verbrauchszähler erfasst den Hausverbrauch
+wechselstromseitig vollständig und die Ladung erscheint dort nicht. Träfe das nicht zu, wäre die
+Ladung doppelt gezählt. Die Annahme steht in FR-5b und ist an der Tabelle prüfbar, weil dort alle
+Grössen einzeln stehen — sie war beim Umsetzen nicht entscheidbar.
+
+**Die Tabellenspalte Produktion bleibt der gemessene Wert.** Die Tabelle ist das Protokoll der
+Eingangsgrössen: Der Überschuss muss sich aus ihr erklären lassen. Würde dort der verrechnete Wert
+stehen, passte er nicht mehr zum Überschuss daneben. Das Diagramm zeigt die Interpretation, die
+Tabelle die Grundlage — und über die beiden neuen Spalten lässt sich die eine in die andere
+umrechnen.
+
+**Der Legendenname wechselt mit der Datenlage.** Ohne Speicherdaten `Produktion`, mit ihnen
+`Produktion (mit Speicher)`. Ein fester Name hätte „Produktion“ über eine Zahl geschrieben, die in
+keiner Tabelle steht.
+
+**Ein Fund nebenbei:** `zuDto(Nachgerechnet)` setzte **kein** `soc`. Die nachgerechnete Ansicht
+zeigte damit keinen Ladezustand, die Aufzeichnung schon — beim Umschalten verschwand die Kurve,
+ohne dass sich an den Daten etwas geändert hätte. Beides wird jetzt in `reichereSpeicherAn()`
+ergänzt, und zwar **nur im Tagespfad**: Der gemeinsame Rechenweg trägt auch die Rückrechnung über
+366 Tage, und die Zustandszeitreihe mit mehreren tausend Werten je Tag wäre dort die eigentliche
+Laufzeit (NFR-1).
+
+**Der Anfangswert kommt aus dem Vortag.** Für das erste Intervall eines Tages liegt der letzte
+Ladezustand davor vor Mitternacht; ohne eine eigene Abfrage bliebe 00:00–00:15 als einziges
+Intervall leer.
+
+**Eigene Abfrage statt Erweiterung.** `sumBilanzKomponentenPerZeitBetween` hätte die Werte in einem
+Zug mitliefern können. Der Speicher ist aber keine Bilanzkomponente, und diese Abfrage trägt die
+Statistik-Kennzahlen mit — eine zusätzliche Spalte dort verschiebt die Indizes für einen Aufrufer,
+den diese Änderung nichts angeht.
+
+**Spaltenpräfix `speicher_`:** Die Tabelle hat bereits `batterieladung` — das ist der **Zustand**
+(FREI/GESPERRT), keine Menge. Eine Spalte `ladung` daneben wäre beim Lesen einer Abfrage kaum
+auseinanderzuhalten.
+
+**Geprüft:** Backend kompiliert, 1325 Backend-Tests, 1659 Frontend-Tests, Frontend gebaut — alles grün.
+
+**Nötig:** Rebuild für V158 und V159. Die Spalten füllen sich ab dem nächsten Job-Lauf;
+zurückliegende Entscheide bleiben leer. Die **nachgerechnete** Ansicht zeigt die Mengen dagegen
+sofort auch für vergangene Tage — sie liest die Messwerte, nicht den Entscheid.
+
+**Am Bildschirm gesehen** (17.09.2026): Die verrechnete Kurve wird gezeichnet und liegt über dem
+Verbrauch, die Legende heißt „Produktion (mit Speicher)“, Tooltip und Tabellenspalten stimmen
+zusammen — im selben Bild trug ein Intervall 3.913 kWh verrechnet bei 3.700 kWh Ladung und
+0.213 kWh am Erzeugungszähler. Genau der Anteil, der vorher fehlte.
+
+> **Weiter offen:** Ob die Kurve über einen ganzen Sonnentag hinweg fachlich plausibel bleibt.
+> Das ist eine Beurteilung an echten Tagesverläufen, nicht an einem Intervall — und die lokalen
+> Speicherwerte taugen dazu nicht, weil der Simulator sie unabhängig von Produktion und Verbrauch
+> erzeugt.
+
+**Nachtrag zum Tooltip (17.09.2026):** Mit den drei neuen Zeilen nennt er dreizehn Grössen und war
+bei der ECharts-Vorgabe von 14 px höher als das Diagramm. ECharts schneidet dann **oben** ab statt
+zu scrollen — sichtbar blieb der Rumpf ab „Produktion (mit Speicher)“, während Zeitpunkt, Preis und
+Tiefstpreis verschwanden. Also gerade die Führungsgrössen der Steuerung. Jetzt 11 px und knapperes
+Padding. Der Fehler wächst mit der Zeilenzahl: Kommt eine weitere Grösse dazu, ist er wieder da.

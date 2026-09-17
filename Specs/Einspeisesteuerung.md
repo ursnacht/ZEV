@@ -458,11 +458,64 @@ wie der NK-Eintrag).
    * Farben aus den Design-Tokens, **nicht** hart kodiert (`Specs/DarkMode.md`).
    * Tooltip mit Zeitpunkt (`dd.MM.yyyy HH:mm`), Preis und beiden Zuständen; Zahlen über
      `formatSwissNumber()`, **kein** `toLocaleString()`.
+     > **Schriftgrösse 11 px statt der ECharts-Vorgabe 14.** Der Tooltip nennt dreizehn Grössen.
+     > Bei 14 px war er höher als das Diagramm, und ECharts schneidet oben ab statt zu scrollen —
+     > Zeitpunkt und Preise, also gerade die Führungsgrössen, fielen weg.
 4. **Entscheidungsprotokoll** als `zev-table` unterhalb des Diagramms: Zeit, Preis, erwarteter
    Tiefstpreis, Produktion, Verbrauch, Überschuss, Regel, Batterieladung, Einspeisung. Beträge und
    Mengen rechtsbündig (`zev-table__number`).
    * Die Spalte **Regel** zeigt den übersetzten Klartext, nicht den Schlüssel.
    * Leerer Tag: Hinweis `STEUERUNG_KEINE_ENTSCHEIDE` statt einer leeren Tabelle.
+
+### FR-5b: Die wirkliche Erzeugung sichtbar machen
+
+Liegt eine Einheit vom Typ `SPEICHER` vor, werden deren gemessene Lade- und Entlademengen je
+Intervall im Entscheid festgehalten (`speicher_ladung`, `speicher_entladung`, beide als Betrag,
+beide leer ohne Speicher-Einheit).
+
+**Das Diagramm zeigt dann die verrechnete Erzeugung:**
+
+```
+Produktion (dargestellt) = produktion + speicher_ladung − speicher_entladung
+```
+
+> **Warum das nötig ist.** Der Hybrid-Wechselrichter gibt wechselstromseitig nur ab, was das Haus
+> braucht. Was aus der Erzeugung direkt in die Batterie fliesst, läuft über keinen
+> Erzeugungszähler und fehlt in `produktion` — bei voller Sonne stand dort weniger als der
+> Verbrauch, was zur Frage führte, ob überhaupt richtig summiert wird. Umgekehrt erscheint eine
+> Entladung dort als Erzeugung, obwohl sie keine ist.
+
+**Nur die Darstellung.** Überschuss, Regel und die gespeicherten Zustände bleiben auf den
+**gemessenen** Werten. Ein Entscheid vor und nach dieser Änderung ist damit derselbe, und die
+Rückrechnung über die Historie liefert unveränderte Zahlen.
+
+> **Warum nicht auch der Entscheid?** Es wäre das Naheliegende — der ursprüngliche Befund war ja,
+> dass die Steuerung erst bei voller Batterie einen Überschuss sieht. Behoben wurde das über die
+> **Regelreihenfolge**: `KEIN_UEBERSCHUSS` wird erst nach den Preisregeln geprüft, die Sperren
+> greifen also auch ohne gemessenen Überschuss. Den Überschuss zusätzlich zu verändern hätte
+> alle künftigen Entscheide mit den bisherigen unvergleichbar gemacht.
+
+**Der Verbrauch bleibt unverändert.** Angenommen wird, dass der Verbrauchszähler den Hausverbrauch
+wechselstromseitig vollständig erfasst und die Batterieladung dort nicht erscheint — sie läuft
+gleichstromseitig. Träfe das nicht zu, wäre die Ladung doppelt gezählt: einmal im Verbrauch, einmal
+in der verrechneten Produktion. Prüfbar an der Tabelle, weil dort alle Grössen einzeln stehen.
+
+**Bekannte Grenze:** Lädt die Batterie aus dem **Netz** statt aus der Erzeugung, zählt die Ladung
+fälschlich zur Produktion. Der Fall tritt bei negativen Preisen auf.
+
+**In der Tabelle** erscheinen **Ladung** und **Entladung** als eigene Spalten — neben der
+Bilanzdifferenz, nicht an ihrer Stelle: Die Differenz ist errechnet und enthält alles nicht
+Gemessene. Weichen beide Angaben voneinander ab, fehlen Einheiten. Die Spalte **Produktion** zeigt
+weiterhin den **gemessenen** Wert — sie ist Eingangsgrösse des Entscheids, und der Überschuss muss
+sich aus ihr erklären lassen. Der Spaltenkopf trägt den Hinweis dazu.
+
+**Die Legende sagt, was gezeichnet ist:** ohne Speicherdaten `Produktion`, mit ihnen
+`Produktion (mit Speicher)`. Sonst stünde „Produktion“ über einer Zahl, die in keiner Tabelle steht.
+
+**Die nachgerechnete Ansicht zeigt dasselbe.** Speichermengen und Ladezustand werden auch dort
+geliefert — sonst verschwänden beim Umschalten Spalten und Kurve, ohne dass sich an den Daten etwas
+geändert hätte. Die **Kennzahlen** der Rückrechnung brauchen beides nicht und laden es nicht: über
+366 Tage wäre die Zustandszeitreihe die eigentliche Laufzeit (NFR-1).
 
 ### FR-6: Nachrechnen über die Historie
 
@@ -618,6 +671,10 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 | `STEUERUNG_RUECKLIEFERUNG` | Rücklieferung | Feed-in to grid |
 | `STEUERUNG_BILANZ_DIFFERENZ` | Batterie (aus Bilanz) | Battery (from balance) |
 | `STEUERUNG_SOC` | Ladezustand | State of charge |
+| `STEUERUNG_LADUNG` | Ladung | Charged |
+| `STEUERUNG_ENTLADUNG` | Entladung | Discharged |
+| `STEUERUNG_PRODUKTION_VERRECHNET` | Produktion (mit Speicher) | Production (incl. storage) |
+| `STEUERUNG_PRODUKTION_VERRECHNET_HINWEIS` | Gemessene Produktion zuzüglich Ladung, abzüglich Entladung … | Measured production plus storage charging, less discharging … |
 | `STEUERUNG_BILANZ_HINWEIS` | Produktion + Bezug − Verbrauch − Rücklieferung. … | Production + grid supply − consumption − feed-in. … |
 | `STEUERUNG_BATTERIELADUNG` | Batterieladung | Battery charging |
 | `STEUERUNG_EINSPEISUNG` | Einspeisung | Feed-in |
@@ -693,6 +750,19 @@ Der Text ist an kein Feature gebunden.
 * [ ] Fehlen Bezug oder Rücklieferung (Entscheid vor V149), bleibt die Differenz **leer** statt `0`.
 * [ ] Bezug und Rücklieferung beeinflussen **keinen** Entscheid — dieselben Messwerte ergeben mit und ohne sie dieselbe Regel.
 * [ ] Ein Tag ohne Entscheide zeigt den Hinweis statt einer leeren Tabelle.
+* [ ] Der Tooltip zeigt **alle** Zeilen einschliesslich Zeitpunkt und Preis, ohne oben abgeschnitten zu werden.
+* [ ] Liegt eine `SPEICHER`-Einheit vor, trägt jeder Entscheid Lade- und Entlademenge des Intervalls.
+* [ ] Ohne `SPEICHER`-Einheit bleiben beide Spalten **leer** — nicht `0`.
+* [ ] Die Produktionskurve zeigt `produktion + Ladung − Entladung`; die Tabellenspalte Produktion
+  zeigt weiterhin den gemessenen Wert.
+* [ ] **Überschuss und Regel ändern sich durch die Speicherdaten nicht** — derselbe Tag ergibt vor
+  und nach der Änderung dieselben Entscheide.
+* [ ] Die Legende heißt `Produktion (mit Speicher)`, sobald Speicherdaten vorliegen, sonst
+  `Produktion`.
+* [ ] Die Bandhöhe richtet sich nach der **verrechneten** Produktion — die Kurve läuft an Tagen mit
+  viel Ladung nicht über den oberen Rand hinaus.
+* [ ] Die **nachgerechnete** Ansicht zeigt Speichermengen und Ladezustand ebenso wie die Aufzeichnung.
+* [ ] Der Ladezustand des **ersten** Intervalls eines Tages stammt nötigenfalls aus dem Vortag.
 * [ ] „Heute“ setzt den angezeigten Tag auf den heutigen und lädt ihn.
 * [ ] „Heute“ ist deaktiviert, solange der heutige Tag bereits angezeigt wird.
 * [ ] „Aktualisieren“ lädt den angezeigten Tag neu, ohne das Datum zu ändern.

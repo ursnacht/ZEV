@@ -116,6 +116,26 @@ public class Steuerentscheid {
     @Column(name = "soc", precision = 5, scale = 1)
     private BigDecimal soc;
 
+    /**
+     * Gemessene <b>Ladung</b> der {@code SPEICHER}-Einheit im Intervall in kWh; {@code null}, wenn
+     * kein Speicher erfasst ist.
+     *
+     * <p>Geht in <b>keine</b> Regel ein. Gegenstück zur Bilanzdifferenz (V149): Die war ein
+     * Residuum und enthielt alles nicht Gemessene; dies hier ist der Zählerwert.
+     */
+    @Column(name = "speicher_ladung", precision = 12, scale = 3)
+    private BigDecimal speicherLadung;
+
+    /**
+     * Gemessene <b>Entladung</b> der {@code SPEICHER}-Einheit im Intervall in kWh, <b>als
+     * Betrag</b>; {@code null}, wenn kein Speicher erfasst ist.
+     *
+     * <p>Getrennt von {@link #speicherLadung} geführt: Ein Saldo von 0 kann „nichts passiert"
+     * heissen oder „2 kWh rein, 2 kWh raus".
+     */
+    @Column(name = "speicher_entladung", precision = 12, scale = 3)
+    private BigDecimal speicherEntladung;
+
     /** {@code max(0, produktion − verbrauch)} in kWh. */
     @NotNull
     @Column(name = "ueberschuss", precision = 12, scale = 3, nullable = false)
@@ -231,6 +251,22 @@ public class Steuerentscheid {
 
     public void setSoc(BigDecimal soc) {
         this.soc = soc;
+    }
+
+    public BigDecimal getSpeicherLadung() {
+        return speicherLadung;
+    }
+
+    public void setSpeicherLadung(BigDecimal speicherLadung) {
+        this.speicherLadung = speicherLadung;
+    }
+
+    public BigDecimal getSpeicherEntladung() {
+        return speicherEntladung;
+    }
+
+    public void setSpeicherEntladung(BigDecimal speicherEntladung) {
+        this.speicherEntladung = speicherEntladung;
     }
 
     public BigDecimal getUeberschuss() {

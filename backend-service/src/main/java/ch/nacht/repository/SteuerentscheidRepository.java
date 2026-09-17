@@ -54,12 +54,13 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
     @Modifying
     @Query(value = """
         INSERT INTO zev.steuerentscheid (org_id, zeit_von, preis, preis_tief_rest, produktion,
-                                         verbrauch, bezug, ruecklieferung, soc, ueberschuss,
+                                         verbrauch, bezug, ruecklieferung, soc,
+                                         speicher_ladung, speicher_entladung, ueberschuss,
                                          regel, batterieladung, einspeisung, schwellwert,
                                          speicherwert, erstellt_am)
         VALUES (:orgId, :zeitVon, :preis, :preisTiefRest, :produktion, :verbrauch, :bezug,
-                :ruecklieferung, :soc, :ueberschuss, :regel, :batterieladung, :einspeisung,
-                :schwellwert, :speicherwert, now())
+                :ruecklieferung, :soc, :speicherLadung, :speicherEntladung, :ueberschuss,
+                :regel, :batterieladung, :einspeisung, :schwellwert, :speicherwert, now())
         ON CONFLICT (org_id, zeit_von)
         DO UPDATE SET preis           = EXCLUDED.preis,
                       preis_tief_rest = EXCLUDED.preis_tief_rest,
@@ -68,6 +69,8 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
                       bezug           = EXCLUDED.bezug,
                       ruecklieferung  = EXCLUDED.ruecklieferung,
                       soc             = EXCLUDED.soc,
+                      speicher_ladung    = EXCLUDED.speicher_ladung,
+                      speicher_entladung = EXCLUDED.speicher_entladung,
                       ueberschuss     = EXCLUDED.ueberschuss,
                       regel           = EXCLUDED.regel,
                       batterieladung  = EXCLUDED.batterieladung,
@@ -86,6 +89,8 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
         @Param("bezug") BigDecimal bezug,
         @Param("ruecklieferung") BigDecimal ruecklieferung,
         @Param("soc") BigDecimal soc,
+        @Param("speicherLadung") BigDecimal speicherLadung,
+        @Param("speicherEntladung") BigDecimal speicherEntladung,
         @Param("ueberschuss") BigDecimal ueberschuss,
         @Param("regel") String regel,
         @Param("batterieladung") String batterieladung,

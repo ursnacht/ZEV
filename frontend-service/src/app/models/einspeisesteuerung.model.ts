@@ -69,6 +69,15 @@ export interface Steuerentscheid {
    * eine bei 40 % hat Kapazität freigehalten.
    */
   soc: number | null;
+  /**
+   * Gemessene **Ladung** des Speichers im Intervall in kWh; `null` ohne Speicher-Einheit.
+   *
+   * Gegenstück zur Bilanzdifferenz: Die ist ein Residuum und enthält alles nicht Gemessene, dies
+   * hier ist der Zählerwert.
+   */
+  speicherLadung: number | null;
+  /** Gemessene **Entladung** des Speichers im Intervall in kWh, als Betrag; `null` ohne Speicher. */
+  speicherEntladung: number | null;
   ueberschuss: number;
   regel: Steuerregel;
   batterieladung: Steuerzustand;
