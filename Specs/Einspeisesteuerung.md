@@ -920,7 +920,9 @@ Lücke nicht**, es rechnet nur und speichert nichts.
 ## 7. Abgrenzung / Out of Scope
 
 * **Das Schalten selbst.** Kein MQTT-Publish, kein Wechselrichter-Zugriff, keine Anlagensteuerung.
-  Diese Ausbaustufe beobachtet.
+  Diese Ausbaustufe beobachtet. — **Wie** es ginge, ist recherchiert und in
+  `Specs/Solinteg_Modbus_Register.md` festgehalten (Register 50207 für die Batterie, 50208 für die
+  Einspeisung, dazu die Vorbehalte). Die Notiz ist Vorarbeit, keine Zusage.
 * **Ertragsrechnung in Franken** (FR-6): braucht gemessene Lade-/Entladedaten und den
   Ladezustand. Die Kapazität (20 kWh) ist zwar bekannt und konfigurierbar, aber **keine Regel
   wertet sie in dieser Ausbaustufe aus** — sie steht dort für die nächste.
