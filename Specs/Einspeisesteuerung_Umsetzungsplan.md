@@ -726,3 +726,24 @@ bei der ECharts-Vorgabe von 14 px höher als das Diagramm. ECharts schneidet dan
 zu scrollen — sichtbar blieb der Rumpf ab „Produktion (mit Speicher)“, während Zeitpunkt, Preis und
 Tiefstpreis verschwanden. Also gerade die Führungsgrössen der Steuerung. Jetzt 11 px und knapperes
 Padding. Der Fehler wächst mit der Zeilenzahl: Kommt eine weitere Grösse dazu, ist er wieder da.
+
+---
+
+## Nachtrag 15 — Protokolltabelle neuste zuerst (17.09.2026)
+
+Die Tabelle sortiert absteigend nach Zeit. Beim heutigen Tag steht damit das zuletzt ausgewertete
+Intervall oben, statt am Ende von bis zu 96 Zeilen.
+
+**Zwei Listen statt einer gedrehten.** `entscheide` bleibt aufsteigend — das Diagramm zeichnet eine
+Zeitachse nach rechts, und `bloecke()` setzt aufeinanderfolgende Intervalle voraus. Ein `reverse()`
+auf der gemeinsamen Liste hätte die Kurven rückwärts laufen lassen und die Zustandsbänder in 96
+Einzelrechtecke zerlegt — und kein Test hätte es gemerkt, weil die Komponente keine hat.
+
+**Einmal beim Laden berechnet, nicht als Getter.** Ein Getter liefe bei jedem
+Change-Detection-Zyklus und gäbe jedes Mal ein neues Array zurück.
+
+**Sortiert statt gedreht.** Ein `reverse()` wäre nur richtig, solange der Server aufsteigend
+liefert. Das tut er (`ORDER BY zeitVon`), aber die Tabelle hätte damit an einer Zusage gehängt, die
+sie selbst nicht prüfen kann. Bei 96 Zeilen kostet das Sortieren nichts.
+
+**Geprüft:** Frontend gebaut, 1659 Frontend-Tests grün. Keine Migration, keine neuen Übersetzungen.

@@ -122,7 +122,10 @@
         </tr>
       </thead>
       <tbody>
-        @for (entscheid of entscheide; track entscheid.zeit) {
+        <!-- Neuste zuerst: Beim heutigen Tag steht das zuletzt ausgewertete Intervall oben, ohne
+             dass jemand ans Ende von 96 Zeilen scrollen muss. Das DIAGRAMM nutzt weiter die
+             aufsteigende Liste - seine Zeitachse laeuft nach rechts. -->
+        @for (entscheid of entscheideNeusteZuerst; track entscheid.zeit) {
           <tr>
             <td>{{ uhrzeit(entscheid) }}</td>
             <td class="zev-table__number">{{ preis(entscheid.preis) }}</td>

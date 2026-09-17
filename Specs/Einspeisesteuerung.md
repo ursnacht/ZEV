@@ -464,6 +464,12 @@ wie der NK-Eintrag).
 4. **Entscheidungsprotokoll** als `zev-table` unterhalb des Diagramms: Zeit, Preis, erwarteter
    Tiefstpreis, Produktion, Verbrauch, Überschuss, Regel, Batterieladung, Einspeisung. Beträge und
    Mengen rechtsbündig (`zev-table__number`).
+   * **Neuste Einträge oben** (absteigend nach Zeit). Beim heutigen Tag steht damit das zuletzt
+     ausgewertete Intervall an erster Stelle, statt am Ende von bis zu 96 Zeilen.
+     > **Das Diagramm behält die aufsteigende Reihenfolge.** Seine Zeitachse läuft nach rechts, und
+     > die Blockbildung der Zustandsbänder setzt aufsteigende Intervalle voraus. Die Ansicht hält
+     > deshalb **zwei** Listen; würde die eine umgedreht statt eine zweite gebildet, liefen die
+     > Kurven rückwärts und die Bänder zerfielen in Einzelrechtecke.
    * Die Spalte **Regel** zeigt den übersetzten Klartext, nicht den Schlüssel.
    * Leerer Tag: Hinweis `STEUERUNG_KEINE_ENTSCHEIDE` statt einer leeren Tabelle.
 
@@ -750,6 +756,9 @@ Der Text ist an kein Feature gebunden.
 * [ ] Fehlen Bezug oder Rücklieferung (Entscheid vor V149), bleibt die Differenz **leer** statt `0`.
 * [ ] Bezug und Rücklieferung beeinflussen **keinen** Entscheid — dieselben Messwerte ergeben mit und ohne sie dieselbe Regel.
 * [ ] Ein Tag ohne Entscheide zeigt den Hinweis statt einer leeren Tabelle.
+* [ ] Die Tabelle zeigt die **neusten Einträge oben**; die erste Zeile trägt die späteste Zeit.
+* [ ] Das **Diagramm** zeichnet unverändert von links nach rechts, und die Zustandsbänder bleiben
+  zusammenhängende Blöcke.
 * [ ] Der Tooltip zeigt **alle** Zeilen einschliesslich Zeitpunkt und Preis, ohne oben abgeschnitten zu werden.
 * [ ] Liegt eine `SPEICHER`-Einheit vor, trägt jeder Entscheid Lade- und Entlademenge des Intervalls.
 * [ ] Ohne `SPEICHER`-Einheit bleiben beide Spalten **leer** — nicht `0`.

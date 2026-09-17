@@ -72,7 +72,22 @@ export class EinspeisesteuerungComponent extends WithMessage
   /** Gewählter Tag in Ortszeit, ISO `yyyy-MM-dd`. */
   datum = this.heuteIso();
 
+  /** Entscheide des Tages, **aufsteigend** — die Form, die das Diagramm braucht. */
   entscheide: Steuerentscheid[] = [];
+
+  /**
+   * Dieselben Entscheide, **neuste zuerst** — die Form für die Protokolltabelle.
+   *
+   * <p><b>Zwei Listen, nicht eine gedrehte:</b> Das Diagramm zeichnet eine Zeitachse und
+   * `bloecke()` fasst aufeinanderfolgende Intervalle zusammen; beides setzt aufsteigende
+   * Reihenfolge voraus. Würde `entscheide` selbst umgedreht, liefen die Kurven rückwärts und die
+   * Zustandsbänder zerfielen in Einzelrechtecke — ohne dass ein Test es merkte.
+   *
+   * <p>Einmal beim Laden berechnet statt als Getter: Ein Getter liefe bei jedem
+   * Change-Detection-Zyklus und gäbe jedes Mal ein neues Array zurück.
+   */
+  entscheideNeusteZuerst: Steuerentscheid[] = [];
+
   loading = false;
 
   /** Schwellwert der Rückrechnung; vorbelegt mit dem des ersten Entscheids. */
@@ -131,6 +146,7 @@ export class EinspeisesteuerungComponent extends WithMessage
     quelle.subscribe({
       next: (daten) => {
         this.entscheide = daten;
+        this.entscheideNeusteZuerst = this.neusteZuerst(daten);
         this.loading = false;
         if (this.simulationSchwellwert == null && daten.length > 0) {
           this.simulationSchwellwert = daten[0].schwellwert;
@@ -140,6 +156,7 @@ export class EinspeisesteuerungComponent extends WithMessage
       error: (error) => {
         this.loading = false;
         this.entscheide = [];
+        this.entscheideNeusteZuerst = [];
         this.showMessage(error.error || 'STEUERUNG_FEHLER_LADEN', 'error');
       }
     });
@@ -307,6 +324,18 @@ export class EinspeisesteuerungComponent extends WithMessage
    */
   produktionVerrechnet(e: Steuerentscheid): number {
     return e.produktion + (e.speicherLadung ?? 0) - (e.speicherEntladung ?? 0);
+  }
+
+  /**
+   * Kopie der Entscheide, absteigend nach Zeit.
+   *
+   * <p><b>Sortiert statt gedreht:</b> Ein `reverse()` gäbe nur dann das Richtige, wenn der Server
+   * aufsteigend liefert. Das tut er heute (`ORDER BY zeitVon`), aber die Tabelle hinge damit an
+   * einer Zusage, die sie selbst nicht prüfen kann.
+   */
+  private neusteZuerst(daten: Steuerentscheid[]): Steuerentscheid[] {
+    return [...daten].sort(
+      (a, b) => new Date(b.zeit).getTime() - new Date(a.zeit).getTime());
   }
 
   /** Uhrzeit `HH:mm` des Intervalls. */
