@@ -111,6 +111,50 @@ zusammenhängende gesperrte Intervalle zu Blöcken zusammen, und an einem typisc
 wenige. Der eigentliche Vorteil: **Der Wechselrichter führt den Plan selbst aus** und ist nicht
 darauf angewiesen, dass der Pi lebt.
 
+### Weg C — BMS-Bitfeld (nicht gangbar)
+
+`53508` Bit 10 (**Charge Command**, 1 = Enable, 0 = Disable) neben Bit 8 (On-grid Discharge) wäre
+genau die gesuchte Semantik: Laden verbieten, Entladen erlauben. Der ganze Block 53500–53523 trägt
+im Datenblatt aber den Vermerk **„Only for BMS access to EMS“** — diese Register schreibt ein
+externes BMS an das EMS. Bei einer Batterie mit eigenem BMS am Wechselrichter ist das kein Weg.
+
+## Welcher Weg trägt die Zustände der Steuerung
+
+„Ladung gesperrt“ soll nur das **Laden** verhindern — das Entladen muss weiterlaufen, sonst deckt
+die Batterie den Hausbedarf nicht mehr. **Einen Schalter dafür gibt es nicht:** Das Protokoll kennt
+weder ein Ladeverbot noch eine SOC-**Obergrenze** (52502–52505 sind untere Entladegrenzen).
+
+**Weg A trifft zu viel.** `50207 = 0` legt die Batterie still, also auch das Entladen. Bei
+`WARTEN_AUF_TAL` ist das doppelt teuer: Der Hausbedarf käme aus dem Netz, zum hohen Preis, den die
+Regel gerade vermeiden will. Nur das Laden zu sperren hiesse, `50207` laufend auf den aktuellen
+Hausbedarf nachzuführen — die Anwendung würde damit zum echten EMS, mit der Watchdog-Pflicht aus
+Appendix 2 und einem Pi, an dem der Betrieb hängt.
+
+**Weg B trifft es.** Ein Zeitfenster mit `53007 = 2` (discharge) lässt in der Sperrzeit entladen
+statt laden — bei hohem Preis ohnehin das Gewünschte.
+
+### Warum ein Fahrplan genügt
+
+**Jede Sperre der Regel ist eine reine Preisentscheidung** (`Specs/Einspeisesteuerung.md`, FR-2):
+`PREIS_NEGATIV`, `EINSPEISEN_LOHNT` und `WARTEN_AUF_TAL` werten nur Preise aus. Die beiden
+übrigen Regeln brauchen Messwerte, setzen aber **keine** Sperre.
+
+Der Schaltplan eines Tages steht damit fest, sobald die Preise vorliegen — es braucht keine
+Reaktion auf Messwerte und also kein Schalten im 15-Minuten-Takt. Die Steuerung schriebe einmal
+täglich einen **Fahrplan**. Der Gewinn ist nicht Bequemlichkeit, sondern das Ausfallverhalten:
+**Der Wechselrichter führt den Plan selbst aus.** Fällt der Pi aus, läuft die Anlage weiter,
+statt in einem Sperrzustand oder im Schutz zu hängen.
+
+### Offen an Weg B
+
+* **Was `discharge` in einer Periode genau bewirkt** — Entladung nur bis zum Hausbedarf oder auch
+  ins Netz? Das Datenblatt sagt es nicht. `53010 Power Limit` begrenzt die Leistung, nicht das Ziel.
+* **Ob sechs Perioden reichen.** An einem Tag mit zerstückelten Preisen könnten mehr Blöcke
+  entstehen; dann müssten benachbarte zusammengefasst oder die kürzesten weggelassen werden.
+* **Die Einspeisesperre** (`PREIS_NEGATIV`) deckt Weg B **nicht** ab: Die Zeitfenster steuern die
+  Batterie, nicht die Netzeinspeisung. Dafür bliebe `50208` im EMS-Modus oder ein Export-Limit —
+  womit ein Teil der Steuerung doch wieder am laufenden Betrieb des Pi hängt.
+
 ## Was vor einer Umsetzung zu klären wäre
 
 **Der Watchdog.** Appendix 2 des Protokolls: Sind Smart Meter (25104–25110) und BMS (53500–53523)

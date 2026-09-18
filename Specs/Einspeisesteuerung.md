@@ -126,6 +126,17 @@ anderweitig gebunden ist:
 | `einspeisung` | `FREI` | Der Überschuss **darf** ins Netz eingespiesen werden. |
 | | **`GESPERRT`** | Es soll **nicht** eingespiesen werden. |
 
+> **Jede Sperre ist eine reine Preisentscheidung.** Die drei Regeln, die überhaupt sperren —
+> `PREIS_NEGATIV`, `EINSPEISEN_LOHNT`, `WARTEN_AUF_TAL` — werten **nur Preise** aus; die beiden
+> übrigen (`KEIN_UEBERSCHUSS`, `LADEN`) brauchen Messwerte, lassen aber beide Zustände `FREI`.
+>
+> Das ist keine Beobachtung am Rande, sondern eine Eigenschaft, an der eine künftige Ausbaustufe
+> hängt: Der Schaltplan eines Tages steht fest, sobald die Preise vorliegen. Eine Anlage liesse
+> sich damit über einen **Fahrplan** steuern, den der Wechselrichter selbst ausführt, statt über
+> Schaltbefehle im 15-Minuten-Takt — und wäre damit unabhängig davon, ob das Gateway gerade läuft
+> (`Specs/Solinteg_Modbus_Register.md`). Würde später eine Regel ergänzt, die **sperrt und dabei
+> Messwerte auswertet**, fällt diese Möglichkeit weg.
+
 `GESPERRT` bei der Batterieladung ist damit kein Abschalten, sondern eine **Umlenkung**: nicht
 jetzt speichern, sondern einspeisen. In beiden Fällen, in denen die Sperre auftritt (Regeln 3 und
 4), steht `einspeisung` folgerichtig auf `FREI`.
@@ -737,6 +748,8 @@ Der Text ist an kein Feature gebunden.
 * [ ] Ist für den Rest des Tages ein Preis unter dem Schwellwert zu erwarten, ist `batterieladung = GESPERRT`.
 * [ ] Ist kein solcher Preis mehr zu erwarten, ist `batterieladung = FREI` — auch bei hohem aktuellem Preis unterhalb des Speicherwerts.
 * [ ] Die Regeln werden in der Reihenfolge 1–5 geprüft; die erste zutreffende bestimmt den Entscheid und steht in `regel`.
+* [ ] **Keine Regel, die einen Zustand auf `GESPERRT` setzt, wertet Messwerte aus** — die Sperren
+  hängen allein am Preis und sind damit im Voraus berechenbar.
 * [ ] Der Tiefstpreis berücksichtigt **nur** Intervalle, die **nach** dem ausgewerteten liegen, und nur solche des **gleichen Ortstages**.
 * [ ] Der Überschuss zählt ausschliesslich `PRODUCER` und `CONSUMER`.
 * [ ] **Der Überschuss wird aus negativen Producer-Werten korrekt gebildet:** Bei `total = −10` (Producer) und `total = 4` (Consumer) ergibt sich ein Überschuss von **6**, nicht 0 und nicht −14.
@@ -952,8 +965,9 @@ Lücke nicht**, es rechnet nur und speichert nichts.
 
 * **Das Schalten selbst.** Kein MQTT-Publish, kein Wechselrichter-Zugriff, keine Anlagensteuerung.
   Diese Ausbaustufe beobachtet. — **Wie** es ginge, ist recherchiert und in
-  `Specs/Solinteg_Modbus_Register.md` festgehalten (Register 50207 für die Batterie, 50208 für die
-  Einspeisung, dazu die Vorbehalte). Die Notiz ist Vorarbeit, keine Zusage.
+  `Specs/Solinteg_Modbus_Register.md` festgehalten — einschliesslich des Befunds, dass ein blosses
+  `50207 = 0` **zu viel** sperrt (es legt auch das Entladen still) und der Weg über einen
+  **Fahrplan** im Economic Mode besser passt. Die Notiz ist Vorarbeit, keine Zusage.
 * **Ertragsrechnung in Franken** (FR-6): braucht gemessene Lade-/Entladedaten und den
   Ladezustand. Die Kapazität (20 kWh) ist zwar bekannt und konfigurierbar, aber **keine Regel
   wertet sie in dieser Ausbaustufe aus** — sie steht dort für die nächste.
