@@ -149,11 +149,21 @@ statt in einem Sperrzustand oder im Schutz zu hängen.
 
 * **Was `discharge` in einer Periode genau bewirkt** — Entladung nur bis zum Hausbedarf oder auch
   ins Netz? Das Datenblatt sagt es nicht. `53010 Power Limit` begrenzt die Leistung, nicht das Ziel.
-* **Ob sechs Perioden reichen.** An einem Tag mit zerstückelten Preisen könnten mehr Blöcke
-  entstehen; dann müssten benachbarte zusammengefasst oder die kürzesten weggelassen werden.
+* **Ob sechs Perioden reichen** — **gemessen, vorläufig ja.** Auf der Anlage ausgezählt
+  (18.09.2026, Gap-and-Islands über `steuerentscheid`): **drei Tage, höchstens ein Block je Tag,
+  im Schnitt 1.0, kein Tag über sechs.** Die Sperrzeit ist also ein zusammenhängender Abschnitt —
+  morgens gesperrt bis zum Preistal, danach frei — und passt bequem in eine einzige Periode.
+  > **Drei Tage sind wenig.** Die Aufzeichnung begann erst mit der Umstellung auf Ortszeit (V147),
+  > und sie stammt aus einer Jahreszeit. Ein Tag mit zerstückelten Preisen könnte mehr Blöcke
+  > ergeben; dann müssten benachbarte zusammengefasst (und dabei freie Intervalle mitgesperrt) oder
+  > die kürzesten weggelassen werden. Die Abfrage steht im Verlauf und lässt sich später
+  > wiederholen — sie gehört auf die **Hene-DB**, lokal sind die Entscheide synthetisch.
 * **Die Einspeisesperre** (`PREIS_NEGATIV`) deckt Weg B **nicht** ab: Die Zeitfenster steuern die
   Batterie, nicht die Netzeinspeisung. Dafür bliebe `50208` im EMS-Modus oder ein Export-Limit —
   womit ein Teil der Steuerung doch wieder am laufenden Betrieb des Pi hängt.
+  > **Praktisch bisher ohne Fall:** Dieselbe Auswertung zeigt für `einspeisung` **keine einzige**
+  > gesperrte Viertelstunde — negative Preise sind in der bisherigen Aufzeichnung nicht
+  > vorgekommen. Die Lücke ist real, aber sie trifft den Zustand, der am seltensten eintritt.
 
 ## Was vor einer Umsetzung zu klären wäre
 
