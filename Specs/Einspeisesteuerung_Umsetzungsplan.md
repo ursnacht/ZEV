@@ -773,6 +773,54 @@ dunklen Thema im Browser.
 **Geprüft:** Design System gebaut, Frontend gebaut, 1660 Frontend-Tests grün (einer mehr als zuvor).
 Keine Migration, keine neuen Übersetzungen.
 
-> **Noch nicht am Bildschirm geprüft:** Ob Gelb und Orange in der Legende nebeneinander gut genug
-> auseinanderzuhalten sind — sie liegen im Farbkreis nur etwa 20° auseinander. Das zeigt erst die
-> Ansicht, in beiden Themes.
+**Am Bildschirm bestätigt** (18.09.2026, dunkles Thema): Gelb und Orange sind in der Legende klar
+auseinanderzuhalten — die Produktionskurve gelb, das Band darunter deutlich orange. Im hellen
+Thema noch nicht angesehen.
+
+---
+
+## Nachtrag 17 — Die verrechnete Produktion war nachts negativ (18.09.2026)
+
+Im Tagesverlauf der Anlage aufgefallen: Die Kurve „Produktion (mit Speicher)“ lag zwischen 00:00
+und 07:00 **unter null**.
+
+**Der erste Erklärungsversuch war falsch** und ist hier festgehalten, weil er plausibel klang: Die
+Entladung werde zu Unrecht abgezogen, weil der Erzeugungszähler sie gar nicht sehe. Das
+Entscheidungsprotokoll widerlegte es sofort — **nachts steht in `produktion` 0.117 bis 0.266 kWh**,
+ohne Sonne. Der Zähler misst die Wechselstromabgabe des Wechselrichters, und die kommt nachts aus
+der Batterie. Der Abzug ist also richtig.
+
+**Die wirkliche Ursache ist die Auflösung.** Die Entladung kommt in Schritten von 0.1 kWh
+(`Specs/Solinteg_Modbus_Register.md`), die Produktion auf drei Stellen. Liegt die wirkliche
+Entladung bei 0.17 kWh je Viertelstunde, meldet der Zähler mal 0.1 und mal 0.2 — im Mittel richtig,
+je Intervall aber um bis zu ±0.08 daneben. Nachgerechnet am Protokoll:
+
+| Zeit | Produktion | Entladung | `P + L − E` |
+|---|---|---|---|
+| 06:45 | 0.117 | 0.200 | −0.083 |
+| 04:00 | 0.172 | 0.200 | −0.028 |
+| 07:00 | 0.266 | 0.200 | +0.066 |
+
+Das sind genau die Täler und Zacken des Diagramms.
+
+**Behoben über eine Schranke bei 0.** Eine negative Erzeugung gibt es nicht; das ist eine
+physikalische Aussage und keine Kosmetik. Die Rohwerte bleiben in der Tabelle einzeln stehen, die
+Rechnung ist nachvollziehbar.
+
+**Was die Schranke NICHT behebt:** das Zacken tagsüber. Solange grobe Entladung von feiner
+Produktion abgezogen wird, bleibt das Rauschen — es fällt nur nicht mehr unter null. Bei Mengen um
+0.2 kWh je Viertelstunde ist das ein erheblicher Anteil; bei den Mengen eines Sonnentags fällt es
+kaum ins Gewicht.
+
+**Zur Lehre:** Der erste Schluss entstand aus der Kurve allein. Das Protokoll darunter hätte ihn in
+einer Zeile widerlegt — es steht genau dafür da (FR-5), und ich habe es nicht gelesen.
+
+**Geprüft:** Frontend gebaut; am Tagesverlauf vom 18.09.2026 gegen das Protokoll nachgerechnet —
+08:00 `0.151 + 0.100 = 0.251`, 07:30 `0.171 − 0.100 = 0.071`, 07:15 `0.192 − 0.200 → 0`. Die Täler
+liegen jetzt auf der Nulllinie statt darunter. Keine Migration — gespeichert wird weiterhin beides
+getrennt, gerechnet wird erst in der Anzeige.
+
+> **Offen bleibt die andere Hälfte desselben Fehlers:** Nachts müsste die Kurve durchgehend auf
+> null liegen. Sie zeigt stattdessen Zacken bis 0.07 kWh — immer dann, wenn der Zähler 0.1 meldet,
+> wo 0.2 richtig wäre. Die Schranke fängt nur die negative Seite ab. Abhilfe gäbe nur eine feinere
+> Quelle (Register 30258, Batterieleistung in Watt) und damit ein anderes Messprinzip.

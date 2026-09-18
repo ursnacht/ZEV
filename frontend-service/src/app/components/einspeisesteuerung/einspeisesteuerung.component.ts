@@ -309,21 +309,34 @@ export class EinspeisesteuerungComponent extends WithMessage
   }
 
   /**
-   * Erzeugung einschliesslich dessen, was in den Speicher ging — `produktion + Ladung − Entladung`.
+   * Erzeugung einschliesslich dessen, was in den Speicher ging —
+   * `max(0, produktion + Ladung − Entladung)`.
    *
    * <p><b>Warum das nötig ist:</b> Der Hybrid-Wechselrichter gibt wechselstromseitig nur ab, was
    * das Haus braucht. Was aus der Erzeugung direkt in die Batterie fliesst, läuft über keinen
    * Erzeugungszähler und fehlt in `produktion` — bei voller Sonne stand dort weniger als der
-   * Verbrauch. Umgekehrt erscheint eine Entladung dort als Erzeugung, obwohl sie keine ist.
+   * Verbrauch. Umgekehrt erscheint eine Entladung dort als Erzeugung, obwohl sie keine ist:
+   * Nachts misst der Zähler 0.1–0.3 kWh je Viertelstunde, ohne dass die Sonne scheint.
+   *
+   * <p><b>Warum die Schranke bei 0:</b> Die Entladung ist nur auf **0.1 kWh** genau (der
+   * Wechselrichter führt seine Energiezähler in Zehnteln, siehe
+   * `Specs/Solinteg_Modbus_Register.md`), die Produktion dagegen auf drei Stellen. Liegt die
+   * wirkliche Entladung bei 0.17 kWh, meldet der Zähler mal 0.1 und mal 0.2 — die Differenz
+   * schwankt um bis zu ±0.08, und nachts, wo sie null sein müsste, kippt sie ins Negative. Genau
+   * das zeigte der Tagesverlauf. Eine negative Erzeugung gibt es nicht; die Schranke ist eine
+   * physikalische Aussage, keine Kosmetik.
+   *
+   * <p>Die Rohwerte bleiben in der Tabelle sichtbar — wer nachrechnen will, findet dort
+   * Produktion, Ladung und Entladung einzeln.
    *
    * <p><b>Nur für die Darstellung.</b> Überschuss, Regel und die gespeicherten Zustände bleiben auf
-   * den gemessenen Werten — die Tabelle zeigt deshalb weiterhin die gemessene Produktion.
+   * den gemessenen Werten.
    *
    * <p><b>Grenze:</b> Lädt die Batterie aus dem **Netz** statt aus der Erzeugung, zählt die Ladung
    * hier fälschlich zur Produktion. Der Fall tritt bei negativen Preisen auf.
    */
   produktionVerrechnet(e: Steuerentscheid): number {
-    return e.produktion + (e.speicherLadung ?? 0) - (e.speicherEntladung ?? 0);
+    return Math.max(0, e.produktion + (e.speicherLadung ?? 0) - (e.speicherEntladung ?? 0));
   }
 
   /**

@@ -488,14 +488,25 @@ beide leer ohne Speicher-Einheit).
 **Das Diagramm zeigt dann die verrechnete Erzeugung:**
 
 ```
-Produktion (dargestellt) = produktion + speicher_ladung − speicher_entladung
+Produktion (dargestellt) = max(0, produktion + speicher_ladung − speicher_entladung)
 ```
 
 > **Warum das nötig ist.** Der Hybrid-Wechselrichter gibt wechselstromseitig nur ab, was das Haus
 > braucht. Was aus der Erzeugung direkt in die Batterie fliesst, läuft über keinen
 > Erzeugungszähler und fehlt in `produktion` — bei voller Sonne stand dort weniger als der
 > Verbrauch, was zur Frage führte, ob überhaupt richtig summiert wird. Umgekehrt erscheint eine
-> Entladung dort als Erzeugung, obwohl sie keine ist.
+> Entladung dort als Erzeugung, obwohl sie keine ist: **Nachts misst der Zähler 0.1–0.3 kWh je
+> Viertelstunde**, ohne dass die Sonne scheint.
+
+> **Warum die Schranke bei 0.** Die Entladung ist nur auf **0.1 kWh** genau — der Wechselrichter
+> führt seine Energiezähler in Zehnteln (`Specs/Solinteg_Modbus_Register.md`) —, die Produktion
+> dagegen auf drei Stellen. Liegt die wirkliche Entladung bei 0.17 kWh je Viertelstunde, meldet der
+> Zähler mal 0.1 und mal 0.2: Die Differenz schwankt um bis zu ±0.08, und nachts, wo sie null sein
+> müsste, kippt sie ins **Negative**. Genau das zeigte der Tagesverlauf vom 18.09.2026. Eine
+> negative Erzeugung gibt es nicht — die Schranke ist eine physikalische Aussage, keine Kosmetik.
+>
+> Die Rohwerte bleiben in der Tabelle sichtbar: Produktion, Ladung und Entladung stehen dort
+> einzeln, die Rechnung ist damit nachvollziehbar.
 
 **Nur die Darstellung.** Überschuss, Regel und die gespeicherten Zustände bleiben auf den
 **gemessenen** Werten. Ein Entscheid vor und nach dieser Änderung ist damit derselbe, und die
@@ -771,8 +782,10 @@ Der Text ist an kein Feature gebunden.
 * [ ] Der Tooltip zeigt **alle** Zeilen einschliesslich Zeitpunkt und Preis, ohne oben abgeschnitten zu werden.
 * [ ] Liegt eine `SPEICHER`-Einheit vor, trägt jeder Entscheid Lade- und Entlademenge des Intervalls.
 * [ ] Ohne `SPEICHER`-Einheit bleiben beide Spalten **leer** — nicht `0`.
-* [ ] Die Produktionskurve zeigt `produktion + Ladung − Entladung`; die Tabellenspalte Produktion
-  zeigt weiterhin den gemessenen Wert.
+* [ ] Die Produktionskurve zeigt `max(0, produktion + Ladung − Entladung)`; die Tabellenspalte
+  Produktion zeigt weiterhin den gemessenen Wert.
+* [ ] Die dargestellte Produktion wird **nie negativ** — auch nicht nachts, wenn die Batterie
+  entlädt und keine Erzeugung vorliegt.
 * [ ] **Überschuss und Regel ändern sich durch die Speicherdaten nicht** — derselbe Tag ergibt vor
   und nach der Änderung dieselben Entscheide.
 * [ ] Die Legende heißt `Produktion (mit Speicher)`, sobald Speicherdaten vorliegen, sonst
