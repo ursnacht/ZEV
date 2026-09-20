@@ -941,3 +941,49 @@ dafür ist die Testphase da, die weiterhin offen ist.
 Aufzeichnung intakt und es fehlt kein Entscheid.
 
 **Geprüft:** 1335 Backend-Tests grün — was hier wenig aussagt, siehe oben.
+
+---
+
+## Nachtrag 21 — Der Upsert war kaputt, und nichts merkte es (18.09.2026)
+
+Auf der Anlage brach **jeder Job-Lauf** ab:
+
+```
+ERROR: INSERT has more target columns than expressions
+```
+
+**Ursache.** Beim Ergänzen von `soc_minimum` (V160) und `soc_hysterese` (V162) kamen die Spalten in
+die Zielliste und in `DO UPDATE SET`, die Platzhalter aber **nicht** in `VALUES`. 19 Spalten, 17
+Werte.
+
+**Warum es durchging.** Der Upsert ist natives SQL in einer Annotation:
+
+* Kein Compiler liest hinein.
+* Die Service-Tests mocken das Repository weg — der String wird nie ausgeführt.
+* Es gibt keinen Integrationstest auf diese Abfrage.
+
+1337 grüne Tests sagten über die eine Zeile, auf die es ankam, nichts aus. Aufgefallen ist es erst
+im Betrieb, und zwar an einem Job, der viertelstündlich läuft und dessen Ausfall niemandem sofort
+auffällt — die Aufzeichnung wäre still stehengeblieben.
+
+**Der Hinweis lag vor.** Nach dem Patch hatte ich mit `grep` geprüft und **drei** Treffer für
+`soc_minimum` gesehen: Spaltenliste, `DO UPDATE`, `@Param`. Es hätten **vier** sein müssen. Die
+fehlende Zeile stand in der Ausgabe — ich habe sie nicht gezählt.
+
+**Neu: `SteuerentscheidUpsertQueryTest`.** Er liest den Query-Text aus der Annotation und prüft
+zweierlei, ohne Datenbank:
+
+1. **Zielspalten und `VALUES` sind gleich viele** — genau dieser Fehler.
+2. **Jede Spalte steht auch im `DO UPDATE SET`** (ausser `org_id`/`zeit_von`). Eine dort vergessene
+   Spalte wäre völlig still: Der erste Lauf schriebe sie, ein zweiter über dasselbe Intervall
+   liesse den alten Wert stehen.
+
+**Gegengeprobt:** Mit dem Fehler wieder eingebaut wird der Test rot (`expected: <20> but was:
+<19>`). Ein Test, der nie rot war, beweist nichts.
+
+**Geprüft:** 1337 Backend-Tests grün.
+
+> **Dieselbe Lücke wie in Nachtrag 20.** Zwei Fehler hintereinander an nativem SQL, beide erst im
+> Betrieb sichtbar. Der Cast dort und die Platzhalter hier hätten sich mit einem `@DataJpaTest`
+> gegen eine echte Datenbank gemeinsam abfangen lassen — der Query-Test hier deckt nur die
+> abzählbare Hälfte ab.

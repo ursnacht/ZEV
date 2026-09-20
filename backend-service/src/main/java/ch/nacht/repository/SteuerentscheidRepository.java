@@ -64,6 +64,12 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
      *
      * <p>Die Enum-Werte kommen als {@code String} — ein nativer Query kennt die Java-Enums nicht;
      * die CHECK-Constraints der Tabelle prüfen sie datenbankseitig.
+     *
+     * <p><b>Spaltenliste und {@code VALUES} muessen zusammenpassen</b> — das prueft
+     * {@code SteuerentscheidUpsertQueryTest}, seit hier beim Ergaenzen zweier Spalten die
+     * Platzhalter fehlten und der Job auf der Anlage jeden Lauf mit
+     * {@code INSERT has more target columns than expressions} abbrach. Ein nativer Query wird von
+     * keinem Compiler gelesen und von keinem Mock-Test ausgefuehrt.
      */
     @Modifying
     @Query(value = """
@@ -75,7 +81,7 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
         VALUES (:orgId, :zeitVon, :preis, :preisTiefRest, :produktion, :verbrauch, :bezug,
                 :ruecklieferung, :soc, :speicherLadung, :speicherEntladung, :ueberschuss,
                 :regel, :batterieladung, :einspeisung, :schwellwert, :speicherwert,
-                now())
+                :socMinimum, :socHysterese, now())
         ON CONFLICT (org_id, zeit_von)
         DO UPDATE SET preis           = EXCLUDED.preis,
                       preis_tief_rest = EXCLUDED.preis_tief_rest,
