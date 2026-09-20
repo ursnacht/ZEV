@@ -1087,8 +1087,25 @@ gebaut, 1660 Tests grün.
 
 **Nötig:** Rebuild für V164 und V165.
 
-> **Noch offen:** Ob 0.02 der richtige Abstand ist. Das lässt sich jetzt **nachrechnen** — mit
-> verschiedenen Werten über dieselbe Historie —, statt es zu schätzen. Und der 18.09. bleibt
-> knapp: Dort ist das Warten wirtschaftlich richtig und trotzdem riskant. Ob es dafür zusätzlich
-> ein Sicherheitsnetz braucht, wäre nach dem Abstand an längeren Daten zu entscheiden — ein
-> Problem auf einmal.
+**An den vier Tagen nachgerechnet** (20.09.2026, Werte aus der Tagesansicht abgelesen):
+
+| Tag | Sperre vorher | mit Abstand 0.02 | |
+|---|---|---|---|
+| 17.09. | bis 11:45 | bis ~11:00, dazu Lücke 03:15–05:00 | nachts ohne Wirkung |
+| 18.09. | bis 15:00 | **bis 15:00** | unverändert — das lohnende Tal bleibt |
+| 19.09. | bis 14:00 | **bis ~11:00** | rund drei Stunden Sonne gewonnen |
+| 20.09. | bis 13:00 | **bis ~10:00** | rund drei Stunden gewonnen |
+
+Das ist die Trennschärfe, auf die es ankam: Die beiden Tage mit dem bedeutungslosen Tal (0.005
+gegenüber 0.010) geben früh frei, der Tag mit dem echten Tal (0.05 gegenüber 0.15) sperrt
+unverändert weiter. Eine Regel „ab 13 Uhr" hätte alle vier gleich behandelt. **0.02 bleibt.**
+
+Die Lücke am 17.09. zwischen 03:15 und 05:00 zeigt die Mechanik im Kleinen: Dort lag das Tal nur
+knapp unter dem damaligen Preis. Ohne Wirkung, weil nachts kein Überschuss anfällt.
+
+> **Offen bleibt der 18.09.** Dort ist das Warten wirtschaftlich richtig — und genau deshalb
+> riskant: bis 15:00 gesperrt, danach muss die Restsonne für die volle Ladung reichen. Ein
+> bewölkter Nachmittag, und der Speicher bleibt halb leer. Dafür wäre das Sicherheitsnetz gedacht
+> (Begrenzung auf die Erzeugungszeit oder die SOC-Rampe). Bewusst **noch nicht** umgesetzt: Mit dem
+> Abstand fallen die meisten langen Sperren ohnehin weg; ob der verbleibende Fall häufig genug ist,
+> um eine weitere Regel zu rechtfertigen, zeigen erst ein paar Wochen. Ein Problem auf einmal.
