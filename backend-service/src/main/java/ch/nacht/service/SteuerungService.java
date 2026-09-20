@@ -453,10 +453,24 @@ public class SteuerungService {
 
         for (Object[] zeile : geraetezustandRepository.letzterWertJeIntervall(
                 orgId, einheitId, Zustandsgroesse.SOC.name(), von, bis)) {
-            verlauf.put(((java.sql.Timestamp) zeile[0]).toLocalDateTime(),
-                    (BigDecimal) zeile[1]);
+            verlauf.put(alsLocalDateTime(zeile[0]), (BigDecimal) zeile[1]);
         }
         return verlauf;
+    }
+
+    /**
+     * Zeitstempel einer <b>nativen</b> Abfrage in {@link LocalDateTime}.
+     *
+     * <p><b>Warum beide Fälle:</b> Hier stand zuerst ein fester Cast auf {@code java.sql.Timestamp}
+     * — eine Annahme über den Treiber, die nicht zutraf. Der PostgreSQL-Treiber liefert für eine
+     * {@code timestamp}-Spalte bereits ein {@link LocalDateTime}; die Rückrechnung brach bei Hene
+     * mit einer {@code ClassCastException} ab. Ein JPQL-Ergebnis wäre typisiert gewesen — bei
+     * einer nativen Abfrage ist es das nicht, und was zurückkommt, hängt am Treiber.
+     */
+    private LocalDateTime alsLocalDateTime(Object wert) {
+        return wert instanceof java.sql.Timestamp stempel
+                ? stempel.toLocalDateTime()
+                : (LocalDateTime) wert;
     }
 
     /** Der übergebene Speicherwert, oder — bei {@code null} — der des Mandanten. */

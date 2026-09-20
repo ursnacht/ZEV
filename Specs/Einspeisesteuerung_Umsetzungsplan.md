@@ -912,3 +912,32 @@ laufende Freigabe nicht, und ohne Hysterese endet sie am Mindestwert. Der dritte
 > **Offen bleibt der Wert selbst:** Ob fünf Punkte der richtige Abstand sind, zeigt erst der
 > Betrieb. Zu wenig heisst Flattern, zu viel heisst, dass der Speicher über den nötigen Stand
 > hinaus lädt, während günstigere Intervalle bevorstehen.
+
+---
+
+## Nachtrag 20 — ClassCastException in der Rückrechnung (18.09.2026)
+
+Auf der Anlage brach das Nachrechnen sofort ab:
+
+```
+java.lang.ClassCastException: class java.time.LocalDateTime cannot be cast to
+class java.sql.Timestamp
+    at SteuerungService.socVerlauf(SteuerungService.java:456)
+```
+
+**Ursache: eine ungeprüfte Annahme über den Treiber.** In `socVerlauf` stand ein fester Cast auf
+`java.sql.Timestamp`. Der PostgreSQL-Treiber liefert für eine `timestamp`-Spalte aber bereits ein
+`LocalDateTime`. Behoben über eine Umwandlung, die **beide** Fälle abdeckt — dann hält sie auch
+einem Treiberwechsel stand.
+
+**Warum es kein Test fand.** Die Abfrage ist die erste **native** Query in diesem Feature; ein
+JPQL-Ergebnis wäre typisiert gewesen. Was eine native Abfrage zurückgibt, hängt am Treiber und
+lässt sich nur gegen eine **echte Datenbank** prüfen. Die Unit-Tests mocken das Repository und
+sehen den Cast nie; einen `@DataJpaTest` auf `letzterWertJeIntervall` gibt es noch nicht. Genau
+dafür ist die Testphase da, die weiterhin offen ist.
+
+**Der Job war nicht betroffen** — er liest den Ladezustand über die typisierte JPQL-Abfrage
+(`socAmIntervallende`). Nur die Rückrechnung nutzt die aggregierte native Query, also blieb die
+Aufzeichnung intakt und es fehlt kein Entscheid.
+
+**Geprüft:** 1335 Backend-Tests grün — was hier wenig aussagt, siehe oben.
