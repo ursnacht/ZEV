@@ -987,3 +987,52 @@ zweierlei, ohne Datenbank:
 > Betrieb sichtbar. Der Cast dort und die Platzhalter hier hätten sich mit einem `@DataJpaTest`
 > gegen eine echte Datenbank gemeinsam abfangen lassen — der Query-Test hier deckt nur die
 > abzählbare Hälfte ab.
+
+---
+
+## Nachtrag 22 — Integrationstests für die nativen Abfragen (20.09.2026)
+
+Nach zwei Produktivfehlern hintereinander an nativem SQL (Nachträge 20 und 21) decken jetzt zwei
+`@DataJpaTest`-Klassen mit Testcontainers ab, was kein Compiler und kein Mock-Test sieht:
+
+* `GeraetezustandRepositoryIT` (12 Tests) — `letzterWertJeIntervall`
+* `SteuerentscheidRepositoryIT` (7 Tests) — `upsert`
+
+**Was sie gegen die beiden Fehler halten:**
+
+* **Der Laufzeittyp ist festgenagelt:** `bucket` ist tatsächlich `LocalDateTime`, `wert` ein
+  `BigDecimal`. Verschiebt ein Treiber- oder Hibernate-Wechsel das, bricht künftig der Test statt
+  des Jobs.
+* **Mandanten-Isolation im härtesten Fall:** gleiche `einheit_id`, andere `org_id`, und der fremde
+  Wert liegt im selben Intervall **später**. Ohne die ausdrückliche `org_id`-Bedingung gewänne er
+  das `DISTINCT ON` — der Test fällt dann deterministisch. Bei nativem SQL greift der
+  Hibernate-`orgFilter` nicht; das ist die einzige Absicherung, die es dafür gibt.
+* **Der Upsert überschreibt wirklich:** zweiter Aufruf auf dasselbe Intervall → ein Datensatz,
+  gleiche Id, alle 17 Wertspalten neu. Jede Spalte trägt einen eigenen unverwechselbaren Wert,
+  sonst fielen vertauschte Platzhalter nicht auf. Dazu der Rückweg nach `null`, wenn der Speicher
+  ausfällt.
+
+**Dazu die Randfälle der Intervallbildung:** mehrere Werte im selben Intervall (der letzte gewinnt,
+Einfügereihenfolge verdreht, damit nicht die Id entscheidet), Wert genau auf der Intervallgrenze,
+leeres Intervall liefert **keine** Zeile (worauf die `floorEntry`-Logik im Service baut), Zeitraum
+ohne Daten, ganzer Tag → 96 Buckets.
+
+> **Grenze dieser Tests:** Das Schema der Integrationstests erzeugt **Hibernate**
+> (`ddl-auto=create-drop`), nicht Flyway. Der Sequenz-Default auf `id` und der Unique-Constraint
+> `uq_steuerentscheid_org_zeit` fehlen dort und werden im Test selbst nachgezogen. Damit kann der
+> Test **nicht** bezeugen, dass der Konfliktschlüssel zum Constraint der echten Tabelle passt —
+> das bleibt Sache der Migration. Enger ziehen liesse sich das über
+> `@Table(uniqueConstraints = …)` an der Entity.
+
+**Bewusst nicht geprüft:** `erstellt_am` beim Überschreiben (`now()` ist innerhalb einer
+Transaktion konstant — ein „wird neu gesetzt"-Vergleich wäre eine Scheinprüfung), zwei Werte mit
+identischem Zeitstempel im selben Intervall (`DISTINCT ON` wählt dort willkürlich, der Test wäre
+flaky), und der Umstellungstag.
+
+**Nebenbefund, ausserhalb dieses Features:** `mvn verify` war **seit `74aafa0`
+(feat(nebenkosten): Umlage pro Person)** rot — 79 Errors in den NK-Integrationstests, weil
+`anzahl_personen` mit V135 NOT NULL wurde, ohne dass die Fixtures es setzen. Die
+Integrationstests liefen seither nicht mehr durch; `mvn test` allein blieb grün und verdeckte es.
+Behoben in einem eigenen Commit.
+
+**Geprüft:** `mvn verify` vollständig grün — 1337 Unit-Tests und 344 Integrationstests.
