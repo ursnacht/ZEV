@@ -90,6 +90,8 @@ export interface Steuerentscheid {
   speicherwert: number;
   /** Mindest-Ladezustand, der beim Entscheid galt; `null` bei Entscheiden vor V160. */
   socMinimum: number | null;
+  /** Hysterese, die beim Entscheid galt; `null` bei Entscheiden vor V162. */
+  socHysterese: number | null;
 }
 
 /** Anfrage der Rückrechnung. */

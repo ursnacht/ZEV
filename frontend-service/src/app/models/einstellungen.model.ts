@@ -29,6 +29,8 @@ export interface SteuerKonfiguration {
   batteriekapazitaet?: number | null;
   /** Mindest-Ladezustand in Prozent; darunter hebt `SOC_TIEF` eine Ladesperre auf. */
   socMinimum?: number | null;
+  /** Prozentpunkte ueber dem Mindestwert, bis zu denen die Freigabe weiterlaeuft. */
+  socHysterese?: number | null;
 }
 
 /**

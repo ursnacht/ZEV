@@ -875,3 +875,40 @@ Grenze, genau auf der Grenze, ohne Ladezustand, ohne Mindestwert, gegen `PREIS_N
 > folgenlos; sobald geschaltet wird, bräuchte es eine Hysterese (freigeben unter 20 %, wieder
 > sperren erst über 25 %). Als offene Frage vermerkt, nicht umgesetzt — es gibt dafür noch keine
 > Beobachtung.
+
+---
+
+## Nachtrag 19 — Hysterese für `SOC_TIEF` (18.09.2026)
+
+Die Freigabe endet nicht mehr am Mindestwert, sondern erst fünf Prozentpunkte darüber (Vorgabe,
+konfigurierbar). Mit 20 % heisst das: freigeben unter 20, wieder sperren ab 25.
+
+**Umgesetzt als EIN verschobener Schwellwert**, nicht als zweite Regel: Die Grenze hängt davon ab,
+ob die Freigabe bereits gilt. Sie wirkt nur nach oben heraus — die Einstiegsschwelle bleibt der
+Mindestwert, sonst begänne die Freigabe schon bei 25 %.
+
+**Die Regel war bisher zustandslos.** Das ist die eigentliche Änderung: Eine Hysterese braucht
+Gedächtnis, und zwar den Entscheid des **Vorintervalls**.
+
+* Der **Job** liest ihn aus der Aufzeichnung (`findByZeitVon`). Bewusst das exakte Vorintervall und
+  nicht „der letzte davor": Nach einer Lücke von Stunden sägte ein alter Entscheid eine Freigabe
+  fort, die längst nicht mehr gilt. Fehlt es, beginnt die Kette neu — ohne erweiterte Grenze.
+* Die **Rückrechnung** führt den Zustand im Lauf mit. Sie darf die Aufzeichnung nicht lesen, sonst
+  rechnete sie mit dem Ergebnis eines **anderen** Schwellwerts und wäre keine unabhängige Probe
+  mehr. Beide Wege erzeugen damit dieselbe Kette, ohne voneinander abzuhängen.
+
+**Die Hysterese steht im Entscheid** (V162), wie Schwellwert, Speicherwert und Mindestwert. Ohne
+sie liesse sich ein Entscheid nicht erklären: „Ladung freigegeben bei 22 %" sieht falsch aus,
+solange nicht dabeisteht, dass die Freigabe bei 20 % begann und erst über 25 % endet.
+
+**Vier neue Tests**: Freigabe läuft bei 22 % weiter, endet bei 25 %, greift bei 22 % **ohne**
+laufende Freigabe nicht, und ohne Hysterese endet sie am Mindestwert. Der dritte ist der wichtigste
+— er hält fest, dass die Hysterese nur in eine Richtung wirkt.
+
+**Geprüft:** **1335** Backend-Tests, 1660 Frontend-Tests, beides gebaut — alles grün.
+
+**Nötig:** Rebuild für V162 und V163 (zusammen mit V160/V161 aus Nachtrag 18).
+
+> **Offen bleibt der Wert selbst:** Ob fünf Punkte der richtige Abstand sind, zeigt erst der
+> Betrieb. Zu wenig heisst Flattern, zu viel heisst, dass der Speicher über den nötigen Stand
+> hinaus lädt, während günstigere Intervalle bevorstehen.

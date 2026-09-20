@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Zugriff auf die Steuerentscheide der Einspeisesteuerung
@@ -38,6 +39,19 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
     );
 
     /**
+     * Der Entscheid eines bestimmten Intervalls; leer, wenn keiner vorliegt.
+     *
+     * <p><b>Wofür:</b> Die Hysterese von {@code SOC_TIEF} braucht den Zustand des <b>Vor</b>-
+     * intervalls — galt dort die Freigabe, liegt die Grenze höher. Bewusst das exakte
+     * Vorintervall und nicht „der letzte davor": Nach einer Lücke von Stunden oder Tagen sägte
+     * ein alter Entscheid eine Freigabe fort, die längst nicht mehr gilt. Fehlt das Vorintervall,
+     * beginnt die Kette neu — ohne erweiterte Grenze, also auf der sicheren Seite.
+     *
+     * @param zeitVon Beginn des Intervalls in Ortszeit
+     */
+    Optional<Steuerentscheid> findByZeitVon(LocalDateTime zeitVon);
+
+    /**
      * Schreibt einen Entscheid; ein vorhandener wird überschrieben.
      *
      * <p><b>Warum ein Upsert und kein {@code save}:</b> Treffen Messwerte verspätet ein, wertet der
@@ -50,7 +64,6 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
      *
      * <p>Die Enum-Werte kommen als {@code String} — ein nativer Query kennt die Java-Enums nicht;
      * die CHECK-Constraints der Tabelle prüfen sie datenbankseitig.
-
      */
     @Modifying
     @Query(value = """
@@ -58,7 +71,7 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
                                          verbrauch, bezug, ruecklieferung, soc,
                                          speicher_ladung, speicher_entladung, ueberschuss,
                                          regel, batterieladung, einspeisung, schwellwert,
-                                         speicherwert, soc_minimum, erstellt_am)
+                                         speicherwert, soc_minimum, soc_hysterese, erstellt_am)
         VALUES (:orgId, :zeitVon, :preis, :preisTiefRest, :produktion, :verbrauch, :bezug,
                 :ruecklieferung, :soc, :speicherLadung, :speicherEntladung, :ueberschuss,
                 :regel, :batterieladung, :einspeisung, :schwellwert, :speicherwert,
@@ -80,6 +93,7 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
                       schwellwert     = EXCLUDED.schwellwert,
                       speicherwert    = EXCLUDED.speicherwert,
                       soc_minimum     = EXCLUDED.soc_minimum,
+                      soc_hysterese   = EXCLUDED.soc_hysterese,
                       erstellt_am     = now()
         """, nativeQuery = true)
     void upsert(
@@ -100,6 +114,7 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
         @Param("einspeisung") String einspeisung,
         @Param("schwellwert") BigDecimal schwellwert,
         @Param("speicherwert") BigDecimal speicherwert,
-        @Param("socMinimum") BigDecimal socMinimum
+        @Param("socMinimum") BigDecimal socMinimum,
+        @Param("socHysterese") BigDecimal socHysterese
     );
 }

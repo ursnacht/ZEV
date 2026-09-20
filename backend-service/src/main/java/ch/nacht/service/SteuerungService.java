@@ -132,24 +132,27 @@ public class SteuerungService {
         BigDecimal schwellwert = konfiguration.schwellwertOderVorgabe();
         BigDecimal speicherwert = konfiguration.speicherwertOderVorgabe();
         BigDecimal socMinimum = konfiguration.socMinimumOderVorgabe();
+        BigDecimal socHysterese = konfiguration.socHystereseOderVorgabe();
 
         Messung messung = messungFuer(zeitVon);
         BigDecimal preis = preisFuer(zeitVon);
         BigDecimal preisTiefRest = tiefstpreisRestDesTages(zeitVon);
         BigDecimal soc = socAmIntervallende(orgId, zeitVon);
         Speicher speicher = speicherFuer(zeitVon);
+        boolean socTiefGaltZuvor = socTiefGaltImVorintervall(zeitVon);
 
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(preis, preisTiefRest,
-                        messung.produktion(), messung.verbrauch(), soc),
-                schwellwert, speicherwert, socMinimum);
+                        messung.produktion(), messung.verbrauch(), soc, socTiefGaltZuvor),
+                schwellwert, speicherwert, socMinimum, socHysterese);
 
         steuerentscheidRepository.upsert(orgId, zeitVon, preis, preisTiefRest,
                 messung.produktion(), messung.verbrauch(), messung.bezug(),
                 messung.ruecklieferung(), soc, speicher.ladung(), speicher.entladung(),
                 entscheid.ueberschuss(),
                 entscheid.regel().name(), entscheid.batterieladung().name(),
-                entscheid.einspeisung().name(), schwellwert, speicherwert, socMinimum);
+                entscheid.einspeisung().name(), schwellwert, speicherwert, socMinimum,
+                socHysterese);
 
         // Auf INFO und mit den Eingangsgroessen: Ein Entscheid ohne die Zahlen, aus denen er
         // entstand, laesst sich im Nachhinein nicht pruefen - und genau diese Pruefung war noetig,
@@ -217,6 +220,7 @@ public class SteuerungService {
 
         BigDecimal wirksamerSpeicherwert = speicherwertOderMandant(orgId, speicherwert);
         BigDecimal wirksamesSocMinimum = socMinimumDesMandanten(orgId);
+        BigDecimal wirksameSocHysterese = socHystereseDesMandanten(orgId);
 
         Map<Steuerregel, Integer> jeRegel = new EnumMap<>(Steuerregel.class);
         for (Steuerregel regel : Steuerregel.values()) {
@@ -227,7 +231,7 @@ public class SteuerungService {
         int[] tage = new int[1];
 
         tage[0] = rechneNach(orgId, von, bis, schwellwert, wirksamerSpeicherwert,
-                wirksamesSocMinimum, n -> {
+                wirksamesSocMinimum, wirksameSocHysterese, n -> {
             // Nur Intervalle mit Ueberschuss zaehlen - siehe Methodenkommentar.
             if (n.entscheid().ueberschuss().signum() <= 0) {
                 return;
@@ -294,10 +298,13 @@ public class SteuerungService {
         BigDecimal wirksamerSpeicherwert = speicherwertOderMandant(orgId, speicherwert);
 
         BigDecimal wirksamesSocMinimum = socMinimumDesMandanten(orgId);
+        BigDecimal wirksameSocHysterese = socHystereseDesMandanten(orgId);
 
         List<SteuerentscheidDTO> dtos = new ArrayList<>();
         rechneNach(orgId, datum, datum, schwellwert, wirksamerSpeicherwert, wirksamesSocMinimum,
-                n -> dtos.add(zuDto(n, schwellwert, wirksamerSpeicherwert, wirksamesSocMinimum)));
+                wirksameSocHysterese,
+                n -> dtos.add(zuDto(n, schwellwert, wirksamerSpeicherwert, wirksamesSocMinimum,
+                        wirksameSocHysterese)));
         reichereSpeicherAn(dtos, datum);
 
         log.info("Steuerung nachgerechnet: org={} tag={} schwellwert={} -> {} Intervalle",
@@ -324,7 +331,7 @@ public class SteuerungService {
      * @return Anzahl der Ortstage, für die Preise vorlagen
      */
     private int rechneNach(Long orgId, LocalDate von, LocalDate bis, BigDecimal schwellwert,
-                           BigDecimal speicherwert, BigDecimal socMinimum,
+                           BigDecimal speicherwert, BigDecimal socMinimum, BigDecimal socHysterese,
                            Consumer<Nachgerechnet> verbraucher) {
         // Preise einmal laden, nach Ortstag buendeln und dabei auf Ortszeit umschluesseln: Der
         // Tiefstpreis des Resttages ist fuer jedes Intervall neu zu bestimmen, und eine Abfrage je
@@ -344,6 +351,11 @@ public class SteuerungService {
         // sagen, welcher gilt (FR-6a).
         TreeMap<LocalDateTime, BigDecimal> socVerlauf = socVerlauf(orgId,
                 von.atStartOfDay(), bis.plusDays(1).atStartOfDay());
+
+        // Die Hysterese braucht den Zustand des Vorintervalls. Der Job liest ihn aus der
+        // Aufzeichnung; hier wird er IM LAUF mitgefuehrt - die Rueckrechnung soll ohne gespeicherte
+        // Entscheide auskommen. Der erste Durchgang beginnt ohne Freigabe: die engere Grenze.
+        boolean socTiefGaltZuvor = false;
 
         for (Object[] zeile : messwerteRepository.sumBilanzKomponentenPerZeitBetween(
                 vonEnde, bisEnde)) {
@@ -367,13 +379,32 @@ public class SteuerungService {
 
             SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                     new SteuerRegelService.Eingabe(preis, preisTiefRest,
-                            messung.produktion(), messung.verbrauch(), soc),
-                    schwellwert, speicherwert, socMinimum);
+                            messung.produktion(), messung.verbrauch(), soc, socTiefGaltZuvor),
+                    schwellwert, speicherwert, socMinimum, socHysterese);
+            socTiefGaltZuvor = entscheid.regel() == Steuerregel.SOC_TIEF;
 
             verbraucher.accept(
                     new Nachgerechnet(zeit, preis, preisTiefRest, messung, soc, entscheid));
         }
         return preiseJeTag.size();
+    }
+
+    /**
+     * Galt im <b>Vorintervall</b> bereits {@code SOC_TIEF}? Grundlage der Hysterese.
+     *
+     * <p>Gelesen wird der gespeicherte Entscheid des unmittelbar vorangehenden Intervalls. Fehlt
+     * er - erster Lauf, Luecke, Flag frisch eingeschaltet -, beginnt die Kette neu: keine
+     * erweiterte Grenze, also die engere und damit sichere Seite.
+     *
+     * <p><b>Der Job liest hier gespeicherte Entscheide</b>, anders als die Rueckrechnung. Das ist
+     * kein Widerspruch: Er schreibt die Aufzeichnung fort und darf sich auf sie beziehen. Die
+     * Rueckrechnung fuehrt denselben Zustand stattdessen im Lauf mit, damit sie ohne die
+     * Aufzeichnung auskommt - sonst rechnete sie mit dem Ergebnis eines anderen Schwellwerts.
+     */
+    private boolean socTiefGaltImVorintervall(LocalDateTime zeitVon) {
+        return steuerentscheidRepository.findByZeitVon(zeitVon.minusMinutes(INTERVALL_MINUTEN))
+                .map(e -> e.getRegel() == Steuerregel.SOC_TIEF)
+                .orElse(false);
     }
 
     /**
@@ -385,6 +416,11 @@ public class SteuerungService {
      */
     private BigDecimal socMinimumDesMandanten(Long orgId) {
         return einstellungenService.getSteuerKonfiguration(orgId).socMinimumOderVorgabe();
+    }
+
+    /** Die Hysterese des Mandanten - wie der Mindestwert nicht erprobbar. */
+    private BigDecimal socHystereseDesMandanten(Long orgId) {
+        return einstellungenService.getSteuerKonfiguration(orgId).socHystereseOderVorgabe();
     }
 
     /**
@@ -692,7 +728,8 @@ public class SteuerungService {
      * woraus dieser Entscheid entstand, und das waren hier die eingegebenen Werte.
      */
     private SteuerentscheidDTO zuDto(Nachgerechnet n, BigDecimal schwellwert,
-                                     BigDecimal speicherwert, BigDecimal socMinimum) {
+                                     BigDecimal speicherwert, BigDecimal socMinimum,
+                                     BigDecimal socHysterese) {
         SteuerentscheidDTO dto = new SteuerentscheidDTO();
         dto.setZeit(n.zeit());
         dto.setPreis(n.preis());
@@ -713,6 +750,7 @@ public class SteuerungService {
         dto.setSchwellwert(schwellwert);
         dto.setSpeicherwert(speicherwert);
         dto.setSocMinimum(socMinimum);
+        dto.setSocHysterese(socHysterese);
         return dto;
     }
 
@@ -736,6 +774,7 @@ public class SteuerungService {
         dto.setSchwellwert(entscheid.getSchwellwert());
         dto.setSpeicherwert(entscheid.getSpeicherwert());
         dto.setSocMinimum(entscheid.getSocMinimum());
+        dto.setSocHysterese(entscheid.getSocHysterese());
         return dto;
     }
 

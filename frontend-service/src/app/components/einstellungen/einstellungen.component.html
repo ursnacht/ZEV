@@ -144,6 +144,13 @@
             </div>
 
             <div class="zev-form-group">
+              <label for="socHysterese">{{ 'STEUERUNG_SOC_HYSTERESE' | translate }}:</label>
+              <input type="number" id="socHysterese" class="zev-input" step="1" min="0" max="100"
+                [(ngModel)]="formData.steuerung.socHysterese" name="socHysterese" />
+              <small class="zev-form-hint">{{ 'STEUERUNG_SOC_HYSTERESE_HINWEIS' | translate }}</small>
+            </div>
+
+            <div class="zev-form-group">
               <label for="batteriekapazitaet">{{ 'STEUERUNG_BATTERIEKAPAZITAET' | translate }}:</label>
               <input type="number" id="batteriekapazitaet" class="zev-input" step="0.1" min="0"
                 [(ngModel)]="formData.steuerung.batteriekapazitaet" name="batteriekapazitaet" />

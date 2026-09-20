@@ -48,7 +48,8 @@ public class SteuerRegelService {
      * @param verbrauch     Summe der {@code CONSUMER} in kWh
      */
     public record Eingabe(BigDecimal preis, BigDecimal preisTiefRest,
-                          BigDecimal produktion, BigDecimal verbrauch, BigDecimal soc) {
+                          BigDecimal produktion, BigDecimal verbrauch, BigDecimal soc,
+                          boolean socTiefGaltZuvor) {
     }
 
     /**
@@ -60,7 +61,9 @@ public class SteuerRegelService {
      * <ol>
      *   <li>{@code PREIS_NEGATIV} — Einspeisen kostet Geld. Laden bleibt frei.</li>
      *   <li>{@code SOC_TIEF} — der Speicher ist zu leer, um zu warten. <b>Hebt</b> eine Sperre
-     *       auf, statt eine zu setzen, und steht deshalb vor den beiden Preisregeln.</li>
+     *       auf, statt eine zu setzen, und steht deshalb vor den beiden Preisregeln. Mit
+     *       <b>Hysterese</b>: Gilt die Freigabe bereits, endet sie erst {@code socHysterese}
+     *       Punkte über dem Mindestwert.</li>
      *   <li>{@code EINSPEISEN_LOHNT} — die Vergütung übertrifft den Wert einer gespeicherten kWh.</li>
      *   <li>{@code WARTEN_AUF_TAL} — heute kommt noch etwas <b>Billigeres als jetzt</b>, und es
      *       liegt unter dem Schwellwert; Kapazität dafür freihalten.</li>
@@ -92,10 +95,12 @@ public class SteuerRegelService {
      * @param speicherwert Wert einer gespeicherten kWh in CHF/kWh; darf negativ sein
      * @param socMinimum   Ladezustand in Prozent, unterhalb dessen {@code SOC_TIEF} greift;
      *                     {@code null} schaltet die Regel ab
+     * @param socHysterese Prozentpunkte, um die die Grenze steigt, solange die Freigabe gilt;
+     *                     {@code null} oder 0 schaltet die Hysterese ab
      * @return der Entscheid samt Überschuss
      */
     public Entscheid entscheide(Eingabe eingabe, BigDecimal schwellwert, BigDecimal speicherwert,
-                                BigDecimal socMinimum) {
+                                BigDecimal socMinimum, BigDecimal socHysterese) {
         BigDecimal ueberschuss = ueberschuss(eingabe);
 
         // 1. Negativer Preis: Einspeisen kostet Geld. Die Batterie darf laden - sie nimmt Energie
@@ -117,8 +122,14 @@ public class SteuerRegelService {
         //    OHNE SOC greift sie nicht: kein Speicher erfasst, kein Messwert, kein Urteil.
         //    Nichtstun ist auch hier der sichere Zustand - eine Freigabe auf Verdacht wuerde die
         //    Preisregeln wirkungslos machen, und zwar unbemerkt.
+        //    HYSTERESE: Gilt die Freigabe bereits, liegt die Grenze um socHysterese HOEHER.
+        //    Ohne diesen Abstand endete eine Freigabe beim ersten Messwert ueber dem Mindestwert,
+        //    und der Entscheid wechselte im Viertelstundentakt zwischen Freigabe und Sperre,
+        //    sobald der Ladezustand dort pendelt. Mit 20 % und 5 % heisst das: freigeben unter
+        //    20 %, wieder sperren erst ab 25 %.
         if (eingabe.soc() != null && socMinimum != null
-                && eingabe.soc().compareTo(socMinimum) < 0) {
+                && eingabe.soc().compareTo(grenze(socMinimum, socHysterese,
+                        eingabe.socTiefGaltZuvor())) < 0) {
             return new Entscheid(Steuerregel.SOC_TIEF,
                     Steuerzustand.FREI, Steuerzustand.FREI, ueberschuss);
         }
@@ -177,6 +188,23 @@ public class SteuerRegelService {
         }
         return new Entscheid(Steuerregel.LADEN,
                 Steuerzustand.FREI, Steuerzustand.FREI, ueberschuss);
+    }
+
+    /**
+     * Die wirksame Untergrenze des Ladezustands — angehoben, solange die Freigabe schon gilt.
+     *
+     * <p>Das ist die ganze Hysterese: <b>ein</b> Schwellwert, der sich verschiebt, statt zweier
+     * Regeln. Fiel der Ladezustand unter den Mindestwert, gilt bis
+     * {@code socMinimum + socHysterese} weiter freigegeben; danach greifen die Preisregeln wieder.
+     *
+     * <p>Ohne Hysterese (fehlend oder 0) ist die Grenze schlicht der Mindestwert.
+     */
+    private BigDecimal grenze(BigDecimal socMinimum, BigDecimal socHysterese,
+                              boolean socTiefGaltZuvor) {
+        if (!socTiefGaltZuvor || socHysterese == null) {
+            return socMinimum;
+        }
+        return socMinimum.add(socHysterese);
     }
 
     /**

@@ -177,6 +177,14 @@ public class Steuerentscheid {
     @Column(name = "soc_minimum", precision = 5, scale = 1)
     private BigDecimal socMinimum;
 
+    /**
+     * Die beim Entscheid geltende Hysterese in Prozentpunkten; {@code null} vor V162.
+     *
+     * <p>Ohne sie wäre ein Entscheid nicht erklärbar: „Ladung freigegeben bei 22 %" sieht falsch
+     * aus, solange nicht dabeisteht, dass die Freigabe bei 20 % begann und erst über 25 % endet.
+     */
+    @Column(name = "soc_hysterese", precision = 5, scale = 1)
+    private BigDecimal socHysterese;
 
     @Column(name = "erstellt_am", nullable = false)
     private LocalDateTime erstelltAm;
@@ -270,6 +278,14 @@ public class Steuerentscheid {
 
     public void setSocMinimum(BigDecimal socMinimum) {
         this.socMinimum = socMinimum;
+    }
+
+    public BigDecimal getSocHysterese() {
+        return socHysterese;
+    }
+
+    public void setSocHysterese(BigDecimal socHysterese) {
+        this.socHysterese = socHysterese;
     }
 
     public BigDecimal getSpeicherLadung() {

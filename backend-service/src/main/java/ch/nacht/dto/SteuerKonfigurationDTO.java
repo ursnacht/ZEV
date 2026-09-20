@@ -50,6 +50,14 @@ public class SteuerKonfigurationDTO {
     public static final BigDecimal VORGABE_SOC_MINIMUM = new BigDecimal("20.0");
 
     /**
+     * Vorgabe der Hysterese in Prozentpunkten für {@code SOC_TIEF}.
+     *
+     * <p>5 Punkte entsprechen bei einem 20-kWh-Speicher rund einer Kilowattstunde — genug, dass
+     * eine Freigabe spürbar nachlädt, statt beim ersten Messwert darüber wieder zu enden.
+     */
+    public static final BigDecimal VORGABE_SOC_HYSTERESE = new BigDecimal("5.0");
+
+    /**
      * Schwellwert für {@code WARTEN_AUF_TAL} in CHF/kWh.
      *
      * <p><b>Darf negativ sein</b> — es gibt keinen Vorzeichen-Wächter, dieselbe Begründung wie bei
@@ -80,6 +88,18 @@ public class SteuerKonfigurationDTO {
     @PositiveOrZero(message = "Mindest-Ladezustand darf nicht negativ sein")
     private BigDecimal socMinimum;
 
+    /**
+     * Hysterese in Prozentpunkten über {@link #socMinimum}, bis zu denen weiter geladen wird.
+     *
+     * <p><b>Warum es sie braucht:</b> Ohne Abstand würde eine Freigabe beim ersten Messwert über
+     * der Grenze wieder enden, und der Entscheid wechselte im Viertelstundentakt, sobald der
+     * Ladezustand um den Mindestwert pendelt.
+     *
+     * <p>0 schaltet die Hysterese ab — dann gilt allein {@link #socMinimum}.
+     */
+    @PositiveOrZero(message = "Hysterese darf nicht negativ sein")
+    private BigDecimal socHysterese;
+
     public SteuerKonfigurationDTO() {
     }
 
@@ -103,6 +123,11 @@ public class SteuerKonfigurationDTO {
     /** Der Mindest-Ladezustand oder die Vorgabe, wenn keiner erfasst ist. */
     public BigDecimal socMinimumOderVorgabe() {
         return socMinimum != null ? socMinimum : VORGABE_SOC_MINIMUM;
+    }
+
+    /** Die Hysterese oder die Vorgabe, wenn keine erfasst ist. */
+    public BigDecimal socHystereseOderVorgabe() {
+        return socHysterese != null ? socHysterese : VORGABE_SOC_HYSTERESE;
     }
 
     public BigDecimal getSchwellwert() {
@@ -137,11 +162,20 @@ public class SteuerKonfigurationDTO {
         this.socMinimum = socMinimum;
     }
 
+    public BigDecimal getSocHysterese() {
+        return socHysterese;
+    }
+
+    public void setSocHysterese(BigDecimal socHysterese) {
+        this.socHysterese = socHysterese;
+    }
+
     @Override
     public String toString() {
         return "SteuerKonfigurationDTO{schwellwert=" + schwellwert +
                ", speicherwert=" + speicherwert +
                ", batteriekapazitaet=" + batteriekapazitaet +
-               ", socMinimum=" + socMinimum + "}";
+               ", socMinimum=" + socMinimum +
+               ", socHysterese=" + socHysterese + "}";
     }
 }

@@ -313,9 +313,10 @@ beiden sperrenden Preisregeln. Das ist ihr Zweck: Sie hebt eine Sperre auf, stat
 
 | | |
 |---|---|
-| Vergleich | `soc < socMinimum` — ein **echtes** Kleiner-als; auf der Grenze ist die Reserve noch da |
+| Vergleich | `soc < grenze` — ein **echtes** Kleiner-als; auf der Grenze ist die Reserve noch da |
+| Grenze | `socMinimum`, solange die Freigabe **nicht** gilt; `socMinimum + socHysterese`, solange sie gilt |
 | Ergebnis | `batterieladung = FREI`, `einspeisung = FREI` |
-| Vorgabe | **20 %** |
+| Vorgabe | **20 %** Mindestwert, **5 Prozentpunkte** Hysterese |
 | Ohne Speicher / ohne Messwert | greift **nicht** |
 | Ohne konfigurierten Wert | greift **nicht** (`null` schaltet sie ab) |
 
@@ -331,6 +332,27 @@ beiden sperrenden Preisregeln. Das ist ihr Zweck: Sie hebt eine Sperre auf, stat
 > **Warum sie ohne Messwert nicht greift.** Eine Freigabe auf Verdacht machte die Preisregeln
 > wirkungslos, und zwar unbemerkt: Wo kein Speicher erfasst ist, sähe niemand, dass gar nichts
 > mehr gesperrt wird.
+
+**Hysterese.** Die Freigabe endet nicht am Mindestwert, sondern erst `socHysterese` Prozentpunkte
+darüber. Mit 20 % und 5 %: freigeben unter 20, wieder sperren ab 25.
+
+> **Warum:** Ohne Abstand endete eine Freigabe beim ersten Messwert über der Grenze, und der
+> Entscheid wechselte im Viertelstundentakt zwischen Freigabe und Sperre, sobald der Ladezustand
+> dort pendelt. Beim Ladevorgang selbst hätte das zur Folge, dass der Speicher immer wieder kurz
+> anläuft und stoppt.
+
+> **Umgesetzt als EIN verschobener Schwellwert, nicht als zweite Regel.** Die Grenze hängt davon
+> ab, ob die Freigabe schon gilt — das ist die ganze Hysterese. Sie wirkt nur nach oben heraus: Die
+> **Einstiegs**schwelle bleibt der Mindestwert, sonst begänne die Freigabe schon bei 25 %.
+
+**Die Regel braucht damit ein Gedächtnis**, und das ist der Zustand des **Vorintervalls**:
+* Der **Job** liest den gespeicherten Entscheid des unmittelbar vorangehenden Intervalls. Bewusst
+  das exakte Vorintervall und nicht „den letzten davor": Nach einer Lücke von Stunden sägte ein
+  alter Entscheid eine Freigabe fort, die längst nicht mehr gilt. Fehlt es, beginnt die Kette neu —
+  ohne erweiterte Grenze, also auf der engeren und damit sicheren Seite.
+* Die **Rückrechnung** führt denselben Zustand im Lauf mit, statt gespeicherte Entscheide zu
+  lesen. Sonst rechnete sie mit dem Ergebnis eines anderen Schwellwerts — und wäre nicht mehr die
+  unabhängige Probe, die sie sein soll (FR-6).
 
 **Der Mindestwert ist nicht erprobbar.** Die Rückrechnung (FR-6) dreht am Preis-Schwellwert; sie
 nimmt für `SOC_TIEF` den Wert des Mandanten. Eine zweite frei wählbare Grösse machte die
@@ -688,7 +710,7 @@ eigenen Zähler hat** — einen Einheiten-Typ `SPEICHER` gibt es bis heute nicht
 
 ### FR-7: Einstellungen je Mandant
 
-Die vier Werte aus FR-2 und FR-2a werden in der bestehenden Maske **Einstellungen** gepflegt
+Die fünf Werte aus FR-2 und FR-2a werden in der bestehenden Maske **Einstellungen** gepflegt
 (`Specs/Einstellungen.md`), in einem eigenen Abschnitt **Einspeisesteuerung**:
 
 | Feld | Eingabe | Validierung |
@@ -696,6 +718,7 @@ Die vier Werte aus FR-2 und FR-2a werden in der bestehenden Maske **Einstellunge
 | Schwellwert | Zahl, CHF/kWh | 5 Nachkommastellen; **negativ erlaubt** |
 | Speicherwert | Zahl, CHF/kWh | 5 Nachkommastellen; **negativ erlaubt** |
 | Mindest-Ladezustand | Zahl, % | 0–100; leer erlaubt (→ Vorgabe 20); **nicht negativ** — ein Ladezustand ist ein Anteil, kein Preis |
+| Hysterese Ladezustand | Zahl, Prozentpunkte | 0–100; leer erlaubt (→ Vorgabe 5); **nicht negativ**; 0 schaltet sie ab |
 | Batteriekapazität | Zahl, kWh | ≥ 0; leer erlaubt |
 
 * Der Abschnitt erscheint **nur bei aktivem Feature-Flag** — sonst stünden Felder da, die nichts
@@ -772,6 +795,8 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 | `STEUERUNG_BATTERIEKAPAZITAET` | Batteriekapazität | Battery capacity |
 | `STEUERUNG_SOC_MINIMUM` | Mindest-Ladezustand | Minimum state of charge |
 | `STEUERUNG_SOC_MINIMUM_HINWEIS` | Fällt der Ladezustand unter diesen Wert … | If the state of charge drops below this value … |
+| `STEUERUNG_SOC_HYSTERESE` | Hysterese Ladezustand | State of charge hysteresis |
+| `STEUERUNG_SOC_HYSTERESE_HINWEIS` | Prozentpunkte über dem Mindest-Ladezustand … | Percentage points above the minimum state of charge … |
 | `FEATURE_FLAG_EINSPEISESTEUERUNG` | Einspeisesteuerung (Trockenlauf) | Feed-in control (dry run) |
 
 **Wiederverwendet, nicht neu angelegt:** `HEUTE` („Heute“ / „Today“) besteht seit V65
@@ -800,6 +825,14 @@ Der Text ist an kein Feature gebunden.
 * [ ] Fällt der Ladezustand unter den Mindestwert, ist `batterieladung = FREI` und die Regel lautet
   `SOC_TIEF` — auch wenn eine Preisregel gesperrt hätte.
 * [ ] **Genau auf** dem Mindestwert wird **nicht** freigegeben.
+* [ ] **Solange die Freigabe gilt, bleibt sie bis `socMinimum + socHysterese` bestehen** — bei 20 %
+  und 5 % ist ein Intervall mit 22 % noch `SOC_TIEF`.
+* [ ] Ab `socMinimum + socHysterese` greifen die Preisregeln wieder.
+* [ ] Dieselben 22 % ergeben **ohne** laufende Freigabe eine Sperre — die Hysterese senkt die
+  Einstiegsschwelle nicht.
+* [ ] Ohne Hysterese (leer oder 0) endet die Freigabe am Mindestwert.
+* [ ] Fehlt der Entscheid des Vorintervalls, gilt die **engere** Grenze.
+* [ ] Jeder Entscheid trägt die beim Entscheid geltende Hysterese.
 * [ ] Ohne Ladezustand (kein Speicher, kein Messwert) greift `SOC_TIEF` **nicht**.
 * [ ] Ohne konfigurierten Mindestwert greift `SOC_TIEF` **nicht**.
 * [ ] Bei negativem Preis bleibt `PREIS_NEGATIV` die Begründung, auch wenn der Ladezustand tief ist.
@@ -1043,10 +1076,9 @@ Lücke nicht**, es rechnet nur und speichert nichts.
 
 ## 8. Offene Fragen
 
-* **Braucht `SOC_TIEF` eine Hysterese?** Pendelt der Ladezustand um den Mindestwert, wechselt der
-  Entscheid im 15-Minuten-Takt zwischen Freigabe und Sperre. Im Trockenlauf folgenlos; sobald
-  geschaltet wird, wäre ein zweiter Wert nötig (freigeben unter 20 %, wieder sperren erst über
-  25 %). Noch keine Beobachtung, die dafür spricht.
+* **Ist 5 Prozentpunkte der richtige Abstand?** Die Hysterese ist umgesetzt (FR-2a); ob 5 Punkte
+  reichen, zeigt erst der Betrieb. Zu wenig heisst Flattern, zu viel heisst, dass der Speicher
+  über den nötigen Stand hinaus geladen wird, während günstigere Intervalle bevorstehen.
 * **Ist 20 % der richtige Mindestwert?** Ein Startwert. Er hängt am Verbrauchsprofil und daran, wie
   lange der Speicher über Nacht tragen soll.
 

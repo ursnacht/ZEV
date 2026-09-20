@@ -42,6 +42,8 @@ public class SteuerentscheidDTO {
     private BigDecimal speicherwert;
     /** Mindest-Ladezustand, der beim Entscheid galt; `null` bei Entscheiden vor V160. */
     private BigDecimal socMinimum;
+    /** Hysterese, die beim Entscheid galt; `null` bei Entscheiden vor V162. */
+    private BigDecimal socHysterese;
 
     public SteuerentscheidDTO() {
     }
@@ -204,5 +206,13 @@ public class SteuerentscheidDTO {
 
     public void setSocMinimum(BigDecimal socMinimum) {
         this.socMinimum = socMinimum;
+    }
+
+    public BigDecimal getSocHysterese() {
+        return socHysterese;
+    }
+
+    public void setSocHysterese(BigDecimal socHysterese) {
+        this.socHysterese = socHysterese;
     }
 }
