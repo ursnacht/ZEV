@@ -58,6 +58,15 @@ public class SteuerKonfigurationDTO {
     public static final BigDecimal VORGABE_SOC_HYSTERESE = new BigDecimal("5.0");
 
     /**
+     * Vorgabe des Mindest-Preisabstands in CHF/kWh für {@code WARTEN_AUF_TAL}.
+     *
+     * <p>2 Rappen. Darunter lohnt das Warten die verstreichende Sonnenstunde nicht: Bei einem
+     * 20-kWh-Speicher bringt ein Abstand von 0.005 über eine volle Ladung rund fünf Rappen, das
+     * Risiko einer am Abend leeren Batterie steht dagegen bei einem Vielfachen davon.
+     */
+    public static final BigDecimal VORGABE_MINDEST_ABSTAND = new BigDecimal("0.02000");
+
+    /**
      * Schwellwert für {@code WARTEN_AUF_TAL} in CHF/kWh.
      *
      * <p><b>Darf negativ sein</b> — es gibt keinen Vorzeichen-Wächter, dieselbe Begründung wie bei
@@ -100,6 +109,17 @@ public class SteuerKonfigurationDTO {
     @PositiveOrZero(message = "Hysterese darf nicht negativ sein")
     private BigDecimal socHysterese;
 
+    /**
+     * Mindestabstand in CHF/kWh, um den das erwartete Tal unter dem aktuellen Preis liegen muss,
+     * damit {@code WARTEN_AUF_TAL} greift.
+     *
+     * <p><b>Nicht negativ</b>, anders als Schwellwert und Speicherwert: Ein negativer Abstand
+     * hiesse, auch auf ein <i>teureres</i> Intervall zu warten. 0 schaltet die Prüfung ab und
+     * stellt das Verhalten vor V164 her.
+     */
+    @PositiveOrZero(message = "Mindest-Preisabstand darf nicht negativ sein")
+    private BigDecimal mindestAbstand;
+
     public SteuerKonfigurationDTO() {
     }
 
@@ -128,6 +148,11 @@ public class SteuerKonfigurationDTO {
     /** Die Hysterese oder die Vorgabe, wenn keine erfasst ist. */
     public BigDecimal socHystereseOderVorgabe() {
         return socHysterese != null ? socHysterese : VORGABE_SOC_HYSTERESE;
+    }
+
+    /** Der Mindest-Preisabstand oder die Vorgabe, wenn keiner erfasst ist. */
+    public BigDecimal mindestAbstandOderVorgabe() {
+        return mindestAbstand != null ? mindestAbstand : VORGABE_MINDEST_ABSTAND;
     }
 
     public BigDecimal getSchwellwert() {
@@ -170,12 +195,21 @@ public class SteuerKonfigurationDTO {
         this.socHysterese = socHysterese;
     }
 
+    public BigDecimal getMindestAbstand() {
+        return mindestAbstand;
+    }
+
+    public void setMindestAbstand(BigDecimal mindestAbstand) {
+        this.mindestAbstand = mindestAbstand;
+    }
+
     @Override
     public String toString() {
         return "SteuerKonfigurationDTO{schwellwert=" + schwellwert +
                ", speicherwert=" + speicherwert +
                ", batteriekapazitaet=" + batteriekapazitaet +
                ", socMinimum=" + socMinimum +
-               ", socHysterese=" + socHysterese + "}";
+               ", socHysterese=" + socHysterese +
+               ", mindestAbstand=" + mindestAbstand + "}";
     }
 }

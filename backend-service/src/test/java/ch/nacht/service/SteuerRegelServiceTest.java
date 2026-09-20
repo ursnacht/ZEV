@@ -39,6 +39,13 @@ public class SteuerRegelServiceTest {
     /** Hysterese: Freigabe endet erst 5 Punkte ueber dem Mindestwert. */
     private static final BigDecimal SOC_HYSTERESE = new BigDecimal("5.0");
 
+    /**
+     * Mindest-Preisabstand. Die meisten Faelle setzen ihn auf 0 und pruefen damit die Regel ohne
+     * diese Bedingung; die eigenen Tests weiter unten drehen daran.
+     */
+    private static final BigDecimal KEIN_ABSTAND = BigDecimal.ZERO;
+    private static final BigDecimal ABSTAND = new BigDecimal("0.02000");
+
     /** Produktion deutlich über Verbrauch — für die Fälle, in denen ein Überschuss gebraucht wird. */
     private static final BigDecimal PRODUKTION = new BigDecimal("4.000");
     private static final BigDecimal VERBRAUCH = new BigDecimal("0.300");
@@ -83,7 +90,7 @@ public class SteuerRegelServiceTest {
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(new BigDecimal("0.100"), new BigDecimal("0.200"),
                         new BigDecimal("1.000"), new BigDecimal("2.000"), SOC_HOCH, false),
-                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE);
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, KEIN_ABSTAND);
 
         assertEquals(Steuerregel.KEIN_UEBERSCHUSS, entscheid.regel());
         assertEquals(Steuerzustand.FREI, entscheid.batterieladung());
@@ -105,7 +112,7 @@ public class SteuerRegelServiceTest {
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(new BigDecimal("0.190"), new BigDecimal("0.100"),
                         new BigDecimal("1.000"), new BigDecimal("2.000"), SOC_HOCH, false),
-                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE);
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, KEIN_ABSTAND);
 
         assertEquals(Steuerregel.WARTEN_AUF_TAL, entscheid.regel());
         assertEquals(Steuerzustand.GESPERRT, entscheid.batterieladung());
@@ -119,7 +126,7 @@ public class SteuerRegelServiceTest {
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(new BigDecimal("0.320"), new BigDecimal("0.300"),
                         BigDecimal.ZERO, new BigDecimal("2.000"), SOC_HOCH, false),
-                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE);
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, KEIN_ABSTAND);
 
         assertEquals(Steuerregel.EINSPEISEN_LOHNT, entscheid.regel());
         assertEquals(Steuerzustand.GESPERRT, entscheid.batterieladung());
@@ -131,7 +138,7 @@ public class SteuerRegelServiceTest {
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(new BigDecimal("0.100"), null,
                         new BigDecimal("10"), new BigDecimal("4"), SOC_HOCH, false),
-                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE);
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, KEIN_ABSTAND);
 
         assertEquals(0, new BigDecimal("6").compareTo(entscheid.ueberschuss()));
     }
@@ -210,7 +217,7 @@ public class SteuerRegelServiceTest {
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(null, new BigDecimal("0.010"),
                         PRODUKTION, VERBRAUCH, SOC_HOCH, false),
-                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE);
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, KEIN_ABSTAND);
 
         assertEquals(Steuerregel.LADEN, entscheid.regel());
         assertEquals(Steuerzustand.FREI, entscheid.batterieladung());
@@ -222,7 +229,7 @@ public class SteuerRegelServiceTest {
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(new BigDecimal("0.100"), null,
                         PRODUKTION, VERBRAUCH, SOC_HOCH, false),
-                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE);
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, KEIN_ABSTAND);
 
         assertEquals(Steuerregel.LADEN, entscheid.regel());
     }
@@ -233,7 +240,7 @@ public class SteuerRegelServiceTest {
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(new BigDecimal("0.050"), new BigDecimal("-0.020"),
                         PRODUKTION, VERBRAUCH, SOC_HOCH, false),
-                new BigDecimal("-0.010"), SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE);
+                new BigDecimal("-0.010"), SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, KEIN_ABSTAND);
 
         assertEquals(Steuerregel.WARTEN_AUF_TAL, entscheid.regel());
     }
@@ -260,7 +267,7 @@ public class SteuerRegelServiceTest {
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(new BigDecimal("-0.010"), new BigDecimal("0.010"),
                         BigDecimal.ZERO, new BigDecimal("2.000"), SOC_HOCH, false),
-                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE);
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, KEIN_ABSTAND);
 
         assertEquals(Steuerregel.PREIS_NEGATIV, entscheid.regel());
         assertEquals(0, BigDecimal.ZERO.compareTo(entscheid.ueberschuss()));
@@ -275,7 +282,7 @@ public class SteuerRegelServiceTest {
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(new BigDecimal("0.200"), new BigDecimal("0.100"),
                         PRODUKTION, VERBRAUCH, new BigDecimal("15.0"), false),
-                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE);
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, KEIN_ABSTAND);
 
         assertEquals(Steuerregel.SOC_TIEF, entscheid.regel());
         assertEquals(Steuerzustand.FREI, entscheid.batterieladung());
@@ -288,7 +295,7 @@ public class SteuerRegelServiceTest {
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(new BigDecimal("0.200"), new BigDecimal("0.100"),
                         PRODUKTION, VERBRAUCH, SOC_MINIMUM, false),
-                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE);
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, KEIN_ABSTAND);
 
         assertEquals(Steuerregel.WARTEN_AUF_TAL, entscheid.regel());
     }
@@ -300,7 +307,7 @@ public class SteuerRegelServiceTest {
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(new BigDecimal("0.200"), new BigDecimal("0.100"),
                         PRODUKTION, VERBRAUCH, null, false),
-                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE);
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, KEIN_ABSTAND);
 
         assertEquals(Steuerregel.WARTEN_AUF_TAL, entscheid.regel());
     }
@@ -312,7 +319,7 @@ public class SteuerRegelServiceTest {
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(new BigDecimal("-0.010"), new BigDecimal("0.100"),
                         PRODUKTION, VERBRAUCH, new BigDecimal("5.0"), false),
-                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE);
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, KEIN_ABSTAND);
 
         assertEquals(Steuerregel.PREIS_NEGATIV, entscheid.regel());
         assertEquals(Steuerzustand.FREI, entscheid.batterieladung());
@@ -325,7 +332,7 @@ public class SteuerRegelServiceTest {
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(new BigDecimal("0.400"), null,
                         PRODUKTION, VERBRAUCH, new BigDecimal("5.0"), false),
-                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE);
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, KEIN_ABSTAND);
 
         assertEquals(Steuerregel.SOC_TIEF, entscheid.regel());
         assertEquals(Steuerzustand.FREI, entscheid.batterieladung());
@@ -337,7 +344,7 @@ public class SteuerRegelServiceTest {
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(new BigDecimal("0.200"), new BigDecimal("0.100"),
                         PRODUKTION, VERBRAUCH, new BigDecimal("1.0"), false),
-                SCHWELLWERT, SPEICHERWERT, null, SOC_HYSTERESE);
+                SCHWELLWERT, SPEICHERWERT, null, SOC_HYSTERESE, KEIN_ABSTAND);
 
         assertEquals(Steuerregel.WARTEN_AUF_TAL, entscheid.regel());
     }
@@ -349,7 +356,7 @@ public class SteuerRegelServiceTest {
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(new BigDecimal("0.200"), new BigDecimal("0.100"),
                         PRODUKTION, VERBRAUCH, new BigDecimal("22.0"), true),
-                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE);
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, KEIN_ABSTAND);
 
         assertEquals(Steuerregel.SOC_TIEF, entscheid.regel());
     }
@@ -360,7 +367,7 @@ public class SteuerRegelServiceTest {
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(new BigDecimal("0.200"), new BigDecimal("0.100"),
                         PRODUKTION, VERBRAUCH, new BigDecimal("25.0"), true),
-                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE);
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, KEIN_ABSTAND);
 
         assertEquals(Steuerregel.WARTEN_AUF_TAL, entscheid.regel());
     }
@@ -372,7 +379,7 @@ public class SteuerRegelServiceTest {
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(new BigDecimal("0.200"), new BigDecimal("0.100"),
                         PRODUKTION, VERBRAUCH, new BigDecimal("22.0"), false),
-                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE);
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, KEIN_ABSTAND);
 
         assertEquals(Steuerregel.WARTEN_AUF_TAL, entscheid.regel());
     }
@@ -383,9 +390,73 @@ public class SteuerRegelServiceTest {
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(new BigDecimal("0.200"), new BigDecimal("0.100"),
                         PRODUKTION, VERBRAUCH, new BigDecimal("22.0"), true),
-                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, null);
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, null, KEIN_ABSTAND);
 
         assertEquals(Steuerregel.WARTEN_AUF_TAL, entscheid.regel());
+    }
+
+    // ==================== Mindest-Preisabstand ====================
+
+    @Test
+    void entscheide_TalNurKnappTiefer_SperrtNicht() {
+        // Der Fall vom 19.09.2026 bei Hene: Preis 0.010, Tal 0.005. Die halbe Rappe Unterschied
+        // rechtfertigt keine vier Stunden Sperre in der besten Sonne.
+        SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
+                new SteuerRegelService.Eingabe(new BigDecimal("0.010"), new BigDecimal("0.005"),
+                        PRODUKTION, VERBRAUCH, SOC_HOCH, false),
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, ABSTAND);
+
+        assertEquals(Steuerregel.LADEN, entscheid.regel());
+        assertEquals(Steuerzustand.FREI, entscheid.batterieladung());
+    }
+
+    @Test
+    void entscheide_TalDeutlichTiefer_SperrtWeiterhin() {
+        // Der Fall vom 18.09.2026: Preis 0.150, Tal 0.050 - hier lohnt das Warten, und die Regel
+        // soll unveraendert sperren. Waere das nicht so, kostete der Abstand genau den Ertrag,
+        // fuer den die ganze Steuerung da ist.
+        SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
+                new SteuerRegelService.Eingabe(new BigDecimal("0.150"), new BigDecimal("0.050"),
+                        PRODUKTION, VERBRAUCH, SOC_HOCH, false),
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, ABSTAND);
+
+        assertEquals(Steuerregel.WARTEN_AUF_TAL, entscheid.regel());
+        assertEquals(Steuerzustand.GESPERRT, entscheid.batterieladung());
+    }
+
+    @Test
+    void entscheide_TalGenauUmDenAbstandTiefer_SperrtNicht() {
+        // Grenzfall: Preis 0.100, Tal 0.080, Abstand 0.020. Die Bedingung ist ein echtes
+        // Kleiner-als (tal < preis - abstand); Gleichstand genuegt nicht.
+        SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
+                new SteuerRegelService.Eingabe(new BigDecimal("0.100"), new BigDecimal("0.080"),
+                        PRODUKTION, VERBRAUCH, SOC_HOCH, false),
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, ABSTAND);
+
+        assertEquals(Steuerregel.LADEN, entscheid.regel());
+    }
+
+    @Test
+    void entscheide_OhneAbstand_VerhaeltSichWieVorV164() {
+        // Abstand null schaltet die Bedingung ab - dieselbe Lage wie oben ergibt dann eine Sperre.
+        SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
+                new SteuerRegelService.Eingabe(new BigDecimal("0.010"), new BigDecimal("0.005"),
+                        PRODUKTION, VERBRAUCH, SOC_HOCH, false),
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, null);
+
+        assertEquals(Steuerregel.WARTEN_AUF_TAL, entscheid.regel());
+    }
+
+    @Test
+    void entscheide_AbstandGreiftNichtInDieSchwellwertBedingung() {
+        // Der Abstand ist eine ZUSAETZLICHE Bedingung, keine Ersetzung: Liegt das Tal ueber dem
+        // Schwellwert, wird auch bei grossem Abstand nicht gesperrt.
+        SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
+                new SteuerRegelService.Eingabe(new BigDecimal("0.300"), new BigDecimal("0.200"),
+                        PRODUKTION, VERBRAUCH, SOC_HOCH, false),
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, ABSTAND);
+
+        assertEquals(Steuerregel.LADEN, entscheid.regel());
     }
 
     /** Kurzform mit Überschuss; nur Preis und Tiefstpreis des Resttages unterscheiden die Fälle. */
@@ -393,6 +464,6 @@ public class SteuerRegelServiceTest {
         return steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(new BigDecimal(preis), new BigDecimal(preisTiefRest),
                         PRODUKTION, VERBRAUCH, SOC_HOCH, false),
-                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE);
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, KEIN_ABSTAND);
     }
 }

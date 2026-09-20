@@ -35,10 +35,14 @@ export class EinspeisesteuerungService {
    * @param speicherwert zu erprobender Speicherwert; `null` → Wert des Mandanten
    */
   getEntscheideSimuliert(datum: string, schwellwert: number,
-                         speicherwert?: number | null): Observable<Steuerentscheid[]> {
+                         speicherwert?: number | null,
+                         mindestAbstand?: number | null): Observable<Steuerentscheid[]> {
     const params = new URLSearchParams({ datum, schwellwert: String(schwellwert) });
     if (speicherwert != null) {
       params.set('speicherwert', String(speicherwert));
+    }
+    if (mindestAbstand != null) {
+      params.set('mindestAbstand', String(mindestAbstand));
     }
     return this.http.get<Steuerentscheid[]>(`${this.apiUrl}/entscheide/simuliert?${params}`);
   }

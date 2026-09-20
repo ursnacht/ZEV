@@ -49,6 +49,11 @@
       <input type="number" id="simSchwellwert" class="zev-input" step="0.00001"
         [(ngModel)]="simulationSchwellwert" />
     </div>
+    <div class="zev-form-group">
+      <label for="simAbstand">{{ 'STEUERUNG_MINDEST_ABSTAND' | translate }}</label>
+      <input type="number" id="simAbstand" class="zev-input" step="0.00001" min="0"
+        [(ngModel)]="simulationAbstand" />
+    </div>
     <button type="button" class="zev-button zev-button--primary"
       [disabled]="simulationSchwellwert == null || simulationLaeuft" (click)="rechneNach()">
       <app-icon name="check"></app-icon>

@@ -24,6 +24,8 @@ public class SimulationDTO {
     private LocalDate bis;
     private BigDecimal schwellwert;
     private BigDecimal speicherwert;
+    /** Der erprobte Mindest-Preisabstand — gehoert wie die Schwellen zum Ergebnis. */
+    private BigDecimal mindestAbstand;
 
     /** Ausgewertete Tage (Tage mit Preisen). */
     private int tage;
@@ -72,6 +74,14 @@ public class SimulationDTO {
 
     public BigDecimal getSpeicherwert() {
         return speicherwert;
+    }
+
+    public BigDecimal getMindestAbstand() {
+        return mindestAbstand;
+    }
+
+    public void setMindestAbstand(BigDecimal mindestAbstand) {
+        this.mindestAbstand = mindestAbstand;
     }
 
     public void setSpeicherwert(BigDecimal speicherwert) {

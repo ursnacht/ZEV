@@ -92,6 +92,15 @@ export class EinspeisesteuerungComponent extends WithMessage
 
   /** Schwellwert der Rückrechnung; vorbelegt mit dem des ersten Entscheids. */
   simulationSchwellwert: number | null = null;
+
+  /**
+   * Zu erprobender Mindest-Preisabstand; vorbelegt mit dem des ersten Entscheids.
+   *
+   * <p>Die **zweite** Groesse, an der sich beim Kalibrieren drehen laesst. Sie entscheidet, ob ein
+   * Tal die Sperre ueberhaupt wert ist — ein zu kleiner Abstand laesst die Steuerung fuer einen
+   * halben Rappen Sonnenstunden verstreichen, ein zu grosser schaltet `WARTEN_AUF_TAL` faktisch ab.
+   */
+  simulationAbstand: number | null = null;
   simulation: Simulation | null = null;
   simulationLaeuft = false;
 
@@ -103,6 +112,15 @@ export class EinspeisesteuerungComponent extends WithMessage
    * müsste man für jeden Tag neu rechnen.
    */
   simuliertMitSchwellwert: number | null = null;
+
+  /**
+   * Mindest-Preisabstand, mit dem der angezeigte Tag nachgerechnet ist.
+   *
+   * <p>Muss neben dem Schwellwert mitgefuehrt werden: Sonst laedt ein Tageswechsel den Tag zwar
+   * weiter nachgerechnet, aber mit dem Abstand des **Mandanten** statt dem erprobten — und die
+   * Tagesansicht widersprache den Kennzahlen darunter, ohne dass man es sähe.
+   */
+  simuliertMitAbstand: number | null = null;
 
   readonly regeln = STEUERREGELN;
 
@@ -140,7 +158,8 @@ export class EinspeisesteuerungComponent extends WithMessage
   ladeTag(): void {
     this.loading = true;
     const quelle = this.simuliertMitSchwellwert != null
-      ? this.steuerungService.getEntscheideSimuliert(this.datum, this.simuliertMitSchwellwert)
+      ? this.steuerungService.getEntscheideSimuliert(this.datum, this.simuliertMitSchwellwert,
+          null, this.simuliertMitAbstand)
       : this.steuerungService.getEntscheide(this.datum);
 
     quelle.subscribe({
@@ -150,6 +169,9 @@ export class EinspeisesteuerungComponent extends WithMessage
         this.loading = false;
         if (this.simulationSchwellwert == null && daten.length > 0) {
           this.simulationSchwellwert = daten[0].schwellwert;
+        }
+        if (this.simulationAbstand == null && daten.length > 0) {
+          this.simulationAbstand = daten[0].mindestAbstand;
         }
         void this.zeichne();
       },
@@ -170,6 +192,7 @@ export class EinspeisesteuerungComponent extends WithMessage
    */
   zeigeAufzeichnung(): void {
     this.simuliertMitSchwellwert = null;
+    this.simuliertMitAbstand = null;
     this.ladeTag();
   }
 
@@ -235,7 +258,8 @@ export class EinspeisesteuerungComponent extends WithMessage
     const bis = this.datum;
     const von = this.verschiebe(-365);
     const schwellwert = this.simulationSchwellwert;
-    this.steuerungService.simuliere({ von, bis, schwellwert }).subscribe({
+    const mindestAbstand = this.simulationAbstand;
+    this.steuerungService.simuliere({ von, bis, schwellwert, mindestAbstand }).subscribe({
       next: (ergebnis) => {
         this.simulation = ergebnis;
         this.simulationLaeuft = false;
@@ -243,6 +267,7 @@ export class EinspeisesteuerungComponent extends WithMessage
         // gesperrt worden waere - erst der Tagesverlauf zeigt, WANN. Ohne das blieben Diagramm und
         // Tabelle auf der Aufzeichnung stehen und widersprachen der Auswertung darunter.
         this.simuliertMitSchwellwert = schwellwert;
+        this.simuliertMitAbstand = mindestAbstand;
         this.ladeTag();
       },
       error: (error) => {

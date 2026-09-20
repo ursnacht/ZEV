@@ -293,7 +293,8 @@ class SteuerentscheidRepositoryIT extends AbstractIntegrationTest {
                          BigDecimal soc, BigDecimal speicherLadung, BigDecimal speicherEntladung,
                          BigDecimal ueberschuss, Steuerregel regel, Steuerzustand batterieladung,
                          Steuerzustand einspeisung, BigDecimal schwellwert, BigDecimal speicherwert,
-                         BigDecimal socMinimum, BigDecimal socHysterese) {
+                         BigDecimal socMinimum, BigDecimal socHysterese,
+                         BigDecimal mindestAbstand) {
 
         /** Erste Fassung — alle Spalten belegt, jede mit einem unverwechselbaren Wert. */
         static Werte erste() {
@@ -314,7 +315,8 @@ class SteuerentscheidRepositoryIT extends AbstractIntegrationTest {
                     new BigDecimal("0.07000"),   // schwellwert
                     new BigDecimal("0.15000"),   // speicherwert
                     new BigDecimal("20.0"),      // socMinimum
-                    new BigDecimal("5.0"));      // socHysterese
+                    new BigDecimal("5.0"),       // socHysterese
+                    new BigDecimal("0.02000"));  // mindestAbstand
         }
 
         /** Zweite Fassung — jeder Wert anders als in {@link #erste()}, auch die drei Enums. */
@@ -336,7 +338,8 @@ class SteuerentscheidRepositoryIT extends AbstractIntegrationTest {
                     new BigDecimal("0.09000"),
                     new BigDecimal("0.21000"),
                     new BigDecimal("25.0"),
-                    new BigDecimal("7.5"));
+                    new BigDecimal("7.5"),
+                    new BigDecimal("0.03000"));
         }
 
         /** Nur die nicht-nullbaren Spalten — Anlage ohne Speicher, kein Preis verfuegbar. */
@@ -347,7 +350,7 @@ class SteuerentscheidRepositoryIT extends AbstractIntegrationTest {
                     new BigDecimal("0.000"),
                     Steuerregel.KEIN_UEBERSCHUSS, Steuerzustand.FREI, Steuerzustand.FREI,
                     new BigDecimal("0.07000"), new BigDecimal("0.15000"),
-                    null, null);
+                    null, null, null);
         }
     }
 
@@ -356,7 +359,8 @@ class SteuerentscheidRepositoryIT extends AbstractIntegrationTest {
                 w.produktion(), w.verbrauch(), w.bezug(), w.ruecklieferung(), w.soc(),
                 w.speicherLadung(), w.speicherEntladung(), w.ueberschuss(),
                 w.regel().name(), w.batterieladung().name(), w.einspeisung().name(),
-                w.schwellwert(), w.speicherwert(), w.socMinimum(), w.socHysterese());
+                w.schwellwert(), w.speicherwert(), w.socMinimum(), w.socHysterese(),
+                w.mindestAbstand());
     }
 
     /** Vergleicht Spalte fuer Spalte — bewusst ohne Schleife, damit die Meldung die Spalte nennt. */
@@ -378,6 +382,7 @@ class SteuerentscheidRepositoryIT extends AbstractIntegrationTest {
         assertThat(s.getSpeicherwert()).isEqualByComparingTo(w.speicherwert());
         assertThat(s.getSocMinimum()).isEqualByComparingTo(w.socMinimum());
         assertThat(s.getSocHysterese()).isEqualByComparingTo(w.socHysterese());
+        assertThat(s.getMindestAbstand()).isEqualByComparingTo(w.mindestAbstand());
     }
 
     /**

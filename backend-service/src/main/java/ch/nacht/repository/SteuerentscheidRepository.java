@@ -77,11 +77,12 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
                                          verbrauch, bezug, ruecklieferung, soc,
                                          speicher_ladung, speicher_entladung, ueberschuss,
                                          regel, batterieladung, einspeisung, schwellwert,
-                                         speicherwert, soc_minimum, soc_hysterese, erstellt_am)
+                                         speicherwert, soc_minimum, soc_hysterese, mindest_abstand,
+                                         erstellt_am)
         VALUES (:orgId, :zeitVon, :preis, :preisTiefRest, :produktion, :verbrauch, :bezug,
                 :ruecklieferung, :soc, :speicherLadung, :speicherEntladung, :ueberschuss,
                 :regel, :batterieladung, :einspeisung, :schwellwert, :speicherwert,
-                :socMinimum, :socHysterese, now())
+                :socMinimum, :socHysterese, :mindestAbstand, now())
         ON CONFLICT (org_id, zeit_von)
         DO UPDATE SET preis           = EXCLUDED.preis,
                       preis_tief_rest = EXCLUDED.preis_tief_rest,
@@ -100,6 +101,7 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
                       speicherwert    = EXCLUDED.speicherwert,
                       soc_minimum     = EXCLUDED.soc_minimum,
                       soc_hysterese   = EXCLUDED.soc_hysterese,
+                      mindest_abstand = EXCLUDED.mindest_abstand,
                       erstellt_am     = now()
         """, nativeQuery = true)
     void upsert(
@@ -121,6 +123,7 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
         @Param("schwellwert") BigDecimal schwellwert,
         @Param("speicherwert") BigDecimal speicherwert,
         @Param("socMinimum") BigDecimal socMinimum,
-        @Param("socHysterese") BigDecimal socHysterese
+        @Param("socHysterese") BigDecimal socHysterese,
+        @Param("mindestAbstand") BigDecimal mindestAbstand
     );
 }

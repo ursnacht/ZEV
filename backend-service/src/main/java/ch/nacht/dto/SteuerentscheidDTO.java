@@ -44,6 +44,8 @@ public class SteuerentscheidDTO {
     private BigDecimal socMinimum;
     /** Hysterese, die beim Entscheid galt; `null` bei Entscheiden vor V162. */
     private BigDecimal socHysterese;
+    /** Mindest-Preisabstand, der beim Entscheid galt; `null` vor V164. */
+    private BigDecimal mindestAbstand;
 
     public SteuerentscheidDTO() {
     }
@@ -214,5 +216,13 @@ public class SteuerentscheidDTO {
 
     public void setSocHysterese(BigDecimal socHysterese) {
         this.socHysterese = socHysterese;
+    }
+
+    public BigDecimal getMindestAbstand() {
+        return mindestAbstand;
+    }
+
+    public void setMindestAbstand(BigDecimal mindestAbstand) {
+        this.mindestAbstand = mindestAbstand;
     }
 }

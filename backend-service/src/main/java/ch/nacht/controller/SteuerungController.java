@@ -77,17 +77,22 @@ public class SteuerungController {
      * @param datum        Tag in Ortszeit (Europe/Zurich)
      * @param schwellwert  zu erprobender Schwellwert; darf negativ sein
      * @param speicherwert zu erprobender Speicherwert; fehlt er, gilt der des Mandanten
+     * @param mindestAbstand zu erprobender Mindest-Preisabstand; fehlt er, gilt der des Mandanten
      */
     @GetMapping("/entscheide/simuliert")
     public ResponseEntity<?> getEntscheideSimuliert(
             @RequestParam("datum") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate datum,
             @RequestParam("schwellwert") BigDecimal schwellwert,
-            @RequestParam(value = "speicherwert", required = false) BigDecimal speicherwert) {
+            @RequestParam(value = "speicherwert", required = false) BigDecimal speicherwert,
+            @RequestParam(value = "mindestAbstand", required = false) BigDecimal mindestAbstand) {
         if (schwellwert == null) {
             return ResponseEntity.badRequest().body("schwellwert ist Pflicht");
         }
-        return ResponseEntity.ok(
-                steuerungService.getEntscheideSimuliert(datum, schwellwert, speicherwert));
+        if (mindestAbstand != null && mindestAbstand.signum() < 0) {
+            return ResponseEntity.badRequest().body("mindestAbstand darf nicht negativ sein");
+        }
+        return ResponseEntity.ok(steuerungService.getEntscheideSimuliert(
+                datum, schwellwert, speicherwert, mindestAbstand));
     }
 
     /**
@@ -115,9 +120,15 @@ public class SteuerungController {
         if (anfrage.schwellwert() == null) {
             return ResponseEntity.badRequest().body("schwellwert ist Pflicht");
         }
+        // Negativ hiesse, auch auf ein TEURERES Intervall zu warten - das ist keine Erprobung,
+        // sondern eine Umkehrung der Regel.
+        if (anfrage.mindestAbstand() != null && anfrage.mindestAbstand().signum() < 0) {
+            return ResponseEntity.badRequest().body("mindestAbstand darf nicht negativ sein");
+        }
 
         SimulationDTO ergebnis = steuerungService.simuliere(
-                anfrage.von(), anfrage.bis(), anfrage.schwellwert(), anfrage.speicherwert());
+                anfrage.von(), anfrage.bis(), anfrage.schwellwert(), anfrage.speicherwert(),
+                anfrage.mindestAbstand());
         return ResponseEntity.ok(ergebnis);
     }
 
@@ -128,8 +139,10 @@ public class SteuerungController {
      * @param bis          letzter Ortstag (einschliesslich)
      * @param schwellwert  zu erprobender Schwellwert; darf negativ sein
      * @param speicherwert zu erprobender Speicherwert; {@code null} → Wert des Mandanten
+     * @param mindestAbstand zu erprobender Mindest-Preisabstand; {@code null} → Wert des Mandanten
      */
     public record SimulationAnfrage(LocalDate von, LocalDate bis,
-                                    BigDecimal schwellwert, BigDecimal speicherwert) {
+                                    BigDecimal schwellwert, BigDecimal speicherwert,
+                                    BigDecimal mindestAbstand) {
     }
 }

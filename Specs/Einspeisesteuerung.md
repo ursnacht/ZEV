@@ -364,6 +364,37 @@ lieferten Job und Kennzahlen für dasselbe Intervall verschiedene Entscheide. Ge
 aggregiert (letzter Wert je 15-Minuten-Intervall): Der Zähler meldet alle 30 Sekunden, über 366
 Tage wäre die volle Zeitreihe die eigentliche Laufzeit (NFR-1).
 
+### FR-2b: Das Warten muss sich lohnen — Mindest-Preisabstand
+
+`WARTEN_AUF_TAL` sperrt nur, wenn das erwartete Tal um **mindestens** `mindestAbstand` unter dem
+aktuellen Preis liegt:
+
+```
+preisTiefRest < preis − mindestAbstand        (Vorgabe: 0.02 CHF/kWh)
+```
+
+Die Bedingung tritt **neben** die beiden bestehenden (Tal unter Schwellwert, Tal unter aktuellem
+Preis); sie ersetzt keine davon. `0` oder leer stellt das Verhalten davor her.
+
+> **Warum.** Die Regel prüfte bis dahin nur, **ob** das Tal tiefer liegt — nicht, **wie viel**.
+> An vier ausgewerteten Tagen (17.–20.09.2026) sperrte sie an dreien bis in den frühen Nachmittag.
+> Am 19.09. stand der Preis um 09:45 bereits bei rund 0.010 und das Tal bei 0.005: vier weitere
+> Stunden Sperre, mitten in der besten Sonne, für **einen halben Rappen** je Kilowattstunde. Über
+> eine volle Ladung sind das fünf Rappen — das Risiko einer am Abend leeren Batterie steht
+> dagegen bei einem Vielfachen.
+
+> **Warum keine Regel „ab 13 Uhr laden".** Das war der ursprüngliche Vorschlag. Eine feste Uhrzeit
+> trifft die Sache nicht: Am 18.09. lag das Tal bei 0.05 gegenüber 0.15 am Mittag — dort **lohnte**
+> das Warten, und eine Zwangsladung ab 13 Uhr hätte rund 1.10 CHF an einem einzigen Tag gekostet.
+> Der Abstand unterscheidet beide Fälle, die Uhrzeit nicht. Dazu ist 13 Uhr jahreszeitabhängig:
+> im Dezember ist der brauchbare Teil des Tages dann fast vorbei, im Juni bleiben Stunden.
+
+**Erprobbar wie der Schwellwert** (FR-6): Die Rückrechnung nimmt ihn als zweiten Parameter
+entgegen — anders als Mindest-Ladezustand und Hysterese, deren Wirkung sich erst im Betrieb zeigt.
+Zusammen mit dem Schwellwert bestimmt er, **wie oft** `WARTEN_AUF_TAL` greift; genau daran lässt
+sich kalibrieren. Ein negativer Wert wird mit `400` abgewiesen: Er hiesse, auch auf ein *teureres*
+Intervall zu warten.
+
 ### FR-3: Persistierung
 
 Neue Tabelle `zev.steuerentscheid` (Flyway `V<nächste freie>__Create_Steuerentscheid.sql` — **die höchste vergebene Nummer vor dem Anlegen prüfen**; `Specs/Batteriespeicher.md` braucht ebenfalls eine Migration, und wer zuerst umsetzt, nimmt die nächste):
@@ -617,7 +648,9 @@ geändert hätte. Die **Kennzahlen** der Rückrechnung brauchen beides nicht und
 
 ### FR-6: Nachrechnen über die Historie
 
-`POST /simulation` rechnet die Regel über den gewählten Zeitraum neu — aus `zev.preiszeitreihe` und
+`POST /simulation` rechnet die Regel über den gewählten Zeitraum neu — mit **zwei** erprobbaren
+Grössen: `schwellwert` (Pflicht) und `mindestAbstand` (optional, sonst der Wert des Mandanten).
+Aus `zev.preiszeitreihe` und
 `zev.messwerte`, **ohne** gespeicherte Entscheide zu lesen oder zu verändern.
 
 Das Ergebnis nennt je Schwellwert:
@@ -710,12 +743,13 @@ eigenen Zähler hat** — einen Einheiten-Typ `SPEICHER` gibt es bis heute nicht
 
 ### FR-7: Einstellungen je Mandant
 
-Die fünf Werte aus FR-2 und FR-2a werden in der bestehenden Maske **Einstellungen** gepflegt
+Die sechs Werte aus FR-2, FR-2a und FR-2b werden in der bestehenden Maske **Einstellungen** gepflegt
 (`Specs/Einstellungen.md`), in einem eigenen Abschnitt **Einspeisesteuerung**:
 
 | Feld | Eingabe | Validierung |
 |---|---|---|
 | Schwellwert | Zahl, CHF/kWh | 5 Nachkommastellen; **negativ erlaubt** |
+| Mindest-Preisabstand | Zahl, CHF/kWh | 5 Nachkommastellen; **nicht negativ**; leer → Vorgabe 0.02; 0 schaltet die Prüfung ab |
 | Speicherwert | Zahl, CHF/kWh | 5 Nachkommastellen; **negativ erlaubt** |
 | Mindest-Ladezustand | Zahl, % | 0–100; leer erlaubt (→ Vorgabe 20); **nicht negativ** — ein Ladezustand ist ein Anteil, kein Preis |
 | Hysterese Ladezustand | Zahl, Prozentpunkte | 0–100; leer erlaubt (→ Vorgabe 5); **nicht negativ**; 0 schaltet sie ab |
@@ -796,6 +830,8 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 | `STEUERUNG_SOC_MINIMUM` | Mindest-Ladezustand | Minimum state of charge |
 | `STEUERUNG_SOC_MINIMUM_HINWEIS` | Fällt der Ladezustand unter diesen Wert … | If the state of charge drops below this value … |
 | `STEUERUNG_SOC_HYSTERESE` | Hysterese Ladezustand | State of charge hysteresis |
+| `STEUERUNG_MINDEST_ABSTAND` | Mindest-Preisabstand | Minimum price gap |
+| `STEUERUNG_MINDEST_ABSTAND_HINWEIS` | Um so viel muss das erwartete Preistal unter dem aktuellen Preis liegen … | The expected price trough must lie at least this far below the current price … |
 | `STEUERUNG_SOC_HYSTERESE_HINWEIS` | Prozentpunkte über dem Mindest-Ladezustand … | Percentage points above the minimum state of charge … |
 | `FEATURE_FLAG_EINSPEISESTEUERUNG` | Einspeisesteuerung (Trockenlauf) | Feed-in control (dry run) |
 
@@ -911,6 +947,15 @@ Der Text ist an kein Feature gebunden.
 * [ ] **Steht der aktuelle Preis bereits auf dem Tiefstpreis des Resttages, wird `LADEN` entschieden, nicht `WARTEN_AUF_TAL`** — es gibt nichts, worauf sich warten liesse.
 * [ ] Liegt der Tiefstpreis des Resttages **über** dem aktuellen Preis, wird geladen, auch wenn er unter dem Schwellwert liegt.
 * [ ] Fehlt der aktuelle Preis, greift `WARTEN_AUF_TAL` **nicht**.
+* [ ] **Liegt das Tal weniger als `mindestAbstand` unter dem aktuellen Preis, wird nicht gesperrt**
+  — bei Preis 0.010 und Tal 0.005 lautet die Regel `LADEN`.
+* [ ] Liegt es deutlich darunter (0.150 gegen 0.050), sperrt sie unverändert.
+* [ ] **Genau** um den Abstand tiefer genügt **nicht** — die Bedingung ist ein echtes Kleiner-als.
+* [ ] Ohne Abstand (leer oder 0) verhält sich die Regel wie vor V164.
+* [ ] Der Abstand ersetzt die Schwellwert-Bedingung nicht: Liegt das Tal über dem Schwellwert, wird
+  auch bei grossem Abstand nicht gesperrt.
+* [ ] Die Rückrechnung nimmt den Abstand entgegen; ein negativer Wert wird mit `400` abgewiesen.
+* [ ] Jeder Entscheid trägt den beim Entscheid geltenden Abstand.
 * [ ] Das Ergebnis nennt Tage, Intervalle, Auslösungen je Regel und die verschobene Energie.
 * [ ] Ein Zeitraum über 366 Tage wird mit `400` abgewiesen.
 * [ ] **Nach dem Nachrechnen zeigen Diagramm und Tabelle denselben Tag mit dem erprobten Schwellwert** — die Zustandsbänder sagen, *wann* gesperrt worden wäre.

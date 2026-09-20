@@ -65,8 +65,9 @@ public class SteuerRegelService {
      *       <b>Hysterese</b>: Gilt die Freigabe bereits, endet sie erst {@code socHysterese}
      *       Punkte über dem Mindestwert.</li>
      *   <li>{@code EINSPEISEN_LOHNT} — die Vergütung übertrifft den Wert einer gespeicherten kWh.</li>
-     *   <li>{@code WARTEN_AUF_TAL} — heute kommt noch etwas <b>Billigeres als jetzt</b>, und es
-     *       liegt unter dem Schwellwert; Kapazität dafür freihalten.</li>
+     *   <li>{@code WARTEN_AUF_TAL} — heute kommt noch etwas <b>spürbar Billigeres als jetzt</b>,
+     *       und es liegt unter dem Schwellwert; Kapazität dafür freihalten. „Spürbar" heisst: um
+     *       mindestens {@code mindestAbstand}.</li>
      *   <li>{@code KEIN_UEBERSCHUSS} / {@code LADEN} — keine Sperre. Beide ergeben
      *       {@code FREI}/{@code FREI} und unterscheiden sich nur in der Begründung.</li>
      * </ol>
@@ -97,10 +98,13 @@ public class SteuerRegelService {
      *                     {@code null} schaltet die Regel ab
      * @param socHysterese Prozentpunkte, um die die Grenze steigt, solange die Freigabe gilt;
      *                     {@code null} oder 0 schaltet die Hysterese ab
+     * @param mindestAbstand Betrag in CHF/kWh, um den das Tal unter dem aktuellen Preis liegen
+     *                     muss; {@code null} oder 0 stellt das Verhalten vor V164 her
      * @return der Entscheid samt Überschuss
      */
     public Entscheid entscheide(Eingabe eingabe, BigDecimal schwellwert, BigDecimal speicherwert,
-                                BigDecimal socMinimum, BigDecimal socHysterese) {
+                                BigDecimal socMinimum, BigDecimal socHysterese,
+                                BigDecimal mindestAbstand) {
         BigDecimal ueberschuss = ueberschuss(eingabe);
 
         // 1. Negativer Preis: Einspeisen kostet Geld. Die Batterie darf laden - sie nimmt Energie
@@ -156,10 +160,18 @@ public class SteuerRegelService {
         //
         //    Ohne Preis wird nicht gesperrt: Ein Vergleich ohne die eine Seite ist keiner, und
         //    Nichtstun ist der sichere Zustand.
+        //    DRITTE Bedingung seit V164 - der Abstand muss die Wartezeit wert sein:
+        //      c) das Tal liegt um MINDESTENS mindestAbstand unter dem Preis jetzt
+        //
+        //    Ohne (c) sperrte die Regel auch fuer einen halben Rappen. Am 19.09.2026 stand bei
+        //    Hene der Preis um 09:45 bei rund 0.010 und das Tal bei 0.005; die Sperre lief
+        //    weitere vier Stunden - mitten in der besten Sonne - und brachte ueber eine volle
+        //    Ladung fuenf Rappen. Dafuer stand das Risiko einer am Abend leeren Batterie.
         if (eingabe.preisTiefRest() != null
                 && eingabe.preisTiefRest().compareTo(schwellwert) < 0
                 && eingabe.preis() != null
-                && eingabe.preisTiefRest().compareTo(eingabe.preis()) < 0) {
+                && eingabe.preisTiefRest().compareTo(
+                        eingabe.preis().subtract(abstandOderNull(mindestAbstand))) < 0) {
             return new Entscheid(Steuerregel.WARTEN_AUF_TAL,
                     Steuerzustand.GESPERRT, Steuerzustand.FREI, ueberschuss);
         }
@@ -205,6 +217,11 @@ public class SteuerRegelService {
             return socMinimum;
         }
         return socMinimum.add(socHysterese);
+    }
+
+    /** Der Mindestabstand, oder 0, wenn keiner gesetzt ist — dann gilt das Verhalten vor V164. */
+    private BigDecimal abstandOderNull(BigDecimal mindestAbstand) {
+        return mindestAbstand == null ? BigDecimal.ZERO : mindestAbstand;
     }
 
     /**

@@ -1042,3 +1042,53 @@ Integrationstests liefen seither nicht mehr durch; `mvn test` allein blieb grün
 Behoben in einem eigenen Commit.
 
 **Geprüft:** `mvn verify` vollständig grün — 1337 Unit-Tests und 344 Integrationstests.
+
+---
+
+## Nachtrag 23 — Mindest-Preisabstand für `WARTEN_AUF_TAL` (20.09.2026)
+
+Aus der Beobachtung von vier Tagen (17.–20.09.2026) entstanden. Ausgangsfrage war eine Regel
+„ab 13 Uhr laden"; die Daten sprachen dagegen und zeigten die eigentliche Lücke.
+
+**Was die vier Tage zeigen.** Die Sperre endete an dreien erst im frühen Nachmittag (13:00, 14:00,
+15:00). Der Grund war an zweien **nicht** ein lohnendes Tal, sondern ein fast bedeutungsloses: Am
+19.09. lag der Preis um 09:45 bei rund 0.010 und das erwartete Tal bei 0.005. Die Regel sperrte
+weitere vier Stunden — mitten in der besten Sonne — für einen halben Rappen je kWh.
+
+**Die Ursache:** `WARTEN_AUF_TAL` prüfte nur, **ob** das Tal tiefer liegt, nicht **wie viel**.
+Dritte Bedingung ist jetzt `preisTiefRest < preis − mindestAbstand`, Vorgabe 0.02 CHF/kWh.
+
+**Warum nicht die Uhrzeit-Regel.** Sie hätte am 18.09. das lohnende Tal verpasst (0.05 gegen 0.15,
+bei 11 kWh rund 1.10 CHF an einem Tag) und am 19.09. immer noch bis 13 Uhr gesperrt. Der Abstand
+unterscheidet die beiden Fälle, die Uhrzeit nicht — und er ist unabhängig von der Jahreszeit.
+
+**Erprobbar gemacht.** Der Abstand geht als zweiter Parameter in die Rückrechnung (`POST
+/simulation` und `GET /entscheide/simuliert`), damit sich vor jeder Entscheidung über die ganze
+Historie ansehen lässt, wie viele Sperrstunden wegfallen. Mindest-Ladezustand und Hysterese bleiben
+bewusst **nicht** erprobbar: Sie wirken erst im Betrieb, und drei frei wählbare Grössen machten die
+Kennzahlen mehrdeutig.
+
+**Die Maske führt ihn mit.** `simuliertMitAbstand` steht neben `simuliertMitSchwellwert` — sonst
+lüde ein Tageswechsel den Tag zwar weiter nachgerechnet, aber mit dem Abstand des **Mandanten**
+statt dem erprobten, und die Tagesansicht widersprache den Kennzahlen darunter, ohne dass man es
+sähe. Derselbe Fehler war bei FR-6a schon einmal zu beheben.
+
+**Fünf neue Regeltests**, darunter die beiden echten Tage: 0.010 gegen 0.005 ergibt `LADEN`,
+0.150 gegen 0.050 weiterhin `WARTEN_AUF_TAL`. Dazu der Grenzfall (genau um den Abstand tiefer
+genügt nicht), das Abschalten über 0, und dass der Abstand die Schwellwert-Bedingung **nicht**
+ersetzt.
+
+**Der neue Upsert-IT hat sich sofort bezahlt gemacht:** Er brach beim Kompilieren, weil die
+20. Spalte in seinem Gerüst fehlte — genau die Stelle, an der zwei Tage zuvor die Platzhalter
+vergessen worden waren.
+
+**Geprüft:** `mvn verify` vollständig grün — **1342** Unit-Tests, 344 Integrationstests; Frontend
+gebaut, 1660 Tests grün.
+
+**Nötig:** Rebuild für V164 und V165.
+
+> **Noch offen:** Ob 0.02 der richtige Abstand ist. Das lässt sich jetzt **nachrechnen** — mit
+> verschiedenen Werten über dieselbe Historie —, statt es zu schätzen. Und der 18.09. bleibt
+> knapp: Dort ist das Warten wirtschaftlich richtig und trotzdem riskant. Ob es dafür zusätzlich
+> ein Sicherheitsnetz braucht, wäre nach dem Abstand an längeren Daten zu entscheiden — ein
+> Problem auf einmal.

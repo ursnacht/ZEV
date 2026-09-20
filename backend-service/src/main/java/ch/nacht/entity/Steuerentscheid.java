@@ -194,6 +194,15 @@ public class Steuerentscheid {
     @Column(name = "soc_hysterese", precision = 5, scale = 1)
     private BigDecimal socHysterese;
 
+    /**
+     * Der beim Entscheid geltende Mindest-Preisabstand in CHF/kWh; {@code null} vor V164.
+     *
+     * <p>Ohne ihn liesse sich nicht erklaeren, warum ein Intervall NICHT gesperrt wurde, obwohl im
+     * Rest des Tages ein tieferer Preis stand: Der Abstand war zu klein.
+     */
+    @Column(name = "mindest_abstand", precision = 10, scale = 5)
+    private BigDecimal mindestAbstand;
+
     @Column(name = "erstellt_am", nullable = false)
     private LocalDateTime erstelltAm;
 
@@ -294,6 +303,14 @@ public class Steuerentscheid {
 
     public void setSocHysterese(BigDecimal socHysterese) {
         this.socHysterese = socHysterese;
+    }
+
+    public BigDecimal getMindestAbstand() {
+        return mindestAbstand;
+    }
+
+    public void setMindestAbstand(BigDecimal mindestAbstand) {
+        this.mindestAbstand = mindestAbstand;
     }
 
     public BigDecimal getSpeicherLadung() {

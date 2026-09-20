@@ -31,6 +31,8 @@ export interface SteuerKonfiguration {
   socMinimum?: number | null;
   /** Prozentpunkte ueber dem Mindestwert, bis zu denen die Freigabe weiterlaeuft. */
   socHysterese?: number | null;
+  /** Mindestabstand in CHF/kWh, um den das Tal unter dem aktuellen Preis liegen muss. */
+  mindestAbstand?: number | null;
 }
 
 /**

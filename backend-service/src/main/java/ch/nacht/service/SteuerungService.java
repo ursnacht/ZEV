@@ -133,6 +133,7 @@ public class SteuerungService {
         BigDecimal speicherwert = konfiguration.speicherwertOderVorgabe();
         BigDecimal socMinimum = konfiguration.socMinimumOderVorgabe();
         BigDecimal socHysterese = konfiguration.socHystereseOderVorgabe();
+        BigDecimal mindestAbstand = konfiguration.mindestAbstandOderVorgabe();
 
         Messung messung = messungFuer(zeitVon);
         BigDecimal preis = preisFuer(zeitVon);
@@ -144,7 +145,7 @@ public class SteuerungService {
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(preis, preisTiefRest,
                         messung.produktion(), messung.verbrauch(), soc, socTiefGaltZuvor),
-                schwellwert, speicherwert, socMinimum, socHysterese);
+                schwellwert, speicherwert, socMinimum, socHysterese, mindestAbstand);
 
         steuerentscheidRepository.upsert(orgId, zeitVon, preis, preisTiefRest,
                 messung.produktion(), messung.verbrauch(), messung.bezug(),
@@ -152,7 +153,7 @@ public class SteuerungService {
                 entscheid.ueberschuss(),
                 entscheid.regel().name(), entscheid.batterieladung().name(),
                 entscheid.einspeisung().name(), schwellwert, speicherwert, socMinimum,
-                socHysterese);
+                socHysterese, mindestAbstand);
 
         // Auf INFO und mit den Eingangsgroessen: Ein Entscheid ohne die Zahlen, aus denen er
         // entstand, laesst sich im Nachhinein nicht pruefen - und genau diese Pruefung war noetig,
@@ -213,7 +214,8 @@ public class SteuerungService {
      */
     @Transactional(readOnly = true)
     public SimulationDTO simuliere(LocalDate von, LocalDate bis,
-                                   BigDecimal schwellwert, BigDecimal speicherwert) {
+                                   BigDecimal schwellwert, BigDecimal speicherwert,
+                                   BigDecimal mindestAbstand) {
         Long orgId = organizationContextService.getCurrentOrgId();
         pruefeFeatureFlag(orgId);
         hibernateFilterService.enableOrgFilter();
@@ -221,6 +223,7 @@ public class SteuerungService {
         BigDecimal wirksamerSpeicherwert = speicherwertOderMandant(orgId, speicherwert);
         BigDecimal wirksamesSocMinimum = socMinimumDesMandanten(orgId);
         BigDecimal wirksameSocHysterese = socHystereseDesMandanten(orgId);
+        BigDecimal wirksamerAbstand = mindestAbstandOderMandant(orgId, mindestAbstand);
 
         Map<Steuerregel, Integer> jeRegel = new EnumMap<>(Steuerregel.class);
         for (Steuerregel regel : Steuerregel.values()) {
@@ -231,7 +234,7 @@ public class SteuerungService {
         int[] tage = new int[1];
 
         tage[0] = rechneNach(orgId, von, bis, schwellwert, wirksamerSpeicherwert,
-                wirksamesSocMinimum, wirksameSocHysterese, n -> {
+                wirksamesSocMinimum, wirksameSocHysterese, wirksamerAbstand, n -> {
             // Nur Intervalle mit Ueberschuss zaehlen - siehe Methodenkommentar.
             if (n.entscheid().ueberschuss().signum() <= 0) {
                 return;
@@ -256,6 +259,7 @@ public class SteuerungService {
         dto.setBis(bis);
         dto.setSchwellwert(schwellwert);
         dto.setSpeicherwert(wirksamerSpeicherwert);
+        dto.setMindestAbstand(wirksamerAbstand);
         dto.setTage(tage[0]);
         dto.setIntervalle(intervalle);
         dto.setJeRegel(jeRegel);
@@ -290,7 +294,8 @@ public class SteuerungService {
      */
     @Transactional(readOnly = true)
     public List<SteuerentscheidDTO> getEntscheideSimuliert(LocalDate datum, BigDecimal schwellwert,
-                                                           BigDecimal speicherwert) {
+                                                           BigDecimal speicherwert,
+                                                           BigDecimal mindestAbstand) {
         Long orgId = organizationContextService.getCurrentOrgId();
         pruefeFeatureFlag(orgId);
         hibernateFilterService.enableOrgFilter();
@@ -299,12 +304,13 @@ public class SteuerungService {
 
         BigDecimal wirksamesSocMinimum = socMinimumDesMandanten(orgId);
         BigDecimal wirksameSocHysterese = socHystereseDesMandanten(orgId);
+        BigDecimal wirksamerAbstand = mindestAbstandOderMandant(orgId, mindestAbstand);
 
         List<SteuerentscheidDTO> dtos = new ArrayList<>();
         rechneNach(orgId, datum, datum, schwellwert, wirksamerSpeicherwert, wirksamesSocMinimum,
-                wirksameSocHysterese,
+                wirksameSocHysterese, wirksamerAbstand,
                 n -> dtos.add(zuDto(n, schwellwert, wirksamerSpeicherwert, wirksamesSocMinimum,
-                        wirksameSocHysterese)));
+                        wirksameSocHysterese, wirksamerAbstand)));
         reichereSpeicherAn(dtos, datum);
 
         log.info("Steuerung nachgerechnet: org={} tag={} schwellwert={} -> {} Intervalle",
@@ -332,7 +338,7 @@ public class SteuerungService {
      */
     private int rechneNach(Long orgId, LocalDate von, LocalDate bis, BigDecimal schwellwert,
                            BigDecimal speicherwert, BigDecimal socMinimum, BigDecimal socHysterese,
-                           Consumer<Nachgerechnet> verbraucher) {
+                           BigDecimal mindestAbstand, Consumer<Nachgerechnet> verbraucher) {
         // Preise einmal laden, nach Ortstag buendeln und dabei auf Ortszeit umschluesseln: Der
         // Tiefstpreis des Resttages ist fuer jedes Intervall neu zu bestimmen, und eine Abfrage je
         // Intervall waere bei 35'000 Intervallen die eigentliche Laufzeit (NFR-1). Ab hier ist
@@ -380,7 +386,7 @@ public class SteuerungService {
             SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                     new SteuerRegelService.Eingabe(preis, preisTiefRest,
                             messung.produktion(), messung.verbrauch(), soc, socTiefGaltZuvor),
-                    schwellwert, speicherwert, socMinimum, socHysterese);
+                    schwellwert, speicherwert, socMinimum, socHysterese, mindestAbstand);
             socTiefGaltZuvor = entscheid.regel() == Steuerregel.SOC_TIEF;
 
             verbraucher.accept(
@@ -416,6 +422,20 @@ public class SteuerungService {
      */
     private BigDecimal socMinimumDesMandanten(Long orgId) {
         return einstellungenService.getSteuerKonfiguration(orgId).socMinimumOderVorgabe();
+    }
+
+    /**
+     * Der uebergebene Mindest-Preisabstand, oder - bei {@code null} - der des Mandanten.
+     *
+     * <p><b>Erprobbar</b>, anders als Mindest-Ladezustand und Hysterese: Er entscheidet zusammen
+     * mit dem Schwellwert darueber, wie oft {@code WARTEN_AUF_TAL} greift, und ist damit genau
+     * die zweite Groesse, an der sich beim Kalibrieren drehen laesst. Was die beiden
+     * Ladezustands-Werte tun, zeigt sich dagegen erst im Betrieb.
+     */
+    private BigDecimal mindestAbstandOderMandant(Long orgId, BigDecimal mindestAbstand) {
+        return mindestAbstand != null
+                ? mindestAbstand
+                : einstellungenService.getSteuerKonfiguration(orgId).mindestAbstandOderVorgabe();
     }
 
     /** Die Hysterese des Mandanten - wie der Mindestwert nicht erprobbar. */
@@ -743,7 +763,7 @@ public class SteuerungService {
      */
     private SteuerentscheidDTO zuDto(Nachgerechnet n, BigDecimal schwellwert,
                                      BigDecimal speicherwert, BigDecimal socMinimum,
-                                     BigDecimal socHysterese) {
+                                     BigDecimal socHysterese, BigDecimal mindestAbstand) {
         SteuerentscheidDTO dto = new SteuerentscheidDTO();
         dto.setZeit(n.zeit());
         dto.setPreis(n.preis());
@@ -765,6 +785,7 @@ public class SteuerungService {
         dto.setSpeicherwert(speicherwert);
         dto.setSocMinimum(socMinimum);
         dto.setSocHysterese(socHysterese);
+        dto.setMindestAbstand(mindestAbstand);
         return dto;
     }
 
@@ -789,6 +810,7 @@ public class SteuerungService {
         dto.setSpeicherwert(entscheid.getSpeicherwert());
         dto.setSocMinimum(entscheid.getSocMinimum());
         dto.setSocHysterese(entscheid.getSocHysterese());
+        dto.setMindestAbstand(entscheid.getMindestAbstand());
         return dto;
     }
 

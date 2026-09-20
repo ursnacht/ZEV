@@ -92,6 +92,8 @@ export interface Steuerentscheid {
   socMinimum: number | null;
   /** Hysterese, die beim Entscheid galt; `null` bei Entscheiden vor V162. */
   socHysterese: number | null;
+  /** Mindest-Preisabstand, der beim Entscheid galt; `null` vor V164. */
+  mindestAbstand: number | null;
 }
 
 /** Anfrage der Rückrechnung. */
@@ -99,6 +101,8 @@ export interface SimulationAnfrage {
   von: string;
   bis: string;
   schwellwert: number;
+  /** Zu erprobender Mindest-Preisabstand; `null` → Wert des Mandanten. */
+  mindestAbstand?: number | null;
   /** `null` → Wert des Mandanten. */
   speicherwert?: number | null;
 }
