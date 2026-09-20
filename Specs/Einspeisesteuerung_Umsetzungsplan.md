@@ -1017,12 +1017,18 @@ Einfügereihenfolge verdreht, damit nicht die Id entscheidet), Wert genau auf de
 leeres Intervall liefert **keine** Zeile (worauf die `floorEntry`-Logik im Service baut), Zeitraum
 ohne Daten, ganzer Tag → 96 Buckets.
 
-> **Grenze dieser Tests:** Das Schema der Integrationstests erzeugt **Hibernate**
-> (`ddl-auto=create-drop`), nicht Flyway. Der Sequenz-Default auf `id` und der Unique-Constraint
-> `uq_steuerentscheid_org_zeit` fehlen dort und werden im Test selbst nachgezogen. Damit kann der
-> Test **nicht** bezeugen, dass der Konfliktschlüssel zum Constraint der echten Tabelle passt —
-> das bleibt Sache der Migration. Enger ziehen liesse sich das über
-> `@Table(uniqueConstraints = …)` an der Entity.
+> **Grenze dieser Tests, zur Hälfte behoben:** Das Schema der Integrationstests erzeugt
+> **Hibernate** (`ddl-auto=create-drop`), nicht Flyway. Der Unique-Constraint
+> `uq_steuerentscheid_org_zeit` steht deshalb jetzt als `@UniqueConstraint` an der **Entity** und
+> kommt damit aus derselben Quelle wie das übrige Schema. Solange der Test ihn selbst anlegte,
+> konnte er nicht bezeugen, dass der Konfliktschlüssel zu einem Constraint passt, den die
+> Anwendung wirklich kennt — er stellte genau die Bedingung her, die er prüfen sollte. In der
+> Produktion ändert das nichts: Dort gilt `ddl-auto: validate`, und Hibernate validiert
+> Unique-Constraints ohnehin nicht; die echte Tabelle trägt ihn seit V145.
+>
+> Der **Sequenz-Default auf `id`** bleibt Testsache: Das native `INSERT` nennt die Spalte nicht,
+> weil die echte Tabelle `DEFAULT nextval(...)` trägt, während die Entity ihre Id über
+> `@GeneratedValue(SEQUENCE)` in Java zieht. Das lässt sich an der Entity nicht ausdrücken.
 
 **Bewusst nicht geprüft:** `erstellt_am` beim Überschreiben (`now()` ist innerhalb einer
 Transaktion konstant — ein „wird neu gesetzt"-Vergleich wäre eine Scheinprüfung), zwei Werte mit

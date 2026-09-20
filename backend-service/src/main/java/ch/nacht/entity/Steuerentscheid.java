@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.NotNull;
 import org.hibernate.annotations.Filter;
 
@@ -40,7 +41,14 @@ import java.time.LocalDateTime;
  * man sähe die Wirkung und wüsste die Ursache nicht.
  */
 @Entity
-@Table(name = "steuerentscheid", schema = "zev")
+@Table(name = "steuerentscheid", schema = "zev",
+        // Deckungsgleich mit V145. Der native Upsert verlaesst sich auf
+        // ON CONFLICT (org_id, zeit_von); ohne passenden Constraint scheitert jeder Aufruf mit
+        // "there is no unique or exclusion constraint matching the ON CONFLICT specification".
+        // Hier deklariert, damit ein aus den Entities erzeugtes Schema - etwa in den
+        // Integrationstests - ihn mitbringt, statt dass jeder Test ihn selbst nachziehen muss.
+        uniqueConstraints = @UniqueConstraint(name = "uq_steuerentscheid_org_zeit",
+                columnNames = {"org_id", "zeit_von"}))
 @Filter(name = "orgFilter", condition = "org_id = :orgId")
 public class Steuerentscheid {
 

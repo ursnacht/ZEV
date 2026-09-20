@@ -76,39 +76,31 @@ class SteuerentscheidRepositoryIT extends AbstractIntegrationTest {
         fremd.setErstelltAm(LocalDateTime.now());
         fremdOrgId = organisationRepository.save(fremd).getId();
 
-        ergaenzeSchemaWieV145();
+        ergaenzeIdDefault();
     }
 
     /**
-     * Holt die beiden Eigenschaften der echten Tabelle nach, die der Upsert braucht.
+     * Holt die eine Eigenschaft der echten Tabelle nach, die der Upsert braucht.
      *
      * <p>Das Schema dieses Tests stammt von Hibernate ({@code ddl-auto=create-drop}, Flyway ist
-     * hier abgeschaltet) und nicht aus den Migrationen. Hibernate erzeugt aus der Entity zwei
-     * Dinge <b>nicht</b>, die {@code V145__Create_Steuerentscheid.sql} anlegt und auf die das
-     * native {@code INSERT} angewiesen ist:
+     * hier abgeschaltet) und nicht aus den Migrationen. Der <b>Default auf {@code id}</b> fehlt
+     * dort: Das native {@code INSERT} nennt die Spalte nicht, weil die echte Tabelle
+     * {@code DEFAULT nextval(...)} traegt — die Entity dagegen zieht ihre Id ueber
+     * {@code @GeneratedValue(SEQUENCE)} in Java, weshalb Hibernate die Spalte ohne Default erzeugt.
      *
-     * <ul>
-     *   <li>den <b>Default auf {@code id}</b> — das {@code INSERT} nennt die Spalte nicht, weil die
-     *       echte Tabelle {@code DEFAULT nextval(...)} traegt; die Entity dagegen zieht ihre Id
-     *       ueber {@code @GeneratedValue(SEQUENCE)} in Java, weshalb Hibernate die Spalte ohne
-     *       Default erzeugt;</li>
-     *   <li>den <b>Unique-Constraint {@code uq_steuerentscheid_org_zeit}</b> — ohne ihn scheitert
-     *       jedes {@code ON CONFLICT (org_id, zeit_von)} mit
-     *       {@code there is no unique or exclusion constraint matching the ON CONFLICT
-     *       specification}. Dass Schluessel und Constraint zusammenpassen, ist die stillste
-     *       Annahme des Upserts.</li>
-     * </ul>
+     * <p>Den <b>Unique-Constraint</b> {@code uq_steuerentscheid_org_zeit} zog dieser Test zuerst
+     * ebenfalls selbst nach. Er steht jetzt als {@code @UniqueConstraint} an der Entity und kommt
+     * damit aus derselben Quelle wie das uebrige Schema. Das ist mehr als Bequemlichkeit: Solange
+     * der Test ihn selbst anlegte, konnte er nicht bezeugen, dass der Konfliktschluessel des
+     * Upserts zu einem Constraint passt, den die Anwendung wirklich kennt — er stellte genau die
+     * Bedingung her, die er pruefen sollte.
      *
-     * <p>Beides ist DDL innerhalb der Testtransaktion und wird mit ihr zurueckgerollt.
+     * <p>Die DDL laeuft innerhalb der Testtransaktion und wird mit ihr zurueckgerollt.
      */
-    private void ergaenzeSchemaWieV145() {
+    private void ergaenzeIdDefault() {
         entityManager.createNativeQuery(
                 "ALTER TABLE zev.steuerentscheid "
                         + "ALTER COLUMN id SET DEFAULT nextval('zev.steuerentscheid_seq')")
-                .executeUpdate();
-        entityManager.createNativeQuery(
-                "CREATE UNIQUE INDEX IF NOT EXISTS uq_steuerentscheid_org_zeit "
-                        + "ON zev.steuerentscheid (org_id, zeit_von)")
                 .executeUpdate();
     }
 
