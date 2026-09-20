@@ -126,16 +126,20 @@ anderweitig gebunden ist:
 | `einspeisung` | `FREI` | Der Überschuss **darf** ins Netz eingespiesen werden. |
 | | **`GESPERRT`** | Es soll **nicht** eingespiesen werden. |
 
-> **Jede Sperre ist eine reine Preisentscheidung.** Die drei Regeln, die überhaupt sperren —
-> `PREIS_NEGATIV`, `EINSPEISEN_LOHNT`, `WARTEN_AUF_TAL` — werten **nur Preise** aus; die beiden
-> übrigen (`KEIN_UEBERSCHUSS`, `LADEN`) brauchen Messwerte, lassen aber beide Zustände `FREI`.
+> **Jede Sperre ist eine reine Preisentscheidung** — **das galt bis FR-2a.** Die drei sperrenden
+> Regeln (`PREIS_NEGATIV`, `EINSPEISEN_LOHNT`, `WARTEN_AUF_TAL`) werten nur Preise aus. Damit stand
+> der Schaltplan eines Tages fest, sobald die Preise vorlagen, und die Anlage liesse sich über einen
+> **Fahrplan** steuern, den der Wechselrichter selbst ausführt
+> (`Specs/Solinteg_Modbus_Register.md`).
 >
-> Das ist keine Beobachtung am Rande, sondern eine Eigenschaft, an der eine künftige Ausbaustufe
-> hängt: Der Schaltplan eines Tages steht fest, sobald die Preise vorliegen. Eine Anlage liesse
-> sich damit über einen **Fahrplan** steuern, den der Wechselrichter selbst ausführt, statt über
-> Schaltbefehle im 15-Minuten-Takt — und wäre damit unabhängig davon, ob das Gateway gerade läuft
-> (`Specs/Solinteg_Modbus_Register.md`). Würde später eine Regel ergänzt, die **sperrt und dabei
-> Messwerte auswertet**, fällt diese Möglichkeit weg.
+> **`SOC_TIEF` hebt das auf.** Die Regel wertet einen **Messwert** aus und hängt damit am laufenden
+> Betrieb. Ein Fahrplan allein genügt nicht mehr: Er müsste zur Laufzeit aufgehoben werden können,
+> sobald der Speicher unter die Grenze fällt. Das ist der Preis dieser Regel und war bei ihrer
+> Aufnahme bekannt — ein Speicher, der leerläuft, während auf ein Preistal gewartet wird, kostet
+> mehr, als die Bequemlichkeit eines Fahrplans wert ist.
+>
+> Was bleibt: Die **Sperren** sind weiterhin im Voraus berechenbar. Nur ihre **Aufhebung** ist es
+> nicht.
 
 `GESPERRT` bei der Batterieladung ist damit kein Abschalten, sondern eine **Umlenkung**: nicht
 jetzt speichern, sondern einspeisen. In beiden Fällen, in denen die Sperre auftritt (Regeln 3 und
@@ -299,6 +303,44 @@ damit gespart.
   Begründung wie bei `preiszeitreihe.preis`).
 * Der **Takt des Jobs** bleibt in `application.yml` (`ZEV_STEUERUNG_CRON`, Vorgabe
   `0 1,16,31,46 * * * *`): Er betrifft den Betrieb der Anwendung, nicht die Anlage eines Mandanten.
+
+### FR-2a: Mindest-Ladezustand hebt die Ladesperre auf
+
+Fällt der Ladezustand **unter** den konfigurierten Mindestwert, wird die Batterieladung
+freigegeben — auch wenn eine Preisregel sie gesperrt hätte. Die Regel heißt `SOC_TIEF` und steht
+in der Auswertungsreihenfolge an **zweiter** Stelle, unmittelbar nach `PREIS_NEGATIV` und **vor**
+beiden sperrenden Preisregeln. Das ist ihr Zweck: Sie hebt eine Sperre auf, statt eine zu setzen.
+
+| | |
+|---|---|
+| Vergleich | `soc < socMinimum` — ein **echtes** Kleiner-als; auf der Grenze ist die Reserve noch da |
+| Ergebnis | `batterieladung = FREI`, `einspeisung = FREI` |
+| Vorgabe | **20 %** |
+| Ohne Speicher / ohne Messwert | greift **nicht** |
+| Ohne konfigurierten Wert | greift **nicht** (`null` schaltet sie ab) |
+
+> **Warum vor den Preisregeln.** Ein Speicher, der leerläuft, während die Steuerung auf ein
+> Preistal wartet, deckt den Hausbedarf aus dem **Netz** — zum vollen Bezugstarif (rund 0.35
+> CHF/kWh). Der Gewinn des Wartens liegt bei wenigen Rappen je kWh. Die Rechnung geht selbst dann
+> nicht auf, wenn das erwartete Tal eintrifft.
+
+> **Warum sie beide Zustände frei lässt und die Einspeisung nicht sperrt.** „Einspeisung gesperrt"
+> hiesse, den Überschuss abzuregeln, wenn die Batterie voll ist. Die Regel will laden, nicht
+> abregeln — und der Anlagenregler füllt bei freier Ladung ohnehin zuerst den Speicher.
+
+> **Warum sie ohne Messwert nicht greift.** Eine Freigabe auf Verdacht machte die Preisregeln
+> wirkungslos, und zwar unbemerkt: Wo kein Speicher erfasst ist, sähe niemand, dass gar nichts
+> mehr gesperrt wird.
+
+**Der Mindestwert ist nicht erprobbar.** Die Rückrechnung (FR-6) dreht am Preis-Schwellwert; sie
+nimmt für `SOC_TIEF` den Wert des Mandanten. Eine zweite frei wählbare Grösse machte die
+Kennzahlen mehrdeutig — man sähe eine Wirkung und wüsste nicht, welche der beiden sie verursacht.
+
+**Die Rückrechnung braucht den Ladezustand jetzt selbst.** Bis FR-2a wurde er dort erst für die
+Anzeige nachgeladen; seit die Regel ihn auswertet, muss er **im Rechenweg** vorliegen, sonst
+lieferten Job und Kennzahlen für dasselbe Intervall verschiedene Entscheide. Gelesen wird
+aggregiert (letzter Wert je 15-Minuten-Intervall): Der Zähler meldet alle 30 Sekunden, über 366
+Tage wäre die volle Zeitreihe die eigentliche Laufzeit (NFR-1).
 
 ### FR-3: Persistierung
 
@@ -646,13 +688,14 @@ eigenen Zähler hat** — einen Einheiten-Typ `SPEICHER` gibt es bis heute nicht
 
 ### FR-7: Einstellungen je Mandant
 
-Die drei Werte aus FR-2 werden in der bestehenden Maske **Einstellungen** gepflegt
+Die vier Werte aus FR-2 und FR-2a werden in der bestehenden Maske **Einstellungen** gepflegt
 (`Specs/Einstellungen.md`), in einem eigenen Abschnitt **Einspeisesteuerung**:
 
 | Feld | Eingabe | Validierung |
 |---|---|---|
 | Schwellwert | Zahl, CHF/kWh | 5 Nachkommastellen; **negativ erlaubt** |
 | Speicherwert | Zahl, CHF/kWh | 5 Nachkommastellen; **negativ erlaubt** |
+| Mindest-Ladezustand | Zahl, % | 0–100; leer erlaubt (→ Vorgabe 20); **nicht negativ** — ein Ladezustand ist ein Anteil, kein Preis |
 | Batteriekapazität | Zahl, kWh | ≥ 0; leer erlaubt |
 
 * Der Abschnitt erscheint **nur bei aktivem Feature-Flag** — sonst stünden Felder da, die nichts
@@ -721,11 +764,14 @@ Neue Schlüssel (Flyway `V<nächste freie>__Add_Einspeisesteuerung_Translations.
 | `STEUERUNG_REGEL_KEIN_UEBERSCHUSS` | Kein Überschuss | No surplus |
 | `STEUERUNG_REGEL_EINSPEISEN_LOHNT` | Einspeisen lohnt mehr als speichern | Feed-in beats storage |
 | `STEUERUNG_REGEL_WARTEN_AUF_TAL` | Auf günstigeres Intervall warten | Waiting for a cheaper interval |
+| `STEUERUNG_REGEL_SOC_TIEF` | Ladezustand zu tief — laden | State of charge too low — charge |
 | `STEUERUNG_REGEL_LADEN` | Laden | Charge |
 | `STEUERUNG_KEINE_ENTSCHEIDE` | Für diesen Tag liegen keine Entscheide vor | No decisions for this day |
 | `STEUERUNG_ENERGIE_VERSCHOBEN` | Verschobene Energie | Energy redirected |
 | `STEUERUNG_SPEICHERWERT` | Wert einer gespeicherten kWh | Value of a stored kWh |
 | `STEUERUNG_BATTERIEKAPAZITAET` | Batteriekapazität | Battery capacity |
+| `STEUERUNG_SOC_MINIMUM` | Mindest-Ladezustand | Minimum state of charge |
+| `STEUERUNG_SOC_MINIMUM_HINWEIS` | Fällt der Ladezustand unter diesen Wert … | If the state of charge drops below this value … |
 | `FEATURE_FLAG_EINSPEISESTEUERUNG` | Einspeisesteuerung (Trockenlauf) | Feed-in control (dry run) |
 
 **Wiederverwendet, nicht neu angelegt:** `HEUTE` („Heute“ / „Today“) besteht seit V65
@@ -749,7 +795,17 @@ Der Text ist an kein Feature gebunden.
 * [ ] Ist kein solcher Preis mehr zu erwarten, ist `batterieladung = FREI` — auch bei hohem aktuellem Preis unterhalb des Speicherwerts.
 * [ ] Die Regeln werden in der Reihenfolge 1–5 geprüft; die erste zutreffende bestimmt den Entscheid und steht in `regel`.
 * [ ] **Keine Regel, die einen Zustand auf `GESPERRT` setzt, wertet Messwerte aus** — die Sperren
-  hängen allein am Preis und sind damit im Voraus berechenbar.
+  hängen allein am Preis und sind damit im Voraus berechenbar. (`SOC_TIEF` wertet einen Messwert
+  aus, **hebt** aber eine Sperre auf, statt eine zu setzen — siehe FR-2a.)
+* [ ] Fällt der Ladezustand unter den Mindestwert, ist `batterieladung = FREI` und die Regel lautet
+  `SOC_TIEF` — auch wenn eine Preisregel gesperrt hätte.
+* [ ] **Genau auf** dem Mindestwert wird **nicht** freigegeben.
+* [ ] Ohne Ladezustand (kein Speicher, kein Messwert) greift `SOC_TIEF` **nicht**.
+* [ ] Ohne konfigurierten Mindestwert greift `SOC_TIEF` **nicht**.
+* [ ] Bei negativem Preis bleibt `PREIS_NEGATIV` die Begründung, auch wenn der Ladezustand tief ist.
+* [ ] **Die Rückrechnung wertet denselben Ladezustand aus wie der Job** — dasselbe Intervall ergibt
+  auf beiden Wegen dieselbe Regel.
+* [ ] Jeder Entscheid trägt den beim Entscheid geltenden Mindest-Ladezustand.
 * [ ] Der Tiefstpreis berücksichtigt **nur** Intervalle, die **nach** dem ausgewerteten liegen, und nur solche des **gleichen Ortstages**.
 * [ ] Der Überschuss zählt ausschliesslich `PRODUCER` und `CONSUMER`.
 * [ ] **Der Überschuss wird aus negativen Producer-Werten korrekt gebildet:** Bei `total = −10` (Producer) und `total = 4` (Consumer) ergibt sich ein Überschuss von **6**, nicht 0 und nicht −14.
@@ -986,6 +1042,13 @@ Lücke nicht**, es rechnet nur und speichert nichts.
   ein Mensch.
 
 ## 8. Offene Fragen
+
+* **Braucht `SOC_TIEF` eine Hysterese?** Pendelt der Ladezustand um den Mindestwert, wechselt der
+  Entscheid im 15-Minuten-Takt zwischen Freigabe und Sperre. Im Trockenlauf folgenlos; sobald
+  geschaltet wird, wäre ein zweiter Wert nötig (freigeben unter 20 %, wieder sperren erst über
+  25 %). Noch keine Beobachtung, die dafür spricht.
+* **Ist 20 % der richtige Mindestwert?** Ein Startwert. Er hängt am Verbrauchsprofil und daran, wie
+  lange der Speicher über Nacht tragen soll.
 
 **Beantwortet (13.09.2026) — die Entscheide stecken im Text oben:**
 

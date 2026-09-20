@@ -13,6 +13,15 @@ public enum Steuerregel {
     /** Preis unter 0: Einspeisen kostet Geld. Laden bleibt frei, eingespiesen wird nichts. */
     PREIS_NEGATIV,
 
+    /**
+     * Der Ladezustand liegt unter der konfigurierten Mindestgrenze — es wird geladen.
+     *
+     * <p>Hebt eine Ladesperre auf, die sonst aus {@code EINSPEISEN_LOHNT} oder
+     * {@code WARTEN_AUF_TAL} folgte. Ein Speicher, der leerläuft, während die Steuerung auf ein
+     * Preistal wartet, deckt den Hausbedarf aus dem Netz — teurer als jedes Warten einbringt.
+     */
+    SOC_TIEF,
+
     /** Die Vergütung liegt über dem Wert einer gespeicherten kWh — einspeisen lohnt mehr. */
     EINSPEISEN_LOHNT,
 

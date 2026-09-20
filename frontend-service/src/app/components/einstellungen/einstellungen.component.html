@@ -137,6 +137,13 @@
             </div>
 
             <div class="zev-form-group">
+              <label for="socMinimum">{{ 'STEUERUNG_SOC_MINIMUM' | translate }}:</label>
+              <input type="number" id="socMinimum" class="zev-input" step="1" min="0" max="100"
+                [(ngModel)]="formData.steuerung.socMinimum" name="socMinimum" />
+              <small class="zev-form-hint">{{ 'STEUERUNG_SOC_MINIMUM_HINWEIS' | translate }}</small>
+            </div>
+
+            <div class="zev-form-group">
               <label for="batteriekapazitaet">{{ 'STEUERUNG_BATTERIEKAPAZITAET' | translate }}:</label>
               <input type="number" id="batteriekapazitaet" class="zev-input" step="0.1" min="0"
                 [(ngModel)]="formData.steuerung.batteriekapazitaet" name="batteriekapazitaet" />

@@ -4,6 +4,8 @@ import ch.nacht.entity.Geraetezustand;
 import ch.nacht.entity.Zustandsgroesse;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -56,4 +58,50 @@ public interface GeraetezustandRepository extends JpaRepository<Geraetezustand, 
      */
     List<Geraetezustand> findByEinheitIdAndGroesseAndZeitGreaterThanEqualAndZeitLessThanOrderByZeitAsc(
             Long einheitId, Zustandsgroesse groesse, LocalDateTime von, LocalDateTime bis);
+
+    /**
+     * Je <b>15-Minuten-Intervall</b> der letzte Wert einer Grösse — Rückgabe {@code [beginn, wert]}.
+     *
+     * <p><b>Wofür:</b> Die Rückrechnung wertet bis zu 366 Tage aus. Die Zustandszeitreihe trägt
+     * mehrere tausend Werte je Tag (der Zähler meldet alle 30 s); sie vollständig zu laden wäre
+     * dort die eigentliche Laufzeit (NFR-1). Diese Abfrage liefert stattdessen 96 Zeilen je Tag —
+     * dieselbe Grössenordnung wie die Messwerte.
+     *
+     * <p><b>Der letzte Wert im Intervall</b>, nicht der erste: Der Entscheid beschreibt das
+     * abgeschlossene Intervall, also zählt der Zustand an dessen Ende. Dieselbe Regel wie im Job
+     * ({@code socAmIntervallende}).
+     *
+     * <p><b>Native Query, weil JPQL kein {@code DISTINCT ON} kennt.</b> Damit greift der
+     * Hibernate-{@code orgFilter} <b>nicht</b> — {@code org_id} steht deshalb ausdrücklich in der
+     * Bedingung. Ohne sie läse ein Mandant die Zustände aller anderen mit.
+     *
+     * @param orgId     Mandant — <b>zwingend</b>, siehe oben
+     * @param einheitId Einheit, deren Zustände gelesen werden
+     * @param groesse   Name der Grösse, z.B. {@code SOC}
+     * @param von       Beginn in Ortszeit (einschliesslich)
+     * @param bis       Ende in Ortszeit (ausschliesslich)
+     */
+    @Query(value = """
+        SELECT DISTINCT ON (bucket) bucket, wert FROM (
+            SELECT date_trunc('hour', g.zeit)
+                   + floor(extract(minute FROM g.zeit) / 15) * INTERVAL '15 minutes' AS bucket,
+                   g.zeit AS zeit,
+                   g.wert AS wert
+            FROM zev.geraetezustand g
+            WHERE g.org_id = :orgId
+              AND g.einheit_id = :einheitId
+              AND g.groesse = :groesse
+              AND g.zeit >= :von
+              AND g.zeit < :bis
+        ) je_intervall
+        ORDER BY bucket, zeit DESC
+        """, nativeQuery = true)
+    List<Object[]> letzterWertJeIntervall(
+        @Param("orgId") Long orgId,
+        @Param("einheitId") Long einheitId,
+        @Param("groesse") String groesse,
+        @Param("von") LocalDateTime von,
+        @Param("bis") LocalDateTime bis
+    );
+
 }

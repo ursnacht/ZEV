@@ -27,6 +27,8 @@ export interface SteuerKonfiguration {
   speicherwert?: number | null;
   /** Nutzbare Batteriekapazität in kWh; rein dokumentierend, keine Regel wertet sie aus. */
   batteriekapazitaet?: number | null;
+  /** Mindest-Ladezustand in Prozent; darunter hebt `SOC_TIEF` eine Ladesperre auf. */
+  socMinimum?: number | null;
 }
 
 /**

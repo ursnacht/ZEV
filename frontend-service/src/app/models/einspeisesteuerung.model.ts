@@ -14,6 +14,7 @@ export type Steuerzustand = 'FREI' | 'GESPERRT';
  */
 export type Steuerregel =
   | 'PREIS_NEGATIV'
+  | 'SOC_TIEF'
   | 'EINSPEISEN_LOHNT'
   | 'WARTEN_AUF_TAL'
   | 'KEIN_UEBERSCHUSS'
@@ -22,6 +23,7 @@ export type Steuerregel =
 /** Alle Regeln in Auswertungsreihenfolge — für Tabellen und Legenden. */
 export const STEUERREGELN: Steuerregel[] = [
   'PREIS_NEGATIV',
+  'SOC_TIEF',
   'EINSPEISEN_LOHNT',
   'WARTEN_AUF_TAL',
   'KEIN_UEBERSCHUSS',
@@ -31,6 +33,7 @@ export const STEUERREGELN: Steuerregel[] = [
 /** Übersetzungs-Key je Regel. */
 export const STEUERREGEL_KEYS: Record<Steuerregel, string> = {
   PREIS_NEGATIV: 'STEUERUNG_REGEL_PREIS_NEGATIV',
+  SOC_TIEF: 'STEUERUNG_REGEL_SOC_TIEF',
   KEIN_UEBERSCHUSS: 'STEUERUNG_REGEL_KEIN_UEBERSCHUSS',
   EINSPEISEN_LOHNT: 'STEUERUNG_REGEL_EINSPEISEN_LOHNT',
   WARTEN_AUF_TAL: 'STEUERUNG_REGEL_WARTEN_AUF_TAL',
@@ -85,6 +88,8 @@ export interface Steuerentscheid {
   /** Die **beim Entscheid** geltenden Schwellen, nicht die heutigen. */
   schwellwert: number;
   speicherwert: number;
+  /** Mindest-Ladezustand, der beim Entscheid galt; `null` bei Entscheiden vor V160. */
+  socMinimum: number | null;
 }
 
 /** Anfrage der Rückrechnung. */

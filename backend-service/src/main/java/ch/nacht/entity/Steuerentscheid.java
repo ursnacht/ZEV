@@ -109,9 +109,9 @@ public class Steuerentscheid {
      * Ladezustand des Speichers in Prozent am <b>Ende</b> des Intervalls; {@code null}, wenn kein
      * Speicher erfasst ist oder kein Wert vorlag.
      *
-     * <p>Geht in <b>keine</b> Regel ein — er erklärt den Entscheid im Nachhinein: „Ladung gesperrt
-     * bei 95 %" ist eine andere Aussage als „bei 40 %". Die erste Sperre war wirkungslos, die
-     * zweite hat Kapazität freigehalten.
+     * <p><b>Seit V160 wertet ihn eine Regel aus:</b> Fällt er unter {@link #socMinimum}, hebt
+     * {@link Steuerregel#SOC_TIEF} eine Ladesperre auf. Davor war er reine Erklärung — „Ladung
+     * gesperrt bei 95 %" ist eine andere Aussage als „bei 40 %".
      */
     @Column(name = "soc", precision = 5, scale = 1)
     private BigDecimal soc;
@@ -166,6 +166,17 @@ public class Steuerentscheid {
     @NotNull
     @Column(name = "speicherwert", precision = 10, scale = 5, nullable = false)
     private BigDecimal speicherwert;
+
+    /**
+     * Der beim Entscheid geltende Mindest-Ladezustand in Prozent; {@code null} vor V160.
+     *
+     * <p>Nicht {@code @NotNull}, anders als die beiden übrigen Schwellen: Entscheide aus der Zeit
+     * davor haben den Wert nicht. „Ladung freigegeben bei 18 %" ist nur dann eine Aussage, wenn
+     * dabeisteht, ab welchem Wert freigegeben wurde.
+     */
+    @Column(name = "soc_minimum", precision = 5, scale = 1)
+    private BigDecimal socMinimum;
+
 
     @Column(name = "erstellt_am", nullable = false)
     private LocalDateTime erstelltAm;
@@ -251,6 +262,14 @@ public class Steuerentscheid {
 
     public void setSoc(BigDecimal soc) {
         this.soc = soc;
+    }
+
+    public BigDecimal getSocMinimum() {
+        return socMinimum;
+    }
+
+    public void setSocMinimum(BigDecimal socMinimum) {
+        this.socMinimum = socMinimum;
     }
 
     public BigDecimal getSpeicherLadung() {

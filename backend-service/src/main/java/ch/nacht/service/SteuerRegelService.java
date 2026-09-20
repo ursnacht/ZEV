@@ -48,17 +48,19 @@ public class SteuerRegelService {
      * @param verbrauch     Summe der {@code CONSUMER} in kWh
      */
     public record Eingabe(BigDecimal preis, BigDecimal preisTiefRest,
-                          BigDecimal produktion, BigDecimal verbrauch) {
+                          BigDecimal produktion, BigDecimal verbrauch, BigDecimal soc) {
     }
 
     /**
-     * Wendet die fünf Regeln in fester Reihenfolge an; die erste zutreffende bestimmt den
+     * Wendet die sechs Regeln in fester Reihenfolge an; die erste zutreffende bestimmt den
      * Entscheid.
      *
      * <p><b>Die Reihenfolge ist Fachlichkeit, nicht Stil.</b> Wer sie ändert, ändert das Verhalten
      * der Steuerung:
      * <ol>
      *   <li>{@code PREIS_NEGATIV} — Einspeisen kostet Geld. Laden bleibt frei.</li>
+     *   <li>{@code SOC_TIEF} — der Speicher ist zu leer, um zu warten. <b>Hebt</b> eine Sperre
+     *       auf, statt eine zu setzen, und steht deshalb vor den beiden Preisregeln.</li>
      *   <li>{@code EINSPEISEN_LOHNT} — die Vergütung übertrifft den Wert einer gespeicherten kWh.</li>
      *   <li>{@code WARTEN_AUF_TAL} — heute kommt noch etwas <b>Billigeres als jetzt</b>, und es
      *       liegt unter dem Schwellwert; Kapazität dafür freihalten.</li>
@@ -88,9 +90,12 @@ public class SteuerRegelService {
      * @param eingabe      Messwerte und Preise des Intervalls
      * @param schwellwert  Grenze für {@code WARTEN_AUF_TAL} in CHF/kWh; darf negativ sein
      * @param speicherwert Wert einer gespeicherten kWh in CHF/kWh; darf negativ sein
+     * @param socMinimum   Ladezustand in Prozent, unterhalb dessen {@code SOC_TIEF} greift;
+     *                     {@code null} schaltet die Regel ab
      * @return der Entscheid samt Überschuss
      */
-    public Entscheid entscheide(Eingabe eingabe, BigDecimal schwellwert, BigDecimal speicherwert) {
+    public Entscheid entscheide(Eingabe eingabe, BigDecimal schwellwert, BigDecimal speicherwert,
+                                BigDecimal socMinimum) {
         BigDecimal ueberschuss = ueberschuss(eingabe);
 
         // 1. Negativer Preis: Einspeisen kostet Geld. Die Batterie darf laden - sie nimmt Energie
@@ -100,14 +105,32 @@ public class SteuerRegelService {
                     Steuerzustand.FREI, Steuerzustand.GESPERRT, ueberschuss);
         }
 
-        // 2. Einspeisen lohnt mehr als speichern. Mit dem Massstab "vermiedener Netzbezug" loest
+        // 2. Der Speicher ist zu leer, um noch zu warten. Diese Regel steht VOR den beiden
+        //    sperrenden Preisregeln - das ist ihr ganzer Zweck: Sie hebt eine Sperre auf, die
+        //    sonst folgen wuerde.
+        //
+        //    WARUM: Ein Speicher, der leerlaeuft, waehrend die Steuerung auf ein Preistal wartet,
+        //    deckt den Hausbedarf aus dem NETZ - zum vollen Bezugstarif. Der Gewinn des Wartens
+        //    liegt bei wenigen Rappen je kWh, der vermiedene Netzbezug bei rund 0.35. Die Rechnung
+        //    geht also selbst dann nicht auf, wenn das erwartete Tal eintrifft.
+        //
+        //    OHNE SOC greift sie nicht: kein Speicher erfasst, kein Messwert, kein Urteil.
+        //    Nichtstun ist auch hier der sichere Zustand - eine Freigabe auf Verdacht wuerde die
+        //    Preisregeln wirkungslos machen, und zwar unbemerkt.
+        if (eingabe.soc() != null && socMinimum != null
+                && eingabe.soc().compareTo(socMinimum) < 0) {
+            return new Entscheid(Steuerregel.SOC_TIEF,
+                    Steuerzustand.FREI, Steuerzustand.FREI, ueberschuss);
+        }
+
+        // 3. Einspeisen lohnt mehr als speichern. Mit dem Massstab "vermiedener Netzbezug" loest
         //    das praktisch nie aus - die Regel ist der Waechter fuer Knappheitspreise.
         if (eingabe.preis() != null && eingabe.preis().compareTo(speicherwert) >= 0) {
             return new Entscheid(Steuerregel.EINSPEISEN_LOHNT,
                     Steuerzustand.GESPERRT, Steuerzustand.FREI, ueberschuss);
         }
 
-        // 3. Der Kern: Kommt heute noch ein guenstigeres Intervall, bleibt die knappe
+        // 4. Der Kern: Kommt heute noch ein guenstigeres Intervall, bleibt die knappe
         //    Batteriekapazitaet dafuer frei, statt sie jetzt mit teurerem Strom zu fuellen.
         //
         //    ZWEI Bedingungen, und die zweite fehlte zuerst:
@@ -130,7 +153,7 @@ public class SteuerRegelService {
                     Steuerzustand.GESPERRT, Steuerzustand.FREI, ueberschuss);
         }
 
-        // 4. Keine Sperre. Bleibt noch die Frage, WARUM nicht - beide Faelle ergeben denselben
+        // 5. Keine Sperre. Bleibt noch die Frage, WARUM nicht - beide Faelle ergeben denselben
         //    Entscheid (FREI/FREI) und unterscheiden sich nur in der Begruendung:
         //
         //    a) Kein Ueberschuss gemessen. Fruehere Fassungen prueften das VOR den Preisregeln und

@@ -131,6 +131,7 @@ public class SteuerungService {
         SteuerKonfigurationDTO konfiguration = einstellungenService.getSteuerKonfiguration(orgId);
         BigDecimal schwellwert = konfiguration.schwellwertOderVorgabe();
         BigDecimal speicherwert = konfiguration.speicherwertOderVorgabe();
+        BigDecimal socMinimum = konfiguration.socMinimumOderVorgabe();
 
         Messung messung = messungFuer(zeitVon);
         BigDecimal preis = preisFuer(zeitVon);
@@ -140,24 +141,25 @@ public class SteuerungService {
 
         SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                 new SteuerRegelService.Eingabe(preis, preisTiefRest,
-                        messung.produktion(), messung.verbrauch()),
-                schwellwert, speicherwert);
+                        messung.produktion(), messung.verbrauch(), soc),
+                schwellwert, speicherwert, socMinimum);
 
         steuerentscheidRepository.upsert(orgId, zeitVon, preis, preisTiefRest,
                 messung.produktion(), messung.verbrauch(), messung.bezug(),
                 messung.ruecklieferung(), soc, speicher.ladung(), speicher.entladung(),
                 entscheid.ueberschuss(),
                 entscheid.regel().name(), entscheid.batterieladung().name(),
-                entscheid.einspeisung().name(), schwellwert, speicherwert);
+                entscheid.einspeisung().name(), schwellwert, speicherwert, socMinimum);
 
         // Auf INFO und mit den Eingangsgroessen: Ein Entscheid ohne die Zahlen, aus denen er
         // entstand, laesst sich im Nachhinein nicht pruefen - und genau diese Pruefung war noetig,
         // um den Zeitversatz zu finden.
         log.info("Steuerung. Org: {}, zeit(Ortszeit): {}, preis={}, tiefRest={}, "
-                        + "produktion={}, verbrauch={}, ueberschuss={} -> {} (ladung={}, einspeisung={})",
+                        + "produktion={}, verbrauch={}, ueberschuss={}, soc={} (min {}) "
+                        + "-> {} (ladung={}, einspeisung={})",
                 orgId, zeitVon, preis, preisTiefRest, messung.produktion(), messung.verbrauch(),
-                entscheid.ueberschuss(), entscheid.regel(), entscheid.batterieladung(),
-                entscheid.einspeisung());
+                entscheid.ueberschuss(), soc, socMinimum, entscheid.regel(),
+                entscheid.batterieladung(), entscheid.einspeisung());
     }
 
     /**
@@ -214,6 +216,7 @@ public class SteuerungService {
         hibernateFilterService.enableOrgFilter();
 
         BigDecimal wirksamerSpeicherwert = speicherwertOderMandant(orgId, speicherwert);
+        BigDecimal wirksamesSocMinimum = socMinimumDesMandanten(orgId);
 
         Map<Steuerregel, Integer> jeRegel = new EnumMap<>(Steuerregel.class);
         for (Steuerregel regel : Steuerregel.values()) {
@@ -223,7 +226,8 @@ public class SteuerungService {
         BigDecimal[] energieVerschoben = { BigDecimal.ZERO };
         int[] tage = new int[1];
 
-        tage[0] = rechneNach(von, bis, schwellwert, wirksamerSpeicherwert, n -> {
+        tage[0] = rechneNach(orgId, von, bis, schwellwert, wirksamerSpeicherwert,
+                wirksamesSocMinimum, n -> {
             // Nur Intervalle mit Ueberschuss zaehlen - siehe Methodenkommentar.
             if (n.entscheid().ueberschuss().signum() <= 0) {
                 return;
@@ -289,9 +293,11 @@ public class SteuerungService {
 
         BigDecimal wirksamerSpeicherwert = speicherwertOderMandant(orgId, speicherwert);
 
+        BigDecimal wirksamesSocMinimum = socMinimumDesMandanten(orgId);
+
         List<SteuerentscheidDTO> dtos = new ArrayList<>();
-        rechneNach(datum, datum, schwellwert, wirksamerSpeicherwert,
-                n -> dtos.add(zuDto(n, schwellwert, wirksamerSpeicherwert)));
+        rechneNach(orgId, datum, datum, schwellwert, wirksamerSpeicherwert, wirksamesSocMinimum,
+                n -> dtos.add(zuDto(n, schwellwert, wirksamerSpeicherwert, wirksamesSocMinimum)));
         reichereSpeicherAn(dtos, datum);
 
         log.info("Steuerung nachgerechnet: org={} tag={} schwellwert={} -> {} Intervalle",
@@ -303,7 +309,8 @@ public class SteuerungService {
 
     /** Ein nachgerechnetes Intervall — Eingangsgrössen und das Ergebnis der Regel. */
     private record Nachgerechnet(LocalDateTime zeit, BigDecimal preis, BigDecimal preisTiefRest,
-                                 Messung messung, SteuerRegelService.Entscheid entscheid) {
+                                 Messung messung, BigDecimal soc,
+                                 SteuerRegelService.Entscheid entscheid) {
     }
 
     /**
@@ -316,8 +323,9 @@ public class SteuerungService {
      *
      * @return Anzahl der Ortstage, für die Preise vorlagen
      */
-    private int rechneNach(LocalDate von, LocalDate bis, BigDecimal schwellwert,
-                           BigDecimal speicherwert, Consumer<Nachgerechnet> verbraucher) {
+    private int rechneNach(Long orgId, LocalDate von, LocalDate bis, BigDecimal schwellwert,
+                           BigDecimal speicherwert, BigDecimal socMinimum,
+                           Consumer<Nachgerechnet> verbraucher) {
         // Preise einmal laden, nach Ortstag buendeln und dabei auf Ortszeit umschluesseln: Der
         // Tiefstpreis des Resttages ist fuer jedes Intervall neu zu bestimmen, und eine Abfrage je
         // Intervall waere bei 35'000 Intervallen die eigentliche Laufzeit (NFR-1). Ab hier ist
@@ -329,6 +337,13 @@ public class SteuerungService {
         // verschieben. Eine Zonenrechnung braucht es nicht mehr - beide Seiten sind Ortszeit.
         LocalDateTime vonEnde = von.atStartOfDay().plusMinutes(INTERVALL_MINUTEN);
         LocalDateTime bisEnde = bis.plusDays(1).atStartOfDay().plusMinutes(INTERVALL_MINUTEN);
+
+        // Der Ladezustand geht seit V160 in die Regel ein (SOC_TIEF) und muss deshalb HIER
+        // vorliegen - nicht erst in der Anzeige. Rechnete die Rueckrechnung ohne ihn, ergaeben
+        // Job und Kennzahlen fuer dasselbe Intervall verschiedene Entscheide, und niemand koennte
+        // sagen, welcher gilt (FR-6a).
+        TreeMap<LocalDateTime, BigDecimal> socVerlauf = socVerlauf(orgId,
+                von.atStartOfDay(), bis.plusDays(1).atStartOfDay());
 
         for (Object[] zeile : messwerteRepository.sumBilanzKomponentenPerZeitBetween(
                 vonEnde, bisEnde)) {
@@ -345,14 +360,67 @@ public class SteuerungService {
             BigDecimal preis = preiseDesTages.get(zeit);
             BigDecimal preisTiefRest = tiefstpreisNach(preiseDesTages, zeit);
 
+            // Der letzte bekannte Wert bis zu diesem Intervall - ein Intervall ohne eigene
+            // Meldung erbt den vorigen, statt als "kein Ladezustand" zu gelten.
+            var socEintrag = socVerlauf.floorEntry(zeit);
+            BigDecimal soc = socEintrag == null ? null : socEintrag.getValue();
+
             SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
                     new SteuerRegelService.Eingabe(preis, preisTiefRest,
-                            messung.produktion(), messung.verbrauch()),
-                    schwellwert, speicherwert);
+                            messung.produktion(), messung.verbrauch(), soc),
+                    schwellwert, speicherwert, socMinimum);
 
-            verbraucher.accept(new Nachgerechnet(zeit, preis, preisTiefRest, messung, entscheid));
+            verbraucher.accept(
+                    new Nachgerechnet(zeit, preis, preisTiefRest, messung, soc, entscheid));
         }
         return preiseJeTag.size();
+    }
+
+    /**
+     * Der Mindest-Ladezustand des Mandanten für {@code SOC_TIEF}.
+     *
+     * <p><b>Nicht erprobbar</b>, anders als Schwellwert und Speicherwert: Die Rückrechnung dreht
+     * am Preis-Schwellwert. Eine zweite frei wählbare Grösse machte die Kennzahlen mehrdeutig —
+     * man sähe eine Wirkung und wüsste nicht, welche der beiden sie verursacht hat.
+     */
+    private BigDecimal socMinimumDesMandanten(Long orgId) {
+        return einstellungenService.getSteuerKonfiguration(orgId).socMinimumOderVorgabe();
+    }
+
+    /**
+     * Ladezustand je Intervall über einen Zeitraum, als Nachschlagewerk für die Rückrechnung.
+     *
+     * <p>Der Schlüssel ist der <b>Beginn</b> des 15-Minuten-Intervalls, der Wert der letzte darin
+     * gemeldete Ladezustand. Abgefragt wird aggregiert ({@code letzterWertJeIntervall}) statt die
+     * ganze Zeitreihe zu laden: Der Zähler meldet alle 30 Sekunden, über 366 Tage wäre das die
+     * eigentliche Laufzeit (NFR-1).
+     *
+     * <p>Der <b>Anfangswert</b> wird eigens geholt: Für das erste Intervall liegt der letzte Wert
+     * davor vor dem Zeitraum. Ohne ihn begonne jede Rückrechnung mit einem unbekannten Ladezustand,
+     * und {@code SOC_TIEF} griffe dort nie.
+     *
+     * <p>Leer, wenn kein Speicher erfasst ist — dann greift die Regel nicht, und es wird gar nicht
+     * erst abgefragt.
+     */
+    private TreeMap<LocalDateTime, BigDecimal> socVerlauf(Long orgId, LocalDateTime von,
+                                                          LocalDateTime bis) {
+        TreeMap<LocalDateTime, BigDecimal> verlauf = new TreeMap<>();
+        var speicher = einheitRepository.findFirstByTyp(EinheitTyp.SPEICHER);
+        if (speicher.isEmpty()) {
+            return verlauf;
+        }
+        Long einheitId = speicher.get().getId();
+
+        geraetezustandRepository.findFirstByEinheitIdAndGroesseAndZeitLessThanOrderByZeitDesc(
+                        einheitId, Zustandsgroesse.SOC, von)
+                .ifPresent(z -> verlauf.put(von.minusMinutes(INTERVALL_MINUTEN), z.getWert()));
+
+        for (Object[] zeile : geraetezustandRepository.letzterWertJeIntervall(
+                orgId, einheitId, Zustandsgroesse.SOC.name(), von, bis)) {
+            verlauf.put(((java.sql.Timestamp) zeile[0]).toLocalDateTime(),
+                    (BigDecimal) zeile[1]);
+        }
+        return verlauf;
     }
 
     /** Der übergebene Speicherwert, oder — bei {@code null} — der des Mandanten. */
@@ -624,7 +692,7 @@ public class SteuerungService {
      * woraus dieser Entscheid entstand, und das waren hier die eingegebenen Werte.
      */
     private SteuerentscheidDTO zuDto(Nachgerechnet n, BigDecimal schwellwert,
-                                     BigDecimal speicherwert) {
+                                     BigDecimal speicherwert, BigDecimal socMinimum) {
         SteuerentscheidDTO dto = new SteuerentscheidDTO();
         dto.setZeit(n.zeit());
         dto.setPreis(n.preis());
@@ -641,8 +709,10 @@ public class SteuerungService {
         dto.setRegel(n.entscheid().regel());
         dto.setBatterieladung(n.entscheid().batterieladung());
         dto.setEinspeisung(n.entscheid().einspeisung());
+        dto.setSoc(n.soc());
         dto.setSchwellwert(schwellwert);
         dto.setSpeicherwert(speicherwert);
+        dto.setSocMinimum(socMinimum);
         return dto;
     }
 
@@ -665,6 +735,7 @@ public class SteuerungService {
         dto.setEinspeisung(entscheid.getEinspeisung());
         dto.setSchwellwert(entscheid.getSchwellwert());
         dto.setSpeicherwert(entscheid.getSpeicherwert());
+        dto.setSocMinimum(entscheid.getSocMinimum());
         return dto;
     }
 

@@ -824,3 +824,54 @@ getrennt, gerechnet wird erst in der Anzeige.
 > null liegen. Sie zeigt stattdessen Zacken bis 0.07 kWh — immer dann, wenn der Zähler 0.1 meldet,
 > wo 0.2 richtig wäre. Die Schranke fängt nur die negative Seite ab. Abhilfe gäbe nur eine feinere
 > Quelle (Register 30258, Batterieleistung in Watt) und damit ein anderes Messprinzip.
+
+---
+
+## Nachtrag 18 — Regel `SOC_TIEF` (18.09.2026)
+
+Fällt der Ladezustand unter einen konfigurierbaren Wert (Vorgabe 20 %), wird die Batterieladung
+freigegeben — auch wenn eine Preisregel gesperrt hätte. Die Regel steht an **zweiter** Stelle,
+nach `PREIS_NEGATIV` und vor beiden sperrenden Preisregeln.
+
+**Das kostet die Fahrplan-Eigenschaft.** Zwei Commits zuvor war festgehalten, dass jede Sperre eine
+reine Preisentscheidung ist — und dass die Anlage sich deshalb über einen Fahrplan steuern liesse,
+den der Wechselrichter selbst ausführt (`Specs/Solinteg_Modbus_Register.md`). `SOC_TIEF` wertet
+einen **Messwert** aus und hängt damit am laufenden Betrieb. Das Akzeptanzkriterium dazu ist
+entsprechend eingeschränkt statt gestrichen: Die **Sperren** bleiben im Voraus berechenbar, nur
+ihre **Aufhebung** ist es nicht. Der Preis war beim Entscheid bekannt.
+
+**DDL war nötig** (V160). `ck_steuerentscheid_regel` zählt die erlaubten Regeln auf — ohne die
+Migration wäre der erste Entscheid mit `SOC_TIEF` beim INSERT gescheitert, im Job, nachts, ohne
+dass jemand zusieht. Vorher mit `pg_get_constraintdef` geprüft, nicht angenommen.
+
+**Die Rückrechnung brauchte einen neuen Zugriff.** Bis hierher holte sie den Ladezustand erst
+**nach** dem Rechnen für die Anzeige (`reichereSpeicherAn`). Seit die Regel ihn auswertet, muss er
+im Rechenweg selbst vorliegen — sonst lieferten Job und Kennzahlen für dasselbe Intervall
+verschiedene Entscheide, und FR-6a wäre verletzt. Gelesen wird über eine neue Abfrage
+`letzterWertJeIntervall`: **native Query**, weil JPQL kein `DISTINCT ON` kennt — und deshalb mit
+**ausdrücklichem `org_id`-Filter**, denn der Hibernate-`orgFilter` greift dort nicht. Ohne ihn läse
+ein Mandant die Zustände aller anderen mit.
+
+**Warum aggregiert und nicht die ganze Zeitreihe:** Der Zähler meldet alle 30 Sekunden — mehrere
+tausend Werte je Tag. Über 366 Tage wäre das die eigentliche Laufzeit der Rückrechnung (NFR-1).
+Die Abfrage liefert 96 Zeilen je Tag, dieselbe Grössenordnung wie die Messwerte.
+
+**Der Mindestwert ist nicht erprobbar.** Die Rückrechnung dreht am Preis-Schwellwert und nimmt für
+`SOC_TIEF` den Wert des Mandanten. Zwei frei wählbare Grössen machten die Kennzahlen mehrdeutig.
+
+**Geprüft:** Backend kompiliert, **1331** Backend-Tests (sechs neue für `SOC_TIEF`: unter der
+Grenze, genau auf der Grenze, ohne Ladezustand, ohne Mindestwert, gegen `PREIS_NEGATIV`, gegen
+`EINSPEISEN_LOHNT`), 1660 Frontend-Tests, Frontend gebaut — alles grün.
+
+**Nötig:** Rebuild für V160 und V161.
+
+> **Noch nicht an echten Daten gesehen:** Ob 20 % der richtige Wert ist. Bei Hene lag der
+> Ladezustand heute Morgen um 07:00 bei 47 % und fiel über die Nacht um rund 15 Punkte — die Regel
+> hätte also nicht ausgelöst. Ob sie im Winter zu oft oder zu selten greift, zeigt erst die
+> Auswertung über mehrere Wochen.
+
+> **Nicht geprüft: Flattern an der Grenze.** Pendelt der Ladezustand um den Mindestwert, wechselt
+> der Entscheid im 15-Minuten-Takt zwischen `SOC_TIEF` und einer Sperre. Im Trockenlauf ist das
+> folgenlos; sobald geschaltet wird, bräuchte es eine Hysterese (freigeben unter 20 %, wieder
+> sperren erst über 25 %). Als offene Frage vermerkt, nicht umgesetzt — es gibt dafür noch keine
+> Beobachtung.

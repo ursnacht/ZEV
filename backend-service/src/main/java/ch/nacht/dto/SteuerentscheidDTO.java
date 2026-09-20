@@ -40,6 +40,8 @@ public class SteuerentscheidDTO {
     private Steuerzustand einspeisung;
     private BigDecimal schwellwert;
     private BigDecimal speicherwert;
+    /** Mindest-Ladezustand, der beim Entscheid galt; `null` bei Entscheiden vor V160. */
+    private BigDecimal socMinimum;
 
     public SteuerentscheidDTO() {
     }
@@ -194,5 +196,13 @@ public class SteuerentscheidDTO {
 
     public void setSpeicherwert(BigDecimal speicherwert) {
         this.speicherwert = speicherwert;
+    }
+
+    public BigDecimal getSocMinimum() {
+        return socMinimum;
+    }
+
+    public void setSocMinimum(BigDecimal socMinimum) {
+        this.socMinimum = socMinimum;
     }
 }

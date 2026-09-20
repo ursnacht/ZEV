@@ -50,6 +50,7 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
      *
      * <p>Die Enum-Werte kommen als {@code String} — ein nativer Query kennt die Java-Enums nicht;
      * die CHECK-Constraints der Tabelle prüfen sie datenbankseitig.
+
      */
     @Modifying
     @Query(value = """
@@ -57,10 +58,11 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
                                          verbrauch, bezug, ruecklieferung, soc,
                                          speicher_ladung, speicher_entladung, ueberschuss,
                                          regel, batterieladung, einspeisung, schwellwert,
-                                         speicherwert, erstellt_am)
+                                         speicherwert, soc_minimum, erstellt_am)
         VALUES (:orgId, :zeitVon, :preis, :preisTiefRest, :produktion, :verbrauch, :bezug,
                 :ruecklieferung, :soc, :speicherLadung, :speicherEntladung, :ueberschuss,
-                :regel, :batterieladung, :einspeisung, :schwellwert, :speicherwert, now())
+                :regel, :batterieladung, :einspeisung, :schwellwert, :speicherwert,
+                now())
         ON CONFLICT (org_id, zeit_von)
         DO UPDATE SET preis           = EXCLUDED.preis,
                       preis_tief_rest = EXCLUDED.preis_tief_rest,
@@ -77,6 +79,7 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
                       einspeisung     = EXCLUDED.einspeisung,
                       schwellwert     = EXCLUDED.schwellwert,
                       speicherwert    = EXCLUDED.speicherwert,
+                      soc_minimum     = EXCLUDED.soc_minimum,
                       erstellt_am     = now()
         """, nativeQuery = true)
     void upsert(
@@ -96,6 +99,7 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
         @Param("batterieladung") String batterieladung,
         @Param("einspeisung") String einspeisung,
         @Param("schwellwert") BigDecimal schwellwert,
-        @Param("speicherwert") BigDecimal speicherwert
+        @Param("speicherwert") BigDecimal speicherwert,
+        @Param("socMinimum") BigDecimal socMinimum
     );
 }
