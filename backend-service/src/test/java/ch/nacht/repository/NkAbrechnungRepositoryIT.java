@@ -419,6 +419,9 @@ class NkAbrechnungRepositoryIT extends AbstractIntegrationTest {
         abrechnung.setDatumVon(von);
         abrechnung.setDatumBis(von.plusYears(1).minusDays(1));
         abrechnung.setAnzahlWohnungen(9);
+        // Pflichtfeld seit V135 (Umlage pro Person, NOT NULL mit CHECK >= 1). Fehlt es,
+        // scheitert schon das Anlegen der Fixture - und mit ihr jeder Test dieser Klasse.
+        abrechnung.setAnzahlPersonen(9);
         return abrechnung;
     }
 

@@ -366,6 +366,9 @@ class NkPositionRepositoryIT extends AbstractIntegrationTest {
         abrechnung.setDatumVon(LocalDate.of(2025, 1, 1));
         abrechnung.setDatumBis(LocalDate.of(2025, 12, 31));
         abrechnung.setAnzahlWohnungen(9);
+        // Pflichtfeld seit V135 (Umlage pro Person, NOT NULL mit CHECK >= 1). Fehlt es,
+        // scheitert schon das Anlegen der Fixture - und mit ihr jeder Test dieser Klasse.
+        abrechnung.setAnzahlPersonen(9);
         return abrechnungRepository.saveAndFlush(abrechnung);
     }
 
