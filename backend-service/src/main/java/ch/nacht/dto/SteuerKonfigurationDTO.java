@@ -1,5 +1,9 @@
 package ch.nacht.dto;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.PositiveOrZero;
 
 import java.math.BigDecimal;
@@ -67,6 +71,15 @@ public class SteuerKonfigurationDTO {
     public static final BigDecimal VORGABE_MINDEST_ABSTAND = new BigDecimal("0.02000");
 
     /**
+     * Vorgabe der Tage, ueber die der Umrechnungsfaktor von W/m² auf kWh gelernt wird
+     * (Specs/Ladeplanung.md, FR-3).
+     *
+     * <p>28 Tage. Kürzer folgt der Faktor aktuellen Zuständen schneller (Verschmutzung, Schnee),
+     * länger ist er ruhiger. Ein Startwert — welcher taugt, zeigt der Betrieb.
+     */
+    public static final int VORGABE_HISTORIE_TAGE = 28;
+
+    /**
      * Schwellwert für {@code WARTEN_AUF_TAL} in CHF/kWh.
      *
      * <p><b>Darf negativ sein</b> — es gibt keinen Vorzeichen-Wächter, dieselbe Begründung wie bei
@@ -120,6 +133,44 @@ public class SteuerKonfigurationDTO {
     @PositiveOrZero(message = "Mindest-Preisabstand darf nicht negativ sein")
     private BigDecimal mindestAbstand;
 
+    /**
+     * Breitengrad der Anlage in Grad (Specs/Ladeplanung.md, FR-6).
+     *
+     * <p>Zusammen mit {@link #laengengrad}, {@link #azimut} und {@link #neigung} die Grundlage des
+     * Prognose-Abrufs. Fehlt einer der vier Werte, wird keine Prognose geholt — und die Steuerung
+     * bleibt beim Regelwerk.
+     */
+    @DecimalMin(value = "-90", message = "Breitengrad muss zwischen -90 und 90 liegen")
+    @DecimalMax(value = "90", message = "Breitengrad muss zwischen -90 und 90 liegen")
+    private BigDecimal breitengrad;
+
+    /** Laengengrad der Anlage in Grad. */
+    @DecimalMin(value = "-180", message = "Laengengrad muss zwischen -180 und 180 liegen")
+    @DecimalMax(value = "180", message = "Laengengrad muss zwischen -180 und 180 liegen")
+    private BigDecimal laengengrad;
+
+    /**
+     * Ausrichtung der Module in Grad, in der <b>Open-Meteo-Konvention</b>:
+     * 0 = Süd, −90 = Ost, 90 = West.
+     *
+     * <p><b>Nicht die meteorologische Zählweise</b> (0 = Nord). Wer sie verwechselt, richtet die
+     * Anlage rechnerisch nach Norden: Die Prognose wäre dauerhaft zu tief, der gelernte Faktor
+     * gliche es teilweise aus — und der Fehler bliebe unbemerkt.
+     */
+    @DecimalMin(value = "-180", message = "Azimut muss zwischen -180 und 180 liegen")
+    @DecimalMax(value = "180", message = "Azimut muss zwischen -180 und 180 liegen")
+    private BigDecimal azimut;
+
+    /** Neigung der Module in Grad: 0 = flach, 90 = senkrecht. */
+    @DecimalMin(value = "0", message = "Neigung muss zwischen 0 und 90 liegen")
+    @DecimalMax(value = "90", message = "Neigung muss zwischen 0 und 90 liegen")
+    private BigDecimal neigung;
+
+    /** Tage, ueber die der Umrechnungsfaktor gelernt wird; leer → Vorgabe 28. */
+    @Min(value = 1, message = "Tage fuer den Umrechnungsfaktor muessen mindestens 1 sein")
+    @Max(value = 56, message = "Tage fuer den Umrechnungsfaktor duerfen hoechstens 56 sein")
+    private Integer historieTage;
+
     public SteuerKonfigurationDTO() {
     }
 
@@ -153,6 +204,22 @@ public class SteuerKonfigurationDTO {
     /** Der Mindest-Preisabstand oder die Vorgabe, wenn keiner erfasst ist. */
     public BigDecimal mindestAbstandOderVorgabe() {
         return mindestAbstand != null ? mindestAbstand : VORGABE_MINDEST_ABSTAND;
+    }
+
+    /** Die Tage fuer den Umrechnungsfaktor oder die Vorgabe. */
+    public int historieTageOderVorgabe() {
+        return historieTage != null ? historieTage : VORGABE_HISTORIE_TAGE;
+    }
+
+    /**
+     * {@code true}, wenn Standort <b>und</b> Ausrichtung vollstaendig erfasst sind.
+     *
+     * <p>Alle vier oder keiner: Mit drei Werten laesst sich die Einstrahlung auf die Modulflaeche
+     * nicht bestimmen, und ein stillschweigend angenommener vierter (etwa "flach nach Sueden")
+     * ergaebe eine Prognose, die plausibel aussieht und falsch ist.
+     */
+    public boolean hatStandortUndAusrichtung() {
+        return breitengrad != null && laengengrad != null && azimut != null && neigung != null;
     }
 
     public BigDecimal getSchwellwert() {
@@ -203,6 +270,46 @@ public class SteuerKonfigurationDTO {
         this.mindestAbstand = mindestAbstand;
     }
 
+    public BigDecimal getBreitengrad() {
+        return breitengrad;
+    }
+
+    public void setBreitengrad(BigDecimal breitengrad) {
+        this.breitengrad = breitengrad;
+    }
+
+    public BigDecimal getLaengengrad() {
+        return laengengrad;
+    }
+
+    public void setLaengengrad(BigDecimal laengengrad) {
+        this.laengengrad = laengengrad;
+    }
+
+    public BigDecimal getAzimut() {
+        return azimut;
+    }
+
+    public void setAzimut(BigDecimal azimut) {
+        this.azimut = azimut;
+    }
+
+    public BigDecimal getNeigung() {
+        return neigung;
+    }
+
+    public void setNeigung(BigDecimal neigung) {
+        this.neigung = neigung;
+    }
+
+    public Integer getHistorieTage() {
+        return historieTage;
+    }
+
+    public void setHistorieTage(Integer historieTage) {
+        this.historieTage = historieTage;
+    }
+
     @Override
     public String toString() {
         return "SteuerKonfigurationDTO{schwellwert=" + schwellwert +
@@ -210,6 +317,9 @@ public class SteuerKonfigurationDTO {
                ", batteriekapazitaet=" + batteriekapazitaet +
                ", socMinimum=" + socMinimum +
                ", socHysterese=" + socHysterese +
-               ", mindestAbstand=" + mindestAbstand + "}";
+               ", mindestAbstand=" + mindestAbstand +
+               ", breitengrad=" + breitengrad + ", laengengrad=" + laengengrad +
+               ", azimut=" + azimut + ", neigung=" + neigung +
+               ", historieTage=" + historieTage + "}";
     }
 }

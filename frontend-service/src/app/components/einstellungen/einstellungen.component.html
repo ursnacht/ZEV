@@ -137,6 +137,39 @@
             </div>
 
             <div class="zev-form-group">
+              <label for="breitengrad">{{ 'LADEPLANUNG_BREITENGRAD' | translate }}:</label>
+              <input type="number" id="breitengrad" class="zev-input" step="0.0001" min="-90" max="90"
+                [(ngModel)]="formData.steuerung.breitengrad" name="breitengrad" />
+              <small class="zev-form-hint">{{ 'LADEPLANUNG_STANDORT_HINWEIS' | translate }}</small>
+            </div>
+
+            <div class="zev-form-group">
+              <label for="laengengrad">{{ 'LADEPLANUNG_LAENGENGRAD' | translate }}:</label>
+              <input type="number" id="laengengrad" class="zev-input" step="0.0001" min="-180" max="180"
+                [(ngModel)]="formData.steuerung.laengengrad" name="laengengrad" />
+            </div>
+
+            <div class="zev-form-group">
+              <label for="azimut">{{ 'LADEPLANUNG_AZIMUT' | translate }}:</label>
+              <input type="number" id="azimut" class="zev-input" step="1" min="-180" max="180"
+                [(ngModel)]="formData.steuerung.azimut" name="azimut" />
+              <small class="zev-form-hint">{{ 'LADEPLANUNG_AZIMUT_HINWEIS' | translate }}</small>
+            </div>
+
+            <div class="zev-form-group">
+              <label for="neigung">{{ 'LADEPLANUNG_NEIGUNG' | translate }}:</label>
+              <input type="number" id="neigung" class="zev-input" step="1" min="0" max="90"
+                [(ngModel)]="formData.steuerung.neigung" name="neigung" />
+            </div>
+
+            <div class="zev-form-group">
+              <label for="historieTage">{{ 'LADEPLANUNG_HISTORIE_TAGE' | translate }}:</label>
+              <input type="number" id="historieTage" class="zev-input" step="1" min="1" max="56"
+                [(ngModel)]="formData.steuerung.historieTage" name="historieTage" />
+              <small class="zev-form-hint">{{ 'LADEPLANUNG_FAKTOR_HINWEIS' | translate }}</small>
+            </div>
+
+            <div class="zev-form-group">
               <label for="mindestAbstand">{{ 'STEUERUNG_MINDEST_ABSTAND' | translate }}:</label>
               <input type="number" id="mindestAbstand" class="zev-input" step="0.00001" min="0"
                 [(ngModel)]="formData.steuerung.mindestAbstand" name="mindestAbstand" />

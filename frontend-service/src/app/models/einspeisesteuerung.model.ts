@@ -127,3 +127,20 @@ export interface Simulation {
   /** Überschuss-kWh in Intervallen mit gesperrter Ladung. */
   energieVerschoben: number;
 }
+
+/**
+ * Ein Intervall der Produktionsprognose (`Specs/Ladeplanung.md`, FR-3).
+ *
+ * **Beschreibt die Zukunft** — anders als ein Steuerentscheid, den es nur für abgeschlossene
+ * Intervalle gibt. Deshalb eine eigene Liste und kein Feld am Entscheid.
+ */
+export interface Prognosepunkt {
+  /** Beginn des Intervalls in Ortszeit. */
+  zeit: string;
+  /** Einstrahlung auf die geneigte Modulfläche in W/m². */
+  gti: number;
+  /** Erwartete Erzeugung in kWh; `null`, solange kein Faktor gelernt ist. */
+  erwarteteErzeugung: number | null;
+  /** Der gelernte Faktor von W/m² auf kWh; `null` bei zu wenig Historie. */
+  faktor: number | null;
+}

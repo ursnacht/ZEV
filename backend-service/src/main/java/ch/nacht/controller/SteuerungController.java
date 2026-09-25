@@ -1,7 +1,9 @@
 package ch.nacht.controller;
 
+import ch.nacht.dto.PrognosepunktDTO;
 import ch.nacht.dto.SimulationDTO;
 import ch.nacht.dto.SteuerentscheidDTO;
+import ch.nacht.service.ProduktionsprognoseService;
 import ch.nacht.service.SteuerungService;
 
 import org.slf4j.Logger;
@@ -42,9 +44,12 @@ public class SteuerungController {
     private static final int MAX_TAGE = 366;
 
     private final SteuerungService steuerungService;
+    private final ProduktionsprognoseService produktionsprognoseService;
 
-    public SteuerungController(SteuerungService steuerungService) {
+    public SteuerungController(SteuerungService steuerungService,
+                               ProduktionsprognoseService produktionsprognoseService) {
         this.steuerungService = steuerungService;
+        this.produktionsprognoseService = produktionsprognoseService;
         log.info("SteuerungController initialized");
     }
 
@@ -93,6 +98,24 @@ public class SteuerungController {
         }
         return ResponseEntity.ok(steuerungService.getEntscheideSimuliert(
                 datum, schwellwert, speicherwert, mindestAbstand));
+    }
+
+    /**
+     * Die Produktionsprognose eines Ortstages (Specs/Ladeplanung.md, FR-3).
+     *
+     * <p><b>Eigener Endpunkt, nicht Teil der Entscheide.</b> Die Prognose beschreibt die Zukunft;
+     * Entscheide gibt es nur fuer abgeschlossene Intervalle. Haengte sie daran, waere der Resttag
+     * nie sichtbar - also genau der Teil, um den es geht.
+     *
+     * <p>Leer, wenn fuer den Tag keine Prognose vorliegt. Das ist kein Fehler: Vor dem ersten
+     * Abruf gibt es keine, und ohne Standort wird gar nicht erst geholt.
+     *
+     * @param datum Tag in Ortszeit (Europe/Zurich)
+     */
+    @GetMapping("/prognose")
+    public ResponseEntity<List<PrognosepunktDTO>> getPrognose(
+            @RequestParam("datum") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate datum) {
+        return ResponseEntity.ok(produktionsprognoseService.getPrognose(datum));
     }
 
     /**

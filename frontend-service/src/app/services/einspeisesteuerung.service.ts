@@ -1,7 +1,12 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Simulation, SimulationAnfrage, Steuerentscheid } from '../models/einspeisesteuerung.model';
+import {
+  Prognosepunkt,
+  Simulation,
+  SimulationAnfrage,
+  Steuerentscheid
+} from '../models/einspeisesteuerung.model';
 import { getRuntimeConfig } from '../runtime-config';
 
 /**
@@ -50,6 +55,16 @@ export class EinspeisesteuerungService {
   /**
    * Rechnet die Regel mit abweichenden Schwellen nach — **verändert nichts**.
    */
+  /**
+   * Produktionsprognose eines Ortstages.
+   *
+   * Leer, wenn keine vorliegt — vor dem ersten Abruf oder ohne erfassten Standort. Das ist kein
+   * Fehler, sondern der Normalzustand einer frisch eingerichteten Anlage.
+   */
+  getPrognose(datum: string): Observable<Prognosepunkt[]> {
+    return this.http.get<Prognosepunkt[]>(`${this.apiUrl}/prognose?datum=${datum}`);
+  }
+
   simuliere(anfrage: SimulationAnfrage): Observable<Simulation> {
     return this.http.post<Simulation>(`${this.apiUrl}/simulation`, anfrage);
   }

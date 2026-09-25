@@ -33,6 +33,15 @@ export interface SteuerKonfiguration {
   socHysterese?: number | null;
   /** Mindestabstand in CHF/kWh, um den das Tal unter dem aktuellen Preis liegen muss. */
   mindestAbstand?: number | null;
+  /** Breitengrad der Anlage; zusammen mit den drei folgenden Grundlage des Prognose-Abrufs. */
+  breitengrad?: number | null;
+  laengengrad?: number | null;
+  /** Ausrichtung in Open-Meteo-Konvention: 0 = Sued, -90 = Ost, 90 = West. */
+  azimut?: number | null;
+  /** Neigung: 0 = flach, 90 = senkrecht. */
+  neigung?: number | null;
+  /** Tage, ueber die der Umrechnungsfaktor von W/m2 auf kWh gelernt wird. */
+  historieTage?: number | null;
 }
 
 /**

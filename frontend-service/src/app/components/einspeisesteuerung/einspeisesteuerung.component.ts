@@ -5,6 +5,7 @@ import { EinspeisesteuerungService } from '../../services/einspeisesteuerung.ser
 import {
   STEUERREGELN,
   STEUERREGEL_KEYS,
+  Prognosepunkt,
   Simulation,
   Steuerentscheid,
   Steuerregel
@@ -88,6 +89,21 @@ export class EinspeisesteuerungComponent extends WithMessage
    */
   entscheideNeusteZuerst: Steuerentscheid[] = [];
 
+  /**
+   * Produktionsprognose des angezeigten Tages (`Specs/Ladeplanung.md`, FR-3).
+   *
+   * <p>Eigene Liste neben den Entscheiden, weil sie die **Zukunft** beschreibt: Entscheide gibt es
+   * nur fuer abgeschlossene Intervalle, die Prognose auch fuer den Resttag. Genau der ist der
+   * interessante Teil.
+   *
+   * <p>Leer, solange kein Standort erfasst oder noch nichts abgerufen ist — dann zeigt das
+   * Diagramm die Kurve schlicht nicht.
+   */
+  prognose: Prognosepunkt[] = [];
+
+  /** Prognose nach Intervallbeginn, zum Zuordnen in der Tabelle. */
+  private prognoseJeZeit = new Map<string, Prognosepunkt>();
+
   loading = false;
 
   /** Schwellwert der Rückrechnung; vorbelegt mit dem des ersten Entscheids. */
@@ -162,6 +178,11 @@ export class EinspeisesteuerungComponent extends WithMessage
           null, this.simuliertMitAbstand)
       : this.steuerungService.getEntscheide(this.datum);
 
+    // Die Prognose kommt aus einer EIGENEN Abfrage und wird bewusst nicht mit den Entscheiden
+    // verschraenkt: Sie liegt auch fuer Tage vor, an denen es keine Entscheide gibt, und sie
+    // reicht ueber das letzte ausgewertete Intervall hinaus.
+    this.ladePrognose();
+
     quelle.subscribe({
       next: (daten) => {
         this.entscheide = daten;
@@ -182,6 +203,71 @@ export class EinspeisesteuerungComponent extends WithMessage
         this.showMessage(error.error || 'STEUERUNG_FEHLER_LADEN', 'error');
       }
     });
+  }
+
+  /**
+   * Prognose des angezeigten Tages holen.
+   *
+   * <p><b>Ein Fehler bleibt stumm.</b> Die Prognose ist eine Zugabe; die Seite funktioniert ohne
+   * sie vollstaendig. Eine Fehlermeldung wuerde den Blick auf das Protokoll verstellen, um das es
+   * hier geht — im Log steht der Fehler trotzdem.
+   */
+  private ladePrognose(): void {
+    this.steuerungService.getPrognose(this.datum).subscribe({
+      next: (punkte) => {
+        this.prognose = punkte;
+        this.prognoseJeZeit = new Map(punkte.map(p => [p.zeit, p]));
+        void this.zeichne();
+      },
+      error: (error) => {
+        this.prognose = [];
+        this.prognoseJeZeit = new Map();
+        console.warn('Prognose konnte nicht geladen werden', error);
+      }
+    });
+  }
+
+  /**
+   * Die Prognose als **lückenloses** Zeitraster für das Diagramm.
+   *
+   * <p><b>Warum nicht einfach die Punkte abbilden.</b> `connectNulls: false` greift nur bei einem
+   * ausdrücklichen `null` im Datensatz. Fehlt dagegen eine ganze Zeile — und genau so kommen
+   * Lücken aus der Datenbank —, sieht ECharts zwei benachbarte Punkte und zieht eine Gerade
+   * darüber. Das Fehlen einer Vorhersage sähe dann aus wie eine Vorhersage.
+   *
+   * <p>Deshalb wird das 15-Minuten-Raster zwischen erstem und letztem bekannten Punkt aufgespannt
+   * und jedes fehlende Intervall ausdrücklich mit `null` belegt.
+   */
+  private prognoseReihe(): (number | null)[][] {
+    if (this.prognose.length === 0) {
+      return [];
+    }
+    const werte = new Map(this.prognose.map(
+      p => [new Date(p.zeit).getTime(), p.erwarteteErzeugung]));
+    const zeiten = [...werte.keys()].sort((a, b) => a - b);
+
+    const reihe: (number | null)[][] = [];
+    for (let t = zeiten[0]; t <= zeiten[zeiten.length - 1]; t += INTERVALL_MS) {
+      reihe.push([t, werte.get(t) ?? null]);
+    }
+    return reihe;
+  }
+
+  /** Prognosepunkt eines Entscheids — für die Tabellenspalten. */
+  prognoseFuer(entscheid: Steuerentscheid): Prognosepunkt | undefined {
+    return this.prognoseJeZeit.get(entscheid.zeit);
+  }
+
+  /** Einstrahlung in W/m², ohne Nachkommastellen; leer, wenn keine Prognose vorliegt. */
+  einstrahlung(entscheid: Steuerentscheid): string {
+    const punkt = this.prognoseFuer(entscheid);
+    return punkt == null ? '' : formatSwissNumber(punkt.gti, 0);
+  }
+
+  /** Erwartete Erzeugung in kWh; leer, solange kein Faktor gelernt ist. */
+  erwarteteErzeugung(entscheid: Steuerentscheid): string {
+    const punkt = this.prognoseFuer(entscheid);
+    return punkt?.erwarteteErzeugung == null ? '' : this.menge(punkt.erwarteteErzeugung);
   }
 
   /**
@@ -554,6 +640,22 @@ export class EinspeisesteuerungComponent extends WithMessage
           connectNulls: false,
           data: this.entscheide.map((e, i) => [zeiten[i], e.soc])
         },
+        {
+          // Die PROGNOSE, gestrichelt und auf derselben kWh-Achse wie die gemessene Produktion:
+          // Nur so laesst sich am Abend ablesen, wie gut die Vorhersage war. Die Einstrahlung
+          // selbst (W/m2) steht in der Tabelle - eine vierte y-Achse haette hier keinen Platz,
+          // der rechte Rand musste fuer die dritte schon von 60 auf 115 wachsen.
+          name: this.translationService.translate('LADEPLANUNG_PROGNOSE'),
+          type: 'line',
+          lineStyle: { color: farben.flaeche, width: 2, type: 'dashed' },
+          itemStyle: { color: farben.flaeche },
+          showSymbol: false,
+          yAxisIndex: 1,
+          // Luecken NICHT verbinden: Fehlt die Prognose fuer ein Intervall, soll die Linie
+          // aussetzen statt eine Gerade darueber zu ziehen, die es so nie gab.
+          connectNulls: false,
+          data: this.prognoseReihe()
+        },
         this.band('STEUERUNG_BATTERIELADUNG', e => e.batterieladung === 'GESPERRT', 1),
         this.band('STEUERUNG_EINSPEISUNG', e => e.einspeisung === 'GESPERRT', 2)
       ]
@@ -619,6 +721,11 @@ export class EinspeisesteuerungComponent extends WithMessage
       // Die VERRECHNETE Produktion, weil genau sie gezeichnet wird - sonst liefe die Kurve an
       // Tagen mit viel Ladung ueber den oberen Rand der Achse hinaus.
       hoechste = Math.max(hoechste, this.produktionVerrechnet(e), e.verbrauch ?? 0);
+    }
+    // Die Prognose gehoert in die Bezugsgroesse: Liegt sie ueber der gemessenen Produktion - und
+    // genau das ist am Morgen der Normalfall -, liefe die Kurve sonst oben aus dem Bild.
+    for (const punkt of this.prognose) {
+      hoechste = Math.max(hoechste, punkt.erwarteteErzeugung ?? 0);
     }
     return hoechste > 0 ? hoechste : MENGE_ERSATZ;
   }
@@ -715,6 +822,10 @@ export class EinspeisesteuerungComponent extends WithMessage
           + `${this.menge(this.produktionVerrechnet(e))} kWh<br>`
         + `${t('STEUERUNG_LADUNG')}: ${this.menge(e.speicherLadung)} kWh<br>`
         + `${t('STEUERUNG_ENTLADUNG')}: ${this.menge(e.speicherEntladung)} kWh<br>`)
+      + (this.prognoseFuer(e) == null ? ''
+        : `${t('LADEPLANUNG_EINSTRAHLUNG')}: ${this.einstrahlung(e)} W/m²<br>`
+        + (this.erwarteteErzeugung(e) === '' ? ''
+          : `${t('LADEPLANUNG_PROGNOSE')}: ${this.erwarteteErzeugung(e)} kWh<br>`))
       + `${t('VERBRAUCH')}: ${this.menge(e.verbrauch)} kWh<br>`
       + `${t('STEUERUNG_UEBERSCHUSS')}: ${this.menge(e.ueberschuss)} kWh<br>`
       + `<b>${t(this.regelKey(e.regel))}</b><br>`
