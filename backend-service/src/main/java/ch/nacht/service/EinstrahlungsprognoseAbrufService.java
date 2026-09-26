@@ -116,7 +116,17 @@ public class EinstrahlungsprognoseAbrufService {
         }
     }
 
-    /** Ruft die API auf. Wirft, wenn sie nicht erreichbar ist oder Unerwartetes liefert. */
+    /**
+     * Ruft die API auf. Wirft, wenn sie nicht erreichbar ist oder Unerwartetes liefert.
+     *
+     * <p><b>Die Zeitzone steht unkodiert als {@code Europe/Zurich}.</b> {@code RestClient.uri(String)}
+     * behandelt die Zeichenkette als URI-<i>Vorlage</i> und kodiert sie noch einmal: Aus einem
+     * vorkodierten {@code %2F} wird dabei {@code %252F}, und die API liest den Parameter als
+     * {@code "Europe%2FZurich"} — keine gueltige Zeitzone. Ein Schraegstrich ist im Query-Teil
+     * erlaubt und bleibt unveraendert. Das ist kein Schoenheitsfehler: Ohne gueltige Zeitzone
+     * kaeme die Reihe in UTC zurueck, waehrend diese Klasse sie als Ortszeit ablegt — die ganze
+     * Prognose laege ein bis zwei Stunden daneben und saehe weiterhin plausibel aus.
+     */
     private OpenMeteoResponseDTO hole(SteuerKonfigurationDTO k) {
         String url = basisUrl
                 + "?latitude=" + k.getBreitengrad()
@@ -124,7 +134,7 @@ public class EinstrahlungsprognoseAbrufService {
                 + "&tilt=" + k.getNeigung()
                 + "&azimuth=" + k.getAzimut()
                 + "&minutely_15=global_tilted_irradiance"
-                + "&timezone=Europe%2FZurich"
+                + "&timezone=Europe/Zurich"
                 + "&models=" + modell
                 + "&forecast_days=" + tage;
 
