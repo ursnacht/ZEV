@@ -245,6 +245,7 @@ public class EinstrahlungsprognoseAbrufServiceTest {
     void abrufen_ListenVerschiedenLang_SchreibtNichts() {
         antwortet("""
             {
+              "timezone": "Europe/Zurich",
               "minutely_15": {
                 "time": ["2026-09-25T13:15", "2026-09-25T13:30", "2026-09-25T13:45"],
                 "global_tilted_irradiance": [812.4, 795.1]
@@ -301,6 +302,60 @@ public class EinstrahlungsprognoseAbrufServiceTest {
         meldetFehler();
     }
 
+    /**
+     * <b>Die gemeldete Zeitzone wird gegengeprueft.</b> Weicht sie ab, wird nichts geschrieben.
+     *
+     * <p>Die Zeitstempel kommen ohne Zonenangabe ({@code "2026-09-25T13:15"}). Welche gemeint ist,
+     * sagt einzig dieses Feld — und es lag bis dahin ungeprueft im DTO.
+     *
+     * <p><b>Eine Ruckversicherung, kein eingetretener Fall.</b> Open-Meteo weist eine unbrauchbare
+     * Zeitzone heute mit {@code 400} ab (am 26.09.2026 nachgewiesen). Faellt die API eines Tages
+     * still auf UTC zurueck, laege die ganze Prognose zwei Stunden daneben und saehe weiterhin
+     * plausibel aus — erkennbar allein am Sonnenstand.
+     */
+    @Test
+    void abrufen_AntwortInAndererZeitzone_SchreibtNichtsUndMeldetFehler() {
+        antwortet("""
+            {
+              "timezone": "GMT",
+              "minutely_15": {
+                "time": ["2026-09-25T13:15"],
+                "global_tilted_irradiance": [812.4]
+              }
+            }
+            """);
+
+        assertEquals(0, abrufService.abrufen(ORG_ID));
+        verify(prognoseRepository, never()).upsert(any(), any(), any(), any());
+        verify(systemmeldungService).erfasse(eq(ORG_ID), eq(MeldungLevel.WARN), any(),
+                eq("LADEPLANUNG_PROGNOSE_FEHLER"), parameterCaptor.capture());
+        assertTrue(parameterCaptor.getValue().contains("GMT"),
+                "Die Meldung nennt die gelieferte Zeitzone: " + parameterCaptor.getValue());
+    }
+
+    /**
+     * Fehlt das Feld ganz, wird ebenfalls nichts geschrieben.
+     *
+     * <p>Ein fehlendes Feld ist keine Bestaetigung. Wuerde {@code null} durchgelassen, waere die
+     * Pruefung genau dann wirkungslos, wenn die Antwort am wenigsten dem entspricht, was erwartet
+     * wird.
+     */
+    @Test
+    void abrufen_AntwortOhneZeitzone_SchreibtNichts() {
+        antwortet("""
+            {
+              "minutely_15": {
+                "time": ["2026-09-25T13:15"],
+                "global_tilted_irradiance": [812.4]
+              }
+            }
+            """);
+
+        assertEquals(0, abrufService.abrufen(ORG_ID));
+        verify(prognoseRepository, never()).upsert(any(), any(), any(), any());
+        meldetFehler();
+    }
+
     /** Auch eine Antwort mit leerem {@code minutely_15}-Block wird gemeldet, nicht verschluckt. */
     @Test
     void abrufen_AntwortOhneZeitreihe_MeldetFehler() {
@@ -348,6 +403,7 @@ public class EinstrahlungsprognoseAbrufServiceTest {
     void abrufen_UnlesbarerZeitstempel_MeldetDenWert() {
         antwortet("""
             {
+              "timezone": "Europe/Zurich",
               "minutely_15": {
                 "time": ["25.09.2026 13:15"],
                 "global_tilted_irradiance": [812.4]
@@ -373,6 +429,7 @@ public class EinstrahlungsprognoseAbrufServiceTest {
     void abrufen_LangeFehlerbeschreibung_WirdAufFuenfhundertZeichenGekuerzt() {
         antwortet("""
             {
+              "timezone": "Europe/Zurich",
               "minutely_15": {
                 "time": ["%s"],
                 "global_tilted_irradiance": [812.4]
@@ -452,7 +509,7 @@ public class EinstrahlungsprognoseAbrufServiceTest {
             zeiten.append('"').append(start.plusMinutes(15L * i)).append('"');
             werte.append("100.0");
         }
-        return "{\"minutely_15\": {\"time\": [" + zeiten + "], "
+        return "{\"timezone\": \"Europe/Zurich\", \"minutely_15\": {\"time\": [" + zeiten + "], "
                 + "\"global_tilted_irradiance\": [" + werte + "]}}";
     }
 

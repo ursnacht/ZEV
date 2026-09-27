@@ -50,6 +50,22 @@ public class EinstrahlungsprognoseAbrufService {
     /** Länge der Fehlerbeschreibung in der Systemmeldung ({@code systemmeldung.parameter}). */
     private static final int PARAMETER_MAX_LAENGE = 500;
 
+    /**
+     * Die Zeitzone, in der die Reihe erwartet wird — <b>angefragt und gegengeprüft</b>.
+     *
+     * <p>Sie steht als Konstante, damit die Anfrage und die Prüfung der Antwort nicht auseinander
+     * laufen können. Die Zeichenkette geht <b>unkodiert</b> in die URL; warum, steht bei
+     * {@link #hole(SteuerKonfigurationDTO)}.
+     *
+     * <p><b>Warum überhaupt gegengeprüft wird.</b> Die Zeitstempel der Antwort kommen ohne
+     * Zonenangabe ({@code "2026-09-25T13:15"}); welche gemeint ist, sagt allein das Feld
+     * {@code timezone}. Heute weist Open-Meteo eine unbrauchbare Zeitzone mit {@code 400} ab — die
+     * Prüfung ist also eine Rückversicherung für den Fall, dass es einmal still auf UTC zurückfällt.
+     * Dann läge die ganze Prognose zwei Stunden daneben und sähe weiterhin plausibel aus. Die
+     * Prüfung kostet eine Zeile; dieser Fehler wäre nur am Sonnenstand zu erkennen.
+     */
+    private static final String ZEITZONE = "Europe/Zurich";
+
     private final EinstrahlungsprognoseRepository prognoseRepository;
     private final EinstellungenService einstellungenService;
     private final SystemmeldungService systemmeldungService;
@@ -123,9 +139,11 @@ public class EinstrahlungsprognoseAbrufService {
      * behandelt die Zeichenkette als URI-<i>Vorlage</i> und kodiert sie noch einmal: Aus einem
      * vorkodierten {@code %2F} wird dabei {@code %252F}, und die API liest den Parameter als
      * {@code "Europe%2FZurich"} — keine gueltige Zeitzone. Ein Schraegstrich ist im Query-Teil
-     * erlaubt und bleibt unveraendert. Das ist kein Schoenheitsfehler: Ohne gueltige Zeitzone
-     * kaeme die Reihe in UTC zurueck, waehrend diese Klasse sie als Ortszeit ablegt — die ganze
-     * Prognose laege ein bis zwei Stunden daneben und saehe weiterhin plausibel aus.
+     * erlaubt und bleibt unveraendert.
+     *
+     * <p><b>Der Fehler war real und ist am 26.09.2026 aufgetreten:</b> Open-Meteo antwortete mit
+     * {@code 400 Bad Request: {"error":true,"reason":"Invalid timezone"}}. Der Abruf schlug also
+     * laut fehl und erzeugte eine Systemmeldung — er legte <b>keine</b> falschen Daten ab.
      */
     private OpenMeteoResponseDTO hole(SteuerKonfigurationDTO k) {
         String url = basisUrl
@@ -134,7 +152,7 @@ public class EinstrahlungsprognoseAbrufService {
                 + "&tilt=" + k.getNeigung()
                 + "&azimuth=" + k.getAzimut()
                 + "&minutely_15=global_tilted_irradiance"
-                + "&timezone=Europe/Zurich"
+                + "&timezone=" + ZEITZONE
                 + "&models=" + modell
                 + "&forecast_days=" + tage;
 
@@ -146,6 +164,12 @@ public class EinstrahlungsprognoseAbrufService {
                 || antwort.minutely15().time() == null
                 || antwort.minutely15().globalTiltedIrradiance() == null) {
             throw new IllegalStateException("Antwort ohne minutely_15-Daten");
+        }
+        // Die Zeitstempel kommen ohne Zonenangabe - welche gemeint ist, sagt allein dieses Feld.
+        // Stimmt es nicht, ist jede weitere Verarbeitung eine Fehldeutung.
+        if (!ZEITZONE.equals(antwort.timezone())) {
+            throw new IllegalStateException("Antwort in Zeitzone " + antwort.timezone()
+                    + " statt " + ZEITZONE + " - Zeitstempel waeren verschoben");
         }
         return antwort;
     }
