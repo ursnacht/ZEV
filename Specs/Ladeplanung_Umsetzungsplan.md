@@ -66,7 +66,7 @@ Rückfall-Kennzeichen und die Erweiterung des Entscheidungsprotokolls.
 | [ ] | 3. Upsert erweitern | 20 → 27 Parameter. **Danach `SteuerentscheidUpsertQueryTest` laufen lassen** — er zählt Spalten gegen VALUES und prüft die DO-UPDATE-Liste auf Vollständigkeit. |
 | [ ] | 4. Lastprofil | Query im `MesswerteRepository` (`CONSUMER`, gleiche Wochentage innerhalb `historieTage`), Median je Tageszeit im `ProduktionsprognoseService`. Zeitversatz beachten. |
 | [ ] | 5. Erwarteter Überschuss | `max(0, prognose − lastprofil)` je Intervall, am `PrognosepunktDTO` ergänzt. |
-| [ ] | 6. `LadeplanService` | Merit-Order: sortieren, auffüllen, Rang und benötigte Anzahl zurückgeben. Reine Rechnung ohne Repository-Zugriff — damit einzeln prüfbar. |
+| [ ] | 6. `LadeplanService` | Merit-Order: sortieren, auffüllen, Rang und benötigte Anzahl zurückgeben. Aufgefüllt wird bis `kapazitaetFrei / 0.95` (Ladewirkungsgrad, FR-1). Reine Rechnung ohne Repository-Zugriff — damit einzeln prüfbar. |
 | [ ] | 7. Einhängen mit Rückfall | `SteuerungService.werteAus`: Voraussetzungen an **einer** Stelle prüfen → Merit-Order oder Kaskade; `verfahren` setzen. |
 | [ ] | 8. Übersetzungen | `V169`: `VERFAHREN`, `MERIT_ORDER`, `REGEL`, `RANG`, `RANG_BENOETIGT`, `KAPAZITAET_FREI`, `OHNE_PROGNOSE`, dazu `LADEPLAN` als Regelname. Mit `ON CONFLICT (key) DO NOTHING`, deutsche Texte mit Umlauten. |
 | [ ] | 9. Frontend | Neue Spalten in der Protokolltabelle; Tooltip-Zeilen **nur wenn für das Intervall eine Prognose vorliegt**. |
@@ -138,6 +138,12 @@ Spalten sind reine Anzeige.
   entschieden — und muss es für diesen Plan nicht sein.
 
 **Beim Planen aufgekommen:**
+
+* **Der Ladewirkungsgrad steht als Konstante 0.95** (FR-1), gemessen am 27.09.2026: aus dem
+  Energiezähler gerechnet 43 kWh gegen 40.8 kWh konfigurierte Kapazität. Er gehört in
+  `LadeplanService`, nicht in die Konfiguration — ein Feld dafür wäre eine Frage, die niemand ohne
+  genau diese Rechnung beantworten kann. Ändert sich die Hardware, ist die Rechnung mit einer
+  Abfrage zu wiederholen: `speicher_ladung` gegen `ΔSOC × kapazitaet` über einen Ladevorgang.
 
 * **Gleiche Preise in der Merit-Order.** Die Preiszeitreihe ist viertelstündlich, Gleichstände sind
   trotzdem möglich. Die Sortierung braucht als zweites Kriterium die Zeit, sonst wechselt der Rang

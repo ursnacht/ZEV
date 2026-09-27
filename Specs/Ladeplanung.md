@@ -70,8 +70,25 @@ Je Intervall, im selben Job-Lauf wie heute (`0 6,21,36,51 * * * *`):
    > Viertelstunde — aber ohne die Festlegung wäre nicht bestimmt, ob das Intervall, um das es
    > geht, überhaupt in der Auswahl steht.
 4. **Merit-Order bilden:** Intervalle nach Einspeisepreis **aufsteigend** sortieren.
-5. **Auffüllen**, bis die freie Kapazität gedeckt ist. Die so gewählten Intervalle sind der
+5. **Auffüllen**, bis die freie Kapazität gedeckt ist — und zwar `kapazitaetFrei / 0.95`, weil der
+   erwartete Überschuss die Energie **vor** dem Speicher ist. Die so gewählten Intervalle sind der
    **Ladeplan**.
+
+   > **Der Ladewirkungsgrad, gemessen statt geschätzt.** Am 27.09.2026 wurde die Batterie von 44 %
+   > auf 100 % geladen. Aus dem Energiezähler gerechnet ergab sich eine Kapazität von rund 43 kWh,
+   > konfiguriert sind **40.8** — Verhältnis 1.054, also gut **95 %** Wirkungsgrad. Von 3.0 kWh, die
+   > der Zähler sieht, kommen etwa 2.85 im Speicher an; der Rest bleibt als Wärme in Wechselrichter
+   > und Zellen.
+   >
+   > **Warum das nicht vernachlässigt wird**, obwohl 5 % weit innerhalb der Prognoseungenauigkeit
+   > liegen: Der Fehler zeigt immer in **dieselbe** Richtung. Ohne den Divisor enthielte der Plan
+   > dauerhaft zu wenige Intervalle, und die Batterie wäre am Abend systematisch knapp nicht voll.
+   > Prognosefehler mitteln sich über die Tage heraus, dieser nicht.
+   >
+   > **Kein Konfigurationsfeld.** 0.95 steht als Konstante. Der Wert ist eine Eigenschaft der
+   > Hardware, die sich kaum ändert, und er lässt sich jederzeit aus den Daten nachrechnen —
+   > `speicher_ladung` gegen `ΔSOC × kapazitaet`. Ein Feld dafür wäre eine Frage, die niemand
+   > beantworten kann, ohne genau diese Rechnung zu machen.
 6. **Entscheid für das ausgewertete Intervall:** liegt es im Plan → `batterieladung = FREI`, sonst
    `GESPERRT`.
 7. **Entscheid festhalten** wie bisher, um die Plangrössen erweitert (FR-5).
@@ -385,6 +402,8 @@ Neue Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten
 * [ ] Bei gleicher Kapazität und gleichem Überschuss entscheidet **allein** der Einspeisepreis.
 * [ ] Ist die Batterie voll (freie Kapazität 0), ist der Plan **leer** und jedes Intervall gesperrt.
 * [ ] Ein Intervall **ohne** erwarteten Überschuss belegt keinen Platz im Plan.
+* [ ] Aufgefüllt wird bis **`kapazitaetFrei / 0.95`**, nicht bis `kapazitaetFrei` — der erwartete
+      Überschuss ist die Energie vor dem Speicher, und rund 5 % davon kommen dort nie an.
 * [ ] **Bei negativem Preis** ist `einspeisung = GESPERRT`, über die Ladung entscheidet die
       Merit-Order — nicht mehr pauschal `FREI` wie heute.
 * [ ] **Unter dem Mindest-Ladezustand** ist `batterieladung = FREI`, ohne dass der Plan gefragt wird.
