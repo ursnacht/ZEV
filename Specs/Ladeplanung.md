@@ -133,6 +133,17 @@ https://api.open-meteo.com/v1/forecast
 > (`Specs/Einspeisesteuerung.md`, FR-3); die Spalte trägt deshalb einen Kommentar, der den Bezug
 > ausschreibt.
 
+> **Die Zeitzone gehört unkodiert in die URL, und die Antwort wird gegengeprüft.** Am 26.09.2026
+> stand `Europe%2FZurich` dort; `RestClient.uri(String)` liest die Zeichenkette als URI-Vorlage und
+> kodierte das `%` ein zweites Mal — abgeschickt wurde `Europe%252FZurich`. Open-Meteo antwortete
+> mit `400 Bad Request: {"error":true,"reason":"Invalid timezone"}`. Der Abruf schlug **laut** fehl
+> und erzeugte eine Systemmeldung; falsche Daten entstanden dabei nicht.
+>
+> Zusätzlich wird seit dem 27.09.2026 die **gemeldete** Zeitzone geprüft (Feld `timezone` der
+> Antwort, das bis dahin ungenutzt im DTO lag). Weicht sie ab, wird nichts geschrieben. Das ist
+> eine Rückversicherung für den Fall, dass die API einmal still auf UTC zurückfällt statt
+> abzuweisen — dann läge die ganze Prognose zwei Stunden daneben und sähe weiterhin plausibel aus.
+
 **Abgerufen wird für zwei Tage** (`forecast_days=2`), damit ein Ausfall über Nacht nicht sofort
 zum Rückfall führt.
 

@@ -148,7 +148,24 @@ Spalten sind reine Anzeige.
 * **`PREIS_NEGATIV` ändert sein Verhalten** (FR-1): Sie bricht die Auswertung nicht mehr ab,
   sondern sperrt nur noch die Einspeisung; über die Ladung entscheidet die Merit-Order. Das ist
   eine Verhaltensänderung, keine blosse Umstellung — bei der Abnahme gezielt anzuschauen.
-* **Der URL-Fix der Einstrahlungsprognose ist am echten Dienst noch nicht verifiziert.** Beim
-  nächsten Bau zeigt sich nach einer Stunde, ob Zeilen in `zev.einstrahlungsprognose` stehen oder
-  eine Systemmeldung `LADEPLANUNG_PROGNOSE_FEHLER` erscheint. Ohne Prognose greift ohnehin der
-  Rückfall — die Ladeplanung liefe dann nie an, und zwar still.
+* **Der URL-Fehler war laut, nicht still.** Am 26.09.2026 antwortete Open-Meteo auf das doppelt
+  kodierte `%252F` mit `400 Bad Request: {"error":true,"reason":"Invalid timezone"}`; der Abruf
+  erzeugte eine Systemmeldung und schrieb nichts. **Es sind dabei keine falschen Daten entstanden**
+  — die Zeilen in `zev.einstrahlungsprognose` stammen aus erfolgreichen Läufen und stehen in
+  Ortszeit. Eine Bereinigung ist nicht nötig.
+
+  Auf Hene lässt sich das so kontrollieren:
+
+  ```sql
+  SELECT to_char(zuletzt_aufgetreten, 'YYYY-MM-DD HH24:MI') AS zuletzt, zaehler, parameter
+  FROM zev.systemmeldung WHERE meldung_key = 'LADEPLANUNG_PROGNOSE_FEHLER';
+  ```
+
+  > **`TIMESTAMP` immer mit `to_char` abfragen.** Der `zev-db`-MCP hängt an zonenlose Zeitstempel
+  > ein `Z` und rechnet sie dabei um — aus 07:45 wird `05:45Z`. Das hat hier schon einmal zu einer
+  > Fehldiagnose geführt: Die Verschiebung steckte in der Ausgabe, nicht in den Daten.
+
+* **Bis die erwartete Erzeugung im Diagramm erscheint, vergehen vier Tage.** Der Faktor braucht 150
+  Intervalle mit `gti > 0` aus den Tagen **vor** dem angezeigten Tag; Ende September sind rund 46
+  Intervalle pro Tag hell. Vorher bleibt die Kurve leer — richtig so, aber im Diagramm nicht von
+  „keine Prognosedaten" zu unterscheiden.
