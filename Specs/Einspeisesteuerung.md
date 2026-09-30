@@ -512,6 +512,24 @@ wie der NK-Eintrag).
    `preiszeitreihe-chart`):
    * **Stufenlinie** Einspeisepreis (CHF/kWh, linke y-Achse) — `step: 'end'`, ohne Flächenfüllung:
      Ein Preis gilt für die ganze Viertelstunde.
+     > **Sie deckt den ganzen Tag ab**, nicht nur die ausgewerteten Intervalle. Die Preise stammen
+     > aus einer **eigenen** Abfrage (`GET /api/preiszeitreihe`, dieselbe Permission
+     > `tarife:manage`) statt aus den Entscheiden. Aus ihnen gelesen brach die Kurve dort ab, wo der
+     > Job zuletzt gelaufen war — also mittags, während gerade der **Resttag** die Frage ist, an der
+     > sich Warten oder Laden entscheidet.
+     >
+     > **Der Resttag wird nicht abgesetzt dargestellt.** Sein Preis ist keine Vorhersage, sondern am
+     > Vortag um 02:00 festgelegt und damit so sicher wie der vergangene. Eine gestrichelte Linie
+     > behauptete eine Unsicherheit, die es nicht gibt — anders als bei der erwarteten Erzeugung,
+     > die geschätzt ist.
+     >
+     > **Rückfall:** Ist das Flag `PREISZEITREIHE` aus oder scheitert die Abfrage, speist sich die
+     > Kurve wie bisher aus den Entscheiden. Sie endet dann früher, verschwindet aber nicht.
+     >
+     > **Der Tooltip löst über die Zeit auf, nicht über den Datenindex.** Sobald die Preisreihe
+     > länger ist als die Entscheide, zeigt derselbe Index in beiden Reihen auf verschiedene
+     > Uhrzeiten. Das wäre niemandem aufgefallen: Der Tooltip zeigte plausible Werte zur falschen
+     > Zeit. Für ein Intervall ohne Entscheid nennt er Zeit, Preis und **Noch nicht ausgewertet**.
    * **Flächen** Produktion und Verbrauch (kWh, rechte y-Achse). Die Produktion ist **gelb** — die
      übliche Zuordnung für Sonnenenergie.
      > **Der Gelbton kommt aus einem eigenen Chart-Token, nicht aus `--color-warning`.** Jenes ist
@@ -891,6 +909,13 @@ Der Text ist an kein Feature gebunden.
 **Ansicht**
 * [ ] Die Seite zeigt beim Öffnen den heutigen Tag.
 * [ ] Das Diagramm zeigt Preis, Produktion, Verbrauch und **zwei** Zustandsbänder.
+* [ ] Die **Preiskurve deckt den ganzen Tag ab**, auch wenn Entscheide erst bis zur aktuellen
+      Stunde vorliegen — die übrigen Kurven enden weiterhin beim letzten ausgewerteten Intervall.
+* [ ] Der Tooltip zeigt für ein Intervall **ohne** Entscheid Zeit, Preis und **Noch nicht
+      ausgewertet** — und für jedes Intervall **mit** Entscheid dessen eigene Werte, unabhängig
+      davon, wie viele Preispunkte davor liegen.
+* [ ] Scheitert die Preisabfrage oder ist das Flag `PREISZEITREIHE` aus, zeigt die Kurve die Preise
+      aus den Entscheiden — sie verschwindet **nicht**.
 * [ ] Ein Wechsel des Zustands ist im Band an der richtigen Viertelstunde sichtbar.
 * [ ] **Beide Bänder decken dieselbe Zeitspanne deckungsgleich ab**, wenn beide Zustände im selben Intervall `GESPERRT` sind — kein horizontaler Versatz zwischen ihnen.
 * [ ] Ein Band beginnt am **Beginn** seines ersten Intervalls und endet am **Ende** seines letzten (`zeit + 15min`), deckungsgleich mit dem Stufenverlauf der Preislinie.

@@ -10,6 +10,8 @@ import {
   Steuerentscheid,
   Steuerregel
 } from '../../models/einspeisesteuerung.model';
+import { PreiszeitreiheService } from '../../services/preiszeitreihe.service';
+import { PreiszeitreihePunkt } from '../../models/preiszeitreihe.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { IconComponent } from '../icon/icon.component';
@@ -66,6 +68,7 @@ export class EinspeisesteuerungComponent extends WithMessage
   implements OnInit, AfterViewInit, OnDestroy {
 
   private readonly steuerungService = inject(EinspeisesteuerungService);
+  private readonly preiszeitreiheService = inject(PreiszeitreiheService);
   protected readonly translationService = inject(TranslationService);
 
   @ViewChild('diagramm') private diagrammRef?: ElementRef<HTMLDivElement>;
@@ -103,6 +106,14 @@ export class EinspeisesteuerungComponent extends WithMessage
 
   /** Prognose nach Intervallbeginn, zum Zuordnen in der Tabelle. */
   private prognoseJeZeit = new Map<string, Prognosepunkt>();
+
+  /**
+   * Die Preise des angezeigten Tages — **vollständig**, unabhängig von den Entscheiden.
+   *
+   * <p>Sie liegen für den ganzen Tag vor, während Entscheide nur für abgeschlossene Intervalle
+   * entstehen. Ohne diese eigene Reihe endete die Preiskurve mittags.
+   */
+  preise: PreiszeitreihePunkt[] = [];
 
   loading = false;
 
@@ -182,6 +193,7 @@ export class EinspeisesteuerungComponent extends WithMessage
     // verschraenkt: Sie liegt auch fuer Tage vor, an denen es keine Entscheide gibt, und sie
     // reicht ueber das letzte ausgewertete Intervall hinaus.
     this.ladePrognose();
+    this.ladePreise();
 
     quelle.subscribe({
       next: (daten) => {
@@ -228,6 +240,50 @@ export class EinspeisesteuerungComponent extends WithMessage
   }
 
   /**
+   * Preise des angezeigten Tages holen — für den **ganzen** Tag, nicht nur bis zum letzten
+   * Entscheid.
+   *
+   * <p><b>Warum eine eigene Abfrage.</b> Der Preis stand bisher in den Entscheiden, und die gibt es
+   * nur für abgeschlossene Intervalle. Die Kurve brach deshalb mittags ab, obwohl die Preise für
+   * den ganzen Tag längst vorliegen: Sie werden am Vortag um 02:00 geholt
+   * (`Specs/Preiszeitreihe.md`). Genau der Resttag ist aber der Teil, auf den es ankommt — an ihm
+   * entscheidet sich, ob sich Warten lohnt.
+   *
+   * <p><b>Der Resttag wird nicht abgesetzt dargestellt.</b> Sein Preis ist keine Vorhersage,
+   * sondern für den Folgetag festgelegt und damit so sicher wie der vergangene. Eine gestrichelte
+   * Linie würde Unsicherheit behaupten, die es nicht gibt — anders als bei der erwarteten
+   * Erzeugung, die tatsächlich geschätzt ist.
+   *
+   * <p>Ein Fehler bleibt stumm, wie bei der Prognose: Der Preis steht dann weiterhin je Intervall
+   * in der Tabelle, und das Protokoll bleibt lesbar.
+   */
+  private ladePreise(): void {
+    this.preiszeitreiheService.getPunkte(this.datum, this.datum).subscribe({
+      next: (punkte) => {
+        this.preise = punkte;
+        void this.zeichne();
+      },
+      error: (error) => {
+        this.preise = [];
+        console.warn('Preiszeitreihe konnte nicht geladen werden', error);
+      }
+    });
+  }
+
+  /**
+   * Die Preisreihe für das Diagramm — der ganze Tag, sonst die Preise aus den Entscheiden.
+   *
+   * <p>Der Rückfall ist keine Zier: Er greift, wenn das Flag `PREISZEITREIHE` aus ist oder die
+   * Abfrage scheitert. Dann sieht die Kurve aus wie bisher, statt ganz zu verschwinden.
+   */
+  private preisReihe(): (number | null)[][] {
+    if (this.preise.length > 0) {
+      return this.preise.map(p => [new Date(p.zeit).getTime(), p.preis]);
+    }
+    return this.entscheide.map(e => [new Date(e.zeit).getTime(), e.preis]);
+  }
+
+  /**
    * Die Prognose als **lückenloses** Zeitraster für das Diagramm.
    *
    * <p><b>Warum nicht einfach die Punkte abbilden.</b> `connectNulls: false` greift nur bei einem
@@ -256,6 +312,16 @@ export class EinspeisesteuerungComponent extends WithMessage
   /** Prognosepunkt eines Entscheids — für die Tabellenspalten. */
   prognoseFuer(entscheid: Steuerentscheid): Prognosepunkt | undefined {
     return this.prognoseJeZeit.get(entscheid.zeit);
+  }
+
+  /**
+   * Entscheide nach Zeitstempel, für den Tooltip.
+   *
+   * <p>Wird bei jedem Zeigen neu gebaut — 96 Einträge, und die Alternative wäre ein zweiter
+   * Zustand, der mit `entscheide` synchron gehalten werden müsste.
+   */
+  private entscheideJeZeit(): Map<number, Steuerentscheid> {
+    return new Map(this.entscheide.map(e => [new Date(e.zeit).getTime(), e]));
   }
 
   /** Einstrahlung in W/m², ohne Nachkommastellen; leer, wenn keine Prognose vorliegt. */
@@ -531,7 +597,12 @@ export class EinspeisesteuerungComponent extends WithMessage
         // gerade die Fuehrungsgroessen, waren nicht mehr zu sehen.
         textStyle: { fontSize: 11 },
         padding: [6, 10],
-        formatter: (params: { dataIndex: number }[]) => this.tooltip(params[0]?.dataIndex ?? 0)
+        // Aufgeloest ueber die ZEIT, nicht ueber den Datenindex. Die Preisreihe deckt den ganzen
+        // Tag ab, die Entscheide nur die abgeschlossenen Intervalle - ein Index in die eine Reihe
+        // zeigt in der anderen auf eine andere Uhrzeit. Das faelle niemandem auf: Der Tooltip
+        // zeigte plausible Werte zur falschen Zeit.
+        formatter: (params: { axisValue?: number, data?: unknown[] }[]) =>
+          this.tooltip(Number(params[0]?.axisValue ?? params[0]?.data?.[0] ?? 0))
       },
       legend: { bottom: 60, textStyle: { color: farben.text } },
       xAxis: {
@@ -596,7 +667,7 @@ export class EinspeisesteuerungComponent extends WithMessage
           // nebeneinander nicht zu unterscheiden.
           itemStyle: { color: farben.akzent },
           lineStyle: { color: farben.akzent, width: 2 },
-          data: this.entscheide.map((e, i) => [zeiten[i], e.preis])
+          data: this.preisReihe()
         },
         {
           // Der Name wechselt mit der Datenlage: Ohne Speicherdaten zeigt die Kurve die gemessene
@@ -805,12 +876,18 @@ export class EinspeisesteuerungComponent extends WithMessage
   }
 
   /** Tooltip mit allen Eingangsgrössen — das *Warum* des Entscheids. */
-  private tooltip(index: number): string {
-    const e = this.entscheide[index];
-    if (!e) {
-      return '';
-    }
+  private tooltip(zeitpunkt: number): string {
     const t = (key: string) => this.translationService.translate(key);
+    const e = this.entscheideJeZeit().get(zeitpunkt);
+    if (!e) {
+      // Ein Intervall des Resttages: Es gibt noch keinen Entscheid, wohl aber den Preis. Statt
+      // eines leeren Tooltips die beiden Groessen, die feststehen - sonst wirkte die Kurve tot.
+      const preis = this.preise.find(p => new Date(p.zeit).getTime() === zeitpunkt);
+      return preis == null ? ''
+        : `${formatSwissDateTime(new Date(preis.zeit))}<br>`
+          + `${t('PREIS_CHF_KWH')}: ${this.preis(preis.preis) || '–'}<br>`
+          + `<i>${t('STEUERUNG_NOCH_KEIN_ENTSCHEID')}</i>`;
+    }
     return `${formatSwissDateTime(new Date(e.zeit))}<br>`
       + `${t('PREIS_CHF_KWH')}: ${this.preis(e.preis) || '–'}<br>`
       + `${t('STEUERUNG_TIEFSTPREIS_REST')}: ${this.preis(e.preisTiefRest) || '–'}<br>`
