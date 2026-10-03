@@ -4,6 +4,7 @@ import ch.nacht.AbstractIntegrationTest;
 import ch.nacht.entity.Organisation;
 import ch.nacht.entity.Steuerentscheid;
 import ch.nacht.entity.Steuerregel;
+import ch.nacht.entity.Steuerverfahren;
 import ch.nacht.entity.Steuerzustand;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -354,13 +355,23 @@ class SteuerentscheidRepositoryIT extends AbstractIntegrationTest {
         }
     }
 
+    /** Ohne Plangroessen — der Normalfall vor der Ladeplanung und beim Rueckfall. */
     private void upsert(Long orgId, LocalDateTime zeitVon, Werte w) {
+        upsert(orgId, zeitVon, w, null, null, null, null, null, null, null);
+    }
+
+    private void upsert(Long orgId, LocalDateTime zeitVon, Werte w,
+                        String verfahren, String ladeplanBatterieladung,
+                        BigDecimal prognoseUeberschuss, BigDecimal gti, BigDecimal prognoseFaktor,
+                        Integer rang, Integer rangBenoetigt) {
         steuerentscheidRepository.upsert(orgId, zeitVon, w.preis(), w.preisTiefRest(),
                 w.produktion(), w.verbrauch(), w.bezug(), w.ruecklieferung(), w.soc(),
                 w.speicherLadung(), w.speicherEntladung(), w.ueberschuss(),
                 w.regel().name(), w.batterieladung().name(), w.einspeisung().name(),
                 w.schwellwert(), w.speicherwert(), w.socMinimum(), w.socHysterese(),
-                w.mindestAbstand());
+                w.mindestAbstand(),
+                verfahren, ladeplanBatterieladung, prognoseUeberschuss, gti, prognoseFaktor,
+                rang, rangBenoetigt, rang == null ? null : new BigDecimal("12.345"));
     }
 
     /** Vergleicht Spalte fuer Spalte — bewusst ohne Schleife, damit die Meldung die Spalte nennt. */
@@ -395,5 +406,89 @@ class SteuerentscheidRepositoryIT extends AbstractIntegrationTest {
     private void leereContext() {
         entityManager.flush();
         entityManager.clear();
+    }
+
+    // ==================== Plangroessen der Schattenrechnung (FR-1a) ====================
+
+    /**
+     * Die acht neuen Spalten werden geschrieben und kommen unveraendert zurueck.
+     *
+     * <p><b>Der Grund fuer diesen Test</b>: Beim letzten Erweitern des Upserts um zwei Spalten
+     * fehlten die VALUES-Platzhalter, und der Job auf der Anlage brach jeden Lauf mit
+     * {@code INSERT has more target columns than expressions} ab. Hier sind es acht auf einmal.
+     */
+    @Test
+    void upsert_SchreibtDiePlangroessen() {
+        upsert(orgId, INTERVALL, Werte.erste(), "REGEL", "GESPERRT",
+                new BigDecimal("2.750"), new BigDecimal("555.00"), new BigDecimal("0.00488200"),
+                34, 12);
+        leereContext();
+
+        Steuerentscheid s = steuerentscheidRepository.findAll().getFirst();
+        assertThat(s.getVerfahren()).isEqualTo(Steuerverfahren.REGEL);
+        assertThat(s.getLadeplanBatterieladung()).isEqualTo(Steuerzustand.GESPERRT);
+        assertThat(s.getPrognoseUeberschuss()).isEqualByComparingTo(new BigDecimal("2.750"));
+        assertThat(s.getGti()).isEqualByComparingTo(new BigDecimal("555.00"));
+        assertThat(s.getRang()).isEqualTo(34);
+        assertThat(s.getRangBenoetigt()).isEqualTo(12);
+        assertThat(s.getKapazitaetFrei()).isEqualByComparingTo(new BigDecimal("12.345"));
+    }
+
+    /**
+     * Der Faktor behaelt <b>acht</b> Nachkommastellen.
+     *
+     * <p>Er liegt in der Groessenordnung 0.005; bei sechs Stellen blieben vier signifikante. Eine
+     * zu grobe Spalte faellt nicht auf — der Wert sieht weiterhin plausibel aus.
+     */
+    @Test
+    void upsert_FaktorBehaeltAchtNachkommastellen() {
+        upsert(orgId, INTERVALL, Werte.erste(), "REGEL", "FREI",
+                new BigDecimal("1.000"), new BigDecimal("400.00"), new BigDecimal("0.00482437"),
+                1, 5);
+        leereContext();
+
+        assertThat(steuerentscheidRepository.findAll().getFirst().getPrognoseFaktor())
+                .isEqualByComparingTo(new BigDecimal("0.00482437"));
+    }
+
+    /**
+     * Ohne Plangroessen bleiben die Spalten {@code null} — und zwar alle.
+     *
+     * <p>Das ist der Rueckfall (FR-4). Eine 0 in {@code prognose_ueberschuss} hiesse "nichts
+     * erwartet"; der Grund ist aber "nicht gerechnet", und das ist eine andere Aussage.
+     */
+    @Test
+    void upsert_OhnePlangroessen_BleibenDieSpaltenLeer() {
+        upsert(orgId, INTERVALL, Werte.erste());
+        leereContext();
+
+        Steuerentscheid s = steuerentscheidRepository.findAll().getFirst();
+        assertThat(s.getVerfahren()).isNull();
+        assertThat(s.getLadeplanBatterieladung()).isNull();
+        assertThat(s.getPrognoseUeberschuss()).isNull();
+        assertThat(s.getGti()).isNull();
+        assertThat(s.getPrognoseFaktor()).isNull();
+        assertThat(s.getRang()).isNull();
+        assertThat(s.getRangBenoetigt()).isNull();
+        assertThat(s.getKapazitaetFrei()).isNull();
+    }
+
+    /**
+     * Ein zweiter Lauf ueberschreibt die Plangroessen — auch zurueck auf {@code null}.
+     *
+     * <p>Faellt die Merit-Order spaeter aus, darf der alte Rang nicht stehen bleiben: Er erklaerte
+     * dann einen Entscheid, der ihn gar nicht mehr traegt.
+     */
+    @Test
+    void upsert_ZweiterLaufOhnePlan_LeertDiePlangroessen() {
+        upsert(orgId, INTERVALL, Werte.erste(), "REGEL", "GESPERRT",
+                new BigDecimal("2.750"), new BigDecimal("555.00"), new BigDecimal("0.00488200"),
+                34, 12);
+        upsert(orgId, INTERVALL, Werte.zweite());
+        leereContext();
+
+        Steuerentscheid s = steuerentscheidRepository.findAll().getFirst();
+        assertThat(s.getRang()).isNull();
+        assertThat(s.getLadeplanBatterieladung()).isNull();
     }
 }

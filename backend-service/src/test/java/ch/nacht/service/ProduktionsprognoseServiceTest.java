@@ -568,4 +568,159 @@ public class ProduktionsprognoseServiceTest {
         wert.setAbgerufenAm(LocalDateTime.of(2026, 9, 25, 6, 0));
         return wert;
     }
+
+    // ==================== Das Lastprofil (FR-3) ====================
+
+    /**
+     * <b>Median ueber die gleichen Wochentage.</b> DATUM ist ein Freitag (25.09.2026); gezaehlt
+     * werden nur Freitage aus dem Lernfenster.
+     *
+     * <p>Die drei Stichproben sind 0.4, 0.9 und 0.5 — Median 0.5, Mittelwert 0.6. Die Zahlen sind
+     * so gewaehlt, dass sich beide unterscheiden: Ein Mittelwert statt des Medians faellt sonst
+     * nicht auf. Genau davor schuetzt der Median — ein Waschtag darf nicht alle Freitage praegen.
+     */
+    @Test
+    void getPrognose_Lastprofil_IstDerMedianDerGleichenWochentage() {
+        lernhistorie(MIN_PUNKTE);
+        prognoseFuer(LocalDateTime.of(2026, 9, 25, 12, 0));
+        // Freitage vor dem 25.09.: 04.09., 11.09., 18.09. - jeweils Intervall-ENDE 12:15
+        messwerte(
+                verbrauch(LocalDateTime.of(2026, 9, 4, 12, 15), "0.400"),
+                verbrauch(LocalDateTime.of(2026, 9, 11, 12, 15), "0.900"),
+                verbrauch(LocalDateTime.of(2026, 9, 18, 12, 15), "0.500"));
+
+        PrognosepunktDTO punkt = einzigerPunkt();
+
+        assertEquals(0, new BigDecimal("0.500").compareTo(punkt.getLastprofil()),
+                "Median 0.5, nicht Mittelwert 0.6");
+    }
+
+    /**
+     * <b>Andere Wochentage zaehlen nicht.</b> Der Tagesverlauf eines Haushalts sieht am Wochenende
+     * anders aus als werktags.
+     *
+     * <p>Der Donnerstag traegt absichtlich einen weit abweichenden Wert: Floesse er ein, waere das
+     * Ergebnis ein anderes.
+     */
+    @Test
+    void getPrognose_Lastprofil_IgnoriertAndereWochentage() {
+        lernhistorie(MIN_PUNKTE);
+        prognoseFuer(LocalDateTime.of(2026, 9, 25, 12, 0));
+        messwerte(
+                verbrauch(LocalDateTime.of(2026, 9, 11, 12, 15), "0.400"),
+                verbrauch(LocalDateTime.of(2026, 9, 17, 12, 15), "9.900"),
+                verbrauch(LocalDateTime.of(2026, 9, 18, 12, 15), "0.600"));
+
+        PrognosepunktDTO punkt = einzigerPunkt();
+
+        assertEquals(0, new BigDecimal("0.500").compareTo(punkt.getLastprofil()),
+                "Mittel aus 0.4 und 0.6 - der Donnerstag bleibt draussen");
+    }
+
+    /**
+     * <b>Der Zeitversatz.</b> {@code messwerte.zeit} traegt das Intervall-<b>Ende</b>, die Prognose
+     * den <b>Beginn</b>.
+     *
+     * <p>Der Messwert zu 12:15 gehoert zum Prognoseintervall, das um 12:00 beginnt. Ohne die
+     * Verschiebung landete er bei 12:15 — das Profil waere um eine Viertelstunde versetzt, ohne
+     * dass man es der Zahl ansieht. Dieselbe Falle wie beim Faktor.
+     */
+    @Test
+    void getPrognose_Lastprofil_MesswertZeitIstIntervallende() {
+        lernhistorie(MIN_PUNKTE);
+        when(prognoseRepository.findByZeitBetween(any(), any())).thenReturn(List.of(
+                prognosepunkt(LocalDateTime.of(2026, 9, 25, 12, 0), "100.00"),
+                prognosepunkt(LocalDateTime.of(2026, 9, 25, 12, 15), "100.00")));
+        messwerte(verbrauch(LocalDateTime.of(2026, 9, 18, 12, 15), "0.700"));
+
+        List<PrognosepunktDTO> punkte = produktionsprognoseService.getPrognose(DATUM);
+
+        assertEquals(0, new BigDecimal("0.700").compareTo(punkte.get(0).getLastprofil()),
+                "Der Messwert zu 12:15 gehoert zum Intervall, das um 12:00 BEGINNT");
+        assertNull(punkte.get(1).getLastprofil(), "Fuer 12:15 gibt es keine Stichprobe");
+    }
+
+    /**
+     * Unter sieben Tagen Historie gibt es <b>kein</b> Lastprofil.
+     *
+     * <p>Dann liegt kein gleicher Wochentag im Fenster — es gaebe keine einzige Stichprobe. Ohne
+     * Lastprofil gibt es auch keinen erwarteten Ueberschuss, und die Merit-Order faellt zurueck.
+     */
+    @Test
+    void getPrognose_WenigerAlsSiebenTageHistorie_KeinLastprofil() {
+        konfiguration.setHistorieTage(6);
+        lernhistorie(MIN_PUNKTE);
+        prognoseFuer(LocalDateTime.of(2026, 9, 25, 12, 0));
+        messwerte(verbrauch(LocalDateTime.of(2026, 9, 18, 12, 15), "0.700"));
+
+        PrognosepunktDTO punkt = einzigerPunkt();
+
+        assertNull(punkt.getLastprofil());
+        assertNull(punkt.getErwarteterUeberschuss());
+    }
+
+    // ==================== Der erwartete Ueberschuss (FR-3) ====================
+
+    /** {@code max(0, Erzeugung − Last)} — hier bleibt etwas uebrig. */
+    @Test
+    void getPrognose_ErwarteterUeberschuss_IstErzeugungMinusLast() {
+        lernhistorie(MIN_PUNKTE);
+        prognoseFuer(LocalDateTime.of(2026, 9, 25, 12, 0));
+        // Erzeugung 2.000 kWh bei 100 W/m2 -> Faktor 0.02; die Prognose traegt ebenfalls 100 W/m2
+        messwerte(messwert(ende(0), "2.000"),
+                verbrauch(LocalDateTime.of(2026, 9, 18, 12, 15), "0.500"));
+
+        PrognosepunktDTO punkt = einzigerPunkt();
+
+        assertEquals(0, new BigDecimal("2.000").compareTo(punkt.getErwarteteErzeugung()));
+        assertEquals(0, new BigDecimal("1.500").compareTo(punkt.getErwarteterUeberschuss()));
+    }
+
+    /**
+     * Uebersteigt die Last die Erzeugung, ist der Ueberschuss <b>0</b> — nicht negativ.
+     *
+     * <p>Eine negative Menge haette in der Merit-Order kein Gegenstueck: Dort wird Energie
+     * zugeteilt, und ein negativer Posten liesse die Summe schrumpfen.
+     */
+    @Test
+    void getPrognose_LastGroesserAlsErzeugung_UeberschussIstNull() {
+        lernhistorie(MIN_PUNKTE);
+        prognoseFuer(LocalDateTime.of(2026, 9, 25, 12, 0));
+        messwerte(messwert(ende(0), "2.000"),
+                verbrauch(LocalDateTime.of(2026, 9, 18, 12, 15), "5.000"));
+
+        assertEquals(0, BigDecimal.ZERO.compareTo(einzigerPunkt().getErwarteterUeberschuss()));
+    }
+
+    /**
+     * Ohne Faktor gibt es <b>keinen</b> erwarteten Ueberschuss — auch wenn ein Lastprofil vorliegt.
+     *
+     * <p>Eine 0 hiesse "nichts erwartet". Der Grund ist aber "nicht berechenbar", und das ist eine
+     * andere Aussage: Die erste liesse die Merit-Order das Intervall verwerfen.
+     */
+    @Test
+    void getPrognose_OhneFaktor_KeinErwarteterUeberschuss() {
+        lernhistorie(MIN_PUNKTE - 1);
+        prognoseFuer(LocalDateTime.of(2026, 9, 25, 12, 0));
+        messwerte(verbrauch(LocalDateTime.of(2026, 9, 18, 12, 15), "0.500"));
+
+        PrognosepunktDTO punkt = einzigerPunkt();
+
+        assertNull(punkt.getErwarteteErzeugung());
+        assertNull(punkt.getErwarteterUeberschuss());
+        assertEquals(0, new BigDecimal("0.500").compareTo(punkt.getLastprofil()),
+                "Das Lastprofil steht trotzdem - es haengt nicht am Faktor");
+    }
+
+    /** Zeile wie {@code sumBilanzKomponentenPerZeitBetween}, nur mit Verbrauch (Index 2). */
+    private Object[] verbrauch(LocalDateTime ende, String wert) {
+        return new Object[]{ende, BigDecimal.ZERO, new BigDecimal(wert),
+                BigDecimal.ZERO, BigDecimal.ZERO};
+    }
+
+    /** Genau ein Prognosepunkt zu 100 W/m2 — dieselbe Einstrahlung wie in der Lernhistorie. */
+    private void prognoseFuer(LocalDateTime zeit) {
+        when(prognoseRepository.findByZeitBetween(any(), any()))
+                .thenReturn(List.of(prognosepunkt(zeit, "100.00")));
+    }
 }
