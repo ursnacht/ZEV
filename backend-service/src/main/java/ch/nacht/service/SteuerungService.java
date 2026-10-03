@@ -382,8 +382,11 @@ public class SteuerungService {
                 return Schattenrechnung.leer();
             }
 
+            // ORG-EXPLIZIT: Der Job hat keinen Sicherheitskontext, die kontextgebundene Variante
+            // wuerfe hier NoOrganizationException - und die Schattenrechnung bliebe dauerhaft leer,
+            // ohne dass es auffiele.
             List<PrognosepunktDTO> prognose = produktionsprognoseService
-                    .getPrognose(zeitVon.toLocalDate());
+                    .getPrognose(orgId, zeitVon.toLocalDate());
             PrognosepunktDTO hier = prognose.stream()
                     .filter(p -> p.getZeit().equals(zeitVon))
                     .findFirst().orElse(null);
@@ -927,6 +930,18 @@ public class SteuerungService {
         dto.setSocMinimum(entscheid.getSocMinimum());
         dto.setSocHysterese(entscheid.getSocHysterese());
         dto.setMindestAbstand(entscheid.getMindestAbstand());
+        // Die Plangroessen der Schattenrechnung (FR-1a). Sie sind durchweg nullbar: beim Rueckfall,
+        // und bei jedem Entscheid aus der Zeit vor V169.
+        dto.setVerfahren(entscheid.getVerfahren() == null ? null
+                : entscheid.getVerfahren().name());
+        dto.setLadeplanBatterieladung(entscheid.getLadeplanBatterieladung() == null ? null
+                : entscheid.getLadeplanBatterieladung().name());
+        dto.setPrognoseUeberschuss(entscheid.getPrognoseUeberschuss());
+        dto.setGti(entscheid.getGti());
+        dto.setPrognoseFaktor(entscheid.getPrognoseFaktor());
+        dto.setRang(entscheid.getRang());
+        dto.setRangBenoetigt(entscheid.getRangBenoetigt());
+        dto.setKapazitaetFrei(entscheid.getKapazitaetFrei());
         return dto;
     }
 

@@ -51,6 +51,14 @@ describe('EinspeisesteuerungComponent', () => {
       socMinimum: 20,
       socHysterese: 5,
       mindestAbstand: 0.02,
+      verfahren: 'REGEL',
+      ladeplanBatterieladung: null,
+      prognoseUeberschuss: null,
+      gti: null,
+      prognoseFaktor: null,
+      rang: null,
+      rangBenoetigt: null,
+      kapazitaetFrei: null,
       ...ueberschreibungen
     } as Steuerentscheid;
   }
@@ -70,7 +78,11 @@ describe('EinspeisesteuerungComponent', () => {
     preisReihe: () => (number | null)[][];
     prognoseReihe: () => (number | null)[][];
     tooltip: (zeitpunkt: number) => string;
-    optionen: () => { series: { name: string, data: unknown[] }[] };
+    optionen: () => {
+      series: { name: string, data: unknown[] }[],
+      grid: { bottom: number }
+    };
+    achseMinMitBaendern: () => number;
   } {
     return component as unknown as ReturnType<typeof privat>;
   }
@@ -357,6 +369,165 @@ describe('EinspeisesteuerungComponent', () => {
         { produktion: 0.2, speicherLadung: 0, speicherEntladung: 1.5 });
 
       expect(component.produktionVerrechnet(e)).toBe(0);
+    });
+  });
+
+  // ==================== Die Schattenrechnung (FR-1a) ====================
+
+  describe('Schattenrechnung', () => {
+    /** Ein Entscheid, fuer den die Merit-Order gerechnet hat. */
+    function mitLadeplan(zeit: string, ladeplan: string, batterieladung = 'FREI') {
+      return entscheid(zeit, {
+        batterieladung: batterieladung as 'FREI' | 'GESPERRT',
+        ladeplanBatterieladung: ladeplan,
+        rang: 34,
+        rangBenoetigt: 12
+      });
+    }
+
+    describe('hatLadeplan', () => {
+      it('should be false when no interval was planned', () => {
+        component.entscheide = [entscheid('2026-10-03T10:00:00')];
+
+        expect(component.hatLadeplan()).toBe(false);
+      });
+
+      it('should be true as soon as one interval has a result', () => {
+        component.entscheide = [
+          entscheid('2026-10-03T10:00:00'),
+          mitLadeplan('2026-10-03T10:15:00', 'GESPERRT')
+        ];
+
+        expect(component.hatLadeplan()).toBe(true);
+      });
+    });
+
+    /**
+     * <b>Die Kennzahl der Schattenrechnung.</b> Weichen die Verfahren selten ab, ist der Gewinn
+     * klein und das Regelwerk genuegt — dann waere das Umschalten die falsche Entscheidung.
+     */
+    describe('abweichungen', () => {
+      it('should count only intervals where both methods disagree', () => {
+        component.entscheide = [
+          mitLadeplan('2026-10-03T10:00:00', 'GESPERRT', 'FREI'),   // abweichend
+          mitLadeplan('2026-10-03T10:15:00', 'FREI', 'FREI'),       // gleich
+          mitLadeplan('2026-10-03T10:30:00', 'FREI', 'GESPERRT'),   // abweichend
+          entscheid('2026-10-03T10:45:00')                          // nicht gerechnet
+        ];
+
+        expect(component.abweichungen()).toBe(2);
+      });
+
+      /**
+       * Ein nicht gerechnetes Intervall ist <b>keine</b> Abweichung.
+       *
+       * <p>Sonst zaehlte jede Nacht und jeder Rueckfall mit, und die Kennzahl saehe nach einem
+       * grossen Unterschied aus, wo gar nichts verglichen wurde.
+       */
+      it('should not count intervals the merit order could not plan', () => {
+        component.entscheide = [
+          entscheid('2026-10-03T02:00:00', { batterieladung: 'FREI' }),
+          entscheid('2026-10-03T02:15:00', { batterieladung: 'GESPERRT' })
+        ];
+
+        expect(component.abweichungen()).toBe(0);
+      });
+    });
+
+    describe('Zustandsband', () => {
+      /** Ohne Schattenrechnung bleibt es bei zwei Baendern — wie vor der Ladeplanung. */
+      it('should not draw the shadow band without planning results', () => {
+        component.entscheide = [entscheid('2026-10-03T10:00:00')];
+
+        const namen = privat().optionen().series.map(s => s.name);
+
+        expect(namen).not.toContain('STEUERUNG_LADEPLAN_GESPERRT');
+        expect(namen).toContain('STEUERUNG_EINSPEISUNG');
+      });
+
+      it('should draw the shadow band when planning results exist', () => {
+        component.entscheide = [mitLadeplan('2026-10-03T10:00:00', 'GESPERRT')];
+
+        const namen = privat().optionen().series.map(s => s.name);
+
+        expect(namen).toContain('STEUERUNG_LADEPLAN_GESPERRT');
+        expect(namen).toContain('STEUERUNG_BATTERIELADUNG');
+        expect(namen).toContain('STEUERUNG_EINSPEISUNG');
+      });
+
+      /**
+       * <b>Die Legende braucht mit dem siebten Eintrag zwei Zeilen</b> — und wuchs zuvor nach oben
+       * in die Zeitachse hinein: Die Uhrzeiten standen mitten in den Legendentexten.
+       *
+       * <p>Nicht fest auf den groesseren Wert gesetzt, weil sonst an jedem Tag ohne
+       * Schattenrechnung ein leerer Streifen bliebe.
+       */
+      it('should reserve more room below for the two-line legend', () => {
+        component.entscheide = [entscheid('2026-10-03T10:00:00')];
+        const ohne = privat().optionen().grid.bottom;
+
+        component.entscheide = [mitLadeplan('2026-10-03T10:00:00', 'GESPERRT')];
+        const mit = privat().optionen().grid.bottom;
+
+        expect(mit).toBeGreaterThan(ohne);
+      });
+
+      /**
+       * <b>Die Achse reicht nur dann tiefer, wenn das dritte Band wirklich da ist.</b>
+       *
+       * <p>Fest auf drei Ebenen gesetzt bliebe an jedem Tag vor der Schattenrechnung ein leerer
+       * Streifen unter den Baendern — und die Kurven waeren flacher, ohne Grund.
+       */
+      it('should lower the axis only when the shadow band is drawn', () => {
+        component.entscheide = [entscheid('2026-10-03T10:00:00')];
+        const ohne = privat().achseMinMitBaendern();
+
+        component.entscheide = [mitLadeplan('2026-10-03T10:00:00', 'GESPERRT')];
+        const mit = privat().achseMinMitBaendern();
+
+        expect(mit).toBeLessThan(ohne);
+      });
+    });
+
+    describe('tooltip', () => {
+      /** Ohne Ergebnis der Merit-Order bleibt der Tooltip so hoch wie bisher. */
+      it('should omit the charging plan line when nothing was planned', () => {
+        component.entscheide = [entscheid('2026-10-03T10:00:00')];
+
+        expect(privat().tooltip(ms('2026-10-03T10:00:00')))
+          .not.toContain('STEUERUNG_LADEPLAN');
+      });
+
+      it('should show state and rank in a single line', () => {
+        component.entscheide = [mitLadeplan('2026-10-03T10:00:00', 'GESPERRT', 'GESPERRT')];
+
+        const text = privat().tooltip(ms('2026-10-03T10:00:00'));
+
+        expect(text).toContain('STEUERUNG_LADEPLAN');
+        expect(text).toContain('34/12');
+      });
+
+      /**
+       * Eine Abweichung wird hervorgehoben.
+       *
+       * <p>Sie ist der Ertrag der Schattenrechnung und ginge in einer Liste aus dreizehn Zeilen
+       * sonst unter.
+       */
+      it('should mark a disagreement between the two methods', () => {
+        component.entscheide = [mitLadeplan('2026-10-03T10:00:00', 'GESPERRT', 'FREI')];
+
+        const text = privat().tooltip(ms('2026-10-03T10:00:00'));
+
+        expect(text).toContain('STEUERUNG_ABWEICHUNG');
+        expect(text).toContain('<b>');
+      });
+
+      it('should not mark agreement', () => {
+        component.entscheide = [mitLadeplan('2026-10-03T10:00:00', 'FREI', 'FREI')];
+
+        expect(privat().tooltip(ms('2026-10-03T10:00:00')))
+          .not.toContain('STEUERUNG_ABWEICHUNG');
+      });
     });
   });
 });

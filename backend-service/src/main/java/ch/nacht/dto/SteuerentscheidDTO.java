@@ -47,6 +47,39 @@ public class SteuerentscheidDTO {
     /** Mindest-Preisabstand, der beim Entscheid galt; `null` vor V164. */
     private BigDecimal mindestAbstand;
 
+    /**
+     * Welches Verfahren den <b>geltenden</b> Entscheid gefaellt hat; {@code null} vor V169.
+     *
+     * <p>In der Schattenrechnung durchgehend {@code REGEL} (Specs/Ladeplanung.md, FR-1a).
+     */
+    private String verfahren;
+
+    /**
+     * Was die Merit-Order <b>entschieden haette</b>; {@code null}, wenn sie nicht rechnen konnte.
+     *
+     * <p>Bestimmt den Entscheid nicht. Der Vergleich mit {@link #batterieladung} ist der Zweck der
+     * Schattenrechnung.
+     */
+    private String ladeplanBatterieladung;
+
+    /** Erwarteter PV-Ueberschuss dieses Intervalls in kWh — nicht der gemessene. */
+    private BigDecimal prognoseUeberschuss;
+
+    /** Einstrahlung in W/m2, die dem Entscheid zugrunde lag. */
+    private BigDecimal gti;
+
+    /** Gelernter Umrechnungsfaktor zum Zeitpunkt des Entscheids. */
+    private BigDecimal prognoseFaktor;
+
+    /** Platz dieses Intervalls in der Merit-Order des Resttages. */
+    private Integer rang;
+
+    /** Wie viele Intervalle die freie Kapazitaet deckten. */
+    private Integer rangBenoetigt;
+
+    /** Freie Batteriekapazitaet in kWh beim Entscheid. */
+    private BigDecimal kapazitaetFrei;
+
     public SteuerentscheidDTO() {
     }
 
@@ -224,5 +257,69 @@ public class SteuerentscheidDTO {
 
     public void setMindestAbstand(BigDecimal mindestAbstand) {
         this.mindestAbstand = mindestAbstand;
+    }
+
+    public String getVerfahren() {
+        return verfahren;
+    }
+
+    public void setVerfahren(String verfahren) {
+        this.verfahren = verfahren;
+    }
+
+    public String getLadeplanBatterieladung() {
+        return ladeplanBatterieladung;
+    }
+
+    public void setLadeplanBatterieladung(String ladeplanBatterieladung) {
+        this.ladeplanBatterieladung = ladeplanBatterieladung;
+    }
+
+    public BigDecimal getPrognoseUeberschuss() {
+        return prognoseUeberschuss;
+    }
+
+    public void setPrognoseUeberschuss(BigDecimal prognoseUeberschuss) {
+        this.prognoseUeberschuss = prognoseUeberschuss;
+    }
+
+    public BigDecimal getGti() {
+        return gti;
+    }
+
+    public void setGti(BigDecimal gti) {
+        this.gti = gti;
+    }
+
+    public BigDecimal getPrognoseFaktor() {
+        return prognoseFaktor;
+    }
+
+    public void setPrognoseFaktor(BigDecimal prognoseFaktor) {
+        this.prognoseFaktor = prognoseFaktor;
+    }
+
+    public Integer getRang() {
+        return rang;
+    }
+
+    public void setRang(Integer rang) {
+        this.rang = rang;
+    }
+
+    public Integer getRangBenoetigt() {
+        return rangBenoetigt;
+    }
+
+    public void setRangBenoetigt(Integer rangBenoetigt) {
+        this.rangBenoetigt = rangBenoetigt;
+    }
+
+    public BigDecimal getKapazitaetFrei() {
+        return kapazitaetFrei;
+    }
+
+    public void setKapazitaetFrei(BigDecimal kapazitaetFrei) {
+        this.kapazitaetFrei = kapazitaetFrei;
     }
 }

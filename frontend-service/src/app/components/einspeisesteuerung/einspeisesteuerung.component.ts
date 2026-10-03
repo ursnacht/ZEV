@@ -309,6 +309,33 @@ export class EinspeisesteuerungComponent extends WithMessage
     return reihe;
   }
 
+  /**
+   * Eine Zeile fuer den Ladeplan im Tooltip — oder gar keine.
+   *
+   * <p><b>Eine Zeile, nicht drei.</b> Der Tooltip trug schon dreizehn Groessen bei 11 px, und
+   * ECharts schneidet einen zu hohen Tooltip oben ab statt ihn scrollen zu lassen. Verfahren,
+   * Zustand und Rang stehen deshalb zusammen: „Ladeplan: GESPERRT (Rang 34 von 12)".
+   *
+   * <p>Sie erscheint <b>nur</b>, wenn die Merit-Order fuer dieses Intervall gerechnet hat. Nachts
+   * und bei jedem Rueckfall bleibt der Tooltip so hoch wie bisher.
+   */
+  private ladeplanZeile(e: Steuerentscheid): string {
+    if (e.ladeplanBatterieladung == null) {
+      return '';
+    }
+    const t = (key: string) => this.translationService.translate(key);
+    const zustand = t(e.ladeplanBatterieladung === 'GESPERRT'
+      ? 'STEUERUNG_GESPERRT' : 'STEUERUNG_FREI');
+    const rang = e.rang == null || e.rangBenoetigt == null
+      ? ''
+      : ` (${t('STEUERUNG_RANG')} ${e.rang}/${e.rangBenoetigt})`;
+    // Abweichungen hervorheben: Genau sie sind der Ertrag der Schattenrechnung, und in einer
+    // Tabelle aus dreizehn Zeilen gehen sie sonst unter.
+    const abweichend = e.ladeplanBatterieladung !== e.batterieladung;
+    const text = `${t('STEUERUNG_LADEPLAN')}: ${zustand}${rang}`;
+    return (abweichend ? `<b>${text} ‹${t('STEUERUNG_ABWEICHUNG')}›</b>` : text) + '<br>';
+  }
+
   /** Prognosepunkt eines Entscheids — für die Tabellenspalten. */
   prognoseFuer(entscheid: Steuerentscheid): Prognosepunkt | undefined {
     return this.prognoseJeZeit.get(entscheid.zeit);
@@ -587,7 +614,9 @@ export class EinspeisesteuerungComponent extends WithMessage
     return {
       animation: false,
       // Rechts mehr Platz als links: Dort liegen ZWEI Achsen nebeneinander (kWh und Ladezustand).
-      grid: { left: 60, right: 115, top: 20, bottom: 110 },
+      // Rechts mehr Platz als links: Dort liegen ZWEI Achsen nebeneinander (kWh und Ladezustand).
+      // Unten richtet sich der Platz nach der Legende - siehe `platzUnten()`.
+      grid: { left: 60, right: 115, top: 20, bottom: this.platzUnten() },
       tooltip: {
         trigger: 'axis',
         // Kleiner als der ECharts-Standard (14 px): Der Tooltip nennt DREIZEHN Groessen - Zeit,
@@ -728,7 +757,16 @@ export class EinspeisesteuerungComponent extends WithMessage
           data: this.prognoseReihe()
         },
         this.band('STEUERUNG_BATTERIELADUNG', e => e.batterieladung === 'GESPERRT', 1),
-        this.band('STEUERUNG_EINSPEISUNG', e => e.einspeisung === 'GESPERRT', 2)
+        // Das Schattenband liegt DIREKT unter dem der Batterieladung und traegt dieselbe Farbe,
+        // nur gestrichelt umrandet: Wo die beiden auseinanderlaufen, haetten die Verfahren
+        // verschieden entschieden. Zwei Baender in verschiedenen Farbfamilien waeren schwerer zu
+        // vergleichen als zwei benachbarte in derselben.
+        ...(this.hatLadeplan()
+            ? [this.band('STEUERUNG_LADEPLAN_GESPERRT',
+                e => e.ladeplanBatterieladung === 'GESPERRT', 2, true)]
+            : []),
+        this.band('STEUERUNG_EINSPEISUNG', e => e.einspeisung === 'GESPERRT',
+            this.hatLadeplan() ? 3 : 2)
       ]
     };
   }
@@ -749,11 +787,13 @@ export class EinspeisesteuerungComponent extends WithMessage
    * jeweils andere Band gesetzt ist. So bedeutet dieselbe Höhe immer dieselbe Grösse.
    */
   private band(nameKey: string, gesperrt: (e: Steuerentscheid) => boolean,
-               ebene: number): Record<string, unknown> {
+               ebene: number, schatten = false): Record<string, unknown> {
     const farben = chartFarben();
     // Eigene Farbfamilie, NICHT die der Kurven: Band und Kurve waren zuerst beide gruen bzw. beide
     // blau - in der Legende standen "Produktion" und "Batterieladung" ununterscheidbar nebeneinander.
-    const farbe = ebene === 1 ? farben.bandEins : farben.bandZwei;
+    // Das Schattenband traegt die Farbe der Batterieladung, weil es DASSELBE zeigt - nur vom
+    // anderen Verfahren entschieden.
+    const farbe = (ebene === 1 || schatten) ? farben.bandEins : farben.bandZwei;
     const [oben, unten] = this.bandKanten(ebene);
 
     return {
@@ -770,13 +810,54 @@ export class EinspeisesteuerungComponent extends WithMessage
         silent: true,
         // Gedeckt: Die Baender zeigen einen Zustand, keine Messgroesse, und sollen die Kurven
         // nicht ueberstimmen. Unterschieden werden sie ueber ihre Ebene und die Legende.
-        itemStyle: { color: farbe, opacity: 0.45 },
+        // Das Schattenband blasser und gestrichelt umrandet: Es beschreibt keinen Zustand, der
+        // galt, sondern einen, der gegolten HAETTE. Gleiche Deckkraft liesse beide gleich
+        // verbindlich wirken.
+        itemStyle: schatten
+            ? { color: farbe, opacity: 0.18, borderColor: farbe, borderWidth: 1,
+                borderType: 'dashed' }
+            : { color: farbe, opacity: 0.45 },
         data: this.bloecke(gesperrt).map(([von, bis]) => [
           { xAxis: von, yAxis: oben },
           { xAxis: bis, yAxis: unten }
         ])
       }
     };
+  }
+
+  /**
+   * Platz unterhalb des Diagramms — abhängig davon, wie viele Zeilen die Legende braucht.
+   *
+   * <p><b>Mit dem Schattenband sind es sieben Einträge statt sechs</b>, und ECharts bricht die
+   * Legende dann auf zwei Zeilen um. Sie wächst nach oben und schob die Zeitachse zuvor unter
+   * sich: Die Uhrzeiten standen mitten in den Legendentexten.
+   *
+   * <p>Nicht fest auf den grösseren Wert gesetzt, weil sonst an jedem Tag ohne Schattenrechnung
+   * ein leerer Streifen bliebe und die Kurven flacher liefen.
+   */
+  private platzUnten(): number {
+    return this.hatLadeplan() ? 135 : 110;
+  }
+
+  /**
+   * Hat mindestens ein Intervall des Tages ein Ergebnis der Merit-Order?
+   *
+   * <p>Nur dann wird das Schattenband gezeichnet. Andernfalls bliebe eine leere Ebene stehen und
+   * die Mengen-Achse reichte grundlos tiefer — an jedem Tag vor der Schattenrechnung.
+   */
+  hatLadeplan(): boolean {
+    return this.entscheide.some(e => e.ladeplanBatterieladung != null);
+  }
+
+  /**
+   * Intervalle, in denen die beiden Verfahren **verschieden** entschieden hätten.
+   *
+   * <p>Das ist die eigentliche Kennzahl der Schattenrechnung: Weichen sie selten ab, ist der
+   * Gewinn klein und das Regelwerk genügt.
+   */
+  abweichungen(): number {
+    return this.entscheide.filter(e => e.ladeplanBatterieladung != null
+        && e.ladeplanBatterieladung !== e.batterieladung).length;
   }
 
   /**
@@ -815,9 +896,15 @@ export class EinspeisesteuerungComponent extends WithMessage
     return [oben, oben - hoehe];
   }
 
-  /** Untere Grenze der Mengen-Achse: knapp unter dem tiefsten Band. */
+  /**
+   * Untere Grenze der Mengen-Achse: knapp unter dem tiefsten Band.
+   *
+   * <p>Mit Schattenband sind es drei Ebenen, sonst zwei. Fest auf 3 gesetzt bliebe an Tagen ohne
+   * Schattenrechnung ein leerer Streifen unter den Bändern.
+   */
   private achseMinMitBaendern(): number {
-    return this.bandKanten(2)[1] - this.hoechsteMenge() * BAND_ABSTAND_ANTEIL;
+    const tiefste = this.hatLadeplan() ? 3 : 2;
+    return this.bandKanten(tiefste)[1] - this.hoechsteMenge() * BAND_ABSTAND_ANTEIL;
   }
 
   /**
@@ -903,6 +990,7 @@ export class EinspeisesteuerungComponent extends WithMessage
         : `${t('LADEPLANUNG_EINSTRAHLUNG')}: ${this.einstrahlung(e)} W/m²<br>`
         + (this.erwarteteErzeugung(e) === '' ? ''
           : `${t('LADEPLANUNG_PROGNOSE')}: ${this.erwarteteErzeugung(e)} kWh<br>`))
+      + this.ladeplanZeile(e)
       + `${t('VERBRAUCH')}: ${this.menge(e.verbrauch)} kWh<br>`
       + `${t('STEUERUNG_UEBERSCHUSS')}: ${this.menge(e.ueberschuss)} kWh<br>`
       + `<b>${t(this.regelKey(e.regel))}</b><br>`

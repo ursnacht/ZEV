@@ -68,9 +68,9 @@ Rückfall-Kennzeichen und die Erweiterung des Entscheidungsprotokolls.
 | [x] | 5. Erwarteter Überschuss | `max(0, prognose − lastprofil)` je Intervall, am `PrognosepunktDTO` ergänzt. |
 | [x] | 6. `LadeplanService` | Merit-Order: sortieren, auffüllen, Rang und benötigte Anzahl zurückgeben. Aufgefüllt wird bis `kapazitaetFrei / 0.95` (Ladewirkungsgrad, FR-1). Reine Rechnung ohne Repository-Zugriff — damit einzeln prüfbar. |
 | [x] | 7. Einhängen mit Rückfall | `SteuerungService.werteAus`: Voraussetzungen an **einer** Stelle prüfen → Merit-Order oder Kaskade; `verfahren` setzen. |
-| [ ] | 8. Übersetzungen | `V170`: `VERFAHREN`, `MERIT_ORDER`, `REGEL`, `RANG`, `RANG_BENOETIGT`, `KAPAZITAET_FREI`, `OHNE_PROGNOSE`, dazu `LADEPLAN` als Regelname. Mit `ON CONFLICT (key) DO NOTHING`, deutsche Texte mit Umlauten. |
-| [ ] | 9. Frontend | Neue Spalten in der Protokolltabelle; Tooltip-Zeilen **nur wenn für das Intervall eine Prognose vorliegt**. |
-| [ ] | 10. Tests | Unit für `LadeplanService` und das Lastprofil, IT für den erweiterten Upsert. |
+| [x] | 8. Übersetzungen | `V170`: `STEUERUNG_LADEPLAN_GESPERRT`, `STEUERUNG_VERFAHREN`, `MERIT_ORDER`, `REGEL`, `RANG`, `RANG_BENOETIGT`, `KAPAZITAET_FREI`, `OHNE_PROGNOSE`, dazu `LADEPLAN` als Regelname. Mit `ON CONFLICT (key) DO NOTHING`, deutsche Texte mit Umlauten. |
+| [x] | 9. Frontend | **Drittes Zustandsband** direkt unter dem der Batterieladung, gleiche Farbe, gestrichelt und blasser — nur wenn Planergebnisse vorliegen. Dazu **eine** Tooltip-Zeile mit Zustand und Rang, Abweichungen hervorgehoben. |
+| [x] | 10. Tests | Unit für `LadeplanService` und das Lastprofil, IT für den erweiterten Upsert. |
 
 ---
 

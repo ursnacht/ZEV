@@ -94,6 +94,30 @@ export interface Steuerentscheid {
   socHysterese: number | null;
   /** Mindest-Preisabstand, der beim Entscheid galt; `null` vor V164. */
   mindestAbstand: number | null;
+  /**
+   * Welches Verfahren den **geltenden** Entscheid gefällt hat; `null` vor V169.
+   *
+   * In der Schattenrechnung durchgehend `REGEL` (`Specs/Ladeplanung.md`, FR-1a).
+   */
+  verfahren: string | null;
+  /**
+   * Was die Merit-Order **entschieden hätte**; `null`, wenn sie nicht rechnen konnte.
+   *
+   * Bestimmt den Entscheid nicht — der Vergleich mit `batterieladung` ist der Zweck.
+   */
+  ladeplanBatterieladung: string | null;
+  /** Erwarteter PV-Überschuss in kWh — nicht der gemessene (`ueberschuss`). */
+  prognoseUeberschuss: number | null;
+  /** Einstrahlung in W/m², die dem Entscheid zugrunde lag. */
+  gti: number | null;
+  /** Gelernter Umrechnungsfaktor zum Zeitpunkt des Entscheids. */
+  prognoseFaktor: number | null;
+  /** Platz des Intervalls in der Merit-Order des Resttages. */
+  rang: number | null;
+  /** Wie viele Intervalle die freie Kapazität deckten. */
+  rangBenoetigt: number | null;
+  /** Freie Batteriekapazität in kWh beim Entscheid. */
+  kapazitaetFrei: number | null;
 }
 
 /** Anfrage der Rückrechnung. */
