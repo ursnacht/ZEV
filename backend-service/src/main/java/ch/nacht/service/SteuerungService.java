@@ -2,6 +2,7 @@ package ch.nacht.service;
 
 import ch.nacht.dto.SimulationDTO;
 import ch.nacht.dto.SteuerKonfigurationDTO;
+import ch.nacht.dto.PrognosepunktDTO;
 import ch.nacht.dto.SteuerentscheidDTO;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.FeatureFlag;
@@ -9,6 +10,7 @@ import ch.nacht.entity.Geraetezustand;
 import ch.nacht.entity.Preiszeitreihe;
 import ch.nacht.entity.Steuerentscheid;
 import ch.nacht.entity.Steuerregel;
+import ch.nacht.entity.Steuerverfahren;
 import ch.nacht.entity.Steuerzustand;
 import ch.nacht.entity.Zustandsgroesse;
 import ch.nacht.exception.FeatureDisabledException;
@@ -25,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -76,12 +79,17 @@ public class SteuerungService {
     /** Nachkommastellen einer Energiemenge, wie {@code NUMERIC(12,3)}. */
     private static final int MENGE_SCALE = 3;
 
+    /** Teiler fuer den Ladezustand in Prozent. */
+    private static final BigDecimal HUNDERT = BigDecimal.valueOf(100);
+
     private final SteuerentscheidRepository steuerentscheidRepository;
     private final MesswerteRepository messwerteRepository;
     private final EinheitRepository einheitRepository;
     private final GeraetezustandRepository geraetezustandRepository;
     private final PreiszeitreiheRepository preiszeitreiheRepository;
     private final SteuerRegelService steuerRegelService;
+    private final LadeplanService ladeplanService;
+    private final ProduktionsprognoseService produktionsprognoseService;
     private final EinstellungenService einstellungenService;
     private final FeatureFlagService featureFlagService;
     private final OrganizationContextService organizationContextService;
@@ -93,6 +101,8 @@ public class SteuerungService {
                             GeraetezustandRepository geraetezustandRepository,
                             PreiszeitreiheRepository preiszeitreiheRepository,
                             SteuerRegelService steuerRegelService,
+                            LadeplanService ladeplanService,
+                            ProduktionsprognoseService produktionsprognoseService,
                             EinstellungenService einstellungenService,
                             FeatureFlagService featureFlagService,
                             OrganizationContextService organizationContextService,
@@ -103,6 +113,8 @@ public class SteuerungService {
         this.geraetezustandRepository = geraetezustandRepository;
         this.preiszeitreiheRepository = preiszeitreiheRepository;
         this.steuerRegelService = steuerRegelService;
+        this.ladeplanService = ladeplanService;
+        this.produktionsprognoseService = produktionsprognoseService;
         this.einstellungenService = einstellungenService;
         this.featureFlagService = featureFlagService;
         this.organizationContextService = organizationContextService;
@@ -147,13 +159,21 @@ public class SteuerungService {
                         messung.produktion(), messung.verbrauch(), soc, socTiefGaltZuvor),
                 schwellwert, speicherwert, socMinimum, socHysterese, mindestAbstand);
 
+        // Die Merit-Order rechnet MIT, entscheidet aber nicht (Specs/Ladeplanung.md, FR-1a).
+        // Scheitert sie oder fehlt eine Voraussetzung, bleiben ihre Spalten leer - der Entscheid
+        // der Kaskade steht davon unberuehrt.
+        Schattenrechnung schatten = schattenrechnung(orgId, zeitVon, soc, konfiguration);
+
         steuerentscheidRepository.upsert(orgId, zeitVon, preis, preisTiefRest,
                 messung.produktion(), messung.verbrauch(), messung.bezug(),
                 messung.ruecklieferung(), soc, speicher.ladung(), speicher.entladung(),
                 entscheid.ueberschuss(),
                 entscheid.regel().name(), entscheid.batterieladung().name(),
                 entscheid.einspeisung().name(), schwellwert, speicherwert, socMinimum,
-                socHysterese, mindestAbstand);
+                socHysterese, mindestAbstand,
+                Steuerverfahren.REGEL.name(), schatten.batterieladungName(),
+                schatten.prognoseUeberschuss(), schatten.gti(), schatten.faktor(),
+                schatten.rang(), schatten.rangBenoetigt(), schatten.kapazitaetFrei());
 
         // Auf INFO und mit den Eingangsgroessen: Ein Entscheid ohne die Zahlen, aus denen er
         // entstand, laesst sich im Nachhinein nicht pruefen - und genau diese Pruefung war noetig,
@@ -316,6 +336,102 @@ public class SteuerungService {
         log.info("Steuerung nachgerechnet: org={} tag={} schwellwert={} -> {} Intervalle",
                 orgId, datum, schwellwert, dtos.size());
         return dtos;
+    }
+
+    // ==================== Schattenrechnung (Specs/Ladeplanung.md, FR-1a) ====================
+
+    /**
+     * Was die Merit-Order gerechnet hat — alles {@code null}, wenn sie es nicht konnte.
+     *
+     * <p>Die Felder landen eins zu eins im Entscheid und bestimmen ihn <b>nicht</b>.
+     */
+    private record Schattenrechnung(Steuerzustand batterieladung, BigDecimal prognoseUeberschuss,
+                                    BigDecimal gti, BigDecimal faktor, Integer rang,
+                                    Integer rangBenoetigt, BigDecimal kapazitaetFrei) {
+
+        /** Nichts gerechnet — eine Voraussetzung fehlte oder die Rechnung schlug fehl. */
+        static Schattenrechnung leer() {
+            return new Schattenrechnung(null, null, null, null, null, null, null);
+        }
+
+        String batterieladungName() {
+            return batterieladung == null ? null : batterieladung.name();
+        }
+    }
+
+    /**
+     * Rechnet die Merit-Order für das ausgewertete Intervall <b>mit</b>, ohne zu entscheiden.
+     *
+     * <p><b>Alle Voraussetzungen an einer Stelle</b> (FR-4). Verteilt geprüft würde früher oder
+     * später eine vergessen, und dann rechnete die Merit-Order mit einer Lücke statt
+     * zurückzufallen: Ein zu tiefer erwarteter Überschuss liesse sie dauerhaft „die Restsonne
+     * reicht nicht" schliessen und grundsätzlich laden — das Verfahren wirkte wie abgeschaltet,
+     * ohne dass ein Fehler sichtbar wäre.
+     *
+     * <p><b>Ein Fehler darf den Entscheid nicht mitreissen.</b> Die Kaskade hat bereits
+     * entschieden; was hier schiefgeht, kostet höchstens die Schattenwerte. Deshalb fängt die
+     * Methode alles ab und gibt im Zweifel {@link Schattenrechnung#leer()} zurück.
+     */
+    private Schattenrechnung schattenrechnung(Long orgId, LocalDateTime zeitVon, BigDecimal soc,
+                                              SteuerKonfigurationDTO konfiguration) {
+        try {
+            BigDecimal kapazitaet = konfiguration.getBatteriekapazitaet();
+            if (soc == null || kapazitaet == null || kapazitaet.signum() <= 0
+                    || !konfiguration.hatStandortUndAusrichtung()
+                    || !einheitRepository.existsByTyp(EinheitTyp.SPEICHER)) {
+                return Schattenrechnung.leer();
+            }
+
+            List<PrognosepunktDTO> prognose = produktionsprognoseService
+                    .getPrognose(zeitVon.toLocalDate());
+            PrognosepunktDTO hier = prognose.stream()
+                    .filter(p -> p.getZeit().equals(zeitVon))
+                    .findFirst().orElse(null);
+            // Ohne Punkt fuer DIESES Intervall gaebe es nichts zu protokollieren, und ohne
+            // erwarteten Ueberschuss fehlt dem ganzen Resttag die Grundlage.
+            if (hier == null || hier.getErwarteterUeberschuss() == null) {
+                return Schattenrechnung.leer();
+            }
+
+            TreeMap<LocalDateTime, BigDecimal> preise =
+                    preiseJeOrtstag(PreiszeitreiheZeit.tagesbeginnUtc(zeitVon.toLocalDate()),
+                            PreiszeitreiheZeit.tagesendeUtc(zeitVon.toLocalDate()))
+                            .getOrDefault(zeitVon.toLocalDate(), new TreeMap<>());
+
+            // Der Resttag beginnt beim AUSGEWERTETEN Intervall, nicht bei "jetzt": Ueber seinen
+            // Entscheid wird gerade befunden, also gehoert es in die Merit-Order.
+            List<LadeplanService.Intervall> resttag = new ArrayList<>();
+            for (PrognosepunktDTO punkt : prognose) {
+                if (punkt.getZeit().isBefore(zeitVon) || punkt.getErwarteterUeberschuss() == null) {
+                    continue;
+                }
+                BigDecimal preis = preise.get(punkt.getZeit());
+                if (preis == null) {
+                    continue;
+                }
+                resttag.add(new LadeplanService.Intervall(punkt.getZeit(), preis,
+                        punkt.getErwarteterUeberschuss()));
+            }
+            // Ohne Preise fuer den Resttag gibt es keine Reihenfolge, und eine willkuerliche waere
+            // schlimmer als das Regelwerk.
+            if (resttag.isEmpty()) {
+                return Schattenrechnung.leer();
+            }
+
+            BigDecimal kapazitaetFrei = kapazitaet
+                    .multiply(BigDecimal.ONE.subtract(soc.divide(HUNDERT, 6, RoundingMode.HALF_UP)))
+                    .setScale(3, RoundingMode.HALF_UP);
+
+            LadeplanService.Plan plan = ladeplanService.plane(resttag, zeitVon, kapazitaetFrei);
+
+            return new Schattenrechnung(plan.batterieladung(), hier.getErwarteterUeberschuss(),
+                    hier.getGti(), hier.getFaktor(), plan.rang(), plan.rangBenoetigt(),
+                    plan.kapazitaetFrei());
+        } catch (RuntimeException e) {
+            log.warn("Schattenrechnung fuer org={} {} fehlgeschlagen - Entscheid bleibt gueltig: {}",
+                    orgId, zeitVon, e.getMessage());
+            return Schattenrechnung.leer();
+        }
     }
 
     // ==================== Hilfsmittel ====================

@@ -78,11 +78,17 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
                                          speicher_ladung, speicher_entladung, ueberschuss,
                                          regel, batterieladung, einspeisung, schwellwert,
                                          speicherwert, soc_minimum, soc_hysterese, mindest_abstand,
+                                         verfahren, ladeplan_batterieladung, prognose_ueberschuss,
+                                         gti, prognose_faktor, rang, rang_benoetigt,
+                                         kapazitaet_frei,
                                          erstellt_am)
         VALUES (:orgId, :zeitVon, :preis, :preisTiefRest, :produktion, :verbrauch, :bezug,
                 :ruecklieferung, :soc, :speicherLadung, :speicherEntladung, :ueberschuss,
                 :regel, :batterieladung, :einspeisung, :schwellwert, :speicherwert,
-                :socMinimum, :socHysterese, :mindestAbstand, now())
+                :socMinimum, :socHysterese, :mindestAbstand,
+                :verfahren, :ladeplanBatterieladung, :prognoseUeberschuss,
+                :gti, :prognoseFaktor, :rang, :rangBenoetigt, :kapazitaetFrei,
+                now())
         ON CONFLICT (org_id, zeit_von)
         DO UPDATE SET preis           = EXCLUDED.preis,
                       preis_tief_rest = EXCLUDED.preis_tief_rest,
@@ -102,6 +108,14 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
                       soc_minimum     = EXCLUDED.soc_minimum,
                       soc_hysterese   = EXCLUDED.soc_hysterese,
                       mindest_abstand = EXCLUDED.mindest_abstand,
+                      verfahren       = EXCLUDED.verfahren,
+                      ladeplan_batterieladung = EXCLUDED.ladeplan_batterieladung,
+                      prognose_ueberschuss    = EXCLUDED.prognose_ueberschuss,
+                      gti             = EXCLUDED.gti,
+                      prognose_faktor = EXCLUDED.prognose_faktor,
+                      rang            = EXCLUDED.rang,
+                      rang_benoetigt  = EXCLUDED.rang_benoetigt,
+                      kapazitaet_frei = EXCLUDED.kapazitaet_frei,
                       erstellt_am     = now()
         """, nativeQuery = true)
     void upsert(
@@ -124,6 +138,14 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
         @Param("speicherwert") BigDecimal speicherwert,
         @Param("socMinimum") BigDecimal socMinimum,
         @Param("socHysterese") BigDecimal socHysterese,
-        @Param("mindestAbstand") BigDecimal mindestAbstand
+        @Param("mindestAbstand") BigDecimal mindestAbstand,
+        @Param("verfahren") String verfahren,
+        @Param("ladeplanBatterieladung") String ladeplanBatterieladung,
+        @Param("prognoseUeberschuss") BigDecimal prognoseUeberschuss,
+        @Param("gti") BigDecimal gti,
+        @Param("prognoseFaktor") BigDecimal prognoseFaktor,
+        @Param("rang") Integer rang,
+        @Param("rangBenoetigt") Integer rangBenoetigt,
+        @Param("kapazitaetFrei") BigDecimal kapazitaetFrei
     );
 }

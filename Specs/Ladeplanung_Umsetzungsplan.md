@@ -61,13 +61,13 @@ Rückfall-Kennzeichen und die Erweiterung des Entscheidungsprotokolls.
 
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
-| [ ] | 1. DB-Migration Entscheid | `V169`: sieben Spalten (alle **nullable**), `ck_steuerentscheid_regel` um `LADEPLAN` erweitert. Vorher mit `pg_get_constraintdef` über den `zev-db`-MCP prüfen. Jede Spalte mit `COMMENT ON COLUMN`. |
-| [ ] | 2. Entity, DTO, Enums | `Steuerverfahren` neu; `Steuerregel.LADEPLAN`; sieben Felder an Entity und DTO. |
-| [ ] | 3. Upsert erweitern | 20 → 27 Parameter. **Danach `SteuerentscheidUpsertQueryTest` laufen lassen** — er zählt Spalten gegen VALUES und prüft die DO-UPDATE-Liste auf Vollständigkeit. |
-| [ ] | 4. Lastprofil | Query im `MesswerteRepository` (`CONSUMER`, gleiche Wochentage innerhalb `historieTage`), Median je Tageszeit im `ProduktionsprognoseService`. Zeitversatz beachten. |
-| [ ] | 5. Erwarteter Überschuss | `max(0, prognose − lastprofil)` je Intervall, am `PrognosepunktDTO` ergänzt. |
-| [ ] | 6. `LadeplanService` | Merit-Order: sortieren, auffüllen, Rang und benötigte Anzahl zurückgeben. Aufgefüllt wird bis `kapazitaetFrei / 0.95` (Ladewirkungsgrad, FR-1). Reine Rechnung ohne Repository-Zugriff — damit einzeln prüfbar. |
-| [ ] | 7. Einhängen mit Rückfall | `SteuerungService.werteAus`: Voraussetzungen an **einer** Stelle prüfen → Merit-Order oder Kaskade; `verfahren` setzen. |
+| [x] | 1. DB-Migration Entscheid | `V169`: sieben Spalten (alle **nullable**), `ck_steuerentscheid_regel` um `LADEPLAN` erweitert. Vorher mit `pg_get_constraintdef` über den `zev-db`-MCP prüfen. Jede Spalte mit `COMMENT ON COLUMN`. |
+| [x] | 2. Entity, DTO, Enums | `Steuerverfahren` neu; `Steuerregel.LADEPLAN`; sieben Felder an Entity und DTO. |
+| [x] | 3. Upsert erweitern | 20 → 27 Parameter. **Danach `SteuerentscheidUpsertQueryTest` laufen lassen** — er zählt Spalten gegen VALUES und prüft die DO-UPDATE-Liste auf Vollständigkeit. |
+| [x] | 4. Lastprofil | Query im `MesswerteRepository` (`CONSUMER`, gleiche Wochentage innerhalb `historieTage`), Median je Tageszeit im `ProduktionsprognoseService`. Zeitversatz beachten. |
+| [x] | 5. Erwarteter Überschuss | `max(0, prognose − lastprofil)` je Intervall, am `PrognosepunktDTO` ergänzt. |
+| [x] | 6. `LadeplanService` | Merit-Order: sortieren, auffüllen, Rang und benötigte Anzahl zurückgeben. Aufgefüllt wird bis `kapazitaetFrei / 0.95` (Ladewirkungsgrad, FR-1). Reine Rechnung ohne Repository-Zugriff — damit einzeln prüfbar. |
+| [x] | 7. Einhängen mit Rückfall | `SteuerungService.werteAus`: Voraussetzungen an **einer** Stelle prüfen → Merit-Order oder Kaskade; `verfahren` setzen. |
 | [ ] | 8. Übersetzungen | `V170`: `VERFAHREN`, `MERIT_ORDER`, `REGEL`, `RANG`, `RANG_BENOETIGT`, `KAPAZITAET_FREI`, `OHNE_PROGNOSE`, dazu `LADEPLAN` als Regelname. Mit `ON CONFLICT (key) DO NOTHING`, deutsche Texte mit Umlauten. |
 | [ ] | 9. Frontend | Neue Spalten in der Protokolltabelle; Tooltip-Zeilen **nur wenn für das Intervall eine Prognose vorliegt**. |
 | [ ] | 10. Tests | Unit für `LadeplanService` und das Lastprofil, IT für den erweiterten Upsert. |

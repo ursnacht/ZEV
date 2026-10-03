@@ -93,10 +93,64 @@ Je Intervall, im selben Job-Lauf wie heute (`0 6,21,36,51 * * * *`):
    `GESPERRT`.
 7. **Entscheid festhalten** wie bisher, um die Plangrössen erweitert (FR-5).
 
+### FR-1a: Erste Stufe — Schattenrechnung
+
+**Zunächst entscheidet weiterhin die Regelkaskade.** Die Merit-Order rechnet in jedem Job-Lauf
+**mit**, und ihr Ergebnis wird protokolliert (`ladeplan_batterieladung`, FR-5) — es bestimmt den
+Entscheid aber **nicht**. `verfahren` trägt in dieser Stufe durchgehend `REGEL`.
+
+> **Warum nicht gleich umschalten.** Der Nutzen des Verfahrens ist bisher nicht gemessen, sondern
+> begründet. Die Schattenrechnung liefert die Messung: Nach einer Woche stehen rund 670 Intervalle
+> nebeneinander, in denen beide Verfahren unter denselben Preisen, derselben Prognose und
+> demselben Ladezustand entschieden haben.
+>
+> **Und sie liefert sie ehrlich — anders als eine Rückrechnung.** FR-8 ist zurückgenommen, weil
+> `zev.einstrahlungsprognose` je Intervall nur die **zuletzt** geholte Fassung hält: Eine
+> nachträgliche Auswertung kennte das Wetter, das inzwischen eingetreten ist, und liesse die
+> Merit-Order systematisch besser aussehen. Im **Live-Lauf** besteht dieses Problem nicht — dort
+> liegt die Prognose in genau der Fassung vor, die zum Entscheidungszeitpunkt galt.
+>
+> **Der Trockenlauf macht es umsonst.** Da ohnehin nichts geschaltet wird, ist der Unterschied
+> zwischen Schattenrechnung und Ersatz allein, welche Zahl in welcher Spalte steht. Das Umschalten
+> ist später eine Zeile — und sie beruht dann auf Daten statt auf Zutrauen.
+
+**Woran sich das Umschalten entscheidet,** ist offen (§8). Die Schattenrechnung erzeugt die
+Grundlage dafür: Wie oft weichen die Verfahren überhaupt voneinander ab, und wie viel Energie
+verschiebt die Abweichung? Weichen sie selten ab, ist der Gewinn klein und das Regelwerk genügt.
+
 > **Warum eine Merit-Order und kein Solver.** Solange alle gespeicherten Kilowattstunden denselben
 > Wert haben (`speicherwert`) und keine Leistungsgrenze bindet, ist das Auffüllen nach Preis
 > **beweisbar optimal** — es liefert dasselbe Ergebnis wie ein lineares Programm, in zwanzig Zeilen
 > und ohne Abhängigkeit. Ein LP wird erst nötig, wenn Nebenbedingungen koppeln (siehe §7).
+
+#### Warum das optimal ist
+
+**Das Argument in drei Sätzen.** Eine gespeicherte Kilowattstunde ist immer gleich viel wert — es
+spielt keine Rolle, aus welchem Intervall sie stammt. Was eine Ladung **kostet**, ist deshalb
+allein die Einspeisung, auf die man dafür verzichtet. Füllt man die Kapazität mit den Intervallen
+der niedrigsten Einspeisepreise, verzichtet man auf die geringstmögliche Vergütung.
+
+**Die Gegenprobe:** Nimmt man aus einem optimalen Plan ein Intervall heraus und ersetzt es durch
+eines mit höherem Preis, bleibt die gespeicherte Menge gleich, die entgangene Vergütung steigt.
+Jeder solche Tausch verschlechtert das Ergebnis — also gibt es keinen besseren Plan. Das ist ein
+Austauschargument, kein Optimierungsverfahren; deshalb genügen zwanzig Zeilen, wo sonst ein Solver
+stünde.
+
+**Die Bedingung ist nachgemessen, nicht angenommen.** Der Beweis trägt nur, solange die Batterie
+jeden angebotenen Überschuss auch aufnehmen kann. Am 27.09.2026 um 12:00: Erzeugung 3.737 kWh,
+Verbrauch 0.353 kWh, Ladung 3.400 kWh — die Batterie nahm den **gesamten** Überschuss. Keine
+Leistungsgrenze band.
+
+> **Woran man merkt, dass die Bedingung kippt.** `speicher_ladung` bliebe bei starker Sonne
+> mehrfach auf demselben Wert stehen, während `produktion + speicher_ladung − verbrauch` weiter
+> steigt — die Batterie nimmt dann nicht mehr alles. Das passiert, wenn die Anlage wächst oder der
+> Wechselrichter getauscht wird.
+>
+> **Dann ist das Verfahren nicht mehr optimal, und zwar lautlos:** Die Merit-Order plante weiter
+> Intervalle ein, deren Überschuss gar nicht vollständig in die Batterie passt, und der Plan wäre
+> zu kurz. Ab diesem Punkt bräuchte es ein LP (§7) — oder mindestens eine Deckelung des
+> Überschusses je Intervall auf die Ladeleistung. Die Prüfung gehört in eine Auswertung, nicht in
+> den Job: Sie ist eine Eigenschaft der Anlage, keine des Intervalls.
 
 **Welche Regeln neben der Merit-Order bestehen bleiben:**
 
@@ -261,8 +315,9 @@ Entscheiden aus der Zeit davor fehlen):
 
 | Spalte | Typ | Bedeutung |
 |---|---|---|
-| `verfahren` | VARCHAR(20) | `MERIT_ORDER` oder `REGEL` — welches Verfahren entschied |
-| `regel` | (bestehend) | trägt bei Merit-Order den neuen Wert **`LADEPLAN`** — die Spalte ist `NOT NULL` mit CHECK-Constraint (V145, erweitert in V160), der Wert braucht also eine **DDL-Migration**, kein blosses Enum |
+| `verfahren` | VARCHAR(20) | `MERIT_ORDER` oder `REGEL` — welches Verfahren den **geltenden** Entscheid fällte. In der Schattenrechnung (FR-1a) durchgehend `REGEL` |
+| `ladeplan_batterieladung` | VARCHAR(20) | was die Merit-Order **entschieden hätte**: `FREI` oder `GESPERRT`. `NULL`, wenn sie nicht rechnen konnte — dann fehlte eine Voraussetzung (FR-4) |
+| `regel` | (bestehend) | trägt bei Merit-Order den neuen Wert **`LADEPLAN`** — die Spalte ist `NOT NULL` mit CHECK-Constraint (V145, erweitert in V160), der Wert braucht also eine **DDL-Migration**, kein blosses Enum. Sie wird **mit der ersten Migration** mitgenommen, obwohl die Schattenrechnung den Wert noch nicht schreibt: Sonst scheiterte das spätere Umschalten an einer vergessenen DDL — im Job, nachts |
 | `prognose_ueberschuss` | NUMERIC(12,3) | erwarteter Überschuss **dieses** Intervalls in kWh |
 | `gti` | NUMERIC(8,2) | Einstrahlung in W/m², die dem Entscheid zugrunde lag |
 | `prognose_faktor` | NUMERIC(12,8) | gelernter Umrechnungsfaktor zum Zeitpunkt des Entscheids — **acht** Nachkommastellen, weil der Wert in der Grössenordnung 0.005 liegt und bei sechs nur vier signifikante Stellen blieben |
@@ -401,9 +456,28 @@ Neue Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten
 * [ ] Reicht er, sind nur die günstigsten Intervalle im Plan; ein teureres davor wird gesperrt.
 * [ ] Bei gleicher Kapazität und gleichem Überschuss entscheidet **allein** der Einspeisepreis.
 * [ ] Ist die Batterie voll (freie Kapazität 0), ist der Plan **leer** und jedes Intervall gesperrt.
-* [ ] Ein Intervall **ohne** erwarteten Überschuss belegt keinen Platz im Plan.
+* [ ] Ein Intervall **ohne** erwarteten Überschuss belegt keinen Platz im Plan — und ist
+      `batterieladung = FREI`, nicht `GESPERRT`.
+
+  > **Wo nichts zuzuteilen ist, gibt es nichts zu sperren.** Die Merit-Order verteilt knappe
+  > Kapazität; ohne erwarteten Überschuss ist die Frage gegenstandslos. Andernfalls stünde jede
+  > Nachtstunde auf `GESPERRT`, obwohl nichts zu laden war, und das Protokoll wäre voller
+  > Scheinsperren. Die Regelkaskade entscheidet im selben Fall `FREI` (`KEIN_UEBERSCHUSS`) — so
+  > weichen die Verfahren nur dort voneinander ab, wo wirklich etwas zu entscheiden war. Für die
+  > Schattenrechnung (FR-1a) ist das wesentlich: Sonst zählte jede Nacht als Abweichung und der
+  > Vergleich wäre wertlos.
 * [ ] Aufgefüllt wird bis **`kapazitaetFrei / 0.95`**, nicht bis `kapazitaetFrei` — der erwartete
       Überschuss ist die Energie vor dem Speicher, und rund 5 % davon kommen dort nie an.
+
+**Schattenrechnung (FR-1a)**
+
+* [ ] `batterieladung` und `einspeisung` stammen in dieser Stufe **unverändert** aus der
+      Regelkaskade — die Merit-Order ändert keinen geltenden Entscheid.
+* [ ] `verfahren` trägt durchgehend `REGEL`.
+* [ ] `ladeplan_batterieladung` trägt, was die Merit-Order entschieden hätte — und `NULL`, wenn
+      eine Voraussetzung fehlte.
+* [ ] Ein Fehler in der Merit-Order lässt den Entscheid der Kaskade **unberührt**: Der Job schreibt
+      ihn trotzdem, mit `ladeplan_batterieladung = NULL`.
 * [ ] **Bei negativem Preis** ist `einspeisung = GESPERRT`, über die Ladung entscheidet die
       Merit-Order — nicht mehr pauschal `FREI` wie heute.
 * [ ] **Unter dem Mindest-Ladezustand** ist `batterieladung = FREI`, ohne dass der Plan gefragt wird.

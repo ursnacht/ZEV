@@ -203,6 +203,67 @@ public class Steuerentscheid {
     @Column(name = "mindest_abstand", precision = 10, scale = 5)
     private BigDecimal mindestAbstand;
 
+    /**
+     * Welches Verfahren den <b>geltenden</b> Entscheid gefällt hat (Specs/Ladeplanung.md, FR-5).
+     *
+     * <p>In der Schattenrechnung (FR-1a) durchgehend {@link Steuerverfahren#REGEL}: Die
+     * Merit-Order rechnet mit, entscheidet aber nicht. {@code null} bei Entscheiden vor V169.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "verfahren", length = 20)
+    private Steuerverfahren verfahren;
+
+    /**
+     * Was die Merit-Order <b>entschieden hätte</b>; {@code null}, wenn sie nicht rechnen konnte.
+     *
+     * <p><b>Bestimmt den Entscheid nicht.</b> Sie ist die Messgrösse der Schattenrechnung: Erst der
+     * Vergleich mit {@link #batterieladung} über mehrere Tage zeigt, ob sich das Umschalten lohnt.
+     * Ein {@code null} heisst „eine Voraussetzung fehlte" (FR-4) — nicht „keine Sperre".
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ladeplan_batterieladung", length = 20)
+    private Steuerzustand ladeplanBatterieladung;
+
+    /**
+     * Erwarteter PV-Überschuss dieses Intervalls in kWh: {@code max(0, Erzeugung − Lastprofil)}.
+     *
+     * <p>Nicht zu verwechseln mit {@link #ueberschuss} — der ist <b>gemessen</b>, dieser
+     * <b>erwartet</b>. Beide nebeneinander machen die Prognosegüte später nachprüfbar.
+     */
+    @Column(name = "prognose_ueberschuss", precision = 12, scale = 3)
+    private BigDecimal prognoseUeberschuss;
+
+    /**
+     * Einstrahlung in W/m², die dem Entscheid zugrunde lag.
+     *
+     * <p>Festgehalten, weil {@code zev.einstrahlungsprognose} je Intervall nur die <b>zuletzt</b>
+     * geholte Fassung hält: Der stündliche Abruf überschreibt auch vergangene Intervalle. Dieser
+     * Wert ist damit der einzige, der den Entscheid im Nachhinein noch erklärt.
+     */
+    @Column(name = "gti", precision = 8, scale = 2)
+    private BigDecimal gti;
+
+    /** Gelernter Umrechnungsfaktor von W/m² auf kWh zum Zeitpunkt des Entscheids. */
+    @Column(name = "prognose_faktor", precision = 12, scale = 8)
+    private BigDecimal prognoseFaktor;
+
+    /**
+     * Platz dieses Intervalls in der Merit-Order des Resttages.
+     *
+     * <p>Zusammen mit {@link #rangBenoetigt} erklärt er den Entscheid vollständig: „Rang 34,
+     * gebraucht werden 12" ist nachprüfbar, ein blosses {@code GESPERRT} nicht.
+     */
+    @Column(name = "rang")
+    private Integer rang;
+
+    /** Wie viele Intervalle gebraucht wurden, um die freie Kapazität zu decken. */
+    @Column(name = "rang_benoetigt")
+    private Integer rangBenoetigt;
+
+    /** Freie Batteriekapazität in kWh beim Entscheid: {@code kapazitaet × (1 − soc/100)}. */
+    @Column(name = "kapazitaet_frei", precision = 12, scale = 3)
+    private BigDecimal kapazitaetFrei;
+
     @Column(name = "erstellt_am", nullable = false)
     private LocalDateTime erstelltAm;
 
@@ -311,6 +372,70 @@ public class Steuerentscheid {
 
     public void setMindestAbstand(BigDecimal mindestAbstand) {
         this.mindestAbstand = mindestAbstand;
+    }
+
+    public Steuerverfahren getVerfahren() {
+        return verfahren;
+    }
+
+    public void setVerfahren(Steuerverfahren verfahren) {
+        this.verfahren = verfahren;
+    }
+
+    public Steuerzustand getLadeplanBatterieladung() {
+        return ladeplanBatterieladung;
+    }
+
+    public void setLadeplanBatterieladung(Steuerzustand ladeplanBatterieladung) {
+        this.ladeplanBatterieladung = ladeplanBatterieladung;
+    }
+
+    public BigDecimal getPrognoseUeberschuss() {
+        return prognoseUeberschuss;
+    }
+
+    public void setPrognoseUeberschuss(BigDecimal prognoseUeberschuss) {
+        this.prognoseUeberschuss = prognoseUeberschuss;
+    }
+
+    public BigDecimal getGti() {
+        return gti;
+    }
+
+    public void setGti(BigDecimal gti) {
+        this.gti = gti;
+    }
+
+    public BigDecimal getPrognoseFaktor() {
+        return prognoseFaktor;
+    }
+
+    public void setPrognoseFaktor(BigDecimal prognoseFaktor) {
+        this.prognoseFaktor = prognoseFaktor;
+    }
+
+    public Integer getRang() {
+        return rang;
+    }
+
+    public void setRang(Integer rang) {
+        this.rang = rang;
+    }
+
+    public Integer getRangBenoetigt() {
+        return rangBenoetigt;
+    }
+
+    public void setRangBenoetigt(Integer rangBenoetigt) {
+        this.rangBenoetigt = rangBenoetigt;
+    }
+
+    public BigDecimal getKapazitaetFrei() {
+        return kapazitaetFrei;
+    }
+
+    public void setKapazitaetFrei(BigDecimal kapazitaetFrei) {
+        this.kapazitaetFrei = kapazitaetFrei;
     }
 
     public BigDecimal getSpeicherLadung() {

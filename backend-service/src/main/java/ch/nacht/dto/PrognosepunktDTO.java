@@ -29,6 +29,12 @@ public class PrognosepunktDTO {
     /** Der gelernte Faktor von W/m² auf kWh; {@code null}, wenn zu wenig Historie vorliegt. */
     private BigDecimal faktor;
 
+    /** Erwarteter Verbrauch in kWh (Median der gleichen Wochentage); {@code null} ohne Stichprobe. */
+    private BigDecimal lastprofil;
+
+    /** {@code max(0, erwarteteErzeugung − lastprofil)}; {@code null}, wenn eine Grösse fehlt. */
+    private BigDecimal erwarteterUeberschuss;
+
     public LocalDateTime getZeit() {
         return zeit;
     }
@@ -51,6 +57,33 @@ public class PrognosepunktDTO {
 
     public void setErwarteteErzeugung(BigDecimal erwarteteErzeugung) {
         this.erwarteteErzeugung = erwarteteErzeugung;
+    }
+
+    /**
+     * Erwarteter Verbrauch dieses Intervalls in kWh — der Median der gleichen Wochentage.
+     *
+     * <p>{@code null}, wenn keine Stichprobe vorliegt. Eine 0 hiesse „kein Verbrauch erwartet" und
+     * ergäbe einen zu hohen Überschuss.
+     */
+    public BigDecimal getLastprofil() {
+        return lastprofil;
+    }
+
+    public void setLastprofil(BigDecimal lastprofil) {
+        this.lastprofil = lastprofil;
+    }
+
+    /**
+     * Erwarteter PV-Überschuss: {@code max(0, erwarteteErzeugung − lastprofil)}.
+     *
+     * <p>{@code null}, wenn eine der beiden Grössen fehlt — die Merit-Order fällt dann zurück.
+     */
+    public BigDecimal getErwarteterUeberschuss() {
+        return erwarteterUeberschuss;
+    }
+
+    public void setErwarteterUeberschuss(BigDecimal erwarteterUeberschuss) {
+        this.erwarteterUeberschuss = erwarteterUeberschuss;
     }
 
     public BigDecimal getFaktor() {
