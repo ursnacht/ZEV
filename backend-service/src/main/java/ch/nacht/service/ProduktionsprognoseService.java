@@ -127,7 +127,36 @@ public class ProduktionsprognoseService {
         Long orgId = organizationContextService.getCurrentOrgId();
         pruefeFeatureFlag(orgId);
         hibernateFilterService.enableOrgFilter();
+        return prognose(orgId, datum);
+    }
 
+    /**
+     * Dieselbe Prognose, aber <b>org-explizit</b> — für Hintergrund-Jobs.
+     *
+     * <p><b>Warum eine zweite Signatur nötig ist.</b> Ein Job läuft ohne Sicherheitskontext:
+     * {@code getCurrentOrgId()} liefert dort {@code null}, und {@code enableOrgFilter()} wirft
+     * dann {@link ch.nacht.exception.NoOrganizationException} — fail-closed, damit keine Abfrage
+     * ungefiltert läuft. Dieselbe Trennung gibt es bei
+     * {@link SteuerungService#werteIntervallAus(Long, LocalDateTime)}.
+     *
+     * <p><b>Der Fehler war bereits eingebaut:</b> Die Schattenrechnung rief aus dem Job-Pfad die
+     * kontextgebundene Variante auf. Sie fängt Ausnahmen ab und hätte deshalb dauerhaft leere
+     * Plangrössen geschrieben — die Merit-Order wirkte wie abgeschaltet, ohne dass ein Fehler
+     * sichtbar wurde. Genau die Fehlerart, vor der Specs/Ladeplanung.md, FR-4 warnt.
+     *
+     * <p>Den Feature-Flag prüft hier der <b>Aufrufer</b>: Der Job holt sich ohnehin nur die
+     * Mandanten mit aktivem Flag.
+     *
+     * @param orgId Mandant
+     * @param datum Tag in Ortszeit
+     */
+    @Transactional(readOnly = true)
+    public List<PrognosepunktDTO> getPrognose(Long orgId, LocalDate datum) {
+        hibernateFilterService.enableOrgFilter(orgId);
+        return prognose(orgId, datum);
+    }
+
+    private List<PrognosepunktDTO> prognose(Long orgId, LocalDate datum) {
         List<Einstrahlungsprognose> werte = prognoseRepository.findByZeitBetween(
                 datum.atStartOfDay(), datum.plusDays(1).atStartOfDay());
         if (werte.isEmpty()) {

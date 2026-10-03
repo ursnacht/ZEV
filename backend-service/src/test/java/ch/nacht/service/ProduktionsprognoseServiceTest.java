@@ -712,6 +712,32 @@ public class ProduktionsprognoseServiceTest {
                 "Das Lastprofil steht trotzdem - es haengt nicht am Faktor");
     }
 
+    // ==================== Der Job-Pfad: org-explizit ====================
+
+    /**
+     * <b>Die org-explizite Variante kommt ohne Sicherheitskontext aus.</b>
+     *
+     * <p>Ein Job hat keinen: {@code getCurrentOrgId()} liefert dort {@code null}, und
+     * {@code enableOrgFilter()} wirft dann fail-closed. Die Schattenrechnung rief zuerst die
+     * kontextgebundene Variante auf — sie faengt Ausnahmen ab und haette deshalb dauerhaft leere
+     * Plangroessen geschrieben. Die Merit-Order wirkte wie abgeschaltet, ohne sichtbaren Fehler.
+     */
+    @Test
+    void getPrognoseOrgExplizit_NutztDenKontextNicht() {
+        lernhistorie(MIN_PUNKTE);
+        prognoseFuer(LocalDateTime.of(2026, 9, 25, 12, 0));
+        messwerte(messwert(ende(0), "2.000"));
+
+        List<PrognosepunktDTO> punkte = produktionsprognoseService.getPrognose(ORG_ID, DATUM);
+
+        assertEquals(1, punkte.size());
+        verify(organizationContextService, never()).getCurrentOrgId();
+        // Der Filter wird mit der UEBERGEBENEN Id gesetzt, nicht parameterlos: Die parameterlose
+        // Variante zieht den Kontext und wuerfe im Job fail-closed.
+        verify(hibernateFilterService).enableOrgFilter(ORG_ID);
+        verify(hibernateFilterService, never()).enableOrgFilter();
+    }
+
     /** Zeile wie {@code sumBilanzKomponentenPerZeitBetween}, nur mit Verbrauch (Index 2). */
     private Object[] verbrauch(LocalDateTime ende, String wert) {
         return new Object[]{ende, BigDecimal.ZERO, new BigDecimal(wert),
