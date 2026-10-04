@@ -148,16 +148,46 @@ public class LadeplanServiceTest {
                 "Auch das teure Intervall wird geladen - die Kapazitaet wird sonst nicht voll");
     }
 
-    /** Ist die Batterie voll, ist der Plan leer und jedes Intervall gesperrt. */
+    /**
+     * <b>Ist die Batterie voll, ist der Plan leer — und jedes Intervall {@code FREI}.</b>
+     *
+     * <p>Zuerst stand hier {@code GESPERRT}. Am 04.10.2026 war die Batterie um 13:00 voll, und das
+     * <b>billigste Intervall des Tages</b> (Rang 1) trug damit eine Sperre, die nichts verhindert:
+     * In eine volle Batterie laesst sich ohnehin nichts laden.
+     *
+     * <p>Entscheidend war die Wirkung auf die Schattenrechnung: Die Regelkaskade entscheidet hier
+     * {@code FREI}, also zaehlte jedes Intervall nach dem Vollwerden als Abweichung — an jenem Tag
+     * ueber vierzig. Die Kennzahl des Parallelbetriebs haette Scheinunterschiede gemessen.
+     *
+     * <p>Der Rang bleibt stehen: Er erklaert den Entscheid und ist richtig gerechnet.
+     */
     @Test
-    void plane_BatterieVoll_PlanLeer() {
+    void plane_BatterieVoll_PlanLeerUndTrotzdemFrei() {
         List<LadeplanService.Intervall> resttag = List.of(intervall(0, "0.05", "1.0"));
 
         LadeplanService.Plan plan = ladeplanService.plane(resttag, zeit(0), BigDecimal.ZERO);
 
         assertEquals(0, plan.rangBenoetigt());
-        assertEquals(1, plan.rang());
-        assertEquals(Steuerzustand.GESPERRT, plan.batterieladung());
+        assertEquals(1, plan.rang(), "Der Rang wird trotzdem vergeben - er erklaert den Entscheid");
+        assertEquals(Steuerzustand.FREI, plan.batterieladung());
+    }
+
+    /**
+     * Auch ein <b>teures</b> Intervall ist bei voller Batterie {@code FREI}.
+     *
+     * <p>Sonst haengt die Aussage am Preis, obwohl sie an der Kapazitaet haengt: Es gibt nichts
+     * zuzuteilen, unabhaengig davon, was das Intervall kosten wuerde.
+     */
+    @Test
+    void plane_BatterieVoll_AuchTeuresIntervallFrei() {
+        List<LadeplanService.Intervall> resttag = List.of(
+                intervall(0, "0.25", "1.0"),
+                intervall(1, "0.01", "1.0"));
+
+        LadeplanService.Plan plan = ladeplanService.plane(resttag, zeit(0), BigDecimal.ZERO);
+
+        assertEquals(2, plan.rang());
+        assertEquals(Steuerzustand.FREI, plan.batterieladung());
     }
 
     // ==================== Intervalle ohne Überschuss ====================

@@ -90,7 +90,8 @@ Je Intervall, im selben Job-Lauf wie heute (`0 6,21,36,51 * * * *`):
    > `speicher_ladung` gegen `ΔSOC × kapazitaet`. Ein Feld dafür wäre eine Frage, die niemand
    > beantworten kann, ohne genau diese Rechnung zu machen.
 6. **Entscheid für das ausgewertete Intervall:** liegt es im Plan → `batterieladung = FREI`, sonst
-   `GESPERRT`.
+   `GESPERRT`. **Gibt es nichts zuzuteilen** — kein erwarteter Überschuss oder keine freie
+   Kapazität —, gilt `FREI`.
 7. **Entscheid festhalten** wie bisher, um die Plangrössen erweitert (FR-5).
 
 ### FR-1a: Erste Stufe — Schattenrechnung
@@ -117,6 +118,31 @@ Entscheid aber **nicht**. `verfahren` trägt in dieser Stufe durchgehend `REGEL`
 **Woran sich das Umschalten entscheidet,** ist offen (§8). Die Schattenrechnung erzeugt die
 Grundlage dafür: Wie oft weichen die Verfahren überhaupt voneinander ab, und wie viel Energie
 verschiebt die Abweichung? Weichen sie selten ab, ist der Gewinn klein und das Regelwerk genügt.
+
+> **Der Ladezustand stammt von keinem der beiden Verfahren.** Im Trockenlauf schaltet **niemand**:
+> Die Batterie folgt der Eigenverbrauchsoptimierung des Wechselrichters und lädt, sobald Überschuss
+> da ist. Am 04.10.2026 stieg der Ladezustand von 49 % um 08:45 stetig auf 100 % um 13:00 — keine
+> Sperre wirkte, weder die der Kaskade noch die der Merit-Order.
+>
+> **Für den Vergleich ist das günstig.** Beide Verfahren sehen zu jedem Zeitpunkt dieselbe
+> Ausgangslage, und keines beeinflusst sie. Es gibt keine Asymmetrie zwischen ihnen: Wo sie
+> auseinandergehen, ist das ein echter Unterschied im Entscheid, kein Artefakt des Parallelbetriebs.
+>
+> **Was sich daraus trotzdem nicht ableiten lässt**, ist der Nutzen in Kilowattstunden. Beide planen
+> gegen eine Wirklichkeit, in der **keines** von beiden wirkt. Am 04.10. sperrte die Merit-Order
+> vormittags (Rang 17 bei 8 benötigten) und hielt Kapazität für die billigen Mittagsstunden frei —
+> hätte sie wirklich gesteuert, wäre die Batterie um 13:00 nicht voll gewesen und die Mittagsstunden
+> wären nutzbar geblieben. So aber lud die Anlage ungebremst, und der Plan lief ins Leere.
+>
+> **Die Woche misst also, wie oft und wann die Verfahren verschieden entscheiden — nicht, was das
+> wert gewesen wäre.** Für die Frage „lohnt das Umschalten" genügt das: Weichen sie nie ab, gibt es
+> nichts zu gewinnen. Weichen sie oft und systematisch ab, ist die Richtung erkennbar — den Betrag
+> kennt erst der Wirkbetrieb.
+>
+> **Warum kein simulierter Ladezustand.** Ihn mitzuführen hiesse, einen hypothetischen
+> Anlagenzustand über Tage fortzuschreiben — mit Annahmen über Ladeleistung, Verluste und Entladung,
+> die alle nicht gemessen sind. Ein Fehler darin wäre unsichtbar und verfälschte genau die Zahl, die
+> entscheiden soll.
 
 > **Warum eine Merit-Order und kein Solver.** Solange alle gespeicherten Kilowattstunden denselben
 > Wert haben (`speicherwert`) und keine Leistungsgrenze bindet, ist das Auffüllen nach Preis
@@ -455,7 +481,20 @@ Neue Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten
       ist das laufende Intervall im Plan — es wird geladen, auch bei hohem Preis.
 * [ ] Reicht er, sind nur die günstigsten Intervalle im Plan; ein teureres davor wird gesperrt.
 * [ ] Bei gleicher Kapazität und gleichem Überschuss entscheidet **allein** der Einspeisepreis.
-* [ ] Ist die Batterie voll (freie Kapazität 0), ist der Plan **leer** und jedes Intervall gesperrt.
+* [ ] Ist die Batterie voll (freie Kapazität 0), ist der Plan **leer** — und jedes Intervall
+      `batterieladung = FREI`, nicht `GESPERRT`.
+
+  > **Korrigiert am 04.10.2026.** Zuerst stand hier „jedes Intervall gesperrt". An jenem Tag war
+  > die Batterie um 13:00 voll, und das **billigste Intervall des Tages** (Rang 1) trug `GESPERRT`
+  > — eine Sperre, die nichts verhindert, denn in eine volle Batterie lässt sich nichts laden.
+  >
+  > Entscheidend war die Wirkung auf die Schattenrechnung: Die Regelkaskade entscheidet hier `FREI`,
+  > also zählte **jedes** Intervall nach dem Vollwerden als Abweichung — an diesem einen Tag über
+  > vierzig. Die Kennzahl, um derentwillen der Parallelbetrieb gebaut wurde, hätte
+  > Scheinunterschiede gemessen.
+  >
+  > Damit gilt dieselbe Regel wie beim fehlenden Überschuss: **Wo nichts zuzuteilen ist, gibt es
+  > nichts zu sperren.**
 * [ ] Ein Intervall **ohne** erwarteten Überschuss belegt keinen Platz im Plan — und ist
       `batterieladung = FREI`, nicht `GESPERRT`.
 

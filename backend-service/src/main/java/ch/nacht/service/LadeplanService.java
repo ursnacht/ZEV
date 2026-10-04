@@ -125,23 +125,35 @@ public class LadeplanService {
             }
         }
 
-        return new Plan(batterieladung(rang, rangBenoetigt), rang, rangBenoetigt, kapazitaetFrei);
+        return new Plan(batterieladung(rang, rangBenoetigt, kapazitaetFrei), rang, rangBenoetigt,
+                kapazitaetFrei);
     }
 
     /**
-     * {@code FREI}, wenn das Intervall im Plan liegt.
+     * {@code FREI}, wenn das Intervall im Plan liegt — <b>oder wenn es nichts zuzuteilen gibt</b>.
      *
-     * <p><b>Ohne erwarteten Überschuss ist die Frage gegenstandslos</b> ({@code rang == null}) —
-     * dann gilt {@code FREI}, nicht {@code GESPERRT}. Die Merit-Order teilt knappe Kapazität zu;
-     * wo nichts zuzuteilen ist, gibt es nichts zu sperren.
+     * <p>Die Merit-Order verteilt knappe Kapazität. Wo nichts zu verteilen ist, gibt es nichts zu
+     * sperren, und das gilt in <b>zwei</b> Fällen:
      *
-     * <p>Das ist keine Nachlässigkeit, sondern hält das Protokoll lesbar: Andernfalls stünde jede
-     * Nachtstunde auf {@code GESPERRT}, obwohl nichts zu laden war. Die Regelkaskade entscheidet
-     * im selben Fall {@code FREI} ({@code KEIN_UEBERSCHUSS}) — so weichen die beiden Verfahren nur
-     * dort voneinander ab, wo wirklich etwas zu entscheiden war.
+     * <ul>
+     *   <li><b>Kein erwarteter Überschuss</b> ({@code rang == null}) — nachts und an trüben
+     *       Intervallen.</li>
+     *   <li><b>Keine freie Kapazität</b> ({@code kapazitaetFrei <= 0}) — die Batterie ist voll.</li>
+     * </ul>
+     *
+     * <p><b>Der zweite Fall war zuerst als {@code GESPERRT} festgelegt</b>, und das war falsch. Am
+     * 04.10.2026 stand ab 13:00 das billigste Intervall des Tages (Rang 1) auf {@code GESPERRT},
+     * weil die volle Batterie {@code rangBenoetigt = 0} ergab. Eine Sperre, die nichts verhindert:
+     * In eine volle Batterie lässt sich ohnehin nichts laden.
+     *
+     * <p>Schlimmer als unschön war die Wirkung auf die <b>Schattenrechnung</b> (FR-1a): Die
+     * Regelkaskade entscheidet in beiden Fällen {@code FREI}, also zählte jedes Intervall nach dem
+     * Vollwerden als Abweichung — an diesem einen Tag über vierzig. Die Kennzahl, um derentwillen
+     * der Parallelbetrieb gebaut wurde, hätte Scheinunterschiede gemessen.
      */
-    private Steuerzustand batterieladung(Integer rang, int rangBenoetigt) {
-        if (rang == null) {
+    private Steuerzustand batterieladung(Integer rang, int rangBenoetigt,
+                                         BigDecimal kapazitaetFrei) {
+        if (rang == null || kapazitaetFrei.signum() <= 0) {
             return Steuerzustand.FREI;
         }
         return rang <= rangBenoetigt ? Steuerzustand.FREI : Steuerzustand.GESPERRT;
