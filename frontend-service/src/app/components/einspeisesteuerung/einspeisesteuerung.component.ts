@@ -805,24 +805,40 @@ export class EinspeisesteuerungComponent extends WithMessage
       // Die Serie selbst zeichnet nichts - sie traegt nur die Flaechen und den Legendeneintrag.
       data: [],
       silent: true,
-      itemStyle: { color: farbe },
+      // DERSELBE Stil wie die Flaeche: Die Legende zeichnet ihr Symbol aus dem itemStyle der
+      // SERIE, nicht aus dem der markArea. Stand hier nur die Farbe, waren beide Symbole voll
+      // deckend - und damit nicht zu unterscheiden, obwohl die Baender im Diagramm verschieden
+      // aussehen. Wer dann die Legende las, ordnete das falsche Band zu.
+      itemStyle: this.bandStil(farbe, schatten),
       markArea: {
         silent: true,
         // Gedeckt: Die Baender zeigen einen Zustand, keine Messgroesse, und sollen die Kurven
         // nicht ueberstimmen. Unterschieden werden sie ueber ihre Ebene und die Legende.
-        // Das Schattenband blasser und gestrichelt umrandet: Es beschreibt keinen Zustand, der
-        // galt, sondern einen, der gegolten HAETTE. Gleiche Deckkraft liesse beide gleich
-        // verbindlich wirken.
-        itemStyle: schatten
-            ? { color: farbe, opacity: 0.18, borderColor: farbe, borderWidth: 1,
-                borderType: 'dashed' }
-            : { color: farbe, opacity: 0.45 },
+        itemStyle: this.bandStil(farbe, schatten),
         data: this.bloecke(gesperrt).map(([von, bis]) => [
           { xAxis: von, yAxis: oben },
           { xAxis: bis, yAxis: unten }
         ])
       }
     };
+  }
+
+  /**
+   * Der Stil eines Zustandsbandes — für die Fläche **und** das Legendensymbol.
+   *
+   * <p>Beide aus derselben Quelle, sonst laufen sie auseinander: Die Legende zeichnet aus dem
+   * {@code itemStyle} der Serie, die Fläche aus dem der {@code markArea}. Zuerst stand die
+   * Deckkraft nur bei der Fläche — in der Legende sahen deshalb beide Bänder gleich aus, obwohl
+   * sie es im Diagramm nicht sind.
+   *
+   * <p><b>Das Schattenband ist blasser und gestrichelt umrandet:</b> Es beschreibt keinen Zustand,
+   * der galt, sondern einen, der gegolten hätte. Gleiche Deckkraft liesse beide gleich verbindlich
+   * wirken. 0.25 statt weniger, damit das kleine Legendensymbol noch erkennbar bleibt.
+   */
+  private bandStil(farbe: string, schatten: boolean): Record<string, unknown> {
+    return schatten
+      ? { color: farbe, opacity: 0.25, borderColor: farbe, borderWidth: 1, borderType: 'dashed' }
+      : { color: farbe, opacity: 0.45 };
   }
 
   /**

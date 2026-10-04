@@ -79,7 +79,12 @@ describe('EinspeisesteuerungComponent', () => {
     prognoseReihe: () => (number | null)[][];
     tooltip: (zeitpunkt: number) => string;
     optionen: () => {
-      series: { name: string, data: unknown[] }[],
+      series: {
+        name: string,
+        data: unknown[],
+        itemStyle?: { opacity?: number },
+        markArea?: { itemStyle?: { opacity?: number } }
+      }[],
       grid: { bottom: number }
     };
     achseMinMitBaendern: () => number;
@@ -453,6 +458,36 @@ describe('EinspeisesteuerungComponent', () => {
         expect(namen).toContain('STEUERUNG_LADEPLAN_GESPERRT');
         expect(namen).toContain('STEUERUNG_BATTERIELADUNG');
         expect(namen).toContain('STEUERUNG_EINSPEISUNG');
+      });
+
+      /**
+       * <b>Legendensymbol und Flaeche tragen denselben Stil.</b>
+       *
+       * <p>Die Legende zeichnet aus dem {@code itemStyle} der SERIE, die Flaeche aus dem der
+       * {@code markArea}. Zuerst stand die Deckkraft nur bei der Flaeche: In der Legende sahen
+       * beide Baender gleich aus, obwohl sie es im Diagramm nicht sind — wer sie las, ordnete das
+       * falsche Band zu.
+       */
+      it('should style legend symbol and area identically', () => {
+        component.entscheide = [mitLadeplan('2026-10-03T10:00:00', 'GESPERRT', 'GESPERRT')];
+
+        const serien = privat().optionen().series;
+        const batterie = serien.find(s => s.name === 'STEUERUNG_BATTERIELADUNG');
+        const schatten = serien.find(s => s.name === 'STEUERUNG_LADEPLAN_GESPERRT');
+
+        expect(batterie?.itemStyle?.opacity).toBe(batterie?.markArea?.itemStyle?.opacity);
+        expect(schatten?.itemStyle?.opacity).toBe(schatten?.markArea?.itemStyle?.opacity);
+      });
+
+      /** Das Schattenband ist blasser — es zeigt einen Zustand, der gegolten HAETTE. */
+      it('should draw the shadow band fainter than the real one', () => {
+        component.entscheide = [mitLadeplan('2026-10-03T10:00:00', 'GESPERRT', 'GESPERRT')];
+
+        const serien = privat().optionen().series;
+        const batterie = serien.find(s => s.name === 'STEUERUNG_BATTERIELADUNG');
+        const schatten = serien.find(s => s.name === 'STEUERUNG_LADEPLAN_GESPERRT');
+
+        expect(schatten!.itemStyle!.opacity!).toBeLessThan(batterie!.itemStyle!.opacity!);
       });
 
       /**
