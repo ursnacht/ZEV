@@ -34,17 +34,16 @@
   > lohnt sich die Merit-Order darauf — trüge sie nicht, wäre eine Ladeplanung auf schlechten
   > Zahlen schlechter als das heutige Regelwerk.
   >
-  > Umgesetzt sind damit: FR-2 (Abruf, Job, Tabelle), FR-3 **ohne Lastprofil** (gelernter Faktor,
-  > erwartete Erzeugung), FR-6 (Standort- und Ausrichtungskonfiguration), FR-7 (Endpunkt, Diagramm,
-  > Tabellenspalten, Namensnennung) und die davon berührten Übersetzungen aus FR-9.
+  > **Stand 05.10.2026: alles umgesetzt ausser dem Schalten.** FR-1 bis FR-7 und FR-9 sind gebaut,
+  > die Merit-Order läuft seit dem 04.10. als **Schattenrechnung** (FR-1a) neben der Regelkaskade.
+  > FR-8 ist **zurückgenommen**, nicht offen.
   >
-  > **Offen:** FR-1 (Merit-Order), FR-3-Lastprofil, FR-4 (Rückfall-Kennzeichen), FR-5 (die Spalten
-  > am Entscheid samt DDL für `regel`) — und die sieben Übersetzungen, die zu diesen Teilen
-  > gehören (`VERFAHREN`, `MERIT_ORDER`, `REGEL`, `RANG`, `RANG_BENOETIGT`, `KAPAZITAET_FREI`,
-  > `OHNE_PROGNOSE`). FR-8 ist **zurückgenommen**, nicht offen.
+  > **Was aussteht, ist die Entscheidung, nicht der Code:** Ob die Merit-Order die Kaskade ersetzt,
+  > soll eine Woche Parallelbetrieb beantworten (ab 11.10.2026). Weichen die Verfahren selten
+  > voneinander ab, ist der Gewinn klein und das Regelwerk genügt — dann bleibt es, wie es ist.
   >
-  > Das Lastprofil aus FR-3 fehlt ebenfalls noch — es wird erst für den erwarteten **Überschuss**
-  > gebraucht, und der erst für die Merit-Order.
+  > Die **Prognose** hat ihre Bewährungsprobe bestanden: Über fünf Tage trifft sie die Gesamtmenge
+  > auf 1.4 %, ohne den jeweiligen Tag zu kennen (FR-3, „Was gemessen wurde").
 
 ## 2. Funktionale Anforderungen (FR) - Was soll das System tun?
 
@@ -295,6 +294,65 @@ Profil verschiebt.
 > sondern die Antwort auf „reicht die Restsonne, um die freie Kapazität zu füllen". Am 21.09.2026
 > standen 18 kWh erwarteter Überschuss gegen 10.6 kWh freie Kapazität — diese Antwort ist gegen
 > 30 % Prognosefehler robust.
+
+#### Was gemessen wurde (Stand 05.10.2026)
+
+Fünf Tage, jeder bewertet mit dem Faktor, den der Service **an jenem Morgen** hatte — also ohne
+Kenntnis des Tages selbst:
+
+| Tag | Einstrahlung | tatsächlich | vorhergesagt | Abweichung |
+|---|---|---|---|---|
+| 01.10. | 8'158 | 33.84 kWh | 40.64 kWh | −16.7 % |
+| 02.10. | 11'904 | 57.42 kWh | 58.11 kWh | −1.2 % |
+| 03.10. | 13'272 | 74.67 kWh | 64.68 kWh | +15.4 % |
+| 04.10. | 12'322 | 60.38 kWh | 61.37 kWh | −1.6 % |
+| 05.10. | 15'828 | 72.89 kWh | 78.68 kWh | −7.4 % |
+| **Summe** | | **299.20 kWh** | **303.48 kWh** | **−1.4 %** |
+
+**Über fünf Tage trifft die Prognose die Gesamtmenge auf 1.4 %**, der mittlere absolute Tagesfehler
+liegt bei 8.5 %. Beides deutlich innerhalb der 30 %, gegen die das Verfahren robust sein soll.
+
+> **Der Faktor ist nicht der Engpass — das Wettermodell ist es.** Über dieselben fünf Tage
+> schwankte der gelernte Faktor zwischen 0.00487 und 0.00498, also um **2.3 %**. Die
+> Tagesabweichungen schwankten um ±16 %. Am 01.10. und am 03.10. — den beiden schlechtesten Tagen —
+> war der Faktor nahezu identisch; was sich unterschied, war das Wetter gegenüber der Vorhersage.
+>
+> **Daraus folgt, woran nicht zu arbeiten ist:** Eine Gewichtung nach Aktualität, ein kürzeres
+> Lernfenster, eine andere Regression — all das drehte an einer Grösse, die bereits auf 2 % genau
+> ist. Die verbleibende Streuung kommt von Open-Meteo, und daran lässt sich nichts ändern.
+>
+> **Die Prognose ist zudem dort am besten, wo sie gebraucht wird.** An den drei hellsten Tagen lag
+> der mittlere absolute Fehler bei 3 %, an den drei trübsten bei 16 %. An trüben Tagen reicht die
+> Sonne ohnehin kaum für eine Batterieladung — dann lautet die Antwort „lade, was kommt", und der
+> Fehler ändert daran nichts.
+
+> **Nachprüfbar mit dieser Abfrage** (sie bildet das Lernfenster des Service nach — 28 Tage, der
+> gefragte Tag ausgeschlossen, mindestens 150 helle Intervalle):
+>
+> ```sql
+> WITH tage AS (
+>   SELECT e.zeit::date AS tag, count(*) AS helle, sum(e.gti) AS gti,
+>          sum(s.produktion + coalesce(s.speicher_ladung,0)
+>              - coalesce(s.speicher_entladung,0)) AS ist
+>   FROM zev.einstrahlungsprognose e
+>   JOIN zev.steuerentscheid s ON s.zeit_von = e.zeit AND s.org_id = e.org_id
+>   WHERE e.gti > 0 GROUP BY 1
+> ), historie AS (
+>   SELECT tag, gti, ist,
+>          sum(helle) OVER w AS helle_davor,
+>          sum(ist)   OVER w AS ist_davor,
+>          sum(gti)   OVER w AS gti_davor
+>   FROM tage WINDOW w AS (ORDER BY tag ROWS BETWEEN 28 PRECEDING AND 1 PRECEDING)
+> )
+> SELECT to_char(tag, 'YYYY-MM-DD') AS tag, round(gti, 0) AS summe_gti,
+>        round(ist, 2) AS ist_kwh,
+>        round(CASE WHEN helle_davor >= 150 THEN ist_davor / gti_davor END, 8) AS faktor,
+>        round(gti * ist_davor / nullif(gti_davor, 0), 2) AS erwartet_kwh
+> FROM historie ORDER BY tag;
+> ```
+>
+> **Den Faktor nicht aus allen Tagen zugleich lernen.** Dann stimmt die Summe per Konstruktion, und
+> die Messung bezeugt nur sich selbst.
 
 ### FR-4: Rückfall auf die Regelkaskade
 
@@ -708,9 +766,10 @@ Neue Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten
 * **Wie viele Tage für Lastprofil und Faktor?** Vorgabe 28. Für den Faktor sind vermutlich weniger
   besser (er soll aktuellen Zuständen folgen), für das Lastprofil mehr. Getrennte Werte wären
   denkbar — vorerst einer, bis die Daten etwas anderes nahelegen.
-* **Wie schnell soll der Faktor auf Schnee oder Verschmutzung reagieren?** Ein gleitendes Mittel
-  über 28 Tage reagiert träge. Eine Gewichtung nach Aktualität wäre möglich, ist aber ohne
-  Beobachtung geraten.
+* ~~**Wie schnell soll der Faktor auf Schnee oder Verschmutzung reagieren?**~~ — **beantwortet am
+  05.10.2026: Die Frage ist gegenstandslos.** Der Faktor ist nicht der Engpass (siehe FR-3,
+  „Was gemessen wurde"). Eine Gewichtung nach Aktualität würde an einer Grösse drehen, die bereits
+  auf 2 % genau ist.
 * **Soll der Plan gespeichert werden oder nur der Rang?** Die Spec sieht nur Rang und benötigte
   Anzahl vor — der ganze Plan wäre 96 Werte je Intervall. Reicht das zum Nachvollziehen?
 * **Ab wann ist das Verfahren besser?** Die Rückrechnung kann beide Verfahren über dieselbe
