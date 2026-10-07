@@ -294,6 +294,12 @@ Profil verschiebt.
 > sondern die Antwort auf „reicht die Restsonne, um die freie Kapazität zu füllen". Am 21.09.2026
 > standen 18 kWh erwarteter Überschuss gegen 10.6 kWh freie Kapazität — diese Antwort ist gegen
 > 30 % Prognosefehler robust.
+>
+> **Das gilt nur bei grossem Polster — korrigiert am 07.10.2026.** Am 21.09. lag der erwartete
+> Überschuss 70 % über dem Bedarf. Am 07.10. waren es nur 25 %, und ein Fehler von 30 % beim
+> Überschuss genügte, um die Entscheidung umzukehren (siehe „Was gemessen wurde"). Robust ist das
+> Verfahren also nicht gegen einen bestimmten Fehler, sondern nur, solange der Fehler kleiner ist
+> als das Polster.
 
 #### Was gemessen wurde (Stand 05.10.2026)
 
@@ -353,6 +359,55 @@ liegt bei 8.5 %. Beides deutlich innerhalb der 30 %, gegen die das Verfahren rob
 >
 > **Den Faktor nicht aus allen Tagen zugleich lernen.** Dann stimmt die Summe per Konstruktion, und
 > die Messung bezeugt nur sich selbst.
+
+#### Der 07.10.2026: Erzeugung **und** Verbrauch daneben — und der Plan kippte
+
+Die Messung oben betrifft nur die **Erzeugung**. Die Merit-Order rechnet aber mit dem
+**Überschuss**, und der hängt genauso am Verbrauch. Am 07.10. lag die Schattenrechnung zum ersten
+Mal eindeutig falsch:
+
+| 08:45–19:00 | erwartet | tatsächlich | Abweichung |
+|---|---|---|---|
+| Erzeugung | 37.44 kWh | 32.47 kWh | −5.0 kWh (Prognose 15 % zu hoch) |
+| Verbrauch | 9.31 kWh | 13.35 kWh | +4.0 kWh (43 % mehr als das Lastprofil) |
+| Überschuss | 27.69 kWh | 19.46 kWh | −8.2 kWh (30 % zu hoch) |
+
+Frei waren am Morgen rund 21 kWh, nötig also etwa 22 kWh Überschuss (`/ 0.95`). Erwartet waren
+27.7 — der Plan sperrte deshalb den teuren Vormittag bis 12:00, um die billigeren Stunden danach
+zu nutzen. Gekommen sind 19.5. Die Regelkaskade sperrte an diesem Tag nicht; die Batterie lud
+durchgehend und erreichte trotzdem nur **83 %**. **Hätte die Merit-Order gesteuert, wäre sie noch
+leerer geblieben.**
+
+> **Jeder Fehler allein hätte nicht gereicht.** Nur mit der Erzeugungsabweichung wären es 22.7 kWh
+> gewesen, nur mit der Verbrauchsabweichung 23.7 — beides knapp genug. Erst zusammen fiel der
+> Überschuss unter den Bedarf.
+>
+> **Damit ist die Aussage „das Wettermodell ist der Engpass" zu eng.** Für die Erzeugung bleibt
+> sie richtig. Für den Überschuss ist das **Lastprofil** eine zweite, gleich grosse Fehlerquelle:
+> ein Median aus nur vier Stichproben (gleiche Wochentage in 28 Tagen), und am 07.10. lag der
+> tatsächliche Verbrauch 43 % darüber.
+
+> **Nachprüfbar mit dieser Abfrage** — mit den bei jedem Entscheid gespeicherten Werten, also dem,
+> was das Verfahren zu jenem Zeitpunkt wusste. Den Verbrauch rechnet sie nur für Intervalle mit
+> erwartetem Überschuss zurück; anderswo ist das Lastprofil nicht gespeichert.
+>
+> ```sql
+> SELECT round(sum(gti * prognose_faktor), 2)                             AS erzeugung_erwartet,
+>        round(sum(produktion + coalesce(speicher_ladung,0)
+>                  - coalesce(speicher_entladung,0)), 2)                  AS erzeugung_ist,
+>        round(sum(gti * prognose_faktor - prognose_ueberschuss)
+>              FILTER (WHERE prognose_ueberschuss > 0), 2)                AS verbrauch_erwartet,
+>        round(sum(verbrauch) FILTER (WHERE prognose_ueberschuss > 0), 2) AS verbrauch_ist,
+>        round(sum(prognose_ueberschuss), 2)                              AS ueberschuss_erwartet,
+>        round(sum(greatest(0, produktion + coalesce(speicher_ladung,0)
+>                  - coalesce(speicher_entladung,0) - verbrauch)), 2)     AS ueberschuss_ist
+> FROM zev.steuerentscheid
+> WHERE zeit_von >= :von AND zeit_von < :bis AND prognose_faktor IS NOT NULL;
+> ```
+>
+> **Einschränkung:** Jeder Entscheid speichert die Prognose seiner **eigenen** Auswertung — für
+> spätere Intervalle also eine neuere als die, mit der am Morgen geplant wurde. Ist schon die
+> neuere zu optimistisch, war es die frühere sehr wahrscheinlich auch.
 
 ### FR-4: Rückfall auf die Regelkaskade
 
@@ -762,6 +817,18 @@ Neue Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten
   erfüllt sind — es gibt keinen Schalter dafür.
 
 ## 8. Offene Fragen
+
+* **Braucht die Merit-Order einen Sicherheitszuschlag — und wie gross?** Seit dem 07.10.2026 belegt
+  (FR-3, „Der 07.10.2026"): Bei knappem Polster genügt ein durchschnittlich schlechter Tag, um den
+  Plan umzukehren. Ein Zuschlag hiesse: gesperrt wird erst, wenn der erwartete Überschuss den Bedarf
+  um einen Faktor übersteigt (z. B. 1.3); sonst wird geladen. Am 07.10. hätte 1.3 gereicht
+  (27.7 < 22 × 1.3 = 28.7, also keine Sperre).
+
+  **Bewusst noch nicht eingebaut.** Der Faktor ist aus den Daten der Testwoche zu bestimmen, nicht
+  zu raten: Ist er zu gross, sperrt die Merit-Order fast nie und bringt nichts mehr; ist er zu
+  klein, hilft er an Tagen wie dem 07.10. nicht. Zu ermitteln je Tag: erwarteter gegen
+  tatsächlichen Überschuss ab der ersten Sperre — das Verhältnis der beiden ist genau die Grösse,
+  die der Zuschlag abdecken muss.
 
 * **Wie viele Tage für Lastprofil und Faktor?** Vorgabe 28. Für den Faktor sind vermutlich weniger
   besser (er soll aktuellen Zuständen folgen), für das Lastprofil mehr. Getrennte Werte wären
