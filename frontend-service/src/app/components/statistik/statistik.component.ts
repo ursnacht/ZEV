@@ -48,6 +48,14 @@ export class StatistikComponent extends WithMessage implements OnInit {
    * Datenstatus, damit die geschlossene Ansicht trotzdem etwas aussagt.
    */
   expandedMonthPanels: Set<number> = new Set();
+
+  /**
+   * Schlüssel des Gesamt-Panels in {@link expandedMonthPanels} und {@link expandedMonths}.
+   *
+   * <p>Monate tragen ihren Index ab 0; das Gesamt-Panel teilt sich dieselben Mengen mit −1 und
+   * braucht so keine eigene Zustandslogik.
+   */
+  readonly GESAMT = -1;
   expandedGlobalDetails = false;
 
   /** Aktiver Verteilmodus ist BILANZ (Modus-abhängige Anzeige/Hinweise). */
@@ -101,6 +109,27 @@ export class StatistikComponent extends WithMessage implements OnInit {
     this.dateTo = event.bis;
   }
 
+  /**
+   * Setzt den Zeitraum auf heute–heute (Specs/Statistik.md, FR „Heute").
+   *
+   * <p><b>Lädt nicht</b> — wie der Quartal-Selektor. Ausgelöst wird weiterhin mit „Anzeigen",
+   * damit sich alle Wege, einen Zeitraum zu wählen, gleich verhalten.
+   *
+   * <p>Über {@link formatDate} statt {@code toISOString()}: Letzteres liefert das UTC-Datum, und
+   * kurz nach Mitternacht stünde dann der Vortag im Feld.
+   */
+  onHeute(): void {
+    const heute = this.formatDate(new Date());
+    this.dateFrom = heute;
+    this.dateTo = heute;
+  }
+
+  /** Ist der Zeitraum bereits heute–heute? Dann wäre „Heute" folgenlos und ist deaktiviert. */
+  get zeigtHeute(): boolean {
+    const heute = this.formatDate(new Date());
+    return this.dateFrom === heute && this.dateTo === heute;
+  }
+
   onSubmit(): void {
     if (!this.dateFrom || !this.dateTo) {
       this.showMessage(this.translationService.translate('BITTE_ALLE_FELDER_AUSFUELLEN'), 'error');
@@ -116,6 +145,9 @@ export class StatistikComponent extends WithMessage implements OnInit {
     this.statistik = null;
     this.expandedMonths.clear();
     this.expandedMonthPanels.clear();
+    // Das Gesamt-Panel startet AUFGEKLAPPT, die Monate zugeklappt: Die Summe über den Zeitraum ist
+    // meist das, wonach man sucht - die Monate sind die Aufschlüsselung dazu.
+    this.expandedMonthPanels.add(this.GESAMT);
 
     this.statistikService.getStatistik(this.dateFrom, this.dateTo).subscribe({
       next: (data) => {
@@ -165,6 +197,18 @@ export class StatistikComponent extends WithMessage implements OnInit {
    * CSV-Download der 15-Min-Werte einer Consumer-Einheit für den Monat. Der Dateiname wird
    * benutzerfreundlich aus Einheiten-Name + Monat gebildet (bereinigt).
    */
+  /**
+   * Zeitraum für den CSV-Dateinamen: der Monat (`2024-02`), wenn `von` und `bis` darin liegen,
+   * sonst `von_bis`.
+   *
+   * <p>Das Gesamt-Panel verwendet dieselbe Download-Schaltfläche wie ein Monat. Mit dem Monat von
+   * `von` allein hiesse ein Quartalsexport `…_2024-07.csv`, als enthielte er nur den Juli.
+   */
+  private zeitraumImDateinamen(monat: MonatsStatistik): string {
+    const vonMonat = monat.von.substring(0, 7);
+    return vonMonat === monat.bis.substring(0, 7) ? vonMonat : `${monat.von}_${monat.bis}`;
+  }
+
   onDownloadCsv(monat: MonatsStatistik, einheit: EinheitSummen): void {
     const sprache = this.translationService.getCurrentLanguage();
     this.statistikService.exportCsv(einheit.einheitId, monat.von, monat.bis, sprache).subscribe({
@@ -173,7 +217,7 @@ export class StatistikComponent extends WithMessage implements OnInit {
         const link = document.createElement('a');
         link.href = url;
         const name = einheit.einheitName.replace(/[^A-Za-z0-9._-]/g, '_');
-        link.download = `verbrauch_${name}_${monat.von.substring(0, 7)}.csv`;
+        link.download = `verbrauch_${name}_${this.zeitraumImDateinamen(monat)}.csv`;
         link.click();
         window.URL.revokeObjectURL(url);
       },

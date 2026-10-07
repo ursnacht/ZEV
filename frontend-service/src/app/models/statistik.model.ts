@@ -94,6 +94,11 @@ export interface Statistik {
   fehlendeEinheiten: string[];
   fehlendeTage: string[];
   monate: MonatsStatistik[];
+  /**
+   * Der ganze gewählte Zeitraum, gerechnet wie ein Monat — **nicht** als Summe der Monate.
+   * `jahr` und `monat` sind 0.
+   */
+  gesamt?: MonatsStatistik;
   toleranz: number;
   verteilmodus?: 'PRODUCER_MESSUNG' | 'BILANZ';
 }

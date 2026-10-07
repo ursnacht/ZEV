@@ -205,6 +205,75 @@ public class StatistikServiceTest {
         assertEquals(3, result.getMonate().get(2).getMonat());
     }
 
+    /**
+     * <b>Das Gesamt-Panel wird über den ganzen Zeitraum GERECHNET, nicht aus den Monaten addiert.</b>
+     *
+     * <p>Summen liessen sich addieren, Quoten und der Batterie-Wirkungsgrad aber nicht: Ein Mittel
+     * aus Monatsquoten gewichtete einen trüben Monat gleich wie einen mit zehnmal mehr Energie.
+     *
+     * <p>Das Repository antwortet deshalb für das Gesamtfenster (01.01.–01.04.) mit einem Wert,
+     * der sich aus den Monatswerten <b>nicht</b> ergibt (999 statt 3 × 100). Käme 300 heraus,
+     * wäre addiert worden.
+     */
+    @Test
+    void getStatistik_Gesamt_RechnetUeberDenGanzenZeitraum() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+        LocalDateTime fensterVon = von.atStartOfDay();
+        LocalDateTime fensterBis = bis.plusDays(1).atStartOfDay();
+
+        when(messwerteRepository.findMaxZeit()).thenReturn(Optional.of(LocalDateTime.of(2024, 3, 31, 23, 45)));
+        when(einheitRepository.findAll()).thenReturn(Arrays.asList(producer, consumer1));
+        when(messwerteRepository.findDistinctEinheitenInRange(any(), any()))
+                .thenReturn(Arrays.asList(producer, consumer1));
+        when(messwerteRepository.findDistinctDatesInRange(any(), any())).thenReturn(Collections.emptyList());
+
+        when(messwerteRepository.sumTotalByEinheitTypAndZeitBetween(any(), any(), any()))
+                .thenAnswer(inv -> fensterVon.equals(inv.getArgument(1)) && fensterBis.equals(inv.getArgument(2))
+                        ? 999.0 : 100.0);
+        when(messwerteRepository.sumZevByEinheitTypAndZeitBetween(any(), any(), any())).thenReturn(50.0);
+        when(messwerteRepository.sumZevCalculatedByEinheitTypAndZeitBetween(any(), any(), any())).thenReturn(50.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(any(), any(), any())).thenReturn(100.0);
+        when(messwerteRepository.sumZevByEinheitAndZeitBetween(any(), any(), any())).thenReturn(50.0);
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(any(), any(), any())).thenReturn(50.0);
+
+        StatistikDTO result = statistikService.getStatistik(von, bis);
+
+        MonatsStatistikDTO gesamt = result.getGesamt();
+        assertNotNull(gesamt);
+        assertEquals(999.0, gesamt.getSummeProducerTotal(),
+                "Gesamtfenster gerechnet - 300 hiesse: aus den Monaten addiert");
+        assertEquals(100.0, result.getMonate().get(0).getSummeProducerTotal());
+        assertEquals(von, gesamt.getVon());
+        assertEquals(bis, gesamt.getBis());
+        assertEquals(0, gesamt.getJahr(), "Das Gesamt-Panel ist kein Monat");
+        assertEquals(0, gesamt.getMonat());
+    }
+
+    /** Angebrochene Monate am Rand: Das Gesamt-Panel trägt genau den gewählten Zeitraum. */
+    @Test
+    void getStatistik_Gesamt_TraegtDenGewaehltenZeitraum() {
+        LocalDate von = LocalDate.of(2024, 1, 15);
+        LocalDate bis = LocalDate.of(2024, 2, 10);
+
+        when(messwerteRepository.findMaxZeit()).thenReturn(Optional.of(LocalDateTime.of(2024, 2, 10, 23, 45)));
+        when(einheitRepository.findAll()).thenReturn(Arrays.asList(producer, consumer1));
+        when(messwerteRepository.findDistinctEinheitenInRange(any(), any()))
+                .thenReturn(Arrays.asList(producer, consumer1));
+        when(messwerteRepository.findDistinctDatesInRange(any(), any())).thenReturn(Collections.emptyList());
+        when(messwerteRepository.sumTotalByEinheitTypAndZeitBetween(any(), any(), any())).thenReturn(100.0);
+        when(messwerteRepository.sumZevByEinheitTypAndZeitBetween(any(), any(), any())).thenReturn(50.0);
+        when(messwerteRepository.sumZevCalculatedByEinheitTypAndZeitBetween(any(), any(), any())).thenReturn(50.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(any(), any(), any())).thenReturn(100.0);
+        when(messwerteRepository.sumZevByEinheitAndZeitBetween(any(), any(), any())).thenReturn(50.0);
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(any(), any(), any())).thenReturn(50.0);
+
+        StatistikDTO result = statistikService.getStatistik(von, bis);
+
+        assertEquals(von, result.getGesamt().getVon());
+        assertEquals(bis, result.getGesamt().getBis());
+    }
+
     @Test
     void getStatistik_MissingEinheiten_MarksDataIncomplete() {
         LocalDate von = LocalDate.of(2024, 1, 1);

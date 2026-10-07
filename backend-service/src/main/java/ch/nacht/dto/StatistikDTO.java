@@ -12,6 +12,13 @@ public class StatistikDTO {
     private List<String> fehlendeEinheiten = new ArrayList<>();
     private List<LocalDate> fehlendeTage = new ArrayList<>();
     private List<MonatsStatistikDTO> monate = new ArrayList<>();
+
+    /**
+     * Der gesamte gewählte Zeitraum, gerechnet wie ein Monat — <b>nicht</b> als Summe der Monate.
+     *
+     * <p>Jahr und Monat sind hier 0; das Panel trägt stattdessen von–bis.
+     */
+    private MonatsStatistikDTO gesamt;
     private double toleranz;
     private Verteilmodus verteilmodus;
 
@@ -60,6 +67,14 @@ public class StatistikDTO {
 
     public List<MonatsStatistikDTO> getMonate() {
         return monate;
+    }
+
+    public MonatsStatistikDTO getGesamt() {
+        return gesamt;
+    }
+
+    public void setGesamt(MonatsStatistikDTO gesamt) {
+        this.gesamt = gesamt;
     }
 
     public void setMonate(List<MonatsStatistikDTO> monate) {

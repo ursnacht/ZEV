@@ -128,12 +128,14 @@
         </element>
     </title>
 
-    <!-- Detail Band - One band per month -->
+    <!-- Detail Band - one band for the whole period first, then one per month -->
     <detail>
         <band height="502">
             <!-- Month header -->
             <element kind="textField" uuid="33333333-3333-3333-3333-33333333330c" x="0" y="10" width="555" height="25" forecolor="#333333" fontSize="14.0" bold="true" vTextAlign="Middle">
-                <expression><![CDATA[java.time.Month.of($F{monat}).getDisplayName(java.time.format.TextStyle.FULL, "de".equals($P{SPRACHE}) ? java.util.Locale.GERMAN : java.util.Locale.ENGLISH) + " " + $F{jahr} + " (" + $F{von}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + " - " + $F{bis}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + ")"]]></expression>
+                <!-- monat == 0 ist der GESAMTE Zeitraum (StatistikPdfService.baender). Month.of(0) wuerfe
+                     eine DateTimeException und braeche den ganzen Export ab. -->
+                <expression><![CDATA[($F{monat} == null || $F{monat}.intValue() == 0 ? $P{TRANSLATIONS}.getOrDefault("STATISTIK_GESAMTER_ZEITRAUM", "Gesamter Zeitraum") : java.time.Month.of($F{monat}).getDisplayName(java.time.format.TextStyle.FULL, "de".equals($P{SPRACHE}) ? java.util.Locale.GERMAN : java.util.Locale.ENGLISH) + " " + $F{jahr}) + " (" + $F{von}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + " - " + $F{bis}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + ")"]]></expression>
                 <box>
                     <bottomPen lineWidth="2.0" lineColor="#4CAF50"/>
                 </box>

@@ -31,6 +31,11 @@
             </div>
 
             <div class="zev-button-group">
+              <button type="button" class="zev-button zev-button--secondary" (click)="onHeute()"
+                [disabled]="loading || zeigtHeute">
+                <app-icon name="calendar"></app-icon>
+                {{ 'HEUTE' | translate }}
+              </button>
               <button type="submit" class="zev-button zev-button--primary" [disabled]="loading || !dateFrom || !dateTo">
                 <app-icon name="search"></app-icon>
                 {{ loading ? ('LADE_DATEN' | translate) : ('ANZEIGEN' | translate) }}
@@ -108,6 +113,30 @@
       </div>
     }
 
+    <!-- Gesamter Zeitraum (Specs/Statistik.md): gerechnet ueber den ganzen Zeitraum, NICHT aus den
+         Monaten addiert - die Quoten waeren sonst falsch gewichtet. Startet aufgeklappt. -->
+    @if (statistik?.gesamt; as gesamt) {
+      <div class="zev-panel zev-panel--month">
+        <div class="zev-collapsible">
+          <button type="button" class="zev-collapsible__header" (click)="toggleMonthPanel(GESAMT)"
+            [attr.aria-expanded]="isMonthPanelExpanded(GESAMT)" aria-controls="gesamt">
+            <span class="zev-status-indicator">
+              <span class="zev-status-dot" [ngClass]="getStatusClass(gesamt.datenVollstaendig)"></span>
+              <span>{{ 'STATISTIK_GESAMTER_ZEITRAUM' | translate }}</span>
+            </span>
+            <span class="zev-panel__subtitle">({{ gesamt.von | swissDate }} - {{ gesamt.bis | swissDate }})</span>
+            <span class="zev-collapsible__icon">{{ isMonthPanelExpanded(GESAMT) ? '▼' : '▶' }}</span>
+          </button>
+          @if (isMonthPanelExpanded(GESAMT)) {
+          <div class="zev-collapsible__content" id="gesamt">
+            <ng-container
+              *ngTemplateOutlet="zeitraumInhalt; context: { $implicit: gesamt, schluessel: GESAMT }"></ng-container>
+          </div>
+          }
+        </div>
+      </div>
+    }
+
     <!-- Monthly Statistics -->
     @for (monat of statistik?.monate; track monat; let i = $index) {
       <div class="zev-panel zev-panel--month">
@@ -127,6 +156,19 @@
           </button>
           @if (isMonthPanelExpanded(i)) {
           <div class="zev-collapsible__content" [id]="'monat-' + i">
+            <ng-container
+              *ngTemplateOutlet="zeitraumInhalt; context: { $implicit: monat, schluessel: i }"></ng-container>
+          </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Inhalt EINES Zeitraums - gemeinsam fuer das Gesamt-Panel und jeden Monat. Eine Vorlage
+         statt zwei Kopien: Sonst liefe das Gesamt-Panel beim naechsten Ausbau eines Monats
+         unbemerkt hinterher. `schluessel` ist der Monatsindex bzw. GESAMT (-1) und haelt den
+         Zustand von "Details anzeigen" je Panel getrennt. -->
+    <ng-template #zeitraumInhalt let-monat let-schluessel="schluessel">
             <!-- Summen Tabelle mit Balkendiagrammen -->
             <table class="zev-table zev-table--bars">
               <thead>
@@ -365,11 +407,11 @@
             <!-- Aufklappbare Details -->
             @if (!monat.datenVollstaendig || monat.tageAbweichungen.length > 0) {
               <div class="zev-collapsible">
-                <button type="button" class="zev-collapsible__header" (click)="toggleMonthDetails(i)">
+                <button type="button" class="zev-collapsible__header" (click)="toggleMonthDetails(schluessel)">
                   <span>{{ 'DETAILS_ANZEIGEN' | translate }}</span>
-                  <span class="zev-collapsible__icon">{{ isMonthExpanded(i) ? '▼' : '▶' }}</span>
+                  <span class="zev-collapsible__icon">{{ isMonthExpanded(schluessel) ? '▼' : '▶' }}</span>
                 </button>
-                @if (isMonthExpanded(i)) {
+                @if (isMonthExpanded(schluessel)) {
                   <div class="zev-collapsible__content">
                     <!-- Fehlende Einheiten -->
                     @if (monat.fehlendeEinheiten.length > 0) {
@@ -421,11 +463,7 @@
                 }
               </div>
             }
-          </div>
-          }
-        </div>
-      </div>
-    }
+    </ng-template>
 
     <!-- Empty State -->
     @if (!statistik && !loading) {

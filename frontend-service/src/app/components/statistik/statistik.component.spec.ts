@@ -189,6 +189,61 @@ describe('StatistikComponent', () => {
     });
   });
 
+  describe('onHeute', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should set dateFrom and dateTo to today', () => {
+      vi.setSystemTime(new Date(2026, 9, 7, 14, 30)); // 07.10.2026, 14:30 Ortszeit
+
+      component.onHeute();
+
+      expect(component.dateFrom).toBe('2026-10-07');
+      expect(component.dateTo).toBe('2026-10-07');
+    });
+
+    /**
+     * Das <b>lokale</b> Tagesdatum, nicht das UTC-Datum.
+     *
+     * <p>00:30 Ortszeit ist im Sommer 22:30 UTC des Vortags. Über {@code toISOString()} stünde
+     * dann der 06.10. im Feld — ein Fehler, der nur in der ersten Stunde nach Mitternacht auffällt.
+     */
+    it('should use the local date shortly after midnight', () => {
+      vi.setSystemTime(new Date(2026, 9, 7, 0, 30)); // 07.10.2026, 00:30 Ortszeit
+
+      component.onHeute();
+
+      expect(component.dateFrom).toBe('2026-10-07');
+    });
+
+    /** Wie der Quartal-Selektor: Der Zeitraum wird gesetzt, geladen wird erst mit „Anzeigen". */
+    it('should not load statistics', () => {
+      statistikServiceSpy.getStatistik.mockClear();
+
+      component.onHeute();
+
+      expect(statistikServiceSpy.getStatistik).not.toHaveBeenCalled();
+    });
+
+    it('should report zeigtHeute only for today–today', () => {
+      vi.setSystemTime(new Date(2026, 9, 7, 9, 0));
+      component.onQuarterSelected({ von: '2026-07-01', bis: '2026-09-30' });
+      expect(component.zeigtHeute).toBe(false);
+
+      component.onHeute();
+      expect(component.zeigtHeute).toBe(true);
+
+      // Nur ein Ende auf heute reicht nicht
+      component.dateFrom = '2026-10-01';
+      expect(component.zeigtHeute).toBe(false);
+    });
+  });
+
   describe('onSubmit', () => {
     beforeEach(() => {
       component.dateFrom = '2024-02-01';
@@ -229,7 +284,15 @@ describe('StatistikComponent', () => {
       component.expandedMonthPanels.add(0);
       component.expandedMonthPanels.add(2);
       component.onSubmit();
-      expect(component.expandedMonthPanels.size).toBe(0);
+      expect(component.isMonthPanelExpanded(0)).toBe(false);
+      expect(component.isMonthPanelExpanded(2)).toBe(false);
+    });
+
+    /** Das Gesamt-Panel startet aufgeklappt — auch nach jedem neuen Abruf. */
+    it('should expand the total panel on submit', () => {
+      component.toggleMonthPanel(component.GESAMT);   // vorher zugeklappt
+      component.onSubmit();
+      expect(component.isMonthPanelExpanded(component.GESAMT)).toBe(true);
     });
 
     it('should show error message when dateFrom is empty', () => {
@@ -369,6 +432,19 @@ describe('StatistikComponent', () => {
       const einheit: EinheitSummen = { ...consumerEinheit, einheitName: 'Wohnung A/B' };
       component.onDownloadCsv(mockMonat, einheit);
       expect(linkSpy.download).toBe('verbrauch_Wohnung_A_B_2024-02.csv');
+    });
+
+    /**
+     * Über mehrere Monate (Gesamt-Panel) trägt der Name den Zeitraum.
+     *
+     * <p>Mit dem Monat von `von` allein hiesse ein Quartalsexport `…_2024-01.csv`, als enthielte er
+     * nur den Januar.
+     */
+    it('should name a multi-month export after its range', () => {
+      const gesamt: MonatsStatistik = { ...mockMonat, monat: 0, jahr: 0, von: '2024-01-01', bis: '2024-03-31' };
+      component.onDownloadCsv(gesamt, consumerEinheit);
+      expect(linkSpy.download).toBe('verbrauch_Wohnung_1_2024-01-01_2024-03-31.csv');
+      expect(statistikServiceSpy.exportCsv).toHaveBeenCalledWith(42, '2024-01-01', '2024-03-31', 'de');
     });
 
     it('should show translated error message on service failure', () => {
@@ -919,5 +995,62 @@ describe('StatistikComponent', () => {
       expect(component.messageType).toBe('error');
       expect(component.message).not.toBe('');
     }));
+  });
+
+  // ==================== Gesamt-Panel (Specs/Statistik.md) ====================
+
+  describe('Gesamt-Panel', () => {
+    const gesamt: MonatsStatistik = {
+      ...mockMonat, jahr: 0, monat: 0, von: '2024-01-01', bis: '2024-03-31'
+    };
+
+    function zeige(statistik: Statistik): HTMLElement {
+      component.statistik = statistik;
+      component.loading = false;
+      component.expandedMonthPanels.clear();
+      component.expandedMonthPanels.add(component.GESAMT);
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    it('should render the total panel above the months', () => {
+      const el = zeige({ ...mockStatistik, gesamt });
+
+      const panels = el.querySelectorAll('.zev-panel--month');
+      expect(panels.length).toBe(2);
+      expect(panels[0].textContent).toContain('STATISTIK_GESAMTER_ZEITRAUM');
+    });
+
+    it('should show the total panel expanded and the months collapsed', () => {
+      const el = zeige({ ...mockStatistik, gesamt });
+
+      expect(el.querySelector('#gesamt')).not.toBeNull();
+      expect(el.querySelector('#monat-0')).toBeNull();
+    });
+
+    /**
+     * Gesamt-Panel und Monat verwenden <b>dieselbe</b> Vorlage. Zwei Kopien liefen beim nächsten
+     * Ausbau eines Monats unbemerkt auseinander.
+     */
+    it('should render the same content as a month', () => {
+      const el = zeige({ ...mockStatistik, gesamt });
+
+      const inhaltGesamt = el.querySelector('#gesamt .zev-table--bars');
+      expect(inhaltGesamt).not.toBeNull();
+    });
+
+    it('should not render the total panel without totals', () => {
+      const el = zeige({ ...mockStatistik, gesamt: undefined });
+
+      expect(el.querySelectorAll('.zev-panel--month').length).toBe(1);
+    });
+
+    /** „Details anzeigen" hat im Gesamt-Panel einen eigenen Zustand — nicht den von Monat 0. */
+    it('should keep the details state separate from the first month', () => {
+      component.toggleMonthDetails(component.GESAMT);
+
+      expect(component.isMonthExpanded(component.GESAMT)).toBe(true);
+      expect(component.isMonthExpanded(0)).toBe(false);
+    });
   });
 });

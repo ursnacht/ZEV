@@ -16,7 +16,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -61,8 +63,41 @@ public class StatistikPdfService {
         }
     }
 
+    /**
+     * Setzt die Berichte direkt — für Tests.
+     *
+     * <p>{@link #init()} lädt die vorkompilierten {@code .jasper}-Dateien. Die entstehen aber erst
+     * in der Maven-Phase {@code prepare-package}, also <b>nach</b> den Unit-Tests: Ein Test sähe
+     * dort den Stand des letzten Package-Builds, in einem frischen {@code mvn clean test} gar
+     * keinen. Tests kompilieren die Templates deshalb selbst aus dem {@code .jrxml}.
+     */
+    void verwendeBerichte(JasperReport bericht, JasperReport einheitSummenBericht) {
+        this.compiledReport = bericht;
+        this.compiledEinheitSummenReport = einheitSummenBericht;
+    }
+
     public byte[] generatePdf(StatistikDTO statistik, String sprache) {
         log.info("Generating PDF for statistik, language: {}", sprache);
+
+        try {
+            ByteArrayOutputStream os = new ByteArrayOutputStream();
+            JasperExportManager.exportReportToPdfStream(fuelle(statistik, sprache), os);
+
+            log.info("PDF generated successfully, size: {} bytes", os.size());
+            return os.toByteArray();
+        } catch (JRException e) {
+            log.error("Failed to generate PDF: {}", e.getMessage(), e);
+            throw new RuntimeException("PDF generation failed", e);
+        }
+    }
+
+    /**
+     * Füllt den Bericht, ohne ihn zu exportieren.
+     *
+     * <p>Getrennt vom PDF-Export, damit ein Test den gefüllten Bericht nach seinen Texten durchsuchen
+     * kann — gegen das echte Template, ohne eine PDF-Bibliothek zum Auslesen.
+     */
+    JasperPrint fuelle(StatistikDTO statistik, String sprache) throws JRException {
 
         Map<String, String> translations = loadTranslations(sprache);
 
@@ -89,22 +124,30 @@ public class StatistikPdfService {
         // Verteilmodus BILANZ → Summen-Vergleich wird durch das Kennzahlen-Panel ersetzt (ausgeblendet).
         parameters.put("IST_BILANZ", statistik.getVerteilmodus() == ch.nacht.entity.Verteilmodus.BILANZ);
 
-        // Monate als DataSource für das Detail-Band
-        JRBeanCollectionDataSource monateDataSource =
-            new JRBeanCollectionDataSource(statistik.getMonate());
+        // Ein Detail-Band je Eintrag: zuerst der gesamte Zeitraum, dann die Monate
+        return JasperFillManager.fillReport(compiledReport, parameters,
+                new JRBeanCollectionDataSource(baender(statistik)));
+    }
 
-        try {
-            ByteArrayOutputStream os = new ByteArrayOutputStream();
-            JasperPrint jasperPrint = JasperFillManager.fillReport(
-                compiledReport, parameters, monateDataSource);
-            JasperExportManager.exportReportToPdfStream(jasperPrint, os);
-
-            log.info("PDF generated successfully, size: {} bytes", os.size());
-            return os.toByteArray();
-        } catch (JRException e) {
-            log.error("Failed to generate PDF: {}", e.getMessage(), e);
-            throw new RuntimeException("PDF generation failed", e);
+    /**
+     * Die Einträge des Detail-Bandes: das Gesamt <b>vor</b> den Monaten (Specs/Statistik.md).
+     *
+     * <p>Das Gesamt läuft durch <b>dasselbe</b> Band wie ein Monat — wie auf der Seite durch
+     * dieselbe Vorlage. Zwei Bänder liefen beim nächsten Ausbau auseinander. Erkannt wird es im
+     * Template an {@code monat == 0}.
+     *
+     * <p><b>Eine NEUE Liste, nicht {@code statistik.getMonate()} ergänzt.</b> Die Statistik stammt
+     * aus dem Cache von {@code StatistikService.getStatistik}; das Gesamt dort einzufügen, setzte
+     * es dauerhaft in den gecachten Eintrag — und die Seite zeigte es danach ein zweites Mal, als
+     * vermeintlichen Monat.
+     */
+    static List<MonatsStatistikDTO> baender(StatistikDTO statistik) {
+        List<MonatsStatistikDTO> baender = new ArrayList<>();
+        if (statistik.getGesamt() != null) {
+            baender.add(statistik.getGesamt());
         }
+        baender.addAll(statistik.getMonate());
+        return baender;
     }
 
     private Map<String, String> loadTranslations(String sprache) {

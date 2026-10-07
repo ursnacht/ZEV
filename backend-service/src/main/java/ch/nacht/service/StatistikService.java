@@ -80,6 +80,13 @@ public class StatistikService {
         List<MonatsStatistikDTO> monatsStatistiken = berechneMonatsStatistiken(von, bis, verteilmodus);
         statistik.setMonate(monatsStatistiken);
 
+        // Der gesamte Zeitraum mit DERSELBEN Rechnung wie ein Monat - nicht als Summe der Monate.
+        // Summen liessen sich addieren, die Quoten (Autarkiegrad, Eigenverbrauchsquote ...) und der
+        // Batterie-Wirkungsgrad aber nicht: Ein Mittel aus Monatsquoten gewichtete einen trueben
+        // Dezember gleich wie einen Juni mit zehnmal mehr Energie. Neu gerechnet entstehen sie aus
+        // den Gesamtsummen, mit denselben Formeln, und koennen nicht auseinanderlaufen.
+        statistik.setGesamt(berechneZeitraum(von, bis, verteilmodus));
+
         // Gesamtvollständigkeit basierend auf Monaten
         boolean alleMonateVollstaendig = monatsStatistiken.stream()
                 .allMatch(MonatsStatistikDTO::isDatenVollstaendig);
@@ -158,10 +165,6 @@ public class StatistikService {
 
     private MonatsStatistikDTO berechneMonatsStatistik(YearMonth yearMonth, LocalDate gesamtVon,
             LocalDate gesamtBis, Verteilmodus verteilmodus) {
-        MonatsStatistikDTO dto = new MonatsStatistikDTO();
-        dto.setJahr(yearMonth.getYear());
-        dto.setMonat(yearMonth.getMonthValue());
-
         // Von/Bis für diesen Monat berechnen (berücksichtigt Gesamtzeitraum)
         LocalDate monatsStart = yearMonth.atDay(1);
         LocalDate monatsEnde = yearMonth.atEndOfMonth();
@@ -169,6 +172,22 @@ public class StatistikService {
         LocalDate effektivVon = monatsStart.isBefore(gesamtVon) ? gesamtVon : monatsStart;
         LocalDate effektivBis = monatsEnde.isAfter(gesamtBis) ? gesamtBis : monatsEnde;
 
+        MonatsStatistikDTO dto = berechneZeitraum(effektivVon, effektivBis, verteilmodus);
+        dto.setJahr(yearMonth.getYear());
+        dto.setMonat(yearMonth.getMonthValue());
+        return dto;
+    }
+
+    /**
+     * Statistik über einen <b>beliebigen</b> Zeitraum — einen Monat oder den ganzen gewählten
+     * Bereich (Specs/Statistik.md, Gesamt-Panel).
+     *
+     * <p>Eine Rechnung für beides, damit das Gesamt-Panel nie anders rechnet als ein Monat. Jahr
+     * und Monat bleiben hier leer; sie setzt nur der Aufrufer für ein Monats-Panel.
+     */
+    private MonatsStatistikDTO berechneZeitraum(LocalDate effektivVon, LocalDate effektivBis,
+            Verteilmodus verteilmodus) {
+        MonatsStatistikDTO dto = new MonatsStatistikDTO();
         dto.setVon(effektivVon);
         dto.setBis(effektivBis);
 
@@ -208,8 +227,8 @@ public class StatistikService {
         dto.setBilanzRuecklieferungName(einheitRepository.findFirstByTyp(EinheitTyp.RUECKLIEFERUNG)
                 .map(Einheit::getName).orElse(null));
 
-        logger.debug("Monat {}/{}: ProducerTotal={}, ConsumerTotal={}, ProducerZev={}, ConsumerZev={}, ConsumerZevCalc={}",
-                yearMonth.getYear(), yearMonth.getMonthValue(),
+        logger.debug("Zeitraum {} bis {}: ProducerTotal={}, ConsumerTotal={}, ProducerZev={}, ConsumerZev={}, ConsumerZevCalc={}",
+                effektivVon, effektivBis,
                 summeProducerTotal, summeConsumerTotal, summeProducerZev, summeConsumerZev, summeConsumerZevCalculated);
 
         // Berechnete Werte (nur fuer den Summen-Vergleich gegen die Bilanz-Einheiten):
@@ -219,8 +238,8 @@ public class StatistikService {
         dto.setBezugVonVnb(dto.getSummeConsumerTotal() - dto.getSummeConsumerZev());
         dto.setRuecklieferung(dto.getSummeProducerTotal() - dto.getSummeProducerZev());
 
-        logger.debug("Monat {}/{}: BezugVonVnb={}, Ruecklieferung={}",
-                yearMonth.getYear(), yearMonth.getMonthValue(), dto.getBezugVonVnb(), dto.getRuecklieferung());
+        logger.debug("Zeitraum {} bis {}: BezugVonVnb={}, Ruecklieferung={}",
+                effektivVon, effektivBis, dto.getBezugVonVnb(), dto.getRuecklieferung());
 
         // Vergleiche durchführen
         vergleicheSummen(dto);
