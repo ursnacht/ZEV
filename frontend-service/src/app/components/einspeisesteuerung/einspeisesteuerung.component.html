@@ -96,6 +96,45 @@
     </div>
   </div>
 
+  @if (!loading && (entscheide.length > 0 || prognose.length > 0)) {
+    <!-- Tagessummen der Kurven (FR-5). Bausteine aus dem Design System (zev-info-row), kein eigenes
+         CSS. Auch ohne Entscheide sichtbar, sobald eine Prognose vorliegt - kurz nach Mitternacht
+         gibt es noch keinen Entscheid, wohl aber die erwartete Erzeugung des ganzen Tages. -->
+    <div class="zev-panel">
+      <h3 class="zev-panel__title">{{ 'STEUERUNG_TAGESSUMMEN' | translate }}</h3>
+      <div class="zev-panel__content">
+        <div class="zev-info-row">
+          <span class="zev-info-label">{{ (hatSpeicherdaten ? 'STEUERUNG_PRODUKTION_VERRECHNET' : 'PRODUKTION') | translate }}:</span>
+          <span class="zev-info-value" id="summe-produktion">
+            {{ summeAnzeige(summeProduktion()) }}@if (summeBis() && summeProduktion() != null) { ({{ summeBis() }})}
+          </span>
+        </div>
+        <div class="zev-info-row">
+          <span class="zev-info-label">{{ 'VERBRAUCH' | translate }}:</span>
+          <span class="zev-info-value" id="summe-verbrauch">
+            {{ summeAnzeige(summeVerbrauch()) }}@if (summeBis() && summeVerbrauch() != null) { ({{ summeBis() }})}
+          </span>
+        </div>
+        <!-- Nur heute: die Prognose ueber DENSELBEN Zeitraum wie die Produktion - erst damit sind
+             die beiden vergleichbar. An vergangenen Tagen waere sie gleich der Tagessumme. -->
+        @if (summeBis()) {
+        <div class="zev-info-row">
+          <span class="zev-info-label">{{ 'LADEPLANUNG_PROGNOSE' | translate }}:</span>
+          <span class="zev-info-value" id="summe-prognose-bis-jetzt">
+            {{ summeAnzeige(summeErwarteteErzeugungBisJetzt()) }}@if (summeErwarteteErzeugungBisJetzt() != null) { ({{ summeBis() }})}
+          </span>
+        </div>
+        }
+        <div class="zev-info-row">
+          <span class="zev-info-label">{{ 'LADEPLANUNG_PROGNOSE' | translate }}:</span>
+          <span class="zev-info-value" id="summe-prognose">
+            {{ summeAnzeige(summeErwarteteErzeugung()) }}@if (summeErwarteteErzeugung() != null) { ({{ 'STEUERUNG_GANZER_TAG' | translate }})}
+          </span>
+        </div>
+      </div>
+    </div>
+  }
+
   @if (!loading && entscheide.length > 0) {
     <!-- Das Entscheidungsprotokoll: je Intervall eine Zeile mit den Eingangsgroessen. Bei einer
          Steuerung ist das WARUM wichtiger als das WAS. -->

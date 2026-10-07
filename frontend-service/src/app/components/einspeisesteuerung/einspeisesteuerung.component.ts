@@ -477,6 +477,88 @@ export class EinspeisesteuerungComponent extends WithMessage
     return wert == null ? '' : formatSwissNumber(wert, 1);
   }
 
+  // ==================== Tagessummen (Specs/Einspeisesteuerung.md, FR-5) ====================
+
+  /**
+   * Summe der Produktion — dieselbe Grösse wie die gelbe Kurve, also **verrechnet**, wenn
+   * Speicherdaten vorliegen. Sonst stünde unter „Produktion (mit Speicher)" eine Zahl, die zu keiner
+   * Kurve passt.
+   *
+   * <p>`null` ohne Entscheide: Eine 0 hiesse „nichts produziert", der Grund ist aber „noch nichts
+   * ausgewertet". Am heutigen Tag reicht die Summe von selbst nur bis zum letzten ausgewerteten
+   * Intervall — Entscheide gibt es nur für abgeschlossene.
+   */
+  summeProduktion(): number | null {
+    return this.entscheide.length === 0 ? null
+      : this.entscheide.reduce((summe, e) => summe + this.produktionVerrechnet(e), 0);
+  }
+
+  /** Summe des Verbrauchs; `null` ohne Entscheide. */
+  summeVerbrauch(): number | null {
+    return this.entscheide.length === 0 ? null
+      : this.entscheide.reduce((summe, e) => summe + (e.verbrauch ?? 0), 0);
+  }
+
+  /**
+   * Summe der erwarteten Erzeugung über den **ganzen** Tag — auch die Stunden, die noch kommen.
+   *
+   * <p>`null`, solange kein Faktor gelernt ist: Dann trägt kein Punkt eine erwartete Erzeugung, und
+   * eine 0 sähe aus wie „keine Sonne erwartet".
+   */
+  summeErwarteteErzeugung(): number | null {
+    const werte = this.prognose
+      .map(p => p.erwarteteErzeugung)
+      .filter((w): w is number => w != null);
+    return werte.length === 0 ? null : werte.reduce((summe, w) => summe + w, 0);
+  }
+
+  /**
+   * Erwartete Erzeugung **bis zum letzten ausgewerteten Intervall** — nur heute.
+   *
+   * <p>Erst sie macht den Vergleich mit der Produktion aussagekräftig: Beide decken denselben
+   * Zeitraum ab, und beide meinen die **verrechnete** Erzeugung (der Faktor ist auf ihr gelernt).
+   * Die Tagessumme der Prognose reicht bis Mitternacht und ist dafür nicht geeignet.
+   *
+   * <p>Gezählt werden die Prognosepunkte, deren Intervall **spätestens** mit dem letzten
+   * ausgewerteten beginnt — dieselben Viertelstunden wie in der Produktionssumme.
+   *
+   * <p>`null` an vergangenen Tagen (sie wäre gleich der Tagessumme), ohne Entscheid und ohne
+   * gelernten Faktor.
+   */
+  summeErwarteteErzeugungBisJetzt(): number | null {
+    if (!this.zeigtHeute || this.entscheide.length === 0) {
+      return null;
+    }
+    const letzterBeginn = new Date(this.entscheide[this.entscheide.length - 1].zeit).getTime();
+    const werte = this.prognose
+      .filter(p => new Date(p.zeit).getTime() <= letzterBeginn)
+      .map(p => p.erwarteteErzeugung)
+      .filter((w): w is number => w != null);
+    return werte.length === 0 ? null : werte.reduce((summe, w) => summe + w, 0);
+  }
+
+  /**
+   * „bis HH:MM" für den heutigen Tag — das **Ende** des letzten ausgewerteten Intervalls.
+   *
+   * <p>Nur heute: Ein vergangener Tag ist vollständig, ein Zusatz wäre dort Rauschen. Das Ende statt
+   * des Beginns, weil die Summe die Menge **bis** dahin enthält — ein Intervall ab 14:15 läuft bis
+   * 14:30.
+   */
+  summeBis(): string {
+    if (!this.zeigtHeute || this.entscheide.length === 0) {
+      return '';
+    }
+    const letzter = this.entscheide[this.entscheide.length - 1];
+    const ende = new Date(new Date(letzter.zeit).getTime() + INTERVALL_MS);
+    const zeit = `${String(ende.getHours()).padStart(2, '0')}:${String(ende.getMinutes()).padStart(2, '0')}`;
+    return this.translationService.translate('STEUERUNG_BIS_ZEIT').replace('{0}', zeit);
+  }
+
+  /** Eine Summe zur Anzeige: Menge mit Einheit, „–" wenn unbekannt. */
+  summeAnzeige(wert: number | null): string {
+    return wert == null ? '–' : `${this.menge(wert)} kWh`;
+  }
+
   /** Energiemenge im Schweizer Format. */
   menge(wert: number | null): string {
     return wert == null ? '' : formatSwissNumber(wert, 3);

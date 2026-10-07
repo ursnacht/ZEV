@@ -92,6 +92,7 @@ Trockenlauf beantwortet zuerst die Frage, ob die Regel überhaupt etwas zu entsc
 | [x] | 11. Frontend-Seite | Komponente nach dem Muster von `preiszeitreihe-chart`: ECharts **dynamisch** über `ladeECharts()`, Steuerzeile (`zev-date-range-row`), Diagramm in `zev-panel--chart`, Protokolltabelle als `zev-table`. **Zustandsbänder als Balkenserie** — `BarChart` ist bereits registriert, `markArea` bräuchte ein zusätzliches Modul im gemeinsamen Loader |
 | [x] | 12. Routing & Navigation | Route `/einspeisesteuerung` mit `AuthGuard` + `FeatureFlagGuard`; Menüeintrag mit `*appFeature` **und** `*appPermission` |
 | [x] | 13. Übersetzungen | Migration mit den 20 Schlüsseln aus FR-9, deutsch **mit Umlauten**, `ON CONFLICT (key) DO NOTHING` |
+| [x] | 13a. Tagessummen | Panel zwischen Diagramm und Protokoll (`zev-info-row`): Produktion (verrechnet), Verbrauch, erwartete Erzeugung; heute „bis HH:MM", Prognose „ganzer Tag"; „–" statt 0. Übersetzungen V172. Unit-Tests in `einspeisesteuerung.component.spec.ts` |
 | [ ] | 14. Tests | siehe unten — **bewusst offen**: `/2_umsetzung` erstellt keine Tests, das übernehmen `/3_backend-tests`, `/4_frontend-unit-tests` und `/5_e2e-tests` |
 
 ### Phase 14 im Einzelnen

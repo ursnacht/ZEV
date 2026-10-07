@@ -565,4 +565,153 @@ describe('EinspeisesteuerungComponent', () => {
       });
     });
   });
+
+  // ==================== Tagessummen (FR-5) ====================
+
+  describe('Tagessummen', () => {
+    /**
+     * Die Produktion wird <b>verrechnet</b> summiert — wie die gelbe Kurve. Sonst stünde unter
+     * „Produktion (mit Speicher)" eine Zahl, die zu keiner Kurve passt.
+     */
+    it('should sum the production including battery charging', () => {
+      component.entscheide = [
+        entscheid('2026-10-07T12:00:00', { produktion: 0.3, speicherLadung: 1.2, speicherEntladung: 0 }),
+        entscheid('2026-10-07T12:15:00', { produktion: 0.5, speicherLadung: 0, speicherEntladung: 0 })
+      ];
+
+      expect(component.summeProduktion()).toBeCloseTo(2.0, 3);
+    });
+
+    it('should sum the consumption', () => {
+      component.entscheide = [
+        entscheid('2026-10-07T12:00:00', { verbrauch: 0.4 }),
+        entscheid('2026-10-07T12:15:00', { verbrauch: 0.6 })
+      ];
+
+      expect(component.summeVerbrauch()).toBeCloseTo(1.0, 3);
+    });
+
+    /** Ohne Entscheide „–", nicht 0: Der Grund ist „noch nichts ausgewertet", nicht „nichts produziert". */
+    it('should report no sum without decisions', () => {
+      component.entscheide = [];
+
+      expect(component.summeProduktion()).toBeNull();
+      expect(component.summeVerbrauch()).toBeNull();
+      expect(component.summeAnzeige(component.summeProduktion())).toBe('–');
+    });
+
+    it('should sum the expected generation over the whole day', () => {
+      component.prognose = [
+        prognosepunkt('2026-10-07T10:00:00', 200, 1.0),
+        prognosepunkt('2026-10-07T20:00:00', 300, 1.5)   // noch in der Zukunft - zählt mit
+      ];
+
+      expect(component.summeErwarteteErzeugung()).toBeCloseTo(2.5, 3);
+    });
+
+    /** Ohne gelernten Faktor „–" — eine 0 sähe aus wie „keine Sonne erwartet". */
+    it('should report no expected sum while no factor is learned', () => {
+      component.prognose = [prognosepunkt('2026-10-07T10:00:00', 200, null)];
+
+      expect(component.summeErwarteteErzeugung()).toBeNull();
+    });
+
+    it('should format a sum with unit', () => {
+      expect(component.summeAnzeige(12.3456)).toBe('12.346 kWh');
+    });
+
+    describe('summeBis', () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      /**
+       * Heute: das <b>Ende</b> des letzten ausgewerteten Intervalls. Ein Intervall ab 14:15 läuft
+       * bis 14:30 — mit dem Beginn stünde da eine Viertelstunde zu früh.
+       */
+      it('should name the end of the last interval today', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(2026, 9, 7, 14, 40));
+        component.datum = '2026-10-07';
+        component.entscheide = [
+          entscheid('2026-10-07T14:00:00'),
+          entscheid('2026-10-07T14:15:00')
+        ];
+
+        expect(component.summeBis()).toBe('STEUERUNG_BIS_ZEIT'.replace('{0}', '14:30'));
+      });
+
+      /** Ein vergangener Tag ist vollständig — kein Zusatz. */
+      it('should add nothing for a past day', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(2026, 9, 7, 14, 40));
+        component.datum = '2026-10-06';
+        component.entscheide = [entscheid('2026-10-06T23:45:00')];
+
+        expect(component.summeBis()).toBe('');
+      });
+    });
+
+    describe('summeErwarteteErzeugungBisJetzt', () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      /**
+       * Nur die Viertelstunden, die auch die Produktionssumme enthält — erst dann sind die beiden
+       * vergleichbar. Der Punkt um 15:00 liegt nach dem letzten Entscheid und zählt nicht.
+       */
+      it('should sum the forecast up to the last evaluated interval', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(2026, 9, 7, 14, 40));
+        component.datum = '2026-10-07';
+        component.entscheide = [entscheid('2026-10-07T14:00:00'), entscheid('2026-10-07T14:15:00')];
+        component.prognose = [
+          prognosepunkt('2026-10-07T14:00:00', 200, 1.0),
+          prognosepunkt('2026-10-07T14:15:00', 200, 0.5),
+          prognosepunkt('2026-10-07T15:00:00', 200, 9.9)
+        ];
+
+        expect(component.summeErwarteteErzeugungBisJetzt()).toBeCloseTo(1.5, 3);
+        expect(component.summeErwarteteErzeugung()).toBeCloseTo(11.4, 3);
+      });
+
+      /** Vergangener Tag: Sie wäre gleich der Tagessumme — keine eigene Zeile. */
+      it('should be null for a past day', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(2026, 9, 7, 14, 40));
+        component.datum = '2026-10-06';
+        component.entscheide = [entscheid('2026-10-06T23:45:00')];
+        component.prognose = [prognosepunkt('2026-10-06T12:00:00', 200, 1.0)];
+
+        expect(component.summeErwarteteErzeugungBisJetzt()).toBeNull();
+      });
+
+      it('should be null while no factor is learned', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(2026, 9, 7, 14, 40));
+        component.datum = '2026-10-07';
+        component.entscheide = [entscheid('2026-10-07T14:00:00')];
+        component.prognose = [prognosepunkt('2026-10-07T14:00:00', 200, null)];
+
+        expect(component.summeErwarteteErzeugungBisJetzt()).toBeNull();
+      });
+    });
+
+    it('should show the totals panel between chart and table', () => {
+      component.loading = false;
+      component.entscheide = [entscheid('2026-10-07T12:00:00', { verbrauch: 0.4 })];
+      component.prognose = [prognosepunkt('2026-10-07T12:00:00', 200, 1.0)];
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('#summe-verbrauch')?.textContent).toContain('0.400 kWh');
+      expect(el.querySelector('#summe-prognose')?.textContent).toContain('STEUERUNG_GANZER_TAG');
+
+      // Reihenfolge: Diagramm, dann Summen, dann Protokoll
+      const panelSumme = el.querySelector('#summe-verbrauch')!;
+      const tabelle = el.querySelector('table.zev-table')!;
+      expect(panelSumme.compareDocumentPosition(tabelle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+  });
 });

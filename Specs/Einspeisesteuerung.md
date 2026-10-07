@@ -591,7 +591,30 @@ wie der NK-Eintrag).
      > **Schriftgrösse 11 px statt der ECharts-Vorgabe 14.** Der Tooltip nennt dreizehn Grössen.
      > Bei 14 px war er höher als das Diagramm, und ECharts schneidet oben ab statt zu scrollen —
      > Zeitpunkt und Preise, also gerade die Führungsgrössen, fielen weg.
-4. **Entscheidungsprotokoll** als `zev-table` unterhalb des Diagramms: Zeit, Preis, erwarteter
+4. **Tagessummen** zwischen Diagramm und Protokoll, als `zev-panel` mit `zev-info-row` (Design
+   System, kein eigenes CSS): **Produktion**, **Verbrauch**, **erwartete Erzeugung** in kWh.
+   * **Produktion** ist die Summe der gelben Kurve — also **verrechnet** (mit Speicher), wenn
+     Speicherdaten vorliegen; die Beschriftung wechselt wie in der Legende. Sonst stünde unter
+     „Produktion (mit Speicher)" eine Zahl, die zu keiner Kurve passt.
+   * **Heute** reichen Produktion und Verbrauch bis zum letzten ausgewerteten Intervall — von selbst,
+     weil es Entscheide nur für abgeschlossene Intervalle gibt. Dazu der Zusatz „(bis HH:MM)" mit
+     dem **Ende** dieses Intervalls: Ein Intervall ab 14:15 läuft bis 14:30. An vergangenen Tagen
+     kein Zusatz.
+   * Die **erwartete Erzeugung** summiert den **ganzen** Tag, auch die kommenden Stunden; Zusatz
+     „(ganzer Tag)".
+     > **Für den Vergleich gibt es heute eine zweite Prognosezeile „(bis HH:MM)"** über denselben
+     > Zeitraum wie die Produktion — dieselben Viertelstunden, und beide meinen die verrechnete
+     > Erzeugung (der Faktor ist auf ihr gelernt). Die Tagessumme reicht bis Mitternacht und sagt,
+     > wie viel noch kommt; verglichen wird mit der Zeile „bis jetzt". An vergangenen Tagen entfällt
+     > sie, weil sie der Tagessumme gleich wäre.
+   * **„–" statt 0**, wenn nichts vorliegt: ohne Entscheid (Produktion, Verbrauch) bzw. ohne
+     gelernten Faktor (erwartete Erzeugung). Eine 0 hiesse „nichts produziert" bzw. „keine Sonne
+     erwartet", der Grund ist aber „noch nichts da".
+   * Das Panel erscheint auch **ohne** Entscheide, sobald eine Prognose vorliegt — kurz nach
+     Mitternacht gibt es noch keinen Entscheid, wohl aber die Tagesprognose.
+   * Übersetzungen `STEUERUNG_TAGESSUMMEN`, `STEUERUNG_BIS_ZEIT`, `STEUERUNG_GANZER_TAG` (V172);
+     Zeilenbeschriftungen über die bestehenden Schlüssel der Legende.
+5. **Entscheidungsprotokoll** als `zev-table` unterhalb des Diagramms: Zeit, Preis, erwarteter
    Tiefstpreis, Produktion, Verbrauch, Überschuss, Regel, Batterieladung, Einspeisung. Beträge und
    Mengen rechtsbündig (`zev-table__number`).
    * **Neuste Einträge oben** (absteigend nach Zeit). Beim heutigen Tag steht damit das zuletzt
@@ -916,6 +939,15 @@ Der Text ist an kein Feature gebunden.
       davon, wie viele Preispunkte davor liegen.
 * [ ] Scheitert die Preisabfrage oder ist das Flag `PREISZEITREIHE` aus, zeigt die Kurve die Preise
       aus den Entscheiden — sie verschwindet **nicht**.
+* [ ] Zwischen Diagramm und Protokoll stehen die **Tagessummen** von Produktion, Verbrauch und
+      erwarteter Erzeugung in kWh.
+* [ ] Die Produktionssumme entspricht der gelben Kurve (mit Speicher, sofern Speicherdaten vorliegen).
+* [ ] Am heutigen Tag tragen Produktion und Verbrauch den Zusatz „(bis HH:MM)" mit dem Ende des
+      letzten ausgewerteten Intervalls; an vergangenen Tagen keinen.
+* [ ] Die erwartete Erzeugung summiert den ganzen Tag und trägt den Zusatz „(ganzer Tag)".
+* [ ] Am heutigen Tag steht zusätzlich die erwartete Erzeugung „(bis HH:MM)" — über dieselben
+      Viertelstunden wie die Produktionssumme; an vergangenen Tagen fehlt diese Zeile.
+* [ ] Liegt kein Wert vor, steht „–", nicht 0.
 * [ ] Ein Wechsel des Zustands ist im Band an der richtigen Viertelstunde sichtbar.
 * [ ] **Beide Bänder decken dieselbe Zeitspanne deckungsgleich ab**, wenn beide Zustände im selben Intervall `GESPERRT` sind — kein horizontaler Versatz zwischen ihnen.
 * [ ] Ein Band beginnt am **Beginn** seines ersten Intervalls und endet am **Ende** seines letzten (`zeit + 15min`), deckungsgleich mit dem Stufenverlauf der Preislinie.
