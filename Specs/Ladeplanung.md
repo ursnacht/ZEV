@@ -123,9 +123,28 @@ verschiebt die Abweichung? Weichen sie selten ab, ist der Gewinn klein und das R
 > da ist. Am 04.10.2026 stieg der Ladezustand von 49 % um 08:45 stetig auf 100 % um 13:00 — keine
 > Sperre wirkte, weder die der Kaskade noch die der Merit-Order.
 >
-> **Für den Vergleich ist das günstig.** Beide Verfahren sehen zu jedem Zeitpunkt dieselbe
-> Ausgangslage, und keines beeinflusst sie. Es gibt keine Asymmetrie zwischen ihnen: Wo sie
-> auseinandergehen, ist das ein echter Unterschied im Entscheid, kein Artefakt des Parallelbetriebs.
+> **Vergleichbar ist der Entscheid nur bis zur ersten Abweichung — korrigiert am 07.10.2026.**
+> Bis dahin sehen beide Verfahren dieselbe Ausgangslage; die erste Abweichung des Tages ist ein
+> echter Unterschied. **Danach nicht mehr:** Sperrt die Merit-Order, lädt die Batterie im
+> Testbetrieb trotzdem weiter. Der Ladezustand folgt damit genau dem Verhalten, das der Plan
+> verhindern wollte — die freie Kapazität schrumpft, der Bedarf mit ihr, und der Plan hält immer
+> weniger Intervalle für nötig. **Seine späteren Entscheide sind dadurch zu sperrfreudig.**
+>
+> Bei echter Steuerung bliebe der Ladezustand während der Sperre stehen, der Bedarf bliebe gross,
+> während der erwartete Rest-Überschuss mit jeder Viertelstunde abnimmt — der Plan gäbe die Ladung
+> **früher** wieder frei. Die Rückkopplung, die das Verfahren im Betrieb selbst korrigiert, fehlt
+> im Testbetrieb.
+>
+> **Die Regelkaskade trifft das kaum:** Sie sperrt selten, ihr Bild der Wirklichkeit weicht also
+> wenig von der tatsächlichen ab. Die Verzerrung liegt fast ganz auf der Seite der Merit-Order —
+> und zwar zu ihren Ungunsten: Der Testbetrieb überzeichnet, wie lange sie sperrt.
+>
+> **Für die Auswertung heisst das:** Die **Anzahl** der Abweichungen ist zu hoch. Aussagekräftig
+> sind der Zeitpunkt der **ersten** Abweichung je Tag und der Vergleich zwischen erwartetem und
+> tatsächlichem Überschuss — der hängt vom Ladezustand nicht ab und bleibt die richtige Grundlage
+> für den Sicherheitszuschlag (§8). (Auf die Frage, *woher* der Ladezustand stammt, kam es dabei
+> nicht an: Eine frühere Fassung führte ihn fälschlich auf die Kaskade zurück, die nächste
+> folgerte daraus zu weit, der Vergleich sei durchgehend fair.)
 >
 > **Was sich daraus trotzdem nicht ableiten lässt**, ist der Nutzen in Kilowattstunden. Beide planen
 > gegen eine Wirklichkeit, in der **keines** von beiden wirkt. Am 04.10. sperrte die Merit-Order
@@ -373,10 +392,20 @@ Mal eindeutig falsch:
 | Überschuss | 27.69 kWh | 19.46 kWh | −8.2 kWh (30 % zu hoch) |
 
 Frei waren am Morgen rund 21 kWh, nötig also etwa 22 kWh Überschuss (`/ 0.95`). Erwartet waren
-27.7 — der Plan sperrte deshalb den teuren Vormittag bis 12:00, um die billigeren Stunden danach
+27.7 — der Plan sperrte deshalb ab 08:45 den teuren Vormittag, um die billigeren Stunden danach
 zu nutzen. Gekommen sind 19.5. Die Regelkaskade sperrte an diesem Tag nicht; die Batterie lud
-durchgehend und erreichte trotzdem nur **83 %**. **Hätte die Merit-Order gesteuert, wäre sie noch
-leerer geblieben.**
+durchgehend und erreichte trotzdem nur **83 %**.
+
+> **Bei echter Steuerung wäre die Batterie leerer geblieben — aber nicht so sehr, wie die
+> Schattenwerte zeigen.** Im Protokoll reicht die Sperre bis 12:00. Das überzeichnet: Weil die
+> Batterie im Testbetrieb trotzdem lud, schrumpfte die freie Kapazität und mit ihr der Bedarf
+> (siehe FR-1a). Bei echter Sperre wäre der Ladezustand bei rund 48 % geblieben, der Bedarf bei
+> rund 22 kWh — und sobald der erwartete Rest-Überschuss darunter fiel, hätte der Plan freigegeben,
+> vermutlich gegen 11:00.
+>
+> **Die Richtung bleibt:** Die erste Sperre um 08:45 wäre identisch gewesen, und weil der
+> Überschuss des Tages unter dem Bedarf lag, kostet jede gesperrte Viertelstunde Speicher. Der
+> Befund — der Plan hätte an diesem Tag geschadet — gilt; sein Ausmass ist kleiner.
 
 > **Jeder Fehler allein hätte nicht gereicht.** Nur mit der Erzeugungsabweichung wären es 22.7 kWh
 > gewesen, nur mit der Verbrauchsabweichung 23.7 — beides knapp genug. Erst zusammen fiel der
