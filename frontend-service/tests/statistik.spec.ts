@@ -33,7 +33,8 @@ test.describe('Statistik Page', () => {
         // Check that PDF export button exists and is disabled (no data loaded yet)
         // PDF-Export-Button gezielt: sekundär, aber NICHT --compact (die Download-CSV-Buttons
         // in "Summen pro Einheit" sind ebenfalls --secondary, aber --compact).
-        const pdfButton = page.locator('button.zev-button--secondary:not(.zev-button--compact)');
+        const pdfButton = page.locator(
+            'button.zev-button--secondary:not(.zev-button--compact):has(app-icon[name="download"])');
         await expect(pdfButton).toBeVisible();
         await expect(pdfButton).toBeDisabled();
 
@@ -95,7 +96,8 @@ test.describe('Statistik Page', () => {
             // PDF button should now be enabled
             // PDF-Export-Button gezielt: sekundär, aber NICHT --compact (die Download-CSV-Buttons
         // in "Summen pro Einheit" sind ebenfalls --secondary, aber --compact).
-        const pdfButton = page.locator('button.zev-button--secondary:not(.zev-button--compact)');
+        const pdfButton = page.locator(
+            'button.zev-button--secondary:not(.zev-button--compact):has(app-icon[name="download"])');
             await expect(pdfButton).toBeEnabled();
         }
     });
@@ -112,8 +114,8 @@ test.describe('Statistik Page - Monthly Statistics', () => {
         // Wait for response
         await page.waitForTimeout(2000);
 
-        // Check if monthly panels are displayed
-        const monthPanels = page.locator('.zev-panel--month');
+        // Nur MONATE - das Gesamt-Panel davor traegt aria-controls="gesamt"
+        const monthPanels = page.locator('.zev-panel--month:has(> .zev-collapsible > [aria-controls^="monat-"])');
         const monthPanelCount = await monthPanels.count();
 
         if (monthPanelCount > 0) {
@@ -168,7 +170,9 @@ test.describe('Statistik Page - Monthly Statistics', () => {
         await submitButton.click();
         await expect(submitButton).toBeEnabled({ timeout: 15000 });
 
-        const schalter = page.locator('.zev-panel--month > .zev-collapsible > .zev-collapsible__header');
+        // Nur MONATE: Das Gesamt-Panel davor ist bewusst aufgeklappt (eigener Test unten).
+        const schalter = page.locator(
+            '.zev-panel--month > .zev-collapsible > .zev-collapsible__header[aria-controls^="monat-"]');
         const anzahl = await schalter.count();
         test.skip(anzahl === 0, 'Keine Monatsdaten im Standard-Zeitraum (Vorquartal) vorhanden.');
 
@@ -176,13 +180,13 @@ test.describe('Statistik Page - Monthly Statistics', () => {
         for (let i = 0; i < anzahl; i++) {
             await expect(schalter.nth(i)).toHaveAttribute('aria-expanded', 'false');
         }
-        const inhalt = page.locator('.zev-panel--month > .zev-collapsible > .zev-collapsible__content');
+        const inhalt = page.locator('.zev-panel--month > .zev-collapsible > .zev-collapsible__content[id^="monat-"]');
         await expect(inhalt).toHaveCount(0);
 
         // Aufklappen bringt genau einen Inhalt - die anderen Monate bleiben zu.
         await schalter.first().click();
         await expect(inhalt).toHaveCount(1);
-        await expect(page.locator('.zev-panel--month .zev-table--bars')).toHaveCount(1);
+        await expect(page.locator('[id^="monat-"] .zev-table--bars')).toHaveCount(1);
         if (anzahl > 1) {
             await expect(schalter.nth(1)).toHaveAttribute('aria-expanded', 'false');
         }
@@ -202,7 +206,7 @@ test.describe('Statistik Page - Monthly Statistics', () => {
         // Wait for response
         await page.waitForTimeout(2000);
 
-        const monthPanels = page.locator('.zev-panel--month');
+        const monthPanels = page.locator('.zev-panel--month:has(> .zev-collapsible > [aria-controls^="monat-"])');
         const monthPanelCount = await monthPanels.count();
 
         // Nur prüfen, wenn Monatsdaten geladen wurden (Testdaten-abhängig).
@@ -230,5 +234,89 @@ test.describe('Statistik Page - Monthly Statistics', () => {
             expect(title).not.toBeNull();
             expect((title ?? '').trim().length).toBeGreaterThan(0);
         }
+    });
+});
+
+test.describe('Statistik Page - Gesamter Zeitraum', () => {
+    /**
+     * Das Gesamt-Panel steht OBERHALB der Monate und ist nach dem Laden aufgeklappt
+     * (Specs/Statistik.md, Gesamt-Panel). Es laesst sich wie ein Monat zu- und aufklappen.
+     */
+    test('should show the total panel above the months, expanded', async ({ page }) => {
+        await navigateToStatistik(page);
+
+        const submitButton = page.locator('button.zev-button--primary[type="submit"]');
+        await submitButton.click();
+        await expect(submitButton).toBeEnabled({ timeout: 15000 });
+
+        const gesamtSchalter = page.locator('.zev-collapsible__header[aria-controls="gesamt"]');
+        test.skip(await gesamtSchalter.count() === 0, 'Keine Statistik geladen.');
+
+        // Erstes Panel ist das Gesamt-Panel
+        await expect(page.locator('.zev-panel--month').first()
+            .locator('[aria-controls="gesamt"]')).toHaveCount(1);
+
+        // Aufgeklappt, mit demselben Inhalt wie ein Monat
+        await expect(gesamtSchalter).toHaveAttribute('aria-expanded', 'true');
+        await expect(page.locator('#gesamt .zev-table--bars')).toBeVisible();
+
+        // Zuklappen und wieder aufklappen
+        await gesamtSchalter.click();
+        await expect(page.locator('#gesamt')).toHaveCount(0);
+        await gesamtSchalter.click();
+        await expect(page.locator('#gesamt .zev-table--bars')).toBeVisible();
+    });
+
+    /** Ein neuer Abruf klappt die Monate zu, das Gesamt-Panel aber wieder AUF. */
+    test('should re-expand the total panel on a new query', async ({ page }) => {
+        await navigateToStatistik(page);
+
+        const submitButton = page.locator('button.zev-button--primary[type="submit"]');
+        await submitButton.click();
+        await expect(submitButton).toBeEnabled({ timeout: 15000 });
+
+        const gesamtSchalter = page.locator('.zev-collapsible__header[aria-controls="gesamt"]');
+        test.skip(await gesamtSchalter.count() === 0, 'Keine Statistik geladen.');
+
+        await gesamtSchalter.click();
+        await expect(gesamtSchalter).toHaveAttribute('aria-expanded', 'false');
+
+        await submitButton.click();
+        await expect(submitButton).toBeEnabled({ timeout: 15000 });
+        await expect(page.locator('.zev-collapsible__header[aria-controls="gesamt"]'))
+            .toHaveAttribute('aria-expanded', 'true');
+    });
+});
+
+test.describe('Statistik Page - Heute', () => {
+    /**
+     * „Heute" steht zwischen „Bis Datum" und „Anzeigen", setzt beide Felder auf das heutige
+     * Datum und laedt NICHT (Specs/Statistik.md).
+     */
+    test('should set both dates to today without loading', async ({ page }) => {
+        await navigateToStatistik(page);
+
+        const knoepfe = page.locator('form .zev-button-group button');
+        const heute = knoepfe.first();
+        // Position: erster Knopf der Gruppe, direkt vor "Anzeigen"
+        await expect(heute.locator('app-icon[name="calendar"]')).toHaveCount(1);
+        await expect(knoepfe.nth(1)).toHaveAttribute('type', 'submit');
+
+        await heute.click();
+
+        // Heutiges Datum aus dem BROWSER - dieselbe Zeitzone wie die Anwendung
+        const heuteIso = await page.evaluate(() => {
+            const d = new Date();
+            const zwei = (n: number) => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${zwei(d.getMonth() + 1)}-${zwei(d.getDate())}`;
+        });
+        await expect(page.locator('#dateFrom')).toHaveValue(heuteIso);
+        await expect(page.locator('#dateTo')).toHaveValue(heuteIso);
+
+        // Geladen wird erst mit "Anzeigen": Es steht noch keine Statistik da
+        await expect(page.locator('.zev-collapsible__header[aria-controls="gesamt"]')).toHaveCount(0);
+
+        // Ein zweiter Klick waere folgenlos - die Schaltflaeche ist deaktiviert
+        await expect(heute).toBeDisabled();
     });
 });

@@ -41,7 +41,7 @@ async function loadStatistik(page: Page): Promise<boolean> {
     }
 
     // Wait for the per-unit summary section (only present when data exists).
-    const summenSection = page.locator('.zev-einheit-summen-section').first();
+    const summenSection = page.locator('[id^="monat-"] .zev-einheit-summen-section').first();
     try {
         await summenSection.waitFor({ state: 'visible', timeout: 10000 });
         return true;
@@ -50,9 +50,14 @@ async function loadStatistik(page: Page): Promise<boolean> {
     }
 }
 
-/** The first month panel that contains a "Summen pro Einheit" section. */
+/**
+ * The first month panel that contains a "Summen pro Einheit" section.
+ *
+ * Scoped to MONTHS (`#monat-i`): the total panel above them has its own section and is already
+ * expanded, so `.first()` alone would pick it instead of a month.
+ */
 function firstSummenSection(page: Page): Locator {
-    return page.locator('.zev-einheit-summen-section').first();
+    return page.locator('[id^="monat-"] .zev-einheit-summen-section').first();
 }
 
 /** All CSV-download buttons (download icon) within a summary section. */

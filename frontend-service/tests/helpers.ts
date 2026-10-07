@@ -451,7 +451,11 @@ export async function raeumeMitWiederholung(schritt: () => Promise<boolean>,
 export async function klappeMonateAuf(page: Page, anzahl: number = 1): Promise<number> {
     // Direkte Kinder: Ein aufgeklappter Monat enthaelt mit "Details anzeigen" eine zweite
     // .zev-collapsible__header - die darf hier nicht mitgezaehlt werden.
-    const schalter = page.locator('.zev-panel--month > .zev-collapsible > .zev-collapsible__header');
+    // Nur MONATE (aria-controls="monat-i"): Davor steht das Gesamt-Panel (aria-controls="gesamt"),
+    // das bereits offen ist. Mitgezaehlt, oeffnete dieser Helfer nur es - die Tests praeften dann
+    // unbemerkt das Gesamt-Panel statt eines Monats.
+    const schalter = page.locator(
+        '.zev-panel--month > .zev-collapsible > .zev-collapsible__header[aria-controls^="monat-"]');
     const vorhanden = await schalter.count();
     const zuOeffnen = Math.min(anzahl, vorhanden);
     for (let i = 0; i < zuOeffnen; i++) {
