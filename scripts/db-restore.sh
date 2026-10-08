@@ -47,7 +47,8 @@ SELECT 'messwerte' AS tabelle, count(*)::text AS zeilen FROM zev.messwerte
 UNION ALL SELECT 'steuerentscheid', count(*)::text FROM zev.steuerentscheid
 UNION ALL SELECT 'einheit', count(*)::text FROM zev.einheit
 UNION ALL SELECT 'keycloak.user_entity', count(*)::text FROM keycloak.user_entity
-UNION ALL SELECT 'flyway: letzte Version', max(version) FROM zev.flyway_schema_history WHERE success;
+UNION ALL SELECT 'flyway: letzte Version', (SELECT version FROM zev.flyway_schema_history
+                                           WHERE success ORDER BY installed_rank DESC LIMIT 1);
 SQL
 
 if [ "$NUR_PRUEFEN" = 1 ]; then
