@@ -3,3 +3,7 @@
 # den #!/bin/sh-Shebang des Entrypoints.
 pi-gateway/deploy/mosquitto/mosquitto.conf text eol=lf
 pi-gateway/deploy/mosquitto/docker-entrypoint.sh text eol=lf
+
+# Shell-Skripte laufen auf dem NAS (Linux). Mit CRLF bricht sh mit "\r: command not found" ab -
+# z. B. wenn die Datei aus einem Windows-Checkout aufs NAS kopiert wird.
+scripts/*.sh text eol=lf
