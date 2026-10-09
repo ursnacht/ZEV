@@ -18,8 +18,7 @@
 --        DOCKER="sudo docker" ./scripts/db-backup.sh /volume1/backup/zev
 --        DOCKER="sudo docker" ./scripts/db-restore.sh --nur-pruefen /volume1/backup/zev/zev-<JJJJ-MM-TT_HHMM>.dump
 --   3. Dieses Skript ausfuehren (im Verzeichnis /volume1/docker/zev):
---        sudo docker exec -i postgres sh -c 'psql -v ON_ERROR_STOP=1 -U $POSTGRES_USER -d zev' \
---          < scripts/messwerte-zeit-intervallbeginn.sql
+--        sudo docker exec -i postgres sh -c 'psql -v ON_ERROR_STOP=1 -U $POSTGRES_USER -d zev' < scripts/messwerte-zeit-intervallbeginn.sql
 --      Erwartet: NOTICE "<n> MQTT-Messwerte auf den Intervallbeginn umgestellt", n gleich
 --        SELECT count(*) FROM zev.messwerte WHERE quelle = 'MQTT';
 --   4. Neue Version starten:

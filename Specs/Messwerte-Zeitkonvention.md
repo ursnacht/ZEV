@@ -278,12 +278,12 @@ Keine UI-Änderung. Sichtbare Wirkungen auf Hene nach der Umstellung:
 > `von = bis = Tag` (`StatistikService`, `sumTotalByEinheitTypAndZeitBetween` über die
 > `CONSUMER`-Einheiten). Die Summen sind `double`; „gleich" heisst deshalb auf **0.001 kWh**.
 
-* [ ] Statistik und Einspeisesteuerung zeigen für den 08.10.2026 denselben Verbrauch:
+* [x] Statistik und Einspeisesteuerung zeigen für den 08.10.2026 denselben Verbrauch:
       **31.477 kWh**.
-* [ ] Für jeden Tag vom 14.07. bis zum Tag vor dem Ausrollen ist der Tagesverbrauch der Statistik
+* [x] Für jeden Tag vom 14.07. bis zum Tag vor dem Ausrollen ist der Tagesverbrauch der Statistik
       gleich der Summe `total` der MQTT-Messwerte der `CONSUMER`-Einheiten, die **vor** der
       Umstellung die Stempel `Tag 00:15` bis `Folgetag 00:00` trugen (gegen das Backup prüfbar).
-* [ ] Für jeden Tag vom **13.09. bis 08.10.2026** **ausser** 13.09., 14.09., 15.09., 17.09.,
+* [x] Für jeden Tag vom **13.09. bis 08.10.2026** **ausser** 13.09., 14.09., 15.09., 17.09.,
       18.09., 20.09. und 03.10. stimmt der Tagesverbrauch der Statistik mit der Summe
       `steuerentscheid.verbrauch` überein.
 
@@ -295,14 +295,14 @@ Keine UI-Änderung. Sichtbare Wirkungen auf Hene nach der Umstellung:
   > Tage lässt sich deshalb keine sichere Regel angeben; ausserdem sind Ausrolltag (Lücke, NFR-3)
   > und 25.10. (Zeitumstellung) ohnehin Sonderfälle. Diese Abweichungen liegen in der Steuerung,
   > nicht in der Konvention.
-* [ ] Die nachgerechnete Tagesansicht (`rechneNach` + `reichereSpeicherAn`) liefert an denselben
+* [x] Die nachgerechnete Tagesansicht (`rechneNach` + `reichereSpeicherAn`) liefert an denselben
       Tagen dieselben Werte für Produktion, Verbrauch, Ladung und Entladung wie die gespeicherten
       Entscheide (0.001 kWh).
-* [ ] „Messwerte vorhanden bis" (Statistik, `messwerteBisDate`) nennt nach einem vollständig
+* [x] „Messwerte vorhanden bis" (Statistik, `messwerteBisDate`) nennt nach einem vollständig
       erfassten Tag diesen Tag, nicht den Folgetag.
-* [ ] Der gelernte Umrechnungsfaktor für einen gegebenen Tag ist vor und nach der Umstellung
+* [x] Der gelernte Umrechnungsfaktor für einen gegebenen Tag ist vor und nach der Umstellung
       gleich (die Zuordnung Messwert ↔ Einstrahlung ändert sich nicht, nur ihr Weg).
-* [ ] Das Lastprofil eines gegebenen Tages ist vor und nach der Umstellung gleich.
+* [x] Das Lastprofil eines gegebenen Tages ist vor und nach der Umstellung gleich.
 
 **Unverändert**
 
