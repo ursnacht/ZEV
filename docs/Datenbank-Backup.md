@@ -92,6 +92,11 @@ Läuft alles, kann `zev_alt` weg — es belegt so viel Platz wie die Datenbank s
 docker exec postgres sh -c 'dropdb -U $POSTGRES_USER zev_alt'
 ```
 
+> **Zusätzliche Datenbank-Benutzer** (z. B. `zev_readonly`, `docs/Datenbank-Benutzer.md`) sind
+> **nicht** im Backup — sie gehören zum Server. Ihre Rechte aber schon. Auf einem **frischen**
+> Server deshalb zuerst die Benutzer anlegen, sonst scheitert der Restore (er läuft in einer
+> Transaktion, und die Rechtezuweisung an einen unbekannten Benutzer ist ein Fehler).
+
 ## Version des Backups und der Anwendung
 
 Das Backup enthält auch die Liste der ausgeführten Migrationen (`flyway_schema_history`). Die
