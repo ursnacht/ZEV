@@ -59,9 +59,11 @@ public class SteuerungService {
     /*
      * ZEITBEZUEGE - die Ursache eines behobenen Fehlers, deshalb hier ausbuchstabiert:
      *
-     *   messwerte.zeit           Ortszeit (Europe/Zurich), Intervall-ENDE
-     *                            Die Aggregation rechnet mit LocalDateTime.now() und schreibt
-     *                            upsertMesswert(einheit, ende, total).
+     *   messwerte.zeit           Ortszeit (Europe/Zurich), Intervall-BEGINN
+     *                            Bis Specs/Messwerte-Zeitkonvention.md stempelte die MQTT-Erfassung
+     *                            das ENDE, und diese Klasse verschob jedes Fenster um 15 Minuten.
+     *                            Das ist entfallen: Messwerte und Entscheide sprechen dieselbe
+     *                            Sprache, ein Intervall wird mit [zeitVon, zeitVon+15) gelesen.
      *   steuerentscheid.zeit_von Ortszeit, Intervall-BEGINN
      *   preiszeitreihe.zeit_von  UTC, Intervall-BEGINN  <- der einzige Fremdkoerper
      *
@@ -465,10 +467,10 @@ public class SteuerungService {
         Map<LocalDate, TreeMap<LocalDateTime, BigDecimal>> preiseJeTag = preiseJeOrtstag(
                 PreiszeitreiheZeit.tagesbeginnUtc(von), PreiszeitreiheZeit.tagesendeUtc(bis));
 
-        // Messwerte tragen das Intervall-ENDE; die Grenzen sind deshalb um ein Intervall zu
-        // verschieben. Eine Zonenrechnung braucht es nicht mehr - beide Seiten sind Ortszeit.
-        LocalDateTime vonEnde = von.atStartOfDay().plusMinutes(INTERVALL_MINUTEN);
-        LocalDateTime bisEnde = bis.plusDays(1).atStartOfDay().plusMinutes(INTERVALL_MINUTEN);
+        // Messwerte tragen wie die Entscheide den Intervall-BEGINN, und beide Seiten sind Ortszeit:
+        // Das Fenster ist der Zeitraum selbst, ohne Verschiebung und ohne Zonenrechnung.
+        LocalDateTime vonBeginn = von.atStartOfDay();
+        LocalDateTime bisExklusiv = bis.plusDays(1).atStartOfDay();
 
         // Der Ladezustand geht seit V160 in die Regel ein (SOC_TIEF) und muss deshalb HIER
         // vorliegen - nicht erst in der Anzeige. Rechnete die Rueckrechnung ohne ihn, ergaeben
@@ -483,11 +485,10 @@ public class SteuerungService {
         boolean socTiefGaltZuvor = false;
 
         for (Object[] zeile : messwerteRepository.sumBilanzKomponentenPerZeitBetween(
-                vonEnde, bisEnde)) {
-            // Vom Intervall-Ende zurueck auf den Beginn - die Form, in der Preise (umgeschluesselt)
+                vonBeginn, bisExklusiv)) {
+            // Der Stempel ist der Intervall-Beginn - die Form, in der Preise (umgeschluesselt)
             // und Entscheide gefuehrt werden.
-            LocalDateTime endeOrtszeit = (LocalDateTime) zeile[0];
-            LocalDateTime zeit = endeOrtszeit.minusMinutes(INTERVALL_MINUTEN);
+            LocalDateTime zeit = (LocalDateTime) zeile[0];
             Messung messung = new Messung(alsBigDecimal(zeile[1]), alsBigDecimal(zeile[2]),
                     alsBigDecimal(zeile[3]), alsBigDecimal(zeile[4]));
 
@@ -634,11 +635,11 @@ public class SteuerungService {
     }
 
     /**
-     * Messung des Intervalls, das bei {@code zeitVonUtc} <b>beginnt</b>.
+     * Messung des Intervalls, das bei {@code zeitVon} <b>beginnt</b>.
      *
-     * <p><b>Nur noch eine Verschiebung, keine Zonenrechnung:</b> {@code messwerte.zeit} trägt das
-     * Intervall<b>ende</b> und liegt — wie {@code zeit_von} — in Ortszeit. Das Intervall
-     * 11:45–12:00 steht dort also unter {@code zeit = 12:00}.
+     * <p><b>Weder Verschiebung noch Zonenrechnung:</b> {@code messwerte.zeit} trägt — wie
+     * {@code zeit_von} — den Intervall<b>beginn</b> in Ortszeit. Das Intervall 11:45–12:00 steht
+     * dort unter {@code zeit = 11:45}.
      *
      * <p>Über {@code sumBilanzKomponentenPerZeitBetween}, weil diese Abfrage die Produktion bereits
      * mit {@code ABS()} liefert: In {@code messwerte.total} steht sie <b>negativ</b>, und wer selbst
@@ -650,14 +651,14 @@ public class SteuerungService {
     private Messung messungFuer(LocalDateTime zeitVon) {
         LocalDateTime endeOrtszeit = zeitVon.plusMinutes(INTERVALL_MINUTEN);
         for (Object[] zeile : messwerteRepository.sumBilanzKomponentenPerZeitBetween(
-                endeOrtszeit, endeOrtszeit.plusMinutes(INTERVALL_MINUTEN))) {
+                zeitVon, endeOrtszeit)) {
             return new Messung(alsBigDecimal(zeile[1]), alsBigDecimal(zeile[2]),
                     alsBigDecimal(zeile[3]), alsBigDecimal(zeile[4]));
         }
         // Die Lücke wird gemeldet, nicht nur in Nullen abgebildet: Ein Entscheid mit Produktion 0
         // sieht aus wie Nacht. Ortszeit im Text, weil das Messraster in Ortszeit liegt.
         log.warn("Steuerung: keine Messwerte fuer das Intervall (Ortszeit {} - {}) - Entscheid mit 0",
-                endeOrtszeit.minusMinutes(INTERVALL_MINUTEN), endeOrtszeit);
+                zeitVon, endeOrtszeit);
         return new Messung(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
     }
 
@@ -710,9 +711,8 @@ public class SteuerungService {
         if (!einheitRepository.existsByTyp(EinheitTyp.SPEICHER)) {
             return Speicher.LEER;
         }
-        LocalDateTime ende = zeitVon.plusMinutes(INTERVALL_MINUTEN);
         for (Object[] zeile : messwerteRepository.sumLadungEntladungPerZeitBetween(
-                EinheitTyp.SPEICHER, ende, ende.plusMinutes(INTERVALL_MINUTEN))) {
+                EinheitTyp.SPEICHER, zeitVon, zeitVon.plusMinutes(INTERVALL_MINUTEN))) {
             return new Speicher(alsBigDecimal(zeile[1]), alsBigDecimal(zeile[2]));
         }
         return Speicher.LEER;
@@ -746,13 +746,11 @@ public class SteuerungService {
         LocalDateTime tagesbeginn = datum.atStartOfDay();
         LocalDateTime tagesende = datum.plusDays(1).atStartOfDay();
 
-        // Mengen je Intervall. messwerte.zeit traegt das Intervall-ENDE, die Entscheide den Beginn.
+        // Mengen je Intervall - Messwerte und Entscheide tragen beide den Intervall-Beginn.
         Map<LocalDateTime, Speicher> mengen = new java.util.HashMap<>();
         for (Object[] zeile : messwerteRepository.sumLadungEntladungPerZeitBetween(
-                EinheitTyp.SPEICHER, tagesbeginn.plusMinutes(INTERVALL_MINUTEN),
-                tagesende.plusMinutes(INTERVALL_MINUTEN))) {
-            LocalDateTime beginn = ((LocalDateTime) zeile[0]).minusMinutes(INTERVALL_MINUTEN);
-            mengen.put(beginn, new Speicher(alsBigDecimal(zeile[1]), alsBigDecimal(zeile[2])));
+                EinheitTyp.SPEICHER, tagesbeginn, tagesende)) {
+            mengen.put((LocalDateTime) zeile[0], new Speicher(alsBigDecimal(zeile[1]), alsBigDecimal(zeile[2])));
         }
 
         TreeMap<LocalDateTime, BigDecimal> zustaende = new TreeMap<>();

@@ -27,10 +27,10 @@ import java.time.LocalDateTime;
  * die Einstrahlung hängt an Standort und Ausrichtung der Anlage.
  *
  * <p><b>Zeitbezug:</b> {@link #zeit} ist der <b>Beginn</b> des Intervalls in <b>Ortszeit</b> —
- * derselbe Bezug wie {@code steuerentscheid.zeit_von}. <b>Anders</b> als {@code messwerte.zeit}
- * (Intervall<i>ende</i>) und {@code preiszeitreihe.zeit_von} (UTC). In diesem Umfeld sind drei
- * Zeitkonventionen nebeneinander schon einmal zum Fehler geworden; deshalb steht es hier
- * ausgeschrieben.
+ * derselbe Bezug wie {@code steuerentscheid.zeit_von} und {@code messwerte.zeit}
+ * (Specs/Messwerte-Zeitkonvention.md). Auch {@code preiszeitreihe.zeit_von} ist der Beginn, aber
+ * in <b>UTC</b>. In diesem Umfeld sind mehrere Zeitkonventionen nebeneinander schon einmal zum
+ * Fehler geworden; deshalb steht es hier ausgeschrieben.
  */
 @Entity
 @Table(name = "einstrahlungsprognose", schema = "zev",

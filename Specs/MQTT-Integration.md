@@ -129,6 +129,10 @@ CREATE INDEX idx_zaehler_rohdaten_unverarbeitet
 2. Pro Einheit **je Register die Differenz** über die Intervallgrenze bilden: `ΔBezug` und `ΔEinspeisung` = `(letzter Stand ≤ Intervallende) − (Referenzstand = letzter Stand ≤ vorheriges Intervallende)`.
 3. **Reset/Überlauf/Zählertausch:** Die Guard-Prüfung gilt **pro Register** — ist `ΔBezug` **oder** `ΔEinspeisung` < 0, wird das jeweilige Register-Delta **nicht negativ** übernommen (auf 0 gesetzt), die Referenz neu gesetzt und WARN geloggt. (Wichtig: nicht am Vorzeichen von `total` prüfen, da negatives `total` bei Einspeisung legitim ist – siehe Mapping unten.)
 4. **Mapping auf `messwerte`** (`zeit`, `total`, `einheit`, `org_id`) gemäss Entscheidung (§8):
+   * `zeit` = **Beginn** des Intervalls, Ortszeit (Europe/Zurich) ohne Zone — der Wert für
+     10:00–10:15 steht unter `10:00`, wie beim CSV-Import (`Specs/Messwerte-Zeitkonvention.md`,
+     FR-1). Bis zu jener Umstellung stempelte die Erfassung das **Ende**; diese Spec liess den
+     Stempel offen, und so entstand eine zweite Konvention.
    * `total` = **vorzeichenbehafteter Netto-Wert**: `total = ΔBezug − ΔEinspeisung`. Bezug überwiegt → **positiv** (Verbrauch/Consumer); Einspeisung überwiegt → **negativ** (Produktion/Producer). Producer vs. Consumer wird also **über das Vorzeichen** unterschieden, ohne `einheit.typ`-Verzweigung.
    * `zev`:
      * **Consumer** (`einheit.typ = CONSUMER`): **0** (Sentinel „nicht gemessen"; wird nicht aus MQTT befüllt). Die Solarverteilung ersetzt `0` später durch `zev_calculated` (FR-9).
@@ -138,7 +142,7 @@ CREATE INDEX idx_zaehler_rohdaten_unverarbeitet
    * `zev_calculated` = **NULL** beim Ingest; wird erst durch die **Solarverteilung** (`SolarDistribution`) berechnet. Diese setzt anschliessend `zev = zev_calculated`, sofern `zev = 0` (FR-9).
 5. Speichern mit `quelle = 'MQTT'` (FR-7); Insert/Upsert.
 6. Verarbeitete Rohdaten markieren: `verarbeitet = TRUE`, `verarbeitet_am = NOW()`; Referenzstand fortschreiben.
-7. **Unmittelbar nach der Aggregation** wird **je Mandant (`org_id`)** die **Solarverteilung** (FR-9) für den **behandelten Zeitraum** ausgeführt — d.h. für die Spanne `[frühester Intervall-Start … spätestes Intervall-Ende]` des jeweiligen Mandanten (echte Spanne, auch wenn nur ein 15-Minuten-Intervall verarbeitet wurde). Dadurch tragen die frisch aggregierten Messwerte sofort ihr `zev_calculated` (und – wo `zev = 0` – `zev`), ohne manuellen Anstoss über die UI.
+7. **Unmittelbar nach der Aggregation** wird **je Mandant (`org_id`)** die **Solarverteilung** (FR-9) für den **behandelten Zeitraum** ausgeführt — d.h. für die Spanne `[frühester Intervall-Beginn … spätester Intervall-Beginn]` des jeweiligen Mandanten (die Stempel der erzeugten Messwerte, `Specs/Messwerte-Zeitkonvention.md`, FR-2) (echte Spanne, auch wenn nur ein 15-Minuten-Intervall verarbeitet wurde). Dadurch tragen die frisch aggregierten Messwerte sofort ihr `zev_calculated` (und – wo `zev = 0` – `zev`), ohne manuellen Anstoss über die UI.
    * Aufruf im `ZaehlerAggregationService` über `MesswerteService.calculateSolarDistributionForOrg(orgId, von, bis, algorithmus)`. Da **kein JWT/Request-Kontext** vorliegt, wird der Hibernate-`orgFilter` **explizit** mit der `org_id` versorgt (nicht aus `OrganizationContextService`); **kein** Fortschritts-Tracking.
    * **Algorithmus:** **`PROPORTIONAL`** (Verbraucher erhalten proportional zu ihrem Verbrauch); keine mandantenspezifische Wahl.
    * Fehler der Verteilung werden **pro Mandant** geloggt und brechen die Aggregation der übrigen Mandanten nicht ab.

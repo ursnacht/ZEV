@@ -207,8 +207,13 @@ Grund wie auf Hene.
 
 ### FR-6: Persistierung
 
-Keine neue Tabelle, keine neue Spalte, keine Flyway-Migration. Änderungen: Daten der MQTT-Zeilen
-und Spaltenkommentar auf Hene (FR-5). Mandantenfähigkeit unverändert (`org_id` bleibt, das Skript
+Keine neue Tabelle, keine neue Spalte. Änderungen: Daten der MQTT-Zeilen und Spaltenkommentar
+`messwerte.zeit` auf Hene (FR-5, Skript). Dazu eine Flyway-Migration, die **nur** einen Kommentar
+anpasst: `V173__Einstrahlungsprognose_Zeit_Kommentar.sql` (präzisiert durch
+`V174__Einstrahlungsprognose_Zeit_Kommentar_Praezisierung.sql`) korrigiert den Spaltenkommentar von
+`einstrahlungsprognose.zeit` aus V166, der `messwerte.zeit` noch „Intervallende" nennt. Den
+Kommentar auf `messwerte.zeit` setzt sie **nicht** — an ihm erkennt das Skript, dass es schon
+gelaufen ist. Mandantenfähigkeit unverändert (`org_id` bleibt, das Skript
 verschiebt nur `zeit`).
 
 ### FR-7: Layout
@@ -227,45 +232,45 @@ Keine UI-Änderung. Sichtbare Wirkungen auf Hene nach der Umstellung:
 
 **Konvention und Live-Erfassung**
 
-* [ ] Ein von der Live-Erfassung erzeugter Messwert für das Intervall 10:00–10:15 steht unter
+* [x] Ein von der Live-Erfassung erzeugter Messwert für das Intervall 10:00–10:15 steht unter
       `zeit = 10:00`.
-* [ ] Die Menge dieses Messwerts ist unverändert `letzter Stand ≤ 10:15 − letzter Stand ≤ 10:00`.
-* [ ] Die anschliessende Solarverteilung läuft über `[frühester Intervallbeginn, spätester
+* [x] Die Menge dieses Messwerts ist unverändert `letzter Stand ≤ 10:15 − letzter Stand ≤ 10:00`.
+* [x] Die anschliessende Solarverteilung läuft über `[frühester Intervallbeginn, spätester
       Intervallbeginn]`; der Stempel des Folgeintervalls liegt nicht mehr im Fenster.
-* [ ] Erfasst die Live-Erfassung ein Intervall erneut (spät eintreffende Rohdaten), aktualisiert sie
+* [x] Erfasst die Live-Erfassung ein Intervall erneut (spät eintreffende Rohdaten), aktualisiert sie
       den Messwert unter dem Intervallbeginn; es entsteht keine zweite Zeile.
-* [ ] Javadoc der Entity `Messwerte` und `Specs/MQTT-Integration.md`, FR-6 (inkl. FR-6.7),
+* [x] Javadoc der Entity `Messwerte` und `Specs/MQTT-Integration.md`, FR-6 (inkl. FR-6.7),
       nennen die Konvention „Beginn, Ortszeit".
-* [ ] Kein Kommentar im Code sagt mehr, `messwerte.zeit` trage das Intervallende: Klassenkommentar
+* [x] Kein Kommentar im Code sagt mehr, `messwerte.zeit` trage das Intervallende: Klassenkommentar
       „ZEITBEZÜGE" in `SteuerungService`, Javadoc in `ProduktionsprognoseService` und
       `MesswerteRepository` sind auf FR-1 umgeschrieben.
-* [ ] `Specs/Einspeisesteuerung.md` (FR-3) und `Specs/Ladeplanung.md` (FR-3) beschreiben keinen
+* [x] `Specs/Einspeisesteuerung.md` (FR-3) und `Specs/Ladeplanung.md` (FR-3) beschreiben keinen
       Zeitversatz zwischen `messwerte` und `steuerentscheid` bzw. `einstrahlungsprognose` mehr.
 
 **Steuerung und Prognose ohne Verschiebung (Unit-Tests)**
 
-* [ ] `werteIntervallAus(org, 10:00)` liest Produktion, Verbrauch, Ladung und Entladung aus den
+* [x] `werteIntervallAus(org, 10:00)` liest Produktion, Verbrauch, Ladung und Entladung aus den
       Messwerten mit Stempel `10:00` (nicht `10:15`).
-* [ ] `getEntscheideSimuliert` und `simuliere` ordnen den Messwert mit Stempel `10:00` dem
+* [x] `getEntscheideSimuliert` und `simuliere` ordnen den Messwert mit Stempel `10:00` dem
       Intervall `10:00` zu (`rechneNach`, `reichereSpeicherAn`).
-* [ ] Der Umrechnungsfaktor ordnet den Messwert mit Stempel `10:00` der Einstrahlung mit Stempel
+* [x] Der Umrechnungsfaktor ordnet den Messwert mit Stempel `10:00` der Einstrahlung mit Stempel
       `10:00` zu; Speicherfluss und Lastprofil ebenso.
 
 **Umstellungsskript (Integrationstest)**
 
-* [ ] Nach dem Skript ist jede MQTT-Zeile um genau 15 Minuten früher gestempelt als zuvor;
+* [x] Nach dem Skript ist jede MQTT-Zeile um genau 15 Minuten früher gestempelt als zuvor;
       `total`, `zev`, `zev_calculated`, `einheit_id`, `org_id` und `quelle` sind unverändert.
-* [ ] Anzahl der MQTT-Zeilen und Summe von `total` je Einheit sind vor und nach dem Skript gleich.
-* [ ] CSV-Zeilen sind unverändert (Stempel und Werte).
-* [ ] Nach dem Skript gibt es kein `(einheit_id, zeit)`, das häufiger vorkommt als vorher.
-* [ ] Liegt für eine Einheit eine CSV-Zeile genau 15 Minuten vor einer MQTT-Zeile, bricht das
+* [x] Anzahl der MQTT-Zeilen und Summe von `total` je Einheit sind vor und nach dem Skript gleich.
+* [x] CSV-Zeilen sind unverändert (Stempel und Werte).
+* [x] Nach dem Skript gibt es kein `(einheit_id, zeit)`, das häufiger vorkommt als vorher.
+* [x] Liegt für eine Einheit eine CSV-Zeile genau 15 Minuten vor einer MQTT-Zeile, bricht das
       Skript mit einer Meldung ab, die Anzahl und ein Beispiel nennt; die Datenbank ist unverändert
       (Stempel, Werte und Spaltenkommentar).
-* [ ] Ein zweiter Lauf bricht mit „Bereits umgestellt" ab und verändert nichts.
-* [ ] Ohne MQTT-Zeilen läuft das Skript fehlerfrei durch; die CSV-Zeilen sind unverändert, der
+* [x] Ein zweiter Lauf bricht mit „Bereits umgestellt" ab und verändert nichts.
+* [x] Ohne MQTT-Zeilen läuft das Skript fehlerfrei durch; die CSV-Zeilen sind unverändert, der
       Spaltenkommentar ist gesetzt. (Die `NOTICE` mit der Anzahl ist Bedienerhilfe in `psql` und
       wird im Test nicht geprüft.)
-* [ ] Nach dem Skript trägt `zev.messwerte.zeit` den Spaltenkommentar aus FR-5.
+* [x] Nach dem Skript trägt `zev.messwerte.zeit` den Spaltenkommentar aus FR-5.
 
 **Gleichstand der Auswertungen (auf Hene, nach der Umstellung)**
 
@@ -301,9 +306,9 @@ Keine UI-Änderung. Sichtbare Wirkungen auf Hene nach der Umstellung:
 
 **Unverändert**
 
-* [ ] Für Mut13 (lokal) liefern Statistik und Stromrechnungen vor und nach der Umstellung
+* [x] Für Mut13 (lokal) liefern Statistik und Stromrechnungen vor und nach der Umstellung
       dieselben Werte.
-* [ ] Der Ladezustand eines Entscheids ist vor und nach der Umstellung derselbe.
+* [x] Der Ladezustand eines Entscheids ist vor und nach der Umstellung derselbe.
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
@@ -411,7 +416,7 @@ es dort braucht):
   * `service/ProduktionsprognoseService.java` — Faktor, Speicherfluss, Lastprofil (FR-4)
   * `entity/Messwerte.java`, `repository/MesswerteRepository.java` (Javadoc der
     Zeitraum-Abfragen) — Javadoc
-* **Neu:** `scripts/messwerte-zeit-intervallbeginn.sql` (FR-5). **Keine** Flyway-Migration.
+* **Neu:** `scripts/messwerte-zeit-intervallbeginn.sql` (FR-5); `V173__Einstrahlungsprognose_Zeit_Kommentar.sql` und `V174__Einstrahlungsprognose_Zeit_Kommentar_Praezisierung.sql` (nur Kommentar, FR-6). Keine Flyway-Migration für die Daten.
 * **Code (unverändert, Ergebnisse auf Hene ändern sich):** `StatistikService`,
   `StatistikPdfService`, `RechnungService`, `MesswerteService` (Anzeige, CSV-Import, Verteilung).
 * **Nicht betroffen:** Nebenkostenabrechnung (liest keine Messwerte), Preiszeitreihe,

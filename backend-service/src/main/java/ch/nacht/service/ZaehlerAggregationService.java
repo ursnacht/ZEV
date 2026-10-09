@@ -87,8 +87,10 @@ public class ZaehlerAggregationService {
         LocalDateTime letzteGrenze = floorAufQuartal(jetzt); // letztes abgeschlossenes Intervallende
         int erzeugt = 0;
         // Behandelter Zeitraum je Mandant für die anschliessende Verteilung:
-        // von = frühester Intervall-Start, bis = spätestes Intervall-Ende (echte Spanne, auch bei
-        // nur einem verarbeiteten Intervall).
+        // von = frühester, bis = spätester Intervall-BEGINN - die Stempel der erzeugten Messwerte
+        // (Specs/Messwerte-Zeitkonvention.md, FR-2). Echte Spanne, auch bei nur einem Intervall.
+        // Mit dem Ende als obere Grenze naehme das inklusive BETWEEN der Verteilung den Stempel
+        // des Folgeintervalls mit.
         Map<Long, LocalDateTime> orgVon = new HashMap<>();
         Map<Long, LocalDateTime> orgBis = new HashMap<>();
 
@@ -116,7 +118,7 @@ public class ZaehlerAggregationService {
                         erzeugt++;
                         Long org = einheit.getOrgId();
                         orgVon.merge(org, intervallStart, (a, b) -> a.isBefore(b) ? a : b);
-                        orgBis.merge(org, intervallEnde, (a, b) -> a.isAfter(b) ? a : b);
+                        orgBis.merge(org, intervallStart, (a, b) -> a.isAfter(b) ? a : b);
                     }
                     rohdatenRepository.markVerarbeitet(einheitId, intervallEnde, jetzt);
                 }
@@ -156,6 +158,10 @@ public class ZaehlerAggregationService {
     /**
      * Bildet die Register-Deltas über die Intervallgrenze und schreibt (Upsert) den Messwert.
      * Reset-Guard pro Register (Δ < 0 → 0). {@code total} ist vorzeichenbehaftet.
+     *
+     * <p>Der Messwert steht unter dem <b>Beginn</b> des Intervalls ({@code start}) — dieselbe
+     * Konvention wie beim CSV-Import (Specs/Messwerte-Zeitkonvention.md, FR-1). Die Deltas
+     * spannen weiterhin {@code (start, ende]}; nur der Stempel ist der Beginn.
      *
      * @return true, wenn ein Messwert erzeugt/aktualisiert wurde
      */
@@ -200,7 +206,7 @@ public class ZaehlerAggregationService {
                 einheit, "Einspeisung", ende);
 
         double total = deltaBezug.subtract(deltaEinspeisung).doubleValue();
-        upsertMesswert(einheit, ende, total);
+        upsertMesswert(einheit, start, total);
         return true;
     }
 

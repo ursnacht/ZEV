@@ -60,7 +60,7 @@ public interface MesswerteRepository extends JpaRepository<Messwerte, Long> {
     /**
      * Ladung und Entladung einer {@code SPEICHER}-Einheit <b>je Intervall</b>
      * (Specs/Einspeisesteuerung.md, FR-5b). Rückgabe je Zeile: {@code [zeit, ladung, entladung]},
-     * beide Mengen positiv; {@code zeit} ist wie überall in {@code messwerte} das Intervall<b>ende</b>.
+     * beide Mengen positiv; {@code zeit} ist wie überall in {@code messwerte} der Intervall<b>beginn</b>.
      *
      * <p>Getrennt von {@link #sumLadungEntladungByEinheitTypAndZeitBetween}, die über den ganzen
      * Zeitraum summiert: Die Tagesansicht braucht den Verlauf, nicht die Summe.

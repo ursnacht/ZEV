@@ -6,7 +6,7 @@
 (`Specs/Messwerte-Zeitkonvention.md`). Die MQTT-Live-Erfassung stempelt dafür den Beginn statt des
 Endes, und `SteuerungService` und `ProduktionsprognoseService` verlieren ihre Verschiebungen um eine
 Viertelstunde. Die Bestandsdaten von Hene stellt ein einmaliges SQL-Skript um, das der User beim
-Ausrollen von Hand ausführt; es gibt **keine** Flyway-Migration.
+Ausrollen von Hand ausführt; Flyway passt nur einen Spaltenkommentar an (V173).
 
 ---
 
@@ -19,6 +19,7 @@ Ausrollen von Hand ausführt; es gibt **keine** Flyway-Migration.
 | `backend-service/src/main/java/ch/nacht/service/ProduktionsprognoseService.java` | Historienfenster (Z. 172–173), Lastprofil (Z. 240), Speicherfluss-Fenster (Z. 287–288), Faktor-Zuordnung (Z. 290–297), `speicherflussJeIntervall` (ab Z. 329) |
 | `backend-service/src/main/java/ch/nacht/repository/MesswerteRepository.java` | Javadoc `sumLadungEntladungPerZeitBetween` (Z. 63: „Intervall**ende**") |
 | `backend-service/src/main/java/ch/nacht/entity/Messwerte.java` | Javadoc der Klasse bzw. des Felds `zeit`: Konvention FR-1 |
+| `backend-service/src/main/resources/db/migration/V173__Einstrahlungsprognose_Zeit_Kommentar.sql` | **neu** — nur `COMMENT ON COLUMN zev.einstrahlungsprognose.zeit` |
 | `scripts/messwerte-zeit-intervallbeginn.sql` | **neu** — Umstellungsskript (FR-5), Kopfkommentar mit Ablauf NFR-3 |
 | `backend-service/src/test/java/ch/nacht/service/ZaehlerAggregationServiceTest.java` | Erwartungen auf Stempel `start` und Verteilfenster |
 | `backend-service/src/test/java/ch/nacht/service/SteuerungServiceTest.java` | **neu** |
@@ -29,7 +30,7 @@ Ausrollen von Hand ausführt; es gibt **keine** Flyway-Migration.
 | `Specs/Ladeplanung.md` | FR-3 (Zeitversatz; Hinweise um Z. 246 und Z. 296) |
 | `Specs/Zaehlertausch-Erkennung.md` | Begriffe prüfen |
 
-**Nicht betroffen:** Frontend, Controller, DTOs, Flyway-Migrationen, `StatistikService`,
+**Nicht betroffen:** Frontend, Controller, DTOs, `StatistikService`,
 `StatistikPdfService`, `RechnungService`, `MesswerteService`, `SteuerRegelService` (keine
 Zeitverschiebung), `LadeplanService` (bezieht Lastprofil und Prognose über
 `ProduktionsprognoseService`).
@@ -40,13 +41,13 @@ Zeitverschiebung), `LadeplanService` (bezieht Lastprofil und Prognose über
 
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
-|  [ ]   | 1. Live-Erfassung | `ZaehlerAggregationService.verarbeiteIntervall`: `upsertMesswert(einheit, start, total)`. In der Schleife `orgBis.merge(org, intervallStart, …)` statt `intervallEnde`. Delta-Bildung, `markVerarbeitet(einheitId, intervallEnde, …)` und Systemmeldungen bleiben unverändert (sie arbeiten mit Intervallgrenzen, nicht mit dem Stempel). |
-|  [ ]   | 2. Einspeisesteuerung | `SteuerungService`: <br>• `rechneNach`: Fenster `von.atStartOfDay()` / `bis.plusDays(1).atStartOfDay()`, `zeit = (LocalDateTime) zeile[0]` ohne `minusMinutes`; Variablen `vonEnde`/`bisEnde`/`endeOrtszeit` umbenennen. <br>• `messungFuer`: Fenster `[zeitVon, zeitVon+15)`; Warnmeldung nennt `zeitVon` – `zeitVon+15`. <br>• `speicherFuer`: Fenster `[zeitVon, zeitVon+15)`. <br>• `reichereSpeicherAn`: Fenster `[tagesbeginn, tagesende)`, Schlüssel `zeile[0]` unverschoben. <br>• **Unverändert:** `socAmIntervallende`, `lowerEntry(zeit + 15)`, `findByZeitVon(zeitVon − 15)` (Vorintervall des Entscheids), Preiszugriffe. <br>• Klassenkommentar „ZEITBEZUEGE": `messwerte.zeit` = Ortszeit, Intervall-**BEGINN**; Hinweis, dass die frühere Ende-Konvention mit `Specs/Messwerte-Zeitkonvention.md` entfiel. |
-|  [ ]   | 3. Produktionsprognose | `ProduktionsprognoseService`: <br>• Historie `sumBilanzKomponentenPerZeitBetween(von, bis)` ohne `plusMinutes`. <br>• `lastprofil`: `beginn = (LocalDateTime) zeile[0]`. <br>• `umrechnungsfaktor`: `speicherflussJeIntervall(von, bis)`; in der Schleife eine Variable `zeit = (LocalDateTime) zeile[0]` für **beide** Nachschlagewege (`gtiJeZeit.get(zeit)`, `speicherJeZeit.getOrDefault(zeit, …)` — heute `beginn` bzw. `ende`); Kommentar „Intervall-ENDE … deshalb die Verschiebung" ersetzen. <br>• `speicherflussJeIntervall`: Code unverändert (schlüsselt schon nach dem Stempel), nur Javadoc „Intervall**ende**" → „Intervall**beginn**". <br>• Konstante `INTERVALL_MINUTEN` entfernen, falls danach unbenutzt. |
-|  [ ]   | 4. Javadoc | `Messwerte.java`: Javadoc an `zeit` — „Beginn des 15-Minuten-Intervalls, Ortszeit Europe/Zurich ohne Zone; gilt für jede Quelle (Specs/Messwerte-Zeitkonvention.md)". `MesswerteRepository` Z. 63: „Intervall**beginn**". Danach `grep -rn "Intervall-ENDE\|Intervallende\|Intervall<b>ende" backend-service/src/main` — Treffer zu `messwerte` bereinigen, Treffer zu Ladezustand (`socAmIntervallende`) bleiben. |
-|  [ ]   | 5. Umstellungsskript | `scripts/messwerte-zeit-intervallbeginn.sql`: der `DO`-Block aus FR-5 **wörtlich**. Kopfkommentar: Zweck, „einmalig, nur Hene, nur solange die alte Version geschrieben hat", Ablauf NFR-3 (Schritte 0–4 mit Befehlen), Verweis auf die Spec. Keine `psql`-Metabefehle (`\…`) und kein `BEGIN`/`COMMIT`, damit der Integrationstest die Datei unverändert per JDBC ausführen kann. **Nur Syntax prüfen** — nicht gegen lokale DB oder Hene ausführen. |
-|  [ ]   | 6. Specs nachführen | `MQTT-Integration.md` FR-6: Stempel = Intervallbeginn (Verweis auf die neue Spec); FR-6.7: „`[frühester Intervall-Start … spätester Intervall-Start]`". `Einspeisesteuerung.md` FR-3 und `Ladeplanung.md` FR-3: Ende-Konvention und Zeitversatz-Hinweise durch „gleiche Konvention seit Messwerte-Zeitkonvention" ersetzen; historische Befunde (z. B. Auswertungen mit damaligem Stand) als solche kennzeichnen statt löschen. `Zaehlertausch-Erkennung.md`: Begriffe prüfen. |
-|  [ ]   | 7. Kompilieren | `mvn -pl backend-service compile -q` (JAVA_HOME setzen). Bestehende Tests laufen lassen: `ZaehlerAggregationServiceTest`, `ProduktionsprognoseServiceTest`, `LadeplanServiceTest`, `SteuerRegelServiceTest` — die erwartbar roten Zeitversatz-Tests notieren, sie werden in den Test-Commands angepasst. |
+|  [x]   | 1. Live-Erfassung | `ZaehlerAggregationService.verarbeiteIntervall`: `upsertMesswert(einheit, start, total)`. In der Schleife `orgBis.merge(org, intervallStart, …)` statt `intervallEnde`. Delta-Bildung, `markVerarbeitet(einheitId, intervallEnde, …)` und Systemmeldungen bleiben unverändert (sie arbeiten mit Intervallgrenzen, nicht mit dem Stempel). |
+|  [x]   | 2. Einspeisesteuerung | `SteuerungService`: <br>• `rechneNach`: Fenster `von.atStartOfDay()` / `bis.plusDays(1).atStartOfDay()`, `zeit = (LocalDateTime) zeile[0]` ohne `minusMinutes`; Variablen `vonEnde`/`bisEnde`/`endeOrtszeit` umbenennen. <br>• `messungFuer`: Fenster `[zeitVon, zeitVon+15)`; Warnmeldung nennt `zeitVon` – `zeitVon+15`. <br>• `speicherFuer`: Fenster `[zeitVon, zeitVon+15)`. <br>• `reichereSpeicherAn`: Fenster `[tagesbeginn, tagesende)`, Schlüssel `zeile[0]` unverschoben. <br>• **Unverändert:** `socAmIntervallende`, `lowerEntry(zeit + 15)`, `findByZeitVon(zeitVon − 15)` (Vorintervall des Entscheids), Preiszugriffe. <br>• Klassenkommentar „ZEITBEZUEGE": `messwerte.zeit` = Ortszeit, Intervall-**BEGINN**; Hinweis, dass die frühere Ende-Konvention mit `Specs/Messwerte-Zeitkonvention.md` entfiel. |
+|  [x]   | 3. Produktionsprognose | `ProduktionsprognoseService`: <br>• Historie `sumBilanzKomponentenPerZeitBetween(von, bis)` ohne `plusMinutes`. <br>• `lastprofil`: `beginn = (LocalDateTime) zeile[0]`. <br>• `umrechnungsfaktor`: `speicherflussJeIntervall(von, bis)`; in der Schleife eine Variable `zeit = (LocalDateTime) zeile[0]` für **beide** Nachschlagewege (`gtiJeZeit.get(zeit)`, `speicherJeZeit.getOrDefault(zeit, …)` — heute `beginn` bzw. `ende`); Kommentar „Intervall-ENDE … deshalb die Verschiebung" ersetzen. <br>• `speicherflussJeIntervall`: Code unverändert (schlüsselt schon nach dem Stempel), nur Javadoc „Intervall**ende**" → „Intervall**beginn**". <br>• Konstante `INTERVALL_MINUTEN` entfernen, falls danach unbenutzt. |
+|  [x]   | 4. Javadoc | `Messwerte.java`: Javadoc an `zeit` — „Beginn des 15-Minuten-Intervalls, Ortszeit Europe/Zurich ohne Zone; gilt für jede Quelle (Specs/Messwerte-Zeitkonvention.md)". `MesswerteRepository` Z. 63: „Intervall**beginn**". Danach `grep -rn "Intervall-ENDE\|Intervallende\|Intervall<b>ende" backend-service/src/main` — Treffer zu `messwerte` bereinigen, Treffer zu Ladezustand (`socAmIntervallende`) bleiben. |
+|  [x]   | 5. Umstellungsskript | `scripts/messwerte-zeit-intervallbeginn.sql`: der `DO`-Block aus FR-5 **wörtlich**. Kopfkommentar: Zweck, „einmalig, nur Hene, nur solange die alte Version geschrieben hat", Ablauf NFR-3 (Schritte 0–4 mit Befehlen), Verweis auf die Spec. Keine `psql`-Metabefehle (`\…`) und kein `BEGIN`/`COMMIT`, damit der Integrationstest die Datei unverändert per JDBC ausführen kann. **Nur Syntax prüfen** — nicht gegen lokale DB oder Hene ausführen. |
+|  [x]   | 6. Specs nachführen | `MQTT-Integration.md` FR-6: Stempel = Intervallbeginn (Verweis auf die neue Spec); FR-6.7: „`[frühester Intervall-Start … spätester Intervall-Start]`". `Einspeisesteuerung.md` FR-3 und `Ladeplanung.md` FR-3: Ende-Konvention und Zeitversatz-Hinweise durch „gleiche Konvention seit Messwerte-Zeitkonvention" ersetzen; historische Befunde (z. B. Auswertungen mit damaligem Stand) als solche kennzeichnen statt löschen. `Zaehlertausch-Erkennung.md`: Begriffe prüfen. |
+|  [x]   | 7. Kompilieren | `mvn -pl backend-service compile -q` (JAVA_HOME setzen). Bestehende Tests laufen lassen: `ZaehlerAggregationServiceTest`, `ProduktionsprognoseServiceTest`, `LadeplanServiceTest`, `SteuerRegelServiceTest` — die erwartbar roten Zeitversatz-Tests notieren, sie werden in den Test-Commands angepasst. |
 
 > **Phasen 1–3 gehören in denselben Build** (NFR-3): Einzeln ausgerollt rechnete die Steuerung auf
 > Daten der jeweils anderen Konvention. Lokal ist die Reihenfolge der Phasen frei.
@@ -62,7 +63,7 @@ Zeitverschiebung), `LadeplanService` (bezieht Lastprofil und Prognose über
 
 **Integrationstest des Skripts — Aufbau:**
 
-* `extends AbstractIntegrationTest` (Testcontainers, alle Flyway-Migrationen), Zugriff über
+* `extends AbstractIntegrationTest` (Testcontainers; Schema von Hibernate `create-drop`, **nicht** aus den Flyway-Migrationen — für das Skript genügt das, V173 deckt der Test nicht ab), Zugriff über
   `JdbcTemplate`.
 * **Nicht transaktional** (`@Transactional(propagation = NOT_SUPPORTED)` bzw. kein `@DataJpaTest`-
   Rollback um den Skriptlauf): Der `RAISE EXCEPTION`-Fall bräche sonst die Testtransaktion ab, und
@@ -106,4 +107,13 @@ Beide vor dem `UPDATE`, alles in einem `DO`-Block (atomar).
   aus dem Backup von Schritt 2.
 * **`steuerentscheid`-Bezug zum Vorintervall** (`findByZeitVon(zeitVon − 15)`) ist eine Verschiebung
   auf `steuerentscheid`, nicht auf `messwerte`, und bleibt.
+* **Stand nach Phase 7 (09.10.2026):** Kompiliert. Erwartbar rot, weil ihre Testdaten die
+  Ende-Konvention abbilden: `ProduktionsprognoseServiceTest` (10 — Fenster-, Versatz- und
+  Lastprofiltests) und `ZaehlerAggregationServiceTest` (2 — Verteilfenster, Stempel nach
+  Zählertausch-Lücke). `LadeplanServiceTest` und `SteuerRegelServiceTest` grün. Anpassung über
+  `/3_backend-tests`.
+* **Spaltenkommentar von `einstrahlungsprognose.zeit`** (V166) nannte `messwerte.zeit` noch
+  „Intervallende". V166 bleibt unverändert; korrigiert über `V173__Einstrahlungsprognose_Zeit_Kommentar.sql`
+  (Entscheid des Users, 09.10.2026); `V174__Einstrahlungsprognose_Zeit_Kommentar_Praezisierung.sql` stellt klar, dass `preiszeitreihe.zeit_von` ebenfalls der Beginn ist und sich nur in der Zone (UTC) unterscheidet. V173 darf den Kommentar auf `messwerte.zeit` **nicht**
+  setzen — er ist die Wiederholungssperre des Skripts.
 * **Zeilennummern** in „Betroffene Komponenten" sind Stand 09.10.2026 und dienen der Orientierung.

@@ -238,7 +238,7 @@ Preise vor, gilt `WARTEN_AUF_TAL` als nicht erfüllt (§5).
 
 | Quelle | Zone | Bedeutung von `zeit` |
 |---|---|---|
-| `messwerte.zeit` | **Ortszeit** (die Aggregierung rechnet mit `LocalDateTime.now()`) | Intervall**ende** |
+| `messwerte.zeit` | **Ortszeit** (die Aggregierung rechnet mit `LocalDateTime.now()`) | Intervall**beginn** (bis zur Umstellung gemäss `Specs/Messwerte-Zeitkonvention.md`: MQTT-Werte Intervall**ende**) |
 | `zaehler_rohdaten.zeit` | **Ortszeit** | Zeitpunkt der Messung |
 | `steuerentscheid.zeit_von` | **Ortszeit** | Intervall**beginn** |
 | `preiszeitreihe.zeit_von` | **UTC** | Intervall**beginn** |
@@ -253,6 +253,12 @@ Ortszeit wie die beiden anderen Zeitreihen des Systems. Die Preiszeitreihe bleib
 Fremdkörper — sie wird verbatim von der Börse übernommen und gehört nicht der Steuerung. Umgerechnet
 wird deshalb **nur noch der Preis**, an drei Stellen: `preisFuer`, `tiefstpreisRestDesTages` und —
 einmalig beim Bündeln — `preiseJeOrtstag`. Dahinter ist alles Ortszeit.
+
+**Seit `Specs/Messwerte-Zeitkonvention.md` gilt auch Beginn statt Ende:** `messwerte.zeit` trägt
+wie `steuerentscheid.zeit_von` den Intervall**beginn**. Die Verschiebung um eine Viertelstunde, mit
+der die Steuerung Messwerte las (`messungFuer`, `speicherFuer`, `rechneNach`,
+`reichereSpeicherAn`), ist entfallen; ein Intervall wird mit `[zeit_von, zeit_von + 15 min)`
+gelesen. Der Ladezustand bleibt ein Momentanwert (letzter Wert **vor** dem Intervallende).
 
 > **Warum nicht umgekehrt alles nach UTC?** Weil `messwerte` und `zaehler_rohdaten` bereits
 > Ortszeit führen und nicht zur Disposition stehen. Eine dritte Konvention für eine einzelne neue
@@ -1038,7 +1044,7 @@ Der Text ist an kein Feature gebunden.
 * [ ] Der Abschnitt in den Einstellungen erscheint nur bei aktivem Feature-Flag.
 * [ ] Der Job läuft eine Minute **nach der Aggregierung** (`0 6,21,36,51 * * * *`), nicht nach dem Intervallende.
 * [ ] Der ausgewertete Zeitraum ist das Intervall, das die Aggregierung soeben geschrieben hat — um 12:06 also 11:45–12:00.
-* [ ] Die Messwerte werden über das Intervall**ende** gesucht, der Entscheid trägt den Intervall**beginn** — beide in Ortszeit, ohne Zonenrechnung.
+* [ ] Messwerte und Entscheid tragen beide den Intervall**beginn** — Ortszeit, ohne Verschiebung und ohne Zonenrechnung (`Specs/Messwerte-Zeitkonvention.md`; bis dahin wurden die Messwerte über das Intervall**ende** gesucht).
 * [ ] Der **Preis** ist die einzige Grösse, die umgerechnet wird (`PreiszeitreiheZeit.nachUtc`); im Job an zwei, in der Rückrechnung an einer Stelle.
 * [ ] Preis und Messwerte eines Entscheids gehören zum **selben** Zeitpunkt — prüfbar, indem ein Entscheid gegen `messwerte` und `preiszeitreihe` gegengerechnet wird.
 

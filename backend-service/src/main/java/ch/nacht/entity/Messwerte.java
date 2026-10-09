@@ -18,6 +18,12 @@ public class Messwerte {
     @Column(name = "org_id", nullable = false)
     private Long orgId;
 
+    /**
+     * <b>Beginn</b> des 15-Minuten-Intervalls, dessen Menge {@code total} (und {@code zev},
+     * {@code zevCalculated}) beschreibt — Ortszeit Europe/Zurich ohne Zone, für jede Quelle
+     * (CSV, MQTT, API). Der Wert für 10:00–10:15 steht unter 10:00; ein Tag umfasst die Stempel
+     * 00:00 bis 23:45 (Specs/Messwerte-Zeitkonvention.md, FR-1).
+     */
     @Column(name = "zeit", nullable = false)
     private LocalDateTime zeit;
 

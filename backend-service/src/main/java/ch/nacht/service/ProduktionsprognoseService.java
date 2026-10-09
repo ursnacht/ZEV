@@ -65,9 +65,6 @@ public class ProduktionsprognoseService {
 
     private static final Logger log = LoggerFactory.getLogger(ProduktionsprognoseService.class);
 
-    /** Länge eines Messintervalls — dasselbe Raster wie Messwerte und Prognose. */
-    private static final int INTERVALL_MINUTEN = 15;
-
     /**
      * Mindestzahl an Intervallen mit Einstrahlung, damit ein Faktor gebildet wird.
      *
@@ -169,8 +166,7 @@ public class ProduktionsprognoseService {
                 .historieTageOderVorgabe();
         LocalDateTime von = datum.minusDays(historieTage).atStartOfDay();
         LocalDateTime bis = datum.atStartOfDay();
-        List<Object[]> historie = messwerteRepository.sumBilanzKomponentenPerZeitBetween(
-                von.plusMinutes(INTERVALL_MINUTEN), bis.plusMinutes(INTERVALL_MINUTEN));
+        List<Object[]> historie = messwerteRepository.sumBilanzKomponentenPerZeitBetween(von, bis);
 
         BigDecimal faktor = umrechnungsfaktor(orgId, datum, von, bis, historie);
         Map<LocalTime, BigDecimal> lastprofil = lastprofil(orgId, datum, historieTage, historie);
@@ -218,10 +214,10 @@ public class ProduktionsprognoseService {
      * <p><b>Gleiche Wochentage</b>, weil der Tagesverlauf eines Haushalts am Wochenende anders
      * aussieht als werktags. Bei der Vorgabe von 28 Tagen sind das vier Stichproben je Intervall.
      *
-     * <p><b>Zeitversatz:</b> {@code messwerte.zeit} trägt das Intervall<b>ende</b>, die Prognose
-     * den <b>Beginn</b>. Geschlüsselt wird nach dem Beginn — dieselbe Falle wie beim Faktor, und
-     * sie fällt hier genauso wenig auf: Ein um eine Viertelstunde versetztes Profil sieht aus wie
-     * ein richtiges.
+     * <p><b>Kein Zeitversatz:</b> {@code messwerte.zeit} und die Prognose tragen beide den
+     * Intervall<b>beginn</b> (Specs/Messwerte-Zeitkonvention.md). Geschlüsselt wird nach dem
+     * Stempel selbst. Früher war hier eine Verschiebung nötig — und ein um eine Viertelstunde
+     * versetztes Profil sieht aus wie ein richtiges; deshalb steht es hier.
      *
      * <p>Leer, wenn {@code historieTage < 7} — dann liegt kein gleicher Wochentag im Fenster.
      */
@@ -237,7 +233,7 @@ public class ProduktionsprognoseService {
 
         Map<LocalTime, List<BigDecimal>> stichproben = new HashMap<>();
         for (Object[] zeile : historie) {
-            LocalDateTime beginn = ((LocalDateTime) zeile[0]).minusMinutes(INTERVALL_MINUTEN);
+            LocalDateTime beginn = (LocalDateTime) zeile[0];
             if (beginn.getDayOfWeek() != wochentag) {
                 continue;
             }
@@ -284,18 +280,17 @@ public class ProduktionsprognoseService {
         }
 
         // Der Speicherfluss je Intervall - er fehlt im Erzeugungszaehler und muss dazu.
-        Map<LocalDateTime, BigDecimal> speicherJeZeit = speicherflussJeIntervall(
-                von.plusMinutes(INTERVALL_MINUTEN), bis.plusMinutes(INTERVALL_MINUTEN));
+        Map<LocalDateTime, BigDecimal> speicherJeZeit = speicherflussJeIntervall(von, bis);
 
-        // Gemessene Erzeugung je Intervall. messwerte.zeit traegt das Intervall-ENDE, die Prognose
-        // den BEGINN - deshalb die Verschiebung. Ohne sie waere der Faktor um eine Viertelstunde
-        // versetzt gelernt, und niemand saehe es der Zahl an.
+        // Gemessene Erzeugung je Intervall. Messwerte, Prognose und Speicherfluss tragen alle den
+        // Intervall-BEGINN - ein Stempel fuer alle drei Nachschlagewege. Ein Versatz zwischen
+        // ihnen liesse den Faktor um eine Viertelstunde versetzt lernen, und niemand saehe es der
+        // Zahl an.
         BigDecimal summeErzeugung = BigDecimal.ZERO;
         BigDecimal summeGti = BigDecimal.ZERO;
         for (Object[] zeile : historie) {
-            LocalDateTime ende = (LocalDateTime) zeile[0];
-            LocalDateTime beginn = ende.minusMinutes(INTERVALL_MINUTEN);
-            BigDecimal gti = gtiJeZeit.get(beginn);
+            LocalDateTime zeit = (LocalDateTime) zeile[0];
+            BigDecimal gti = gtiJeZeit.get(zeit);
             if (gti == null) {
                 continue;
             }
@@ -303,7 +298,7 @@ public class ProduktionsprognoseService {
             // erzeugt, auch wenn es am Erzeugungszaehler vorbeilief. Ohne Speicher ist der
             // Zuschlag 0 und es bleibt beim Zaehlerwert.
             BigDecimal erzeugung = alsBigDecimal(zeile[1])
-                    .add(speicherJeZeit.getOrDefault(ende, BigDecimal.ZERO));
+                    .add(speicherJeZeit.getOrDefault(zeit, BigDecimal.ZERO));
             // Eine negative Summe waere keine Erzeugung. Sie kann entstehen, wenn die Batterie
             // entlaedt, waehrend die Sonne schon scheint und der Zaehler wenig sieht.
             if (erzeugung.signum() < 0) {
@@ -321,7 +316,7 @@ public class ProduktionsprognoseService {
 
     /**
      * Netto-Speicherfluss je Intervall: {@code ladung − entladung}, geschlüsselt nach
-     * Intervall<b>ende</b> (wie {@code messwerte.zeit}).
+     * Intervall<b>beginn</b> (wie {@code messwerte.zeit}).
      *
      * <p>Leer, wenn keine {@code SPEICHER}-Einheit erfasst ist — dann bleibt es beim blossen
      * Zählerwert, was ohne Speicher auch richtig ist.

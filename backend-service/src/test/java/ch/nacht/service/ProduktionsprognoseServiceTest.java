@@ -182,7 +182,7 @@ public class ProduktionsprognoseServiceTest {
     void getPrognose_OhneSpeicherEinheit_LerntNurDenZaehlerwert() {
         when(einheitRepository.existsByTyp(EinheitTyp.SPEICHER)).thenReturn(false);
         lernhistorie(MIN_PUNKTE);
-        messwerte(messwert(ende(0), "2.000"));
+        messwerte(messwert(beginn(0), "2.000"));
 
         PrognosepunktDTO punkt = einzigerPunkt();
 
@@ -203,8 +203,8 @@ public class ProduktionsprognoseServiceTest {
     void getPrognose_MitSpeicherEinheit_RechnetLadungHinzuUndEntladungAb() {
         when(einheitRepository.existsByTyp(EinheitTyp.SPEICHER)).thenReturn(true);
         lernhistorie(MIN_PUNKTE);
-        messwerte(messwert(ende(0), "2.000"));
-        speicherfluss(new Object[]{ende(0), new BigDecimal("1.500"), new BigDecimal("0.500")});
+        messwerte(messwert(beginn(0), "2.000"));
+        speicherfluss(new Object[]{beginn(0), new BigDecimal("1.500"), new BigDecimal("0.500")});
 
         PrognosepunktDTO punkt = einzigerPunkt();
 
@@ -212,70 +212,100 @@ public class ProduktionsprognoseServiceTest {
     }
 
     /**
-     * Der Speicherfluss wird im <b>selben verschobenen Fenster</b> geholt wie die Messwerte.
+     * Der Speicherfluss wird im <b>selben, unverschobenen Fenster</b> geholt wie die Messwerte und
+     * die Einstrahlung: 2026-08-28 00:00 bis 2026-09-25 00:00.
      *
-     * <p>Er ist nach Intervall<b>ende</b> geschluesselt, wie {@code messwerte.zeit}. Liefe er ueber
-     * das unverschobene Fenster, fehlte am Rand je ein Intervall — still, und nur am Rand.
+     * <p>Er ist wie {@code messwerte.zeit} nach dem Intervall<b>beginn</b> geschluesselt
+     * (Specs/Messwerte-Zeitkonvention.md). Liefe er ueber ein um 15 Minuten verschobenes Fenster —
+     * die fruehere Ende-Konvention —, fehlte am Rand je ein Intervall: still, und nur am Rand.
      */
     @Test
     void getPrognose_MitSpeicher_FragtSpeicherflussImSelbenFenster() {
         when(einheitRepository.existsByTyp(EinheitTyp.SPEICHER)).thenReturn(true);
         lernhistorie(MIN_PUNKTE);
-        messwerte(messwert(ende(0), "2.000"));
+        messwerte(messwert(beginn(0), "2.000"));
 
         produktionsprognoseService.getPrognose(DATUM);
 
         verify(messwerteRepository).sumLadungEntladungPerZeitBetween(
                 eq(EinheitTyp.SPEICHER),
-                eq(LocalDateTime.of(2026, 8, 28, 0, 15)),
-                eq(LocalDateTime.of(2026, 9, 25, 0, 15)));
+                eq(LocalDateTime.of(2026, 8, 28, 0, 0)),
+                eq(LocalDateTime.of(2026, 9, 25, 0, 0)));
     }
 
-    // ==================== Der gelernte Faktor: Zeitversatz ====================
+    /**
+     * Der Speicherfluss wird nach dem <b>Stempel selbst</b> zugeordnet — derselbe Schluessel wie
+     * Messwert und Einstrahlung.
+     *
+     * <p>Der Fluss steht unter 10:15 (dem zweiten Intervall). Ordnete der Service ihn wie frueher
+     * um eine Viertelstunde versetzt zu, fiele er auf den Messwert von 10:00. Eine blosse
+     * Umverteilung bliebe in der Summe unsichtbar; deshalb ist der Fluss eine Entladung, die nur
+     * am falschen Intervall die Kappung auf 0 ausloest — dann aendert sich die Summe.
+     */
+    @Test
+    void getPrognose_MitSpeicher_SpeicherflussSchluesselIstDerStempel() {
+        when(einheitRepository.existsByTyp(EinheitTyp.SPEICHER)).thenReturn(true);
+        lernhistorie(MIN_PUNKTE);
+        messwerte(messwert(beginn(0), "0.500"), messwert(beginn(1), "3.000"));
+        // Entladung 2.000 im zweiten Intervall (Beginn 10:15): 3.000 − 2.000 = 1.000.
+        // Falsch dem ersten zugeordnet: 0.500 − 2.000 = −1.500 → gekappt auf 0, plus 3.000.
+        speicherfluss(new Object[]{beginn(1), BigDecimal.ZERO, new BigDecimal("2.000")});
+
+        PrognosepunktDTO punkt = einzigerPunkt();
+
+        // Richtig: (0.500 + 1.000) / 200 W/m² = 0.0075; falsch zugeordnet: 3.000 / 200 = 0.015
+        assertEquals(new BigDecimal("0.00750000"), punkt.getFaktor());
+    }
+
+    // ==================== Der gelernte Faktor: keine Zeitverschiebung ====================
 
     /**
-     * <b>Der Zeitversatz.</b> {@code messwerte.zeit} traegt das Intervall<b>ende</b>,
-     * {@code einstrahlungsprognose.zeit} den <b>Beginn</b>.
+     * <b>Keine Zeitverschiebung mehr.</b> {@code messwerte.zeit} und
+     * {@code einstrahlungsprognose.zeit} tragen beide den Intervall<b>beginn</b>
+     * (Specs/Messwerte-Zeitkonvention.md).
      *
-     * <p>Der Messwert zu 10:15 gehoert zur Einstrahlung von 10:00, nicht zu der von 10:15. Damit
-     * das nicht bloss zufaellig stimmt, tragen die beiden fraglichen Intervalle
+     * <p>Der Messwert mit Stempel 10:15 gehoert zur Einstrahlung von 10:15, nicht zu der von
+     * 10:00. Damit das nicht bloss zufaellig stimmt, tragen die beiden fraglichen Intervalle
      * <b>verschiedene</b> Einstrahlung: 10:00 hat 200 W/m², 10:15 hat 500. Eine Erzeugung von
-     * 1.000 kWh ergibt richtig verschoben 1/200 = 0.005, ohne Verschiebung 1/500 = 0.002.
+     * 1.000 kWh ergibt ohne Verschiebung 1/500 = 0.002; mit der frueheren Verschiebung (Stempel als
+     * Ende gelesen) 1/200 = 0.005.
      *
-     * <p>Ohne diesen Test waere der Fehler unsichtbar: Beide Zahlen sind Faktoren in derselben
+     * <p>Ohne diesen Test waere ein Rueckfall unsichtbar: Beide Zahlen sind Faktoren in derselben
      * Groessenordnung, und keine Anzeige verriete, welcher der richtige ist.
      */
     @Test
-    void getPrognose_MesswertZeitIstIntervallende_VerschiebtUmEineViertelstunde() {
+    void getPrognose_MesswertZeitIstIntervallbeginn_OhneVerschiebung() {
         List<Object[]> historie = gtiPunkte(MIN_PUNKTE);
         historie.get(0)[1] = new BigDecimal("200.00");   // Beginn 10:00
         historie.get(1)[1] = new BigDecimal("500.00");   // Beginn 10:15
         when(prognoseRepository.findGtiJeIntervall(any(), any())).thenReturn(historie);
-        // Ein Messwert, gestempelt auf das ENDE 10:15 - er gehoert zum Beginn 10:00.
+        // Ein Messwert, gestempelt auf den BEGINN 10:15 - er gehoert zur Einstrahlung von 10:15.
         messwerte(messwert(LocalDateTime.of(2026, 8, 28, 10, 15), "1.000"));
 
         PrognosepunktDTO punkt = einzigerPunkt();
 
-        assertEquals(new BigDecimal("0.00500000"), punkt.getFaktor());
+        assertEquals(new BigDecimal("0.00200000"), punkt.getFaktor(),
+                "0.005 hiesse: der Messwert wurde wie frueher um 15 Minuten zurueckverschoben");
     }
 
     /**
-     * Die Messwerte werden ueber das um eine Viertelstunde <b>nach hinten</b> verschobene Fenster
-     * geholt.
+     * Die Messwerte werden ueber das <b>unverschobene</b> Fenster geholt — dasselbe wie die
+     * Einstrahlung.
      *
-     * <p>Die Historie umfasst 2026-08-28 bis 2026-09-25 (Beginn-Zeitstempel). Dieselben Intervalle
-     * tragen als Messwert die Enden 00:15 bis 00:15 — ohne die Verschiebung fehlte das letzte
-     * Intervall des Zeitraums und das erste stammte aus dem Tag davor.
+     * <p>Die Historie umfasst 2026-08-28 00:00 bis 2026-09-25 00:00 (Beginn-Zeitstempel), und
+     * {@code messwerte.zeit} traegt seit Specs/Messwerte-Zeitkonvention.md ebenfalls den Beginn.
+     * Mit der frueheren Verschiebung um 00:15 fehlte das erste Intervall des Zeitraums, und das
+     * erste des gefragten Tages trueg in die Historie.
      */
     @Test
-    void getPrognose_FragtMesswerteImVerschobenenFenster() {
+    void getPrognose_FragtMesswerteImUnverschobenenFenster() {
         lernhistorie(MIN_PUNKTE);
 
         produktionsprognoseService.getPrognose(DATUM);
 
         verify(messwerteRepository).sumBilanzKomponentenPerZeitBetween(
-                eq(LocalDateTime.of(2026, 8, 28, 0, 15)),
-                eq(LocalDateTime.of(2026, 9, 25, 0, 15)));
+                eq(LocalDateTime.of(2026, 8, 28, 0, 0)),
+                eq(LocalDateTime.of(2026, 9, 25, 0, 0)));
     }
 
     /**
@@ -290,7 +320,7 @@ public class ProduktionsprognoseServiceTest {
     void getPrognose_MesswertOhnePassendeEinstrahlung_WirdUebersprungen() {
         lernhistorie(MIN_PUNKTE);
         messwerte(
-                messwert(ende(0), "2.000"),
+                messwert(beginn(0), "2.000"),
                 // 20.09. um 03:00 liegt in der Nacht - dafuer gibt es kein helles Intervall
                 messwert(LocalDateTime.of(2026, 9, 20, 3, 0), "9.000"));
 
@@ -313,7 +343,7 @@ public class ProduktionsprognoseServiceTest {
     @Test
     void getPrognose_WenigerAlsMinPunkte_LaesstErwarteteErzeugungLeer() {
         lernhistorie(MIN_PUNKTE - 1);
-        messwerte(messwert(ende(0), "2.000"));
+        messwerte(messwert(beginn(0), "2.000"));
 
         PrognosepunktDTO punkt = einzigerPunkt();
 
@@ -327,7 +357,7 @@ public class ProduktionsprognoseServiceTest {
     @Test
     void getPrognose_GenauMinPunkte_LerntFaktor() {
         lernhistorie(MIN_PUNKTE);
-        messwerte(messwert(ende(0), "2.000"));
+        messwerte(messwert(beginn(0), "2.000"));
 
         PrognosepunktDTO punkt = einzigerPunkt();
 
@@ -350,9 +380,9 @@ public class ProduktionsprognoseServiceTest {
         when(einheitRepository.existsByTyp(EinheitTyp.SPEICHER)).thenReturn(true);
         lernhistorie(MIN_PUNKTE);
         messwerte(
-                messwert(ende(0), "0.100"),   // + 0.000 − 5.000 = −4.900 → 0
-                messwert(ende(1), "3.000"));
-        speicherfluss(new Object[]{ende(0), new BigDecimal("0.000"), new BigDecimal("5.000")});
+                messwert(beginn(0), "0.100"),   // + 0.000 − 5.000 = −4.900 → 0
+                messwert(beginn(1), "3.000"));
+        speicherfluss(new Object[]{beginn(0), new BigDecimal("0.000"), new BigDecimal("5.000")});
 
         PrognosepunktDTO punkt = einzigerPunkt();
 
@@ -385,7 +415,7 @@ public class ProduktionsprognoseServiceTest {
     @Test
     void getPrognose_ErzeugungSummeNull_KeinFaktor() {
         lernhistorie(MIN_PUNKTE);
-        messwerte(messwert(ende(0), "0.000"), messwert(ende(1), "0.000"));
+        messwerte(messwert(beginn(0), "0.000"), messwert(beginn(1), "0.000"));
 
         PrognosepunktDTO punkt = einzigerPunkt();
 
@@ -404,7 +434,7 @@ public class ProduktionsprognoseServiceTest {
     void getPrognose_MesswerteAlsDouble_WerdenUmgerechnet() {
         lernhistorie(MIN_PUNKTE);
         when(messwerteRepository.sumBilanzKomponentenPerZeitBetween(any(), any()))
-                .thenReturn(List.<Object[]>of(new Object[]{ende(0), Double.valueOf(2.0), 0.0, 0.0, 0.0}));
+                .thenReturn(List.<Object[]>of(new Object[]{beginn(0), Double.valueOf(2.0), 0.0, 0.0, 0.0}));
 
         PrognosepunktDTO punkt = einzigerPunkt();
 
@@ -421,8 +451,8 @@ public class ProduktionsprognoseServiceTest {
     void getPrognose_MesswertAggregatNull_ZaehltAlsNull() {
         lernhistorie(MIN_PUNKTE);
         messwerte(
-                new Object[]{ende(0), null, null, null, null},
-                messwert(ende(1), "3.000"));
+                new Object[]{beginn(0), null, null, null, null},
+                messwert(beginn(1), "3.000"));
 
         PrognosepunktDTO punkt = einzigerPunkt();
 
@@ -445,7 +475,7 @@ public class ProduktionsprognoseServiceTest {
         List<Object[]> historie = gtiPunkte(MIN_PUNKTE);
         historie.get(0)[1] = new BigDecimal("300.00");
         when(prognoseRepository.findGtiJeIntervall(any(), any())).thenReturn(historie);
-        messwerte(messwert(ende(0), "2.000"));
+        messwerte(messwert(beginn(0), "2.000"));
 
         PrognosepunktDTO punkt = einzigerPunkt();
 
@@ -464,7 +494,7 @@ public class ProduktionsprognoseServiceTest {
     @Test
     void getPrognose_MehrereIntervalle_UebernimmtZeitUndGtiUndFaktor() {
         lernhistorie(MIN_PUNKTE);
-        messwerte(messwert(ende(0), "2.000"));
+        messwerte(messwert(beginn(0), "2.000"));
         when(prognoseRepository.findByZeitBetween(any(), any())).thenReturn(List.of(
                 prognosepunkt(DATUM.atTime(12, 0), "400.00"),
                 prognosepunkt(DATUM.atTime(12, 15), "0.00")));
@@ -538,12 +568,15 @@ public class ProduktionsprognoseServiceTest {
         return zeilen;
     }
 
-    /** Intervall<b>ende</b> zum i-ten hellen Intervall — so, wie {@code messwerte.zeit} es traegt. */
-    private LocalDateTime ende(int i) {
-        return HELL_START.plusMinutes(15L * i).plusMinutes(15);
+    /**
+     * Intervall<b>beginn</b> zum i-ten hellen Intervall — so, wie {@code messwerte.zeit} und
+     * {@code einstrahlungsprognose.zeit} ihn tragen (Specs/Messwerte-Zeitkonvention.md).
+     */
+    private LocalDateTime beginn(int i) {
+        return HELL_START.plusMinutes(15L * i);
     }
 
-    /** Zeile wie {@code sumBilanzKomponentenPerZeitBetween}: {@code [zeit (Ende), produktion, ...]}. */
+    /** Zeile wie {@code sumBilanzKomponentenPerZeitBetween}: {@code [zeit (Beginn), produktion, ...]}. */
     private Object[] messwert(LocalDateTime zeit, String produktion) {
         return new Object[]{zeit, new BigDecimal(produktion),
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO};
@@ -554,7 +587,7 @@ public class ProduktionsprognoseServiceTest {
                 .thenReturn(Arrays.asList(zeilen));
     }
 
-    /** Zeilen wie {@code sumLadungEntladungPerZeitBetween}: {@code [zeit (Ende), ladung, entladung]}. */
+    /** Zeilen wie {@code sumLadungEntladungPerZeitBetween}: {@code [zeit (Beginn), ladung, entladung]}. */
     private void speicherfluss(Object[]... zeilen) {
         when(messwerteRepository.sumLadungEntladungPerZeitBetween(
                 eq(EinheitTyp.SPEICHER), any(), any())).thenReturn(Arrays.asList(zeilen));
@@ -583,11 +616,11 @@ public class ProduktionsprognoseServiceTest {
     void getPrognose_Lastprofil_IstDerMedianDerGleichenWochentage() {
         lernhistorie(MIN_PUNKTE);
         prognoseFuer(LocalDateTime.of(2026, 9, 25, 12, 0));
-        // Freitage vor dem 25.09.: 04.09., 11.09., 18.09. - jeweils Intervall-ENDE 12:15
+        // Freitage vor dem 25.09.: 04.09., 11.09., 18.09. - jeweils Intervall-BEGINN 12:00
         messwerte(
-                verbrauch(LocalDateTime.of(2026, 9, 4, 12, 15), "0.400"),
-                verbrauch(LocalDateTime.of(2026, 9, 11, 12, 15), "0.900"),
-                verbrauch(LocalDateTime.of(2026, 9, 18, 12, 15), "0.500"));
+                verbrauch(LocalDateTime.of(2026, 9, 4, 12, 0), "0.400"),
+                verbrauch(LocalDateTime.of(2026, 9, 11, 12, 0), "0.900"),
+                verbrauch(LocalDateTime.of(2026, 9, 18, 12, 0), "0.500"));
 
         PrognosepunktDTO punkt = einzigerPunkt();
 
@@ -607,9 +640,9 @@ public class ProduktionsprognoseServiceTest {
         lernhistorie(MIN_PUNKTE);
         prognoseFuer(LocalDateTime.of(2026, 9, 25, 12, 0));
         messwerte(
-                verbrauch(LocalDateTime.of(2026, 9, 11, 12, 15), "0.400"),
-                verbrauch(LocalDateTime.of(2026, 9, 17, 12, 15), "9.900"),
-                verbrauch(LocalDateTime.of(2026, 9, 18, 12, 15), "0.600"));
+                verbrauch(LocalDateTime.of(2026, 9, 11, 12, 0), "0.400"),
+                verbrauch(LocalDateTime.of(2026, 9, 17, 12, 0), "9.900"),
+                verbrauch(LocalDateTime.of(2026, 9, 18, 12, 0), "0.600"));
 
         PrognosepunktDTO punkt = einzigerPunkt();
 
@@ -618,15 +651,15 @@ public class ProduktionsprognoseServiceTest {
     }
 
     /**
-     * <b>Der Zeitversatz.</b> {@code messwerte.zeit} traegt das Intervall-<b>Ende</b>, die Prognose
-     * den <b>Beginn</b>.
+     * <b>Keine Zeitverschiebung im Lastprofil.</b> {@code messwerte.zeit} und die Prognose tragen
+     * beide den Intervall-<b>Beginn</b> (Specs/Messwerte-Zeitkonvention.md).
      *
-     * <p>Der Messwert zu 12:15 gehoert zum Prognoseintervall, das um 12:00 beginnt. Ohne die
-     * Verschiebung landete er bei 12:15 — das Profil waere um eine Viertelstunde versetzt, ohne
-     * dass man es der Zahl ansieht. Dieselbe Falle wie beim Faktor.
+     * <p>Der Messwert mit Stempel 12:15 gehoert zum Prognoseintervall, das um 12:15 beginnt. Mit der
+     * frueheren Verschiebung landete er bei 12:00 — das Profil waere um eine Viertelstunde
+     * versetzt, ohne dass man es der Zahl ansieht. Dieselbe Falle wie beim Faktor.
      */
     @Test
-    void getPrognose_Lastprofil_MesswertZeitIstIntervallende() {
+    void getPrognose_Lastprofil_MesswertZeitIstIntervallbeginn_OhneVerschiebung() {
         lernhistorie(MIN_PUNKTE);
         when(prognoseRepository.findByZeitBetween(any(), any())).thenReturn(List.of(
                 prognosepunkt(LocalDateTime.of(2026, 9, 25, 12, 0), "100.00"),
@@ -635,9 +668,9 @@ public class ProduktionsprognoseServiceTest {
 
         List<PrognosepunktDTO> punkte = produktionsprognoseService.getPrognose(DATUM);
 
-        assertEquals(0, new BigDecimal("0.700").compareTo(punkte.get(0).getLastprofil()),
-                "Der Messwert zu 12:15 gehoert zum Intervall, das um 12:00 BEGINNT");
-        assertNull(punkte.get(1).getLastprofil(), "Fuer 12:15 gibt es keine Stichprobe");
+        assertNull(punkte.get(0).getLastprofil(), "Fuer 12:00 gibt es keine Stichprobe");
+        assertEquals(0, new BigDecimal("0.700").compareTo(punkte.get(1).getLastprofil()),
+                "Der Messwert mit Stempel 12:15 gehoert zum Intervall, das um 12:15 BEGINNT");
     }
 
     /**
@@ -651,7 +684,7 @@ public class ProduktionsprognoseServiceTest {
         konfiguration.setHistorieTage(6);
         lernhistorie(MIN_PUNKTE);
         prognoseFuer(LocalDateTime.of(2026, 9, 25, 12, 0));
-        messwerte(verbrauch(LocalDateTime.of(2026, 9, 18, 12, 15), "0.700"));
+        messwerte(verbrauch(LocalDateTime.of(2026, 9, 18, 12, 0), "0.700"));
 
         PrognosepunktDTO punkt = einzigerPunkt();
 
@@ -667,8 +700,8 @@ public class ProduktionsprognoseServiceTest {
         lernhistorie(MIN_PUNKTE);
         prognoseFuer(LocalDateTime.of(2026, 9, 25, 12, 0));
         // Erzeugung 2.000 kWh bei 100 W/m2 -> Faktor 0.02; die Prognose traegt ebenfalls 100 W/m2
-        messwerte(messwert(ende(0), "2.000"),
-                verbrauch(LocalDateTime.of(2026, 9, 18, 12, 15), "0.500"));
+        messwerte(messwert(beginn(0), "2.000"),
+                verbrauch(LocalDateTime.of(2026, 9, 18, 12, 0), "0.500"));
 
         PrognosepunktDTO punkt = einzigerPunkt();
 
@@ -686,8 +719,8 @@ public class ProduktionsprognoseServiceTest {
     void getPrognose_LastGroesserAlsErzeugung_UeberschussIstNull() {
         lernhistorie(MIN_PUNKTE);
         prognoseFuer(LocalDateTime.of(2026, 9, 25, 12, 0));
-        messwerte(messwert(ende(0), "2.000"),
-                verbrauch(LocalDateTime.of(2026, 9, 18, 12, 15), "5.000"));
+        messwerte(messwert(beginn(0), "2.000"),
+                verbrauch(LocalDateTime.of(2026, 9, 18, 12, 0), "5.000"));
 
         assertEquals(0, BigDecimal.ZERO.compareTo(einzigerPunkt().getErwarteterUeberschuss()));
     }
@@ -702,7 +735,7 @@ public class ProduktionsprognoseServiceTest {
     void getPrognose_OhneFaktor_KeinErwarteterUeberschuss() {
         lernhistorie(MIN_PUNKTE - 1);
         prognoseFuer(LocalDateTime.of(2026, 9, 25, 12, 0));
-        messwerte(verbrauch(LocalDateTime.of(2026, 9, 18, 12, 15), "0.500"));
+        messwerte(verbrauch(LocalDateTime.of(2026, 9, 18, 12, 0), "0.500"));
 
         PrognosepunktDTO punkt = einzigerPunkt();
 
@@ -726,7 +759,7 @@ public class ProduktionsprognoseServiceTest {
     void getPrognoseOrgExplizit_NutztDenKontextNicht() {
         lernhistorie(MIN_PUNKTE);
         prognoseFuer(LocalDateTime.of(2026, 9, 25, 12, 0));
-        messwerte(messwert(ende(0), "2.000"));
+        messwerte(messwert(beginn(0), "2.000"));
 
         List<PrognosepunktDTO> punkte = produktionsprognoseService.getPrognose(ORG_ID, DATUM);
 
@@ -739,8 +772,8 @@ public class ProduktionsprognoseServiceTest {
     }
 
     /** Zeile wie {@code sumBilanzKomponentenPerZeitBetween}, nur mit Verbrauch (Index 2). */
-    private Object[] verbrauch(LocalDateTime ende, String wert) {
-        return new Object[]{ende, BigDecimal.ZERO, new BigDecimal(wert),
+    private Object[] verbrauch(LocalDateTime beginn, String wert) {
+        return new Object[]{beginn, BigDecimal.ZERO, new BigDecimal(wert),
                 BigDecimal.ZERO, BigDecimal.ZERO};
     }
 

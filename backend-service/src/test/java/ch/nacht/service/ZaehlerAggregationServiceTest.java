@@ -356,6 +356,62 @@ public class ZaehlerAggregationServiceTest {
         assertEquals(8.0, captor.getValue().getTotal(), 1e-9);
     }
 
+    // --- Zeitstempel = Intervallbeginn (Specs/Messwerte-Zeitkonvention.md) ----
+
+    /**
+     * Der Messwert steht unter dem <b>Beginn</b> seines Intervalls (FR-1): Das Intervall
+     * {@code (start, ende]} erzeugt {@code zeit = start}, nicht {@code ende}. Die Menge (Delta
+     * über {@code (start, ende]}) bleibt dieselbe.
+     */
+    @Test
+    void aggregiere_NeuerMesswert_ZeitIstIntervallbeginn() {
+        stubCatchUpEinInterval();
+        stubStaende(rohdaten("100.0", "50.0"), rohdaten("110.0", "52.0")); // total=8
+        when(messwerteRepository.findByEinheitAndZeit(eq(einheit), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.aggregiere();
+
+        Messwerte m = captureSavedMesswert();
+        assertEquals(intervall[0], m.getZeit(), "Stempel = Intervallbeginn");
+        assertNotEquals(intervall[1], m.getZeit(), "nicht mehr das Intervallende");
+        assertEquals(intervall[0].plusMinutes(INTERVALL), intervall[1]);
+        assertEquals(8.0, m.getTotal(), 1e-9);
+    }
+
+    /**
+     * Die erneute Verarbeitung desselben Intervalls sucht den bestehenden Messwert unter dem
+     * <b>Beginn</b> — sonst entstuende neben der umgestellten Zeile eine zweite unter dem Ende.
+     */
+    @Test
+    void aggregiere_Upsert_SuchtBestehendenMesswertUnterIntervallbeginn() {
+        stubCatchUpEinInterval();
+        stubStaende(rohdaten("100.0", "50.0"), rohdaten("110.0", "52.0"));
+        when(messwerteRepository.findByEinheitAndZeit(eq(einheit), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.aggregiere();
+
+        verify(messwerteRepository).findByEinheitAndZeit(einheit, intervall[0]);
+        verify(messwerteRepository, never()).findByEinheitAndZeit(einheit, intervall[1]);
+    }
+
+    /**
+     * Die Rohdaten werden weiterhin bis zum Intervall<b>ende</b> als verarbeitet markiert — nur der
+     * Stempel des Messwerts wechselte auf den Beginn, die Intervallgrenzen nicht.
+     */
+    @Test
+    void aggregiere_MarkiertRohdatenBisIntervallende() {
+        stubCatchUpEinInterval();
+        stubStaende(rohdaten("100.0", "50.0"), rohdaten("110.0", "52.0"));
+        when(messwerteRepository.findByEinheitAndZeit(eq(einheit), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.aggregiere();
+
+        verify(rohdatenRepository).markVerarbeitet(eq(EINHEIT_ID), eq(intervall[1]), any());
+    }
+
     // --- Marker / Housekeeping ---------------------------------------------
 
     @Test
@@ -381,10 +437,39 @@ public class ZaehlerAggregationServiceTest {
 
         service.aggregiere();
 
-        // Ein Intervall verarbeitet → Verteilung für ORG_ID über [start, ende] mit PROPORTIONAL,
-        // ohne Fortschritts-Tracking (showProgress = false)
+        // Ein Intervall verarbeitet → Verteilung für ORG_ID über [Beginn, Beginn] mit PROPORTIONAL,
+        // ohne Fortschritts-Tracking (showProgress = false). Beide Grenzen sind der Stempel des
+        // einen erzeugten Messwerts (FR-2): Mit dem Ende als obere Grenze naehme das inklusive
+        // BETWEEN der Verteilung den Messwert des Folgeintervalls mit.
         verify(messwerteService).calculateSolarDistributionForOrg(
-                eq(ORG_ID), eq(intervall[0]), eq(intervall[1]), eq("PROPORTIONAL"), eq(false));
+                eq(ORG_ID), eq(intervall[0]), eq(intervall[0]), eq("PROPORTIONAL"), eq(false));
+    }
+
+    /**
+     * Über mehrere Intervalle spannt das Verteilfenster vom <b>frühesten</b> bis zum
+     * <b>spätesten Intervallbeginn</b> — den Stempeln der erzeugten Messwerte, nicht bis zum
+     * letzten Intervallende.
+     */
+    @Test
+    void aggregiere_MehrereIntervalle_VerteilfensterVonFruehestemBisSpaetestemBeginn() {
+        LocalDateTime q = floorAufQuartal(LocalDateTime.now());
+        stubCatchUpZeitreihe(
+                rohdaten(q.minusMinutes(45), "100.0", "0.0", null),
+                rohdaten(q.minusMinutes(30), "110.0", "0.0", null),
+                rohdaten(q.minusMinutes(15), "115.0", "0.0", null),
+                rohdaten(q, "125.0", "0.0", null));
+        when(messwerteRepository.findByEinheitAndZeit(eq(einheit), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.aggregiere();
+
+        // Drei Intervalle (q-45..q-30], (q-30..q-15], (q-15..q] → Stempel q-45, q-30, q-15
+        ArgumentCaptor<Messwerte> captor = ArgumentCaptor.forClass(Messwerte.class);
+        verify(messwerteRepository, times(3)).save(captor.capture());
+        assertEquals(List.of(q.minusMinutes(45), q.minusMinutes(30), q.minusMinutes(15)),
+                captor.getAllValues().stream().map(Messwerte::getZeit).toList());
+        verify(messwerteService).calculateSolarDistributionForOrg(
+                eq(ORG_ID), eq(q.minusMinutes(45)), eq(q.minusMinutes(15)), eq("PROPORTIONAL"), eq(false));
     }
 
     @Test
@@ -661,7 +746,8 @@ public class ZaehlerAggregationServiceTest {
         ArgumentCaptor<Messwerte> captor = ArgumentCaptor.forClass(Messwerte.class);
         verify(messwerteRepository, times(1)).save(captor.capture());
         assertEquals(10.0, captor.getValue().getTotal(), 1e-9);
-        assertEquals(q, captor.getValue().getZeit());
+        // Das Intervall (q-15, q] steht unter seinem Beginn q-15 (Messwerte-Zeitkonvention)
+        assertEquals(q.minusMinutes(15), captor.getValue().getZeit());
         assertTrue(loggedContaining(Level.WARN, "Zählerwechsel erkannt", "SN-A", "SN-B"));
     }
 

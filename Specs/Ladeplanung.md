@@ -242,8 +242,9 @@ https://api.open-meteo.com/v1/forecast
 
 > **Zeitbezug — hier ist genau hinzusehen.** Mit `timezone=Europe/Zurich` liefert die API
 > **Ortszeit**, und der Zeitstempel eines `minutely_15`-Eintrags ist der **Beginn** des Intervalls.
-> Das ist derselbe Bezug wie `steuerentscheid.zeit_von` und damit ohne Umrechnung verwendbar —
-> **anders** als `messwerte.zeit` (Intervall**ende**) und `preiszeitreihe.zeit_von` (UTC). In
+> Das ist derselbe Bezug wie `steuerentscheid.zeit_von` und — seit
+> `Specs/Messwerte-Zeitkonvention.md` — `messwerte.zeit`, und damit ohne Umrechnung verwendbar;
+> **anders** nur `preiszeitreihe.zeit_von` (UTC). In
 > diesem Feature sind schon drei Zeitkonventionen nebeneinander zum Fehler geworden
 > (`Specs/Einspeisesteuerung.md`, FR-3); die Spalte trägt deshalb einen Kommentar, der den Bezug
 > ausschreibt.
@@ -293,10 +294,11 @@ prognose(i) = gti(i) * faktor
 > Ausrichtungsfehler** ohne dass sie jemand erfassen muss. Er korrigiert sich zudem von selbst,
 > wenn sich an der Anlage etwas ändert. Der Preis dafür: Er braucht Historie (FR-4).
 
-> **Zeitversatz beachten — für Faktor und Lastprofil gleichermassen.** `messwerte.zeit` trägt das
-> Intervall**ende**, `einstrahlungsprognose.zeit` den **Beginn**. Ohne die Verschiebung um eine
-> Viertelstunde wird der Faktor versetzt gelernt, und das sieht man der Zahl nicht an. Dieselbe
-> Falle wie in FR-2.
+> **Gleicher Zeitbezug — für Faktor und Lastprofil gleichermassen.** `messwerte.zeit` und
+> `einstrahlungsprognose.zeit` tragen beide den Intervall**beginn** (`Specs/Messwerte-Zeitkonvention.md`).
+> Bis zu jener Umstellung trug `messwerte.zeit` bei MQTT-Daten das **Ende**, und Faktor und
+> Lastprofil verschoben um eine Viertelstunde. Ein Versatz lässt den Faktor versetzt lernen, und
+> das sieht man der Zahl nicht an. Dieselbe Falle wie in FR-2.
 
 **Lastprofil** je Intervall aus der eigenen Historie: **Median** über die gleichen Wochentage
 innerhalb der letzten `historieTage` (bei der Vorgabe 28 also vier Stichproben je Intervall) aus
