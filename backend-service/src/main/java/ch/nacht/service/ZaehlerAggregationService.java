@@ -137,9 +137,12 @@ public class ZaehlerAggregationService {
             Long org = e.getKey();
             LocalDateTime von = e.getValue();
             LocalDateTime bis = orgBis.get(org);
+            // Fuers Log der abgedeckte Zeitraum: von und bis sind Intervall-BEGINNE, ein einzelnes
+            // Intervall erschiene sonst als "16:45 – 16:45".
+            LocalDateTime ende = bis.plusMinutes(INTERVALL_MINUTEN);
             try {
                 messwerteService.calculateSolarDistributionForOrg(org, von, bis, DEFAULT_ALGORITHM, false);
-                log.info("Solarverteilung nach Aggregation ausgeführt (org={}, {} – {})", org, von, bis);
+                log.info("Solarverteilung nach Aggregation ausgeführt (org={}, {} – {})", org, von, ende);
             } catch (IllegalStateException ex) {
                 // Konfigurationsfehler im Bilanzmodus, z.B. fehlende BEZUG-Einheit
                 // (BILANZMODELL_KEINE_BILANZDATEN): Verteilung dieses Mandanten bricht ab
@@ -147,10 +150,10 @@ public class ZaehlerAggregationService {
                 // Fehlende Bilanzdaten *einzelner Intervalle* führen NICHT hierher: sie werden
                 // übersprungen und als WARN-Systemmeldung gemeldet (Spec Bilanzmodell FR-2.5).
                 log.error("Solarverteilung nach Aggregation abgebrochen (org={}, {} – {}): {}",
-                        org, von, bis, ex.getMessage());
+                        org, von, ende, ex.getMessage());
             } catch (Exception ex) {
                 log.warn("Solarverteilung nach Aggregation fehlgeschlagen (org={}, {} – {}): {}",
-                        org, von, bis, ex.getMessage());
+                        org, von, ende, ex.getMessage());
             }
         }
     }
@@ -218,7 +221,7 @@ public class ZaehlerAggregationService {
             messwert.setZeit(zeit);
             messwert.setOrgId(einheit.getOrgId());
         } else if (messwert.getQuelle() == Quelle.CSV) {
-            log.warn("Aggregation: MQTT überschreibt bestehenden CSV-Messwert (einheit={}, zeit={})",
+            log.warn("Aggregation: MQTT überschreibt bestehenden CSV-Messwert (einheit={}, zeit={} (Intervallbeginn))",
                     einheit.getId(), zeit);
         }
         messwert.setTotal(total);

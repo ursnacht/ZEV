@@ -289,8 +289,11 @@ public class MesswerteService {
     private CalculationResult distribute(LocalDateTime dateFrom, LocalDateTime dateTo,
             String algorithm, Long progressOrgId, boolean showProgress) {
         Verteilmodus modus = einstellungenService.getVerteilmodus(progressOrgId);
-        log.info("Solar distribution - dateFrom: {}, dateTo: {}, algorithm: {}, verteilmodus: {} (org={})",
-                dateFrom, dateTo, algorithm, modus, progressOrgId);
+        // dateFrom/dateTo begrenzen die Zeitstempel INKLUSIVE (findDistinctZeitBetween), und ein
+        // Stempel ist der Intervall-BEGINN. Ein einzelnes Intervall ergibt deshalb von = bis; ohne
+        // den Hinweis sieht das im Log wie ein leerer Zeitraum aus.
+        log.info("Solar distribution - Zeitstempel {} bis {} (inklusive, Intervallbeginn), algorithm: {}, "
+                + "verteilmodus: {} (org={})", dateFrom, dateTo, algorithm, modus, progressOrgId);
 
         long startTime = System.currentTimeMillis();
 
