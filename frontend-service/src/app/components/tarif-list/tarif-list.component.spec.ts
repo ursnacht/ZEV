@@ -360,6 +360,11 @@ describe('TarifListComponent', () => {
 
     it('should use the month for the Grundgebuehr', () => {
       expect(component.preisEinheit(tarif(TarifTyp.GRUNDGEBUEHR))).toBe('MONAT');
+      expect(component.preisEinheit(tarif(TarifTyp.GRUNDGEBUEHR, Mengeneinheit.MONAT))).toBe('MONAT');
+    });
+
+    it('should use the day for a Grundgebuehr per day', () => {
+      expect(component.preisEinheit(tarif(TarifTyp.GRUNDGEBUEHR, Mengeneinheit.TAG))).toBe('TAG');
     });
 
     it('should use the unit of a ZUSATZ tariff', () => {

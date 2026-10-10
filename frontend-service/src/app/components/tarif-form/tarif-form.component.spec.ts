@@ -73,12 +73,13 @@ describe('TarifFormComponent', () => {
     });
   });
 
-  describe('mengeneinheit (nur ZUSATZ)', () => {
-    // Nur der frei konfigurierbare Typ traegt eine eigene Mengeneinheit; bei allen anderen
-    // folgt sie aus dem Typ (Specs/Tarifpositionen.md FR-1.1).
+  describe('mengeneinheit (ZUSATZ, GRUNDGEBUEHR)', () => {
+    // ZUSATZ traegt eine frei waehlbare Mengeneinheit (Specs/Tarifpositionen.md FR-1.1), die
+    // Grundgebuehr Monat oder Tag (Specs/Tarifverwaltung.md FR-3); bei allen anderen folgt sie
+    // aus dem Typ.
 
     it('should not require a unit for the fixed types', () => {
-      for (const typ of [TarifTyp.ZEV, TarifTyp.VNB, TarifTyp.GRUNDGEBUEHR, TarifTyp.LADESTROM]) {
+      for (const typ of [TarifTyp.ZEV, TarifTyp.VNB, TarifTyp.LADESTROM]) {
         component.formData.tariftyp = typ;
         expect(component.brauchtMengeneinheit).toBe(false);
       }
@@ -99,10 +100,76 @@ describe('TarifFormComponent', () => {
       expect(fixture.nativeElement.querySelector('#mengeneinheit')).not.toBeNull();
     });
 
-    it('should offer kWh, month and piece', () => {
+    it('should offer kWh, month and piece for ZUSATZ', () => {
+      component.formData.tariftyp = TarifTyp.ZUSATZ;
       expect(component.mengeneinheitOptions).toEqual([
         Mengeneinheit.KWH, Mengeneinheit.MONAT, Mengeneinheit.STUECK
       ]);
+    });
+
+    it('should offer month and day for the Grundgebuehr', () => {
+      component.formData.tariftyp = TarifTyp.GRUNDGEBUEHR;
+      expect(component.brauchtMengeneinheit).toBe(true);
+      expect(component.mengeneinheitOptions).toEqual([Mengeneinheit.MONAT, Mengeneinheit.TAG]);
+    });
+
+    it('should preselect month when switching to the Grundgebuehr', () => {
+      component.formData.tariftyp = TarifTyp.GRUNDGEBUEHR;
+      component.onTariftypChange();
+      expect(component.formData.mengeneinheit).toBe(Mengeneinheit.MONAT);
+    });
+
+    it('should drop a unit the Grundgebuehr does not allow', () => {
+      // STUECK passt nicht zur Grundgebuehr -> verworfen, dann Vorgabe Monat
+      component.formData.tariftyp = TarifTyp.ZUSATZ;
+      component.formData.mengeneinheit = Mengeneinheit.STUECK;
+
+      component.formData.tariftyp = TarifTyp.GRUNDGEBUEHR;
+      component.onTariftypChange();
+
+      expect(component.formData.mengeneinheit).toBe(Mengeneinheit.MONAT);
+    });
+
+    it('should keep day when the type does not change', () => {
+      component.formData.tariftyp = TarifTyp.GRUNDGEBUEHR;
+      component.onTariftypChange();
+      component.formData.mengeneinheit = Mengeneinheit.TAG;
+
+      component.onTariftypChange();
+
+      expect(component.formData.mengeneinheit).toBe(Mengeneinheit.TAG);
+    });
+
+    it('should not carry the month of the Grundgebuehr over to ZUSATZ', () => {
+      // Monat ist bei ZUSATZ zulaessig - blieb aber als stille Vorbelegung stehen. Bei ZUSATZ
+      // soll die Einheit bewusst gewaehlt werden (E2E tarifpositionen.spec.ts).
+      component.formData.tariftyp = TarifTyp.GRUNDGEBUEHR;
+      component.onTariftypChange();
+      expect(component.formData.mengeneinheit).toBe(Mengeneinheit.MONAT);
+
+      component.formData.tariftyp = TarifTyp.ZUSATZ;
+      component.onTariftypChange();
+
+      expect(component.formData.mengeneinheit).toBeUndefined();
+    });
+
+    it('should drop day when switching from the Grundgebuehr to ZUSATZ', () => {
+      component.formData.tariftyp = TarifTyp.GRUNDGEBUEHR;
+      component.formData.mengeneinheit = Mengeneinheit.TAG;
+
+      component.formData.tariftyp = TarifTyp.ZUSATZ;
+      component.onTariftypChange();
+
+      expect(component.formData.mengeneinheit).toBeUndefined();
+    });
+
+    it('should show month for an existing Grundgebuehr without unit', () => {
+      component.tarif = {
+        id: 7, bezeichnung: 'Messtarif', tariftyp: TarifTyp.GRUNDGEBUEHR, preis: 5,
+        gueltigVon: '2026-01-01', gueltigBis: '2026-12-31'
+      };
+      component.ngOnInit();
+      expect(component.formData.mengeneinheit).toBe(Mengeneinheit.MONAT);
     });
 
     it('should be invalid while a ZUSATZ tariff has no unit', () => {
@@ -129,6 +196,7 @@ describe('TarifFormComponent', () => {
 
     it('should keep the unit while staying on ZUSATZ', () => {
       component.formData.tariftyp = TarifTyp.ZUSATZ;
+      component.onTariftypChange();
       component.formData.mengeneinheit = Mengeneinheit.MONAT;
       component.onTariftypChange();
       expect(component.formData.mengeneinheit).toBe(Mengeneinheit.MONAT);

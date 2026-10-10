@@ -17,6 +17,12 @@ public enum Mengeneinheit {
 
     /** Wiederkehrende Pauschale je Monat — wie die Grundgebühr, aber mit eigenem Preis. */
     MONAT,
+    /**
+     * Pauschale je Kalendertag — für die taggenau abgerechnete Grundgebühr
+     * (Specs/Tarifverwaltung.md, FR-3). Die Menge auf der Rechnung ist die Zahl der Tage im
+     * Rechnungszeitraum, in denen der Tarif gilt.
+     */
+    TAG,
 
     /** Zählbare Einheit (Saunagänge, Schlüssel, …); auf der Rechnung als „Stk". */
     STUECK,

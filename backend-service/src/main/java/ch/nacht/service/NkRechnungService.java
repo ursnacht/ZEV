@@ -60,6 +60,7 @@ public class NkRechnungService {
     private static final Map<Mengeneinheit, String> MENGENEINHEIT_KEYS = Map.of(
             Mengeneinheit.KWH, "KWH",
             Mengeneinheit.MONAT, "MONATE",
+            Mengeneinheit.TAG, "TAGE",
             Mengeneinheit.STUECK, "STUECK",
             Mengeneinheit.M3, "M3",
             Mengeneinheit.M2, "M2",

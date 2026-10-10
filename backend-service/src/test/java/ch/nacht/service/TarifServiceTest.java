@@ -182,6 +182,46 @@ public class TarifServiceTest {
     }
 
     @Test
+    void saveTarif_GrundgebuehrOhneMengeneinheit_GiltProMonat() {
+        // Ohne Angabe bleibt das bisherige Verhalten: volle Monate (Specs/Tarifverwaltung.md, FR-3)
+        Tarif grundgebuehr = new Tarif("Messtarif", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
+            LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        when(tarifRepository.save(any(Tarif.class))).thenAnswer(i -> i.getArgument(0));
+
+        Tarif gespeichert = tarifService.saveTarif(grundgebuehr);
+
+        assertEquals(Mengeneinheit.MONAT, gespeichert.getMengeneinheit());
+    }
+
+    @Test
+    void saveTarif_GrundgebuehrProTag_BleibtTag() {
+        Tarif grundgebuehr = new Tarif("Messtarif", TarifTyp.GRUNDGEBUEHR, new BigDecimal("0.16438"),
+            LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        grundgebuehr.setMengeneinheit(Mengeneinheit.TAG);
+        when(tarifRepository.save(any(Tarif.class))).thenAnswer(i -> i.getArgument(0));
+
+        Tarif gespeichert = tarifService.saveTarif(grundgebuehr);
+
+        assertEquals(Mengeneinheit.TAG, gespeichert.getMengeneinheit());
+        assertEquals("TAG", gespeichert.effektiveMengeneinheit());
+    }
+
+    @Test
+    void saveTarif_GrundgebuehrMitStueck_ThrowsException() {
+        Tarif grundgebuehr = new Tarif("Messtarif", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
+            LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        grundgebuehr.setMengeneinheit(Mengeneinheit.STUECK);
+
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> tarifService.saveTarif(grundgebuehr)
+        );
+
+        assertTrue(exception.getMessage().contains("MONAT oder TAG"));
+        verify(tarifRepository, never()).save(any());
+    }
+
+    @Test
     void saveTarif_LadestromUeberschneidung_ThrowsException() {
         // LADESTROM bleibt je Typ eindeutig: Die Position waehlt den Tarif, ein zweiter hiesse,
         // dieselben kWh zweimal zu erfassen.

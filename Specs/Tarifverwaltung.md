@@ -41,6 +41,29 @@
   * **Lückenprüfung bleibt je Typ** (Rechnungserzeugung und „Quartale/Jahre validieren", `Specs/TarifValidierung.md`): Fehlt nur ein Bestandteil — etwa die Netznutzung, während die Energielieferung gilt —, meldet sie keine Lücke. Eine Prüfung je Bezeichnung würde bei jedem Namenswechsel („Netznutzung 2026" → „Netznutzung 2027") eine Scheinlücke melden.
   * Keine Gruppierung oder Zwischensumme der Bestandteile auf der Rechnung.
 
+### FR-3: Grundgebühr pro Monat oder pro Tag (Entscheid vom 10.10.2026)
+* **User Story:** Als Admin möchte ich eine Grundgebühr der ZEV-Stromrechnung **taggenau** abrechnen können, weil Lieferanten Grundtarife in CHF pro Tag und Zähler angeben und ein Mieterwechsel mitten im Monat sonst einen ganzen Monat ausfallen lässt.
+* **Lösung (Variante c):** Ein `GRUNDGEBUEHR`-Tarif trägt eine **Mengeneinheit**: `MONAT` oder `TAG`. Kein neuer Tariftyp — alles, was an der Grundgebühr hängt (FR-2, „Produzent verrechnen", automatische Aufnahme auf jede Rechnung), gilt unverändert für beide.
+
+  | Mengeneinheit | Menge auf der Rechnung | Preis |
+  |---|---|---|
+  | `MONAT` (Vorgabe) | **volle** Kalendermonate im Teilzeitraum (unverändert; angebrochene Monate zählen nicht) | CHF / Monat |
+  | `TAG` | **jeder Tag** im Teilzeitraum, inklusive Beginn und Ende | CHF / Tag |
+
+  Teilzeitraum = Schnitt aus Gültigkeit des Tarifs und Rechnungszeitraum (bei Mieterwechsel der Zeitraum des Mieters).
+* **Erfassung:** Die Tarifmaske zeigt bei der Grundgebühr die Auswahl „Mengeneinheit" mit **Monat** und **Tag**; neu gewählt ist **Monat** vorbelegt. Der Hinweis erklärt den Unterschied (`GRUNDGEBUEHR_EINHEIT_HINT`).
+* **Persistierung:** `tarif.mengeneinheit` (bestehende Spalte). Migration `V176__Grundgebuehr_Pro_Tag.sql`: CHECK-Constraint um `TAG` erweitert, bestehende Grundgebühren auf `MONAT` gesetzt, Spaltenkommentar, Übersetzungen `TAG` („Tag"/„Day"), `TAGE`, `GRUNDGEBUEHR_EINHEIT_HINT`.
+* **Akzeptanzkriterien:**
+  * [x] Ein Grundgebühr-Tarif lässt sich mit Mengeneinheit „Tag" speichern; ohne Angabe gilt „Monat".
+  * [x] Eine andere Mengeneinheit als Monat oder Tag wird bei der Grundgebühr abgewiesen („Für die Grundgebühr ist nur die Mengeneinheit MONAT oder TAG zulässig").
+  * [x] Grundgebühr pro Tag, ganzes Q3 2026: Menge 92, Einheit „Tag", Betrag 92 × Preis.
+  * [x] Grundgebühr pro Tag, gültig ab 16.08.2026, Rechnung Q3: Menge 46.
+  * [x] Grundgebühr pro Monat, gültig ab 16.08.2026, Rechnung Q3: Menge 1 (nur September) — unverändert.
+  * [x] Bestehende Grundgebühren rechnen nach der Migration wie bisher (Mengeneinheit `MONAT`).
+  * [x] Die Tarifmaske bietet bei der Grundgebühr nur Monat und Tag an, bei ZUSATZ weiterhin kWh, Monat, Stück; bei jedem Wechsel des Typs wird die Einheit neu gesetzt — Grundgebühr: Monat vorbelegt; ZUSATZ: leer, muss bewusst gewählt werden (die Vorbelegung „Monat" der Grundgebühr wandert nicht in einen ZUSATZ-Tarif).
+  * [x] Auf der Rechnung (PDF) steht „CHF / Tag".
+* **Abgrenzung:** Nur die ZEV-Stromrechnung. Die Nebenkostenabrechnung kennt `TAG` nicht (ihre Constraints bleiben unverändert); ein Grundgebühr-Tarif für einzelne Einheiten bleibt ein `ZUSATZ`-Tarif.
+
 ## 3. Technische Spezifikationen (Technical Specs)
 * **DB-Änderungen:**
   * Das System speichert die Tarife in der Datenbank in einer neuen Tabelle "tarife".

@@ -243,8 +243,7 @@ public class TarifpositionService {
      * @throws IllegalArgumentException wenn die Kombination unzulässig ist
      */
     private void pruefeTariftypZuEinheit(Einheit einheit, Tarif tarif) {
-        if (einheit.getTyp() == EinheitTyp.CONSUMER
-                && !TarifTyp.EIGENE_MENGENEINHEIT.contains(tarif.getTariftyp())) {
+        if (einheit.getTyp() == EinheitTyp.CONSUMER && tarif.getTariftyp() != TarifTyp.ZUSATZ) {
             throw new IllegalArgumentException(
                     "Für Konsumenten sind nur Tarife vom Typ " + TarifTyp.ZUSATZ + " zulässig");
         }

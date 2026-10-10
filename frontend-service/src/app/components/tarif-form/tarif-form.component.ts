@@ -1,7 +1,7 @@
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
-  Mengeneinheit, Tarif, TarifTyp, TARIFTYPEN_MIT_MENGENEINHEIT, preisEinheitKey
+  Mengeneinheit, Tarif, TarifTyp, TARIFTYPEN_MIT_MENGENEINHEIT, preisEinheitKey, waehlbareMengeneinheiten
 } from '../../models/tarif.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
@@ -40,17 +40,15 @@ export class TarifFormComponent implements OnInit {
   ];
 
   /**
-   * Auswahl der Mengeneinheit - nur bei Tariftypen mit eigener Einheit sichtbar. Die Werte sind
-   * zugleich die Uebersetzungs-Keys (`KWH`, `MONAT`, `STUECK`).
-   *
-   * `M3` und `CHF` fehlen hier absichtlich: Sie gehoeren zur Nebenkostenabrechnung. Ein Preis
-   * "CHF pro Fr." waere keine sinnvolle Angabe, und Kubikmeter misst dieses System nicht.
+   * Auswahl der Mengeneinheit - nur bei Tariftypen mit eigener Einheit sichtbar, die Werte je Typ
+   * (ZUSATZ: kWh, Monat, Stueck; GRUNDGEBUEHR: Monat oder Tag). Die Werte sind zugleich die
+   * Uebersetzungs-Keys.
    */
-  mengeneinheitOptions: Mengeneinheit[] = [
-    Mengeneinheit.KWH, Mengeneinheit.MONAT, Mengeneinheit.STUECK
-  ];
+  get mengeneinheitOptions(): Mengeneinheit[] {
+    return waehlbareMengeneinheiten(this.formData.tariftyp);
+  }
 
-  /** Wahr, wenn der gewaehlte Typ eine eigene Mengeneinheit traegt (aktuell nur ZUSATZ). */
+  /** Wahr, wenn der gewaehlte Typ eine eigene Mengeneinheit traegt (ZUSATZ, GRUNDGEBUEHR). */
   get brauchtMengeneinheit(): boolean {
     return TARIFTYPEN_MIT_MENGENEINHEIT.includes(this.formData.tariftyp);
   }
@@ -63,19 +61,33 @@ export class TarifFormComponent implements OnInit {
     return preisEinheitKey(this.formData.tariftyp, this.formData.mengeneinheit);
   }
 
+  /** Typ, zu dem die aktuelle Mengeneinheit gehoert - um echte Typwechsel zu erkennen. */
+  private letzterTyp?: TarifTyp;
+
   /**
-   * Verwirft die Mengeneinheit, sobald ein Typ ohne eigene Einheit gewaehlt wird - sonst bliebe
-   * ein unsichtbarer Wert im Formular stehen, den der Server ohnehin verwerfen wuerde.
+   * Setzt die Mengeneinheit bei einem echten Typwechsel neu: Grundgebuehr "pro Monat" (das
+   * bisherige Verhalten), alle anderen leer.
+   *
+   * Bewusst neu statt "behalten, wenn zulaessig": Monat ist auch bei ZUSATZ zulaessig. Wer erst
+   * Grundgebuehr und dann ZUSATZ waehlte, bekam sonst still die Vorbelegung der Grundgebuehr -
+   * bei ZUSATZ soll die Einheit aber bewusst gewaehlt werden (E2E tarifpositionen.spec.ts).
    */
   onTariftypChange(): void {
-    if (!this.brauchtMengeneinheit) {
-      this.formData.mengeneinheit = undefined;
+    if (this.formData.tariftyp === this.letzterTyp) {
+      return;
     }
+    this.letzterTyp = this.formData.tariftyp;
+    this.formData.mengeneinheit =
+      this.formData.tariftyp === TarifTyp.GRUNDGEBUEHR ? Mengeneinheit.MONAT : undefined;
   }
 
   ngOnInit(): void {
     if (this.tarif) {
       this.formData = { ...this.tarif };
+      // Grundgebuehr ohne Angabe gilt pro Monat - so zeigt die Auswahl den wirksamen Wert
+      if (this.formData.tariftyp === TarifTyp.GRUNDGEBUEHR && !this.formData.mengeneinheit) {
+        this.formData.mengeneinheit = Mengeneinheit.MONAT;
+      }
     } else {
       // Set default dates: current year start to end
       const now = new Date();
@@ -83,6 +95,7 @@ export class TarifFormComponent implements OnInit {
       this.formData.gueltigVon = `${year}-01-01`;
       this.formData.gueltigBis = `${year}-12-31`;
     }
+    this.letzterTyp = this.formData.tariftyp;
   }
 
   onSubmit(): void {

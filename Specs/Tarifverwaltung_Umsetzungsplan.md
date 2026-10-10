@@ -475,3 +475,15 @@ Die Regel „3. Keine Überlappung: Pro Tariftyp darf nur ein Tarif für einen T
 |  [x]   | 4. Tests | `TarifServiceTest` (VNB neben VNB, drei Grundgebühren, gleiche Bezeichnung, Ladestrom, Update), `TarifRepositoryIT` (Bezeichnungsvergleich, Sortierung), `RechnungServiceTest` (zwei VNB-Zeilen mit gleicher Menge, drei Grundgebühren), E2E `tarif-verwaltung.spec.ts` (anderer Name zulässig, gleicher Name abgewiesen) |
 
 Keine Migration, keine neuen Übersetzungen: Die Fehlermeldung kommt wie bisher als Text vom Backend.
+
+---
+
+## Ergänzung 10.10.2026: Grundgebühr pro Monat oder pro Tag (Spec FR-3)
+
+| Status | Phase | Beschreibung |
+|--------|-------|--------------|
+|  [x]   | 1. DB-Migration | `V176__Grundgebuehr_Pro_Tag.sql`: `ck_tarif_mengeneinheit` um `TAG`, bestehende Grundgebühren `MONAT`, Spaltenkommentar, Übersetzungen `TAG`, `TAGE`, `GRUNDGEBUEHR_EINHEIT_HINT` |
+|  [x]   | 2. Backend-Entity | `Mengeneinheit.TAG`; `TarifTyp.EIGENE_MENGENEINHEIT` = ZUSATZ, GRUNDGEBUEHR; neu `TarifTyp.GRUNDGEBUEHR_EINHEITEN` = MONAT, TAG |
+|  [x]   | 3. Backend-Service | `TarifService.pruefeMengeneinheit`: Grundgebühr ohne Angabe → MONAT, nur MONAT/TAG zulässig. `RechnungService.berechneGrundgebuehrZeilen`: TAG = Tage im Teilzeitraum (inkl.), MONAT = volle Monate. `TarifpositionService.pruefeTariftypZuEinheit` prüft ausdrücklich auf ZUSATZ statt auf `EIGENE_MENGENEINHEIT` (sonst ginge die Grundgebühr dort als Zusatz-Tarif durch). `NkRechnungService`: Zuordnung `TAG` → `TAGE` vervollständigt |
+|  [x]   | 4. Frontend | `tarif.model.ts`: `Mengeneinheit.TAG`, `waehlbareMengeneinheiten(typ)`, Grundgebühr in `TARIFTYPEN_MIT_MENGENEINHEIT`; `tarif-form`: Optionen je Typ, Vorbelegung Monat, eigener Hinweis |
+|  [x]   | 5. Tests | `TarifServiceTest` (ohne Angabe → Monat, Tag, Stück abgewiesen), `RechnungServiceTest` (92 Tage, 46 Tage ab 16.08., Monat ab 16.08. = 1), `tarif-form.component.spec.ts`, `tarif-list.component.spec.ts` |

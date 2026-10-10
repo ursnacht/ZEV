@@ -6,6 +6,7 @@ import ch.nacht.dto.RechnungKonfigurationDTO;
 import ch.nacht.dto.TarifZeileDTO;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
+import ch.nacht.entity.Mengeneinheit;
 import ch.nacht.entity.Mieter;
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
@@ -201,6 +202,53 @@ public class RechnungServiceTest {
 
         // 20 (ZEV) + 7.50 + 5.00 (VNB) + 27 (Grundgebuehren)
         assertBetrag("59.5", rechnung.getTotalBetrag());
+    }
+
+    /**
+     * Grundgebuehr pro Tag (Specs/Tarifverwaltung.md, FR-3): Menge = Tage im Rechnungszeitraum,
+     * in denen der Tarif gilt - auch angebrochene Monate zaehlen taggenau.
+     */
+    @Test
+    void berechneRechnung_GrundgebuehrProTag_ZaehltJedenTag() {
+        LocalDate von = LocalDate.of(2026, 7, 1);
+        LocalDate bis = LocalDate.of(2026, 9, 30);
+
+        Tarif proTag = new Tarif("Messtarif", TarifTyp.GRUNDGEBUEHR, new BigDecimal("0.10000"),
+            LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        proTag.setMengeneinheit(Mengeneinheit.TAG);
+        // Gilt erst ab 16.08.: 16 Tage August + 30 Tage September = 46 Tage
+        Tarif abMitte = new Tarif("Netznutzung Grundtarif", TarifTyp.GRUNDGEBUEHR, new BigDecimal("0.20000"),
+            LocalDate.of(2026, 8, 16), LocalDate.of(2026, 12, 31));
+        abMitte.setMengeneinheit(Mengeneinheit.TAG);
+        // Pro Monat bleibt bei vollen Monaten: ab 16.08. nur der September
+        Tarif proMonat = new Tarif("Energielieferung Grundtarif", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
+            LocalDate.of(2026, 8, 16), LocalDate.of(2026, 12, 31));
+        proMonat.setMengeneinheit(Mengeneinheit.MONAT);
+
+        when(tarifService.getTarifeForZeitraum(TarifTyp.ZEV, von, bis)).thenReturn(Collections.emptyList());
+        when(tarifService.getTarifeForZeitraum(TarifTyp.VNB, von, bis)).thenReturn(Collections.emptyList());
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(List.of(proTag, abMitte, proMonat));
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
+
+        List<TarifZeileDTO> grund = rechnung.getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR).toList();
+        assertEquals(3, grund.size());
+
+        assertBetrag("92", grund.get(0).getMenge());       // ganzes Quartal: 31 + 31 + 30
+        assertEquals("TAG", grund.get(0).getMengeneinheit());
+        assertBetrag("9.2", grund.get(0).getBetrag());
+
+        assertBetrag("46", grund.get(1).getMenge());
+        assertEquals("TAG", grund.get(1).getMengeneinheit());
+        assertBetrag("9.2", grund.get(1).getBetrag());
+
+        assertBetrag("1", grund.get(2).getMenge());
+        assertEquals("MONAT", grund.get(2).getMengeneinheit());
+        assertBetrag("5", grund.get(2).getBetrag());
+
+        assertBetrag("23.4", rechnung.getTotalBetrag());
     }
 
     @Test

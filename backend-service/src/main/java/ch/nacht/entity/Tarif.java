@@ -57,9 +57,10 @@ public class Tarif {
     private boolean produzentVerrechnen = false;
 
     /**
-     * Nur für {@link TarifTyp#ZUSATZ}: die Mengeneinheit dieses Tarifs — bei allen übrigen Typen
-     * {@code null}, weil sich deren Einheit aus dem Typ ergibt ({@link TarifTyp#mengeneinheit()}).
-     * Für {@code ZUSATZ} ist das Feld Pflicht; geprüft wird das im {@code TarifService}.
+     * Nur für {@link TarifTyp#ZUSATZ} und {@link TarifTyp#GRUNDGEBUEHR}: die Mengeneinheit dieses
+     * Tarifs — bei allen übrigen Typen {@code null}, weil sich deren Einheit aus dem Typ ergibt
+     * ({@link TarifTyp#mengeneinheit()}). Für {@code ZUSATZ} ist das Feld Pflicht, bei der
+     * Grundgebühr {@code MONAT} (Vorgabe) oder {@code TAG}; geprüft wird das im {@code TarifService}.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "mengeneinheit", length = 10)

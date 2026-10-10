@@ -6,6 +6,7 @@ import ch.nacht.dto.RechnungKonfigurationDTO;
 import ch.nacht.dto.TarifZeileDTO;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
+import ch.nacht.entity.Mengeneinheit;
 import ch.nacht.entity.Mieter;
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
@@ -22,6 +23,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Year;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -491,28 +493,35 @@ public class RechnungService {
             LocalDate effVon = tarif.getGueltigVon().isBefore(von) ? von : tarif.getGueltigVon();
             LocalDate effBis = tarif.getGueltigBis().isAfter(bis) ? bis : tarif.getGueltigBis();
 
-            int monate = zaehleVolleMonate(effVon, effBis);
-            if (monate <= 0) {
+            // Pro Tag: jeder Tag des Teilzeitraums (inklusive) - taggenau auch bei Mieterwechsel
+            // mitten im Monat. Pro Monat: nur volle Kalendermonate, wie bisher
+            // (Specs/Tarifverwaltung.md, FR-3).
+            boolean proTag = Mengeneinheit.TAG.name().equals(tarif.effektiveMengeneinheit());
+            long anzahl = proTag
+                    ? ChronoUnit.DAYS.between(effVon, effBis) + 1
+                    : zaehleVolleMonate(effVon, effBis);
+            if (anzahl <= 0) {
                 continue;
             }
 
             BigDecimal preis = tarif.getPreis();
-            BigDecimal betrag = BigDecimal.valueOf(monate).multiply(preis);
+            BigDecimal menge = BigDecimal.valueOf(anzahl);
+            BigDecimal betrag = menge.multiply(preis);
 
             rechnung.addTarifZeile(new TarifZeileDTO(
                     tarif.getBezeichnung(),
                     effVon,
                     effBis,
-                    BigDecimal.valueOf(monate),
+                    menge,
                     preis,
                     betrag,
                     TarifTyp.GRUNDGEBUEHR,
-                    "MONAT"
+                    proTag ? Mengeneinheit.TAG.name() : Mengeneinheit.MONAT.name()
             ));
             total = total.add(betrag);
 
-            log.debug("GRUNDGEBUEHR line ({} to {}): {} Monate * {} = {} CHF",
-                    effVon, effBis, monate, preis, betrag);
+            log.debug("GRUNDGEBUEHR line ({} to {}): {} {} * {} = {} CHF",
+                    effVon, effBis, anzahl, proTag ? "Tage" : "Monate", preis, betrag);
         }
 
         return total;

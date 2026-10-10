@@ -84,8 +84,18 @@ public enum TarifTyp {
     /** Typen, deren Position je <b>Tarif</b> eindeutig ist statt je Tariftyp. */
     public static final Set<TarifTyp> EINDEUTIG_JE_TARIF = EnumSet.of(ZUSATZ);
 
-    /** Typen mit frei wählbarer Mengeneinheit am Tarif. */
-    public static final Set<TarifTyp> EIGENE_MENGENEINHEIT = EnumSet.of(ZUSATZ);
+    /**
+     * Typen mit wählbarer Mengeneinheit am Tarif: {@code ZUSATZ} frei (kWh, Monat, Stück),
+     * {@code GRUNDGEBUEHR} zwischen {@link #GRUNDGEBUEHR_EINHEITEN Monat und Tag}
+     * (Specs/Tarifverwaltung.md, FR-3).
+     */
+    public static final Set<TarifTyp> EIGENE_MENGENEINHEIT = EnumSet.of(ZUSATZ, GRUNDGEBUEHR);
+
+    /**
+     * Zulässige Mengeneinheiten der Grundgebühr: {@code MONAT} zählt volle Kalendermonate (wie
+     * bisher), {@code TAG} jeden Tag des Rechnungszeitraums, in dem der Tarif gilt.
+     */
+    public static final Set<Mengeneinheit> GRUNDGEBUEHR_EINHEITEN = EnumSet.of(Mengeneinheit.MONAT, Mengeneinheit.TAG);
 
     /**
      * Tariff types whose quantities are captured manually as {@link Tarifposition} instead of

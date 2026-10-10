@@ -15,7 +15,7 @@
       <div class="zev-form-hint">{{ 'TARIFTYP_HINT' | translate }}</div>
     </div>
 
-    <!-- Nur Typen mit eigener Mengeneinheit (ZUSATZ); sonst folgt sie aus dem Typ -->
+    <!-- Nur Typen mit eigener Mengeneinheit (ZUSATZ, GRUNDGEBUEHR); sonst folgt sie aus dem Typ -->
     @if (brauchtMengeneinheit) {
       <div class="zev-form-group">
         <label for="mengeneinheit">{{ 'MENGENEINHEIT' | translate }}:</label>
@@ -27,7 +27,7 @@
             <option [ngValue]="einheit">{{ einheit | translate }}</option>
           }
         </select>
-        <div class="zev-form-hint">{{ 'MENGENEINHEIT_HINT' | translate }}</div>
+        <div class="zev-form-hint">{{ (formData.tariftyp === TarifTyp.GRUNDGEBUEHR ? 'GRUNDGEBUEHR_EINHEIT_HINT' : 'MENGENEINHEIT_HINT') | translate }}</div>
       </div>
     }
 

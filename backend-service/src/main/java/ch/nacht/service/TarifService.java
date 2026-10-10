@@ -1,5 +1,6 @@
 package ch.nacht.service;
 
+import ch.nacht.entity.Mengeneinheit;
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
 import ch.nacht.exception.TarifLuecke;
@@ -139,6 +140,17 @@ public class TarifService {
      * @throws IllegalArgumentException wenn ein Typ mit eigener Mengeneinheit keine gesetzt hat
      */
     private void pruefeMengeneinheit(Tarif tarif) {
+        // Grundgebuehr: pro Monat (Vorgabe, wie bisher) oder pro Tag (Specs/Tarifverwaltung.md, FR-3).
+        // Ohne Angabe gilt MONAT - so bleiben Aufrufer ohne das Feld beim bisherigen Verhalten.
+        if (tarif.getTariftyp() == TarifTyp.GRUNDGEBUEHR) {
+            if (tarif.getMengeneinheit() == null) {
+                tarif.setMengeneinheit(Mengeneinheit.MONAT);
+            } else if (!TarifTyp.GRUNDGEBUEHR_EINHEITEN.contains(tarif.getMengeneinheit())) {
+                throw new IllegalArgumentException(
+                        "Für die Grundgebühr ist nur die Mengeneinheit MONAT oder TAG zulässig");
+            }
+            return;
+        }
         if (TarifTyp.EIGENE_MENGENEINHEIT.contains(tarif.getTariftyp())) {
             if (tarif.getMengeneinheit() == null) {
                 throw new IllegalArgumentException(
