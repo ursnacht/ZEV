@@ -27,8 +27,8 @@ public class Tarif {
     private Long orgId;
 
     @NotBlank(message = "Bezeichnung is required")
-    @Size(max = 30, message = "Bezeichnung must not exceed 30 characters")
-    @Column(name = "bezeichnung", length = 30, nullable = false)
+    @Size(max = 50, message = "Bezeichnung must not exceed 50 characters")
+    @Column(name = "bezeichnung", length = 50, nullable = false)
     private String bezeichnung;
 
     @NotNull(message = "Tariftyp is required")

@@ -37,12 +37,12 @@ function gueltigkeit(slot: number): { von: string; bis: string; jahr: number } {
 
 /**
  * Helper to create a unique test tariff name.
- * IMPORTANT: bezeichnung is limited to 30 chars in DB (@Column length=30).
+ * IMPORTANT: bezeichnung is limited to 50 chars in DB (@Column length=50).
  */
 function generateTestTarifName(prefix: string = 'E2E Test'): string {
     const name = `${prefix} ${Date.now()}`;
-    if (name.length > 30) {
-        throw new Error(`Tarif-Bezeichnung "${name}" ist laenger als die 30 Zeichen des Felds`);
+    if (name.length > 50) {
+        throw new Error(`Tarif-Bezeichnung "${name}" ist laenger als die 50 Zeichen des Felds`);
     }
     return name;
 }

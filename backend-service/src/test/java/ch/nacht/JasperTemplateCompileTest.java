@@ -96,6 +96,62 @@ class JasperTemplateCompileTest {
     }
 
     /**
+     * Lange Bezeichnung (50 Zeichen) mit abweichendem Zeitraum bricht um, statt abgeschnitten zu
+     * werden; die Werte daneben wachsen mit. Eine Position ueber den ganzen Rechnungszeitraum steht
+     * ohne Zeitraum (Specs/RechnungenGenerieren.md).
+     */
+    @Test
+    void testRechnungTemplate_LangeBezeichnungBrichtUm_ZeitraumNurWennAbweichend() throws Exception {
+        InputStream stream = getClass().getResourceAsStream("/reports/rechnung.jrxml");
+        assertNotNull(stream, "rechnung.jrxml not found");
+        JasperReport report = JasperCompileManager.compileReport(stream);
+
+        String lang = "Strombezug Hochtarif Netz inkl. Abgaben und Gebühr"; // 50 Zeichen
+        assertEquals(50, lang.length());
+        RechnungDTO rechnung = testRechnung();
+        rechnung.addTarifZeile(new TarifZeileDTO(lang,
+                LocalDate.of(2026, 2, 1), LocalDate.of(2026, 3, 31),
+                new BigDecimal("80"), new BigDecimal("0.34192"), new BigDecimal("27.35360"),
+                TarifTyp.VNB));
+
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("RECHNUNG", rechnung);
+        parameters.put("TRANSLATIONS", Map.of());
+        parameters.put("QR_CODE_IMAGE", null);
+        JasperPrint print = JasperFillManager.fillReport(report, parameters,
+                new JRBeanCollectionDataSource(rechnung.getTarifZeilen()));
+
+        JRPrintText ganzerZeitraum = textMit(print, "ZEV Solarstrom");
+        assertEquals("ZEV Solarstrom", ganzerZeitraum.getFullText(),
+                "Zeitraum gleich Rechnungszeitraum: nur die Bezeichnung");
+
+        JRPrintText umgebrochen = textMit(print, lang);
+        assertEquals(lang + "\n(01.02.2026 - 31.03.2026)", umgebrochen.getFullText());
+        assertTrue(umgebrochen.getHeight() > 18,
+                "Bezeichnung muss umbrechen und die Zeile erhoehen, war " + umgebrochen.getHeight());
+
+        JRPrintText betrag = textMit(print, "27.35");
+        assertEquals(umgebrochen.getY(), betrag.getY(), "Betrag auf derselben Zeile");
+        assertEquals(umgebrochen.getHeight(), betrag.getHeight(), "Betrag waechst mit der Zeile");
+
+        byte[] pdf = JasperExportManager.exportReportToPdf(print);
+        assertEquals("%PDF", new String(pdf, 0, 4, StandardCharsets.US_ASCII));
+    }
+
+    /** Erstes Textelement, dessen Text mit {@code anfang} beginnt. */
+    private static JRPrintText textMit(JasperPrint print, String anfang) {
+        for (JRPrintPage page : print.getPages()) {
+            for (JRPrintElement element : page.getElements()) {
+                if (element instanceof JRPrintText text && text.getFullText() != null
+                        && text.getFullText().startsWith(anfang)) {
+                    return text;
+                }
+            }
+        }
+        throw new AssertionError("Kein Text beginnt mit: " + anfang);
+    }
+
+    /**
      * Rechnung mit einer Tarifzeile und einer Rundungsdifferenz ungleich null - damit auch die
      * bedingte Rundungszeile des Templates ({@code getRundung().signum() != 0}) gefuellt wird und
      * nicht bloss uebersprungen.

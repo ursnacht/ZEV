@@ -51,6 +51,17 @@
     * Die bedingte Rundungszeile prüft `getRundung().signum() != 0` statt `Math.abs(...) > 0.001`. Die Schwelle war nur nötig, weil `double` die Null nicht exakt trifft.
     * Der Betrag des Einzahlungsscheins wird ohne Umrechnung gesetzt (`bill.setAmount(rechnung.getEndBetrag())`).
     * **Ein Test füllt das Template und exportiert ein PDF**, nicht nur kompilieren: Ein Template kompiliert auch mit Feldtypen, die nicht zur Bean passen — der Fehler kommt erst beim Füllen. Der Test kompiliert dazu aus dem `.jrxml` und nicht aus `rechnung.jasper`, weil dieses Binary erst in der Maven-Phase `prepare-package` entsteht und bei `mvn test` vom vorherigen Lauf stammt.
+* Als Admin möchte ich **längere Tarifbezeichnungen** verwenden und auf der Rechnung **vollständig lesen** können; der Zeitraum einer Position soll nur dort stehen, wo er etwas aussagt (Entscheid vom 10.10.2026).
+  * **Ausgangslage:** `tarif.bezeichnung` war auf 30 Zeichen begrenzt. Auf der Rechnung steht je Position „Bezeichnung (TT.MM.JJJJ - TT.MM.JJJJ)" in einer einzeiligen Spalte von 305 pt; was nicht passte, schnitt JasperReports ab. Der Zeitraum stand auch dann, wenn er genau dem Rechnungszeitraum entsprach — also auf fast jeder Zeile, ohne Information.
+  * **Akzeptanzkriterien:**
+    * `tarif.bezeichnung` fasst **50 Zeichen** (Flyway-Migration `VARCHAR(50)`, Entity `@Size(max = 50)`/`length = 50`, Eingabefeld `maxlength="50"` in der Tarifverwaltung). Bestehende Bezeichnungen bleiben unverändert.
+    * Eine Bezeichnung mit 51 Zeichen wird vom Backend abgewiesen (Bean Validation, HTTP 400), wie bisher eine mit 31.
+    * Passt der Text einer Position (Bezeichnung, ggf. Quell-Referenz und Zeitraum) nicht in eine Zeile, wird er **umgebrochen**; die Zeile wird so hoch wie nötig, nichts wird abgeschnitten. Mit 50 Zeichen Bezeichnung und Zeitraum sind das höchstens **zwei Zeilen**. Ist der Text länger als eine Zeile (Schwelle 60 Zeichen), steht der **Zeitraum geschlossen in der zweiten Zeile**; er wird nie zwischen den beiden Daten getrennt.
+    * Bei einer umgebrochenen Position bleiben Menge, Preis, Einheit und Betrag auf derselben Zeile wie die Bezeichnung (vertikal mittig), die Trennlinie unter der Position läuft über die volle Breite.
+    * Entspricht der Zeitraum einer Position **genau** dem Rechnungszeitraum (`von` und `bis` gleich), steht nur die Bezeichnung, **ohne** „(TT.MM.JJJJ - TT.MM.JJJJ)". Weicht er ab (z.B. Tarifwechsel innerhalb des Quartals, Grundgebühr nur über volle Monate, Position mit eigenem Zeitraum), steht er wie bisher.
+    * Die Regel gilt für alle Positionsarten gleich (ZEV, VNB, Grundgebühr, Tarifpositionen).
+    * Die Formatierung steckt in einer testbaren Java-Methode (`ch.nacht.util.RechnungZeilenText`), nicht als Ausdruck im Template; das Template ruft sie auf.
+    * `JasperTemplateCompileTest` füllt das Template mit einer Position, deren Text zwei Zeilen braucht, und exportiert ein PDF.
 * **0-Rechnungen (Endbetrag 0.00 CHF, z.B. kein Verbrauch im Zeitraum):** Das PDF wird erzeugt (Beleg für den Mieter), aber es wird **kein Debitor-Eintrag** angelegt (keine Forderung; `debitor.betrag` hat den Constraint `> 0`, siehe `Specs/Debitorkontrolle.md`). Die übrigen Rechnungen des Laufs sind davon nicht betroffen.
 
 ## 3. Technische Spezifikationen (Technical Specs)

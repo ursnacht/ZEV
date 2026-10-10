@@ -45,7 +45,7 @@
     <div class="zev-form-group">
       <label for="bezeichnung">{{ 'BEZEICHNUNG' | translate }}:</label>
       <input type="text" id="bezeichnung" class="zev-input" [(ngModel)]="formData.bezeichnung" name="bezeichnung"
-        required maxlength="30" [placeholder]="'TARIF_BEZEICHNUNG_PLACEHOLDER' | translate" />
+        required maxlength="50" [placeholder]="'TARIF_BEZEICHNUNG_PLACEHOLDER' | translate" />
         @if (!formData.bezeichnung.trim()) {
           <div class="zev-form-error">
             {{ 'BEZEICHNUNG_IST_ERFORDERLICH' | translate }}

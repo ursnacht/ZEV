@@ -133,31 +133,34 @@
     <!-- Detail Band - Tariff lines -->
     <detail>
         <band height="18">
-            <element kind="textField" uuid="11111111-1111-1111-1111-111111111127" x="0" y="0" width="305" height="18" fontSize="9.0" vTextAlign="Middle">
-                <expression><![CDATA[$F{bezeichnung} + " (" + $F{von}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + " - " + $F{bis}.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) + ")"]]></expression>
+            <!-- Bezeichnung bricht um, statt abgeschnitten zu werden (StretchHeight); die uebrigen
+                 Felder wachsen mit (ContainerHeight), damit Werte und Trennlinie auf der Zeile bleiben.
+                 Zeitraum nur, wenn er vom Rechnungszeitraum abweicht (RechnungZeilenText). -->
+            <element kind="textField" uuid="11111111-1111-1111-1111-111111111127" x="0" y="0" width="305" height="18" fontSize="9.0" vTextAlign="Middle" textAdjust="StretchHeight">
+                <expression><![CDATA[ch.nacht.util.RechnungZeilenText.bezeichnung($F{bezeichnung}, $F{von}, $F{bis}, $P{RECHNUNG}.getVon(), $P{RECHNUNG}.getBis())]]></expression>
                 <box>
                     <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
                 </box>
             </element>
-            <element kind="textField" uuid="11111111-1111-1111-1111-111111111128" x="305" y="0" width="35" height="18" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+            <element kind="textField" uuid="11111111-1111-1111-1111-111111111128" stretchType="ContainerHeight" x="305" y="0" width="35" height="18" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
                 <expression><![CDATA[ch.nacht.util.PdfNumberFormat.decimals($F{menge}, 0)]]></expression>
                 <box>
                     <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
                 </box>
             </element>
-            <element kind="textField" uuid="11111111-1111-1111-1111-111111111129" x="340" y="0" width="70" height="18" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+            <element kind="textField" uuid="11111111-1111-1111-1111-111111111129" stretchType="ContainerHeight" x="340" y="0" width="70" height="18" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
                 <expression><![CDATA[ch.nacht.util.PdfNumberFormat.decimals($F{preis}, 5)]]></expression>
                 <box>
                     <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
                 </box>
             </element>
-            <element kind="textField" uuid="11111111-1111-1111-1111-11111111112a" x="410" y="0" width="70" height="18" fontSize="8.0" hTextAlign="Right" vTextAlign="Middle">
+            <element kind="textField" uuid="11111111-1111-1111-1111-11111111112a" stretchType="ContainerHeight" x="410" y="0" width="70" height="18" fontSize="8.0" hTextAlign="Right" vTextAlign="Middle">
                 <expression><![CDATA["CHF / " + $P{TRANSLATIONS}.get($F{mengeneinheit})]]></expression>
                 <box>
                     <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
                 </box>
             </element>
-            <element kind="textField" uuid="11111111-1111-1111-1111-11111111112b" x="480" y="0" width="75" height="18" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+            <element kind="textField" uuid="11111111-1111-1111-1111-11111111112b" stretchType="ContainerHeight" x="480" y="0" width="75" height="18" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
                 <expression><![CDATA[ch.nacht.util.PdfNumberFormat.chf($F{betrag})]]></expression>
                 <box>
                     <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>

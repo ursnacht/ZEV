@@ -459,3 +459,26 @@ konvertieren. Umgestellt wurde die Rechnungsgenerierung — nicht die beiden and
   `new BigDecimal("…")`; der `@CsvSource`-Parameter von `formatBetragQrBill` ist `BigDecimal`
   (JUnit konvertiert implizit).
 
+---
+
+## Ergänzung 10.10.2026: Längere Bezeichnung, Umbruch, Zeitraum nur bei Abweichung
+
+| Status | Phase | Beschreibung |
+|--------|-------|--------------|
+|  [x]   | 1. DB-Migration | `V175__Tarif_Bezeichnung_50_Zeichen.sql`: `ALTER TABLE zev.tarif ALTER COLUMN bezeichnung TYPE VARCHAR(50)` |
+|  [x]   | 2. Backend-Entity | `Tarif.bezeichnung`: `@Size(max = 50)`, `@Column(length = 50)` |
+|  [x]   | 3. Formatierung | Neu `ch.nacht.util.RechnungZeilenText.bezeichnung(...)`: Zeitraum nur bei Abweichung vom Rechnungszeitraum; über 60 Zeichen steht der Zeitraum nach einem Zeilenumbruch |
+|  [x]   | 4. PDF-Template | `rechnung.jrxml`, Detailband: Bezeichnung `textAdjust="StretchHeight"` und Aufruf von `RechnungZeilenText`; Menge, Preis, Einheit, Betrag `stretchType="ContainerHeight"` |
+|  [x]   | 5. Frontend | `tarif-form.component.html`: `maxlength="50"`; E2E-Helfer in `tarif-verwaltung.spec.ts` auf 50 Zeichen |
+|  [x]   | 6. Tests | `RechnungZeilenTextTest` (neu); `JasperTemplateCompileTest`: Fülltest mit zweizeiliger Position (Höhe > 18, Betrag auf derselben Zeile und gleich hoch, Text ohne Zeitraum bei vollem Zeitraum) |
+
+**Warum der Zeilenumbruch im Text und nicht JasperReports überlassen:** Jasper bricht nach dem
+Bindestrich um und trennt die beiden Daten („… (16.08.2026 -" / „30.09.2026)"). Ein geschütztes
+Leerzeichen hilft nicht, weil der Bindestrich selbst Trennstelle ist; ein nicht trennender
+Bindestrich (U+2011) fehlt in Helvetica, mit der das PDF ohne Schrift-Erweiterung erzeugt wird. Bei
+9 pt passen rund 64 Zeichen in die 305 pt breite Spalte; die Schwelle 60 lässt Reserve für breite
+Buchstaben. Bricht ein Text trotzdem früher, wird er umgebrochen und nicht abgeschnitten.
+
+**Sichtprüfung:** Das gefüllte Template wurde mit PDFBox als Bild gerendert und geprüft (vier
+Positionen: voller Zeitraum, kurzer Text mit Zeitraum, 50 Zeichen mit Zeitraum, 50 Zeichen ohne
+Zeitraum).
