@@ -111,8 +111,8 @@ public class TarifServiceTest {
             LocalDate.of(2025, 12, 31)
         );
 
-        when(tarifRepository.existsOverlappingTarif(
-            eq(TarifTyp.ZEV), any(), any(), eq(-1L)
+        when(tarifRepository.existsOverlappingTarifMitBezeichnung(
+            eq(TarifTyp.ZEV), eq("ZEV Tarif 2025"), any(), any(), eq(-1L)
         )).thenReturn(false);
         when(tarifRepository.save(newTarif)).thenReturn(newTarif);
 
@@ -123,7 +123,9 @@ public class TarifServiceTest {
     }
 
     @Test
-    void saveTarif_OverlappingTarif_ThrowsException() {
+    void saveTarif_OverlappingTarifGleicheBezeichnung_ThrowsException() {
+        // Ein zweiter Tarif mit gleicher Bezeichnung im selben Zeitraum stuende doppelt auf jeder
+        // Rechnung - das bleibt verboten (Specs/Tarifverwaltung.md, FR-2).
         Tarif overlappingTarif = new Tarif(
             "ZEV Tarif 2024 Alt",
             TarifTyp.ZEV,
@@ -132,8 +134,8 @@ public class TarifServiceTest {
             LocalDate.of(2024, 12, 31)
         );
 
-        when(tarifRepository.existsOverlappingTarif(
-            eq(TarifTyp.ZEV), any(), any(), eq(-1L)
+        when(tarifRepository.existsOverlappingTarifMitBezeichnung(
+            eq(TarifTyp.ZEV), eq("ZEV Tarif 2024 Alt"), any(), any(), eq(-1L)
         )).thenReturn(true);
 
         IllegalArgumentException exception = assertThrows(
@@ -141,7 +143,61 @@ public class TarifServiceTest {
             () -> tarifService.saveTarif(overlappingTarif)
         );
 
+        assertTrue(exception.getMessage().contains("gleicher Bezeichnung"));
+        verify(tarifRepository, never()).save(any());
+    }
+
+    @Test
+    void saveTarif_VnbNetznutzungNebenEnergielieferung_SavesSuccessfully() {
+        // Energielieferung und Netznutzung gelten gleichzeitig: Geprueft wird nur gegen Tarife
+        // derselben Bezeichnung, die typweite Pruefung entfaellt fuer VNB.
+        Tarif netznutzung = new Tarif("Netznutzung", TarifTyp.VNB, new BigDecimal("0.10500"),
+            LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+
+        when(tarifRepository.existsOverlappingTarifMitBezeichnung(
+            eq(TarifTyp.VNB), eq("Netznutzung"), any(), any(), eq(-1L))).thenReturn(false);
+        when(tarifRepository.save(netznutzung)).thenReturn(netznutzung);
+
+        assertNotNull(tarifService.saveTarif(netznutzung));
+
+        verify(tarifRepository, never()).existsOverlappingTarif(any(), any(), any(), anyLong());
+        verify(tarifRepository).save(netznutzung);
+    }
+
+    @Test
+    void saveTarif_DreiGrundgebuehren_PruefungJeBezeichnung() {
+        // Energielieferung, Netznutzung und Messtarif sind je ein Grundgebuehr-Tarif.
+        for (String bezeichnung : List.of("Grundtarif Energielieferung", "Grundtarif Netznutzung", "Messtarif")) {
+            Tarif grundgebuehr = new Tarif(bezeichnung, TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+            when(tarifRepository.existsOverlappingTarifMitBezeichnung(
+                eq(TarifTyp.GRUNDGEBUEHR), eq(bezeichnung), any(), any(), eq(-1L))).thenReturn(false);
+            when(tarifRepository.save(grundgebuehr)).thenReturn(grundgebuehr);
+
+            assertNotNull(tarifService.saveTarif(grundgebuehr));
+        }
+
+        verify(tarifRepository, never()).existsOverlappingTarif(any(), any(), any(), anyLong());
+        verify(tarifRepository, times(3)).save(any(Tarif.class));
+    }
+
+    @Test
+    void saveTarif_LadestromUeberschneidung_ThrowsException() {
+        // LADESTROM bleibt je Typ eindeutig: Die Position waehlt den Tarif, ein zweiter hiesse,
+        // dieselben kWh zweimal zu erfassen.
+        Tarif ladestrom = new Tarif("Ladestrom Netznutzung", TarifTyp.LADESTROM, new BigDecimal("0.10000"),
+            LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+
+        when(tarifRepository.existsOverlappingTarif(
+            eq(TarifTyp.LADESTROM), any(), any(), eq(-1L))).thenReturn(true);
+
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> tarifService.saveTarif(ladestrom)
+        );
+
         assertTrue(exception.getMessage().contains("überschneidet"));
+        verify(tarifRepository, never()).existsOverlappingTarifMitBezeichnung(any(), any(), any(), any(), anyLong());
         verify(tarifRepository, never()).save(any());
     }
 
@@ -161,6 +217,7 @@ public class TarifServiceTest {
 
         // Die Pruefung wird fuer diesen Typ gar nicht erst angefragt
         verify(tarifRepository, never()).existsOverlappingTarif(any(), any(), any(), anyLong());
+        verify(tarifRepository, never()).existsOverlappingTarifMitBezeichnung(any(), any(), any(), any(), anyLong());
         verify(tarifRepository).save(sauna);
     }
 
@@ -186,7 +243,7 @@ public class TarifServiceTest {
             LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
         zev.setMengeneinheit(Mengeneinheit.STUECK);
 
-        when(tarifRepository.existsOverlappingTarif(eq(TarifTyp.ZEV), any(), any(), eq(-1L)))
+        when(tarifRepository.existsOverlappingTarifMitBezeichnung(eq(TarifTyp.ZEV), any(), any(), any(), eq(-1L)))
             .thenReturn(false);
         when(tarifRepository.save(any(Tarif.class))).thenAnswer(i -> i.getArgument(0));
 
@@ -219,16 +276,16 @@ public class TarifServiceTest {
     void saveTarif_UpdateExisting_ExcludesItself() {
         zevTarif2024.setBezeichnung("ZEV Tarif 2024 Updated");
 
-        when(tarifRepository.existsOverlappingTarif(
-            eq(TarifTyp.ZEV), any(), any(), eq(1L)
+        when(tarifRepository.existsOverlappingTarifMitBezeichnung(
+            eq(TarifTyp.ZEV), eq("ZEV Tarif 2024 Updated"), any(), any(), eq(1L)
         )).thenReturn(false);
         when(tarifRepository.save(zevTarif2024)).thenReturn(zevTarif2024);
 
         Tarif result = tarifService.saveTarif(zevTarif2024);
 
         assertNotNull(result);
-        verify(tarifRepository).existsOverlappingTarif(
-            eq(TarifTyp.ZEV), any(), any(), eq(1L)
+        verify(tarifRepository).existsOverlappingTarifMitBezeichnung(
+            eq(TarifTyp.ZEV), eq("ZEV Tarif 2024 Updated"), any(), any(), eq(1L)
         );
     }
 

@@ -24,11 +24,13 @@ public interface TarifRepository extends JpaRepository<Tarif, Long> {
      * @param typ Tariff type (ZEV or VNB)
      * @param von Start date (inclusive)
      * @param bis End date (inclusive)
-     * @return List of overlapping tariffs ordered by validity start date
+     * @return List of overlapping tariffs ordered by validity start date, then by name — mehrere
+     *         gleichzeitig gültige Tarife (z.B. Energielieferung und Netznutzung) erscheinen so
+     *         auf jeder Rechnung in derselben Reihenfolge
      */
     @Query("SELECT t FROM Tarif t WHERE t.tariftyp = :typ " +
            "AND t.gueltigVon <= :bis AND t.gueltigBis >= :von " +
-           "ORDER BY t.gueltigVon")
+           "ORDER BY t.gueltigVon, t.bezeichnung")
     List<Tarif> findByTariftypAndZeitraumOverlapping(
         @Param("typ") TarifTyp typ,
         @Param("von") LocalDate von,
@@ -50,6 +52,25 @@ public interface TarifRepository extends JpaRepository<Tarif, Long> {
            "AND t.gueltigVon <= :bis AND t.gueltigBis >= :von")
     boolean existsOverlappingTarif(
         @Param("typ") TarifTyp typ,
+        @Param("von") LocalDate von,
+        @Param("bis") LocalDate bis,
+        @Param("excludeId") Long excludeId
+    );
+
+    /**
+     * Gibt es einen überlappenden Tarif desselben Typs mit <b>derselben Bezeichnung</b>? Für die
+     * Typen, bei denen mehrere Tarife nebeneinander gelten dürfen (ZEV, VNB, Grundgebühr) —
+     * verglichen ohne Gross-/Kleinschreibung und ohne Leerzeichen am Rand.
+     *
+     * @param excludeId ID to exclude (use -1 for new tariffs)
+     */
+    @Query("SELECT COUNT(t) > 0 FROM Tarif t WHERE t.tariftyp = :typ " +
+           "AND LOWER(TRIM(t.bezeichnung)) = LOWER(TRIM(:bezeichnung)) " +
+           "AND t.id != :excludeId " +
+           "AND t.gueltigVon <= :bis AND t.gueltigBis >= :von")
+    boolean existsOverlappingTarifMitBezeichnung(
+        @Param("typ") TarifTyp typ,
+        @Param("bezeichnung") String bezeichnung,
         @Param("von") LocalDate von,
         @Param("bis") LocalDate bis,
         @Param("excludeId") Long excludeId

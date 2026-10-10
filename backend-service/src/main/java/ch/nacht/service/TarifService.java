@@ -68,7 +68,7 @@ public class TarifService {
 
     /**
      * Save a new or updated tariff.
-     * Validates that no overlapping tariff exists for the same type.
+     * Validates overlaps per tariff type (see {@link #pruefeUeberschneidung}).
      *
      * @param tarif Tariff to save
      * @return Saved tariff
@@ -86,20 +86,7 @@ public class TarifService {
 
         pruefeMengeneinheit(tarif);
 
-        // Check for overlapping tariffs. Typen mit mehreren gleichzeitig gueltigen Tarifen
-        // (ZUSATZ) sind ausgenommen: Sauna, Waschkueche und Gaestezimmer teilen sich den Typ und
-        // muessen nebeneinander bestehen. Mehrdeutig wird dadurch nichts, weil der Tarif an der
-        // Position ausdruecklich gewaehlt wird - anders als bei ZEV/VNB/Grundgebuehr, die die
-        // Rechnung selbst heraussucht.
-        Long excludeId = tarif.getId() != null ? tarif.getId() : -1L;
-        if (!TarifTyp.MEHRFACH_GUELTIG.contains(tarif.getTariftyp())
-                && tarifRepository.existsOverlappingTarif(
-                tarif.getTariftyp(),
-                tarif.getGueltigVon(),
-                tarif.getGueltigBis(),
-                excludeId)) {
-            throw new IllegalArgumentException("Tarif überschneidet sich mit bestehendem Tarif");
-        }
+        pruefeUeberschneidung(tarif);
 
         // org_id setzen bei neuem Tarif
         if (tarif.getId() == null) {
@@ -109,6 +96,37 @@ public class TarifService {
         Tarif saved = tarifRepository.save(tarif);
         log.info("Tariff saved with ID: {}", saved.getId());
         return saved;
+    }
+
+    /**
+     * Überschneidungsprüfung je Tariftyp (Specs/Tarifverwaltung.md, FR-2):
+     *
+     * <ul>
+     *   <li>ZEV, VNB, Grundgebühr: mehrere Tarife dürfen gleichzeitig gelten (Energielieferung,
+     *       Netznutzung, Messtarif) — nur nicht zwei mit <b>derselben Bezeichnung</b>. Ein solches
+     *       Duplikat stünde zweimal auf jeder Rechnung.</li>
+     *   <li>ZUSATZ: keine Prüfung; der Tarif wird an der Position ausdrücklich gewählt.</li>
+     *   <li>LADESTROM: keine Überschneidung desselben Typs.</li>
+     * </ul>
+     *
+     * @throws IllegalArgumentException bei einer unzulässigen Überschneidung
+     */
+    private void pruefeUeberschneidung(Tarif tarif) {
+        Long excludeId = tarif.getId() != null ? tarif.getId() : -1L;
+        TarifTyp typ = tarif.getTariftyp();
+        if (TarifTyp.UEBERSCHNEIDUNG_JE_BEZEICHNUNG.contains(typ)) {
+            if (tarifRepository.existsOverlappingTarifMitBezeichnung(typ, tarif.getBezeichnung(),
+                    tarif.getGueltigVon(), tarif.getGueltigBis(), excludeId)) {
+                throw new IllegalArgumentException(
+                        "Tarif überschneidet sich mit bestehendem Tarif gleicher Bezeichnung");
+            }
+            return;
+        }
+        if (!TarifTyp.MEHRFACH_GUELTIG.contains(typ)
+                && tarifRepository.existsOverlappingTarif(typ, tarif.getGueltigVon(),
+                tarif.getGueltigBis(), excludeId)) {
+            throw new IllegalArgumentException("Tarif überschneidet sich mit bestehendem Tarif");
+        }
     }
 
     /**

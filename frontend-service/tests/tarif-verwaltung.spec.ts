@@ -537,27 +537,55 @@ test.describe('Tarif Management - Delete Tariff', () => {
     });
 });
 
+/**
+ * Ueberschneidung (Specs/Tarifverwaltung.md, FR-2): Bei ZEV, VNB und Grundgebuehr duerfen mehrere
+ * Tarife gleichzeitig gelten (Energielieferung, Netznutzung) - nur nicht zwei mit derselben
+ * Bezeichnung.
+ */
 test.describe('Tarif Management - Overlapping Validation', () => {
-    test('should show error when creating overlapping tariff of same type', async ({ page }) => {
+    test('should accept an overlapping tariff of the same type with a different name', async ({ page }) => {
         await navigateToTarife(page);
 
         const zeitraum = gueltigkeit(5);
-        const testName1 = generateTestTarifName('Overlap 1');
+        const testName1 = generateTestTarifName('Energie');
+        await createTarifOrFail(page, {
+            tariftyp: 'VNB',
+            bezeichnung: testName1,
+            preis: '0.15000',
+            gueltigVon: zeitraum.von,
+            gueltigBis: zeitraum.bis
+        });
+
+        // Zweiter VNB-Tarif mit anderer Bezeichnung im selben Zeitraum -> zulaessig
+        const testName2 = generateTestTarifName('Netz');
+        await createTarifOrFail(page, {
+            tariftyp: 'VNB',
+            bezeichnung: testName2,
+            preis: '0.10000',
+            gueltigVon: zeitraum.von,
+            gueltigBis: zeitraum.bis
+        });
+    });
+
+    test('should show error when creating an overlapping tariff with the same name', async ({ page }) => {
+        await navigateToTarife(page);
+
+        const zeitraum = gueltigkeit(6);
+        const testName = generateTestTarifName('Overlap');
         await createTarifOrFail(page, {
             tariftyp: 'ZEV',
-            bezeichnung: testName1,
+            bezeichnung: testName,
             preis: '0.20000',
             gueltigVon: zeitraum.von,
             gueltigBis: zeitraum.bis
         });
 
-        // Zweiter Tarif desselben Typs, der in den ersten hineinragt -> muss abgewiesen werden
-        const testName2 = generateTestTarifName('Overlap 2');
+        // Gleiche Bezeichnung, ragt in den ersten hinein -> muss abgewiesen werden
         await page.locator('button.zev-button--primary').first().click();
         await expect(page.locator('form')).toBeVisible();
         await fillTarifForm(page, {
             tariftyp: 'ZEV',
-            bezeichnung: testName2,
+            bezeichnung: testName,
             preis: '0.21000',
             gueltigVon: `${zeitraum.jahr}-06-01`,
             gueltigBis: `${zeitraum.jahr + 1}-06-30`
@@ -568,10 +596,10 @@ test.describe('Tarif Management - Overlapping Validation', () => {
         const isSuccess = await waitForFormResult(page, 20000);
         if (isSuccess) {
             // Fuer das Aufraeumen registrieren, bevor der Test scheitert
-            createdTarifNames.push(testName2);
+            createdTarifNames.push(testName);
         }
         expect(isSuccess,
-            'Ein ueberschneidender Tarif desselben Typs darf nicht gespeichert werden').toBe(false);
+            'Ein ueberschneidender Tarif mit gleicher Bezeichnung darf nicht gespeichert werden').toBe(false);
 
         await expect(page.locator('.zev-message--error')).toBeVisible();
     });

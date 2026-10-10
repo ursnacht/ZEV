@@ -460,3 +460,18 @@ ON CONFLICT (key) DO NOTHING;
 2. **Annahme:** Bei der Rechnungsanzeige werden die Zeilen nach Tariftyp und dann nach Datum sortiert
 3. **Annahme:** Die alten Tarife aus application.yml werden nicht automatisch migriert (Admin erfasst manuell)
 4. **Annahme:** Das Löschen eines Tarifs ist immer möglich (keine Prüfung auf verwendete Rechnungen, da Rechnungen nicht persistiert werden)
+
+---
+
+## Ergänzung 10.10.2026: Mehrere gleichzeitig gültige Tarife je Typ (Spec FR-2)
+
+Die Regel „3. Keine Überlappung: Pro Tariftyp darf nur ein Tarif für einen Tag gültig sein" gilt nur noch für `LADESTROM`.
+
+| Status | Phase | Beschreibung |
+|--------|-------|--------------|
+|  [x]   | 1. Tariftypen | `TarifTyp.MEHRFACH_GUELTIG` = ZEV, VNB, GRUNDGEBUEHR, ZUSATZ; neu `UEBERSCHNEIDUNG_JE_BEZEICHNUNG` = ZEV, VNB, GRUNDGEBUEHR. Javadoc der Grundgebühr: die frühere Begründung gegen mehrere Grundgebühren betraf eine Gebühr nur für Ladestationen (bleibt `ZUSATZ`) |
+|  [x]   | 2. Repository | `TarifRepository.existsOverlappingTarifMitBezeichnung(typ, bezeichnung, von, bis, excludeId)` mit `LOWER(TRIM(...))`; `findByTariftypAndZeitraumOverlapping` sortiert zusätzlich nach Bezeichnung |
+|  [x]   | 3. Service | `TarifService.pruefeUeberschneidung`: je Bezeichnung (ZEV/VNB/Grundgebühr), keine (ZUSATZ), je Typ (LADESTROM) |
+|  [x]   | 4. Tests | `TarifServiceTest` (VNB neben VNB, drei Grundgebühren, gleiche Bezeichnung, Ladestrom, Update), `TarifRepositoryIT` (Bezeichnungsvergleich, Sortierung), `RechnungServiceTest` (zwei VNB-Zeilen mit gleicher Menge, drei Grundgebühren), E2E `tarif-verwaltung.spec.ts` (anderer Name zulässig, gleicher Name abgewiesen) |
+
+Keine Migration, keine neuen Übersetzungen: Die Fehlermeldung kommt wie bisher als Text vom Backend.

@@ -116,6 +116,46 @@ class TarifRepositoryIT extends AbstractIntegrationTest {
                 LocalDate.of(2024, 6, 1), LocalDate.of(2024, 6, 30), -1L)).isFalse();
     }
 
+    /**
+     * Ueberschneidung mit gleicher Bezeichnung (Specs/Tarifverwaltung.md, FR-2): Energielieferung
+     * und Netznutzung duerfen nebeneinander gelten, ein zweites "Netznutzung" nicht - auch nicht
+     * mit anderer Gross-/Kleinschreibung oder Leerzeichen am Rand.
+     */
+    @Test
+    void existsOverlappingTarifMitBezeichnung_NurGleicheBezeichnungZaehlt() {
+        Tarif netznutzung = tarifRepository.saveAndFlush(createTarif("Netznutzung", TarifTyp.VNB,
+                new BigDecimal("0.10500"), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)));
+
+        assertThat(tarifRepository.existsOverlappingTarifMitBezeichnung(TarifTyp.VNB, "Energielieferung",
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), -1L)).isFalse();
+        assertThat(tarifRepository.existsOverlappingTarifMitBezeichnung(TarifTyp.VNB, "Netznutzung",
+                LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30), -1L)).isTrue();
+        assertThat(tarifRepository.existsOverlappingTarifMitBezeichnung(TarifTyp.VNB, " netznutzung ",
+                LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30), -1L)).isTrue();
+        // Anderer Typ, ausserhalb des Zeitraums, oder der Tarif selbst (Update): keine Kollision
+        assertThat(tarifRepository.existsOverlappingTarifMitBezeichnung(TarifTyp.ZEV, "Netznutzung",
+                LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30), -1L)).isFalse();
+        assertThat(tarifRepository.existsOverlappingTarifMitBezeichnung(TarifTyp.VNB, "Netznutzung",
+                LocalDate.of(2027, 1, 1), LocalDate.of(2027, 12, 31), -1L)).isFalse();
+        assertThat(tarifRepository.existsOverlappingTarifMitBezeichnung(TarifTyp.VNB, "Netznutzung",
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), netznutzung.getId())).isFalse();
+    }
+
+    /** Gleichzeitig gueltige Tarife kommen nach Beginn, dann nach Bezeichnung - stabil auf jeder Rechnung. */
+    @Test
+    void findByTariftypAndZeitraumOverlapping_GleicherBeginn_NachBezeichnung() {
+        tarifRepository.save(createTarif("Netznutzung", TarifTyp.VNB, new BigDecimal("0.10500"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)));
+        tarifRepository.save(createTarif("Energielieferung", TarifTyp.VNB, new BigDecimal("0.15000"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)));
+
+        List<Tarif> tarife = tarifRepository.findByTariftypAndZeitraumOverlapping(TarifTyp.VNB,
+                LocalDate.of(2026, 7, 1), LocalDate.of(2026, 9, 30));
+
+        assertThat(tarife).extracting(Tarif::getBezeichnung)
+                .containsExactly("Energielieferung", "Netznutzung");
+    }
+
     private Tarif tarifFuerOrg(Long orgId, String bezeichnung, TarifTyp typ,
                                LocalDate von, LocalDate bis) {
         Tarif tarif = new Tarif(bezeichnung, typ, new BigDecimal("0.30000"), von, bis);

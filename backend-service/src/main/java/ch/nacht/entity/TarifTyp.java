@@ -23,13 +23,15 @@ public enum TarifTyp {
      * GRUNDGEBUEHR - Monthly fixed fee per electricity meter.
      * Calculated as: number of full calendar months × fixed price per meter.
      *
-     * <p><b>Nicht</b> manuell erfassbar. Der Versuch scheiterte an der Überschneidungsregel:
-     * Je Zeitraum ist nur <i>ein</i> Grundgebühr-Tarif gültig, ein eigener Tarif für Ladestationen
-     * mit eigenem Preis also gar nicht anlegbar. Und diese Regel aufzuheben verbietet sich, weil
-     * {@code RechnungService.berechneGrundgebuehrZeilen} jeden gültigen Grundgebühr-Tarif
-     * automatisch auf <i>jede</i> Konsumenten-Rechnung schreibt — ein zweiter Tarif landete damit
-     * bei allen Wohnungen. Eine Grundgebühr für Ladestationen wird über {@link #ZUSATZ} mit
-     * Mengeneinheit <i>Monat</i> abgebildet (Specs/Tarifpositionen.md).
+     * <p><b>Mehrere gleichzeitig gültig</b> (Specs/Tarifverwaltung.md, FR-2): Energielieferung,
+     * Netznutzung und Messtarif sind je ein eigener Grundgebühr-Tarif.
+     * {@code RechnungService.berechneGrundgebuehrZeilen} schreibt <i>jeden</i> gültigen
+     * Grundgebühr-Tarif auf <i>jede</i> Konsumenten-Rechnung — genau das ist hier gewollt.
+     *
+     * <p><b>Nicht</b> manuell erfassbar, und deshalb auch nicht der Weg für eine Gebühr, die nur
+     * einzelne Einheiten trifft: Ein Grundgebühr-Tarif für Ladestationen landete bei allen
+     * Wohnungen. Eine solche Gebühr wird über {@link #ZUSATZ} mit Mengeneinheit <i>Monat</i>
+     * abgebildet (Specs/Tarifpositionen.md).
      */
     GRUNDGEBUEHR,
 
@@ -56,12 +58,28 @@ public enum TarifTyp {
     /**
      * Tariftypen, für die mehrere gleichzeitig gültige Tarife zulässig sind.
      *
-     * <p>Für alle übrigen weist {@code TarifService.saveTarif} einen zweiten Tarif mit
-     * überlappender Gültigkeit ab — bei ZEV/VNB/Grundgebühr wäre sonst nicht bestimmbar, welcher
-     * Preis gilt. Bei {@code ZUSATZ} wählt der Benutzer den Tarif an der Position ausdrücklich
-     * aus, die Mehrdeutigkeit entsteht dort also gar nicht.
+     * <ul>
+     *   <li><b>ZEV, VNB, Grundgebühr</b> (Specs/Tarifverwaltung.md, FR-2): Der Strompreis setzt
+     *       sich aus Energielieferung und Netznutzung zusammen, die Grundgebühr aus Energielieferung,
+     *       Netznutzung und Messtarif. Die Rechnung schreibt jeden gültigen Tarif als eigene Zeile,
+     *       bei ZEV/VNB mit derselben Menge. Ausgeschlossen bleibt eine Überschneidung mit
+     *       <b>gleicher Bezeichnung</b> ({@link #UEBERSCHNEIDUNG_JE_BEZEICHNUNG}).</li>
+     *   <li><b>ZUSATZ</b>: Der Benutzer wählt den Tarif an der Position ausdrücklich aus; Sauna,
+     *       Waschküche und Gästezimmer gelten nebeneinander. Ohne jede Überschneidungsprüfung.</li>
+     * </ul>
+     *
+     * <p>Für die übrigen (LADESTROM) weist {@code TarifService.saveTarif} einen zweiten Tarif mit
+     * überlappender Gültigkeit ab: Die Position ist je Typ eindeutig, ein zweiter Tarif hiesse,
+     * dieselben kWh zweimal zu erfassen.
      */
-    public static final Set<TarifTyp> MEHRFACH_GUELTIG = EnumSet.of(ZUSATZ);
+    public static final Set<TarifTyp> MEHRFACH_GUELTIG = EnumSet.of(ZEV, VNB, GRUNDGEBUEHR, ZUSATZ);
+
+    /**
+     * Typen, bei denen sich zwei Tarife nur dann nicht überschneiden dürfen, wenn sie <b>dieselbe
+     * Bezeichnung</b> tragen. Schützt vor dem versehentlich doppelt erfassten (oder mit falschen
+     * Daten kopierten) Tarif: Er stünde sonst ein zweites Mal auf jeder Rechnung.
+     */
+    public static final Set<TarifTyp> UEBERSCHNEIDUNG_JE_BEZEICHNUNG = EnumSet.of(ZEV, VNB, GRUNDGEBUEHR);
 
     /** Typen, deren Position je <b>Tarif</b> eindeutig ist statt je Tariftyp. */
     public static final Set<TarifTyp> EINDEUTIG_JE_TARIF = EnumSet.of(ZUSATZ);

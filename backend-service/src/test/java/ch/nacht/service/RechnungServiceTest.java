@@ -149,6 +149,60 @@ public class RechnungServiceTest {
         assertBetrag("37.0", rechnung.getEndBetrag());
     }
 
+    /**
+     * Mehrere gleichzeitig gueltige Tarife eines Typs (Specs/Tarifverwaltung.md, FR-2):
+     * Energielieferung und Netznutzung je als eigene VNB-Zeile mit derselben Menge, drei
+     * Grundgebuehren je als eigene Zeile.
+     */
+    @Test
+    void berechneRechnung_MehrereGleichzeitigGueltigeTarife_JeTarifEineZeile() {
+        LocalDate von = LocalDate.of(2026, 7, 1);
+        LocalDate bis = LocalDate.of(2026, 9, 30);
+        LocalDate jahrVon = LocalDate.of(2026, 1, 1);
+        LocalDate jahrBis = LocalDate.of(2026, 12, 31);
+
+        Tarif zev = new Tarif("vZEV PV Tarif", TarifTyp.ZEV, new BigDecimal("0.20000"), jahrVon, jahrBis);
+        Tarif energie = new Tarif("Energielieferung", TarifTyp.VNB, new BigDecimal("0.15000"), jahrVon, jahrBis);
+        Tarif netz = new Tarif("Netznutzung", TarifTyp.VNB, new BigDecimal("0.10000"), jahrVon, jahrBis);
+        Tarif grundEnergie = new Tarif("Grundtarif Energielieferung", TarifTyp.GRUNDGEBUEHR,
+            new BigDecimal("2.00000"), jahrVon, jahrBis);
+        Tarif grundNetz = new Tarif("Grundtarif Netznutzung", TarifTyp.GRUNDGEBUEHR,
+            new BigDecimal("3.00000"), jahrVon, jahrBis);
+        Tarif mess = new Tarif("Messtarif", TarifTyp.GRUNDGEBUEHR, new BigDecimal("4.00000"), jahrVon, jahrBis);
+
+        when(tarifService.getTarifeForZeitraum(TarifTyp.ZEV, von, bis)).thenReturn(List.of(zev));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.VNB, von, bis)).thenReturn(List.of(energie, netz));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(List.of(grundEnergie, grundNetz, mess));
+
+        // 100 kWh ZEV, 150 kWh total -> 50 kWh VNB
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(
+            eq(consumer), any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(
+            eq(consumer), any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(150.0);
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
+
+        List<TarifZeileDTO> vnb = rechnung.getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.VNB).toList();
+        assertEquals(List.of("Energielieferung", "Netznutzung"),
+            vnb.stream().map(TarifZeileDTO::getBezeichnung).toList());
+        // Beide Zeilen tragen dieselbe Menge - Energielieferung und Netznutzung gelten fuer dieselben kWh
+        assertBetrag("50", vnb.get(0).getMenge());
+        assertBetrag("50", vnb.get(1).getMenge());
+        assertBetrag("7.5", vnb.get(0).getBetrag());
+        assertBetrag("5.0", vnb.get(1).getBetrag());
+
+        List<TarifZeileDTO> grund = rechnung.getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR).toList();
+        assertEquals(3, grund.size());
+        // je 3 volle Monate: 6 + 9 + 12
+        assertBetrag("27", grund.stream().map(TarifZeileDTO::getBetrag).reduce(BigDecimal.ZERO, BigDecimal::add));
+
+        // 20 (ZEV) + 7.50 + 5.00 (VNB) + 27 (Grundgebuehren)
+        assertBetrag("59.5", rechnung.getTotalBetrag());
+    }
+
     @Test
     void berechneRechnung_WithTenant_IncludesTenantData() {
         LocalDate von = LocalDate.of(2024, 1, 1);
