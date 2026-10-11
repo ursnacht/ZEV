@@ -118,6 +118,9 @@ Entscheid aber **nicht**. `verfahren` trägt in dieser Stufe durchgehend `REGEL`
 Grundlage dafür: Wie oft weichen die Verfahren überhaupt voneinander ab, und wie viel Energie
 verschiebt die Abweichung? Weichen sie selten ab, ist der Gewinn klein und das Regelwerk genügt.
 
+> **Erste Auswertung am 11.10.2026: vorerst nicht umschalten** — siehe FR-3, „Auswertung der
+> Testwoche". Die Schattenrechnung läuft weiter; erneute Auswertung im Frühling.
+
 > **Der Ladezustand stammt von keinem der beiden Verfahren.** Im Trockenlauf schaltet **niemand**:
 > Die Batterie folgt der Eigenverbrauchsoptimierung des Wechselrichters und lädt, sobald Überschuss
 > da ist. Am 04.10.2026 stieg der Ladezustand von 49 % um 08:45 stetig auf 100 % um 13:00 — keine
@@ -439,6 +442,67 @@ durchgehend und erreichte trotzdem nur **83 %**.
 > **Einschränkung:** Jeder Entscheid speichert die Prognose seiner **eigenen** Auswertung — für
 > spätere Intervalle also eine neuere als die, mit der am Morgen geplant wurde. Ist schon die
 > neuere zu optimistisch, war es die frühere sehr wahrscheinlich auch.
+
+#### Auswertung der Testwoche (04.–10.10.2026)
+
+Ausgewertet am 11.10.2026 auf Hene, mit den bei jedem Entscheid gespeicherten Werten. Der 04.10.
+ist nicht vergleichbar (noch mit der alten Regel für die volle Batterie geschrieben).
+
+**Wann die Merit-Order abweicht** — nur die **erste** Abweichung je Tag ist aussagekräftig (FR-1a):
+
+| Tag | erste Sperre | Ladezustand | frei / nötig | Rest-Überschuss erwartet / tatsächlich | Batterie voll | Urteil |
+|---|---|---|---|---|---|---|
+| 05.10. | 08:30 | 51 % | 20.0 / 21.0 kWh | 66.9 / 62.6 | 12:30 | Sperre richtig |
+| 06.10. | 08:30 | 40 % | 24.5 / 25.8 kWh | 63.0 / 58.9 | 12:45 | Sperre richtig |
+| 07.10. | 08:45 | 49 % | 20.8 / 21.9 kWh | 27.7 / 19.5 | nie (max. 89 %) | **Sperre falsch** |
+| 08.10. | — | — | — | 6.6 / 5.6 | nie | keine Sperre, richtig (trüb) |
+| 09.10. | 09:00 | 16 % | 34.3 / 36.1 kWh | 45.1 / 45.9 | 15:15 | Sperre richtig, knapp |
+| 10.10. | — | — | — | 19.4 / 32.0 | ja | keine Sperre, obwohl es gereicht hätte |
+
+Das Muster: An sonnigen Tagen sperrt die Merit-Order den Vormittag ab 08:30–09:00, um die
+billigeren Mittagsstunden zum Laden zu nutzen. In 3 von 4 Fällen wäre die Batterie trotzdem voll
+geworden.
+
+**Erwarteter gegen tatsächlichen Überschuss** (ganzer Tag, Abfrage oben):
+
+| Tag | 04.10. | 05.10. | 06.10. | 07.10. | 08.10. | 09.10. | 10.10. |
+|---|---|---|---|---|---|---|---|
+| tatsächlich / erwartet | 1.07 | 0.94 | 0.93 | **0.70** | 0.84 | 1.02 | 1.65 |
+
+Der Fehler streut in **beide** Richtungen (−30 % bis +65 %). Die Verbrauchsprognose lag fast
+täglich zu tief, an manchen Tagen deutlich (09.10.: 8.9 erwartet, 15.9 tatsächlich).
+
+**Was es gebracht hätte** — in den gesperrten Viertelstunden würde der Überschuss eingespeist
+statt geladen, die Batterie lädt später zu tieferem Preis nach:
+
+| Tag | eingespeist statt geladen | Preis gesperrt | Preis später | Vorteil |
+|---|---|---|---|---|
+| 05.10. | 21.6 kWh | 0.185 | 0.171 | 0.30 CHF |
+| 06.10. | 14.7 kWh | 0.185 | 0.168 | 0.25 CHF |
+| 07.10. | 7.6 kWh | 0.185 | 0.171 | 0.11 CHF |
+| 09.10. | 12.2 kWh | 0.193 | 0.180 | 0.15 CHF |
+
+Rund **0.80 CHF in der Woche**: Der Preisunterschied zwischen Vormittag und Mittag beträgt im
+Oktober nur 1–2 Rappen je kWh. Dagegen steht der 07.10.: Die Batterie erreichte nur 89 %, was
+gesperrt wurde, fehlt am Abend und kommt aus dem Netz — rund 0.28 CHF/kWh Bezug gegen 0.185
+Einspeisung. Bei einigen kWh frisst das den Gewinn der Woche auf. (Die Schattenwerte überzeichnen
+das Ausmass, FR-1a; die Richtung gilt.)
+
+**Ergebnis — vorerst nicht umschalten:**
+
+* **Der Nutzen ist im Herbst marginal**, ein einziger Fehltag hebt ihn auf.
+* **Die Logik stimmt, die Prognose ist das Problem.** Entscheidet die Merit-Order mit einer
+  zutreffenden Prognose, entscheidet sie richtig. Erzeugung und Verbrauch weichen aber je um bis zu
+  30–40 % ab (siehe „Der 07.10.2026").
+* **Ein Sicherheitszuschlag hilft nur bedingt** (§8): Ein Faktor von 1.4 hätte den 07.10. verhindert
+  (27.7 / 21.9 = 1.26), aber auch den richtigen 09.10. (45.1 / 36.1 = 1.25) — und damit die
+  Sperren genau dann, wenn das Polster knapp ist. Was bliebe, sind die Tage mit grossem Polster,
+  an denen die Batterie ohnehin voll wird.
+* **Eine Woche ist eine kleine Stichprobe**, und im Winter wird es kaum Abweichungen geben (die
+  Batterie wird selten voll).
+* **Die Schattenrechnung läuft weiter** — sie kostet nichts. **Erneut auswerten im Frühling**
+  (April/Mai): viel Überschuss, Batterie früh voll, vermutlich grössere Preisunterschiede über den
+  Tag. Dieselben drei Abfragen (erste Abweichung, Überschuss-Verhältnis, Vorteil in Franken).
 
 ### FR-4: Rückfall auf die Regelkaskade
 
@@ -861,6 +925,11 @@ Neue Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten
   tatsächlichen Überschuss ab der ersten Sperre — das Verhältnis der beiden ist genau die Grösse,
   die der Zuschlag abdecken muss.
 
+  **Stand nach der Testwoche (11.10.2026):** Das Verhältnis tatsächlich/erwartet lag zwischen 0.70
+  und 1.65 (FR-3, „Auswertung der Testwoche"). Kandidat ist ein Faktor von **1.4** (Überschuss zu
+  70 % eingerechnet) — er hätte den 07.10. verhindert, aber auch den richtigen 09.10. Bei einer
+  Woche Daten bleibt er ein Kandidat; entschieden wird mit der Auswertung im Frühling.
+
 * **Wie viele Tage für Lastprofil und Faktor?** Vorgabe 28. Für den Faktor sind vermutlich weniger
   besser (er soll aktuellen Zuständen folgen), für das Lastprofil mehr. Getrennte Werte wären
   denkbar — vorerst einer, bis die Daten etwas anderes nahelegen.
@@ -873,6 +942,9 @@ Neue Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten
 * **Ab wann ist das Verfahren besser?** Die Rückrechnung kann beide Verfahren über dieselbe
   Historie vergleichen. Offen ist, welche Kennzahl entscheidet: verschobene Energie, vermiedener
   Netzbezug in Franken, oder die Zahl der Tage, an denen der Speicher am Abend nicht voll war.
+  **Erste Antwort (11.10.2026):** in Franken gerechnet rund 0.80 CHF pro Woche im Oktober, ein
+  Fehltag (Speicher am Abend nicht voll) hebt ihn auf — vorerst nicht umschalten, erneut auswerten
+  im Frühling (FR-3, „Auswertung der Testwoche").
 * **Bleibt die Regelkaskade dauerhaft?** Sie ist Rückfall — ob sie nach einer Erprobungszeit
   entfällt oder bestehen bleibt, ist noch nicht entschieden.
 * **Wie oft ändert sich die Prognose wirklich?** `meteoswiss_icon_ch1` wird alle drei Stunden neu
