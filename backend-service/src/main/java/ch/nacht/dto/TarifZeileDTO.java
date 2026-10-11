@@ -32,6 +32,20 @@ public class TarifZeileDTO {
     @com.fasterxml.jackson.annotation.JsonIgnore
     private int reihenfolge;
 
+    /**
+     * Uebersetzungs-Key der Bezugsgroesse des Preises ("CHF / Jahr"), wenn sie von der
+     * Mengeneinheit abweicht - beim Jahrespreis (Specs/Tarifverwaltung.md, FR-6). Sonst
+     * {@code null}: Die Rechnung zeigt dann "CHF / <Mengeneinheit>".
+     */
+    private String preisEinheit;
+
+    /**
+     * Uebersetzungs-Key der Einheit hinter der Menge ("123 kWh", "3 Monate", "1 Monat"), gesetzt
+     * vom {@code RechnungService} fuer jede Zeile (Specs/RechnungenGenerieren.md). {@code null}:
+     * nur die Zahl.
+     */
+    private String mengeEinheit;
+
     public TarifZeileDTO() {
     }
 
@@ -79,6 +93,22 @@ public class TarifZeileDTO {
 
     public void setBis(LocalDate bis) {
         this.bis = bis;
+    }
+
+    public String getPreisEinheit() {
+        return preisEinheit;
+    }
+
+    public void setPreisEinheit(String preisEinheit) {
+        this.preisEinheit = preisEinheit;
+    }
+
+    public String getMengeEinheit() {
+        return mengeEinheit;
+    }
+
+    public void setMengeEinheit(String mengeEinheit) {
+        this.mengeEinheit = mengeEinheit;
     }
 
     public int getReihenfolge() {

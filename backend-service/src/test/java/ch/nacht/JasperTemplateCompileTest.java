@@ -138,6 +138,38 @@ class JasperTemplateCompileTest {
         assertEquals("%PDF", new String(pdf, 0, 4, StandardCharsets.US_ASCII));
     }
 
+    /**
+     * Jahrespreis (Specs/Tarifverwaltung.md, FR-6): Menge in Worten, Preis "CHF / Jahr".
+     */
+    @Test
+    void testRechnungTemplate_JahrespreisZeigtMonateUndCHFproJahr() throws Exception {
+        InputStream stream = getClass().getResourceAsStream("/reports/rechnung.jrxml");
+        JasperReport report = JasperCompileManager.compileReport(stream);
+
+        RechnungDTO rechnung = testRechnung();
+        // Die Einheit setzt im Betrieb der RechnungService; hier direkt
+        rechnung.getTarifZeilen().get(0).setMengeEinheit("KWH");
+        TarifZeileDTO jahr = new TarifZeileDTO("Messtarif", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31),
+                new BigDecimal("3"), new BigDecimal("120.00000"), new BigDecimal("30"),
+                TarifTyp.GRUNDGEBUEHR, "MONAT");
+        jahr.setPreisEinheit("JAHR");
+        jahr.setMengeEinheit("MONATE");
+        rechnung.addTarifZeile(jahr);
+
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("RECHNUNG", rechnung);
+        parameters.put("TRANSLATIONS", Map.of("MONATE", "Monate", "JAHR", "Jahr", "MONAT", "Monat"));
+        parameters.put("QR_CODE_IMAGE", null);
+        JasperPrint print = JasperFillManager.fillReport(report, parameters,
+                new JRBeanCollectionDataSource(rechnung.getTarifZeilen()));
+
+        assertEquals("3 Monate", textMit(print, "3 Monate").getFullText());
+        // Auch die normale Zeile traegt die Einheit (ohne Uebersetzung: der Key)
+        assertEquals("123 KWH", textMit(print, "123").getFullText());
+        assertEquals("CHF / Jahr", textMit(print, "CHF / Jahr").getFullText());
+        assertEquals("120.00000", textMit(print, "120.00000").getFullText());
+    }
+
     /** Erstes Textelement, dessen Text mit {@code anfang} beginnt. */
     private static JRPrintText textMit(JasperPrint print, String anfang) {
         for (JRPrintPage page : print.getPages()) {

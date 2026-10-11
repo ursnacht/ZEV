@@ -501,3 +501,15 @@ Keine Migration, keine neuen Übersetzungen: Die Fehlermeldung kommt wie bisher 
 |  [x]   | 5. Design System | `components/sortable/sortable.css` |
 |  [x]   | 6. Frontend | `tarif-list`: drei Panels (nur aktuelles Jahr offen), je eine `cdkDropList`, Griff-Spalte; Spaltensortierung entfernt; `tarif.service.verschiebeTarif` |
 |  [x]   | 7. Tests | `TarifServiceTest`, `RechnungServiceTest`, `TarifControllerTest`, `TarifRepositoryIT`; `tarif-list.component.spec.ts`, `tarif.service.spec.ts`; E2E: `oeffneTarifPanels` in `helpers.ts` (Testtarife liegen im zugeklappten Panel „Zukünftige Tarife"), `waitForTableWithData` mit `.first()`, neuer Panel- und Drag-&-Drop-Test in `tarif-verwaltung.spec.ts` |
+
+---
+
+## Ergänzung 11.10.2026: Jahrespreis (Spec FR-6)
+
+| Status | Phase | Beschreibung |
+|--------|-------|--------------|
+|  [x]   | 1. DB-Migration | `V180__Tarif_Preis_Pro_Jahr.sql`: Spalte `preis_pro_jahr`, Kommentar, Übersetzungen |
+|  [x]   | 2. Backend | `Tarif.preisProJahr`; `TarifService.pruefePreisProJahr`; `RechnungService`: Grundgebühr nach Monaten (/12) und nach Tagen (`jahresanteilNachTagen`, je Kalenderjahr), Zusatz-Positionen (/12); `TarifZeileDTO.preisEinheit` und `mengeEinheit` für die Anzeige |
+|  [x]   | 3. PDF | `rechnung.jrxml`: Spalten neu verteilt (Bezeichnung 265, Menge 65, Einheit 80 pt), Menge mit Wort, Preis-Einheit „Jahr"; `RechnungZeilenText.ZEICHEN_EINE_ZEILE` 52; Sichtprüfung am gerenderten PDF |
+|  [x]   | 4. Frontend | `jahrespreisMoeglich`, `preisEinheitKey(..., proJahr)`; Checkbox in `tarif-form`; Liste „/ Jahr" |
+|  [x]   | 5. Tests | `RechnungServiceTest` (Quartale = Jahrespreis nach Monaten/Tagen, Schaltjahr, Jahreswechsel, ab Mitte Quartal, Zusatz), `TarifServiceTest` (zulässig/abgewiesen), `JasperTemplateCompileTest` (Füllen mit „3 Monate"/„CHF / Jahr"), `tarif-form`/`tarif-list`-Specs |

@@ -846,4 +846,51 @@ public class TarifServiceTest {
         tarif.setReihenfolge(reihenfolge);
         return tarif;
     }
+
+    // ==================== Jahrespreis (Specs/Tarifverwaltung.md, FR-6) ====================
+
+    @Test
+    void saveTarif_GrundgebuehrMitJahrespreis_Gespeichert() {
+        Tarif tarif = new Tarif("Messtarif", TarifTyp.GRUNDGEBUEHR, new BigDecimal("120.00000"),
+            LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        tarif.setPreisProJahr(true);
+        when(tarifRepository.save(any(Tarif.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertTrue(tarifService.saveTarif(tarif).isPreisProJahr());
+    }
+
+    @Test
+    void saveTarif_ZusatzProMonatMitJahrespreis_Gespeichert() {
+        Tarif tarif = new Tarif("Ladestation", TarifTyp.ZUSATZ, new BigDecimal("240.00000"),
+            LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        tarif.setMengeneinheit(Mengeneinheit.MONAT);
+        tarif.setPreisProJahr(true);
+        when(tarifRepository.save(any(Tarif.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertTrue(tarifService.saveTarif(tarif).isPreisProJahr());
+    }
+
+    @Test
+    void saveTarif_JahrespreisBeiZusatzProStueck_ThrowsException() {
+        Tarif tarif = new Tarif("Sauna", TarifTyp.ZUSATZ, new BigDecimal("5.00000"),
+            LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        tarif.setMengeneinheit(Mengeneinheit.STUECK);
+        tarif.setPreisProJahr(true);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+            () -> tarifService.saveTarif(tarif));
+
+        assertTrue(ex.getMessage().contains("Jahrespreis"));
+        verify(tarifRepository, never()).save(any());
+    }
+
+    @Test
+    void saveTarif_JahrespreisBeiVnb_ThrowsException() {
+        Tarif tarif = new Tarif("Netz", TarifTyp.VNB, new BigDecimal("0.10000"),
+            LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        tarif.setPreisProJahr(true);
+
+        assertThrows(IllegalArgumentException.class, () -> tarifService.saveTarif(tarif));
+        verify(tarifRepository, never()).save(any());
+    }
 }

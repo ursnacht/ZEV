@@ -17,6 +17,9 @@
     <field name="preis" class="java.math.BigDecimal"/>
     <field name="betrag" class="java.math.BigDecimal"/>
     <field name="mengeneinheit" class="java.lang.String"/>
+    <!-- Jahrespreis (Specs/Tarifverwaltung.md, FR-6): Bezugsgroesse des Preises und Wort hinter der Menge -->
+    <field name="preisEinheit" class="java.lang.String"/>
+    <field name="mengeEinheit" class="java.lang.String"/>
 
     <!-- Variables -->
     <variable name="HAS_MULTIPLE_TARIFFS" class="java.lang.Boolean" calculation="System">
@@ -98,25 +101,25 @@
         </element>
 
         <!-- Table headers -->
-        <element kind="textField" uuid="11111111-1111-1111-1111-111111111122" mode="Opaque" x="0" y="25" width="305" height="20" backcolor="#F8F8F8" forecolor="#0099CC" fontSize="9.0" bold="true" vTextAlign="Middle">
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111122" mode="Opaque" x="0" y="25" width="265" height="20" backcolor="#F8F8F8" forecolor="#0099CC" fontSize="9.0" bold="true" vTextAlign="Middle">
             <expression><![CDATA[$P{TRANSLATIONS}.get("BEZEICHNUNG")]]></expression>
             <box>
                 <bottomPen lineWidth="2.0" lineColor="#0099CC"/>
             </box>
         </element>
-        <element kind="textField" uuid="11111111-1111-1111-1111-111111111123" mode="Opaque" x="305" y="25" width="35" height="20" backcolor="#F8F8F8" forecolor="#0099CC" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111123" mode="Opaque" x="265" y="25" width="65" height="20" backcolor="#F8F8F8" forecolor="#0099CC" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
             <expression><![CDATA[$P{TRANSLATIONS}.get("MENGE")]]></expression>
             <box>
                 <bottomPen lineWidth="2.0" lineColor="#0099CC"/>
             </box>
         </element>
-        <element kind="textField" uuid="11111111-1111-1111-1111-111111111124" mode="Opaque" x="340" y="25" width="70" height="20" backcolor="#F8F8F8" forecolor="#0099CC" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111124" mode="Opaque" x="330" y="25" width="70" height="20" backcolor="#F8F8F8" forecolor="#0099CC" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
             <expression><![CDATA[$P{TRANSLATIONS}.get("PREIS")]]></expression>
             <box>
                 <bottomPen lineWidth="2.0" lineColor="#0099CC"/>
             </box>
         </element>
-        <element kind="textField" uuid="11111111-1111-1111-1111-111111111125" mode="Opaque" x="410" y="25" width="70" height="20" backcolor="#F8F8F8" forecolor="#0099CC" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
+        <element kind="textField" uuid="11111111-1111-1111-1111-111111111125" mode="Opaque" x="400" y="25" width="80" height="20" backcolor="#F8F8F8" forecolor="#0099CC" fontSize="9.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
             <expression><![CDATA[$P{TRANSLATIONS}.get("EINHEIT_LABEL")]]></expression>
             <box>
                 <bottomPen lineWidth="2.0" lineColor="#0099CC"/>
@@ -136,26 +139,26 @@
             <!-- Bezeichnung bricht um, statt abgeschnitten zu werden (StretchHeight); die uebrigen
                  Felder wachsen mit (ContainerHeight), damit Werte und Trennlinie auf der Zeile bleiben.
                  Zeitraum nur, wenn er vom Rechnungszeitraum abweicht (RechnungZeilenText). -->
-            <element kind="textField" uuid="11111111-1111-1111-1111-111111111127" x="0" y="0" width="305" height="18" fontSize="9.0" vTextAlign="Middle" textAdjust="StretchHeight">
+            <element kind="textField" uuid="11111111-1111-1111-1111-111111111127" x="0" y="0" width="265" height="18" fontSize="9.0" vTextAlign="Middle" textAdjust="StretchHeight">
                 <expression><![CDATA[ch.nacht.util.RechnungZeilenText.bezeichnung($F{bezeichnung}, $F{von}, $F{bis}, $P{RECHNUNG}.getVon(), $P{RECHNUNG}.getBis())]]></expression>
                 <box>
                     <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
                 </box>
             </element>
-            <element kind="textField" uuid="11111111-1111-1111-1111-111111111128" stretchType="ContainerHeight" x="305" y="0" width="35" height="18" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
-                <expression><![CDATA[ch.nacht.util.PdfNumberFormat.decimals($F{menge}, 0)]]></expression>
+            <element kind="textField" uuid="11111111-1111-1111-1111-111111111128" stretchType="ContainerHeight" x="265" y="0" width="65" height="18" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA[ch.nacht.util.RechnungZeilenText.menge($F{menge}, $F{mengeEinheit}, $P{TRANSLATIONS})]]></expression>
                 <box>
                     <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
                 </box>
             </element>
-            <element kind="textField" uuid="11111111-1111-1111-1111-111111111129" stretchType="ContainerHeight" x="340" y="0" width="70" height="18" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
+            <element kind="textField" uuid="11111111-1111-1111-1111-111111111129" stretchType="ContainerHeight" x="330" y="0" width="70" height="18" fontSize="9.0" hTextAlign="Right" vTextAlign="Middle">
                 <expression><![CDATA[ch.nacht.util.PdfNumberFormat.decimals($F{preis}, 5)]]></expression>
                 <box>
                     <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
                 </box>
             </element>
-            <element kind="textField" uuid="11111111-1111-1111-1111-11111111112a" stretchType="ContainerHeight" x="410" y="0" width="70" height="18" fontSize="8.0" hTextAlign="Right" vTextAlign="Middle">
-                <expression><![CDATA["CHF / " + $P{TRANSLATIONS}.get($F{mengeneinheit})]]></expression>
+            <element kind="textField" uuid="11111111-1111-1111-1111-11111111112a" stretchType="ContainerHeight" x="400" y="0" width="80" height="18" fontSize="8.0" hTextAlign="Right" vTextAlign="Middle">
+                <expression><![CDATA["CHF / " + $P{TRANSLATIONS}.get($F{preisEinheit} != null ? $F{preisEinheit} : $F{mengeneinheit})]]></expression>
                 <box>
                     <bottomPen lineWidth="0.5" lineColor="#EEEEEE"/>
                 </box>

@@ -80,6 +80,17 @@
   pointer-events: auto;
 }
 
+/* Nach oben aufklappen, wenn unten zu wenig Platz ist (setzt die Angular-Komponente) */
+.zev-kebab-menu--up {
+  top: auto;
+  bottom: 100%;
+  transform: translateY(8px);
+}
+
+.zev-kebab-menu--up.zev-kebab-menu--open {
+  transform: translateY(0);
+}
+
 /* Menu Items */
 .zev-kebab-menu__item {
   /* Flex layout so a wrapping label hangs under its first word (next to the

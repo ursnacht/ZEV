@@ -318,4 +318,50 @@ describe('KebabMenuComponent', () => {
     expect(menues[1].classList.contains('zev-kebab-menu--open')).toBe(true);
     expect(menues[0].classList.contains('zev-kebab-menu--open')).toBe(false);
   });
+
+  describe('nach oben aufklappen', () => {
+    /** Knopf an Position top..bottom, Menue mit Hoehe `hoehe`, Fenster `fenster` hoch. */
+    function lage(top: number, bottom: number, hoehe: number, fenster: number): void {
+      const host: HTMLElement = fixture.nativeElement;
+      const knopf = host.querySelector('.zev-kebab-button') as HTMLElement;
+      const menue = host.querySelector('.zev-kebab-menu') as HTMLElement;
+      vi.spyOn(knopf, 'getBoundingClientRect').mockReturnValue({ top, bottom } as DOMRect);
+      Object.defineProperty(menue, 'offsetHeight', { configurable: true, value: hoehe });
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: fenster });
+    }
+
+    it('should open downwards when there is room below', () => {
+      lage(100, 120, 150, 800);
+      oeffne();
+      expect(menu().classList.contains('zev-kebab-menu--up')).toBe(false);
+    });
+
+    it('should open upwards near the bottom of the window', () => {
+      lage(700, 720, 150, 800);
+      oeffne();
+      expect(menu().classList.contains('zev-kebab-menu--up')).toBe(true);
+    });
+
+    it('should stay downwards when there is even less room above', () => {
+      lage(40, 60, 150, 160);
+      oeffne();
+      expect(menu().classList.contains('zev-kebab-menu--up')).toBe(false);
+    });
+
+    it('should open upwards at the bottom of a clipping container', () => {
+      // Panel mit overflow: hidden endet bei 300 - unten nur 30 px, oben 250 px
+      lage(250, 270, 150, 800);
+      const panel = document.createElement('div');
+      panel.style.overflow = 'hidden';
+      const host: HTMLElement = fixture.nativeElement;
+      host.parentElement!.insertBefore(panel, host);
+      panel.appendChild(host);
+      vi.spyOn(panel, 'getBoundingClientRect').mockReturnValue({ top: 0, bottom: 300 } as DOMRect);
+
+      oeffne();
+
+      expect(menu().classList.contains('zev-kebab-menu--up')).toBe(true);
+      panel.remove();
+    });
+  });
 });

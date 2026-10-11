@@ -2,6 +2,7 @@ package ch.nacht.util;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
 
 /**
  * Text einer Positionszeile auf der Stromrechnung ({@code reports/rechnung.jrxml},
@@ -19,13 +20,14 @@ public final class RechnungZeilenText {
     private static final DateTimeFormatter DATUM = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
     /**
-     * Zeichen, die in die Bezeichnungsspalte (305 pt, 9 pt Helvetica) auf eine Zeile passen — rund
-     * 64, mit Reserve für breite Buchstaben. Ist der Text länger, steht der Zeitraum in der zweiten
+     * Zeichen, die in die Bezeichnungsspalte (265 pt, 9 pt Helvetica) auf eine Zeile passen — rund
+     * 55, mit Reserve für breite Buchstaben. (Bis zum Jahrespreis 305 pt und 60 Zeichen; die
+     * Mengenspalte brauchte Platz für „92 Tage".) Ist der Text länger, steht der Zeitraum in der zweiten
      * Zeile. Sonst bricht JasperReports nach dem Bindestrich um und trennt die beiden Daten
      * ("… (16.08.2026 -" / "30.09.2026)"). Ein nicht trennender Bindestrich hilft nicht: Helvetica
      * im PDF kennt ihn nicht.
      */
-    static final int ZEICHEN_EINE_ZEILE = 60;
+    static final int ZEICHEN_EINE_ZEILE = 52;
 
     private RechnungZeilenText() {
     }
@@ -54,5 +56,23 @@ public final class RechnungZeilenText {
         String zeitraum = "(" + DATUM.format(von) + " - " + DATUM.format(bis) + ")";
         String trenner = text.length() + 1 + zeitraum.length() > ZEICHEN_EINE_ZEILE ? "\n" : " ";
         return text + trenner + zeitraum;
+    }
+
+    /**
+     * Menge mit Einheit fuer die Mengenspalte: {@code 123 kWh}, {@code 3 Monate}, {@code 1 Monat}
+     * (Specs/RechnungenGenerieren.md). Ohne Einheit nur die Zahl; ohne Uebersetzung der Key selbst -
+     * eine fehlende Uebersetzung soll sichtbar sein, nicht als "null" auf der Rechnung stehen.
+     *
+     * @param menge         Menge (ganzzahlig formatiert)
+     * @param einheitKey    Uebersetzungs-Key der Einheit, z.B. {@code KWH}, {@code MONATE}; oder {@code null}
+     * @param uebersetzungen Uebersetzungen der Rechnungssprache
+     */
+    public static String menge(Number menge, String einheitKey, Map<?, ?> uebersetzungen) {
+        String zahl = PdfNumberFormat.decimals(menge, 0);
+        if (einheitKey == null) {
+            return zahl;
+        }
+        Object text = uebersetzungen != null ? uebersetzungen.get(einheitKey) : null;
+        return zahl + " " + (text != null ? text : einheitKey);
     }
 }

@@ -599,4 +599,15 @@ describe('TarifListComponent', () => {
       expect(component.message).toBe('');
     }));
   });
+
+  describe('preisEinheit mit Jahrespreis', () => {
+    it('should show the price per year', () => {
+      const tarif: Tarif = {
+        id: 5, bezeichnung: 'Messtarif', tariftyp: TarifTyp.GRUNDGEBUEHR, preis: 120,
+        gueltigVon: '2026-01-01', gueltigBis: '2026-12-31',
+        mengeneinheit: Mengeneinheit.MONAT, preisProJahr: true
+      };
+      expect(component.preisEinheit(tarif)).toBe('JAHR');
+    });
+  });
 });

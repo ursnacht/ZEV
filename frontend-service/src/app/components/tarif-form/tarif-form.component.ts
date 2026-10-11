@@ -1,7 +1,8 @@
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
-  Mengeneinheit, Tarif, TarifTyp, TARIFTYPEN_MIT_MENGENEINHEIT, preisEinheitKey, waehlbareMengeneinheiten
+  Mengeneinheit, Tarif, TarifTyp, TARIFTYPEN_MIT_MENGENEINHEIT, jahrespreisMoeglich, preisEinheitKey,
+  waehlbareMengeneinheiten
 } from '../../models/tarif.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
@@ -60,7 +61,12 @@ export class TarifFormComponent implements OnInit {
    * ein Tarif mit freier Einheit noch keine gewaehlt hat - dann steht nur "CHF" da.
    */
   get preisEinheit(): string {
-    return preisEinheitKey(this.formData.tariftyp, this.formData.mengeneinheit);
+    return preisEinheitKey(this.formData.tariftyp, this.formData.mengeneinheit, this.formData.preisProJahr);
+  }
+
+  /** Checkbox "Preis gilt fuer das ganze Jahr" nur, wo ein Jahrespreis moeglich ist (FR-6). */
+  get jahrespreisMoeglich(): boolean {
+    return jahrespreisMoeglich(this.formData.tariftyp, this.formData.mengeneinheit);
   }
 
   /** Typ, zu dem die aktuelle Mengeneinheit gehoert - um echte Typwechsel zu erkennen. */
@@ -102,6 +108,11 @@ export class TarifFormComponent implements OnInit {
 
   onSubmit(): void {
     if (this.isFormValid()) {
+      // Ein Jahrespreis, der zum Typ oder zur Einheit nicht (mehr) passt, wuerde vom Server
+      // abgewiesen - etwa nach einem Wechsel von Monat auf Stueck.
+      if (!this.jahrespreisMoeglich) {
+        this.formData.preisProJahr = false;
+      }
       this.save.emit(this.formData);
     }
   }

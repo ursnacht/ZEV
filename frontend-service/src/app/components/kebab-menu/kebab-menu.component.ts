@@ -22,6 +22,13 @@ export class KebabMenuComponent implements OnDestroy {
 
   isOpen = false;
 
+  /**
+   * Klappt nach oben auf, wenn unter dem Knopf zu wenig Platz ist - sonst schnitte ein Panel mit
+   * `overflow: hidden` oder eine scrollende Tabelle (Spaltenbreiten-Direktive) das Menue der unteren
+   * Zeilen ab, oder es ragte unter den Fensterrand.
+   */
+  nachOben = false;
+
   private documentClickListener: ((e: MouseEvent) => void) | null = null;
   private escapeKeyListener: ((e: KeyboardEvent) => void) | null = null;
 
@@ -34,6 +41,7 @@ export class KebabMenuComponent implements OnDestroy {
   toggle(): void {
     this.isOpen = !this.isOpen;
     if (this.isOpen) {
+      this.nachOben = this.mussNachObenAufklappen();
       this.addListeners();
     } else {
       this.removeListeners();
@@ -50,6 +58,35 @@ export class KebabMenuComponent implements OnDestroy {
   onItemClick(action: string): void {
     this.itemClick.emit(action);
     this.close();
+  }
+
+  /**
+   * Vergleicht den Platz unter und ueber dem Knopf - jeweils bis zum naechsten Vorfahren, der
+   * abschneidet (`overflow` nicht `visible`), hoechstens bis zum Fensterrand. Nach oben nur, wenn
+   * das Menue unten nicht passt und oben mehr Platz ist.
+   */
+  private mussNachObenAufklappen(): boolean {
+    const host: HTMLElement = this.elementRef.nativeElement;
+    const knopf = host.querySelector('.zev-kebab-button') as HTMLElement | null;
+    const menue = host.querySelector('.zev-kebab-menu') as HTMLElement | null;
+    if (!knopf || !menue) {
+      return false;
+    }
+    const rechteck = knopf.getBoundingClientRect();
+    const hoehe = menue.offsetHeight;
+    let unten = window.innerHeight;
+    let oben = 0;
+    for (let el = host.parentElement; el; el = el.parentElement) {
+      const stil = getComputedStyle(el);
+      if ([stil.overflow, stil.overflowX, stil.overflowY].some(w => !!w && w !== 'visible')) {
+        const rand = el.getBoundingClientRect();
+        unten = Math.min(unten, rand.bottom);
+        oben = Math.max(oben, rand.top);
+      }
+    }
+    const platzUnten = unten - rechteck.bottom;
+    const platzOben = rechteck.top - oben;
+    return platzUnten < hoehe && platzOben > platzUnten;
   }
 
   private addListeners(): void {

@@ -68,6 +68,16 @@ public class Tarif {
     private int reihenfolge = 0;
 
     /**
+     * {@code true}: {@link #preis} gilt fuer das ganze Jahr und wird anteilig verrechnet - nach
+     * Monaten (Monate / 12) oder nach Tagen (Tage / Tage des Kalenderjahres)
+     * (Specs/Tarifverwaltung.md, FR-6). Nur bei {@link TarifTyp#GRUNDGEBUEHR} und bei
+     * {@link TarifTyp#ZUSATZ} mit Mengeneinheit {@link Mengeneinheit#MONAT}; geprueft im
+     * {@code TarifService}.
+     */
+    @Column(name = "preis_pro_jahr", nullable = false)
+    private boolean preisProJahr = false;
+
+    /**
      * Nur für {@link TarifTyp#ZUSATZ} und {@link TarifTyp#GRUNDGEBUEHR}: die Mengeneinheit dieses
      * Tarifs — bei allen übrigen Typen {@code null}, weil sich deren Einheit aus dem Typ ergibt
      * ({@link TarifTyp#mengeneinheit()}). Für {@code ZUSATZ} ist das Feld Pflicht, bei der
@@ -155,6 +165,14 @@ public class Tarif {
 
     public void setOrgId(Long orgId) {
         this.orgId = orgId;
+    }
+
+    public boolean isPreisProJahr() {
+        return preisProJahr;
+    }
+
+    public void setPreisProJahr(boolean preisProJahr) {
+        this.preisProJahr = preisProJahr;
     }
 
     public int getReihenfolge() {

@@ -23,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -1769,5 +1770,175 @@ public class RechnungServiceTest {
     private static void assertBetrag(String erwartet, BigDecimal tatsaechlich) {
         assertEquals(0, new BigDecimal(erwartet).compareTo(tatsaechlich),
                 () -> "erwartet " + erwartet + ", war " + tatsaechlich);
+    }
+
+    // ─── Jahrespreis (Specs/Tarifverwaltung.md, FR-6) ──────────────────────────
+
+    private Tarif jahresGrundgebuehr(String preis, Mengeneinheit verteilung, int jahr) {
+        Tarif tarif = new Tarif("Messtarif", TarifTyp.GRUNDGEBUEHR, new BigDecimal(preis),
+            LocalDate.of(jahr, 1, 1), LocalDate.of(jahr, 12, 31));
+        tarif.setMengeneinheit(verteilung);
+        tarif.setPreisProJahr(true);
+        return tarif;
+    }
+
+    /** Summe der Grundgebuehr-Betraege der vier Quartalsrechnungen eines Jahres. */
+    private BigDecimal summeDerQuartale(Tarif tarif, int jahr) {
+        BigDecimal summe = BigDecimal.ZERO;
+        for (int q = 0; q < 4; q++) {
+            LocalDate von = LocalDate.of(jahr, q * 3 + 1, 1);
+            LocalDate bis = von.plusMonths(3).minusDays(1);
+            lenient().when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis)).thenReturn(List.of(tarif));
+            RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
+            summe = summe.add(rechnung.getTarifZeilen().stream()
+                .filter(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR)
+                .map(TarifZeileDTO::getBetrag).reduce(BigDecimal.ZERO, BigDecimal::add));
+        }
+        return summe;
+    }
+
+    @Test
+    void berechneRechnung_JahrespreisNachMonaten_QuartaleErgebenGenauDenJahrespreis() {
+        assertEquals(0, summeDerQuartale(jahresGrundgebuehr("100.00000", Mengeneinheit.MONAT, 2026), 2026)
+            .compareTo(new BigDecimal("100")));
+    }
+
+    @Test
+    void berechneRechnung_JahrespreisNachTagen_QuartaleErgebenDenJahrespreis() {
+        // 90 + 91 + 92 + 92 = 365 Tage; Rundung nur auf 10 Nachkommastellen
+        BigDecimal summe = summeDerQuartale(jahresGrundgebuehr("100.00000", Mengeneinheit.TAG, 2026), 2026);
+        assertEquals(0, summe.setScale(6, RoundingMode.HALF_UP).compareTo(new BigDecimal("100.000000")));
+    }
+
+    @Test
+    void berechneRechnung_JahrespreisNachTagen_SchaltjahrMit366Tagen() {
+        // 2028: 91 + 91 + 92 + 92 = 366
+        BigDecimal summe = summeDerQuartale(jahresGrundgebuehr("366.00000", Mengeneinheit.TAG, 2028), 2028);
+        assertEquals(0, summe.setScale(6, RoundingMode.HALF_UP).compareTo(new BigDecimal("366.000000")));
+    }
+
+    @Test
+    void berechneRechnung_JahrespreisNachMonaten_ZeigtMonateUndCHFproJahr() {
+        LocalDate von = LocalDate.of(2026, 7, 1);
+        LocalDate bis = LocalDate.of(2026, 9, 30);
+        lenient().when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(List.of(jahresGrundgebuehr("120.00000", Mengeneinheit.MONAT, 2026)));
+
+        TarifZeileDTO zeile = rechnungService.berechneRechnung(consumer, null, von, bis).getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR).findFirst().orElseThrow();
+
+        assertBetrag("3", zeile.getMenge());
+        assertBetrag("120.00000", zeile.getPreis());   // der Jahrespreis steht auf der Rechnung
+        assertBetrag("30", zeile.getBetrag());
+        assertEquals("JAHR", zeile.getPreisEinheit());
+        assertEquals("MONATE", zeile.getMengeEinheit());
+    }
+
+    @Test
+    void berechneRechnung_JahrespreisNachTagen_AnteiligAbMitteQuartal() {
+        LocalDate von = LocalDate.of(2026, 7, 1);
+        LocalDate bis = LocalDate.of(2026, 9, 30);
+        Tarif tarif = jahresGrundgebuehr("365.00000", Mengeneinheit.TAG, 2026);
+        tarif.setGueltigVon(LocalDate.of(2026, 8, 1));   // 31 + 30 = 61 Tage
+        lenient().when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis)).thenReturn(List.of(tarif));
+
+        TarifZeileDTO zeile = rechnungService.berechneRechnung(consumer, null, von, bis).getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR).findFirst().orElseThrow();
+
+        assertBetrag("61", zeile.getMenge());
+        assertBetrag("61", zeile.getBetrag());
+        assertEquals("TAGE", zeile.getMengeEinheit());
+    }
+
+    @Test
+    void berechneRechnung_JahrespreisNachTagen_UeberJahreswechselJeJahrGeteilt() {
+        // 31.12.2027 (1/365 von 365) + 01.01.2028 (1/366 von 366) = 2
+        LocalDate von = LocalDate.of(2027, 12, 31);
+        LocalDate bis = LocalDate.of(2028, 1, 1);
+        Tarif tarif = new Tarif("Messtarif", TarifTyp.GRUNDGEBUEHR, new BigDecimal("365.00000"),
+            LocalDate.of(2027, 1, 1), LocalDate.of(2028, 12, 31));
+        tarif.setMengeneinheit(Mengeneinheit.TAG);
+        tarif.setPreisProJahr(true);
+        lenient().when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis)).thenReturn(List.of(tarif));
+
+        TarifZeileDTO zeile = rechnungService.berechneRechnung(consumer, null, von, bis).getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR).findFirst().orElseThrow();
+
+        assertBetrag("2", zeile.getMenge());
+        // 365/365 + 365/366
+        assertEquals(0, zeile.getBetrag().setScale(6, RoundingMode.HALF_UP)
+            .compareTo(new BigDecimal("1.997268")));
+        assertEquals("TAGE", zeile.getMengeEinheit());
+    }
+
+    @Test
+    void berechneRechnung_OhneJahrespreis_KeineJahresAnzeige() {
+        LocalDate von = LocalDate.of(2026, 7, 1);
+        LocalDate bis = LocalDate.of(2026, 9, 30);
+        Tarif monatlich = new Tarif("Messtarif", TarifTyp.GRUNDGEBUEHR, new BigDecimal("10.00000"),
+            LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        lenient().when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis)).thenReturn(List.of(monatlich));
+
+        TarifZeileDTO zeile = rechnungService.berechneRechnung(consumer, null, von, bis).getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR).findFirst().orElseThrow();
+
+        assertBetrag("30", zeile.getBetrag());
+        assertNull(zeile.getPreisEinheit());
+        // Die Menge traegt ihre Einheit wie jede Zeile - nur der Preis bleibt pro Monat
+        assertEquals("MONATE", zeile.getMengeEinheit());
+    }
+
+    @Test
+    void berechneRechnung_ZusatzMitJahrespreis_MonateDurchZwoelf() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+        Mieter mieter = mieterMitMesswerten(von, bis);
+        Tarif zusatz = new Tarif("Grundgebühr Ladestation", TarifTyp.ZUSATZ, new BigDecimal("240.00000"),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31));
+        zusatz.setId(98L);
+        zusatz.setMengeneinheit(Mengeneinheit.MONAT);
+        zusatz.setPreisProJahr(true);
+        when(tarifpositionService.getFuerRechnung(anyCollection(), eq(von), eq(bis)))
+            .thenReturn(List.of(tarifposition(zusatz, ladestation(), 2024, 1, "3")));
+
+        TarifZeileDTO zeile = rechnungService.berechneRechnung(consumer, mieter, von, bis).getTarifZeilen().stream()
+            .filter(z -> z.getTyp() == TarifTyp.ZUSATZ).findFirst().orElseThrow();
+
+        assertBetrag("3", zeile.getMenge());
+        assertBetrag("240.00000", zeile.getPreis());
+        assertBetrag("60", zeile.getBetrag());       // 240 * 3 / 12
+        assertEquals("JAHR", zeile.getPreisEinheit());
+        assertEquals("MONATE", zeile.getMengeEinheit());
+    }
+
+    // ─── Einheit in der Mengenspalte (Specs/RechnungenGenerieren.md) ───────────
+
+    @Test
+    void berechneRechnung_JedeZeileTraegtDieEinheitDerMenge() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+        Tarif grund = new Tarif("Messtarif", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.ZEV, von, bis)).thenReturn(List.of(zevTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.VNB, von, bis)).thenReturn(List.of(vnbTarif2024));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis)).thenReturn(List.of(grund));
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(eq(consumer), any(), any())).thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(eq(consumer), any(), any())).thenReturn(150.0);
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
+
+        assertEquals(List.of("KWH", "KWH", "MONATE"),
+            rechnung.getTarifZeilen().stream().map(TarifZeileDTO::getMengeEinheit).toList());
+    }
+
+    @Test
+    void mengeEinheitKey_EinzahlUndMehrzahl() {
+        assertEquals("MONAT", RechnungService.mengeEinheitKey("MONAT", BigDecimal.ONE));
+        assertEquals("MONATE", RechnungService.mengeEinheitKey("MONAT", new BigDecimal("3")));
+        assertEquals("TAG", RechnungService.mengeEinheitKey("TAG", BigDecimal.ONE));
+        assertEquals("TAGE", RechnungService.mengeEinheitKey("TAG", new BigDecimal("92")));
+        assertEquals("KWH", RechnungService.mengeEinheitKey("KWH", new BigDecimal("1")));
+        assertEquals("STUECK", RechnungService.mengeEinheitKey("STUECK", new BigDecimal("4")));
+        assertNull(RechnungService.mengeEinheitKey(null, BigDecimal.TEN));
     }
 }

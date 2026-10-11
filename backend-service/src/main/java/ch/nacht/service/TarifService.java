@@ -86,6 +86,7 @@ public class TarifService {
         }
 
         pruefeMengeneinheit(tarif);
+        pruefePreisProJahr(tarif);
 
         pruefeUeberschneidung(tarif);
 
@@ -103,6 +104,25 @@ public class TarifService {
         Tarif saved = tarifRepository.save(tarif);
         log.info("Tariff saved with ID: {}", saved.getId());
         return saved;
+    }
+
+    /**
+     * Ein Jahrespreis (Specs/Tarifverwaltung.md, FR-6) ist nur dort sinnvoll, wo die Menge eine
+     * Zeitdauer ist: bei der Grundgebuehr (pro Monat oder pro Tag verteilt) und bei Zusatz-Tarifen
+     * pro Monat. Bei kWh oder Stueck gaebe es keinen Anteil am Jahr.
+     *
+     * @throws IllegalArgumentException bei einem Jahrespreis an einem anderen Tarif
+     */
+    private void pruefePreisProJahr(Tarif tarif) {
+        if (!tarif.isPreisProJahr()) {
+            return;
+        }
+        boolean zulaessig = tarif.getTariftyp() == TarifTyp.GRUNDGEBUEHR
+                || (tarif.getTariftyp() == TarifTyp.ZUSATZ && tarif.getMengeneinheit() == Mengeneinheit.MONAT);
+        if (!zulaessig) {
+            throw new IllegalArgumentException(
+                    "Ein Jahrespreis ist nur bei der Grundgebühr und bei Zusatz-Tarifen pro Monat möglich");
+        }
     }
 
     /**

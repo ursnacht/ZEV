@@ -40,7 +40,8 @@
         <!-- Drei Panels nach Gueltigkeit (Specs/Tarifverwaltung.md, FR-4); verschoben wird nur
              innerhalb eines Panels - jedes hat eine eigene cdkDropList. -->
         @for (gruppe of gruppenReihenfolge; track gruppe) {
-          <div class="zev-collapsible">
+          <!-- overflow-visible: sonst schnitte das Panel das Kebab-Menue der letzten Zeile ab -->
+          <div class="zev-collapsible zev-collapsible--overflow-visible">
             <button type="button" class="zev-collapsible__header" (click)="toggleGruppe(gruppe)"
               [attr.aria-expanded]="offen[gruppe]" [attr.aria-controls]="'tarife-' + gruppe">
               <span>

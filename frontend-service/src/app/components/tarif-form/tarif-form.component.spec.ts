@@ -479,4 +479,45 @@ describe('TarifFormComponent', () => {
       expect(cancelSpy).toHaveBeenCalled();
     });
   });
+
+  describe('Jahrespreis (FR-6)', () => {
+    it('should offer the annual price for the Grundgebuehr', () => {
+      component.formData.tariftyp = TarifTyp.GRUNDGEBUEHR;
+      expect(component.jahrespreisMoeglich).toBe(true);
+    });
+
+    it('should offer the annual price for ZUSATZ only per month', () => {
+      component.formData.tariftyp = TarifTyp.ZUSATZ;
+      component.formData.mengeneinheit = Mengeneinheit.MONAT;
+      expect(component.jahrespreisMoeglich).toBe(true);
+
+      component.formData.mengeneinheit = Mengeneinheit.STUECK;
+      expect(component.jahrespreisMoeglich).toBe(false);
+    });
+
+    it('should not offer the annual price for ZEV, VNB and Ladestrom', () => {
+      for (const typ of [TarifTyp.ZEV, TarifTyp.VNB, TarifTyp.LADESTROM]) {
+        component.formData.tariftyp = typ;
+        expect(component.jahrespreisMoeglich).toBe(false);
+      }
+    });
+
+    it('should label the price per year when the annual price is set', () => {
+      component.formData.tariftyp = TarifTyp.GRUNDGEBUEHR;
+      component.formData.mengeneinheit = Mengeneinheit.TAG;
+      component.formData.preisProJahr = true;
+      expect(component.preisEinheit).toBe('JAHR');
+    });
+
+    it('should drop an annual price that no longer fits on submit', () => {
+      vi.spyOn(component.save, 'emit');
+      component.formData = {
+        bezeichnung: 'Sauna', tariftyp: TarifTyp.ZUSATZ, preis: 5,
+        gueltigVon: '2026-01-01', gueltigBis: '2026-12-31',
+        mengeneinheit: Mengeneinheit.STUECK, preisProJahr: true
+      };
+      component.onSubmit();
+      expect(component.save.emit).toHaveBeenCalledWith(expect.objectContaining({ preisProJahr: false }));
+    });
+  });
 });

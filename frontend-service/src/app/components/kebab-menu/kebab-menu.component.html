@@ -5,7 +5,7 @@
     <span class="zev-kebab-button__dot"></span>
   </button>
 
-  <ul class="zev-kebab-menu" [class.zev-kebab-menu--open]="isOpen">
+  <ul class="zev-kebab-menu" [class.zev-kebab-menu--open]="isOpen" [class.zev-kebab-menu--up]="nachOben">
     @for (item of items; track item) {
       <li>
         <button class="zev-kebab-menu__item"

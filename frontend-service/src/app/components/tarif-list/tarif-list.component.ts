@@ -222,7 +222,7 @@ export class TarifListComponent implements OnInit {
 
   /** Übersetzungs-Key der Preis-Einheit („CHF pro …") dieser Zeile. */
   preisEinheit(tarif: Tarif): string {
-    return preisEinheitKey(tarif.tariftyp as TarifTyp, tarif.mengeneinheit);
+    return preisEinheitKey(tarif.tariftyp as TarifTyp, tarif.mengeneinheit, tarif.preisProJahr);
   }
 
   onValidateQuartale(): void {

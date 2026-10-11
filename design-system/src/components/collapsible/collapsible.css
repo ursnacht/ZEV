@@ -57,3 +57,24 @@
 .zev-collapsible__content > div + div {
   margin-top: 15px;
 }
+
+/*
+ * Panel mit Elementen, die ueber den Rand hinausragen duerfen - etwa das Kebab-Menue der letzten
+ * Tabellenzeile (Tarifverwaltung). Das Basis-Panel schneidet mit `overflow: hidden` ab, damit die
+ * runden Ecken sauber bleiben; hier uebernehmen Kopf und Inhalt die Ecken selbst.
+ */
+.zev-collapsible--overflow-visible {
+  overflow: visible;
+}
+
+.zev-collapsible--overflow-visible > .zev-collapsible__header {
+  border-radius: 4px;
+}
+
+.zev-collapsible--overflow-visible > .zev-collapsible__header:not(:last-child) {
+  border-radius: 4px 4px 0 0;
+}
+
+.zev-collapsible--overflow-visible > .zev-collapsible__content {
+  border-radius: 0 0 4px 4px;
+}

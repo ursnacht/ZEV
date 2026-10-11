@@ -59,12 +59,24 @@ export function waehlbareMengeneinheiten(typ: TarifTyp | undefined): Mengeneinhe
  * Liefert `''`, solange ein Tarif mit freier Einheit noch keine gewählt hat — dann zeigt die
  * Oberfläche nur „CHF", statt fälschlich kWh zu behaupten.
  */
-export function preisEinheitKey(typ: TarifTyp | undefined, einheit?: Mengeneinheit): string {
+export function preisEinheitKey(typ: TarifTyp | undefined, einheit?: Mengeneinheit, proJahr?: boolean): string {
+  if (proJahr && jahrespreisMoeglich(typ, einheit)) {
+    return 'JAHR';
+  }
   if (typ && TARIFTYPEN_MIT_MENGENEINHEIT.includes(typ)) {
     // Eine Grundgebuehr ohne Angabe gilt pro Monat (Backend-Vorgabe)
     return einheit ?? (typ === TarifTyp.GRUNDGEBUEHR ? 'MONAT' : '');
   }
   return 'KWH';
+}
+
+/**
+ * Ist ein Jahrespreis moeglich (Specs/Tarifverwaltung.md, FR-6)? Bei der Grundgebuehr immer, bei
+ * ZUSATZ nur mit Mengeneinheit Monat - sonst gaebe es keinen Anteil am Jahr. Spiegelt
+ * `TarifService.pruefePreisProJahr` im Backend.
+ */
+export function jahrespreisMoeglich(typ: TarifTyp | undefined, einheit?: Mengeneinheit): boolean {
+  return typ === TarifTyp.GRUNDGEBUEHR || (typ === TarifTyp.ZUSATZ && einheit === Mengeneinheit.MONAT);
 }
 
 /**
@@ -125,7 +137,8 @@ export interface Tarif {
   gueltigBis: string;  // ISO date format: YYYY-MM-DD
   produzentVerrechnen?: boolean;  // Only relevant for GRUNDGEBUEHR: also charge producers
   mengeneinheit?: Mengeneinheit;  // Pflicht bei ZUSATZ, MONAT/TAG bei GRUNDGEBUEHR, sonst leer
-  reihenfolge?: number;  // Reihenfolge auf der Rechnung; aendert nur PUT /api/tarife/reihenfolge
+  reihenfolge?: number;  // Reihenfolge auf der Rechnung; aendert nur PUT /api/tarife/{id}/verschieben
+  preisProJahr?: boolean;  // Jahrespreis, anteilig verrechnet (nur GRUNDGEBUEHR, ZUSATZ pro Monat)
 }
 
 /** A single tariff coverage gap (language-neutral; the frontend translates it). */

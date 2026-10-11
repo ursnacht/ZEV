@@ -62,6 +62,13 @@
     * Die Regel gilt für alle Positionsarten gleich (ZEV, VNB, Grundgebühr, Tarifpositionen).
     * Die Formatierung steckt in einer testbaren Java-Methode (`ch.nacht.util.RechnungZeilenText`), nicht als Ausdruck im Template; das Template ruft sie auf.
     * `JasperTemplateCompileTest` füllt das Template mit einer Position, deren Text zwei Zeilen braucht, und exportiert ein PDF.
+* Als Admin möchte ich auf der Rechnung bei **jeder Position die Einheit der Menge** sehen („123 kWh", „3 Monate", „1 Monat", „92 Tage", „5 Stück"), damit die Menge ohne Blick auf die Preisspalte verständlich ist (Entscheid vom 11.10.2026).
+  * **Akzeptanzkriterien:**
+    * [x] Die Spalte „Menge" zeigt Zahl und Einheit für alle Positionsarten (ZEV, VNB, Grundgebühr, Tarifpositionen).
+    * [x] Monat und Tag erscheinen in Einzahl bei 1, sonst in Mehrzahl; die übrigen Einheiten wie in der Preisspalte (kWh, Stück).
+    * [x] Die Einheit ist übersetzt (bestehende Keys `KWH`, `MONAT`/`MONATE`, `TAG`/`TAGE`, `STUECK`); fehlt eine Übersetzung, steht der Key statt „null".
+    * [x] Die Mengenspalte ist 65 pt breit (seit dem Jahrespreis, `Specs/Tarifverwaltung.md` FR-6) und fasst auch „12'345 kWh".
+    * [x] Die Formatierung steckt in `RechnungZeilenText.menge(...)` (getestet), die Einheit setzt `RechnungService` für jede Zeile.
 * **0-Rechnungen (Endbetrag 0.00 CHF, z.B. kein Verbrauch im Zeitraum):** Das PDF wird erzeugt (Beleg für den Mieter), aber es wird **kein Debitor-Eintrag** angelegt (keine Forderung; `debitor.betrag` hat den Constraint `> 0`, siehe `Specs/Debitorkontrolle.md`). Die übrigen Rechnungen des Laufs sind davon nicht betroffen.
 
 ## 3. Technische Spezifikationen (Technical Specs)

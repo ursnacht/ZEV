@@ -90,6 +90,7 @@
   * [x] Innerhalb eines Panels lässt sich ein Tarif am Griff verschieben; die neue Reihenfolge bleibt nach dem Neuladen erhalten.
   * [x] Zwischen Panels lässt sich nicht verschieben (je Panel eine eigene Drop-Liste).
   * [x] Die Spaltenköpfe sind nicht mehr sortierbar.
+  * [x] Das Kebab-Menü der unteren Zeilen wird nicht abgeschnitten: Die Panels schneiden nicht ab (`.zev-collapsible--overflow-visible`), und das Menü klappt allgemein **nach oben** auf, wenn darunter bis zum nächsten abschneidenden Element (Panel, scrollende Tabelle nach Spaltenbreiten-Änderung) oder zum Fensterrand zu wenig Platz ist (`app-kebab-menu`, `.zev-kebab-menu--up`) — auf allen Listen.
   * [x] Auf der Rechnung stehen die Zeilen in der Reihenfolge der Tarife, auch über Typen hinweg (z.B. Grundgebühr vor Strombezug).
   * [x] Ein neuer VNB-Tarif steht direkt hinter dem letzten VNB-Tarif; ein Bearbeiten ändert den Platz nicht.
   * [x] `PUT /api/tarife/{id}/verschieben` weist fehlende oder doppelte Ziele, unbekannte (auch mandantenfremde) Tarife und ein Verschieben relativ zu sich selbst mit 400 ab.
@@ -105,6 +106,30 @@
   * [x] Ein Tarif mit Preis 0 lässt sich anlegen und bearbeiten; ein negativer Preis wird abgewiesen (Backend `@PositiveOrZero`, Formular `min="0"`).
   * [x] Ein neues Formular zeigt ein leeres Preisfeld; ohne Preis bleibt Speichern gesperrt.
   * [x] Die Meldung lautet „Preis ist erforderlich und darf nicht negativ sein" (V179).
+
+### FR-6: Jahrespreis, anteilig verrechnet (Entscheid vom 11.10.2026)
+* **User Story:** Als Admin möchte ich bei einer Gebühr den **Preis für das ganze Jahr** erfassen; die Rechnung verteilt ihn anteilig auf die verrechneten Monate oder Tage.
+* **Wo möglich:** bei der **Grundgebühr** (pro Monat oder pro Tag verteilt, FR-3) und bei **Zusatz-Tarifen mit Mengeneinheit Monat**. Bei kWh oder Stück gibt es keinen Anteil am Jahr — dort erscheint die Option nicht, und das Backend weist sie ab.
+* **Erfassung:** Checkbox „Preis gilt für das ganze Jahr" in der Tarifmaske. In der Liste steht der Preis mit „/ Jahr".
+* **Rechnung:**
+
+  | Verteilung | Menge (in Worten) | Betrag |
+  |---|---|---|
+  | nach Monaten | „3 Monate" (volle Monate bzw. erfasste Monate der Tarifposition) | Jahrespreis × Monate / 12 |
+  | nach Tagen | „61 Tage" | Jahrespreis × Tage / Tage des Kalenderjahres (365 bzw. 366); über den Jahreswechsel je Jahr gerechnet |
+
+  Als Preis steht der **Jahrespreis** mit „CHF / Jahr". Die vier Quartalsrechnungen ergeben zusammen genau den Jahrespreis (nach Tagen auf 10 Nachkommastellen; gerundet wird wie immer nur der Endbetrag). Menge × Preis ergibt hier bewusst nicht direkt den Betrag — „pro Jahr" in der Preisspalte erklärt den Anteil.
+* **PDF-Layout:** Die Mengenspalte ist breiter (65 statt 35 pt) für „92 Tage"; die Bezeichnung dafür schmaler (265 statt 305 pt), der Zeitraum wandert ab 52 statt 60 Zeichen in die zweite Zeile (`RechnungZeilenText`).
+* **Persistierung:** `tarif.preis_pro_jahr BOOLEAN NOT NULL DEFAULT false` (V180); bestehende Tarife unverändert.
+* **Akzeptanzkriterien:**
+  * [x] Grundgebühr 100.– pro Jahr nach Monaten: die vier Quartale ergeben zusammen genau 100.–.
+  * [x] Nach Tagen 2026 (365) und 2028 (366): die Quartale ergeben zusammen den Jahrespreis.
+  * [x] Nach Tagen, gültig ab 01.08.2026, Rechnung Q3: Menge „61 Tage", Betrag 61/365 des Jahrespreises.
+  * [x] Über den Jahreswechsel wird je Kalenderjahr mit dessen Tagen gerechnet.
+  * [x] Zusatz-Tarif pro Monat mit Jahrespreis: Betrag = Jahrespreis × erfasste Monate / 12.
+  * [x] Auf der Rechnung: Menge „3 Monate", Preis 120.00000, Einheit „CHF / Jahr".
+  * [x] Ohne Jahrespreis bleibt die Rechnung wie bisher (Menge × Preis, „CHF / Monat").
+  * [x] Ein Jahrespreis bei ZEV, VNB, Ladestrom oder Zusatz pro Stück/kWh wird abgewiesen.
 
 ## 3. Technische Spezifikationen (Technical Specs)
 * **DB-Änderungen:**

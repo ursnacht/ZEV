@@ -2,7 +2,9 @@ package ch.nacht.util;
 
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -67,5 +69,26 @@ class RechnungZeilenTextTest {
         String bezeichnung = "x".repeat(RechnungZeilenText.ZEICHEN_EINE_ZEILE - 25);
         assertEquals(bezeichnung + "\n(16.08.2026 - 30.09.2026)",
                 RechnungZeilenText.bezeichnung(bezeichnung, LocalDate.of(2026, 8, 16), Q3_BIS, Q3_VON, Q3_BIS));
+    }
+
+    @Test
+    void menge_MitEinheit() {
+        assertEquals("123 kWh", RechnungZeilenText.menge(new BigDecimal("123"), "KWH", Map.of("KWH", "kWh")));
+        assertEquals("3 Monate", RechnungZeilenText.menge(new BigDecimal("3"), "MONATE", Map.of("MONATE", "Monate")));
+    }
+
+    @Test
+    void menge_MitTausendertrennzeichen() {
+        assertEquals("12'345 kWh", RechnungZeilenText.menge(new BigDecimal("12345"), "KWH", Map.of("KWH", "kWh")));
+    }
+
+    @Test
+    void menge_OhneEinheit_NurZahl() {
+        assertEquals("80", RechnungZeilenText.menge(new BigDecimal("80"), null, Map.of()));
+    }
+
+    @Test
+    void menge_OhneUebersetzung_ZeigtKey() {
+        assertEquals("5 STUECK", RechnungZeilenText.menge(new BigDecimal("5"), "STUECK", Map.of()));
     }
 }
