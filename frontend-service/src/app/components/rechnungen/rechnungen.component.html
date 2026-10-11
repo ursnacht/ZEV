@@ -54,6 +54,11 @@
           </div>
         </form>
 
+        <!-- Ladeanzeige waehrend der Generierung -->
+        @if (generating) {
+          <app-loading-indicator text="RECHNUNGEN_WERDEN_GENERIERT" />
+        }
+
         <!-- Results Section -->
         @if (generatedRechnungen.length > 0) {
           <div class="zev-panel zev-panel--chart">

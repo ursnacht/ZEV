@@ -98,6 +98,18 @@
     * [ ] Die Überschrift ist übersetzt („Entire period" auf Englisch).
     * [ ] Ein PDF-Export ändert die Monatsliste der Seite nicht — auch nach mehreren Exporten erscheint das Gesamt-Panel auf der Seite genau einmal.
     * [ ] Der CSV-Download im Gesamt-Panel exportiert den ganzen Zeitraum; der Dateiname trägt dann von und bis statt eines Monats.
+* Als Benutzer möchte ich während der Berechnung der Statistik eine **Ladeanzeige** sehen, weil das Laden mittlerweile einige Sekunden dauert und die Seite sonst wirkt, als reagiere sie nicht (Entscheid vom 11.10.2026).
+  * **Wiederverwendbar:** Aussehen im Design System (`.zev-loading` in `spinner.css`), Angular-Komponente `app-loading-indicator` (`components/loading-indicator/`) mit den Eingaben `text` (Übersetzungs-Key, Vorgabe `LADE_DATEN`) und `inline`. Zweiter Einsatz: **Rechnungen generieren** (`RECHNUNGEN_WERDEN_GENERIERT`).
+  * **Akzeptanzkriterien:**
+    * [x] Während die Statistik berechnet wird, erscheint unter dem Formular ein Spinner mit dem Text „Statistik wird berechnet …".
+    * [x] Liegt schon eine Statistik vor und wird neu berechnet, bleibt sie stehen und wird gedimmt (`.zev-busy`) — kein Layout-Sprung.
+    * [x] Ist die Berechnung fertig (oder fehlgeschlagen), verschwindet die Anzeige.
+    * [x] Auf der Seite „Rechnungen" erscheint während des Generierens dieselbe Anzeige mit „Rechnungen werden generiert …".
+    * [x] Die Anzeige erscheint erst nach **300 ms**; schnellere Antworten zeigen sie nicht (kein Aufblitzen).
+    * [x] Screenreader: Die Anzeige ist `role="status"` mit `aria-live="polite"`, der Spinner selbst `aria-hidden`.
+    * [x] Bei „weniger Bewegung" (`prefers-reduced-motion`) dreht der Spinner langsamer.
+    * [x] Die Texte sind übersetzt (V177).
+    * [x] Der Design-System-Showcase zeigt die Anzeige (Standard und Inline) mit ihren CSS-Klassen.
 
 ### 3. Technische Spezifikationen (Technical Specs)
 * Verwende das Design System

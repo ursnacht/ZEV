@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { LoadingIndicatorComponent } from '../loading-indicator/loading-indicator.component';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WithMessage } from '../../utils/with-message';
@@ -29,7 +30,7 @@ export interface KennzahlZeile {
 @Component({
   selector: 'app-statistik',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe, EinheitTypPipe, SwissDatePipe, QuarterSelectorComponent, IconComponent],
+  imports: [LoadingIndicatorComponent, CommonModule, FormsModule, TranslatePipe, EinheitTypPipe, SwissDatePipe, QuarterSelectorComponent, IconComponent],
   templateUrl: './statistik.component.html',
   styleUrls: ['./statistik.component.css']
 })

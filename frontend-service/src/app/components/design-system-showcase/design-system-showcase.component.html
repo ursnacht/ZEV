@@ -362,6 +362,40 @@
   </div>
 </section>
 
+<!-- Loading Indicator Section -->
+<section class="showcase-section">
+  <h2>Ladeanzeige</h2>
+  <p>Spinner mit Text für länger dauernde Abfragen (Statistik, Rechnungen generieren). Erscheint
+    erst nach 300 ms, damit sie bei schnellen Antworten nicht aufblitzt.</p>
+
+  <div class="subsection">
+    <h3>Standard</h3>
+    <app-loading-indicator text="LADE_DATEN" />
+  </div>
+
+  <div class="subsection">
+    <h3>Inline</h3>
+    <app-loading-indicator text="LADE_DATEN" [inline]="true" />
+  </div>
+
+  <div class="subsection">
+    <h3>Verwendung</h3>
+    <pre><code>&#64;if (loading) {{ '{' }}
+  &lt;app-loading-indicator text="STATISTIK_WIRD_BERECHNET" /&gt;
+{{ '}' }}</code></pre>
+  </div>
+
+  <div class="subsection">
+    <h3>CSS Klassen</h3>
+    <ul class="zev-list">
+      <li><code>.zev-loading</code> - zentrierter grosser Spinner mit Text, eingeblendet nach 300 ms</li>
+      <li><code>.zev-loading--inline</code> - kompakt in einer Zeile</li>
+      <li><code>.zev-spinner</code> / <code>--small</code> / <code>--large</code> - der Spinner allein</li>
+      <li><code>.zev-busy</code> - Inhalt während einer Aktualisierung dimmen statt ausblenden</li>
+    </ul>
+  </div>
+</section>
+
 <!-- Navigation Section -->
 <section class="showcase-section">
   <h2>Navigation</h2>

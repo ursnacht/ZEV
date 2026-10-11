@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { LoadingIndicatorComponent } from '../loading-indicator/loading-indicator.component';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WithMessage } from '../../utils/with-message';
@@ -18,7 +19,7 @@ import { RouterLink } from '@angular/router';
 @Component({
   selector: 'app-rechnungen',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe, QuarterSelectorComponent, IconComponent,
+  imports: [LoadingIndicatorComponent, CommonModule, FormsModule, TranslatePipe, QuarterSelectorComponent, IconComponent,
     EinheitSelectorComponent, FeatureFlagDirective, RouterLink],
   templateUrl: './rechnungen.component.html',
   styleUrls: ['./rechnungen.component.css']

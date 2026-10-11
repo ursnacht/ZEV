@@ -584,3 +584,16 @@ ein Collapsible; beim Laden sind alle zugeklappt.
   - `tests/export-messdaten.spec.ts`: `loadStatistik()` klappt auf, **bevor** es auf
     „Summen pro Einheit" wartet. Ohne diesen Schritt hätte der Helfer stillschweigend `false`
     geliefert und **alle** Tests der Datei übersprungen statt rot zu laufen.
+
+---
+
+## Ergänzung 11.10.2026: Ladeanzeige
+
+| Status | Phase | Beschreibung |
+|--------|-------|--------------|
+|  [x]   | 1. Design System | `spinner.css`: `.zev-loading` (zentriert, grosser Spinner, Einblenden nach 300 ms), `.zev-loading--inline`, `prefers-reduced-motion` |
+|  [x]   | 2. Komponente | `components/loading-indicator/loading-indicator.component.ts` (`app-loading-indicator`, Eingaben `text`, `inline`; `role="status"`) |
+|  [x]   | 3. Einsatz | Statistik: Anzeige während `loading`, Ergebnisse in `.zev-busy`-Wrapper; Rechnungen: Anzeige während `generating` |
+|  [x]   | 4. Übersetzungen | `V177__Add_Ladeanzeige_Translations.sql`: `STATISTIK_WIRD_BERECHNET`, `RECHNUNGEN_WERDEN_GENERIERT` |
+|  [x]   | 5. Showcase | Abschnitt „Ladeanzeige" im Design-System-Showcase |
+|  [x]   | 6. Tests | `loading-indicator.component.spec.ts`; je ein Test in `statistik.component.spec.ts` und `rechnungen.component.spec.ts` |

@@ -1053,4 +1053,20 @@ describe('StatistikComponent', () => {
       expect(component.isMonthExpanded(0)).toBe(false);
     });
   });
+
+  describe('Ladeanzeige', () => {
+    it('should show the loading indicator while loading', () => {
+      component.loading = true;
+      fixture.detectChanges();
+      const anzeige = fixture.nativeElement.querySelector('app-loading-indicator');
+      expect(anzeige).not.toBeNull();
+      expect(anzeige.textContent).toContain('STATISTIK_WIRD_BERECHNET');
+    });
+
+    it('should not show the loading indicator when idle', () => {
+      component.loading = false;
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('app-loading-indicator')).toBeNull();
+    });
+  });
 });

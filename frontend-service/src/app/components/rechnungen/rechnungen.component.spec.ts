@@ -474,4 +474,20 @@ describe('RechnungenComponent', () => {
       expect(fixture.nativeElement.querySelector('app-einheit-selector')).toBeTruthy();
     });
   });
+
+  describe('Ladeanzeige', () => {
+    it('should show the loading indicator while generating', () => {
+      component.generating = true;
+      fixture.detectChanges();
+      const anzeige = fixture.nativeElement.querySelector('app-loading-indicator');
+      expect(anzeige).not.toBeNull();
+      expect(anzeige.textContent).toContain('RECHNUNGEN_WERDEN_GENERIERT');
+    });
+
+    it('should not show the loading indicator when idle', () => {
+      component.generating = false;
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('app-loading-indicator')).toBeNull();
+    });
+  });
 });

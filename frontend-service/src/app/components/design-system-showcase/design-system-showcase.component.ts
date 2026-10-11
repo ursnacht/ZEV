@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { LoadingIndicatorComponent } from '../loading-indicator/loading-indicator.component';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
@@ -8,7 +9,7 @@ import { ICONS } from '../icon/icons';
 @Component({
   selector: 'app-design-system-showcase',
   standalone: true,
-  imports: [TranslatePipe, QuarterSelectorComponent, IconComponent, FormsModule],
+  imports: [TranslatePipe, QuarterSelectorComponent, IconComponent, FormsModule, LoadingIndicatorComponent],
   templateUrl: './design-system-showcase.component.html',
   styleUrl: './design-system-showcase.component.css'
 })

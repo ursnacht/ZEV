@@ -51,6 +51,13 @@
       </div>
     </div>
 
+    <!-- Ladeanzeige: Die Berechnung kann einige Sekunden dauern -->
+    @if (loading) {
+      <app-loading-indicator text="STATISTIK_WIRD_BERECHNET" />
+    }
+
+    <!-- Ergebnisse; waehrend einer Neuberechnung gedimmt statt ausgeblendet (kein Layout-Sprung) -->
+    <div [class.zev-busy]="loading">
     <!-- Overview Section -->
     @if (statistik) {
       <div class="zev-panel">
@@ -464,6 +471,8 @@
               </div>
             }
     </ng-template>
+
+    </div>
 
     <!-- Empty State -->
     @if (!statistik && !loading) {
