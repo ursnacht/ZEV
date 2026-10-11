@@ -3,7 +3,7 @@ package ch.nacht.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import org.hibernate.annotations.Filter;
 
@@ -37,7 +37,9 @@ public class Tarif {
     private TarifTyp tariftyp;
 
     @NotNull(message = "Preis is required")
-    @Positive(message = "Preis must be positive")
+    // 0 ist zulaessig: eine kostenlose Leistung (z.B. "Grundgebuehr Ladestation" auf Hene), die
+    // trotzdem auf der Rechnung stehen soll (Specs/Tarifverwaltung.md, FR-5).
+    @PositiveOrZero(message = "Preis must not be negative")
     @Column(name = "preis", precision = 10, scale = 5, nullable = false)
     private BigDecimal preis;
 
@@ -55,6 +57,15 @@ public class Tarif {
      */
     @Column(name = "produzent_verrechnen", nullable = false)
     private boolean produzentVerrechnen = false;
+
+    /**
+     * Reihenfolge der Zeilen auf der ZEV-Rechnung, aufsteigend und über alle Tariftypen
+     * (Specs/Tarifverwaltung.md, FR-4). Gesetzt und geändert nur vom {@code TarifService}: beim
+     * Anlegen hinter den letzten Tarif desselben Typs, sonst per Drag & Drop. Ein Wert, den der
+     * Client beim Bearbeiten mitschickt, wird nicht übernommen.
+     */
+    @Column(name = "reihenfolge", nullable = false)
+    private int reihenfolge = 0;
 
     /**
      * Nur für {@link TarifTyp#ZUSATZ} und {@link TarifTyp#GRUNDGEBUEHR}: die Mengeneinheit dieses
@@ -144,6 +155,14 @@ public class Tarif {
 
     public void setOrgId(Long orgId) {
         this.orgId = orgId;
+    }
+
+    public int getReihenfolge() {
+        return reihenfolge;
+    }
+
+    public void setReihenfolge(int reihenfolge) {
+        this.reihenfolge = reihenfolge;
     }
 
     public boolean isProduzentVerrechnen() {

@@ -125,6 +125,7 @@ export interface Tarif {
   gueltigBis: string;  // ISO date format: YYYY-MM-DD
   produzentVerrechnen?: boolean;  // Only relevant for GRUNDGEBUEHR: also charge producers
   mengeneinheit?: Mengeneinheit;  // Pflicht bei ZUSATZ, MONAT/TAG bei GRUNDGEBUEHR, sonst leer
+  reihenfolge?: number;  // Reihenfolge auf der Rechnung; aendert nur PUT /api/tarife/reihenfolge
 }
 
 /** A single tariff coverage gap (language-neutral; the frontend translates it). */

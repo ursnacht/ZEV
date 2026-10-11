@@ -1,7 +1,7 @@
 import { test, expect, Locator, Page } from '@playwright/test';
 import {
     E2E_MIETENDE, clickKebabMenuItem, loescheZeileMitText, navigateViaMenu,
-    raeumeMitWiederholung, waitForFormResult, waitForTableWithData
+    raeumeMitWiederholung, waitForFormResult, waitForTableWithData, oeffneTarifPanels
 } from './helpers';
 
 /**
@@ -51,6 +51,10 @@ let einheitenMitPositionen: string[] = [];
 async function navigateTo(page: Page, route: string): Promise<void> {
     await navigateViaMenu(page, route);
     await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
+    if (route === '/tarife') {
+        // Die Testtarife liegen im zugeklappten Panel "Zukuenftige Tarife"
+        await oeffneTarifPanels(page);
+    }
 }
 
 /**

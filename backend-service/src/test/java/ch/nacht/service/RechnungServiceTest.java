@@ -251,6 +251,40 @@ public class RechnungServiceTest {
         assertBetrag("23.4", rechnung.getTotalBetrag());
     }
 
+    /**
+     * Reihenfolge der Zeilen = Reihenfolge der Tarife, ueber alle Typen hinweg
+     * (Specs/Tarifverwaltung.md, FR-4) - hier die Grundgebuehr vor dem Strombezug.
+     */
+    @Test
+    void berechneRechnung_ZeilenInDerReihenfolgeDerTarife() {
+        LocalDate von = LocalDate.of(2026, 7, 1);
+        LocalDate bis = LocalDate.of(2026, 9, 30);
+        LocalDate jahrVon = LocalDate.of(2026, 1, 1);
+        LocalDate jahrBis = LocalDate.of(2026, 12, 31);
+
+        Tarif zev = new Tarif("vZEV PV Tarif", TarifTyp.ZEV, new BigDecimal("0.20000"), jahrVon, jahrBis);
+        zev.setReihenfolge(4);
+        Tarif netz = new Tarif("Netznutzung", TarifTyp.VNB, new BigDecimal("0.10000"), jahrVon, jahrBis);
+        netz.setReihenfolge(3);
+        Tarif energie = new Tarif("Energielieferung", TarifTyp.VNB, new BigDecimal("0.15000"), jahrVon, jahrBis);
+        energie.setReihenfolge(2);
+        Tarif grund = new Tarif("Grundtarif", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"), jahrVon, jahrBis);
+        grund.setReihenfolge(1);
+
+        when(tarifService.getTarifeForZeitraum(TarifTyp.ZEV, von, bis)).thenReturn(List.of(zev));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.VNB, von, bis)).thenReturn(List.of(netz, energie));
+        when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis)).thenReturn(List.of(grund));
+        when(messwerteRepository.sumZevCalculatedByEinheitAndZeitBetween(
+            eq(consumer), any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(100.0);
+        when(messwerteRepository.sumTotalByEinheitAndZeitBetween(
+            eq(consumer), any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(150.0);
+
+        RechnungDTO rechnung = rechnungService.berechneRechnung(consumer, null, von, bis);
+
+        assertEquals(List.of("Grundtarif", "Energielieferung", "Netznutzung", "vZEV PV Tarif"),
+            rechnung.getTarifZeilen().stream().map(TarifZeileDTO::getBezeichnung).toList());
+    }
+
     @Test
     void berechneRechnung_WithTenant_IncludesTenantData() {
         LocalDate von = LocalDate.of(2024, 1, 1);

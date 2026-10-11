@@ -156,6 +156,93 @@ class TarifRepositoryIT extends AbstractIntegrationTest {
                 .containsExactly("Energielieferung", "Netznutzung");
     }
 
+    /**
+     * Platz schaffen fuer einen neuen Tarif: Bulk-Update ohne Hibernate-Filter - die org_id in der
+     * Bedingung muss die Tarife anderer Mandanten unberuehrt lassen (Specs/Tarifverwaltung.md, FR-4).
+     */
+    @Test
+    void verschiebeReihenfolgeAb_NurEigenerMandantUndNurDahinter() {
+        Tarif eins = createTarif("Eins", TarifTyp.ZEV, new BigDecimal("0.2"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        eins.setReihenfolge(1);
+        Tarif zwei = createTarif("Zwei", TarifTyp.VNB, new BigDecimal("0.3"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        zwei.setReihenfolge(2);
+        Tarif fremd = tarifFuerOrg(FREMD_ORG_ID, "Fremd", TarifTyp.VNB,
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        fremd.setReihenfolge(2);
+        tarifRepository.saveAllAndFlush(List.of(eins, zwei, fremd));
+
+        int verschoben = tarifRepository.verschiebeReihenfolgeAb(TEST_ORG_ID, 1);
+        entityManager.clear();
+
+        assertThat(verschoben).isEqualTo(1);
+        assertThat(tarifRepository.findById(eins.getId()).orElseThrow().getReihenfolge()).isEqualTo(1);
+        assertThat(tarifRepository.findById(zwei.getId()).orElseThrow().getReihenfolge()).isEqualTo(3);
+        assertThat(tarifRepository.findById(fremd.getId()).orElseThrow().getReihenfolge()).isEqualTo(2);
+    }
+
+    @Test
+    void verschiebeReihenfolgeBereich_NurBereichUndEigenerMandant() {
+        List<Tarif> eigene = new java.util.ArrayList<>();
+        for (int platz = 1; platz <= 4; platz++) {
+            Tarif t = createTarif("T" + platz, TarifTyp.VNB, new BigDecimal("0.3"),
+                    LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+            t.setReihenfolge(platz);
+            eigene.add(t);
+        }
+        Tarif fremd = tarifFuerOrg(FREMD_ORG_ID, "Fremd", TarifTyp.VNB,
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        fremd.setReihenfolge(2);
+        eigene.add(fremd);
+        tarifRepository.saveAllAndFlush(eigene);
+
+        int verschoben = tarifRepository.verschiebeReihenfolgeBereich(TEST_ORG_ID, 2, 3, 1);
+        entityManager.clear();
+
+        assertThat(verschoben).isEqualTo(2);
+        assertThat(eigene).extracting(t -> tarifRepository.findById(t.getId()).orElseThrow().getReihenfolge())
+                .containsExactly(1, 3, 4, 4, 2);
+    }
+
+    /**
+     * Ein Tarif mit Preis 0 (Altbestand auf Hene, heute durch @Positive verboten) laesst sich
+     * umsortieren: Das Update geht an der Bean Validation der Entity vorbei.
+     */
+    @Test
+    void setzeReihenfolge_TarifMitPreisNull_OhneBeanValidation() {
+        Tarif tarif = tarifRepository.saveAndFlush(createTarif("Gratis", TarifTyp.ZUSATZ,
+                new BigDecimal("1.00000"), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)));
+        // Preis 0 direkt in die Datenbank - wie der Altbestand, an der Validierung vorbei
+        entityManager.createNativeQuery("UPDATE zev.tarif SET preis = 0 WHERE id = :id")
+                .setParameter("id", tarif.getId()).executeUpdate();
+        entityManager.clear();
+
+        int geaendert = tarifRepository.setzeReihenfolge(TEST_ORG_ID, tarif.getId(), 42);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(geaendert).isEqualTo(1);
+        assertThat(tarifRepository.findById(tarif.getId()).orElseThrow().getReihenfolge()).isEqualTo(42);
+        // Fremder Mandant: kein Treffer
+        assertThat(tarifRepository.setzeReihenfolge(FREMD_ORG_ID, tarif.getId(), 7)).isZero();
+    }
+
+    @Test
+    void findMaxReihenfolgeByTariftyp_JeTyp() {
+        Tarif zev = createTarif("ZEV", TarifTyp.ZEV, new BigDecimal("0.2"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        zev.setReihenfolge(4);
+        Tarif vnb = createTarif("VNB", TarifTyp.VNB, new BigDecimal("0.3"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        vnb.setReihenfolge(9);
+        tarifRepository.saveAllAndFlush(List.of(zev, vnb));
+
+        assertThat(tarifRepository.findMaxReihenfolgeByTariftyp(TarifTyp.ZEV)).isEqualTo(4);
+        assertThat(tarifRepository.findMaxReihenfolgeByTariftyp(TarifTyp.LADESTROM)).isNull();
+        assertThat(tarifRepository.findMaxReihenfolge()).isEqualTo(9);
+    }
+
     private Tarif tarifFuerOrg(Long orgId, String bezeichnung, TarifTyp typ,
                                LocalDate von, LocalDate bis) {
         Tarif tarif = new Tarif(bezeichnung, typ, new BigDecimal("0.30000"), von, bis);

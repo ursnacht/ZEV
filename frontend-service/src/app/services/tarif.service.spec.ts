@@ -214,4 +214,22 @@ describe('TarifService', () => {
       req.flush(invalidResult);
     });
   });
+
+  describe('verschiebeTarif', () => {
+    it('should PUT a move before a target', () => {
+      service.verschiebeTarif(3, { vor: 1 }).subscribe();
+
+      const req = httpMock.expectOne(`${apiUrl}/3/verschieben?vor=1`);
+      expect(req.request.method).toBe('PUT');
+      req.flush(null);
+    });
+
+    it('should PUT a move after a target', () => {
+      service.verschiebeTarif(3, { nach: 5 }).subscribe();
+
+      const req = httpMock.expectOne(`${apiUrl}/3/verschieben?nach=5`);
+      expect(req.request.method).toBe('PUT');
+      req.flush(null);
+    });
+  });
 });

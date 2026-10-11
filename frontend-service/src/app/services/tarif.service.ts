@@ -32,6 +32,15 @@ export class TarifService {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
   }
 
+  /**
+   * Verschiebt einen Tarif direkt vor (`vor`) oder hinter (`nach`) einen anderen. Nur die eine
+   * Verschiebung, nicht die ganze Liste - gleichzeitige Sitzungen ueberschreiben sich so nicht.
+   */
+  verschiebeTarif(id: number, ziel: { vor: number } | { nach: number }): Observable<void> {
+    const param = 'vor' in ziel ? `vor=${ziel.vor}` : `nach=${ziel.nach}`;
+    return this.http.put<void>(`${this.apiUrl}/${id}/verschieben?${param}`, null);
+  }
+
   // GET, nicht POST: Die Validierung liest nur. Der frühere POST schickte einen Body, den das
   // Backend nie las - siehe TarifController.validateTarife.
   validateQuartale(): Observable<ValidationResult> {

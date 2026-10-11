@@ -64,6 +64,48 @@
   * [x] Auf der Rechnung (PDF) steht „CHF / Tag".
 * **Abgrenzung:** Nur die ZEV-Stromrechnung. Die Nebenkostenabrechnung kennt `TAG` nicht (ihre Constraints bleiben unverändert); ein Grundgebühr-Tarif für einzelne Einheiten bleibt ein `ZUSATZ`-Tarif.
 
+### FR-4: Reihenfolge der Tarife und Panels nach Zeitraum (Entscheid vom 11.10.2026)
+* **User Story:** Als Admin möchte ich die Reihenfolge der Tarife festlegen, damit die Positionen auf der Rechnung in einer bewussten Reihenfolge stehen statt nach Typ und Name. Die Tarife sind dazu nach Zeitraum in Panels gruppiert.
+* **Panels** (einklappbar, `.zev-collapsible`), nach Gültigkeit:
+
+  | Panel | Enthält | Beim Aufruf |
+  |---|---|---|
+  | Zukünftige Tarife | `gueltig_von` nach dem 31.12. des aktuellen Jahres | zu |
+  | Tarife *Jahr* | gilt an mindestens einem Tag des aktuellen Jahres (auch über die Jahresgrenze, z.B. 01.10.2025–31.12.2026) | **offen** |
+  | Frühere Tarife | `gueltig_bis` vor dem 01.01. des aktuellen Jahres | zu |
+
+  Die Kopfzeile nennt die Zahl der Tarife; ein leeres Panel zeigt „Keine Tarife".
+* **Reihenfolge:**
+  * Verschieben per **Drag & Drop am Griff** (Angular CDK), **nur innerhalb eines Panels**. Die Gruppe tauscht dabei nur ihre eigenen Plätze; Tarife anderer Panels behalten ihren Platz.
+  * Gespeichert wird sofort, und zwar nur die **eine Verschiebung**: `PUT /api/tarife/{id}/verschieben?vor={zielId}` bzw. `?nach={zielId}` (nach oben vor den neuen Nachfolger, nach unten hinter den neuen Vorgänger; Permission `tarife:manage` wie die übrige Tarifverwaltung). Der Server verschiebt den Tarif und rückt nur die Plätze **zwischen** Start und Ziel um eins nach. Bei einem Fehler zeigt die Liste wieder den gespeicherten Stand.
+  * **Warum nicht die ganze Reihenfolge des Panels senden:** Zwei gleichzeitige Sitzungen überschrieben sich damit gegenseitig mit ihrem veralteten Stand — beobachtet im E2E-Lauf mit Chromium und Firefox parallel.
+  * Die **Spaltensortierung** per Klick auf die Spaltenköpfe **entfällt** — die Tabelle zeigt immer die Reihenfolge der Rechnung.
+  * Ein **neuer Tarif** kommt direkt hinter den letzten Tarif desselben Typs (die dahinter rücken nach); der erste Tarif eines Typs ans Ende. Beim Bearbeiten bleibt der Platz unverändert.
+* **Rechnung:** Die Zeilen stehen in der Reihenfolge ihrer Tarife, **über alle Tariftypen hinweg** (ZEV, VNB, Tarifpositionen, Grundgebühr gemischt nach Reihenfolge). Mehrere Zeilen desselben Tarifs (z.B. Tarifpositionen) nach Beginn.
+* **Persistierung:** neue Spalte `tarif.reihenfolge INTEGER NOT NULL` (je Mandant fortlaufend). Migration `V178__Tarif_Reihenfolge.sql` belegt sie mit der bisherigen Reihenfolge der Rechnung (ZEV, VNB, Ladestrom, Zusatz, Grundgebühr; je Typ nach Beginn und Bezeichnung) — bestehende Rechnungen sehen danach gleich aus. Übersetzungen ebenda.
+* **Design System:** neu `sortable.css` (`.zev-table__griff`, Stile der CDK-Drag-Vorschau — global, weil Angular die Vorschau an den `<body>` hängt).
+* **Akzeptanzkriterien:**
+  * [x] Die Tarifverwaltung zeigt drei Panels: Zukünftige Tarife, Tarife *aktuelles Jahr*, Frühere Tarife; beim Aufruf ist nur das aktuelle Jahr offen.
+  * [x] Ein Tarif von 01.10. des Vorjahres bis 31.12. dieses Jahres steht im Panel des aktuellen Jahres.
+  * [x] Innerhalb eines Panels lässt sich ein Tarif am Griff verschieben; die neue Reihenfolge bleibt nach dem Neuladen erhalten.
+  * [x] Zwischen Panels lässt sich nicht verschieben (je Panel eine eigene Drop-Liste).
+  * [x] Die Spaltenköpfe sind nicht mehr sortierbar.
+  * [x] Auf der Rechnung stehen die Zeilen in der Reihenfolge der Tarife, auch über Typen hinweg (z.B. Grundgebühr vor Strombezug).
+  * [x] Ein neuer VNB-Tarif steht direkt hinter dem letzten VNB-Tarif; ein Bearbeiten ändert den Platz nicht.
+  * [x] `PUT /api/tarife/{id}/verschieben` weist fehlende oder doppelte Ziele, unbekannte (auch mandantenfremde) Tarife und ein Verschieben relativ zu sich selbst mit 400 ab.
+  * [x] Eine Verschiebung ändert nur den verschobenen Tarif und die Plätze zwischen Start und Ziel; andere Tarife, auch anderer Mandanten, bleiben unberührt.
+  * [x] Auch ein Tarif mit Altbestand-Werten ausserhalb der heutigen Regeln (auf Hene: „Grundgebühr Ladestation" mit Preis 0) lässt sich verschieben — die Reihenfolge wird als einzelne Spalte gesetzt, nicht über die Entity mit ihrer Bean Validation.
+  * [x] Nach der Migration ist die Reihenfolge der Rechnung unverändert.
+
+### FR-5: Preis 0 zulässig (Entscheid vom 11.10.2026)
+* Ein Tarif darf den Preis **0** haben. Zweck ist **Goodwill**: Die Gebühr gibt es eigentlich, auf die Verrechnung wird aber verzichtet — und das soll auf der Rechnung sichtbar sein (auf Hene: „Grundgebühr Ladestation" mit Betrag 0.00). Negative Preise bleiben verboten.
+* Bisher galt `@Positive`; ein solcher Altbestand-Tarif liess sich nicht mehr bearbeiten und brach das Umsortieren (FR-4) ab.
+* Das Preisfeld eines **neuen** Tarifs startet **leer** statt mit 0 — sonst ginge ein vergessener Preis unbemerkt als Gratis-Tarif durch.
+* **Akzeptanzkriterien:**
+  * [x] Ein Tarif mit Preis 0 lässt sich anlegen und bearbeiten; ein negativer Preis wird abgewiesen (Backend `@PositiveOrZero`, Formular `min="0"`).
+  * [x] Ein neues Formular zeigt ein leeres Preisfeld; ohne Preis bleibt Speichern gesperrt.
+  * [x] Die Meldung lautet „Preis ist erforderlich und darf nicht negativ sein" (V179).
+
 ## 3. Technische Spezifikationen (Technical Specs)
 * **DB-Änderungen:**
   * Das System speichert die Tarife in der Datenbank in einer neuen Tabelle "tarife".

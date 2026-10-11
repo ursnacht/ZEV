@@ -35,90 +35,85 @@
         </button>
       </div>
       @if (tarife.length > 0) {
-        <table class="zev-table" appColumnResize>
-          <thead>
-            <tr>
-              <th class="zev-table__header--sortable" (click)="onSort('tariftyp')">
-                {{ 'TARIFTYP' | translate }}
-                @if (sortColumn === 'tariftyp') {
-                  <span class="zev-table__sort-indicator">
-                    {{ sortDirection === 'asc' ? '▲' : '▼' }}
-                  </span>
+        <p class="zev-text--muted">{{ 'TARIF_REIHENFOLGE_HINWEIS' | translate }}</p>
+
+        <!-- Drei Panels nach Gueltigkeit (Specs/Tarifverwaltung.md, FR-4); verschoben wird nur
+             innerhalb eines Panels - jedes hat eine eigene cdkDropList. -->
+        @for (gruppe of gruppenReihenfolge; track gruppe) {
+          <div class="zev-collapsible">
+            <button type="button" class="zev-collapsible__header" (click)="toggleGruppe(gruppe)"
+              [attr.aria-expanded]="offen[gruppe]" [attr.aria-controls]="'tarife-' + gruppe">
+              <span>
+                {{ gruppenTitel(gruppe) | translate }}@if (gruppe === 'aktuell') { {{ jahr }}}
+                ({{ gruppen[gruppe].length }})
+              </span>
+              <span class="zev-collapsible__icon">{{ offen[gruppe] ? '▼' : '▶' }}</span>
+            </button>
+            @if (offen[gruppe]) {
+              <div class="zev-collapsible__content" [id]="'tarife-' + gruppe">
+                @if (gruppen[gruppe].length > 0) {
+                  <table class="zev-table" appColumnResize>
+                    <thead>
+                      <tr>
+                        <th class="zev-table__griff"></th>
+                        <th>{{ 'TARIFTYP' | translate }}</th>
+                        <th>{{ 'BEZEICHNUNG' | translate }}</th>
+                        <!-- Ohne feste Einheit in der Ueberschrift: Grundgebuehr rechnet pro Monat
+                             oder Tag, Zusatzleistungen je nach Tarif - die Einheit steht in der Zeile.
+                             `zev-table__number` auch hier: Sonst stand der Titel links, waehrend die
+                             Zahlen darunter rechts standen. -->
+                        <th class="zev-table__number">{{ 'PREIS' | translate }} (CHF)</th>
+                        <th>{{ 'GUELTIG_VON' | translate }}</th>
+                        <th>{{ 'GUELTIG_BIS' | translate }}</th>
+                        <th>{{ 'TARIF_PRODUZENT_VERRECHNEN_SPALTE' | translate }}</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody cdkDropList [cdkDropListData]="gruppen[gruppe]"
+                      (cdkDropListDropped)="onDrop(gruppe, $event)">
+                      @for (tarif of gruppen[gruppe]; track tarif.id) {
+                        <tr cdkDrag>
+                          <td class="zev-table__griff" cdkDragHandle
+                            [attr.aria-label]="'TARIF_VERSCHIEBEN' | translate">
+                            <app-icon name="menu"></app-icon>
+                          </td>
+                          <td>
+                            <span class="tarif-typ-badge" [class.tarif-typ-badge--zev]="tarif.tariftyp === 'ZEV'" [class.tarif-typ-badge--vnb]="tarif.tariftyp === 'VNB'" [class.tarif-typ-badge--grundgebuehr]="tarif.tariftyp === 'GRUNDGEBUEHR'">
+                              {{ ('TARIFTYP_' + tarif.tariftyp) | translate }}
+                            </span>
+                          </td>
+                          <td>{{ tarif.bezeichnung }}</td>
+                          <td class="zev-table__number">
+                            {{ formatPreis(tarif.preis) }}
+                            <span class="zev-text--muted">/ {{ preisEinheit(tarif) | translate }}</span>
+                          </td>
+                          <td>{{ tarif.gueltigVon | swissDate }}</td>
+                          <td>{{ tarif.gueltigBis | swissDate }}</td>
+                          <td>
+                            @if (tarif.tariftyp === 'GRUNDGEBUEHR') {
+                              <input type="checkbox" class="zev-checkbox" [checked]="tarif.produzentVerrechnen" disabled
+                                [attr.aria-label]="'TARIF_PRODUZENT_VERRECHNEN' | translate" />
+                            } @else {
+                              &ndash;
+                            }
+                          </td>
+                          <td>
+                            <app-kebab-menu
+                              [items]="menuItems"
+                              (itemClick)="onMenuAction($event, tarif)">
+                            </app-kebab-menu>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                } @else {
+                  <p class="zev-text--muted">{{ 'KEINE_TARIFE_IN_GRUPPE' | translate }}</p>
                 }
-              </th>
-              <th class="zev-table__header--sortable" (click)="onSort('bezeichnung')">
-                {{ 'BEZEICHNUNG' | translate }}
-                @if (sortColumn === 'bezeichnung') {
-                  <span class="zev-table__sort-indicator">
-                    {{ sortDirection === 'asc' ? '▲' : '▼' }}
-                  </span>
-                }
-              </th>
-              <!-- Ohne feste Einheit in der Ueberschrift: Grundgebuehr rechnet pro Monat,
-                   Zusatzleistungen je nach Tarif - die Einheit steht deshalb in der Zeile.
-                   `zev-table__number` auch hier: Sonst stand der Titel links, waehrend die
-                   Zahlen darunter rechts standen. -->
-              <th class="zev-table__header--sortable zev-table__number" (click)="onSort('preis')">
-                {{ 'PREIS' | translate }} (CHF)
-                @if (sortColumn === 'preis') {
-                  <span class="zev-table__sort-indicator">
-                    {{ sortDirection === 'asc' ? '▲' : '▼' }}
-                  </span>
-                }
-              </th>
-              <th class="zev-table__header--sortable" (click)="onSort('gueltigVon')">
-                {{ 'GUELTIG_VON' | translate }}
-                @if (sortColumn === 'gueltigVon') {
-                  <span class="zev-table__sort-indicator">
-                    {{ sortDirection === 'asc' ? '▲' : '▼' }}
-                  </span>
-                }
-              </th>
-              <th class="zev-table__header--sortable" (click)="onSort('gueltigBis')">
-                {{ 'GUELTIG_BIS' | translate }}
-                @if (sortColumn === 'gueltigBis') {
-                  <span class="zev-table__sort-indicator">
-                    {{ sortDirection === 'asc' ? '▲' : '▼' }}
-                  </span>
-                }
-              </th>
-              <th>{{ 'TARIF_PRODUZENT_VERRECHNEN_SPALTE' | translate }}</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (tarif of tarife; track tarif) {
-              <tr>
-                <td>
-                  <span class="tarif-typ-badge" [class.tarif-typ-badge--zev]="tarif.tariftyp === 'ZEV'" [class.tarif-typ-badge--vnb]="tarif.tariftyp === 'VNB'" [class.tarif-typ-badge--grundgebuehr]="tarif.tariftyp === 'GRUNDGEBUEHR'">
-                    {{ ('TARIFTYP_' + tarif.tariftyp) | translate }}
-                  </span>
-                </td>
-                <td>{{ tarif.bezeichnung }}</td>
-                <td class="zev-table__number">
-                  {{ formatPreis(tarif.preis) }}
-                  <span class="zev-text--muted">/ {{ preisEinheit(tarif) | translate }}</span>
-                </td>
-                <td>{{ tarif.gueltigVon | swissDate }}</td>
-                <td>{{ tarif.gueltigBis | swissDate }}</td>
-                <td>
-                  @if (tarif.tariftyp === 'GRUNDGEBUEHR') {
-                    <input type="checkbox" class="zev-checkbox" [checked]="tarif.produzentVerrechnen" disabled
-                      [attr.aria-label]="'TARIF_PRODUZENT_VERRECHNEN' | translate" />
-                  } @else {
-                    &ndash;
-                  }
-                </td>
-                <td>
-                  <app-kebab-menu
-                    [items]="menuItems"
-                    (itemClick)="onMenuAction($event, tarif)">
-                  </app-kebab-menu>
-                </td>
-              </tr>
+              </div>
             }
-          </tbody>
-        </table>
+          </div>
+        }
       }
       @if (tarife.length === 0) {
         <p>{{ 'KEINE_TARIFE_VORHANDEN' | translate }}</p>

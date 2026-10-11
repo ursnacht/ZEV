@@ -1,8 +1,7 @@
 import { test as baseTest, expect, Locator, Page } from '@playwright/test';
 import {
     clickKebabMenuItem, closeKebabMenu, closeKebabMenuWithEsc, loescheZeileMitText, navigateViaMenu,
-    openKebabMenu, waitForFormResult, waitForTableWithData
-} from './helpers';
+    openKebabMenu, waitForFormResult, waitForTableWithData, oeffneTarifPanels } from './helpers';
 
 /**
  * tests / kebab-menu.spec.ts
@@ -68,6 +67,7 @@ async function navigateToTarife(page: Page): Promise<void> {
     await navigateViaMenu(page, '/tarife');
     await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
     // Wait for table to load
+    await oeffneTarifPanels(page);
     await waitForTableWithData(page, 10000);
 }
 
@@ -120,7 +120,7 @@ function gueltigkeit(versatz: number): { von: string; bis: string } {
  * soll auffallen, statt den Test ohne jede Pruefung durchlaufen zu lassen.
  */
 async function ersteZeileOrFail(page: Page): Promise<Locator> {
-    await expect(page.locator('.zev-table')).toBeVisible();
+    await expect(page.locator('.zev-table').first()).toBeVisible();
     const zeilen = page.locator('.zev-table tbody tr');
     // `expect.poll`, nicht `expect(await ...count())`: Die Tabelle ist sichtbar, bevor ihre Zeilen
     // aus der Antwort des Servers gefuellt sind - ein blankes `count()` liest die leere Zwischenzeit.
@@ -263,7 +263,7 @@ test.describe('Kebab Menu - Close Behavior', () => {
     test('should close first menu when opening another', async ({ page }) => {
         await navigateToTarife(page);
 
-        await expect(page.locator('.zev-table')).toBeVisible();
+        await expect(page.locator('.zev-table').first()).toBeVisible();
         const tableRows = page.locator('.zev-table tbody tr');
         await expect.poll(() => tableRows.count(),
             { message: 'Fuer diesen Test werden mindestens zwei Tabellenzeilen benoetigt' })

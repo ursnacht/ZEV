@@ -3,6 +3,7 @@ package ch.nacht.repository;
 import ch.nacht.entity.Tarif;
 import ch.nacht.entity.TarifTyp;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -75,6 +76,50 @@ public interface TarifRepository extends JpaRepository<Tarif, Long> {
         @Param("bis") LocalDate bis,
         @Param("excludeId") Long excludeId
     );
+
+    /**
+     * Alle Tarife in der Reihenfolge der Rechnung (Specs/Tarifverwaltung.md, FR-4).
+     */
+    List<Tarif> findAllByOrderByReihenfolgeAscIdAsc();
+
+    /** Hoechste Reihenfolge eines Typs; {@code null}, wenn es keinen Tarif dieses Typs gibt. */
+    @Query("SELECT MAX(t.reihenfolge) FROM Tarif t WHERE t.tariftyp = :typ")
+    Integer findMaxReihenfolgeByTariftyp(@Param("typ") TarifTyp typ);
+
+    /** Hoechste Reihenfolge ueberhaupt; {@code null} ohne Tarife. */
+    @Query("SELECT MAX(t.reihenfolge) FROM Tarif t")
+    Integer findMaxReihenfolge();
+
+    /**
+     * Schiebt alle Tarife hinter {@code ab} um eins nach hinten, um Platz fuer einen neuen zu
+     * schaffen. Bulk-Update: Der Hibernate-Filter greift hier NICHT, deshalb die org_id
+     * ausdruecklich in der Bedingung.
+     */
+    @Modifying
+    @Query("UPDATE Tarif t SET t.reihenfolge = t.reihenfolge + 1 WHERE t.orgId = :orgId AND t.reihenfolge > :ab")
+    int verschiebeReihenfolgeAb(@Param("orgId") Long orgId, @Param("ab") int ab);
+
+    /**
+     * Verschiebt die Plaetze {@code von..bis} (inklusive) um {@code delta} - Platz machen beim
+     * Verschieben eines Tarifs. Bulk-Update: org_id ausdruecklich, der Hibernate-Filter greift hier
+     * nicht.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("UPDATE Tarif t SET t.reihenfolge = t.reihenfolge + :delta " +
+           "WHERE t.orgId = :orgId AND t.reihenfolge BETWEEN :von AND :bis")
+    int verschiebeReihenfolgeBereich(@Param("orgId") Long orgId, @Param("von") int von,
+                                     @Param("bis") int bis, @Param("delta") int delta);
+
+    /**
+     * Setzt den Platz eines einzelnen Tarifs - als Update der einen Spalte statt ueber die Entity.
+     * Sonst prueft Hibernate beim Commit die Bean Validation des ganzen Tarifs, und ein Tarif mit
+     * einem Altbestand-Wert ausserhalb der heutigen Regeln (auf Hene: Preis 0) liesse sich nicht
+     * mehr umsortieren.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE Tarif t SET t.reihenfolge = :reihenfolge WHERE t.id = :id AND t.orgId = :orgId")
+    int setzeReihenfolge(@Param("orgId") Long orgId, @Param("id") Long id,
+                         @Param("reihenfolge") int reihenfolge);
 
     /**
      * Find all tariffs ordered by type and validity start date (descending).

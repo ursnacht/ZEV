@@ -21,7 +21,9 @@ export class TarifFormComponent implements OnInit {
   formData: Tarif = {
     bezeichnung: '',
     tariftyp: TarifTyp.ZEV,
-    preis: 0,
+    // Leer statt 0: Seit 0 ein gueltiger Preis ist (Specs/Tarifverwaltung.md, FR-5), ginge ein
+    // vergessener Preis sonst unbemerkt als Gratis-Tarif durch.
+    preis: null as unknown as number,
     gueltigVon: '',
     gueltigBis: '',
     produzentVerrechnen: false
@@ -112,7 +114,7 @@ export class TarifFormComponent implements OnInit {
     return !!(
       this.formData.bezeichnung.trim() &&
       this.formData.tariftyp &&
-      this.formData.preis > 0 &&
+      this.formData.preis != null && this.formData.preis >= 0 &&
       this.formData.gueltigVon &&
       this.formData.gueltigBis &&
       this.formData.gueltigVon <= this.formData.gueltigBis &&

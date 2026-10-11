@@ -72,14 +72,15 @@ public class TarifServiceTest {
 
     @Test
     void getAllTarife_ReturnsSortedList() {
-        when(tarifRepository.findAllByOrderByTariftypAscGueltigVonDesc())
+        // In der Reihenfolge der Rechnung (Specs/Tarifverwaltung.md, FR-4)
+        when(tarifRepository.findAllByOrderByReihenfolgeAscIdAsc())
             .thenReturn(Arrays.asList(vnbTarif2024, zevTarif2024));
 
         List<Tarif> result = tarifService.getAllTarife();
 
         assertNotNull(result);
         assertEquals(2, result.size());
-        verify(tarifRepository).findAllByOrderByTariftypAscGueltigVonDesc();
+        verify(tarifRepository).findAllByOrderByReihenfolgeAscIdAsc();
     }
 
     @Test
@@ -697,5 +698,152 @@ public class TarifServiceTest {
         assertFalse(result.valid());
         // Check date format is dd.MM.yyyy (Swiss format)
         assertThat(result.luecken().get(0).luecken().get(0).datum(), containsString("01.01.2024"));
+    }
+
+    // ==================== Reihenfolge (Specs/Tarifverwaltung.md, FR-4) ====================
+
+    @Test
+    void saveTarif_Neu_KommtHinterDenLetztenTarifDesselbenTyps() {
+        Tarif neu = new Tarif("Netznutzung", TarifTyp.VNB, new BigDecimal("0.10000"),
+            LocalDate.of(2027, 1, 1), LocalDate.of(2027, 12, 31));
+        when(organizationContextService.getCurrentOrgId()).thenReturn(7L);
+        when(tarifRepository.findMaxReihenfolgeByTariftyp(TarifTyp.VNB)).thenReturn(4);
+        when(tarifRepository.save(any(Tarif.class))).thenAnswer(i -> i.getArgument(0));
+
+        Tarif gespeichert = tarifService.saveTarif(neu);
+
+        // Die Tarife hinter Platz 4 ruecken nach - nur im eigenen Mandanten
+        verify(tarifRepository).verschiebeReihenfolgeAb(7L, 4);
+        assertEquals(5, gespeichert.getReihenfolge());
+    }
+
+    @Test
+    void saveTarif_ErsterSeinesTyps_KommtAnsEnde() {
+        Tarif neu = new Tarif("Ladestrom", TarifTyp.LADESTROM, new BigDecimal("0.30000"),
+            LocalDate.of(2027, 1, 1), LocalDate.of(2027, 12, 31));
+        when(tarifRepository.findMaxReihenfolgeByTariftyp(TarifTyp.LADESTROM)).thenReturn(null);
+        when(tarifRepository.findMaxReihenfolge()).thenReturn(9);
+        when(tarifRepository.save(any(Tarif.class))).thenAnswer(i -> i.getArgument(0));
+
+        Tarif gespeichert = tarifService.saveTarif(neu);
+
+        assertEquals(10, gespeichert.getReihenfolge());
+        verify(tarifRepository, never()).verschiebeReihenfolgeAb(any(), anyInt());
+    }
+
+    @Test
+    void saveTarif_ErsterTarifUeberhaupt_ErhaeltPlatzEins() {
+        Tarif neu = new Tarif("ZEV", TarifTyp.ZEV, new BigDecimal("0.20000"),
+            LocalDate.of(2027, 1, 1), LocalDate.of(2027, 12, 31));
+        when(tarifRepository.save(any(Tarif.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertEquals(1, tarifService.saveTarif(neu).getReihenfolge());
+    }
+
+    @Test
+    void saveTarif_Update_BehaeltGespeicherteReihenfolge() {
+        // Ein mitgeschickter Wert waere ein veralteter Stand der Liste
+        Tarif bestehend = new Tarif("ZEV Tarif 2024", TarifTyp.ZEV, new BigDecimal("0.20000"),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31));
+        bestehend.setId(1L);
+        bestehend.setReihenfolge(3);
+        zevTarif2024.setReihenfolge(99);
+        when(tarifRepository.findFirstById(1L)).thenReturn(Optional.of(bestehend));
+        when(tarifRepository.save(any(Tarif.class))).thenAnswer(i -> i.getArgument(0));
+
+        Tarif gespeichert = tarifService.saveTarif(zevTarif2024);
+
+        assertEquals(3, gespeichert.getReihenfolge());
+        verify(tarifRepository, never()).verschiebeReihenfolgeAb(any(), anyInt());
+    }
+
+    @Test
+    void verschiebe_NachVornVorZiel_RuecktDieDazwischenNach() {
+        // Platz 7 vor Platz 2: 2..6 ruecken um eins nach hinten, der Tarif erhaelt Platz 2
+        Tarif tarif = tarifMitPlatz(30L, 7);
+        tarif.setOrgId(5L);
+        when(tarifRepository.findFirstById(30L)).thenReturn(Optional.of(tarif));
+        when(tarifRepository.findFirstById(10L)).thenReturn(Optional.of(tarifMitPlatz(10L, 2)));
+
+        tarifService.verschiebe(30L, 10L, null);
+
+        verify(tarifRepository).verschiebeReihenfolgeBereich(5L, 2, 6, 1);
+        verify(tarifRepository).setzeReihenfolge(5L, 30L, 2);
+        // Kein Speichern der Entity - sonst schluege die Bean Validation des ganzen Tarifs zu
+        verify(tarifRepository, never()).save(any());
+        verify(hibernateFilterService).enableOrgFilter();
+    }
+
+    @Test
+    void verschiebe_NachHintenHinterZiel_RuecktDieDazwischenVor() {
+        // Platz 2 hinter Platz 7: 3..7 ruecken um eins nach vorn, der Tarif erhaelt Platz 7
+        Tarif tarif = tarifMitPlatz(10L, 2);
+        tarif.setOrgId(5L);
+        when(tarifRepository.findFirstById(10L)).thenReturn(Optional.of(tarif));
+        when(tarifRepository.findFirstById(30L)).thenReturn(Optional.of(tarifMitPlatz(30L, 7)));
+
+        tarifService.verschiebe(10L, null, 30L);
+
+        verify(tarifRepository).verschiebeReihenfolgeBereich(5L, 3, 7, -1);
+        verify(tarifRepository).setzeReihenfolge(5L, 10L, 7);
+    }
+
+    @Test
+    void verschiebe_NachHintenVorZiel_EndetDavor() {
+        // Platz 2 vor Platz 7: 3..6 ruecken vor, der Tarif erhaelt Platz 6
+        Tarif tarif = tarifMitPlatz(10L, 2);
+        tarif.setOrgId(5L);
+        when(tarifRepository.findFirstById(10L)).thenReturn(Optional.of(tarif));
+        when(tarifRepository.findFirstById(30L)).thenReturn(Optional.of(tarifMitPlatz(30L, 7)));
+
+        tarifService.verschiebe(10L, 30L, null);
+
+        verify(tarifRepository).verschiebeReihenfolgeBereich(5L, 3, 6, -1);
+        verify(tarifRepository).setzeReihenfolge(5L, 10L, 6);
+    }
+
+    @Test
+    void verschiebe_SchonAmZiel_AendertNurDenTarif() {
+        // Platz 3 vor Platz 4: steht schon dort - kein Bereich zu verschieben
+        Tarif tarif = tarifMitPlatz(10L, 3);
+        when(tarifRepository.findFirstById(10L)).thenReturn(Optional.of(tarif));
+        when(tarifRepository.findFirstById(20L)).thenReturn(Optional.of(tarifMitPlatz(20L, 4)));
+
+        tarifService.verschiebe(10L, 20L, null);
+
+        verify(tarifRepository, never()).verschiebeReihenfolgeBereich(any(), anyInt(), anyInt(), anyInt());
+        verify(tarifRepository).setzeReihenfolge(tarif.getOrgId(), 10L, 3);
+    }
+
+    @Test
+    void verschiebe_UnbekannterOderFremderTarif_ThrowsException() {
+        // findFirstById laeuft unter dem orgFilter - ein mandantenfremder Tarif ist "unbekannt"
+        when(tarifRepository.findFirstById(1L)).thenReturn(Optional.empty());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+            () -> tarifService.verschiebe(1L, 2L, null));
+
+        assertTrue(ex.getMessage().contains("Unbekannter Tarif"));
+        verify(tarifRepository, never()).setzeReihenfolge(any(), any(), anyInt());
+    }
+
+    @Test
+    void verschiebe_OhneOderMitZweiZielen_ThrowsException() {
+        assertThrows(IllegalArgumentException.class, () -> tarifService.verschiebe(1L, null, null));
+        assertThrows(IllegalArgumentException.class, () -> tarifService.verschiebe(1L, 2L, 3L));
+        verify(tarifRepository, never()).findFirstById(any());
+    }
+
+    @Test
+    void verschiebe_RelativZuSichSelbst_ThrowsException() {
+        assertThrows(IllegalArgumentException.class, () -> tarifService.verschiebe(1L, 1L, null));
+    }
+
+    private static Tarif tarifMitPlatz(Long id, int reihenfolge) {
+        Tarif tarif = new Tarif("T" + id, TarifTyp.VNB, new BigDecimal("0.10000"),
+            LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        tarif.setId(id);
+        tarif.setReihenfolge(reihenfolge);
+        return tarif;
     }
 }

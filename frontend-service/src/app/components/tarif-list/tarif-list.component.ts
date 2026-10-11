@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList, moveItemInArray } from '@angular/cdk/drag-drop';
 import { TarifService } from '../../services/tarif.service';
 import { Tarif, TarifTyp, ValidationResult, preisEinheitKey } from '../../models/tarif.model';
 import { formatTarifLuecke } from '../../utils/tarif-luecke.util';
@@ -14,24 +15,39 @@ import { IconComponent } from '../icon/icon.component';
 import { PreiszeitreiheChartComponent } from '../preiszeitreihe-chart/preiszeitreihe-chart.component';
 import { FeatureFlagDirective } from '../../directives/feature-flag.directive';
 
+/** Panel der Tarifverwaltung (Specs/Tarifverwaltung.md, FR-4). */
+export type TarifGruppe = 'zukuenftig' | 'aktuell' | 'alt';
+
 @Component({
   selector: 'app-tarif-list',
   standalone: true,
   imports: [CommonModule, TarifFormComponent, TranslatePipe, SwissDatePipe, KebabMenuComponent,
-    ColumnResizeDirective, IconComponent, PreiszeitreiheChartComponent, FeatureFlagDirective],
+    ColumnResizeDirective, IconComponent, PreiszeitreiheChartComponent, FeatureFlagDirective,
+    CdkDropList, CdkDrag, CdkDragHandle],
   templateUrl: './tarif-list.component.html',
   styleUrls: ['./tarif-list.component.css']
 })
 export class TarifListComponent implements OnInit {
   tarife: Tarif[] = [];
+
+  /** Die drei Panels, je in der Reihenfolge der Rechnung. Neu gebildet bei jedem Laden. */
+  gruppen: Record<TarifGruppe, Tarif[]> = { zukuenftig: [], aktuell: [], alt: [] };
+
+  /** Reihenfolge der Panels auf der Seite. */
+  readonly gruppenReihenfolge: TarifGruppe[] = ['zukuenftig', 'aktuell', 'alt'];
+
+  /** Beim Oeffnen der Seite ist nur das aktuelle Jahr aufgeklappt. */
+  offen: Record<TarifGruppe, boolean> = { zukuenftig: false, aktuell: true, alt: false };
+
+  /** Das aktuelle Jahr - Grenze zwischen den Panels und Titel des mittleren. */
+  readonly jahr = new Date().getFullYear();
+
   selectedTarif: Tarif | null = null;
   showForm = false;
   message = '';
   messageType: 'success' | 'error' = 'success';
   messagePersistent = false;
   validationErrors: string[] = [];
-  sortColumn: 'bezeichnung' | 'tariftyp' | 'preis' | 'gueltigVon' | 'gueltigBis' | null = 'tariftyp';
-  sortDirection: 'asc' | 'desc' = 'asc';
 
   menuItems: KebabMenuItem[] = [
     { label: 'BEARBEITEN', action: 'edit', icon: 'edit-2' },
@@ -52,6 +68,7 @@ export class TarifListComponent implements OnInit {
     this.tarifService.getAllTarife().subscribe({
       next: (data) => {
         this.tarife = data;
+        this.gruppen = this.gruppiere(data);
       },
       error: (error) => {
         this.showMessage('FEHLER_LADEN_TARIFE', 'error');
@@ -139,33 +156,63 @@ export class TarifListComponent implements OnInit {
     this.selectedTarif = null;
   }
 
-  onSort(column: 'bezeichnung' | 'tariftyp' | 'preis' | 'gueltigVon' | 'gueltigBis'): void {
-    if (this.sortColumn === column) {
-      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-    } else {
-      this.sortColumn = column;
-      this.sortDirection = 'asc';
+  /**
+   * Teilt die Tarife nach ihrer Gueltigkeit auf die drei Panels auf:
+   * aktuelles Jahr = gilt an mindestens einem Tag des Jahres; zukuenftig = beginnt danach;
+   * frueher = endete davor. Die Reihenfolge innerhalb eines Panels ist die vom Server
+   * (Reihenfolge der Rechnung).
+   */
+  gruppiere(tarife: Tarif[]): Record<TarifGruppe, Tarif[]> {
+    const jahresbeginn = `${this.jahr}-01-01`;
+    const jahresende = `${this.jahr}-12-31`;
+    const gruppen: Record<TarifGruppe, Tarif[]> = { zukuenftig: [], aktuell: [], alt: [] };
+    for (const tarif of tarife) {
+      if (tarif.gueltigVon > jahresende) {
+        gruppen.zukuenftig.push(tarif);
+      } else if (tarif.gueltigBis < jahresbeginn) {
+        gruppen.alt.push(tarif);
+      } else {
+        gruppen.aktuell.push(tarif);
+      }
     }
+    return gruppen;
+  }
 
-    this.tarife.sort((a, b) => {
-      let aValue: any = a[column];
-      let bValue: any = b[column];
+  toggleGruppe(gruppe: TarifGruppe): void {
+    this.offen[gruppe] = !this.offen[gruppe];
+  }
 
-      if (aValue === null || aValue === undefined) return 1;
-      if (bValue === null || bValue === undefined) return -1;
+  /** Uebersetzungs-Key des Panel-Titels. */
+  gruppenTitel(gruppe: TarifGruppe): string {
+    return gruppe === 'zukuenftig' ? 'TARIFE_ZUKUENFTIG'
+      : gruppe === 'alt' ? 'TARIFE_ALT' : 'TARIFE_AKTUELLES_JAHR';
+  }
 
-      if (typeof aValue === 'string') {
-        aValue = aValue.toLowerCase();
-        bValue = bValue.toLowerCase();
+  /**
+   * Zeile innerhalb eines Panels verschoben: sofort anzeigen, dann speichern. Gemeldet wird nur
+   * die eine Verschiebung - nach oben "vor" den neuen Nachfolger, nach unten "hinter" den neuen
+   * Vorgaenger. Schlaegt das Speichern fehl, wird neu geladen: Die Liste zeigt dann wieder den
+   * gespeicherten Stand.
+   */
+  onDrop(gruppe: TarifGruppe, event: CdkDragDrop<Tarif[]>): void {
+    if (event.previousIndex === event.currentIndex) {
+      return;
+    }
+    const liste = this.gruppen[gruppe];
+    moveItemInArray(liste, event.previousIndex, event.currentIndex);
+    const tarif = liste[event.currentIndex];
+    const ziel = event.currentIndex < event.previousIndex
+      ? { vor: liste[event.currentIndex + 1].id! }
+      : { nach: liste[event.currentIndex - 1].id! };
+    this.tarifService.verschiebeTarif(tarif.id!, ziel).subscribe({
+      next: () => {
+        this.showMessage('TARIF_REIHENFOLGE_GESPEICHERT', 'success');
+        this.loadTarife();
+      },
+      error: () => {
+        this.showMessage('FEHLER_REIHENFOLGE_TARIF', 'error');
+        this.loadTarife();
       }
-
-      if (aValue < bValue) {
-        return this.sortDirection === 'asc' ? -1 : 1;
-      }
-      if (aValue > bValue) {
-        return this.sortDirection === 'asc' ? 1 : -1;
-      }
-      return 0;
     });
   }
 

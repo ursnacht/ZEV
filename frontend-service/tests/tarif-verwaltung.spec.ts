@@ -1,7 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import {
-    clickKebabMenuItem, loescheZeileMitText, navigateViaMenu, waitForFormResult, waitForTableWithData
-} from './helpers';
+    clickKebabMenuItem, loescheZeileMitText, navigateViaMenu, waitForFormResult, waitForTableWithData, oeffneTarifPanels } from './helpers';
 
 /**
  * tests / tarif-verwaltung.spec.ts
@@ -56,6 +55,7 @@ async function navigateToTarife(page: Page): Promise<void> {
     // Wait for Tarife page to load - use the container's h1, not navbar
     await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
     // Wait for table to load
+    await oeffneTarifPanels(page);
     await waitForTableWithData(page, 10000);
 }
 
@@ -258,13 +258,13 @@ test.describe('Tarif Management - Navigation and Display', () => {
         const createButton = page.locator('button.zev-button--primary').first();
         await expect(createButton).toBeVisible();
 
-        await expect(page.locator('.zev-table')).toBeVisible();
+        await expect(page.locator('.zev-table').first()).toBeVisible();
     });
 
     test('should display tariff table with correct columns', async ({ page }) => {
         await navigateToTarife(page);
 
-        await expect(page.locator('.zev-table')).toBeVisible();
+        await expect(page.locator('.zev-table').first()).toBeVisible();
 
         const headers = page.locator('.zev-table th');
         // Tariftyp, Bezeichnung, Preis, Gueltig von, Gueltig bis, Actions
@@ -290,26 +290,73 @@ test.describe('Tarif Management - Navigation and Display', () => {
     });
 });
 
-test.describe('Tarif Management - Sorting', () => {
-    test('should sort tariffs by clicking on column headers', async ({ page }) => {
+/**
+ * Panels und Reihenfolge (Specs/Tarifverwaltung.md, FR-4): drei Panels nach Gueltigkeit, beim
+ * Aufruf nur das aktuelle Jahr offen; die Reihenfolge aendert sich per Drag & Drop am Griff.
+ */
+test.describe('Tarif Management - Panels und Reihenfolge', () => {
+    test('should open only the panel of the current year', async ({ page }) => {
+        await navigateViaMenu(page, '/tarife');
+        await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
+
+        const koepfe = page.locator('.zev-collapsible__header');
+        await expect(koepfe).toHaveCount(3);
+        await expect(koepfe.nth(0)).toHaveAttribute('aria-expanded', 'false');
+        await expect(koepfe.nth(1)).toHaveAttribute('aria-expanded', 'true');
+        await expect(koepfe.nth(1)).toContainText(String(new Date().getFullYear()));
+        await expect(koepfe.nth(2)).toHaveAttribute('aria-expanded', 'false');
+        // Keine Spaltensortierung mehr: die Reihenfolge ist die der Rechnung
+        await expect(page.locator('.zev-table__header--sortable')).toHaveCount(0);
+    });
+
+    test('should reorder tariffs by drag and drop and keep the order after reload', async ({ page }) => {
         await navigateToTarife(page);
 
-        await expect(page.locator('.zev-table')).toBeVisible();
+        const zeitraum = gueltigkeit(7);
+        const erster = generateTestTarifName('Reihe A');
+        const zweiter = generateTestTarifName('Reihe B');
+        for (const bezeichnung of [erster, zweiter]) {
+            await createTarifOrFail(page, {
+                tariftyp: 'VNB', bezeichnung, preis: '0.10000',
+                gueltigVon: zeitraum.von, gueltigBis: zeitraum.bis
+            });
+        }
 
-        const rows = page.locator('.zev-table tbody tr');
-        await expect.poll(() => rows.count(),
-            { message: 'Fuer den Sortier-Test werden mindestens zwei Tarife benoetigt' })
-            .toBeGreaterThan(1);
+        const panel = page.locator('#tarife-zukuenftig');
+        const zeileA = panel.locator(`tr:has-text("${erster}")`);
+        const zeileB = panel.locator(`tr:has-text("${zweiter}")`);
+        // Neu angelegt: B hinter A (hinter dem letzten Tarif desselben Typs)
+        expect((await zeileA.boundingBox())!.y).toBeLessThan((await zeileB.boundingBox())!.y);
 
-        const tariftypHeader = page.locator('th').filter({ hasText: /Tariftyp/i }).first();
-        await tariftypHeader.click();
+        // B am Griff ueber A ziehen. Zuerst ins Bild scrollen (sonst stimmen die Koordinaten
+        // nicht), dann die Startschwelle des CDK (5 px) ueberschreiten, dann in Schritten zum Ziel -
+        // Firefox erkannte den Zug sonst nicht immer.
+        const griff = zeileB.locator('.zev-table__griff');
+        await griff.scrollIntoViewIfNeeded();
+        const von = (await griff.boundingBox())!;
+        const ziel = (await zeileA.boundingBox())!;
+        const x = von.x + von.width / 2;
 
-        const sortIndicator = page.locator('.zev-table__sort-indicator');
-        await expect(sortIndicator.first()).toBeVisible();
+        // Bestaetigt wird ueber den Request, nicht ueber "irgendeine Erfolgsmeldung": Die Meldung
+        // vom Anlegen des zweiten Tarifs steht noch 5 Sekunden und haette einen ausgebliebenen Zug
+        // verdeckt.
+        const gespeichert = page.waitForResponse(r =>
+            r.url().includes('/verschieben') && r.request().method() === 'PUT',
+            { timeout: 15000 });
+        await page.mouse.move(x, von.y + von.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(x, von.y + von.height / 2 - 10, { steps: 5 });
+        await page.mouse.move(x, ziel.y + 2, { steps: 20 });
+        await page.mouse.up();
 
-        // Erneuter Klick dreht die Richtung um
-        await tariftypHeader.click();
-        await expect(sortIndicator.first()).toBeVisible();
+        expect((await gespeichert).status(), 'Reihenfolge muss gespeichert werden').toBe(204);
+
+        // Nach dem Neuladen der Seite bleibt die neue Reihenfolge
+        await navigateToTarife(page);
+        const neuA = page.locator('#tarife-zukuenftig').locator(`tr:has-text("${erster}")`);
+        const neuB = page.locator('#tarife-zukuenftig').locator(`tr:has-text("${zweiter}")`);
+        await expect(neuB).toBeVisible();
+        expect((await neuB.boundingBox())!.y).toBeLessThan((await neuA.boundingBox())!.y);
     });
 });
 

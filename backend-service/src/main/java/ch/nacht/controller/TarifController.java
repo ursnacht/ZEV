@@ -83,6 +83,28 @@ public class TarifController {
         }
     }
 
+    /**
+     * Verschiebt einen Tarif direkt vor oder hinter einen anderen (Specs/Tarifverwaltung.md, FR-4).
+     *
+     * @param id   Tarif, der verschoben wird
+     * @param vor  Ziel: direkt vor diesen Tarif
+     * @param nach Ziel: direkt hinter diesen Tarif
+     * @return 204, oder 400 ohne bzw. mit zwei Zielen und bei unbekanntem Tarif oder Ziel
+     */
+    @PutMapping("/{id}/verschieben")
+    public ResponseEntity<?> verschiebe(@PathVariable Long id,
+                                        @RequestParam(required = false) Long vor,
+                                        @RequestParam(required = false) Long nach) {
+        log.info("Moving tarif {} (vor={}, nach={})", id, vor, nach);
+        try {
+            tarifService.verschiebe(id, vor, nach);
+            return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException e) {
+            log.warn("Failed to move tarif {}: {}", id, e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTarif(@PathVariable Long id) {
         log.info("Deleting tarif with id: {}", id);

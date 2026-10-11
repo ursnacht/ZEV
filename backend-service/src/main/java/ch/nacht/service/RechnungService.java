@@ -263,6 +263,7 @@ public class RechnungService {
         rechnung.setStellerStrasse(steller.getStrasse());
         rechnung.setStellerPlzOrt(steller.getPlz() + " " + steller.getOrt());
 
+        sortiereZeilen(rechnung);
         return rechnung;
     }
 
@@ -304,6 +305,7 @@ public class RechnungService {
         rechnung.setStellerStrasse(steller.getStrasse());
         rechnung.setStellerPlzOrt(steller.getPlz() + " " + steller.getOrt());
 
+        sortiereZeilen(rechnung);
         return rechnung;
     }
 
@@ -314,6 +316,24 @@ public class RechnungService {
      * @param mieter Tenant
      * @return true if a CONSUMER unit is assigned to the tenant
      */
+    /** Traegt die Reihenfolge des Tarifs in die Zeile ein (Sortierung in {@link #sortiereZeilen}). */
+    private TarifZeileDTO mitReihenfolge(Tarif tarif, TarifZeileDTO zeile) {
+        zeile.setReihenfolge(tarif.getReihenfolge());
+        return zeile;
+    }
+
+    /**
+     * Ordnet die Zeilen nach der Reihenfolge ihres Tarifs (Specs/Tarifverwaltung.md, FR-4), ueber
+     * alle Tariftypen; Zeilen desselben Tarifs (z.B. zwei Tarifpositionen) nach Beginn. Stabil:
+     * Bei gleicher Reihenfolge bleibt die Reihenfolge der Berechnung erhalten.
+     */
+    private void sortiereZeilen(RechnungDTO rechnung) {
+        rechnung.getTarifZeilen().sort(java.util.Comparator
+                .comparingInt(TarifZeileDTO::getReihenfolge)
+                .thenComparing(TarifZeileDTO::getVon,
+                        java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())));
+    }
+
     private boolean hatWohnung(Mieter mieter) {
         return mieterService.getEinheitIds(mieter.getId()).stream()
                 .map(einheitRepository::findFirstById)
@@ -366,6 +386,7 @@ public class RechnungService {
         rechnung.setStellerStrasse(steller.getStrasse());
         rechnung.setStellerPlzOrt(steller.getPlz() + " " + steller.getOrt());
 
+        sortiereZeilen(rechnung);
         return rechnung;
     }
 
@@ -411,7 +432,7 @@ public class RechnungService {
 
             LocalDate[] zeitraum = zeitraumDerPositionszeile(position);
 
-            rechnung.addTarifZeile(new TarifZeileDTO(
+            rechnung.addTarifZeile(mitReihenfolge(position.getTarif(), new TarifZeileDTO(
                     bezeichnungMitQuellReferenz(position),
                     zeitraum[0],
                     zeitraum[1],
@@ -422,7 +443,7 @@ public class RechnungService {
                     // Bei ZUSATZ steht die Einheit am Tarif, sonst folgt sie aus dem Typ -
                     // sonst stuende auf der Rechnung "3 kWh" fuer drei Monate Gaestezimmer.
                     position.getTarif().effektiveMengeneinheit()
-            ));
+            )));
             total = total.add(betrag);
 
             log.debug("Tarifposition line (Q{}/{}): {} * {} = {} CHF",
@@ -508,7 +529,7 @@ public class RechnungService {
             BigDecimal menge = BigDecimal.valueOf(anzahl);
             BigDecimal betrag = menge.multiply(preis);
 
-            rechnung.addTarifZeile(new TarifZeileDTO(
+            rechnung.addTarifZeile(mitReihenfolge(tarif, new TarifZeileDTO(
                     tarif.getBezeichnung(),
                     effVon,
                     effBis,
@@ -517,7 +538,7 @@ public class RechnungService {
                     betrag,
                     TarifTyp.GRUNDGEBUEHR,
                     proTag ? Mengeneinheit.TAG.name() : Mengeneinheit.MONAT.name()
-            ));
+            )));
             total = total.add(betrag);
 
             log.debug("GRUNDGEBUEHR line ({} to {}): {} {} * {} = {} CHF",
@@ -610,7 +631,7 @@ public class RechnungService {
                 typ,
                 "KWH"
             );
-            rechnung.addTarifZeile(zeile);
+            rechnung.addTarifZeile(mitReihenfolge(tarif, zeile));
             totalBetrag = totalBetrag.add(betrag);
 
             log.debug("{} line ({} to {}): {} kWh * {} = {} CHF",

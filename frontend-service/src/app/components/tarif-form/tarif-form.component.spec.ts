@@ -33,7 +33,8 @@ describe('TarifFormComponent', () => {
     it('should initialize with default form data when no tarif input', () => {
       expect(component.formData.bezeichnung).toBe('');
       expect(component.formData.tariftyp).toBe(TarifTyp.ZEV);
-      expect(component.formData.preis).toBe(0);
+      // Leer statt 0 - ein vergessener Preis darf nicht als Gratis-Tarif durchgehen
+      expect(component.formData.preis).toBeNull();
     });
 
     it('should set default dates to current year', () => {
@@ -324,11 +325,22 @@ describe('TarifFormComponent', () => {
       expect(component.isFormValid()).toBe(false);
     });
 
-    it('should return false when preis is zero', () => {
+    it('should return true when preis is zero (free service)', () => {
       component.formData = {
         bezeichnung: 'Test',
         tariftyp: TarifTyp.ZEV,
         preis: 0,
+        gueltigVon: '2024-01-01',
+        gueltigBis: '2024-12-31'
+      };
+      expect(component.isFormValid()).toBe(true);
+    });
+
+    it('should return false when preis is empty', () => {
+      component.formData = {
+        bezeichnung: 'Test',
+        tariftyp: TarifTyp.ZEV,
+        preis: null as unknown as number,
         gueltigVon: '2024-01-01',
         gueltigBis: '2024-12-31'
       };

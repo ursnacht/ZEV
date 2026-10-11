@@ -25,6 +25,13 @@ public class TarifZeileDTO {
     private TarifTyp typ;
     private String mengeneinheit; // "kWh" for ZEV/VNB, "Monate" for GRUNDGEBUEHR
 
+    /**
+     * Reihenfolge des Tarifs dieser Zeile (Specs/Tarifverwaltung.md, FR-4) - nur zum Sortieren
+     * der Zeilen im {@code RechnungService}, nicht Teil der API.
+     */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private int reihenfolge;
+
     public TarifZeileDTO() {
     }
 
@@ -72,6 +79,14 @@ public class TarifZeileDTO {
 
     public void setBis(LocalDate bis) {
         this.bis = bis;
+    }
+
+    public int getReihenfolge() {
+        return reihenfolge;
+    }
+
+    public void setReihenfolge(int reihenfolge) {
+        this.reihenfolge = reihenfolge;
     }
 
     public BigDecimal getMenge() {

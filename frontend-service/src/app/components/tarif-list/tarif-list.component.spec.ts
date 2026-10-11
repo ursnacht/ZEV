@@ -34,7 +34,8 @@ describe('TarifListComponent', () => {
 
   beforeEach(async () => {
     tarifServiceSpy = createSpyObj<TarifService>('TarifService', [
-      'getAllTarife', 'createTarif', 'updateTarif', 'deleteTarif', 'validateQuartale', 'validateJahre'
+      'getAllTarife', 'createTarif', 'updateTarif', 'deleteTarif', 'validateQuartale', 'validateJahre',
+      'verschiebeTarif'
     ]);
     translationServiceSpy = createSpyObj<TranslationService>('TranslationService', ['translate']);
 
@@ -68,9 +69,8 @@ describe('TarifListComponent', () => {
       expect(component.showForm).toBe(false);
     });
 
-    it('should have default sort by tariftyp ascending', () => {
-      expect(component.sortColumn).toBe('tariftyp');
-      expect(component.sortDirection).toBe('asc');
+    it('should open only the panel of the current year', () => {
+      expect(component.offen).toEqual({ zukuenftig: false, aktuell: true, alt: false });
     });
 
     it('should have menu items for edit, copy and delete', () => {
@@ -300,37 +300,101 @@ describe('TarifListComponent', () => {
     });
   });
 
-  describe('onSort', () => {
+  describe('gruppiere', () => {
+    const jahr = new Date().getFullYear();
+    const t = (id: number, von: string, bis: string): Tarif => ({
+      id, bezeichnung: 'T' + id, tariftyp: TarifTyp.VNB, preis: 0.1, gueltigVon: von, gueltigBis: bis
+    });
+
+    it('should assign tariffs by validity to future, current and past', () => {
+      const gruppen = component.gruppiere([
+        t(1, `${jahr + 1}-01-01`, `${jahr + 1}-12-31`),
+        t(2, `${jahr}-04-01`, `${jahr}-06-30`),
+        t(3, `${jahr - 1}-01-01`, `${jahr - 1}-12-31`)
+      ]);
+      expect(gruppen.zukuenftig.map(x => x.id)).toEqual([1]);
+      expect(gruppen.aktuell.map(x => x.id)).toEqual([2]);
+      expect(gruppen.alt.map(x => x.id)).toEqual([3]);
+    });
+
+    it('should put a tariff spanning into the current year into the current panel', () => {
+      // 01.10. Vorjahr bis 31.12. dieses Jahres: gilt heute noch
+      const gruppen = component.gruppiere([t(4, `${jahr - 1}-10-01`, `${jahr}-12-31`)]);
+      expect(gruppen.aktuell.map(x => x.id)).toEqual([4]);
+    });
+
+    it('should treat the year boundaries as part of the current year', () => {
+      const gruppen = component.gruppiere([
+        t(5, `${jahr - 1}-01-01`, `${jahr}-01-01`),   // endet am 1. Januar
+        t(6, `${jahr}-12-31`, `${jahr + 1}-12-31`)     // beginnt am 31. Dezember
+      ]);
+      expect(gruppen.aktuell.map(x => x.id)).toEqual([5, 6]);
+    });
+
+    it('should keep the server order within a panel', () => {
+      const gruppen = component.gruppiere([
+        t(9, `${jahr}-01-01`, `${jahr}-12-31`),
+        t(7, `${jahr}-01-01`, `${jahr}-12-31`)
+      ]);
+      expect(gruppen.aktuell.map(x => x.id)).toEqual([9, 7]);
+    });
+  });
+
+  describe('toggleGruppe', () => {
+    it('should open and close a panel', () => {
+      component.toggleGruppe('zukuenftig');
+      expect(component.offen.zukuenftig).toBe(true);
+      component.toggleGruppe('zukuenftig');
+      expect(component.offen.zukuenftig).toBe(false);
+    });
+  });
+
+  describe('onDrop', () => {
+    const jahr = new Date().getFullYear();
+    const aktuelle: Tarif[] = [1, 2, 3].map(id => ({
+      id, bezeichnung: 'T' + id, tariftyp: TarifTyp.VNB, preis: 0.1,
+      gueltigVon: `${jahr}-01-01`, gueltigBis: `${jahr}-12-31`
+    }));
+
     beforeEach(() => {
-      component.tarife = [...mockTarife];
+      component.gruppen = { zukuenftig: [], aktuell: [...aktuelle], alt: [] };
+      tarifServiceSpy.getAllTarife.mockClear();
     });
 
-    it('should toggle sort direction when clicking same column', () => {
-      component.sortColumn = 'bezeichnung';
-      component.sortDirection = 'asc';
-      component.onSort('bezeichnung');
-      expect(component.sortDirection).toBe('desc');
+    it('should move a tariff up before its new successor and reload', () => {
+      tarifServiceSpy.verschiebeTarif.mockReturnValue(of(void 0));
+
+      component.onDrop('aktuell', { previousIndex: 2, currentIndex: 0 } as any);
+
+      // 3 steht jetzt vor 1 (die Liste selbst ist danach neu geladen)
+      expect(tarifServiceSpy.verschiebeTarif).toHaveBeenCalledWith(3, { vor: 1 });
+      expect(component.messageType).toBe('success');
+      expect(component.message).toBe('TARIF_REIHENFOLGE_GESPEICHERT');
+      expect(tarifServiceSpy.getAllTarife).toHaveBeenCalled();
     });
 
-    it('should set new column and reset direction to asc', () => {
-      component.sortColumn = 'bezeichnung';
-      component.sortDirection = 'desc';
-      component.onSort('preis');
-      expect(component.sortColumn).toBe('preis');
-      expect(component.sortDirection).toBe('asc');
+    it('should move a tariff down behind its new predecessor', () => {
+      tarifServiceSpy.verschiebeTarif.mockReturnValue(of(void 0));
+
+      component.onDrop('aktuell', { previousIndex: 0, currentIndex: 1 } as any);
+
+      // 1 steht jetzt hinter 2
+      expect(tarifServiceSpy.verschiebeTarif).toHaveBeenCalledWith(1, { nach: 2 });
     });
 
-    it('should sort tarife by bezeichnung ascending', () => {
-      component.onSort('bezeichnung');
-      expect(component.tarife[0].bezeichnung).toBe('VNB Tarif');
-      expect(component.tarife[1].bezeichnung).toBe('ZEV Tarif');
+    it('should do nothing when dropped at the same place', () => {
+      component.onDrop('aktuell', { previousIndex: 1, currentIndex: 1 } as any);
+      expect(tarifServiceSpy.verschiebeTarif).not.toHaveBeenCalled();
     });
 
-    it('should sort tarife by preis descending', () => {
-      component.sortColumn = 'preis';
-      component.onSort('preis');
-      expect(component.tarife[0].preis).toBe(0.342);
-      expect(component.tarife[1].preis).toBe(0.195);
+    it('should show an error and reload the saved order on failure', () => {
+      tarifServiceSpy.verschiebeTarif.mockReturnValue(throwError(() => ({ status: 400 })));
+
+      component.onDrop('aktuell', { previousIndex: 0, currentIndex: 2 } as any);
+
+      expect(component.messageType).toBe('error');
+      expect(component.message).toBe('FEHLER_REIHENFOLGE_TARIF');
+      expect(tarifServiceSpy.getAllTarife).toHaveBeenCalled();
     });
   });
 

@@ -428,7 +428,7 @@ test.describe('Preiszeitreihe - Feature-Flag', () => {
             await navigateViaMenu(page, '/tarife');
             await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
 
-            await expect(page.locator('.zev-table')).toBeVisible({ timeout: 15000 });
+            await expect(page.locator('.zev-table').first()).toBeVisible({ timeout: 15000 });
             await expect(page.locator(PANEL)).toHaveCount(0);
         } finally {
             await setzeFlag(page, true);

@@ -57,8 +57,8 @@
         <!-- Bezugsgroesse haengt am Tariftyp bzw. der gewaehlten Mengeneinheit -->
         <label for="preis">{{ 'PREIS' | translate }} (CHF@if (preisEinheit) {/{{ preisEinheit | translate }}}):</label>
         <input type="number" id="preis" class="zev-input" [(ngModel)]="formData.preis" name="preis"
-          required min="0.00001" step="0.00001" placeholder="0.20000" />
-          @if (formData.preis <= 0) {
+          required min="0" step="0.00001" placeholder="0.20000" />
+          @if (formData.preis == null || formData.preis < 0) {
             <div class="zev-form-error">
               {{ 'PREIS_IST_ERFORDERLICH' | translate }}
             </div>

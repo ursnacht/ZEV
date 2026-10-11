@@ -311,7 +311,9 @@ export async function waitForFormResult(page: Page, timeout: number = 15000): Pr
  * Wait for table to be visible and have data
  */
 export async function waitForTableWithData(page: Page, timeout: number = 10000): Promise<boolean> {
-    const table = page.locator('.zev-table');
+    // .first(): Seiten mit mehreren Tabellen (Tarifverwaltung: ein Panel je Zeitraum) verletzten
+    // sonst den Strict Mode - waitFor warf, und der Helfer lieferte still false, ohne zu warten.
+    const table = page.locator('.zev-table').first();
     try {
         await table.waitFor({ state: 'visible', timeout });
         // Wait for at least one row
@@ -466,4 +468,18 @@ export async function klappeMonateAuf(page: Page, anzahl: number = 1): Promise<n
         await expect(knopf).toHaveAttribute('aria-expanded', 'true');
     }
     return zuOeffnen;
+}
+
+/**
+ * Klappt in der Tarifverwaltung alle Panels auf (Specs/Tarifverwaltung.md, FR-4). Beim Aufruf
+ * ist nur das aktuelle Jahr offen - die Tarife der E2E-Tests liegen aber in fernen Zukunftsjahren
+ * und waeren sonst unsichtbar. Ohne Tarife gibt es keine Panels; dann kehrt der Helfer zurueck.
+ */
+export async function oeffneTarifPanels(page: Page): Promise<void> {
+    const kopf = page.locator('.zev-collapsible__header');
+    await kopf.first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => undefined);
+    const zu = page.locator('.zev-collapsible__header[aria-expanded="false"]');
+    for (let i = 0; i < 3 && (await zu.count()) > 0; i++) {
+        await zu.first().click();
+    }
 }

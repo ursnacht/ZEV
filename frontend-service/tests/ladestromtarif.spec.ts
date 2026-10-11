@@ -1,8 +1,7 @@
 import { test, expect, Locator, Page } from '@playwright/test';
 import {
     E2E_MIETENDE, clickKebabMenuItem, loescheZeileMitText, navigateViaMenu, openKebabMenu,
-    raeumeMitWiederholung, waitForFormResult, waitForTableWithData
-} from './helpers';
+    raeumeMitWiederholung, waitForFormResult, waitForTableWithData, oeffneTarifPanels } from './helpers';
 
 /**
  * tests / ladestromtarif.spec.ts
@@ -67,6 +66,7 @@ let einheitenMitPositionen: string[] = [];
 async function navigateToTarife(page: Page): Promise<void> {
     await navigateViaMenu(page, '/tarife');
     await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
+    await oeffneTarifPanels(page);
     await waitForTableWithData(page, 10000);
 }
 

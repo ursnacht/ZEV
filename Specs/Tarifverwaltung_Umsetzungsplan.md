@@ -487,3 +487,17 @@ Keine Migration, keine neuen Übersetzungen: Die Fehlermeldung kommt wie bisher 
 |  [x]   | 3. Backend-Service | `TarifService.pruefeMengeneinheit`: Grundgebühr ohne Angabe → MONAT, nur MONAT/TAG zulässig. `RechnungService.berechneGrundgebuehrZeilen`: TAG = Tage im Teilzeitraum (inkl.), MONAT = volle Monate. `TarifpositionService.pruefeTariftypZuEinheit` prüft ausdrücklich auf ZUSATZ statt auf `EIGENE_MENGENEINHEIT` (sonst ginge die Grundgebühr dort als Zusatz-Tarif durch). `NkRechnungService`: Zuordnung `TAG` → `TAGE` vervollständigt |
 |  [x]   | 4. Frontend | `tarif.model.ts`: `Mengeneinheit.TAG`, `waehlbareMengeneinheiten(typ)`, Grundgebühr in `TARIFTYPEN_MIT_MENGENEINHEIT`; `tarif-form`: Optionen je Typ, Vorbelegung Monat, eigener Hinweis |
 |  [x]   | 5. Tests | `TarifServiceTest` (ohne Angabe → Monat, Tag, Stück abgewiesen), `RechnungServiceTest` (92 Tage, 46 Tage ab 16.08., Monat ab 16.08. = 1), `tarif-form.component.spec.ts`, `tarif-list.component.spec.ts` |
+
+---
+
+## Ergänzung 11.10.2026: Reihenfolge der Tarife und Panels (Spec FR-4)
+
+| Status | Phase | Beschreibung |
+|--------|-------|--------------|
+|  [x]   | 1. DB-Migration | `V178__Tarif_Reihenfolge.sql`: Spalte `reihenfolge` mit Startwert = bisherige Rechnungsreihenfolge, NOT NULL, Kommentar, Übersetzungen |
+|  [x]   | 2. Backend-Entity/Repository | `Tarif.reihenfolge`; `TarifRepository`: `findAllByOrderByReihenfolgeAscIdAsc`, `findMaxReihenfolgeByTariftyp`, `findMaxReihenfolge`, `verschiebeReihenfolgeAb` und `verschiebeReihenfolgeBereich` (Bulk-Updates mit ausdrücklicher `org_id`, weil der Hibernate-Filter dort nicht greift) |
+|  [x]   | 3. Backend-Service/Controller | `TarifService.saveTarif`: neuer Tarif hinter den letzten seines Typs, Update behält den Platz; `verschiebe(id, vor, nach)`; `PUT /api/tarife/{id}/verschieben?vor=|nach=` (nur die eine Verschiebung — eine erste Fassung schickte die ganze Panel-Reihenfolge, gleichzeitige Sitzungen überschrieben sich damit) |
+|  [x]   | 4. Rechnung | `TarifZeileDTO.reihenfolge` (`@JsonIgnore`); `RechnungService.sortiereZeilen` vor jeder Rückgabe |
+|  [x]   | 5. Design System | `components/sortable/sortable.css` |
+|  [x]   | 6. Frontend | `tarif-list`: drei Panels (nur aktuelles Jahr offen), je eine `cdkDropList`, Griff-Spalte; Spaltensortierung entfernt; `tarif.service.verschiebeTarif` |
+|  [x]   | 7. Tests | `TarifServiceTest`, `RechnungServiceTest`, `TarifControllerTest`, `TarifRepositoryIT`; `tarif-list.component.spec.ts`, `tarif.service.spec.ts`; E2E: `oeffneTarifPanels` in `helpers.ts` (Testtarife liegen im zugeklappten Panel „Zukünftige Tarife"), `waitForTableWithData` mit `.first()`, neuer Panel- und Drag-&-Drop-Test in `tarif-verwaltung.spec.ts` |

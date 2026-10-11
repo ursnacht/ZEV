@@ -1,0 +1,36 @@
+/**
+ * Sortierbare Tabellenzeilen (Drag & Drop mit Angular CDK, `cdkDropList`/`cdkDrag`).
+ *
+ * Erster Einsatz: Reihenfolge der Tarife (Specs/Tarifverwaltung.md, FR-4). Die Nebenkosten-Maske
+ * hatte dieselben Regeln noch komponentenlokal - die CDK-Klassen (`cdk-drag-preview`) haengt
+ * Angular aber an den <body>, wo komponentenlokale Styles nicht hinreichen. Deshalb global hier.
+ */
+
+/* Griff-Zelle: schmale Spalte mit dem Zieh-Symbol */
+.zev-table__griff {
+  width: 2.5rem;
+  text-align: center;
+  color: var(--color-gray-500, #6b7280);
+  cursor: grab;
+}
+
+.zev-table__griff:active {
+  cursor: grabbing;
+}
+
+/* Die gezogene Zeile: schwebend ueber der Tabelle */
+.cdk-drag-preview {
+  box-shadow: var(--shadow-md);
+  background-color: var(--color-white, #ffffff);
+  opacity: 0.9;
+}
+
+/* Der freie Platz, an dem die Zeile landen wird */
+.cdk-drag-placeholder {
+  opacity: 0.4;
+}
+
+/* Die uebrigen Zeilen weichen weich aus */
+.cdk-drop-list-dragging .cdk-drag:not(.cdk-drag-placeholder) {
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}

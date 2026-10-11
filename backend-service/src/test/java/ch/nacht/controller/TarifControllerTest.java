@@ -311,4 +311,42 @@ public class TarifControllerTest {
             .andExpect(jsonPath("$.valid", is(true)))
             .andExpect(jsonPath("$.luecken", hasSize(0)));
     }
+
+    @Test
+    void verschiebe_VorZiel_ReturnsNoContent() throws Exception {
+        mockMvc.perform(put("/api/tarife/3/verschieben").param("vor", "1"))
+            .andExpect(status().isNoContent());
+
+        verify(tarifService).verschiebe(3L, 1L, null);
+    }
+
+    @Test
+    void verschiebe_NachZiel_ReturnsNoContent() throws Exception {
+        mockMvc.perform(put("/api/tarife/3/verschieben").param("nach", "5"))
+            .andExpect(status().isNoContent());
+
+        verify(tarifService).verschiebe(3L, null, 5L);
+    }
+
+    @Test
+    void verschiebe_UnbekannterTarif_ReturnsBadRequest() throws Exception {
+        doThrow(new IllegalArgumentException("Unbekannter Tarif"))
+            .when(tarifService).verschiebe(any(), any(), any());
+
+        mockMvc.perform(put("/api/tarife/999/verschieben").param("vor", "1"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createTarif_PreisNull_ReturnsCreated() throws Exception {
+        // Kostenlose Leistung (Specs/Tarifverwaltung.md, FR-5)
+        Tarif gratis = new Tarif("Grundgebühr Ladestation", TarifTyp.ZUSATZ, BigDecimal.ZERO,
+            LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        when(tarifService.saveTarif(any(Tarif.class))).thenReturn(gratis);
+
+        mockMvc.perform(post("/api/tarife")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(gratis)))
+            .andExpect(status().isCreated());
+    }
 }

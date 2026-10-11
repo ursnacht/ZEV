@@ -1,7 +1,6 @@
 import { test as baseTest, expect, Locator, Page } from '@playwright/test';
 import {
-    getPreviousQuarter, loescheZeileMitText, navigateViaMenu, waitForFormResult, waitForTableWithData
-} from './helpers';
+    getPreviousQuarter, loescheZeileMitText, navigateViaMenu, waitForFormResult, waitForTableWithData, oeffneTarifPanels } from './helpers';
 
 /**
  * tests / rechnungen.spec.ts
@@ -85,6 +84,7 @@ async function navigateToRechnungen(page: Page): Promise<void> {
 async function navigateToTarife(page: Page): Promise<void> {
     await navigateViaMenu(page, '/tarife');
     await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
+    await oeffneTarifPanels(page);
     await waitForTableWithData(page, 10000);
 }
 
