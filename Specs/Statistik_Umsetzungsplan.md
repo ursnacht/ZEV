@@ -597,3 +597,14 @@ ein Collapsible; beim Laden sind alle zugeklappt.
 |  [x]   | 4. Übersetzungen | `V177__Add_Ladeanzeige_Translations.sql`: `STATISTIK_WIRD_BERECHNET`, `RECHNUNGEN_WERDEN_GENERIERT` |
 |  [x]   | 5. Showcase | Abschnitt „Ladeanzeige" im Design-System-Showcase |
 |  [x]   | 6. Tests | `loading-indicator.component.spec.ts`; je ein Test in `statistik.component.spec.ts` und `rechnungen.component.spec.ts` |
+
+---
+
+## Ergänzung 13.10.2026: Blättern des Zeitraums
+
+| Status | Phase | Beschreibung |
+|--------|-------|--------------|
+|  [x]   | 1. Utility | `blaettereZeitraum(von, bis, richtung)` in `utils/date-utils.ts`: Tag / ganze Monate / Anzahl Tage, lokale Kalenderdaten |
+|  [x]   | 2. Komponente | `statistik.component`: `onBlaettern(richtung)` (setzt Daten, lädt sofort), `kannBlaettern`; zwei Schaltflächen vor „Heute" (`zev-button--secondary`, kein neues CSS) |
+|  [x]   | 3. Übersetzungen | `V181__Add_Statistik_Blaettern_Translations.sql`: `ZEITRAUM_ZURUECK`, `ZEITRAUM_VOR` |
+|  [x]   | 4. Tests | `date-utils.spec.ts` (Tag, Monat inkl. Schaltjahr, Quartal, Jahr, Tage, Zeitumstellung, ungültig), `statistik.component.spec.ts` |

@@ -297,10 +297,10 @@ test.describe('Statistik Page - Heute', () => {
         await navigateToStatistik(page);
 
         const knoepfe = page.locator('form .zev-button-group button');
-        const heute = knoepfe.first();
-        // Position: erster Knopf der Gruppe, direkt vor "Anzeigen"
+        const heute = knoepfe.nth(2);
+        // Position: nach den beiden Blaettern-Knoepfen, direkt vor "Anzeigen"
         await expect(heute.locator('app-icon[name="calendar"]')).toHaveCount(1);
-        await expect(knoepfe.nth(1)).toHaveAttribute('type', 'submit');
+        await expect(knoepfe.nth(3)).toHaveAttribute('type', 'submit');
 
         await heute.click();
 
@@ -318,5 +318,37 @@ test.describe('Statistik Page - Heute', () => {
 
         // Ein zweiter Klick waere folgenlos - die Schaltflaeche ist deaktiviert
         await expect(heute).toBeDisabled();
+    });
+});
+
+/**
+ * Blaettern des Zeitraums (Specs/Statistik.md, FR „Blaettern"): um die Laenge des Zeitraums,
+ * ganze Monate monatsweise mit angepasstem Monatsende - und es wird sofort geladen.
+ */
+test.describe('Statistik Page - Blaettern', () => {
+    test('should page a whole month and load immediately', async ({ page }) => {
+        await navigateToStatistik(page);
+
+        await page.locator('#dateFrom').fill('2026-09-01');
+        await page.locator('#dateTo').fill('2026-09-30');
+
+        await page.locator('#zeitraumVor').click();
+
+        await expect(page.locator('#dateFrom')).toHaveValue('2026-10-01');
+        await expect(page.locator('#dateTo')).toHaveValue('2026-10-31');
+        // Sofort geladen: das Gesamt-Panel erscheint ohne Klick auf "Anzeigen"
+        await expect(page.locator('.zev-collapsible__header[aria-controls="gesamt"]')).toBeVisible({ timeout: 60000 });
+    });
+
+    test('should page a single day backwards', async ({ page }) => {
+        await navigateToStatistik(page);
+
+        await page.locator('#dateFrom').fill('2026-10-01');
+        await page.locator('#dateTo').fill('2026-10-01');
+
+        await page.locator('#zeitraumZurueck').click();
+
+        await expect(page.locator('#dateFrom')).toHaveValue('2026-09-30');
+        await expect(page.locator('#dateTo')).toHaveValue('2026-09-30');
     });
 });

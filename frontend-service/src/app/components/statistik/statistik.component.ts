@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { blaettereZeitraum } from '../../utils/date-utils';
 import { LoadingIndicatorComponent } from '../loading-indicator/loading-indicator.component';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -123,6 +124,26 @@ export class StatistikComponent extends WithMessage implements OnInit {
     const heute = this.formatDate(new Date());
     this.dateFrom = heute;
     this.dateTo = heute;
+  }
+
+  /**
+   * Blättert den Zeitraum um seine eigene Länge (Specs/Statistik.md, FR „Blättern") und lädt
+   * sofort — anders als „Heute" und der Quartal-Selektor: Blättern ohne Ergebnis hiesse, jedes Mal
+   * zusätzlich „Anzeigen" zu klicken.
+   */
+  onBlaettern(richtung: 1 | -1): void {
+    if (!this.kannBlaettern) {
+      return;
+    }
+    const neu = blaettereZeitraum(this.dateFrom, this.dateTo, richtung);
+    this.dateFrom = neu.von;
+    this.dateTo = neu.bis;
+    this.onSubmit();
+  }
+
+  /** Blättern nur mit gültigem Zeitraum und nicht während eines Ladevorgangs. */
+  get kannBlaettern(): boolean {
+    return !this.loading && !!this.dateFrom && !!this.dateTo && this.dateFrom <= this.dateTo;
   }
 
   /** Ist der Zeitraum bereits heute–heute? Dann wäre „Heute" folgenlos und ist deaktiviert. */

@@ -31,6 +31,17 @@
             </div>
 
             <div class="zev-button-group">
+              <!-- Blättern um die Länge des Zeitraums: Tag, ganze Monate oder Anzahl Tage -->
+              <button type="button" id="zeitraumZurueck" class="zev-button zev-button--secondary" (click)="onBlaettern(-1)"
+                [disabled]="!kannBlaettern" [attr.aria-label]="'ZEITRAUM_ZURUECK' | translate"
+                [title]="'ZEITRAUM_ZURUECK' | translate">
+                <app-icon name="chevron-left"></app-icon>
+              </button>
+              <button type="button" id="zeitraumVor" class="zev-button zev-button--secondary" (click)="onBlaettern(1)"
+                [disabled]="!kannBlaettern" [attr.aria-label]="'ZEITRAUM_VOR' | translate"
+                [title]="'ZEITRAUM_VOR' | translate">
+                <app-icon name="chevron-right"></app-icon>
+              </button>
               <button type="button" class="zev-button zev-button--secondary" (click)="onHeute()"
                 [disabled]="loading || zeigtHeute">
                 <app-icon name="calendar"></app-icon>

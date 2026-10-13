@@ -129,3 +129,57 @@ export function formatSwissDateTime(date: Date | string | null | undefined,
   return `${zwei(wert.getDate())}.${zwei(wert.getMonth() + 1)}.${wert.getFullYear()} `
     + `${zwei(wert.getHours())}:${zwei(wert.getMinutes())}`;
 }
+
+/**
+ * Blättert einen Zeitraum um seine eigene Länge vor oder zurück (Specs/Statistik.md, FR „Blättern"):
+ *
+ * - **von = bis:** um einen Tag.
+ * - **Ganze Monate** (von = 1. eines Monats, bis = letzter Tag eines Monats): um ihre Anzahl Monate;
+ *   das Monatsende wird angepasst (Februar → 28./29., April → 30.). Ein Monat, ein Quartal, ein Jahr.
+ * - **sonst:** um die Anzahl Tage (01.–07. → 08.–14.).
+ *
+ * Rechnet mit lokalen Kalenderdaten, nicht mit `toISOString()` (UTC) — sonst verschöbe die
+ * Sommerzeit den Tag.
+ *
+ * @param von ISO-Datum (yyyy-MM-dd)
+ * @param bis ISO-Datum (yyyy-MM-dd), nicht vor `von`
+ * @param richtung 1 = vor, -1 = zurück
+ * @returns neuer Zeitraum; bei ungültiger Eingabe unverändert
+ */
+export function blaettereZeitraum(von: string, bis: string, richtung: 1 | -1): { von: string; bis: string } {
+  const start = isoZuDatum(von);
+  const ende = isoZuDatum(bis);
+  if (!start || !ende || start > ende) {
+    return { von, bis };
+  }
+
+  if (von === bis) {
+    return { von: datumZuIso(plusTage(start, richtung)), bis: datumZuIso(plusTage(ende, richtung)) };
+  }
+
+  const ganzeMonate = start.getDate() === 1 && plusTage(ende, 1).getDate() === 1;
+  if (ganzeMonate) {
+    const monate = (ende.getFullYear() - start.getFullYear()) * 12 + (ende.getMonth() - start.getMonth()) + 1;
+    const versatz = richtung * monate;
+    const neuVon = new Date(start.getFullYear(), start.getMonth() + versatz, 1);
+    // Tag 0 des Folgemonats = letzter Tag des Monats - passt das Monatsende automatisch an
+    const neuBis = new Date(ende.getFullYear(), ende.getMonth() + versatz + 1, 0);
+    return { von: datumZuIso(neuVon), bis: datumZuIso(neuBis) };
+  }
+
+  const tage = Math.round((ende.getTime() - start.getTime()) / 86_400_000) + 1;
+  return { von: datumZuIso(plusTage(start, richtung * tage)), bis: datumZuIso(plusTage(ende, richtung * tage)) };
+}
+
+function isoZuDatum(iso: string): Date | null {
+  const teile = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? '');
+  return teile ? new Date(Number(teile[1]), Number(teile[2]) - 1, Number(teile[3])) : null;
+}
+
+function datumZuIso(datum: Date): string {
+  return `${datum.getFullYear()}-${String(datum.getMonth() + 1).padStart(2, '0')}-${String(datum.getDate()).padStart(2, '0')}`;
+}
+
+function plusTage(datum: Date, tage: number): Date {
+  return new Date(datum.getFullYear(), datum.getMonth(), datum.getDate() + tage);
+}

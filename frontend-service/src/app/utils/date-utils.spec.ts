@@ -1,4 +1,4 @@
-import { formatSwissDate, formatSwissDateTime, parseSwissDate, swissToIsoDate } from './date-utils';
+import { blaettereZeitraum, formatSwissDate, formatSwissDateTime, parseSwissDate, swissToIsoDate } from './date-utils';
 
 describe('Date Utils', () => {
   describe('formatSwissDate', () => {
@@ -119,6 +119,56 @@ describe('Date Utils', () => {
 
     it('should return the fallback for an unreadable value', () => {
       expect(formatSwissDateTime('kein Datum')).toBe('-');
+    });
+  });
+
+  describe('blaettereZeitraum', () => {
+    it('should move a single day by one day', () => {
+      expect(blaettereZeitraum('2026-10-13', '2026-10-13', 1)).toEqual({ von: '2026-10-14', bis: '2026-10-14' });
+      expect(blaettereZeitraum('2026-10-13', '2026-10-13', -1)).toEqual({ von: '2026-10-12', bis: '2026-10-12' });
+    });
+
+    it('should move a single day across month and year', () => {
+      expect(blaettereZeitraum('2026-12-31', '2026-12-31', 1)).toEqual({ von: '2027-01-01', bis: '2027-01-01' });
+    });
+
+    it('should move a whole month and adjust the month end', () => {
+      expect(blaettereZeitraum('2026-01-01', '2026-01-31', 1)).toEqual({ von: '2026-02-01', bis: '2026-02-28' });
+      expect(blaettereZeitraum('2026-02-01', '2026-02-28', 1)).toEqual({ von: '2026-03-01', bis: '2026-03-31' });
+      expect(blaettereZeitraum('2026-05-01', '2026-05-31', -1)).toEqual({ von: '2026-04-01', bis: '2026-04-30' });
+    });
+
+    it('should respect leap years', () => {
+      expect(blaettereZeitraum('2028-01-01', '2028-01-31', 1)).toEqual({ von: '2028-02-01', bis: '2028-02-29' });
+    });
+
+    it('should move a quarter by three months', () => {
+      expect(blaettereZeitraum('2026-07-01', '2026-09-30', 1)).toEqual({ von: '2026-10-01', bis: '2026-12-31' });
+      expect(blaettereZeitraum('2026-01-01', '2026-03-31', -1)).toEqual({ von: '2025-10-01', bis: '2025-12-31' });
+    });
+
+    it('should move a year by twelve months', () => {
+      expect(blaettereZeitraum('2026-01-01', '2026-12-31', 1)).toEqual({ von: '2027-01-01', bis: '2027-12-31' });
+    });
+
+    it('should move other ranges by their number of days', () => {
+      expect(blaettereZeitraum('2026-10-01', '2026-10-07', 1)).toEqual({ von: '2026-10-08', bis: '2026-10-14' });
+      expect(blaettereZeitraum('2026-10-08', '2026-10-14', -1)).toEqual({ von: '2026-10-01', bis: '2026-10-07' });
+    });
+
+    it('should not treat the 1st to a mid-month day as a whole month', () => {
+      // 01.-15. = 15 Tage
+      expect(blaettereZeitraum('2026-10-01', '2026-10-15', 1)).toEqual({ von: '2026-10-16', bis: '2026-10-30' });
+    });
+
+    it('should count days correctly across the daylight saving change', () => {
+      // 25.10.2026: Umstellung auf Winterzeit - 7 Tage bleiben 7 Tage
+      expect(blaettereZeitraum('2026-10-22', '2026-10-28', 1)).toEqual({ von: '2026-10-29', bis: '2026-11-04' });
+    });
+
+    it('should leave an invalid range unchanged', () => {
+      expect(blaettereZeitraum('2026-10-14', '2026-10-01', 1)).toEqual({ von: '2026-10-14', bis: '2026-10-01' });
+      expect(blaettereZeitraum('', '2026-10-01', 1)).toEqual({ von: '', bis: '2026-10-01' });
     });
   });
 });

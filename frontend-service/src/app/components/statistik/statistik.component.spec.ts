@@ -1069,4 +1069,44 @@ describe('StatistikComponent', () => {
       expect(fixture.nativeElement.querySelector('app-loading-indicator')).toBeNull();
     });
   });
+
+  describe('Blättern', () => {
+    it('should move a month forward and load immediately', () => {
+      const laden = vi.spyOn(component, 'onSubmit').mockImplementation(() => {});
+      component.dateFrom = '2026-09-01';
+      component.dateTo = '2026-09-30';
+
+      component.onBlaettern(1);
+
+      expect(component.dateFrom).toBe('2026-10-01');
+      expect(component.dateTo).toBe('2026-10-31');
+      expect(laden).toHaveBeenCalled();
+    });
+
+    it('should move a day backwards', () => {
+      vi.spyOn(component, 'onSubmit').mockImplementation(() => {});
+      component.dateFrom = '2026-10-13';
+      component.dateTo = '2026-10-13';
+
+      component.onBlaettern(-1);
+
+      expect(component.dateFrom).toBe('2026-10-12');
+      expect(component.dateTo).toBe('2026-10-12');
+    });
+
+    it('should not move while loading or with an invalid range', () => {
+      const laden = vi.spyOn(component, 'onSubmit').mockImplementation(() => {});
+      component.dateFrom = '2026-10-14';
+      component.dateTo = '2026-10-01';
+      component.onBlaettern(1);
+      expect(component.dateFrom).toBe('2026-10-14');
+
+      component.dateFrom = '2026-10-01';
+      component.dateTo = '2026-10-07';
+      component.loading = true;
+      component.onBlaettern(1);
+      expect(component.dateFrom).toBe('2026-10-01');
+      expect(laden).not.toHaveBeenCalled();
+    });
+  });
 });

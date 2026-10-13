@@ -98,6 +98,26 @@
     * [ ] Die Überschrift ist übersetzt („Entire period" auf Englisch).
     * [ ] Ein PDF-Export ändert die Monatsliste der Seite nicht — auch nach mehreren Exporten erscheint das Gesamt-Panel auf der Seite genau einmal.
     * [ ] Der CSV-Download im Gesamt-Panel exportiert den ganzen Zeitraum; der Dateiname trägt dann von und bis statt eines Monats.
+* Als Benutzer möchte ich den Zeitraum mit zwei Schaltflächen **◀ / ▶ vor- und zurückblättern**, ohne die Daten von Hand zu ändern (Entscheid vom 13.10.2026).
+  * **Regel — geblättert wird um die Länge des Zeitraums:**
+
+    | Zeitraum | Schritt | Beispiel ▶ |
+    |---|---|---|
+    | von = bis | 1 Tag | 13.10. → 14.10. |
+    | ganze Monate (von = 1. eines Monats, bis = letzter Tag eines Monats) | Anzahl Monate; Monatsende angepasst | 01.01.–31.01. → 01.02.–28.02.; Quartal 01.07.–30.09. → 01.10.–31.12. |
+    | sonst | Anzahl Tage | 01.10.–07.10. → 08.10.–14.10. |
+
+  * **Lädt sofort** — anders als „Heute" und der Quartal-Selektor, die nur die Daten setzen: Blättern ohne Ergebnis hiesse, jedes Mal zusätzlich „Anzeigen" zu klicken.
+  * Die Regel steckt in `blaettereZeitraum` (`utils/date-utils.ts`), rechnet mit lokalen Kalenderdaten (Schaltjahr, Sommerzeit).
+  * **Akzeptanzkriterien:**
+    * [x] Links von „Heute" stehen zwei Schaltflächen ◀ / ▶ (Icons `chevron-left`/`chevron-right`, übersetzte Beschriftung `ZEITRAUM_ZURUECK`/`ZEITRAUM_VOR` als Tooltip und `aria-label`).
+    * [x] Ein Tag blättert um einen Tag, auch über Monats- und Jahresgrenzen.
+    * [x] Ein ganzer Monat blättert monatsweise und passt das Monatsende an (Januar → Februar 28./29., Mai ← April 30.).
+    * [x] Mehrere ganze Monate (Quartal, Jahr) blättern um ihre Anzahl Monate.
+    * [x] Andere Zeiträume blättern um ihre Anzahl Tage; 01.–15. ist kein ganzer Monat (→ 16.–30.).
+    * [x] Über die Zeitumstellung bleiben 7 Tage 7 Tage.
+    * [x] Nach dem Blättern wird die Statistik sofort geladen.
+    * [x] Während des Ladens und bei ungültigem Zeitraum (von > bis, leer) sind die Schaltflächen gesperrt.
 * Als Benutzer möchte ich während der Berechnung der Statistik eine **Ladeanzeige** sehen, weil das Laden mittlerweile einige Sekunden dauert und die Seite sonst wirkt, als reagiere sie nicht (Entscheid vom 11.10.2026).
   * **Wiederverwendbar:** Aussehen im Design System (`.zev-loading` in `spinner.css`), Angular-Komponente `app-loading-indicator` (`components/loading-indicator/`) mit den Eingaben `text` (Übersetzungs-Key, Vorgabe `LADE_DATEN`) und `inline`. Zweiter Einsatz: **Rechnungen generieren** (`RECHNUNGEN_WERDEN_GENERIERT`).
   * **Akzeptanzkriterien:**
