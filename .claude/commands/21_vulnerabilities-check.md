@@ -92,7 +92,7 @@ cd frontend-service && npm.cmd audit fix --dry-run
 # Nur Production-/Runtime-Abhängigkeiten betrachten
 cd frontend-service && npm.cmd audit --omit=dev
 ```
-- Vulns nur in `devDependencies` (Build-/Test-Tooling wie karma, webpack-dev-server,
+- Vulns nur in `devDependencies` (Build-/Test-Tooling wie vitest, jsdom, webpack-dev-server,
   @angular/cli, license-checker) landen **nicht** im ausgelieferten Bundle → meist geringes
   Praxis-Risiko (Angriff nur über lokalen Build-/Dev-Server-Prozess).
 - Vulns in Runtime-Deps (`@angular/*`, `keycloak-*`, `rxjs`, `zone.js`) sind **kritischer**,
@@ -180,7 +180,7 @@ Priorisierung: **Runtime + High/Critical** zuerst, dann Runtime/Moderate, dann D
 
 | Modul | Paket | Severity | Scope | Pfad (Herkunft) | Fix verfügbar |
 |-------|-------|----------|-------|-----------------|---------------|
-| frontend-service | lodash | High | Dev (karma) | transitiv | ja (ohne --force) |
+| frontend-service | lodash | High | Dev (vitest) | transitiv | ja (ohne --force) |
 | ... | ... | ... | ... | ... | ... |
 
 ## Maven-Vulnerabilities (OWASP Dependency-Check)

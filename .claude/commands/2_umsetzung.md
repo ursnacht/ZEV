@@ -54,6 +54,7 @@ Die Struktur jeder Datei wird aus den **Template-Dateien in CLAUDE.md** übernom
 | Repository | `backend-service/src/main/java/ch/nacht/repository/TarifRepository.java` |
 | Service | `backend-service/src/main/java/ch/nacht/service/TarifService.java` |
 | Controller | `backend-service/src/main/java/ch/nacht/controller/TarifController.java` |
+| DTO | `backend-service/src/main/java/ch/nacht/dto/DebitorDTO.java` |
 | Angular Model | `frontend-service/src/app/models/tarif.model.ts` |
 | Angular Service | `frontend-service/src/app/services/tarif.service.ts` |
 | List-Component | `frontend-service/src/app/components/tarif-list/` |

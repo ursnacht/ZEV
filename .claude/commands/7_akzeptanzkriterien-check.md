@@ -51,8 +51,8 @@ Für jedes Akzeptanzkriterium systematisch prüfen:
 
 #### Navigation / Menü
 - Route in `frontend-service/src/app/app.routes.ts` vorhanden?
-- Menüeintrag in `frontend-service/src/app/app.component.html` vorhanden?
-- Richtige Rolle im `AuthGuard` konfiguriert?
+- Menüeintrag in `frontend-service/src/app/components/navigation/navigation.component.html` vorhanden?
+- Richtige Permission im `AuthGuard` (`data.permissions`) konfiguriert?
 
 #### CRUD-Operationen
 - Controller-Endpoints vorhanden? (GET, POST, PUT, DELETE)
@@ -65,14 +65,18 @@ Für jedes Akzeptanzkriterium systematisch prüfen:
 - Frontend: Formularvalidierung implementiert?
 - Fehlermeldungen via TranslationService?
 
+#### Übersetzungen (i18n)
+- Alle Translation-Keys der Spec in einer Flyway-Migration vorhanden?
+- Deutsche Übersetzungstexte mit Umlauten (`ä`/`ö`/`ü`) statt `ae`/`oe`/`ue`?
+
 #### Persistierung
 - Flyway-Migration vorhanden?
 - Entity mit allen geforderten Feldern?
 - Repository mit nötigen Queries?
 
 #### Sicherheit
-- `@PreAuthorize` mit richtiger Rolle?
-- `AuthGuard` mit richtiger Rolle in Route?
+- `@PreAuthorize("hasAuthority('<permission>')")` mit richtiger Permission?
+- `AuthGuard` mit richtiger Permission in Route (`data.permissions`)?
 
 #### Multi-Tenancy
 - `org_id` Spalte in Migration?
@@ -107,10 +111,10 @@ Für jedes Akzeptanzkriterium systematisch prüfen:
 
 | Kriterium-Typ | Wie prüfen |
 |---------------|-----------|
-| "ist aus dem Menü aufrufbar" | Route in `app.routes.ts`, Link in `app.component.html` |
+| "ist aus dem Menü aufrufbar" | Route in `app.routes.ts`, Link in `navigation.component.html` |
 | "können erfasst, bearbeitet, gelöscht werden" | POST/PUT/DELETE Endpoints, Form-Component, Kebab-Menü |
 | "Validierung X muss gelten" | Service-Code, `@Valid`, Conditional Logic |
-| "Rolle X notwendig" | `@PreAuthorize`, `AuthGuard`, Route `data.roles` |
+| "Rolle/Permission X notwendig" | `@PreAuthorize("hasAuthority(...)")`, `AuthGuard`, Route `data.permissions`; Rolle→Permission in `Specs/Berechtigungen.md` |
 | "Fehlermeldung anzeigen" | Exception-Handling, `.zev-message--error`, Translation-Key |
 | "Texte mehrsprachig" | Migration mit DE/EN und `ON CONFLICT (key) DO NOTHING`; deutsche Texte mit Umlauten statt `ae`/`oe`/`ue` (`ss` statt `ß` ist korrekt) |
 | "Daten in DB speichern" | Flyway-Migration, Entity, Repository |

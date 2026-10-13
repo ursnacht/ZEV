@@ -59,6 +59,14 @@ Leitplanken: nicht committen/stagen/pushen, Umgebung nicht veraendern (Docker/Ke
    mvn versions:display-parent-updates
    ```
 
+4. **Property-Updates** (optional, für Versionen in `<properties>`, z.B. `spring-boot-admin.version`):
+
+   ```bash
+   mvn versions:display-property-updates
+   ```
+
+**Nützliche Optionen:** `-DallowMajorUpdates=false` (nur Minor/Patch anzeigen), `-DallowSnapshots=false` (Default).
+
 > **Hinweis:** Die Ausgabe kann umfangreich sein. Auf die Zeilen mit `->` filtern (z.B. `| grep -E '\->'`) und Plugin-/Build-Warnungen (`WARNING`, `Unsafe`, `minimum version`) ausblenden.
 
 ### Phase 2: Befunde klassifizieren
@@ -116,6 +124,7 @@ Falls keine Updates: „Keine Updates — alle selbst gepinnten Dependencies sin
 
 ## Wichtige Regeln
 
+* **Netzwerkzugriff** auf die Maven-Repositories nötig; die erste Ausführung lädt Metadaten und dauert länger.
 * **READ-ONLY** — dieser Command prüft und berichtet nur. Keine `pom.xml` und kein Code wird verändert.
 * **Konservativ bewerten** — Pre-Releases und Major-Bumps nie als „sicher" empfehlen.
 * **Nachweis liefern** — für jeden Bump-Kandidaten die `pom.xml` (und ggf. Zeile/Property) angeben.

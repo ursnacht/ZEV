@@ -82,11 +82,11 @@ Spec NICHT aendern - dieser Check ist READ-ONLY. Siehe CLAUDE.md.
 - Haben alle Kriterien eine Checkbox (`[ ]`)?
 - Sind sie konkret und testbar (nicht "soll funktionieren", sondern prüfbares Verhalten)?
 - Decken sie alle FR-Anforderungen ab?
-- Decken sie NFR-2 (Sicherheit/Rolle) ab?
+- Decken sie NFR-2 (Sicherheit/Permission) ab?
 - Sind Edge Cases aus Abschnitt 5 als testbare AK abgebildet?
 
 **Sicherheit (NFR-2):**
-- Ist die Rolle explizit genannt (`zev` oder `zev_admin`)?
+- Ist die Permission explizit genannt (z.B. `tarife:manage`) und passt sie zu `Specs/Berechtigungen.md`?
 - Ist `@PreAuthorize` / `AuthGuard` erwähnt?
 
 **Multi-Tenancy:**

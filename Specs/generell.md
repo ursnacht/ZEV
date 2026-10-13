@@ -109,11 +109,11 @@ Bei der Code-Generierung die Vorlagen-Tabelle in `CLAUDE.md` (Abschnitt "Code-Vo
 
 ### Authentifizierung & Autorisierung
 * Alle Benutzer sind via Keycloak authentifiziert
-* Rollen beachten:
-    * `zev` - Standardbenutzer (Lesezugriff)
-    * `zev_admin` - Administrator (Schreibzugriff)
-* Backend: `@PreAuthorize` Annotationen verwenden
-* Frontend: `AuthGuard` für geschützte Routen
+* **Permission-basiert:** Geprüft werden feingranulare Permissions (z.B. `tarife:manage`), nicht Fachrollen.
+  Die Fachrollen sind Keycloak Composite Roles (`zev_user ⊂ org_admin ⊂ zev_admin`); welche Rolle welche
+  Permission hat, steht in `Specs/Berechtigungen.md`.
+* Backend: `@PreAuthorize("hasAuthority('<permission>')")` auf Klassenebene
+* Frontend: `AuthGuard` mit `data: { permissions: [...] }` je Route
 
 ### Logging
 * INFO: Wichtige Geschäftsvorgänge (z.B. Upload, Berechnung)

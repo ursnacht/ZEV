@@ -23,7 +23,7 @@ $ARGUMENTS
 
 ## Hinweise
 * **Akzeptanzkriterien** müssen konkret und testbar sein (mit Checkbox `[ ]`)
-* **Sicherheit (NFR-2):** Rollen explizit nennen (`zev` oder `zev_admin`)
+* **Sicherheit (NFR-2):** Permissions explizit nennen (z.B. `tarife:manage`) und die Fachrollen dazu (`zev_user` / `org_admin` / `zev_admin`, siehe `Specs/Berechtigungen.md`)
 * **Multi-Tenancy:** Falls neue Daten gespeichert werden, auf Mandantenfähigkeit hinweisen (`org_id`)
 * **i18n:** Alle UI-Texte müssen via `TranslationService` kommen - als Abhängigkeit vermerken. Deutsche Texte in der Spec mit Umlauten schreiben (`ä`/`ö`/`ü`), damit sie so in die Migration übernommen werden können.
 * **Edge Cases:** Mindestens leere Listen, Netzwerkfehler und ungültige Eingaben behandeln

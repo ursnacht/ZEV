@@ -97,6 +97,7 @@ Bei der Code-Generierung diese Dateien als Vorlage verwenden und deren Struktur 
 | Repository      | `backend-service/src/main/java/ch/nacht/repository/TarifRepository.java`     |
 | Service         | `backend-service/src/main/java/ch/nacht/service/TarifService.java`           |
 | Controller      | `backend-service/src/main/java/ch/nacht/controller/TarifController.java`     |
+| DTO             | `backend-service/src/main/java/ch/nacht/dto/DebitorDTO.java`                 |
 | Service Test    | `backend-service/src/test/java/ch/nacht/service/TarifServiceTest.java`       |
 | Controller Test | `backend-service/src/test/java/ch/nacht/controller/TarifControllerTest.java` |
 

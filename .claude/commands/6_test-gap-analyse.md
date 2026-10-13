@@ -70,7 +70,7 @@ backend-service/src/test/java/ch/nacht/**/*IT.java    → Integration Tests
 
 **Frontend Unit:**
 ```
-frontend-service/src/app/**/*.spec.ts  → Unit Tests (Jasmine/Karma)
+frontend-service/src/app/**/*.spec.ts  → Unit Tests (Vitest)
 ```
 
 **E2E:**

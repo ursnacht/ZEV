@@ -123,7 +123,7 @@ public class [Entity]ServiceTest {
         // Testdaten initialisieren mit allen Pflichtfeldern
         test[Entity]1 = new [Entity]();
         test[Entity]1.setId(1L);
-        test[Entity]1.setOrgId(UUID.randomUUID());
+        test[Entity]1.setOrgId(1L);
         // ... weitere Felder
 
         test[Entity]2 = new [Entity]();
@@ -172,7 +172,7 @@ public class [Entity]ServiceTest {
         // Arrange - neue Entity (ohne ID)
         [Entity] new[Entity] = new [Entity]();
         // ... Felder setzen
-        UUID orgId = UUID.randomUUID();
+        Long orgId = 1L;
         when(organizationContextService.getCurrentOrgId()).thenReturn(orgId);
         when([entity]Repository.save(any())).thenReturn(test[Entity]1);
 

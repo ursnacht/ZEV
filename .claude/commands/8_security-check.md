@@ -84,11 +84,11 @@ Das wichtigste ZEV-Risiko ist Cross-Tenant-Datenzugriff. Pro mandantenfähiger E
 ### Phase 3: Autorisierung (OWASP A01)
 1. **Jede** Controller-Methode (bzw. die Klasse) trägt `@PreAuthorize`. Fehlt es auf einem
    nicht-`public`-Endpoint → **High**.
-2. Die Rolle stimmt mit der **Route/Rollen-Matrix in `CLAUDE.md`** überein
-   (`zev` vs `zev_admin`; z.B. `/api/tarife`, `/api/mieter`, `/api/rechnungen`, `/api/einstellungen`
-   = `zev_admin`). Abweichung (zu schwache Rolle) → **High**, (zu strenge) → **Low/Hinweis**.
+2. Die Permission (`@PreAuthorize("hasAuthority('<permission>')")`) stimmt mit der
+   **Permission-Matrix in `Specs/Berechtigungen.md`** überein (z.B. `/api/tarife` = `tarife:manage`,
+   nur `org_admin`/`zev_admin`). Abweichung (zu schwache Permission) → **High**, (zu strenge) → **Low/Hinweis**.
 3. `PingController` / Actuator-/`public`-Endpoints bewusst offen? Sonst → **Medium**.
-4. **Frontend-`AuthGuard`** schützt dieselben Routen mit denselben Rollen wie das Backend
+4. **Frontend-`AuthGuard`** schützt dieselben Routen mit denselben Permissions (`data.permissions`) wie das Backend
    (Frontend-Guard ist nur UX, **nicht** die Sicherheitsgrenze – Backend muss immer prüfen).
 
 ### Phase 4: Injection & Eingabe-Validierung (OWASP A03)
