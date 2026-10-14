@@ -189,3 +189,14 @@ Anlass: Akzeptanzkriterien-Check vom 14.10.2026 — eine Exception aus einer tra
 hätte die Transaktion des Jobs als rollback-only markiert (Spec, Anhang A.14). Die Unit-Tests prüfen
 die Isolierung und die Fehlerbehandlung; das Rollback-Verhalten von Spring selbst bilden sie nicht
 nach.
+
+---
+
+## Nachtrag 14.10.2026 — `SOC_TIEF` vor der Schattenrechnung
+
+| Status | Phase | Beschreibung |
+|--------|-------|--------------|
+|  [x]   | 1. Backend | `SteuerRegelService.socTief(...)` (statisch, aus Regel 2 herausgelöst, inkl. Hysterese); `SteuerungService.schattenrechnung()`: greift sie, `FREI` ohne Rang und ohne Plan, Prognosegrössen und freie Kapazität bleiben |
+|  [x]   | 2. Tests | `SteuerungServiceTest`: unter Minimum → FREI ohne Plan; Hysterese nach `SOC_TIEF` → weiterhin FREI; über Minimum ohne vorherige Freigabe → Plan wird gefragt |
+
+Anlass: Scheinabweichungen am 09.10.2026, 09:00–10:45 (Spec, Anhang A.15).

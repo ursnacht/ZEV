@@ -173,7 +173,8 @@ public class SteuerungService {
         // Die Merit-Order rechnet MIT, entscheidet aber nicht (Specs/Ladeplanung.md, FR-1a).
         // Scheitert sie oder fehlt eine Voraussetzung, bleiben ihre Spalten leer - der Entscheid
         // der Kaskade steht davon unberuehrt. In EIGENER Transaktion, siehe dort.
-        Schattenrechnung schatten = schattenrechnungIsoliert(orgId, zeitVon, soc, konfiguration);
+        Schattenrechnung schatten = schattenrechnungIsoliert(orgId, zeitVon, soc, konfiguration,
+                SteuerRegelService.socTief(soc, socMinimum, socHysterese, socTiefGaltZuvor));
 
         steuerentscheidRepository.upsert(orgId, zeitVon, preis, preisTiefRest,
                 messung.produktion(), messung.verbrauch(), messung.bezug(),
@@ -389,11 +390,12 @@ public class SteuerungService {
      */
     private Schattenrechnung schattenrechnungIsoliert(Long orgId, LocalDateTime zeitVon,
                                                       BigDecimal soc,
-                                                      SteuerKonfigurationDTO konfiguration) {
+                                                      SteuerKonfigurationDTO konfiguration,
+                                                      boolean socTief) {
         try {
             Schattenrechnung ergebnis = schattenTransaktion.execute(status -> {
                 hibernateFilterService.enableOrgFilter(orgId);
-                return schattenrechnung(orgId, zeitVon, soc, konfiguration);
+                return schattenrechnung(orgId, zeitVon, soc, konfiguration, socTief);
             });
             return ergebnis == null ? Schattenrechnung.leer() : ergebnis;
         } catch (RuntimeException e) {
@@ -418,7 +420,8 @@ public class SteuerungService {
      * zusammen mit der eigenen Transaktion aus {@link #schattenrechnungIsoliert}.
      */
     private Schattenrechnung schattenrechnung(Long orgId, LocalDateTime zeitVon, BigDecimal soc,
-                                              SteuerKonfigurationDTO konfiguration) {
+                                              SteuerKonfigurationDTO konfiguration,
+                                              boolean socTief) {
         try {
             BigDecimal kapazitaet = konfiguration.getBatteriekapazitaet();
             if (soc == null || kapazitaet == null || kapazitaet.signum() <= 0
@@ -439,6 +442,22 @@ public class SteuerungService {
             // erwarteten Ueberschuss fehlt dem ganzen Resttag die Grundlage.
             if (hier == null || hier.getErwarteterUeberschuss() == null) {
                 return Schattenrechnung.leer();
+            }
+
+            BigDecimal kapazitaetFrei = kapazitaet
+                    .multiply(BigDecimal.ONE.subtract(soc.divide(HUNDERT, 6, RoundingMode.HALF_UP)))
+                    .setScale(3, RoundingMode.HALF_UP);
+
+            // SOC_TIEF ist der Merit-Order VORGESCHALTET (Specs/Ladeplanung.md, FR-1): Unter dem
+            // Mindest-Ladezustand wird geladen, ohne den Plan zu fragen - mit derselben Hysterese
+            // wie die Kaskade. Fragte die Schattenrechnung hier den Plan, protokollierte sie Sperren,
+            // die die umgeschaltete Merit-Order nie verhaengte; am 09.10.2026 zaehlte so 09:00 bei
+            // 16 % als erste Abweichung des Tages (Spec, Anhang A.9). Prognosegroessen werden
+            // trotzdem festgehalten - die Auswertung von erwartetem und tatsaechlichem Ueberschuss
+            // braucht sie auch fuer diese Intervalle. Kein Rang: Es wurde nichts geplant.
+            if (socTief) {
+                return new Schattenrechnung(Steuerzustand.FREI, hier.getErwarteterUeberschuss(),
+                        hier.getGti(), hier.getFaktor(), null, null, kapazitaetFrei);
             }
 
             TreeMap<LocalDateTime, BigDecimal> preise =
@@ -465,10 +484,6 @@ public class SteuerungService {
             if (resttag.isEmpty()) {
                 return Schattenrechnung.leer();
             }
-
-            BigDecimal kapazitaetFrei = kapazitaet
-                    .multiply(BigDecimal.ONE.subtract(soc.divide(HUNDERT, 6, RoundingMode.HALF_UP)))
-                    .setScale(3, RoundingMode.HALF_UP);
 
             LadeplanService.Plan plan = ladeplanService.plane(resttag, zeitVon, kapazitaetFrei);
 

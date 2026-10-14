@@ -131,9 +131,7 @@ public class SteuerRegelService {
         //    und der Entscheid wechselte im Viertelstundentakt zwischen Freigabe und Sperre,
         //    sobald der Ladezustand dort pendelt. Mit 20 % und 5 % heisst das: freigeben unter
         //    20 %, wieder sperren erst ab 25 %.
-        if (eingabe.soc() != null && socMinimum != null
-                && eingabe.soc().compareTo(grenze(socMinimum, socHysterese,
-                        eingabe.socTiefGaltZuvor())) < 0) {
+        if (socTief(eingabe.soc(), socMinimum, socHysterese, eingabe.socTiefGaltZuvor())) {
             return new Entscheid(Steuerregel.SOC_TIEF,
                     Steuerzustand.FREI, Steuerzustand.FREI, ueberschuss);
         }
@@ -211,7 +209,26 @@ public class SteuerRegelService {
      *
      * <p>Ohne Hysterese (fehlend oder 0) ist die Grenze schlicht der Mindestwert.
      */
-    private BigDecimal grenze(BigDecimal socMinimum, BigDecimal socHysterese,
+    /**
+     * Greift {@code SOC_TIEF}? — der Speicher ist zu leer, um noch zu warten.
+     *
+     * <p><b>Eine Prüfung für beide Verfahren.</b> Die Regelkaskade nutzt sie als Regel 2, die
+     * Schattenrechnung der Merit-Order als vorgeschaltete Bedingung (Specs/Ladeplanung.md, FR-1).
+     * Zwei eigene Fassungen liefen auseinander — und jede Differenz zählte in der Auswertung als
+     * Abweichung der Verfahren, obwohl sie nur eine der Umsetzung wäre.
+     *
+     * @param soc              Ladezustand in Prozent; {@code null} → greift nicht
+     * @param socMinimum       Mindest-Ladezustand; {@code null} schaltet die Regel ab
+     * @param socHysterese     Prozentpunkte, um die die Grenze steigt, solange die Freigabe gilt
+     * @param socTiefGaltZuvor galt {@code SOC_TIEF} im Vorintervall?
+     */
+    public static boolean socTief(BigDecimal soc, BigDecimal socMinimum, BigDecimal socHysterese,
+                                  boolean socTiefGaltZuvor) {
+        return soc != null && socMinimum != null
+                && soc.compareTo(grenze(socMinimum, socHysterese, socTiefGaltZuvor)) < 0;
+    }
+
+    private static BigDecimal grenze(BigDecimal socMinimum, BigDecimal socHysterese,
                               boolean socTiefGaltZuvor) {
         if (!socTiefGaltZuvor || socHysterese == null) {
             return socMinimum;

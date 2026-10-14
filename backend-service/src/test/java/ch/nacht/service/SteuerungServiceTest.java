@@ -1,5 +1,6 @@
 package ch.nacht.service;
 
+import ch.nacht.dto.PrognosepunktDTO;
 import ch.nacht.dto.SimulationDTO;
 import ch.nacht.dto.SteuerKonfigurationDTO;
 import ch.nacht.dto.SteuerentscheidDTO;
@@ -8,6 +9,7 @@ import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.FeatureFlag;
 import ch.nacht.entity.Geraetezustand;
 import ch.nacht.entity.Preiszeitreihe;
+import ch.nacht.entity.Steuerentscheid;
 import ch.nacht.entity.Steuerregel;
 import ch.nacht.entity.Steuerzustand;
 import ch.nacht.entity.Zustandsgroesse;
@@ -263,6 +265,70 @@ public class SteuerungServiceTest {
     }
 
     /**
+     * Unter dem Mindest-Ladezustand fragt die Schattenrechnung den Plan NICHT - SOC_TIEF ist der
+     * Merit-Order vorgeschaltet. Protokolliert wird FREI ohne Rang, die Prognosegroessen bleiben.
+     * Vorher stand hier GESPERRT (09.10.2026, 09:00 bei 16 %): eine Scheinabweichung.
+     */
+    @Test
+    void werteIntervallAus_UnterMindestLadezustand_SchattenFreiOhnePlan() {
+        mitVoraussetzungenDerSchattenrechnung();
+        mitLadezustand("16.0");
+        when(produktionsprognoseService.getPrognose(ORG_ID, DATUM))
+                .thenReturn(List.of(prognosepunkt(ZEHN_UHR, "0.661")));
+
+        steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
+
+        verify(ladeplanService, never()).plane(any(), any(), any());
+        verify(steuerentscheidRepository).upsert(eq(ORG_ID), eq(ZEHN_UHR), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(),
+                eq("REGEL"), eq("FREI"), eq(new BigDecimal("0.661")), eq(new BigDecimal("400")),
+                eq(new BigDecimal("0.005")), isNull(), isNull(), eq(new BigDecimal("34.272")));
+    }
+
+    /**
+     * Dieselbe Hysterese wie die Kaskade: Galt SOC_TIEF im Vorintervall, bleibt die Freigabe bis
+     * Minimum + Hysterese (20 + 5 = 25 %) - bei 22 % also weiterhin FREI ohne Plan.
+     */
+    @Test
+    void werteIntervallAus_HystereseNachSocTief_SchattenWeiterhinFreiOhnePlan() {
+        mitVoraussetzungenDerSchattenrechnung();
+        mitLadezustand("22.0");
+        Steuerentscheid vorher = new Steuerentscheid();
+        vorher.setRegel(Steuerregel.SOC_TIEF);
+        when(steuerentscheidRepository.findByZeitVon(DATUM.atTime(9, 45))).thenReturn(Optional.of(vorher));
+        when(produktionsprognoseService.getPrognose(ORG_ID, DATUM))
+                .thenReturn(List.of(prognosepunkt(ZEHN_UHR, "0.661")));
+
+        steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
+
+        verify(ladeplanService, never()).plane(any(), any(), any());
+        verify(steuerentscheidRepository).upsert(eq(ORG_ID), eq(ZEHN_UHR), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(),
+                eq("REGEL"), eq("FREI"), any(), any(), any(), isNull(), isNull(), any());
+    }
+
+    /**
+     * Ohne vorherige Freigabe gilt die einfache Grenze: 22 % liegt darueber, also fragt die
+     * Schattenrechnung den Plan (hier ohne Preise fuer den Resttag -> Rueckfall, Schatten leer).
+     */
+    @Test
+    void werteIntervallAus_UeberMindestLadezustand_SchattenFragtDenPlan() {
+        mitVoraussetzungenDerSchattenrechnung();
+        mitLadezustand("22.0");
+        when(produktionsprognoseService.getPrognose(ORG_ID, DATUM))
+                .thenReturn(List.of(prognosepunkt(ZEHN_UHR, "0.661")));
+
+        steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
+
+        verify(steuerentscheidRepository).upsert(eq(ORG_ID), eq(ZEHN_UHR), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(),
+                eq("REGEL"), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull());
+    }
+
+    /**
      * Die Schattenrechnung laeuft in einer EIGENEN, nur lesenden Transaktion - nur so trifft ein
      * Fehler darin nicht die Transaktion des Entscheids.
      */
@@ -472,6 +538,22 @@ public class SteuerungServiceTest {
         when(geraetezustandRepository.findFirstByEinheitIdAndGroesseAndZeitLessThanOrderByZeitDesc(
                 SPEICHER_ID, Zustandsgroesse.SOC, VIERTEL_NACH_ZEHN))
                 .thenReturn(Optional.of(soc(DATUM.atTime(10, 14), "50.0")));
+    }
+
+    private void mitLadezustand(String wert) {
+        when(geraetezustandRepository.findFirstByEinheitIdAndGroesseAndZeitLessThanOrderByZeitDesc(
+                SPEICHER_ID, Zustandsgroesse.SOC, VIERTEL_NACH_ZEHN))
+                .thenReturn(Optional.of(soc(DATUM.atTime(10, 14), wert)));
+    }
+
+    /** Ein Prognosepunkt mit Einstrahlung 400 W/m2 und Faktor 0.005. */
+    private PrognosepunktDTO prognosepunkt(LocalDateTime zeit, String ueberschuss) {
+        PrognosepunktDTO punkt = new PrognosepunktDTO();
+        punkt.setZeit(zeit);
+        punkt.setGti(new BigDecimal("400"));
+        punkt.setFaktor(new BigDecimal("0.005"));
+        punkt.setErwarteterUeberschuss(new BigDecimal(ueberschuss));
+        return punkt;
     }
 
     private Geraetezustand soc(LocalDateTime zeit, String wert) {

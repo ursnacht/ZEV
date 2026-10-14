@@ -111,6 +111,11 @@ aber **nicht**. `verfahren` trägt in dieser Stufe durchgehend `REGEL`.
 Die Schattenrechnung läuft in einer **eigenen, nur lesenden Transaktion** (`REQUIRES_NEW`). Ein
 Fehler darin kostet höchstens die Schattenwerte, nie den Entscheid der Kaskade.
 
+Sie bildet die Merit-Order **samt vorgeschaltetem `SOC_TIEF`** nach (FR-1, Tabelle der bestehenden
+Regeln): Unter dem Mindest-Ladezustand — mit derselben Prüfung und Hysterese wie die Kaskade
+(`SteuerRegelService.socTief`) — protokolliert sie `FREI` ohne Rang, hält die Prognosegrössen aber
+fest. Sonst entstünden Scheinabweichungen. (Hintergrund: Anhang A.15)
+
 > In der Transaktion des Jobs hätte eine Exception aus einer transaktionalen Bean diese als
 > rollback-only markiert — der Entscheid wäre trotz `catch` verloren gegangen.
 > (Hintergrund: Anhang A.14)
@@ -476,7 +481,12 @@ Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten**:
       SteuerungServiceTest#werteIntervallAus_SchattenrechnungLaeuftInEigenerLesenderTransaktion)
 * [ ] **Bei negativem Preis** ist `einspeisung = GESPERRT`, über die Ladung entscheidet die
       Merit-Order — nicht mehr pauschal `FREI` wie in der Regelkaskade.
-* [ ] **Unter dem Mindest-Ladezustand** ist `batterieladung = FREI`, ohne dass der Plan gefragt wird.
+* [ ] **Unter dem Mindest-Ladezustand** ist `batterieladung = FREI`, ohne dass der Plan gefragt wird
+      — mit derselben Hysterese wie die Regelkaskade; in der Schattenrechnung entsprechend
+      `ladeplan_batterieladung = FREI` ohne Rang
+      (Test: SteuerungServiceTest#werteIntervallAus_UnterMindestLadezustand_SchattenFreiOhnePlan;
+      SteuerungServiceTest#werteIntervallAus_HystereseNachSocTief_SchattenWeiterhinFreiOhnePlan;
+      SteuerungServiceTest#werteIntervallAus_UeberMindestLadezustand_SchattenFragtDenPlan)
 * [ ] Der Plan umfasst das **ausgewertete** Intervall und alle folgenden des gleichen Ortstages —
       keine früheren.
 
@@ -991,6 +1001,13 @@ Das Muster: An sonnigen Tagen sperrt die Merit-Order den Vormittag ab 08:30–09
 billigeren Mittagsstunden zum Laden zu nutzen. In 3 von 4 Fällen wäre die Batterie trotzdem voll
 geworden.
 
+> **Korrektur zum 09.10. (14.10.2026):** Die Sperre ab 09:00 bei 16 % ist eine **Scheinabweichung**
+> — der Ladezustand lag unter dem Mindestwert, und die Schattenrechnung fragte den Plan, statt
+> `SOC_TIEF` vorzuschalten (A.15). Die echte erste Abweichung des Tages war **11:15 bei 35 %**.
+> Die eingespeiste Menge (12.2 kWh) und der Vorteil (0.15 CHF) unten sind entsprechend zu hoch.
+> Am Ergebnis „vorerst nicht umschalten" ändert das nichts; die Woche fällt eher noch ungünstiger
+> für die Merit-Order aus.
+
 **Erwarteter gegen tatsächlichen Überschuss** (ganzer Tag, Abfrage A.8):
 
 | Tag | 04.10. | 05.10. | 06.10. | 07.10. | 08.10. | 09.10. | 10.10. |
@@ -1095,3 +1112,23 @@ hat jeder Tag 96 Entscheide.
 **Behebung:** Die Schattenrechnung läuft über eine `TransactionTemplate` mit `REQUIRES_NEW` und
 `readOnly`; ein Fehler darin, auch beim Commit, wird abgefangen und ergibt leere Schattenwerte. Die
 neue Transaktion hat eine eigene Hibernate-Session, der Org-Filter wird darin erneut gesetzt.
+
+### A.15 Scheinabweichung unter dem Mindest-Ladezustand (FR-1a; gefunden und behoben am 14.10.2026)
+
+Gefunden beim Akzeptanzkriterien-Check. FR-1 schaltet `SOC_TIEF` der Merit-Order vor; die
+Schattenrechnung tat das nicht und fragte den Plan auch unter dem Mindest-Ladezustand. Lag das
+Intervall nicht unter den günstigsten, protokollierte sie `GESPERRT`, während die Kaskade
+(`SOC_TIEF`) `FREI` entschied — eine Abweichung, die die umgeschaltete Merit-Order nie gehabt hätte.
+
+Auf Hene betraf das seit Beginn der Schattenrechnung nur den **09.10.2026, 09:00–10:45**
+(Ladezustand 16–24 %, Hysterese bis 25 %): sechs Intervalle bis 10:15 unter dem Minimum, zwei
+weitere in der Hysterese. Die Auswertung der Testwoche zählte 09:00 als erste Abweichung (A.9).
+
+**Behebung:** Die Prüfung aus der Kaskade ist als `SteuerRegelService.socTief(...)` herausgelöst und
+wird von beiden Verfahren benutzt — dieselbe Grenze, dieselbe Hysterese. Greift sie, protokolliert
+die Schattenrechnung `FREI` ohne Rang; Einstrahlung, Faktor, erwarteter Überschuss und freie
+Kapazität bleiben erhalten, weil die Auswertung von erwartetem und tatsächlichem Überschuss
+(Abfrage A.8, `prognose_faktor IS NOT NULL`) sie auch für diese Intervalle braucht.
+
+**Festgelegt dabei:** Die Hysterese gilt für die vorgeschaltete Regel genauso wie in der Kaskade.
+Die Spec liess das offen; zwei verschiedene Grenzen hätten wieder Scheinabweichungen erzeugt.
