@@ -446,65 +446,85 @@ Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten**:
 
 * [x] Reicht der erwartete Überschuss des Resttages **nicht**, um die freie Kapazität zu füllen,
       ist das laufende Intervall im Plan — es wird geladen, auch bei hohem Preis.
+      (Test: LadeplanServiceTest#plane_UeberschussReichtNicht_AllesImPlan)
 * [x] Reicht er, sind nur die günstigsten Intervalle im Plan; ein teureres davor wird gesperrt.
+      (Test: LadeplanServiceTest#plane_TeuerstesIntervallWirdGesperrt)
 * [x] Bei gleicher Kapazität und gleichem Überschuss entscheidet **allein** der Einspeisepreis.
+      (Test: LadeplanServiceTest#plane_SortiertNachPreisNichtNachZeit; LadeplanServiceTest#plane_TeuerstesIntervallWirdGesperrt)
 * [x] Ist die Batterie voll (freie Kapazität 0), ist der Plan **leer** — und jedes Intervall
       `batterieladung = FREI`, nicht `GESPERRT` (Hintergrund: Anhang A.10).
+      (Test: LadeplanServiceTest#plane_BatterieVoll_PlanLeerUndTrotzdemFrei; LadeplanServiceTest#plane_BatterieVoll_AuchTeuresIntervallFrei)
 * [x] Ein Intervall **ohne** erwarteten Überschuss belegt keinen Platz im Plan — und ist
       `batterieladung = FREI`, nicht `GESPERRT`.
+      (Test: LadeplanServiceTest#plane_OhneUeberschuss_FreiUndOhneRang; LadeplanServiceTest#plane_IntervallOhneUeberschussZaehltNichtMit)
 * [x] Aufgefüllt wird bis **`kapazitaetFrei / 0.95`**, nicht bis `kapazitaetFrei` — der erwartete
       Überschuss ist die Energie vor dem Speicher, und rund 5 % davon kommen dort nie an.
+      (Test: LadeplanServiceTest#plane_BeruecksichtigtDenLadewirkungsgrad)
 
 **Schattenrechnung (FR-1a)**
 
-* [x] `batterieladung` und `einspeisung` stammen in dieser Stufe **unverändert** aus der
+* [ ] `batterieladung` und `einspeisung` stammen in dieser Stufe **unverändert** aus der
       Regelkaskade — die Merit-Order ändert keinen geltenden Entscheid.
-* [x] `verfahren` trägt durchgehend `REGEL`.
-* [x] `ladeplan_batterieladung` trägt, was die Merit-Order entschieden hätte — und `NULL`, wenn
+* [ ] `verfahren` trägt durchgehend `REGEL`.
+* [ ] `ladeplan_batterieladung` trägt, was die Merit-Order entschieden hätte — und `NULL`, wenn
       eine Voraussetzung fehlte.
 * [x] Ein Fehler in der Merit-Order lässt den Entscheid der Kaskade **unberührt**: Der Job schreibt
       ihn trotzdem, mit `ladeplan_batterieladung = NULL` — auch wenn der Fehler in einer
       transaktionalen Bean entsteht (Hintergrund: Anhang A.14).
+      (Test: SteuerungServiceTest#werteIntervallAus_PrognoseWirft_EntscheidWirdTrotzdemGeschrieben;
+      SteuerungServiceTest#werteIntervallAus_SchattenTransaktionScheitertBeimCommit_EntscheidWirdTrotzdemGeschrieben;
+      SteuerungServiceTest#werteIntervallAus_SchattenrechnungLaeuftInEigenerLesenderTransaktion)
 * [ ] **Bei negativem Preis** ist `einspeisung = GESPERRT`, über die Ladung entscheidet die
       Merit-Order — nicht mehr pauschal `FREI` wie in der Regelkaskade.
-* [x] **Unter dem Mindest-Ladezustand** ist `batterieladung = FREI`, ohne dass der Plan gefragt wird.
-* [x] Der Plan umfasst das **ausgewertete** Intervall und alle folgenden des gleichen Ortstages —
+* [ ] **Unter dem Mindest-Ladezustand** ist `batterieladung = FREI`, ohne dass der Plan gefragt wird.
+* [ ] Der Plan umfasst das **ausgewertete** Intervall und alle folgenden des gleichen Ortstages —
       keine früheren.
 
 **Der Fall, der das Verfahren ausgelöst hat**
 
 * [x] **18.09./21.09.-Lage** (Tal am Nachmittag, Restsonne reicht): gesperrt bis zum Tal — wie die
-      Regelkaskade.
+      Regelkaskade. (Test: LadeplanServiceTest#plane_TeuerstesIntervallWirdGesperrt)
 * [x] **Dieselbe Lage mit bewölktem Nachmittag** (Restsonne reicht nicht): das laufende Intervall
       ist im Plan, es wird **vorgeladen**. Genau hier unterscheiden sich die beiden Verfahren.
+      (Test: LadeplanServiceTest#plane_UeberschussReichtNicht_AllesImPlan)
 
 **Prognose-Abruf**
 
 * [x] Der Abruf-Job schreibt je Intervall **einen** Datensatz; ein zweiter Lauf überschreibt ihn,
       statt einen weiteren anzulegen.
+      (Test: EinstrahlungsprognoseRepositoryIT#upsert_GleichesIntervallZweimal_UeberschreibtMitGleicherId;
+      EinstrahlungsprognoseAbrufServiceTest#abrufen_ZweiIntervalle_SchreibtBeideOhneZonenrechnung)
 * [x] `zeit` trägt den **Beginn** des Intervalls in **Ortszeit** und ist ohne Umrechnung mit
       `steuerentscheid.zeit_von` vergleichbar.
+      (Test: EinstrahlungsprognoseAbrufServiceTest#abrufen_ZweiIntervalle_SchreibtBeideOhneZonenrechnung; EinstrahlungsprognoseRepositoryIT#upsert_Ortszeit_KommtUnveraendertZurueck)
 * [x] Ist die API nicht erreichbar, bleibt die vorhandene Prognose stehen; der Fehler erscheint als
       Systemmeldung und der Job läuft beim nächsten Mal weiter.
-* [x] Der Steuerungs-Job ruft **keine** externe Schnittstelle auf.
+      (Test: EinstrahlungsprognoseAbrufServiceTest#abrufen_ApiAntwortetMitFehler_MeldetUndGibtNullZurueck)
+* [ ] Der Steuerungs-Job ruft **keine** externe Schnittstelle auf.
 * [x] Der Abruf erfolgt je Mandant mit dessen Standort und Ausrichtung.
+      (Test: EinstrahlungsprognoseAbrufServiceTest#abrufen_BautUrlAusKonfiguration; EinstrahlungsprognoseAbrufServiceTest#abrufen_SetztMandantenfilterMitUebergebenerOrgId)
 
 **Umrechnungsfaktor**
 
-* [x] Der Faktor ist das Verhältnis der Summen (gemessene Erzeugung zu Einstrahlung) über die
+* [ ] Der Faktor ist das Verhältnis der Summen (gemessene Erzeugung zu Einstrahlung) über die
       letzten *n* Tage, nur über Intervalle mit `gti > 0`.
 * [x] Mit weniger als **150 Intervallen mit `gti > 0`** im Lernfenster gibt es **keinen** Faktor
-      → Rückfall.
+      → Rückfall. (Test: ProduktionsprognoseServiceTest#getPrognose_WenigerAlsMinPunkte_LaesstErwarteteErzeugungLeer;
+      ProduktionsprognoseServiceTest#getPrognose_GenauMinPunkte_LerntFaktor; ProduktionsprognoseServiceTest#getPrognose_OhneFaktor_KeinErwarteterUeberschuss)
 * [x] Bei `historieTage < 7` gibt es **kein** Lastprofil → Rückfall.
+      (Test: ProduktionsprognoseServiceTest#getPrognose_WenigerAlsSiebenTageHistorie_KeinLastprofil)
 * [x] Der erwartete Überschuss ist nie negativ.
+      (Test: ProduktionsprognoseServiceTest#getPrognose_LastGroesserAlsErzeugung_UeberschussIstNull)
 * [x] Das Lastprofil ist der **Median** der letzten *n* gleichen Wochentage, nicht der Mittelwert.
+      (Test: ProduktionsprognoseServiceTest#getPrognose_Lastprofil_IstDerMedianDerGleichenWochentage;
+      ProduktionsprognoseServiceTest#getPrognose_Lastprofil_IgnoriertAndereWochentage)
 
 **Rückfall**
 
-* [x] Fehlt Standort, Ausrichtung, Prognose, Faktor, Lastprofil, Kapazität, Speicher-Einheit,
+* [ ] Fehlt Standort, Ausrichtung, Prognose, Faktor, Lastprofil, Kapazität, Speicher-Einheit,
       Ladezustand **oder Preise für den Resttag**, entscheidet die Regelkaskade — und der Entscheid
       trägt `verfahren = REGEL`.
-* [x] Eine Batteriekapazität von **0** wirkt wie eine fehlende.
+* [ ] Eine Batteriekapazität von **0** wirkt wie eine fehlende.
 * [ ] Ein Entscheid nach Merit-Order trägt `verfahren = MERIT_ORDER` **und** Rang, benötigte
       Anzahl, Einstrahlung, Prognose, Faktor und freie Kapazität.
 * [ ] Aus Einstrahlung und Faktor lässt sich die erwartete Erzeugung nachrechnen — die drei Werte
@@ -514,28 +534,30 @@ Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten**:
 
 * [ ] Die Tabelle nennt je Intervall das Verfahren; Merit-Order- und Regel-Entscheide sind
       unterscheidbar.
-* [x] Das Diagramm zeigt die **erwartete Erzeugung** als eigene, gestrichelte Linie neben der
+* [ ] Das Diagramm zeigt die **erwartete Erzeugung** als eigene, gestrichelte Linie neben der
       gemessenen Produktion, auf **derselben** kWh-Achse.
-* [x] Das Diagramm bekommt **keine vierte y-Achse**.
-* [x] Die **Einstrahlung in W/m²** steht in der Protokolltabelle und im Tooltip, nicht im Diagramm.
+* [ ] Das Diagramm bekommt **keine vierte y-Achse**.
+* [ ] Die **Einstrahlung in W/m²** steht in der Protokolltabelle und im Tooltip, nicht im Diagramm.
 * [x] Ein Tag ohne Prognose zeigt die Linie **nicht**, statt sie auf 0 zu zeichnen.
+      (Test: einspeisesteuerung.component.spec.ts › prognoseReihe › should return an empty series without forecast data)
 * [x] Fehlt die Prognose nur für einzelne Intervalle, setzt die Linie dort **aus**, statt über die
-      Lücke gezogen zu werden.
+      Lücke gezogen zu werden. (Test: einspeisesteuerung.component.spec.ts › prognoseReihe › should fill gaps with explicit null)
 * [x] Der Lizenz-Bereich nennt Open-Meteo und die CC-BY-4.0-Lizenz.
+      (Nachweis: lizenzen.component.html:138; V167__Add_Ladeplanung_Translations.sql:49)
 
 **Rückrechnung**
 
 * [ ] Die Rückrechnung liefert für zurückliegende Tage **Regel-Entscheide** und kennzeichnet sie
       als solche.
-* [x] Sie stützt sich **nicht** auf `zev.einstrahlungsprognose` — dort stünde die nachträglich
+* [ ] Sie stützt sich **nicht** auf `zev.einstrahlungsprognose` — dort stünde die nachträglich
       geholte Fassung.
 
 **Sicherheit und Flag**
 
-* [x] Alle Endpunkte verlangen `tarife:manage` (403 ohne).
-* [x] Bei ausgeschaltetem Feature-Flag `EINSPEISESTEUERUNG` antworten sie mit `403`, und der
+* [ ] Alle Endpunkte verlangen `tarife:manage` (403 ohne).
+* [ ] Bei ausgeschaltetem Feature-Flag `EINSPEISESTEUERUNG` antworten sie mit `403`, und der
       Abruf-Job läuft nicht.
-* [x] Es wird **nichts** geschaltet: kein MQTT-Publish, kein Schreibpfad zur Anlage.
+* [ ] Es wird **nichts** geschaltet: kein MQTT-Publish, kein Schreibpfad zur Anlage.
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
