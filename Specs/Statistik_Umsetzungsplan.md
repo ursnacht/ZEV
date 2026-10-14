@@ -628,3 +628,13 @@ ein Collapsible; beim Laden sind alle zugeklappt.
 |  [x]   | 2. Tests | `statistik.component.spec.ts`: keine Meldung nach dem Laden, alter Fehler wird weggeräumt |
 
 Der Key `MONATE_GELADEN` wird nicht mehr verwendet; er bleibt in der Datenbank (keine Migration für eine reine Bereinigung).
+
+---
+
+## Änderung 14.10.2026: „Anzeigen" neben den Quartalen
+
+| Status | Phase | Beschreibung |
+|--------|-------|--------------|
+|  [x]   | 1. Design System | `quarter-selector.css`: `.zev-quarter-selector__actions` (Abstand links, `:empty` ausgeblendet), Selektor-Zeile `align-items: center` |
+|  [x]   | 2. Komponenten | `quarter-selector.component.ts`: Aktions-Slot `<ng-content>`; `statistik.component.html`: Submit-Knopf „Anzeigen" in den Slot verschoben, aus der Knopfgruppe der Datumszeile entfernt |
+|  [x]   | 3. Tests | `quarter-selector.component.spec.ts` (projizierter Inhalt nach den Quartalen), E2E `statistik.spec.ts` (Heute-Test: Position von „Anzeigen") |

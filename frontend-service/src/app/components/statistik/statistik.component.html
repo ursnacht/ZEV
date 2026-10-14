@@ -16,6 +16,13 @@
           [selectedVon]="dateFrom"
           [selectedBis]="dateTo"
           (quarterSelected)="onQuarterSelected($event)">
+          <!-- "Anzeigen" neben den Quartalen (seit 14.10.2026): Quartal waehlen und Anzeigen
+               gehoeren zusammen; Heute und Blaettern laden ohnehin selbst. -->
+          <button type="submit" id="statistikAnzeigen" class="zev-button zev-button--primary"
+            [disabled]="loading || !dateFrom || !dateTo">
+            <app-icon name="search"></app-icon>
+            {{ loading ? ('LADE_DATEN' | translate) : ('ANZEIGEN' | translate) }}
+          </button>
         </app-quarter-selector>
 
         <div class="zev-date-range-row">
@@ -46,10 +53,6 @@
                 [disabled]="loading">
                 <app-icon name="calendar"></app-icon>
                 {{ 'HEUTE' | translate }}
-              </button>
-              <button type="submit" class="zev-button zev-button--primary" [disabled]="loading || !dateFrom || !dateTo">
-                <app-icon name="search"></app-icon>
-                {{ loading ? ('LADE_DATEN' | translate) : ('ANZEIGEN' | translate) }}
               </button>
               <button type="button" class="zev-button zev-button--secondary" (click)="exportPdf()"
                 [disabled]="!statistik || loading">

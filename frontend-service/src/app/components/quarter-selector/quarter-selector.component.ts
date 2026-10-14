@@ -23,6 +23,9 @@ interface Quarter {
           {{ q.label }}
         </button>
       }
+      <!-- Aktions-Slot: z.B. "Anzeigen" direkt neben den Quartalen (Statistik). Ohne Inhalt
+           blendet das Design System den Slot aus (:empty). -->
+      <span class="zev-quarter-selector__actions"><ng-content></ng-content></span>
     </div>
     `
 })

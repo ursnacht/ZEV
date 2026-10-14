@@ -290,17 +290,20 @@ test.describe('Statistik Page - Gesamter Zeitraum', () => {
 
 test.describe('Statistik Page - Heute', () => {
     /**
-     * „Heute" steht vor „Anzeigen", setzt beide Felder auf das heutige Datum und zeigt die
-     * Statistik sofort an (Specs/Statistik.md, geaendert am 14.10.2026).
+     * „Heute" steht nach den Blaetterknoepfen, setzt beide Felder auf das heutige Datum und zeigt
+     * die Statistik sofort an (Specs/Statistik.md, geaendert am 14.10.2026). „Anzeigen" steht seit
+     * dem 14.10.2026 neben den Quartalen.
      */
     test('should set both dates to today and load immediately', async ({ page }) => {
         await navigateToStatistik(page);
 
         const knoepfe = page.locator('form .zev-button-group button');
         const heute = knoepfe.nth(2);
-        // Position: nach den beiden Blaettern-Knoepfen, direkt vor "Anzeigen"
+        // Position: nach den beiden Blaettern-Knoepfen; "Anzeigen" steht neben den Quartalen
         await expect(heute.locator('app-icon[name="calendar"]')).toHaveCount(1);
-        await expect(knoepfe.nth(3)).toHaveAttribute('type', 'submit');
+        await expect(page.locator('.zev-quarter-selector__actions button[type="submit"]'))
+            .toHaveCount(1);
+        await expect(page.locator('form .zev-button-group button[type="submit"]')).toHaveCount(0);
 
         await heute.click();
 

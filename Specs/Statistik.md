@@ -12,13 +12,21 @@
       * der entsprechende Quartal-Button im Quartal-Selektor ist aktiv markiert
       * Jahreswechsel: im Q1 wird Q4 des Vorjahres vorselektiert
       * der Zeitraum bleibt manuell änderbar
-    * **Schaltfläche „Heute"** zwischen dem Feld „Bis Datum" und „Anzeigen": setzt „Datum von" **und** „Datum bis" auf das heutige Datum (Ortszeit).
+    * **Schaltfläche „Anzeigen"** steht **rechts neben den Quartalsknöpfen** (seit 14.10.2026; vorher am Ende der Zeile mit den Datumsfeldern). Wer ein Quartal wählt, findet den Auslöser gleich daneben — der Quartal-Selektor setzt nur den Zeitraum, „Heute" und das Blättern laden ohnehin selbst.
+      * Umgesetzt über einen **Aktions-Slot** des Quartal-Selektors (`ng-content`, Design System `.zev-quarter-selector__actions`); ohne Inhalt nimmt der Slot keinen Platz ein, die übrigen Verwendungen (Rechnungen, Messwerte, Debitoren, Solarberechnung) bleiben unverändert.
+      * Verhalten unverändert: Submit des Formulars, deaktiviert während des Ladens oder ohne beide Daten, während des Ladens mit dem Text `LADE_DATEN`.
+      * **Akzeptanzkriterien:**
+        * [x] „Anzeigen" steht in derselben Zeile rechts neben dem letzten Quartalsknopf, mit sichtbarem Abstand.
+        * [x] In der Zeile der Datumsfelder steht kein „Anzeigen" mehr; dort bleiben ◀ / ▶, „Heute" und „PDF exportieren".
+        * [x] Klick auf „Anzeigen" lädt die Statistik des eingestellten Zeitraums wie bisher.
+        * [x] Andere Seiten mit Quartal-Selektor sehen unverändert aus.
+    * **Schaltfläche „Heute"** nach den Blätterknöpfen ◀ / ▶: setzt „Datum von" **und** „Datum bis" auf das heutige Datum (Ortszeit).
       * **Zeigt die Statistik sofort an** (geändert am 14.10.2026; vorher setzte sie nur den Zeitraum, und geladen wurde mit „Anzeigen" — wie beim Blättern ist der Umweg über „Anzeigen" bei einem einzelnen Tag nur lästig).
       * **Auch ein zweiter Klick lädt:** Für den laufenden Tag kommen laufend Messwerte dazu, „Heute" ist damit zugleich „aktualisieren". Gesperrt ist die Schaltfläche nur während des Ladens (bis 14.10.2026: auch, solange heute–heute schon eingestellt war).
       * Icon `calendar`, `zev-button--secondary`; Text über den bestehenden Schlüssel `HEUTE` (seit V65) — **keine** neue Übersetzung, keine Migration.
       * Der Quartal-Selektor zeigt danach kein Quartal mehr als aktiv: Ein einzelner Tag ist kein Quartal.
       * **Akzeptanzkriterien:**
-        * [x] Die Schaltfläche „Heute" steht vor „Anzeigen" (seit dem Blättern nach ◀ / ▶).
+        * [x] Die Schaltfläche „Heute" steht nach ◀ / ▶ (seit 14.10.2026 steht „Anzeigen" neben den Quartalen).
         * [ ] Ein Klick setzt „Datum von" und „Datum bis" auf das heutige Datum.
         * [ ] Das Datum ist das **lokale** Tagesdatum, nicht das UTC-Datum — kurz nach Mitternacht darf nicht der Vortag erscheinen.
         * [x] Ein Klick zeigt die Statistik des heutigen Tages sofort an (ohne „Anzeigen").

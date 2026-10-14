@@ -331,6 +331,8 @@
       [selectedVon]="quarterDateFrom"
       [selectedBis]="quarterDateTo"
       (quarterSelected)="onQuarterSelected($event)">
+      <!-- Optionaler Aktions-Slot (.zev-quarter-selector__actions), z.B. Anzeigen in der Statistik -->
+      <button type="button" class="zev-button zev-button--primary">Anzeigen</button>
     </app-quarter-selector>
     @if (quarterDateFrom && quarterDateTo) {
       <p style="margin-top: var(--spacing-sm); color: var(--color-gray-600);">

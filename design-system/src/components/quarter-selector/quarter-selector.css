@@ -8,8 +8,26 @@
 .zev-quarter-selector {
   display: flex;
   flex-wrap: wrap;
+  /* Quartalsknoepfe und ein (hoeherer) Knopf im Aktions-Slot auf gemeinsamer Mittellinie */
+  align-items: center;
   gap: var(--spacing-xs);
   margin-bottom: var(--spacing-md);
+}
+
+/*
+ * Aktions-Slot rechts neben den Quartalsknoepfen (z.B. "Anzeigen" in der Statistik): Wer ein
+ * Quartal waehlt, findet den Ausloeser gleich daneben. Der Abstand trennt ihn sichtbar von der
+ * Auswahl; ohne Inhalt nimmt der Slot keinen Platz ein.
+ */
+.zev-quarter-selector__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-left: var(--spacing-md);
+}
+
+.zev-quarter-selector__actions:empty {
+  display: none;
 }
 
 .zev-quarter-selector__label {

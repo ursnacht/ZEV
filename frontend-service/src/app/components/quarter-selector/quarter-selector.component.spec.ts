@@ -1,3 +1,4 @@
+import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { QuarterSelectorComponent } from './quarter-selector.component';
 import { TranslationService } from '../../services/translation.service';
@@ -193,5 +194,32 @@ describe('QuarterSelectorComponent', () => {
       const lastQuarter = component.quarters[component.quarters.length - 1];
       expect(lastQuarter.label).toBe(expectedLabel);
     });
+  });
+});
+
+/** Host mit projiziertem Inhalt - wie die Statistik mit ihrem Knopf "Anzeigen". */
+@Component({
+  standalone: true,
+  imports: [QuarterSelectorComponent],
+  template: '<app-quarter-selector><button id="projiziert">Anzeigen</button></app-quarter-selector>'
+})
+class HostMitAktionComponent {}
+
+describe('QuarterSelectorComponent - Aktions-Slot', () => {
+  it('should render projected content after the quarter buttons', async () => {
+    await TestBed.configureTestingModule({
+      imports: [HostMitAktionComponent],
+      providers: [
+        { provide: TranslationService, useValue: { translate: (k: string) => k } }
+      ]
+    }).compileComponents();
+    const fixture = TestBed.createComponent(HostMitAktionComponent);
+    fixture.detectChanges();
+
+    const selektor: HTMLElement = fixture.nativeElement.querySelector('.zev-quarter-selector');
+    const slot = selektor.querySelector('.zev-quarter-selector__actions')!;
+    expect(slot.querySelector('#projiziert')).not.toBeNull();
+    // Der Slot steht nach dem letzten Quartalsknopf
+    expect(selektor.lastElementChild).toBe(slot);
   });
 });
