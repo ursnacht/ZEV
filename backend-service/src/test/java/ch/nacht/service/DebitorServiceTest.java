@@ -195,6 +195,19 @@ public class DebitorServiceTest {
     }
 
     @Test
+    void create_SetztErstelltAmAufHeute_IgnoriertWertDesClients() {
+        // Manuell erfasst: Erfassungsdatum (Specs/Debitorkontrolle.md, FR „Erstellt am")
+        DebitorDTO dto = buildValidDTO();
+        dto.setErstelltAm(LocalDate.of(2000, 1, 1));
+        when(organizationContextService.getCurrentOrgId()).thenReturn(ORG_ID);
+        when(debitorRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        DebitorDTO result = debitorService.create(dto);
+
+        assertEquals(LocalDate.now(), result.getErstelltAm());
+    }
+
+    @Test
     void create_WithZahldatum_SavesSuccessfully() {
         DebitorDTO dto = buildValidDTO();
         dto.setZahldatum(BIS.plusDays(1)); // zahldatum > datumBis → valid
@@ -472,7 +485,8 @@ public class DebitorServiceTest {
                 Debitorherkunft.ZEV);
 
         verify(organizationContextService).getCurrentOrgId();
-        verify(debitorRepository).upsert(10L, new BigDecimal("125.50"), VON, BIS, ORG_ID, "ZEV");
+        verify(debitorRepository).upsert(eq(10L), eq(new BigDecimal("125.50")), eq(VON), eq(BIS), eq(ORG_ID), eq("ZEV"),
+            eq(LocalDate.now()));
     }
 
     // ==================== Helpers ====================
@@ -557,6 +571,7 @@ public class DebitorServiceTest {
         debitorService.upsertFromRechnung(10L, new BigDecimal("812.35"), VON, BIS,
                 Debitorherkunft.NK);
 
-        verify(debitorRepository).upsert(10L, new BigDecimal("812.35"), VON, BIS, ORG_ID, "NK");
+        verify(debitorRepository).upsert(eq(10L), eq(new BigDecimal("812.35")), eq(VON), eq(BIS), eq(ORG_ID), eq("NK"),
+            eq(LocalDate.now()));
     }
 }

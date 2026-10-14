@@ -542,3 +542,14 @@ ersten unsichtbar, obwohl sie offen ist und den ganzen Zeitraum betrifft.
   Rändern, ein Tag daneben, Einzeltag als Zeitraum.
 - **Nebenbefund, mitkorrigiert:** FR-2 nannte weiterhin den alten Unique-Constraint
   `(mieter_id, datum_von, org_id)`. Seit V126 gehört die `herkunft` dazu.
+
+---
+
+## Ergänzung 14.10.2026: Erstellt am (Spec FR-5)
+
+| Status | Phase | Beschreibung |
+|--------|-------|--------------|
+|  [x]   | 1. DB-Migration | `V182__Debitor_Erstellt_Am.sql`: Spalte `erstellt_am DATE`, Bestand = `CURRENT_DATE`, `NOT NULL`, Default, Kommentar, Übersetzung `DEBITOR_ERSTELLT_AM` |
+|  [x]   | 2. Backend | `Debitor.erstelltAm` (Default heute), `DebitorDTO.erstelltAm` (nur lesend); `DebitorRepository.upsert` setzt `erstellt_am` beim Einfügen und beim Aktualisieren offener Einträge (Parameter aus der Anwendung); `DebitorService.create` setzt heute, `update` lässt es stehen |
+|  [x]   | 3. Frontend | `debitor.model.ts` `erstelltAm`; Liste: sortierbare Spalte „Erstellt am" links vom Zahldatum |
+|  [x]   | 4. Tests | `DebitorRepositoryIT` (neu: Datum gesetzt, offen überschrieben, bezahlt unverändert), `DebitorServiceTest` (Upsert-Datum, manuell = heute), `debitorkontrolle-list.component.spec.ts` (Sortierung) |

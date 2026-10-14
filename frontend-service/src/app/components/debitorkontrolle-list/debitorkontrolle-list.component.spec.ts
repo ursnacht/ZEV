@@ -570,6 +570,16 @@ describe('DebitorkontrolleListComponent', () => {
       expect(component.debitoren[1].mieterName).toBe('Max Muster');
     });
 
+    it('should sort debitoren by erstelltAm (Specs/Debitorkontrolle.md, FR „Erstellt am")', () => {
+      component.debitoren = [
+        { id: 1, mieterId: 10, betrag: 1, datumVon: '2026-07-01', datumBis: '2026-09-30', erstelltAm: '2026-10-14' },
+        { id: 2, mieterId: 11, betrag: 2, datumVon: '2026-04-01', datumBis: '2026-06-30', erstelltAm: '2026-07-03' }
+      ];
+      component.sortColumn = null;
+      component.onSort('erstelltAm');
+      expect(component.debitoren.map(d => d.id)).toEqual([2, 1]);
+    });
+
     it('should sort debitoren by mieterName descending', () => {
       component.debitoren = [...mockDebitoren];
       component.sortColumn = 'mieterName';

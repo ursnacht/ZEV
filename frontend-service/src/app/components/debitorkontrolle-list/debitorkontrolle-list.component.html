@@ -89,6 +89,12 @@
                   <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
                 }
               </th>
+              <th class="zev-table__header--sortable" (click)="onSort('erstelltAm')">
+                {{ 'DEBITOR_ERSTELLT_AM' | translate }}
+                @if (sortColumn === 'erstelltAm') {
+                  <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+                }
+              </th>
               <th class="zev-table__header--sortable" (click)="onSort('zahldatum')">
                 {{ 'ZAHLDATUM' | translate }}
                 @if (sortColumn === 'zahldatum') {
@@ -127,6 +133,7 @@
                 <td class="zev-table__number">{{ debitor.betrag | swissNumber:2 }}</td>
                 <td>{{ debitor.datumVon | swissDate }}</td>
                 <td>{{ debitor.datumBis | swissDate }}</td>
+                <td>{{ debitor.erstelltAm ? (debitor.erstelltAm | swissDate) : '-' }}</td>
                 <td>{{ debitor.zahldatum ? (debitor.zahldatum | swissDate) : '-' }}</td>
                 <td>
                   <!-- Fehlender Wert = ZEV: Der Bestand vor V126 ist aus der Stromabrechnung

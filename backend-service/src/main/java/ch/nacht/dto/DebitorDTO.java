@@ -23,6 +23,8 @@ public class DebitorDTO {
     private LocalDate datumVon;
     private LocalDate datumBis;
     private LocalDate zahldatum;
+    /** Nur lesend: setzt der Server (Rechnungsgenerierung bzw. Erfassung), nie der Client. */
+    private LocalDate erstelltAm;
     private Debitorherkunft herkunft;
 
     public Long getId() {
@@ -79,6 +81,14 @@ public class DebitorDTO {
 
     public void setDatumBis(LocalDate datumBis) {
         this.datumBis = datumBis;
+    }
+
+    public LocalDate getErstelltAm() {
+        return erstelltAm;
+    }
+
+    public void setErstelltAm(LocalDate erstelltAm) {
+        this.erstelltAm = erstelltAm;
     }
 
     public LocalDate getZahldatum() {

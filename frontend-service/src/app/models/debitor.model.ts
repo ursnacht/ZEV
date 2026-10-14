@@ -16,6 +16,7 @@ export interface Debitor {
   datumVon: string;      // ISO: YYYY-MM-DD
   datumBis: string;      // ISO: YYYY-MM-DD
   zahldatum?: string;    // ISO: YYYY-MM-DD, optional
+  erstelltAm?: string;   // ISO: YYYY-MM-DD; nur lesend, setzt der Server (Rechnungsgenerierung)
   /** Fehlt sie im Request, setzt der Server `ZEV` - der Bestand ist so entstanden. */
   herkunft?: DebitorHerkunft;
 }

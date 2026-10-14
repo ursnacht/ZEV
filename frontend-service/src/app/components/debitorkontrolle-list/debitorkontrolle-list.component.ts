@@ -48,7 +48,7 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
    */
   herkunftFilter: DebitorHerkunftFilter = 'ALLE';
 
-  sortColumn: 'mieterName' | 'betrag' | 'datumVon' | 'datumBis' | 'zahldatum' | 'status' | 'herkunft' | null = 'mieterName';
+  sortColumn: 'mieterName' | 'betrag' | 'datumVon' | 'datumBis' | 'erstelltAm' | 'zahldatum' | 'status' | 'herkunft' | null = 'mieterName';
   sortDirection: 'asc' | 'desc' = 'asc';
 
   menuItemsOffen: KebabMenuItem[] = [
@@ -363,7 +363,7 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
     });
   }
 
-  onSort(column: 'mieterName' | 'betrag' | 'datumVon' | 'datumBis' | 'zahldatum' | 'status'
+  onSort(column: 'mieterName' | 'betrag' | 'datumVon' | 'datumBis' | 'erstelltAm' | 'zahldatum' | 'status'
     | 'herkunft'): void {
     if (this.sortColumn === column) {
       this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';

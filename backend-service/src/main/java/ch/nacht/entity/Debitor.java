@@ -56,12 +56,28 @@ public class Debitor {
     @Column(name = "zahldatum")
     private LocalDate zahldatum;
 
+    /**
+     * Datum der letzten Rechnungsgenerierung, die diesen Eintrag geschrieben hat
+     * (Specs/Debitorkontrolle.md, FR „Erstellt am"). Bei einer bezahlten Forderung bleibt es stehen
+     * - wie der Betrag. Manuell erfasst: Erfassungsdatum.
+     */
+    @Column(name = "erstellt_am", nullable = false)
+    private LocalDate erstelltAm = LocalDate.now();
+
     @NotNull(message = "Herkunft is required")
     @Enumerated(EnumType.STRING)
     @Column(name = "herkunft", length = 10, nullable = false)
     private Debitorherkunft herkunft = Debitorherkunft.ZEV;
 
     public Debitor() {
+    }
+
+    public LocalDate getErstelltAm() {
+        return erstelltAm;
+    }
+
+    public void setErstelltAm(LocalDate erstelltAm) {
+        this.erstelltAm = erstelltAm;
     }
 
     public Long getId() {

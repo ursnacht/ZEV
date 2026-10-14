@@ -45,6 +45,7 @@
   NK-Jahresabrechnung und die ZEV-Quartalsrechnung denselben `datum_von` haben und die eine Buchung
   die andere sonst überschrieben hätte (`Specs/Nebenkosten/RechnungenGenerieren.md`, FR-5).
 * `herkunft` (varchar(10), Pflicht, `ZEV` \| `NK`, Default `ZEV`) – Herkunft der Forderung
+* `erstellt_am` (date, Pflicht, Default `CURRENT_DATE`) – Datum der letzten Rechnungsgenerierung, die den Eintrag geschrieben hat (FR-5, V182)
 * `ON DELETE CASCADE` auf `mieter_id`: Wird ein Mieter gelöscht, werden zugehörige Debitor-Einträge automatisch mitgelöscht
 * Der GET-Endpunkt liefert im `DebitorDTO` die Felder `mieterName` und `einheitName` per JOIN auf `mieter` und `einheit` (keine Denormalisierung)
 * Flyway-Migration für die neue Tabelle
@@ -64,6 +65,22 @@
 * Wird für denselben `(mieter_id, datum_von, org_id)` ein Eintrag erneut generiert, wird der bestehende Eintrag aktualisiert (Upsert), sofern `zahldatum` noch nicht gesetzt ist.
 * Die Erstellung erfolgt innerhalb derselben Transaktion wie die Rechnungsgenerierung; schlägt die Generierung fehl, wird kein Eintrag erstellt.
 
+### FR-5: Erstellt am (Entscheid vom 14.10.2026)
+* **Neue Spalte** `debitor.erstellt_am` (`DATE`, Pflicht): das Datum der **letzten Rechnungsgenerierung**, die den Eintrag geschrieben hat — ZEV- wie NK-Rechnungen.
+* **Rechnungsgenerierung (Upsert, FR-3):** Ein neuer Eintrag erhält das heutige Datum; ein bestehender **offener** Eintrag wird mit dem heutigen Datum überschrieben — zusammen mit Betrag und Datum bis.
+  * **Bezahlte Einträge bleiben unberührt**, wie heute schon Betrag und Zeitraum (`WHERE zahldatum IS NULL`). Sonst trüge eine bezahlte Rechnung das Datum einer späteren, nie versandten Neuberechnung.
+  * Das Datum kommt aus der Anwendung (Ortszeit), nicht aus `CURRENT_DATE` der Datenbank.
+* **Manuell erfasst** (Formular): Erfassungsdatum. Beim Bearbeiten bleibt es; ein vom Client mitgeschickter Wert wird nie übernommen. Im Formular erscheint es nicht.
+* **Datenmigration** (`V182__Debitor_Erstellt_Am.sql`): Bestehende Einträge erhalten das **Datum der Migration**; danach `NOT NULL`. Übersetzung `DEBITOR_ERSTELLT_AM` („Erstellt am").
+* **Anzeige:** Spalte „Erstellt am" in der Tabelle **links vom Zahldatum**, Schweizer Format, sortierbar.
+* **Akzeptanzkriterien:**
+  * [x] Ein beim Rechnungsgenerieren neu angelegter Eintrag trägt das Datum der Generierung.
+  * [x] Ein erneutes Generieren überschreibt bei einem offenen Eintrag „Erstellt am" mit dem neuen Datum.
+  * [x] Bei einem bezahlten Eintrag bleibt „Erstellt am" unverändert (wie Betrag und Zeitraum).
+  * [x] Ein manuell erfasster Eintrag trägt das Erfassungsdatum; ein mitgeschickter Wert wird ignoriert; Bearbeiten ändert es nicht.
+  * [x] Bestehende Einträge haben nach der Migration das Datum der Migration; die Spalte ist danach Pflicht.
+  * [x] Die Tabelle zeigt „Erstellt am" links von „Zahldatum" im Format `dd.MM.yyyy`; die Spalte ist sortierbar.
+
 ### FR-4: Layout
 * Neue Route `/debitoren` mit Komponente `DebitorkontrolleComponent`
 * Neuer Menüeintrag "Debitorkontrolle" (unter "Rechnungen")
@@ -77,6 +94,7 @@
      * Betrag (CHF, rechtsbündig)
      * Datum von (Schweizer Format `dd.MM.yyyy`)
      * Datum bis (Schweizer Format)
+     * Erstellt am (Schweizer Format; FR-5)
      * Zahldatum (Schweizer Format, "-" wenn leer)
      * Status ("Bezahlt" / "Offen", abgeleitet vom Zahldatum): "Offen" → Design-System-Badge `zev-status--warning`, "Bezahlt" → `zev-status--success`
      * Aktionen (Kebab-Menü: Bearbeiten, **Heute**, **Gestern**, **Zahldatum löschen** (nur wenn Zahldatum gesetzt), Löschen)

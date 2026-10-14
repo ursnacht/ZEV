@@ -100,6 +100,8 @@ public class DebitorService {
         debitor.setDatumBis(dto.getDatumBis());
         debitor.setZahldatum(dto.getZahldatum());
         debitor.setHerkunft(herkunftOderZev(dto));
+        // Manuell erfasst: Erfassungsdatum - ein mitgeschickter Wert wird nicht uebernommen
+        debitor.setErstelltAm(LocalDate.now());
         Debitor saved = debitorRepository.save(debitor);
         log.info("Created debitor entry id={} for mieterId={}", saved.getId(), saved.getMieterId());
         return toDTO(saved);
@@ -150,7 +152,7 @@ public class DebitorService {
     /**
      * Upsert a debitor entry from invoice generation.
      * Only invoices with a mieter are persisted.
-     * Updates betrag/datumBis only if zahldatum is not yet set.
+     * Updates betrag/datumBis/erstelltAm only if zahldatum is not yet set.
      *
      * <p>Das Upsert ist <b>je Herkunft</b> idempotent: Ein wiederholter Lauf aktualisiert seine
      * eigene Forderung und laesst die der anderen Herkunft unberuehrt
@@ -166,7 +168,8 @@ public class DebitorService {
     public void upsertFromRechnung(Long mieterId, BigDecimal betrag, LocalDate datumVon, LocalDate datumBis,
                                    Debitorherkunft herkunft) {
         Long orgId = organizationContextService.getCurrentOrgId();
-        debitorRepository.upsert(mieterId, betrag, datumVon, datumBis, orgId, herkunft.name());
+        // Datum der Rechnungsgenerierung; bei bezahlten Forderungen laesst das Upsert es stehen
+        debitorRepository.upsert(mieterId, betrag, datumVon, datumBis, orgId, herkunft.name(), LocalDate.now());
         log.info("Upserted debitor for mieterId={}, datumVon={}, betrag={}, herkunft={}",
                 mieterId, datumVon, betrag, herkunft);
     }
@@ -237,6 +240,7 @@ public class DebitorService {
         dto.setDatumVon(d.getDatumVon());
         dto.setDatumBis(d.getDatumBis());
         dto.setZahldatum(d.getZahldatum());
+        dto.setErstelltAm(d.getErstelltAm());
         dto.setHerkunft(d.getHerkunft());
         mieterRepository.findFirstById(d.getMieterId()).ifPresent(m -> {
             dto.setMieterName(m.getName());

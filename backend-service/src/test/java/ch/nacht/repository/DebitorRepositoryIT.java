@@ -51,6 +51,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("test")
 class DebitorRepositoryIT extends AbstractIntegrationTest {
 
+    /** Datum der Rechnungsgenerierung in den Upsert-Tests - bewusst nicht heute. */
+    private static final LocalDate GENERIERT = LocalDate.of(2030, 1, 15);
+
     @Autowired
     private DebitorRepository debitorRepository;
 
@@ -159,7 +162,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
         syncMitDatenbank();
 
         debitorRepository.upsert(fremder.getMieterId(), new BigDecimal("1.00"),
-                LocalDate.of(2026, 2, 1), LocalDate.of(2026, 2, 28), TEST_ORG_ID, Debitorherkunft.ZEV.name());
+                LocalDate.of(2026, 2, 1), LocalDate.of(2026, 2, 28), TEST_ORG_ID, Debitorherkunft.ZEV.name(), GENERIERT);
         syncMitDatenbank();
 
         aktiviereOrgFilter(entityManager, ANDERE_ORG_ID);
@@ -389,7 +392,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldInsertNewDebitorViaUpsert() {
         debitorRepository.upsert(mieterAId, new BigDecimal("250.00"),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name());
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name(), GENERIERT);
         syncMitDatenbank();
 
         List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
@@ -399,8 +402,9 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
         assertThat(result.get(0).getMieterId()).isEqualTo(mieterAId);
         assertThat(result.get(0).getBetrag()).isEqualByComparingTo("250.00");
         assertThat(result.get(0).getDatumBis()).isEqualTo(LocalDate.of(2026, 3, 31));
-        // Ein neu erzeugter Eintrag ist offen
+        // Ein neu erzeugter Eintrag ist offen und traegt das Datum der Rechnungsgenerierung
         assertThat(result.get(0).getZahldatum()).isNull();
+        assertThat(result.get(0).getErstelltAm()).isEqualTo(GENERIERT);
     }
 
     @Test
@@ -411,7 +415,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
         syncMitDatenbank();
 
         debitorRepository.upsert(mieterAId, new BigDecimal("175.50"),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name());
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name(), GENERIERT);
         syncMitDatenbank();
 
         List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
@@ -420,6 +424,8 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getBetrag()).isEqualByComparingTo("175.50");
         assertThat(result.get(0).getDatumBis()).isEqualTo(LocalDate.of(2026, 3, 31));
+        // Erstellt am = Datum der letzten Generierung
+        assertThat(result.get(0).getErstelltAm()).isEqualTo(GENERIERT);
     }
 
     @Test
@@ -431,7 +437,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
         syncMitDatenbank();
 
         debitorRepository.upsert(mieterAId, new BigDecimal("999.00"),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 30), TEST_ORG_ID, Debitorherkunft.ZEV.name());
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 30), TEST_ORG_ID, Debitorherkunft.ZEV.name(), GENERIERT);
         syncMitDatenbank();
 
         List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
@@ -441,15 +447,17 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
         assertThat(result.get(0).getBetrag()).isEqualByComparingTo("100.00");
         assertThat(result.get(0).getDatumBis()).isEqualTo(LocalDate.of(2026, 3, 31));
         assertThat(result.get(0).getZahldatum()).isEqualTo(LocalDate.of(2026, 4, 10));
+        // Auch das Erstellungsdatum bleibt - die bezahlte Rechnung ist nicht neu erstellt worden
+        assertThat(result.get(0).getErstelltAm()).isNotEqualTo(GENERIERT);
     }
 
     @Test
     void shouldCreateSeparateEntriesForDifferentPeriods() {
         // Der Schluessel enthaelt datum_von: Ein neues Quartal ergibt einen neuen Eintrag
         debitorRepository.upsert(mieterAId, new BigDecimal("100.00"),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name());
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name(), GENERIERT);
         debitorRepository.upsert(mieterAId, new BigDecimal("200.00"),
-                LocalDate.of(2026, 4, 1), LocalDate.of(2026, 6, 30), TEST_ORG_ID, Debitorherkunft.ZEV.name());
+                LocalDate.of(2026, 4, 1), LocalDate.of(2026, 6, 30), TEST_ORG_ID, Debitorherkunft.ZEV.name(), GENERIERT);
         syncMitDatenbank();
 
         List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
@@ -463,9 +471,9 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
     @Test
     void shouldCreateSeparateEntriesForDifferentMieter() {
         debitorRepository.upsert(mieterAId, new BigDecimal("100.00"),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name());
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name(), GENERIERT);
         debitorRepository.upsert(mieterBId, new BigDecimal("200.00"),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name());
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name(), GENERIERT);
         syncMitDatenbank();
 
         List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
@@ -481,9 +489,9 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
         // org_id gehoert zum Schluessel: Derselbe Mieter und Zeitraum in einem anderen Mandanten
         // ergibt einen eigenen Eintrag statt eines Konflikts
         debitorRepository.upsert(mieterAId, new BigDecimal("100.00"),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name());
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name(), GENERIERT);
         debitorRepository.upsert(mieterAId, new BigDecimal("200.00"),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), ANDERE_ORG_ID, Debitorherkunft.ZEV.name());
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), ANDERE_ORG_ID, Debitorherkunft.ZEV.name(), GENERIERT);
         syncMitDatenbank();
 
         // Ohne aktiven Org-Filter sind beide sichtbar - das Trennen ist Aufgabe des Service
@@ -500,7 +508,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
         // Mehrere Laeufe hintereinander duerfen die Tabelle nicht aufblaehen
         for (int lauf = 1; lauf <= 3; lauf++) {
             debitorRepository.upsert(mieterAId, new BigDecimal(lauf * 100 + ".00"),
-                    LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name());
+                    LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID, Debitorherkunft.ZEV.name(), GENERIERT);
             syncMitDatenbank();
         }
 
@@ -527,10 +535,10 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
     void upsertMitVerschiedenerHerkunft_ErzeugtZweiForderungen() {
         debitorRepository.upsert(mieterAId, new BigDecimal("250.00"),
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID,
-                Debitorherkunft.ZEV.name());
+                Debitorherkunft.ZEV.name(), GENERIERT);
         debitorRepository.upsert(mieterAId, new BigDecimal("812.35"),
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), TEST_ORG_ID,
-                Debitorherkunft.NK.name());
+                Debitorherkunft.NK.name(), GENERIERT);
         syncMitDatenbank();
 
         List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
@@ -548,16 +556,16 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
     void upsertNK_LaesstZEVForderungUnberuehrt() {
         debitorRepository.upsert(mieterAId, new BigDecimal("250.00"),
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID,
-                Debitorherkunft.ZEV.name());
+                Debitorherkunft.ZEV.name(), GENERIERT);
         debitorRepository.upsert(mieterAId, new BigDecimal("100.00"),
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), TEST_ORG_ID,
-                Debitorherkunft.NK.name());
+                Debitorherkunft.NK.name(), GENERIERT);
         syncMitDatenbank();
 
         // Zweiter NK-Lauf mit geaendertem Betrag
         debitorRepository.upsert(mieterAId, new BigDecimal("199.95"),
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), TEST_ORG_ID,
-                Debitorherkunft.NK.name());
+                Debitorherkunft.NK.name(), GENERIERT);
         syncMitDatenbank();
 
         List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
@@ -582,10 +590,10 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
     void upsertZEV_FunktioniertNachDemSchluesseltausch() {
         debitorRepository.upsert(mieterAId, new BigDecimal("100.00"),
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID,
-                Debitorherkunft.ZEV.name());
+                Debitorherkunft.ZEV.name(), GENERIERT);
         debitorRepository.upsert(mieterAId, new BigDecimal("175.50"),
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), TEST_ORG_ID,
-                Debitorherkunft.ZEV.name());
+                Debitorherkunft.ZEV.name(), GENERIERT);
         syncMitDatenbank();
 
         List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
@@ -601,7 +609,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
     void upsertNK_BezahlteForderung_BleibtUnveraendert() {
         debitorRepository.upsert(mieterAId, new BigDecimal("100.00"),
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), TEST_ORG_ID,
-                Debitorherkunft.NK.name());
+                Debitorherkunft.NK.name(), GENERIERT);
         syncMitDatenbank();
 
         Debitor bezahlt = debitorRepository.findByZeitraumUeberschneidung(
@@ -612,7 +620,7 @@ class DebitorRepositoryIT extends AbstractIntegrationTest {
 
         debitorRepository.upsert(mieterAId, new BigDecimal("999.00"),
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), TEST_ORG_ID,
-                Debitorherkunft.NK.name());
+                Debitorherkunft.NK.name(), GENERIERT);
         syncMitDatenbank();
 
         List<Debitor> result = debitorRepository.findByZeitraumUeberschneidung(
