@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { createSpyObj, SpyObj } from '../../../testing/spy';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { EinspeisesteuerungComponent } from './einspeisesteuerung.component';
 import { EinspeisesteuerungService } from '../../services/einspeisesteuerung.service';
 import { PreiszeitreiheService } from '../../services/preiszeitreihe.service';
@@ -304,6 +304,104 @@ describe('EinspeisesteuerungComponent', () => {
 
       expect(text).not.toContain('STEUERUNG_NOCH_KEIN_ENTSCHEID');
       expect(text).toContain('STEUERUNG_UEBERSCHUSS');
+    });
+
+    /** Morgen liegt oft NUR die Prognose vor - der Tooltip nennt sie, statt leer zu bleiben. */
+    it('should show the forecast for an interval with neither decision nor price', () => {
+      component.entscheide = [];
+      component.preise = [];
+      component.prognose = [prognosepunkt('2026-10-15T12:00:00', 640, 4.25)];
+
+      const text = privat().tooltip(ms('2026-10-15T12:00:00'));
+
+      expect(text).toContain('15.10.2026 12:00');
+      expect(text).toContain('LADEPLANUNG_EINSTRAHLUNG: 640');
+      expect(text).toContain('LADEPLANUNG_PROGNOSE: 4.250');
+      expect(text).toContain('STEUERUNG_NOCH_KEIN_ENTSCHEID');
+      expect(text).not.toContain('PREIS_CHF_KWH');
+    });
+
+    /** Liegen Preis und Prognose vor, aber kein Entscheid, nennt der Tooltip beide. */
+    it('should show price and forecast together for an interval without a decision', () => {
+      component.entscheide = [];
+      component.preise = [preispunkt('2026-10-15T12:00:00', 0.19)];
+      component.prognose = [prognosepunkt('2026-10-15T12:00:00', 640, null)];
+
+      const text = privat().tooltip(ms('2026-10-15T12:00:00'));
+
+      expect(text).toContain('PREIS_CHF_KWH');
+      expect(text).toContain('LADEPLANUNG_EINSTRAHLUNG');
+      // Ohne gelernten Faktor keine erwartete Erzeugung - auch keine leere Zeile
+      expect(text).not.toContain('LADEPLANUNG_PROGNOSE');
+    });
+  });
+
+  // ==================== Teilweise Daten (14.10.2026) ====================
+
+  describe('hatKurven', () => {
+    it('should be false when nothing is available', () => {
+      component.entscheide = [];
+      component.preise = [];
+      component.prognose = [];
+
+      expect(component.hatKurven()).toBe(false);
+    });
+
+    /** Der Anlass der Aenderung: Fuer morgen liegt nur die Prognose vor - gezeichnet wird trotzdem. */
+    it('should be true with only the forecast', () => {
+      component.entscheide = [];
+      component.preise = [];
+      component.prognose = [prognosepunkt('2026-10-15T12:00:00', 640)];
+
+      expect(component.hatKurven()).toBe(true);
+    });
+
+    it('should be true with only prices', () => {
+      component.entscheide = [];
+      component.preise = [preispunkt('2026-10-15T12:00:00', 0.19)];
+      component.prognose = [];
+
+      expect(component.hatKurven()).toBe(true);
+    });
+
+    it('should be true with decisions', () => {
+      component.entscheide = [entscheid('2026-10-14T08:00:00')];
+      component.preise = [];
+      component.prognose = [];
+
+      expect(component.hatKurven()).toBe(true);
+    });
+  });
+
+  describe('Tageswechsel', () => {
+    /**
+     * Seit das Diagramm schon mit einer Kurve zeichnet, darf die Prognose des Vortages nicht stehen
+     * bleiben, bis die Antwort fuer den neuen Tag da ist - sonst stuende sie allein im Bild.
+     */
+    it('should drop forecast and prices of the previous day', () => {
+      component.prognose = [prognosepunkt('2026-10-14T12:00:00', 640)];
+      component.preise = [preispunkt('2026-10-14T12:00:00', 0.19)];
+      steuerungServiceSpy.getPrognose.mockReturnValue(NEVER);
+      preiszeitreiheServiceSpy.getPunkte.mockReturnValue(NEVER);
+
+      component.naechsterTag();
+
+      expect(component.prognose).toEqual([]);
+      expect(component.preise).toEqual([]);
+      expect(component.hatKurven()).toBe(false);
+    });
+
+    /** Aktualisieren bleibt beim selben Tag - die Kurven bleiben bis zur neuen Antwort stehen. */
+    it('should keep forecast and prices when refreshing the same day', () => {
+      component.prognose = [prognosepunkt('2026-10-14T12:00:00', 640)];
+      component.preise = [preispunkt('2026-10-14T12:00:00', 0.19)];
+      steuerungServiceSpy.getPrognose.mockReturnValue(NEVER);
+      preiszeitreiheServiceSpy.getPunkte.mockReturnValue(NEVER);
+
+      component.aktualisieren();
+
+      expect(component.prognose.length).toBe(1);
+      expect(component.preise.length).toBe(1);
     });
   });
 

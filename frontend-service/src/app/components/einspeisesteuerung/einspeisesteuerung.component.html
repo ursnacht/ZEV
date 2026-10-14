@@ -80,6 +80,16 @@
     </div>
   }
 
+  <!-- Hinweis UEBER dem Diagramm, als Meldung (Design System, kein eigenes CSS). Im Panel lag er
+       unter der Diagrammflaeche - mit oder ohne gezeichnete Kurven ausserhalb des sichtbaren
+       Bereichs. Er sagt, warum Produktion, Verbrauch, Baender und Protokoll fehlen; Preis und
+       Prognose (z.B. morgen) zeichnet das Diagramm trotzdem. -->
+  @if (!loading && entscheide.length === 0) {
+    <div class="zev-message zev-message--info zev-message--statisch" id="keine-entscheide">
+      <span>{{ 'STEUERUNG_KEINE_ENTSCHEIDE' | translate }}</span>
+    </div>
+  }
+
   <!-- Der Behaelter bleibt IMMER im DOM: ECharts braucht ein gemessenes Element. Steht er hinter
        einem `@if`, existiert er im Moment des Zeichnens noch nicht - `zeichne()` bricht dann still
        ab, und die Seite zeigt Tabelle ohne Diagramm. Genau das ist hier passiert. Ladezustand und
@@ -89,9 +99,6 @@
       <div #diagramm class="steuerung-diagramm"></div>
       @if (loading) {
         <div class="zev-spinner"></div>
-      }
-      @if (!loading && entscheide.length === 0) {
-        <p class="zev-empty-state">{{ 'STEUERUNG_KEINE_ENTSCHEIDE' | translate }}</p>
       }
     </div>
   </div>

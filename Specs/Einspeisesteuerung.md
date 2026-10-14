@@ -516,6 +516,22 @@ wie der NK-Eintrag).
      Entscheide zurück, statt neu zu laden.
 3. **Diagramm** in `zev-panel--chart` (ECharts, dynamisch nachgeladen wie
    `preiszeitreihe-chart`):
+   * **Gezeichnet wird, sobald mindestens eine Kurve Werte hat** — Entscheide, Preise **oder**
+     Prognose (Entscheid vom 14.10.2026). Fehlende Kurven bleiben einfach weg; gezeigt wird so viel
+     wie möglich.
+     > **Anlass:** Für morgen liegt die erwartete Einstrahlung schon vor, ab dem frühen Nachmittag
+     > auch die Preise — Entscheide gibt es aber erst, wenn die Intervalle abgelaufen sind. Bis
+     > dahin blieb das Diagramm leer, obwohl gerade der Blick auf den nächsten Tag interessiert.
+     >
+     > Ohne Entscheide fehlen Produktion, Verbrauch, Ladezustand und die Zustandsbänder; die
+     > Achsen und die Legende bleiben gleich. Der Hinweis `STEUERUNG_KEINE_ENTSCHEIDE` steht als
+     > Info-Meldung **über dem Diagramm** (unter der Datumszeile) und erklärt, warum — im Panel lag
+     > er unter der Diagrammfläche und damit ausserhalb des sichtbaren Bereichs, mit wie ohne
+     > gezeichnete Kurven.
+     >
+     > **Beim Tageswechsel** werden Preise und Prognose des bisherigen Tages verworfen, bevor die
+     > neuen geladen sind. Sonst stünde die Kurve des Vortages kurz allein im Bild — bei einem Tag
+     > ohne Daten sogar dauerhaft. *Aktualisieren* behält sie bis zur neuen Antwort (kein Flackern).
    * **Stufenlinie** Einspeisepreis (CHF/kWh, linke y-Achse) — `step: 'end'`, ohne Flächenfüllung:
      Ein Preis gilt für die ganze Viertelstunde.
      > **Sie deckt den ganzen Tag ab**, nicht nur die ausgewerteten Intervalle. Die Preise stammen
@@ -943,6 +959,14 @@ Der Text ist an kein Feature gebunden.
 * [ ] Der Tooltip zeigt für ein Intervall **ohne** Entscheid Zeit, Preis und **Noch nicht
       ausgewertet** — und für jedes Intervall **mit** Entscheid dessen eigene Werte, unabhängig
       davon, wie viele Preispunkte davor liegen.
+* [x] Liegt für einen Tag (z.B. morgen) **nur** die Prognose vor, zeichnet das Diagramm die
+      erwartete Erzeugung; liegen nur Preise vor, die Preiskurve. Ohne jede Kurve bleibt es leer.
+* [x] Der Tooltip zeigt für ein Intervall ohne Entscheid neben dem Preis auch Einstrahlung und
+      erwartete Erzeugung, sofern vorhanden — auch dann, wenn kein Preis vorliegt.
+* [x] Ohne Entscheide steht der Hinweis `STEUERUNG_KEINE_ENTSCHEIDE` als Info-Meldung über dem
+      Diagramm — sichtbar ohne Scrollen, mit wie ohne gezeichnete Kurven.
+* [x] Beim Wechsel auf einen anderen Tag erscheinen keine Kurven des vorher angezeigten Tages;
+      *Aktualisieren* lässt die Kurven bis zur neuen Antwort stehen.
 * [ ] Scheitert die Preisabfrage oder ist das Flag `PREISZEITREIHE` aus, zeigt die Kurve die Preise
       aus den Entscheiden — sie verschwindet **nicht**.
 * [ ] Zwischen Diagramm und Protokoll stehen die **Tagessummen** von Produktion, Verbrauch und
@@ -1120,8 +1144,8 @@ Der Job protokolliert auf `INFO` nach demselben Muster wie `ZaehlerAggregationSe
 | **Keine Messwerte für das Intervall** | Produktion und Verbrauch `0`, Überschuss `0` → `KEIN_UEBERSCHUSS`, sofern keine Preisregel greift. Der Entscheid wird geschrieben, damit die Lücke **sichtbar** ist statt unsichtbar. |
 | **Nachrechnen für einen Tag ohne Messwerte** | Leere Liste; die Ansicht zeigt den Hinweis „keine Entscheide“ wie bei einem Tag ohne Aufzeichnung. Kein Fehler — der Tag hat schlicht keine Grundlage. |
 | **Messwerte treffen verspätet ein** (MQTT-Ausfall) | Der nächste Lauf überschreibt den Entscheid des betroffenen Intervalls per Upsert. Ein Nachlauf über ältere Intervalle ist **nicht** vorgesehen (§7). |
-| **Leerer Tag in der Ansicht** | Hinweis `STEUERUNG_KEINE_ENTSCHEIDE`, kein leeres Diagrammgerüst. |
-| **Datum in der Zukunft** | Leere Liste mit demselben Hinweis, kein Fehler. |
+| **Leerer Tag in der Ansicht** | Hinweis `STEUERUNG_KEINE_ENTSCHEIDE` als Info-Meldung über dem Diagramm. Liegen Preise oder Prognose vor, zeichnet das Diagramm diese (seit 14.10.2026). |
+| **Datum in der Zukunft** | Leere Liste mit demselben Hinweis, kein Fehler. Prognose und — sobald veröffentlicht — Preise des Tages erscheinen im Diagramm. |
 | **`von` nach `bis`** beim Nachrechnen | `400` mit lesbarem Klartext. |
 | **Zeitraum über 366 Tage** | `400`. |
 | **Zeitumstellung Frühling** | Die Stunde 02:00–03:00 entfällt; der Ortstag hat 92 Intervalle. Es entsteht eine Lücke, sonst nichts. |

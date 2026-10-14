@@ -151,6 +151,9 @@ export class EinspeisesteuerungComponent extends WithMessage
 
   readonly regeln = STEUERREGELN;
 
+  /** Tag, dessen Prognose und Preise gerade gehalten werden — erkennt den Tageswechsel. */
+  private geladenesDatum: string | null = null;
+
   private echarts: EChartsCore = null;
   private instanz?: { setOption: (o: unknown, n?: boolean) => void; resize: () => void; dispose: () => void };
   private resizeObserver?: ResizeObserver;
@@ -184,6 +187,16 @@ export class EinspeisesteuerungComponent extends WithMessage
    */
   ladeTag(): void {
     this.loading = true;
+    // Beim Tageswechsel die Kurven des VORTAGES verwerfen. Seit das Diagramm schon mit einer
+    // einzigen Kurve zeichnet, stuende sonst bis zum Eintreffen der neuen Antworten die Prognose
+    // des alten Tages auf der Zeitachse des neuen - oder ganz allein, wenn der neue keine hat.
+    // Beim Aktualisieren desselben Tages bleiben sie stehen, sonst flackerte das Diagramm.
+    if (this.datum !== this.geladenesDatum) {
+      this.prognose = [];
+      this.prognoseJeZeit = new Map();
+      this.preise = [];
+      this.geladenesDatum = this.datum;
+    }
     const quelle = this.simuliertMitSchwellwert != null
       ? this.steuerungService.getEntscheideSimuliert(this.datum, this.simuliertMitSchwellwert,
           null, this.simuliertMitAbstand)
@@ -651,7 +664,7 @@ export class EinspeisesteuerungComponent extends WithMessage
    * ab 11:30 frei".
    */
   private async zeichne(): Promise<void> {
-    if (this.entscheide.length === 0) {
+    if (!this.hatKurven()) {
       this.instanz?.dispose();
       this.instanz = undefined;
       return;
@@ -669,6 +682,17 @@ export class EinspeisesteuerungComponent extends WithMessage
       this.resizeObserver.observe(behaelter);
     }
     this.instanz.setOption(this.optionen(), true);
+  }
+
+  /**
+   * Liegt für den Tag **mindestens eine** Kurve vor — Entscheide, Preise oder Prognose?
+   *
+   * <p>Dann wird gezeichnet, was da ist. Bis zum 14.10.2026 zeichnete das Diagramm nur mit
+   * Entscheiden: Für morgen blieb es leer, obwohl die erwartete Erzeugung (und ab dem frühen
+   * Nachmittag auch die Preise) längst vorlagen — gerade der Blick auf den nächsten Tag fehlte.
+   */
+  hatKurven(): boolean {
+    return this.entscheide.length > 0 || this.preise.length > 0 || this.prognose.length > 0;
   }
 
   /** Lädt `echarts` beim ersten Zeichnen nach. `false`, wenn das misslingt. */
@@ -1065,13 +1089,21 @@ export class EinspeisesteuerungComponent extends WithMessage
     const t = (key: string) => this.translationService.translate(key);
     const e = this.entscheideJeZeit().get(zeitpunkt);
     if (!e) {
-      // Ein Intervall des Resttages: Es gibt noch keinen Entscheid, wohl aber den Preis. Statt
-      // eines leeren Tooltips die beiden Groessen, die feststehen - sonst wirkte die Kurve tot.
+      // Ein Intervall des Resttages oder eines kuenftigen Tages: Es gibt noch keinen Entscheid,
+      // wohl aber Preis und/oder Prognose. Statt eines leeren Tooltips die Groessen, die schon
+      // feststehen - sonst wirkte die Kurve tot. Fuer morgen liegt oft NUR die Prognose vor.
       const preis = this.preise.find(p => new Date(p.zeit).getTime() === zeitpunkt);
-      return preis == null ? ''
-        : `${formatSwissDateTime(new Date(preis.zeit))}<br>`
-          + `${t('PREIS_CHF_KWH')}: ${this.preis(preis.preis) || '–'}<br>`
-          + `<i>${t('STEUERUNG_NOCH_KEIN_ENTSCHEID')}</i>`;
+      const prognose = this.prognose.find(p => new Date(p.zeit).getTime() === zeitpunkt);
+      if (preis == null && prognose == null) {
+        return '';
+      }
+      return `${formatSwissDateTime(new Date(zeitpunkt))}<br>`
+        + (preis == null ? '' : `${t('PREIS_CHF_KWH')}: ${this.preis(preis.preis) || '–'}<br>`)
+        + (prognose == null ? ''
+          : `${t('LADEPLANUNG_EINSTRAHLUNG')}: ${formatSwissNumber(prognose.gti, 0)} W/m²<br>`
+          + (prognose.erwarteteErzeugung == null ? ''
+            : `${t('LADEPLANUNG_PROGNOSE')}: ${this.menge(prognose.erwarteteErzeugung)} kWh<br>`))
+        + `<i>${t('STEUERUNG_NOCH_KEIN_ENTSCHEID')}</i>`;
     }
     return `${formatSwissDateTime(new Date(e.zeit))}<br>`
       + `${t('PREIS_CHF_KWH')}: ${this.preis(e.preis) || '–'}<br>`

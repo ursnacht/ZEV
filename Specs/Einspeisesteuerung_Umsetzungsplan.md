@@ -1110,3 +1110,15 @@ knapp unter dem damaligen Preis. Ohne Wirkung, weil nachts kein Überschuss anf�
 > (Begrenzung auf die Erzeugungszeit oder die SOC-Rampe). Bewusst **noch nicht** umgesetzt: Mit dem
 > Abstand fallen die meisten langen Sperren ohnehin weg; ob der verbleibende Fall häufig genug ist,
 > um eine weitere Regel zu rechtfertigen, zeigen erst ein paar Wochen. Ein Problem auf einmal.
+
+---
+
+## Nachtrag 24 — Diagramm auch mit teilweisen Daten (14.10.2026)
+
+| Status | Phase | Beschreibung |
+|--------|-------|--------------|
+|  [x]   | 1. Komponente | `zeichne()` prüft `hatKurven()` (Entscheide, Preise **oder** Prognose) statt nur der Entscheide; `ladeTag()` verwirft Prognose und Preise beim Tageswechsel (`geladenesDatum`), nicht beim Aktualisieren; Tooltip ohne Entscheid nennt Preis, Einstrahlung und erwartete Erzeugung, soweit vorhanden; Hinweis „keine Entscheide“ als `zev-message--info` über dem Diagramm statt `zev-empty-state` im Panel (lag dort unter der Diagrammfläche) |
+|  [x]   | 2. Tests | `einspeisesteuerung.component.spec.ts`: `hatKurven` (nichts / nur Prognose / nur Preise / Entscheide), Tooltip mit nur Prognose bzw. Preis + Prognose ohne Faktor, Tageswechsel verwirft, Aktualisieren behält |
+
+Backend unverändert: `/api/steuerung/prognose` und `/api/preiszeitreihe` liefern auch für künftige
+Tage, sobald Daten vorliegen. Keine Migration, keine neuen Übersetzungen.
