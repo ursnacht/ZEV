@@ -175,3 +175,17 @@ Spalten sind reine Anzeige.
   Intervalle mit `gti > 0` aus den Tagen **vor** dem angezeigten Tag; Ende September sind rund 46
   Intervalle pro Tag hell. Vorher bleibt die Kurve leer — richtig so, aber im Diagramm nicht von
   „keine Prognosedaten" zu unterscheiden.
+
+---
+
+## Nachtrag 14.10.2026 — Schattenrechnung in eigener Transaktion
+
+| Status | Phase | Beschreibung |
+|--------|-------|--------------|
+|  [x]   | 1. Backend | `SteuerungService`: Schattenrechnung über `TransactionTemplate` (`REQUIRES_NEW`, `readOnly`) in `schattenrechnungIsoliert()`; Org-Filter in der neuen Transaktion erneut gesetzt; Fehler inkl. gescheitertem Commit ergeben leere Schattenwerte. Neuer Konstruktorparameter `PlatformTransactionManager` |
+|  [x]   | 2. Tests | `SteuerungServiceTest`: Prognose wirft → Entscheid geschrieben; Commit der Schattentransaktion scheitert → Entscheid geschrieben; Schattenrechnung läuft in eigener, lesender Transaktion |
+
+Anlass: Akzeptanzkriterien-Check vom 14.10.2026 — eine Exception aus einer transaktionalen Bean
+hätte die Transaktion des Jobs als rollback-only markiert (Spec, Anhang A.14). Die Unit-Tests prüfen
+die Isolierung und die Fehlerbehandlung; das Rollback-Verhalten von Spring selbst bilden sie nicht
+nach.

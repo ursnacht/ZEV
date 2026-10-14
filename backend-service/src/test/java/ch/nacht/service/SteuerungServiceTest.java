@@ -27,6 +27,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.UnexpectedRollbackException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -101,6 +104,10 @@ public class SteuerungServiceTest {
     @Mock
     private HibernateFilterService hibernateFilterService;
 
+    /** Fuer die eigene Transaktion der Schattenrechnung (REQUIRES_NEW). */
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
     @InjectMocks
     private SteuerungService steuerungService;
 
@@ -139,7 +146,8 @@ public class SteuerungServiceTest {
     void werteIntervallAus_FragtMesswerteAbIntervallbeginn() {
         steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
 
-        verify(hibernateFilterService).enableOrgFilter(ORG_ID);
+        // Zweimal: im Job und erneut in der eigenen Transaktion der Schattenrechnung
+        verify(hibernateFilterService, times(2)).enableOrgFilter(ORG_ID);
         verify(messwerteRepository).sumBilanzKomponentenPerZeitBetween(ZEHN_UHR, VIERTEL_NACH_ZEHN);
         verify(messwerteRepository, never())
                 .sumBilanzKomponentenPerZeitBetween(VIERTEL_NACH_ZEHN, DATUM.atTime(10, 30));
@@ -211,6 +219,69 @@ public class SteuerungServiceTest {
         verify(steuerentscheidRepository).upsert(eq(ORG_ID), eq(ZEHN_UHR), any(), any(), any(),
                 any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
                 any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    // ==================== Schattenrechnung isoliert (Specs/Ladeplanung.md, FR-1a) ====================
+
+    /**
+     * Wirft die Prognose, wird der Entscheid der Kaskade trotzdem geschrieben — mit leeren
+     * Schattenwerten.
+     */
+    @Test
+    void werteIntervallAus_PrognoseWirft_EntscheidWirdTrotzdemGeschrieben() {
+        mitVoraussetzungenDerSchattenrechnung();
+        when(produktionsprognoseService.getPrognose(ORG_ID, DATUM))
+                .thenThrow(new IllegalStateException("Prognose kaputt"));
+
+        steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
+
+        verify(steuerentscheidRepository).upsert(eq(ORG_ID), eq(ZEHN_UHR), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(), any(),
+                eq("LADEN"), eq("FREI"), eq("FREI"), any(), any(), any(), any(), any(),
+                eq("REGEL"), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull());
+    }
+
+    /**
+     * Der eigentliche Fehlerfall: Scheitert die Transaktion der Schattenrechnung erst beim Commit
+     * (rollback-only nach einer Exception in einer transaktionalen Bean), darf auch das den
+     * Entscheid nicht mitreissen. Vor der Isolierung lief die Schattenrechnung in der Transaktion
+     * des Jobs - der Commit des Entscheids waere gescheitert.
+     */
+    @Test
+    void werteIntervallAus_SchattenTransaktionScheitertBeimCommit_EntscheidWirdTrotzdemGeschrieben() {
+        mitVoraussetzungenDerSchattenrechnung();
+        when(produktionsprognoseService.getPrognose(ORG_ID, DATUM)).thenReturn(List.of());
+        doThrow(new UnexpectedRollbackException("rollback-only"))
+                .when(transactionManager).commit(any());
+
+        steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
+
+        verify(steuerentscheidRepository).upsert(eq(ORG_ID), eq(ZEHN_UHR), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(), any(),
+                eq("LADEN"), eq("FREI"), eq("FREI"), any(), any(), any(), any(), any(),
+                eq("REGEL"), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull());
+    }
+
+    /**
+     * Die Schattenrechnung laeuft in einer EIGENEN, nur lesenden Transaktion - nur so trifft ein
+     * Fehler darin nicht die Transaktion des Entscheids.
+     */
+    @Test
+    void werteIntervallAus_SchattenrechnungLaeuftInEigenerLesenderTransaktion() {
+        mitVoraussetzungenDerSchattenrechnung();
+        when(produktionsprognoseService.getPrognose(ORG_ID, DATUM)).thenReturn(List.of());
+
+        steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
+
+        ArgumentCaptor<TransactionDefinition> definition =
+                ArgumentCaptor.forClass(TransactionDefinition.class);
+        verify(transactionManager).getTransaction(definition.capture());
+        assertEquals(TransactionDefinition.PROPAGATION_REQUIRES_NEW,
+                definition.getValue().getPropagationBehavior());
+        assertTrue(definition.getValue().isReadOnly());
+        // Neue Transaktion = neue Session: der Org-Filter wird dort erneut gesetzt
+        verify(hibernateFilterService, times(2)).enableOrgFilter(ORG_ID);
+        verify(produktionsprognoseService).getPrognose(ORG_ID, DATUM);
     }
 
     /**
@@ -382,6 +453,25 @@ public class SteuerungServiceTest {
 
     private List<Object[]> zeilen(Object[]... zeilen) {
         return Arrays.asList(zeilen);
+    }
+
+    /**
+     * Alle Voraussetzungen der Schattenrechnung erfuellt (Specs/Ladeplanung.md, FR-4) - damit sie
+     * bis zur Prognose kommt.
+     */
+    private void mitVoraussetzungenDerSchattenrechnung() {
+        konfiguration.setBatteriekapazitaet(new BigDecimal("40.8"));
+        konfiguration.setBreitengrad(new BigDecimal("47.0"));
+        konfiguration.setLaengengrad(new BigDecimal("7.5"));
+        konfiguration.setAzimut(BigDecimal.ZERO);
+        konfiguration.setNeigung(new BigDecimal("30"));
+        when(einheitRepository.existsByTyp(EinheitTyp.SPEICHER)).thenReturn(true);
+        when(einheitRepository.findFirstByTyp(EinheitTyp.SPEICHER)).thenReturn(Optional.of(speicher));
+        when(messwerteRepository.sumLadungEntladungPerZeitBetween(any(), any(), any()))
+                .thenReturn(List.of());
+        when(geraetezustandRepository.findFirstByEinheitIdAndGroesseAndZeitLessThanOrderByZeitDesc(
+                SPEICHER_ID, Zustandsgroesse.SOC, VIERTEL_NACH_ZEHN))
+                .thenReturn(Optional.of(soc(DATUM.atTime(10, 14), "50.0")));
     }
 
     private Geraetezustand soc(LocalDateTime zeit, String wert) {

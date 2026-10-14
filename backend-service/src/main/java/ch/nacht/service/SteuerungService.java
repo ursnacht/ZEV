@@ -24,7 +24,10 @@ import ch.nacht.util.PreiszeitreiheZeit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -96,6 +99,7 @@ public class SteuerungService {
     private final FeatureFlagService featureFlagService;
     private final OrganizationContextService organizationContextService;
     private final HibernateFilterService hibernateFilterService;
+    private final TransactionTemplate schattenTransaktion;
 
     public SteuerungService(SteuerentscheidRepository steuerentscheidRepository,
                             MesswerteRepository messwerteRepository,
@@ -108,7 +112,8 @@ public class SteuerungService {
                             EinstellungenService einstellungenService,
                             FeatureFlagService featureFlagService,
                             OrganizationContextService organizationContextService,
-                            HibernateFilterService hibernateFilterService) {
+                            HibernateFilterService hibernateFilterService,
+                            PlatformTransactionManager transactionManager) {
         this.steuerentscheidRepository = steuerentscheidRepository;
         this.messwerteRepository = messwerteRepository;
         this.einheitRepository = einheitRepository;
@@ -121,6 +126,10 @@ public class SteuerungService {
         this.featureFlagService = featureFlagService;
         this.organizationContextService = organizationContextService;
         this.hibernateFilterService = hibernateFilterService;
+        // Eigene, nur lesende Transaktion fuer die Schattenrechnung - siehe schattenrechnungIsoliert()
+        this.schattenTransaktion = new TransactionTemplate(transactionManager);
+        this.schattenTransaktion.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.schattenTransaktion.setReadOnly(true);
         log.info("SteuerungService initialized");
     }
 
@@ -163,8 +172,8 @@ public class SteuerungService {
 
         // Die Merit-Order rechnet MIT, entscheidet aber nicht (Specs/Ladeplanung.md, FR-1a).
         // Scheitert sie oder fehlt eine Voraussetzung, bleiben ihre Spalten leer - der Entscheid
-        // der Kaskade steht davon unberuehrt.
-        Schattenrechnung schatten = schattenrechnung(orgId, zeitVon, soc, konfiguration);
+        // der Kaskade steht davon unberuehrt. In EIGENER Transaktion, siehe dort.
+        Schattenrechnung schatten = schattenrechnungIsoliert(orgId, zeitVon, soc, konfiguration);
 
         steuerentscheidRepository.upsert(orgId, zeitVon, preis, preisTiefRest,
                 messung.produktion(), messung.verbrauch(), messung.bezug(),
@@ -362,6 +371,39 @@ public class SteuerungService {
     }
 
     /**
+     * Die Schattenrechnung in einer <b>eigenen, nur lesenden Transaktion</b>
+     * ({@code REQUIRES_NEW}).
+     *
+     * <p><b>Warum das {@code catch} in {@link #schattenrechnung} allein nicht genügte</b>
+     * (Specs/Ladeplanung.md, Akzeptanzkriterium „Ein Fehler in der Merit-Order lässt den
+     * Entscheid der Kaskade unberührt"): Die Schattenrechnung ruft transaktionale Beans auf —
+     * {@link ProduktionsprognoseService#getPrognose(Long, LocalDate)} und die Repositories. Liefen
+     * sie in der Transaktion von {@link #werteIntervallAus}, markierte eine Exception darin diese
+     * Transaktion als <i>rollback-only</i>, noch bevor das {@code catch} sie abfängt. Der Commit
+     * scheiterte dann mit {@code UnexpectedRollbackException}, und der Entscheid der Kaskade
+     * würde <b>nicht</b> geschrieben — genau das, was die Schattenrechnung nie bewirken darf.
+     *
+     * <p>In der eigenen Transaktion trifft ein solcher Fehler nur sie; das {@code catch} hier
+     * fängt auch den gescheiterten Commit ab. Der Org-Filter wird neu gesetzt, weil die neue
+     * Transaktion eine neue Hibernate-Session hat.
+     */
+    private Schattenrechnung schattenrechnungIsoliert(Long orgId, LocalDateTime zeitVon,
+                                                      BigDecimal soc,
+                                                      SteuerKonfigurationDTO konfiguration) {
+        try {
+            Schattenrechnung ergebnis = schattenTransaktion.execute(status -> {
+                hibernateFilterService.enableOrgFilter(orgId);
+                return schattenrechnung(orgId, zeitVon, soc, konfiguration);
+            });
+            return ergebnis == null ? Schattenrechnung.leer() : ergebnis;
+        } catch (RuntimeException e) {
+            log.warn("Schattenrechnung fuer org={} {} fehlgeschlagen - Entscheid bleibt gueltig: {}",
+                    orgId, zeitVon, e.getMessage());
+            return Schattenrechnung.leer();
+        }
+    }
+
+    /**
      * Rechnet die Merit-Order für das ausgewertete Intervall <b>mit</b>, ohne zu entscheiden.
      *
      * <p><b>Alle Voraussetzungen an einer Stelle</b> (FR-4). Verteilt geprüft würde früher oder
@@ -372,7 +414,8 @@ public class SteuerungService {
      *
      * <p><b>Ein Fehler darf den Entscheid nicht mitreissen.</b> Die Kaskade hat bereits
      * entschieden; was hier schiefgeht, kostet höchstens die Schattenwerte. Deshalb fängt die
-     * Methode alles ab und gibt im Zweifel {@link Schattenrechnung#leer()} zurück.
+     * Methode alles ab und gibt im Zweifel {@link Schattenrechnung#leer()} zurück. Das genügt nur
+     * zusammen mit der eigenen Transaktion aus {@link #schattenrechnungIsoliert}.
      */
     private Schattenrechnung schattenrechnung(Long orgId, LocalDateTime zeitVon, BigDecimal soc,
                                               SteuerKonfigurationDTO konfiguration) {
