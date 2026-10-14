@@ -221,26 +221,25 @@ describe('StatistikComponent', () => {
       expect(component.dateFrom).toBe('2026-10-07');
     });
 
-    /** Wie der Quartal-Selektor: Der Zeitraum wird gesetzt, geladen wird erst mit „Anzeigen". */
-    it('should not load statistics', () => {
+    /** Geändert am 14.10.2026: „Heute" zeigt die Statistik sofort an. */
+    it('should load statistics for today immediately', () => {
+      vi.setSystemTime(new Date(2026, 9, 7, 9, 0));
       statistikServiceSpy.getStatistik.mockClear();
 
       component.onHeute();
 
-      expect(statistikServiceSpy.getStatistik).not.toHaveBeenCalled();
+      expect(statistikServiceSpy.getStatistik).toHaveBeenCalledWith('2026-10-07', '2026-10-07');
     });
 
-    it('should report zeigtHeute only for today–today', () => {
+    /** Ein zweiter Klick aktualisiert - für den laufenden Tag kommen laufend Messwerte dazu. */
+    it('should reload when today is already shown', () => {
       vi.setSystemTime(new Date(2026, 9, 7, 9, 0));
-      component.onQuarterSelected({ von: '2026-07-01', bis: '2026-09-30' });
-      expect(component.zeigtHeute).toBe(false);
+      component.onHeute();
+      statistikServiceSpy.getStatistik.mockClear();
 
       component.onHeute();
-      expect(component.zeigtHeute).toBe(true);
 
-      // Nur ein Ende auf heute reicht nicht
-      component.dateFrom = '2026-10-01';
-      expect(component.zeigtHeute).toBe(false);
+      expect(statistikServiceSpy.getStatistik).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -265,11 +264,17 @@ describe('StatistikComponent', () => {
       expect(component.loading).toBe(false);
     });
 
-    it('should show success message with month count', () => {
+    /** Geaendert am 14.10.2026: keine Erfolgsmeldung - die Statistik selbst ist die Rueckmeldung. */
+    it('should not show a message after loading', () => {
       component.onSubmit();
-      expect(component.messageType).toBe('success');
-      expect(component.message).toContain('1');
-      expect(component.message).toContain('MONATE_GELADEN');
+      expect(component.message).toBe('');
+      expect(component.messageType).toBe('');
+    });
+
+    it('should clear a previous error message when loading again', () => {
+      component.showMessage('FEHLER_BEIM_LADEN_DER_DATEN: alt', 'error');
+      component.onSubmit();
+      expect(component.message).toBe('');
     });
 
     it('should clear expandedMonths on submit', () => {
@@ -978,9 +983,8 @@ describe('StatistikComponent', () => {
 
   describe('message auto-dismiss', () => {
     it('should auto-dismiss success messages after 5s', fakeAsync(() => {
-      component.dateFrom = '2024-02-01';
-      component.dateTo = '2024-02-29';
-      component.onSubmit();
+      // Das Laden zeigt seit dem 14.10.2026 keine Erfolgsmeldung mehr - direkt erzeugt
+      component.showMessage('OK', 'success');
       expect(component.messageType).toBe('success');
       tick(5000);
       expect(component.message).toBe('');

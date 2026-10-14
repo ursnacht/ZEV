@@ -112,10 +112,11 @@ export class StatistikComponent extends WithMessage implements OnInit {
   }
 
   /**
-   * Setzt den Zeitraum auf heute–heute (Specs/Statistik.md, FR „Heute").
+   * Setzt den Zeitraum auf heute–heute und zeigt die Statistik sofort an (Specs/Statistik.md,
+   * FR „Heute", geändert am 14.10.2026 — vorher setzte der Knopf nur die Daten).
    *
-   * <p><b>Lädt nicht</b> — wie der Quartal-Selektor. Ausgelöst wird weiterhin mit „Anzeigen",
-   * damit sich alle Wege, einen Zeitraum zu wählen, gleich verhalten.
+   * <p>Auch ein zweiter Klick lädt: Für den laufenden Tag kommen laufend Messwerte dazu, „Heute"
+   * ist damit zugleich „aktualisieren".
    *
    * <p>Über {@link formatDate} statt {@code toISOString()}: Letzteres liefert das UTC-Datum, und
    * kurz nach Mitternacht stünde dann der Vortag im Feld.
@@ -124,11 +125,12 @@ export class StatistikComponent extends WithMessage implements OnInit {
     const heute = this.formatDate(new Date());
     this.dateFrom = heute;
     this.dateTo = heute;
+    this.onSubmit();
   }
 
   /**
    * Blättert den Zeitraum um seine eigene Länge (Specs/Statistik.md, FR „Blättern") und lädt
-   * sofort — anders als „Heute" und der Quartal-Selektor: Blättern ohne Ergebnis hiesse, jedes Mal
+   * sofort — wie „Heute", anders als der Quartal-Selektor: Blättern ohne Ergebnis hiesse, jedes Mal
    * zusätzlich „Anzeigen" zu klicken.
    */
   onBlaettern(richtung: 1 | -1): void {
@@ -146,12 +148,6 @@ export class StatistikComponent extends WithMessage implements OnInit {
     return !this.loading && !!this.dateFrom && !!this.dateTo && this.dateFrom <= this.dateTo;
   }
 
-  /** Ist der Zeitraum bereits heute–heute? Dann wäre „Heute" folgenlos und ist deaktiviert. */
-  get zeigtHeute(): boolean {
-    const heute = this.formatDate(new Date());
-    return this.dateFrom === heute && this.dateTo === heute;
-  }
-
   onSubmit(): void {
     if (!this.dateFrom || !this.dateTo) {
       this.showMessage(this.translationService.translate('BITTE_ALLE_FELDER_AUSFUELLEN'), 'error');
@@ -163,6 +159,10 @@ export class StatistikComponent extends WithMessage implements OnInit {
       return;
     }
 
+    // Keine Erfolgsmeldung nach dem Laden (Specs/Statistik.md, geaendert am 14.10.2026) - die
+    // Statistik selbst ist die Rueckmeldung. Eine alte Meldung (etwa ein frueherer Ladefehler)
+    // wird deshalb hier weggeraeumt; frueher ueberschrieb sie die Erfolgsmeldung.
+    this.dismissMessage();
     this.loading = true;
     this.statistik = null;
     this.expandedMonths.clear();
@@ -175,10 +175,6 @@ export class StatistikComponent extends WithMessage implements OnInit {
       next: (data) => {
         this.statistik = data;
         this.loading = false;
-        this.showMessage(
-          `${data.monate.length} ${this.translationService.translate('MONATE_GELADEN')}`,
-          'success'
-        );
       },
       error: (error) => {
         this.showMessage(

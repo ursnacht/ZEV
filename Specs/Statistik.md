@@ -13,16 +13,17 @@
       * Jahreswechsel: im Q1 wird Q4 des Vorjahres vorselektiert
       * der Zeitraum bleibt manuell änderbar
     * **Schaltfläche „Heute"** zwischen dem Feld „Bis Datum" und „Anzeigen": setzt „Datum von" **und** „Datum bis" auf das heutige Datum (Ortszeit).
-      * Sie **setzt nur den Zeitraum**, sie lädt nicht — wie der Quartal-Selektor. Ausgelöst wird weiterhin mit „Anzeigen". So verhalten sich alle Wege, einen Zeitraum zu wählen, gleich.
-      * Deaktiviert, solange der Zeitraum bereits heute–heute ist — sonst wäre der Klick folgenlos, ohne dass man es vorher sähe (wie „Heute" in der Einspeisesteuerung).
+      * **Zeigt die Statistik sofort an** (geändert am 14.10.2026; vorher setzte sie nur den Zeitraum, und geladen wurde mit „Anzeigen" — wie beim Blättern ist der Umweg über „Anzeigen" bei einem einzelnen Tag nur lästig).
+      * **Auch ein zweiter Klick lädt:** Für den laufenden Tag kommen laufend Messwerte dazu, „Heute" ist damit zugleich „aktualisieren". Gesperrt ist die Schaltfläche nur während des Ladens (bis 14.10.2026: auch, solange heute–heute schon eingestellt war).
       * Icon `calendar`, `zev-button--secondary`; Text über den bestehenden Schlüssel `HEUTE` (seit V65) — **keine** neue Übersetzung, keine Migration.
       * Der Quartal-Selektor zeigt danach kein Quartal mehr als aktiv: Ein einzelner Tag ist kein Quartal.
       * **Akzeptanzkriterien:**
-        * [ ] Die Schaltfläche „Heute" steht zwischen „Bis Datum" und „Anzeigen".
+        * [x] Die Schaltfläche „Heute" steht vor „Anzeigen" (seit dem Blättern nach ◀ / ▶).
         * [ ] Ein Klick setzt „Datum von" und „Datum bis" auf das heutige Datum.
         * [ ] Das Datum ist das **lokale** Tagesdatum, nicht das UTC-Datum — kurz nach Mitternacht darf nicht der Vortag erscheinen.
-        * [ ] Ein Klick lädt **keine** Statistik; erst „Anzeigen" tut das.
-        * [ ] Ist der Zeitraum bereits heute–heute, ist die Schaltfläche deaktiviert.
+        * [x] Ein Klick zeigt die Statistik des heutigen Tages sofort an (ohne „Anzeigen").
+        * [x] Ein weiterer Klick bei bereits gezeigtem heutigem Tag lädt neu (aktualisiert).
+        * [x] Während des Ladens ist die Schaltfläche deaktiviert.
 * Gib einen Überblick über die Daten:
   * "Messwerte vorhanden bis" mit Angabe des letzten Datums, für das Daten vorhanden sind
   * Angabe, ob für alle Consumer und Producer Daten bis zum Datum "Messwerte vorhanden bis" vorliegen oder Lücken vorhanden sind, d.h. Daten von Einheiten fehlen oder Tage fehlen 
@@ -98,6 +99,13 @@
     * [ ] Die Überschrift ist übersetzt („Entire period" auf Englisch).
     * [ ] Ein PDF-Export ändert die Monatsliste der Seite nicht — auch nach mehreren Exporten erscheint das Gesamt-Panel auf der Seite genau einmal.
     * [ ] Der CSV-Download im Gesamt-Panel exportiert den ganzen Zeitraum; der Dateiname trägt dann von und bis statt eines Monats.
+* Nach dem Laden erscheint **keine Erfolgsmeldung** mehr („n Monate geladen"; geändert am 14.10.2026): Die angezeigte Statistik ist die Rückmeldung, und seit „Heute" und das Blättern sofort laden, erschien sie bei fast jedem Klick.
+  * Eine noch stehende Meldung (z.B. ein früherer Ladefehler) wird beim Start des Ladens weggeräumt — bisher überschrieb sie die Erfolgsmeldung.
+  * Fehlermeldungen (Ladefehler, ungültiger Zeitraum, Export) bleiben unverändert.
+  * **Akzeptanzkriterien:**
+    * [x] Nach erfolgreichem Laden steht keine Meldung.
+    * [x] Eine Fehlermeldung eines früheren Ladeversuchs verschwindet beim nächsten Laden.
+    * [x] Ein Ladefehler wird weiterhin als Fehlermeldung angezeigt.
 * Als Benutzer möchte ich den Zeitraum mit zwei Schaltflächen **◀ / ▶ vor- und zurückblättern**, ohne die Daten von Hand zu ändern (Entscheid vom 13.10.2026).
   * **Regel — geblättert wird um die Länge des Zeitraums:**
 
@@ -107,7 +115,7 @@
     | ganze Monate (von = 1. eines Monats, bis = letzter Tag eines Monats) | Anzahl Monate; Monatsende angepasst | 01.01.–31.01. → 01.02.–28.02.; Quartal 01.07.–30.09. → 01.10.–31.12. |
     | sonst | Anzahl Tage | 01.10.–07.10. → 08.10.–14.10. |
 
-  * **Lädt sofort** — anders als „Heute" und der Quartal-Selektor, die nur die Daten setzen: Blättern ohne Ergebnis hiesse, jedes Mal zusätzlich „Anzeigen" zu klicken.
+  * **Lädt sofort** — wie „Heute" (seit 14.10.2026), anders als der Quartal-Selektor, der nur die Daten setzt: Blättern ohne Ergebnis hiesse, jedes Mal zusätzlich „Anzeigen" zu klicken.
   * Die Regel steckt in `blaettereZeitraum` (`utils/date-utils.ts`), rechnet mit lokalen Kalenderdaten (Schaltjahr, Sommerzeit).
   * **Akzeptanzkriterien:**
     * [x] Links von „Heute" stehen zwei Schaltflächen ◀ / ▶ (Icons `chevron-left`/`chevron-right`, übersetzte Beschriftung `ZEITRAUM_ZURUECK`/`ZEITRAUM_VOR` als Tooltip und `aria-label`).

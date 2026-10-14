@@ -608,3 +608,23 @@ ein Collapsible; beim Laden sind alle zugeklappt.
 |  [x]   | 2. Komponente | `statistik.component`: `onBlaettern(richtung)` (setzt Daten, lädt sofort), `kannBlaettern`; zwei Schaltflächen vor „Heute" (`zev-button--secondary`, kein neues CSS) |
 |  [x]   | 3. Übersetzungen | `V181__Add_Statistik_Blaettern_Translations.sql`: `ZEITRAUM_ZURUECK`, `ZEITRAUM_VOR` |
 |  [x]   | 4. Tests | `date-utils.spec.ts` (Tag, Monat inkl. Schaltjahr, Quartal, Jahr, Tage, Zeitumstellung, ungültig), `statistik.component.spec.ts` |
+
+---
+
+## Änderung 14.10.2026: „Heute" zeigt sofort an
+
+| Status | Phase | Beschreibung |
+|--------|-------|--------------|
+|  [x]   | 1. Komponente | `onHeute()` ruft nach dem Setzen der Daten `onSubmit()`; `zeigtHeute` entfällt, die Schaltfläche ist nur während des Ladens gesperrt (zweiter Klick = aktualisieren) |
+|  [x]   | 2. Tests | `statistik.component.spec.ts` (lädt sofort, zweiter Klick lädt erneut), E2E `statistik.spec.ts` (Heute zeigt das Gesamt-Panel ohne „Anzeigen") |
+
+---
+
+## Änderung 14.10.2026: keine Erfolgsmeldung nach dem Laden
+
+| Status | Phase | Beschreibung |
+|--------|-------|--------------|
+|  [x]   | 1. Komponente | `onSubmit()`: Erfolgsmeldung „n Monate geladen" entfernt; `dismissMessage()` beim Start des Ladens räumt eine alte Meldung weg |
+|  [x]   | 2. Tests | `statistik.component.spec.ts`: keine Meldung nach dem Laden, alter Fehler wird weggeräumt |
+
+Der Key `MONATE_GELADEN` wird nicht mehr verwendet; er bleibt in der Datenbank (keine Migration für eine reine Bereinigung).

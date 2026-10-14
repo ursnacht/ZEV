@@ -290,10 +290,10 @@ test.describe('Statistik Page - Gesamter Zeitraum', () => {
 
 test.describe('Statistik Page - Heute', () => {
     /**
-     * „Heute" steht zwischen „Bis Datum" und „Anzeigen", setzt beide Felder auf das heutige
-     * Datum und laedt NICHT (Specs/Statistik.md).
+     * „Heute" steht vor „Anzeigen", setzt beide Felder auf das heutige Datum und zeigt die
+     * Statistik sofort an (Specs/Statistik.md, geaendert am 14.10.2026).
      */
-    test('should set both dates to today without loading', async ({ page }) => {
+    test('should set both dates to today and load immediately', async ({ page }) => {
         await navigateToStatistik(page);
 
         const knoepfe = page.locator('form .zev-button-group button');
@@ -313,11 +313,12 @@ test.describe('Statistik Page - Heute', () => {
         await expect(page.locator('#dateFrom')).toHaveValue(heuteIso);
         await expect(page.locator('#dateTo')).toHaveValue(heuteIso);
 
-        // Geladen wird erst mit "Anzeigen": Es steht noch keine Statistik da
-        await expect(page.locator('.zev-collapsible__header[aria-controls="gesamt"]')).toHaveCount(0);
+        // Sofort geladen: das Gesamt-Panel erscheint ohne Klick auf "Anzeigen"
+        await expect(page.locator('.zev-collapsible__header[aria-controls="gesamt"]'))
+            .toBeVisible({ timeout: 60000 });
 
-        // Ein zweiter Klick waere folgenlos - die Schaltflaeche ist deaktiviert
-        await expect(heute).toBeDisabled();
+        // Ein zweiter Klick aktualisiert - die Schaltflaeche bleibt nach dem Laden aktiv
+        await expect(heute).toBeEnabled();
     });
 });
 
