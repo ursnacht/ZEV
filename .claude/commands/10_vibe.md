@@ -15,8 +15,57 @@ $ARGUMENTS
 3. **Stelle Rückfragen** bei wesentlichen Unklarheiten, die die Umsetzung beeinflussen – BEVOR du weitermachst.
 4. **Ergänze das Anforderungsdokument** mit den zusätzlichen Anforderungen.
     - Ergänze die Funktionalen Anforderungen, die Akzeptanzkriterien und die Nichtfunktionalen Anforderungen wo nötig.
+    - **Ändern statt anhängen** (siehe Block unten) – die Spec beschreibt den aktuellen Stand, die Geschichte steht im Anhang.
+
+## 📝 Spec ändern statt anhängen
+Ohne diese Regel wuchsen Specs auf über 1000 Zeilen („geändert am …, vorher …" mitten im Text), und
+der aktuelle Stand war nur noch mit der ganzen Geschichte zu lesen. Aufräumen von Altlasten:
+`/15_anforderungen_konsolidieren`.
+
+* **Die gültige Anforderung direkt umschreiben**, im Präsens – kein „neu seit …", „vorher …",
+  „bis 14.10.2026 …" im aktuellen Teil.
+* **Die ersetzte Fassung in den Anhang** `## Anhang A – Entscheidungen und Verlauf` am Ende der Spec
+  (anlegen, falls er fehlt): eigener Unterabschnitt `### A.n <Thema> (FR-x, <Datum>)` mit dem, was
+  vorher galt, und dem Grund der Änderung.
+* **Kurze Begründungen** (1–3 Sätze) bleiben als `>`-Block bei der Anforderung; lange Begründungen,
+  Fehlergeschichten und Belege kommen in den Anhang, beim FR ein Verweis „(Hintergrund: Anhang A.n)".
+* **Ersetzte Akzeptanzkriterien** werden umgeschrieben oder in den Anhang verschoben – nicht stehen
+  gelassen, sie wären sonst ein falscher Prüfauftrag. Neue Kriterien in die passende Gruppe in
+  Abschnitt 3, nicht als eigener Nachtragsblock.
+* **FR-/NFR-Nummern nie ändern** – der Code verweist darauf. Neue Anforderung: nächste freie Nummer
+  oder Unternummer (`FR-5b`).
+* Der **Umsetzungsplan** bleibt ein Protokoll: Dort ist ein datierter Nachtrag richtig.
 5. **Setze die neuen Anforderungen um** gemäss den Vorgaben in `Specs/generell.md`.
     - **Design System zuerst prüfen** (siehe Block unten) – kein UI-CSS ohne diese Prüfung.
+6. **Kompiliere und teste** – Frontend-Build und betroffene Unit-Tests müssen grün sein (Befehle: `.claude/commands/2_umsetzung.md`, Abschnitt „Validierung").
+7. **Sichtprüfung im Browser** (bei UI-Änderungen) – siehe Block unten. Ohne UI-Änderung (reines Backend, nur Spec) entfällt sie; das im Abschlussbericht ausdrücklich sagen.
+
+## 👁️ Sichtprüfung im Browser – bei UI-Änderungen
+Grüne Unit-Tests sagen nicht, dass es **aussieht** wie gewollt. Belegt am 14.10.2026: Alle Tests der
+Einspeisesteuerung waren grün, im Browser lag der neue Hinweis aber unterhalb der Diagrammfläche,
+ausserhalb des sichtbaren Bereichs.
+
+1. **Rebuild-Befehl nennen und auf den User warten** – die Umgebung gehört dem User (CLAUDE.md), z.B.
+   `docker compose up -d --build frontend-service`. Erst nach seiner Bestätigung weiter.
+2. **Prüfen, dass der Container die Änderung enthält** – `docker ps --format "{{.Names}} {{.CreatedAt}}"`
+   (nur lesend) gegen die Änderungszeit der Dateien. Sonst prüft man den alten Stand.
+3. **Temporäres Playwright-Skript** `frontend-service/tests/zz-sichtpruefung.spec.ts` gegen
+   `http://localhost:8000` (Login über `navigateToHome` aus `tests/helpers.ts`, Testuser `testuser`):
+   * Nur `chromium`, ausführen mit `npx playwright test tests/zz-sichtpruefung.spec.ts --project=chromium --retries=0 --reporter=line`.
+   * `page.on('console')` und `page.on('pageerror')` mitschreiben – Fehler in der Konsole sind ein Befund.
+   * Screenshot in die Scratchpad (`page.screenshot({ path, fullPage: true })`) und mit dem Read-Tool **ansehen**.
+     Bei Farben oder Kontrasten zusätzlich im Dark Mode (`page.emulateMedia({ colorScheme: 'dark' })`).
+   * Gezielt prüfen, was die Änderung verspricht: Position, Sichtbarkeit **ohne Scrollen**, Abstände,
+     Umbruch bei schmaler Breite (`page.setViewportSize({ width: 390, height: 844 })`), Texte übersetzt
+     (kein roher Key).
+4. **Nur lesen, nichts verändern:** Keine Datensätze über die UI anlegen, ändern oder löschen; keine
+   DB-, Keycloak- oder Feature-Flag-Änderungen. Fehlen dem Testuser Flag oder Daten (anderer Mandant),
+   die Antworten **nur im Browser** mit `page.route(...)` umschreiben (z.B. `/api/feature-flags` auf
+   `true`, eine Liste vorgeben) und das im Bericht nennen.
+5. **Aufräumen:** Skript nach `scratchpad/` verschieben oder löschen, `test-results/zz-sichtpruefung*`
+   entfernen. Es wird **nie** committet – `git status` muss danach nur die eigentlichen Änderungen zeigen.
+6. **Befund:** Weicht etwas ab, korrigieren und die Sichtprüfung wiederholen. Im Abschlussbericht
+   sagen, was angesehen wurde – und was nicht (z.B. „nur mit vorgegebenen Daten“).
 
 ## 🎨 Design System – zwingend beachten (bei UI-Änderungen)
 * **Kein neues UI-CSS ohne vorherige Prüfung des Design Systems.** Bestehende Klassen wiederverwenden, wiederverwendbare Styles gehören ins Design System – Details, Klassenliste und Regeln stehen in `Specs/generell.md` (Abschnitt „Design System"). Dort nachschlagen, nicht hier duplizieren.
@@ -35,6 +84,7 @@ $ARGUMENTS
 * Weiche nicht von der Struktur des Templates `Specs/SPEC.md` ab
 * Implementiere die neuen Anforderungen im Anwendungscode
 * Passe die bestehenden Tests falls nötig an
+* Bei UI-Änderungen: Sichtprüfung im Browser durchgeführt (Screenshot angesehen) – oder begründet, warum nicht
 
 ## Referenz
 * `Specs/[Feature-Name].md` - das bestehende und zu ergänzende Anforderungsdokument
