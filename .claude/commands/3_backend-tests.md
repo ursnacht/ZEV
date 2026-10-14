@@ -54,6 +54,12 @@ ausgefuehrte Flyway-Migrationen nicht aendern - siehe CLAUDE.md.
 1. Erstelle Tests für fehlende Cases (Vorlagen unten beachten)
 2. Führe Tests aus: `mvn test -Dtest=XxxTest`
 3. Behebe Fehler bis Tests grün sind
+4. Trage die Test-Verweise in der Spec ein (siehe unten)
+
+**Test-Verweis in der Spec eintragen:** Prüft ein neuer Test ein Akzeptanzkriterium aus
+`Specs/[Feature-Name].md`, den Verweis am Ende des Kriteriums ergänzen (Format: `Specs/SPEC.md`,
+Abschnitt 3, z.B. `(Test: TarifServiceTest#saveTarif_OverlappingTarif_ThrowsException)`). **Die Checkbox nicht setzen** – das tut `/7_akzeptanzkriterien-check`.
+Kriterien, für die kein sinnvoller Test möglich ist, im Bericht nennen.
 
 ## Testpyramide
 * **Unit Tests:** 70-80% der Tests

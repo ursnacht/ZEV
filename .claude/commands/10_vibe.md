@@ -34,11 +34,15 @@ der aktuelle Stand war nur noch mit der ganzen Geschichte zu lesen. Aufräumen v
   Abschnitt 3, nicht als eigener Nachtragsblock.
 * **FR-/NFR-Nummern nie ändern** – der Code verweist darauf. Neue Anforderung: nächste freie Nummer
   oder Unternummer (`FR-5b`).
+* **Kein Umsetzungsstand im Fliesstext** – kein „umgesetzt", „Stand …", „fehlt noch". Die Spec
+  beschreibt das Soll; den Stand zeigen die Checkboxen und der Umsetzungsplan.
 * Der **Umsetzungsplan** bleibt ein Protokoll: Dort ist ein datierter Nachtrag richtig.
 5. **Setze die neuen Anforderungen um** gemäss den Vorgaben in `Specs/generell.md`.
     - **Design System zuerst prüfen** (siehe Block unten) – kein UI-CSS ohne diese Prüfung.
 6. **Kompiliere und teste** – Frontend-Build und betroffene Unit-Tests müssen grün sein (Befehle: `.claude/commands/2_umsetzung.md`, Abschnitt „Validierung").
-7. **Sichtprüfung im Browser** (bei UI-Änderungen) – siehe Block unten. Ohne UI-Änderung (reines Backend, nur Spec) entfällt sie; das im Abschlussbericht ausdrücklich sagen.
+    - Jedes neue oder geänderte Akzeptanzkriterium bekommt einen Test, und der Verweis steht am Kriterium (`Specs/SPEC.md`, Abschnitt 3). **Die Checkbox setzt du nicht selbst.**
+7. **Akzeptanzkriterien prüfen** – `/7_akzeptanzkriterien-check` als Sub-Agent, beschränkt auf die in diesem Durchgang neuen oder geänderten Kriterien (im Prompt aufzählen). Er setzt die Checkboxen; ⚠️ OHNE TEST oder ❌ FEHLT beheben und erneut prüfen. Seinen Bericht unverändert weitergeben.
+8. **Sichtprüfung im Browser** (bei UI-Änderungen) – siehe Block unten. Ohne UI-Änderung (reines Backend, nur Spec) entfällt sie; das im Abschlussbericht ausdrücklich sagen.
 
 ## 👁️ Sichtprüfung im Browser – bei UI-Änderungen
 Grüne Unit-Tests sagen nicht, dass es **aussieht** wie gewollt. Belegt am 14.10.2026: Alle Tests der
@@ -84,6 +88,7 @@ ausserhalb des sichtbaren Bereichs.
 * Weiche nicht von der Struktur des Templates `Specs/SPEC.md` ab
 * Implementiere die neuen Anforderungen im Anwendungscode
 * Passe die bestehenden Tests falls nötig an
+* Neue/geänderte Akzeptanzkriterien mit Test-Verweis, Checkboxen von `/7_akzeptanzkriterien-check` gesetzt
 * Bei UI-Änderungen: Sichtprüfung im Browser durchgeführt (Screenshot angesehen) – oder begründet, warum nicht
 
 ## Referenz

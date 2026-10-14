@@ -80,7 +80,12 @@ frontend-service/tests/*.spec.ts  → E2E Tests (Playwright)
 
 ### Phase 3: Gap-Analyse erstellen
 
-Für jede Implementierung prüfen:
+**Zuerst die Akzeptanzkriterien** (falls ein Feature angegeben ist): Jedes Kriterium in
+`Specs/[Feature-Name].md` ohne Verweis `(Test: …)` / `(E2E: …)` / `(Nachweis: …)` ist eine Lücke;
+ebenso ein Verweis auf einen Test, den es nicht (mehr) gibt. Diese Lücken stehen im Bericht
+**zuoberst** – sie sind fachlich begründet, die Datei-Lücken unten nur strukturell.
+
+Danach für jede Implementierung prüfen:
 - Existiert ein entsprechender Test?
 - Test-Namenskonvention: `XxxService.java` → `XxxServiceTest.java`
 - Component-Konvention: `xxx.component.ts` → `xxx.component.spec.ts`

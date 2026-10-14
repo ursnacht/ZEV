@@ -63,6 +63,8 @@ Für jeden Abschnitt:
 | Akzeptanzkriterien aus Nachträgen | in Abschnitt 3 unter der passenden Gruppe, Status unverändert |
 | Ersetztes Akzeptanzkriterium | → Anhang (nicht stehen lassen – es wäre ein falscher Prüfauftrag) |
 | Beantwortete offene Frage | Antwort in die Anforderung, Frage + Antwort in den Anhang |
+| Umsetzungsstand im Fliesstext („umgesetzt", „Stand …", „fehlt noch") | → Anhang (Verlauf); im aktuellen Teil nur das Soll — den Stand zeigen Checkboxen und Umsetzungsplan |
+| Test-Verweise an Kriterien (`(Test: …)`) | bleiben unverändert am Kriterium |
 
 **Anhang** am Ende, nach Abschnitt 8:
 ```markdown

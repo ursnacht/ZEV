@@ -47,7 +47,24 @@ Leitplanken: nicht committen/stagen/pushen, Umgebung nicht veraendern (Docker/Ke
    - Edge Cases & Fehlerbehandlung
 
 ### Phase 2: Code-Analyse pro Kriterium
-Für jedes Akzeptanzkriterium systematisch prüfen:
+Für jedes Akzeptanzkriterium zwei Fragen — **beide** müssen mit Ja beantwortet sein, damit es `[x]`
+wird (Konvention: `Specs/SPEC.md`, Abschnitt 3):
+
+1. **Ist es im Code erfüllt?** (Prüfpunkte unten)
+2. **Prüft ein Test genau dieses Kriterium, und ist er grün?**
+   * Steht ein Verweis `(Test: …)` / `(E2E: …)` am Kriterium: Test öffnen und bestätigen, dass er
+     das **Kriterium** prüft — nicht nur denselben Code berührt. Ein Verweis auf einen Test, der
+     etwas anderes prüft, ist ein Befund.
+   * Fehlt der Verweis: passenden Test suchen. Gefunden → Verweis am Kriterium **eintragen**.
+     Keiner da → Status **⚠️ OHNE TEST**, Checkbox bleibt `[ ]`.
+   * **Ausführen:** Backend- und Frontend-Unit-Tests, auf die verwiesen wird, gezielt laufen lassen
+     (`mvn test -Dtest=Klasse`, `npm test -- --include=<datei>`). E2E-Tests nur, wenn der Stack
+     läuft; sonst im Bericht „E2E nicht ausgeführt" vermerken und die Checkbox nur setzen, wenn der
+     User den letzten Lauf als grün bestätigt hat.
+   * `(Nachweis: Datei:Zeile)` genügt nur für statische Sachverhalte ohne Verhalten
+     (Übersetzungstext, Spaltenkommentar, Lizenzhinweis).
+
+Prüfpunkte für Frage 1:
 
 #### Navigation / Menü
 - Route in `frontend-service/src/app/app.routes.ts` vorhanden?
@@ -93,17 +110,22 @@ Für jedes Akzeptanzkriterium systematisch prüfen:
 
 | # | Kriterium | Status | Nachweis |
 |---|-----------|--------|----------|
-| 1 | Beschreibung... | ✅ OK | Route `/xyz` in app.routes.ts:42, Menüeintrag vorhanden |
-| 2 | Beschreibung... | ✅ OK | `MieterService.save()` validiert Überlappung (MieterService.java:87) |
-| 3 | Beschreibung... | ❌ FEHLT | Keine Validierung für Mietende > Mietbeginn gefunden |
+| 1 | Beschreibung... | ✅ OK | Route `/xyz` in app.routes.ts:42; (E2E: mieter.spec.ts › should open via menu) grün |
+| 2 | Beschreibung... | ✅ OK | `MieterService.save()` validiert Überlappung (MieterService.java:87); (Test: MieterServiceTest#save_Ueberlappung_Wirft) grün |
+| 3 | Beschreibung... | ⚠️ OHNE TEST | Im Code erfüllt (MieterService.java:95), aber kein Test prüft es |
+| 4 | Beschreibung... | ❌ FEHLT | Keine Validierung für Mietende > Mietbeginn gefunden |
 
 ## Zusätzliche Befunde
 - Befunde die nicht direkt ein Akzeptanzkriterium betreffen, aber relevant sind
 ```
 
-2. Aktualisiere direkt im Anschluss die Checkboxen in der Spec-Datei:
-   * **Nur erfüllte Kriterien** von `[ ]` auf `[x]` ändern
-   * Nicht erfüllte Kriterien bleiben als `[ ]`
+2. Aktualisiere direkt im Anschluss die Spec-Datei:
+   * `[x]` **nur** für ✅ OK (erfüllt **und** grüner Test bzw. statischer Nachweis)
+   * ⚠️ OHNE TEST und ❌ FEHLT bleiben bzw. werden `[ ]` — auch ein bisheriges `[x]` ohne Test
+     wird zurückgesetzt; im Bericht ausdrücklich auflisten, welche zurückgesetzt wurden
+   * Gefundene Test-Verweise am Kriterium eintragen (`(Test: …)`, `(E2E: …)`)
+   * Sonst nichts an der Spec ändern
+3. Im Bericht die **⚠️ OHNE TEST**-Kriterien als Auftrag für `/3`–`/5` zusammenfassen.
 
 ---
 
@@ -125,8 +147,9 @@ Für jedes Akzeptanzkriterium systematisch prüfen:
 
 ## Wichtige Regeln
 * **Konservativ bewerten** - Im Zweifel als "FEHLT" markieren
-* **Nachweis liefern** - Für jedes "OK" den konkreten Code-Ort angeben (Datei:Zeile)
-* **Keine Code-Änderungen** - Nur die Spec-Datei wird aktualisiert (Checkboxen), keine neue Datei erstellen
+* **Nachweis liefern** - Für jedes "OK" den Code-Ort (Datei:Zeile) **und** den Test angeben
+* **Kein `[x]` ohne Test** - siehe Phase 2; „im Code gesehen" genügt nicht
+* **Keine Code-Änderungen** - Nur die Spec-Datei wird aktualisiert (Checkboxen, Test-Verweise), keine neue Datei erstellen
 
 ## Referenz
 * CLAUDE.md - Projekt-Architektur

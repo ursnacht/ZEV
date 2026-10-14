@@ -5,11 +5,15 @@
 > * Jeden Slot ausfüllen. Trifft etwas nicht zu: **`n/a` + kurze Begründung** (z.B. „Kein `org_id`: globale Systemdaten").
 > * Ziel ist deterministische Codegenerierung — je konkreter Spalten, Endpunkte und Validierungen, desto eindeutiger der generierte Code.
 > * `<Platzhalter>` in spitzen Klammern und Beispielzeilen in Tabellen ersetzen.
+> * **Die Spec beschreibt das Soll, keinen Umsetzungsstand.** Kein „umgesetzt", „Stand …", „fehlt
+>   noch" im Fliesstext — solche Sätze veralten unbemerkt (`Specs/Ladeplanung.md` behauptete
+>   „alles umgesetzt", während Spalten und Übersetzungen fehlten). Den Stand zeigen die
+>   Checkboxen in Abschnitt 3 und der Umsetzungsplan.
 
 ## 1. Ziel & Kontext - Warum wird das Feature benötigt?
 * **Was soll erreicht werden:** (Kurze Zusammenfassung)
 * **Warum machen wir das:** (Business Value / Hintergrund)
-* **Aktueller Stand:** Wie funktioniert es jetzt? (Falls relevant)
+* **Ausgangslage:** Wie funktioniert es ohne dieses Feature? (Falls relevant — Kontext, kein Umsetzungsstand)
 
 ## 2. Funktionale Anforderungen (FR) - Was soll das System tun?
 
@@ -79,10 +83,21 @@
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
 > Konkret und testbar formulieren (prüfbares Verhalten, nicht „soll funktionieren"). Nach Themen gruppieren. Permissions/403 und HTTP-Status-Codes explizit abdecken. Edge Cases aus Abschnitt 5 als AK abbilden.
+>
+> **Jedes Kriterium nennt den Test, der es prüft** — am Zeilenende in Klammern:
+> * Backend: `(Test: SteuerungServiceTest#werteIntervallAus_PrognoseWirft_EntscheidWirdTrotzdemGeschrieben)`
+> * Frontend-Unit: `(Test: statistik.component.spec.ts › onHeute › should load statistics for today immediately)`
+> * E2E: `(E2E: statistik.spec.ts › should set both dates to today and load immediately)`
+> * Mehrere Tests mit `;` trennen.
+> * Nur für **statische** Sachverhalte ohne Verhalten (Übersetzungstext, Spaltenkommentar, Lizenzhinweis) genügt `(Nachweis: Datei:Zeile)`. **Verhalten braucht einen Test.**
+>
+> **`[x]` heisst: Ein Test existiert, prüft genau dieses Kriterium und ist grün.** Gesetzt wird es nur von `/7_akzeptanzkriterien-check`. Im Code erfüllt, aber ohne Test → bleibt `[ ]`. Den Test-Verweis tragen die Test-Commands (`/3`–`/5`) und `/10_vibe` ein, sobald der Test existiert; die Checkbox setzen sie nicht.
+>
+> *Warum:* Der Transaktionsfehler der Schattenrechnung (`Specs/Ladeplanung.md`, Anhang A.14) stand als Kriterium sauber da — es gab nur keinen Test dafür, und aufgefallen ist er erst beim Prüfen.
 
 ### <Themengruppe, z.B. Anzeige>
-* [ ] Muss X können
-* [ ] Darf Y nicht zulassen
+* [ ] Muss X können (Test: XxxServiceTest#methode_Szenario_Ergebnis)
+* [ ] Darf Y nicht zulassen (E2E: xxx.spec.ts › should reject Y)
 
 ### <Themengruppe, z.B. Erstellen / Bearbeiten / Löschen>
 * [ ] Muss Fehlermeldung Z anzeigen, wenn …

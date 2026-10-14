@@ -58,6 +58,12 @@ Leitplanken: nicht committen/stagen/pushen, Umgebung nicht veraendern (Docker/Ke
 2. Führe Tests aus: `npm test -- --include=<pfad/zur/xxx.spec.ts>` (Vitest, single-run; `--include` mehrfach angebbar). **Ohne `--include`** deutet `ng test` den Pfad als Projektnamen und bricht mit `Invalid values: Argument: project` ab.
 3. Behebe Fehler bis Tests grün sind
 4. Zum Schluss die **komplette** Suite grün laufen lassen: `npm test`
+5. Trage die Test-Verweise in der Spec ein (siehe unten)
+
+**Test-Verweis in der Spec eintragen:** Prüft ein neuer Test ein Akzeptanzkriterium aus
+`Specs/[Feature-Name].md`, den Verweis am Ende des Kriteriums ergänzen (Format: `Specs/SPEC.md`,
+Abschnitt 3, z.B. `(Test: tarif-form.component.spec.ts › isFormValid › should return false when required field empty)`). **Die Checkbox nicht setzen** – das tut `/7_akzeptanzkriterien-check`.
+Kriterien, für die kein sinnvoller Test möglich ist, im Bericht nennen.
 
 ## Testpyramide
 * **Unit Tests:** 70-80% der Tests (dieser Command)

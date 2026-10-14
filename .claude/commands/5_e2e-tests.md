@@ -60,6 +60,12 @@ auszufuehren.
 1. Erstelle Tests für fehlende Szenarien (Vorlage unten beachten)
 2. Führe Tests aus: `npm run e2e:ci` oder `npx playwright test tests/xxx.spec.ts`
 3. Behebe Fehler bis Tests grün sind
+4. Trage die Test-Verweise in der Spec ein (siehe unten)
+
+**Test-Verweis in der Spec eintragen:** Prüft ein neuer Test ein Akzeptanzkriterium aus
+`Specs/[Feature-Name].md`, den Verweis am Ende des Kriteriums ergänzen (Format: `Specs/SPEC.md`,
+Abschnitt 3, z.B. `(E2E: tarif-verwaltung.spec.ts › should create new item successfully)`). **Die Checkbox nicht setzen** – das tut `/7_akzeptanzkriterien-check`.
+Kriterien, für die kein sinnvoller Test möglich ist, im Bericht nennen.
 
 ## Testpyramide
 * **E2E Tests:** 5-10% der Tests (dieser Command)
