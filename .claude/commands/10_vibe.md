@@ -44,6 +44,25 @@ der aktuelle Stand war nur noch mit der ganzen Geschichte zu lesen. Aufräumen v
 7. **Akzeptanzkriterien prüfen** – `/7_akzeptanzkriterien-check` als Sub-Agent, beschränkt auf die in diesem Durchgang neuen oder geänderten Kriterien (im Prompt aufzählen). Er setzt die Checkboxen; ⚠️ OHNE TEST oder ❌ FEHLT beheben und erneut prüfen. Seinen Bericht unverändert weitergeben.
 8. **Sichtprüfung im Browser** (bei UI-Änderungen) – siehe Block unten. Ohne UI-Änderung (reines Backend, nur Spec) entfällt sie; das im Abschlussbericht ausdrücklich sagen.
 
+## ⚖️ Kurzer Weg – Änderungen ohne neues Verhalten
+Der Aufwand soll zur Änderung passen. **Ohne neues oder geändertes Verhalten** – reine Layout-,
+Text- oder Stilkorrekturen (z.B. eine Schaltfläche verschieben, eine Beschriftung ändern, einen
+Abstand korrigieren) – gilt:
+
+* **Schritt 7 entfällt** (kein Akzeptanzkriterien-Check per Sub-Agent). Ein bestehendes Kriterium,
+  das die Änderung betrifft, wird angepasst; seine Checkbox und sein Test-Verweis bleiben, sofern
+  der Test weiterhin grün ist.
+* **Kein neuer Test nur für die Position** eines Elements. Bestehende Tests anpassen, die an der
+  alten Darstellung hängen.
+* **Die Sichtprüfung (Schritt 8) ist der Nachweis** – bei UI-Änderungen also gerade nicht
+  auslassen.
+* Spec und Umsetzungsplan werden trotzdem nachgeführt (Schritt 4), knapp.
+
+**Verhalten ändert sich, sobald** Daten anders geladen, gespeichert, berechnet, validiert oder
+berechtigt werden, ein Ablauf andere Schritte hat oder etwas Neues erscheint, das vorher fehlte
+(z.B. ein Diagramm, das nun auch ohne Entscheide zeichnet). Dann gilt der volle Ablauf. **Im Zweifel
+der volle Ablauf** – und im Abschlussbericht sagen, welcher Weg gewählt wurde und warum.
+
 ## 👁️ Sichtprüfung im Browser – bei UI-Änderungen
 Grüne Unit-Tests sagen nicht, dass es **aussieht** wie gewollt. Belegt am 14.10.2026: Alle Tests der
 Einspeisesteuerung waren grün, im Browser lag der neue Hinweis aber unterhalb der Diagrammfläche,

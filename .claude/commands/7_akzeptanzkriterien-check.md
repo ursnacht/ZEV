@@ -57,6 +57,14 @@ wird (Konvention: `Specs/SPEC.md`, Abschnitt 3):
      etwas anderes prüft, ist ein Befund.
    * Fehlt der Verweis: passenden Test suchen. Gefunden → Verweis am Kriterium **eintragen**.
      Keiner da → Status **⚠️ OHNE TEST**, Checkbox bleibt `[ ]`.
+   * **Lohnt ein Test überhaupt?** Schützt er vor keinem realen Fehler – weil das Kriterium eine
+     Designentscheidung beschreibt („keine vierte y-Achse"), eine Eigenschaft, die sich nicht
+     unbemerkt ändern kann, oder etwas, das ein bestehender Test schon mitprüft –, dann ist es
+     vermutlich **kein Akzeptanzkriterium**. Status **💭 UMFORMULIEREN** statt ⚠️ OHNE TEST, mit
+     Vorschlag: als Designentscheidung in das zugehörige FR verschieben, mit dem Kriterium
+     zusammenlegen, das der bestehende Test prüft, oder streichen. **Nicht selbst umformulieren** –
+     die Spec gehört dem User; der Check schlägt nur vor.
+   * Im Zweifel ⚠️ OHNE TEST: Ein Test, der echtes Verhalten absichert, ist nie Ritual.
    * **Ausführen:** Backend- und Frontend-Unit-Tests, auf die verwiesen wird, gezielt laufen lassen
      (`mvn test -Dtest=Klasse`, `npm test -- --include=<datei>`). E2E-Tests nur, wenn der Stack
      läuft; sonst im Bericht „E2E nicht ausgeführt" vermerken und die Checkbox nur setzen, wenn der
@@ -113,6 +121,7 @@ Prüfpunkte für Frage 1:
 | 1 | Beschreibung... | ✅ OK | Route `/xyz` in app.routes.ts:42; (E2E: mieter.spec.ts › should open via menu) grün |
 | 2 | Beschreibung... | ✅ OK | `MieterService.save()` validiert Überlappung (MieterService.java:87); (Test: MieterServiceTest#save_Ueberlappung_Wirft) grün |
 | 3 | Beschreibung... | ⚠️ OHNE TEST | Im Code erfüllt (MieterService.java:95), aber kein Test prüft es |
+| 5 | Beschreibung... | 💭 UMFORMULIEREN | Designentscheidung, ein Test schützte vor nichts → als Satz in FR-7 verschieben |
 | 4 | Beschreibung... | ❌ FEHLT | Keine Validierung für Mietende > Mietbeginn gefunden |
 
 ## Zusätzliche Befunde
@@ -121,11 +130,13 @@ Prüfpunkte für Frage 1:
 
 2. Aktualisiere direkt im Anschluss die Spec-Datei:
    * `[x]` **nur** für ✅ OK (erfüllt **und** grüner Test bzw. statischer Nachweis)
-   * ⚠️ OHNE TEST und ❌ FEHLT bleiben bzw. werden `[ ]` — auch ein bisheriges `[x]` ohne Test
+   * ⚠️ OHNE TEST, 💭 UMFORMULIEREN und ❌ FEHLT bleiben bzw. werden `[ ]` — auch ein bisheriges `[x]` ohne Test
      wird zurückgesetzt; im Bericht ausdrücklich auflisten, welche zurückgesetzt wurden
    * Gefundene Test-Verweise am Kriterium eintragen (`(Test: …)`, `(E2E: …)`)
    * Sonst nichts an der Spec ändern
-3. Im Bericht die **⚠️ OHNE TEST**-Kriterien als Auftrag für `/3`–`/5` zusammenfassen.
+3. Im Bericht die **⚠️ OHNE TEST**-Kriterien als Auftrag für `/3`–`/5` zusammenfassen – nach
+   Risiko geordnet, das wichtigste zuerst. Die **💭 UMFORMULIEREN**-Kriterien getrennt davon als
+   Vorschläge an den User, nicht als Testauftrag.
 
 ---
 
