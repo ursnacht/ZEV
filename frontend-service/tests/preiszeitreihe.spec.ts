@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { navigateViaMenu, waitForFormResult } from './helpers';
+import { navigateViaMenu, setzeFeatureFlag } from './helpers';
 
 /**
  * tests / preiszeitreihe.spec.ts
@@ -29,42 +29,11 @@ test.beforeEach(({ browserName }) => {
         + 'Zustands-Races zu vermeiden.');
 });
 
-const FLAG_CHECKBOX = '#flag-PREISZEITREIHE';
-const FLAG_ENDPOINT = '/api/feature-flags/PREISZEITREIHE';
-const EFFECTIVE_FLAGS_GET = '/api/feature-flags';
 const PANEL = '.preiszeitreihe';
 const DIAGRAMM = '.preiszeitreihe__diagramm';
 
 /** Zustand des Flags vor dieser Suite — wird am Ende wiederhergestellt. */
 let flagVorher: boolean | null = null;
-
-/**
- * Schaltet das Flag über die Einstellungen und wartet auf das `PUT` **und** das Nachladen der
- * effektiven Flags — erst danach kennt die Anwendung den neuen Stand. Liefert den Zustand **vor**
- * dem Aufruf.
- */
-async function setzeFlag(page: Page, aktiv: boolean): Promise<boolean> {
-    await navigateViaMenu(page, '/einstellungen');
-    const checkbox = page.locator(FLAG_CHECKBOX);
-    await checkbox.waitFor({ state: 'visible', timeout: 15000 });
-
-    const vorher = await checkbox.isChecked();
-    if (vorher === aktiv) {
-        return vorher;
-    }
-
-    const put = page.waitForResponse(
-        r => r.url().includes(FLAG_ENDPOINT) && r.request().method() === 'PUT',
-        { timeout: 15000 });
-    const nachladen = page.waitForResponse(
-        r => r.url().endsWith(EFFECTIVE_FLAGS_GET) && r.request().method() === 'GET',
-        { timeout: 15000 });
-    await checkbox.click();
-    await put;
-    await nachladen.catch(() => console.log('setzeFlag: kein Nachladen der Flags erkannt'));
-    await waitForFormResult(page);
-    return vorher;
-}
 
 /** Öffnet die Tarifseite und wartet auf den Bereich Einspeisepreise. */
 async function oeffneTarife(page: Page): Promise<void> {
@@ -152,7 +121,7 @@ test.beforeAll(async ({ browser }, testInfo) => {
     }
     const page = await browser.newPage();
     try {
-        flagVorher = await setzeFlag(page, true);
+        flagVorher = await setzeFeatureFlag(page, 'PREISZEITREIHE', true);
     } finally {
         await page.close();
     }
@@ -164,7 +133,7 @@ test.afterAll(async ({ browser }, testInfo) => {
     }
     const page = await browser.newPage();
     try {
-        await setzeFlag(page, false);
+        await setzeFeatureFlag(page, 'PREISZEITREIHE', false);
     } catch (error) {
         console.error(`Feature-Flag konnte nicht zurueckgesetzt werden: ${error}`);
     } finally {
@@ -423,7 +392,7 @@ test.describe('Preiszeitreihe - Feature-Flag', () => {
      * ihn eingeschaltet, und `serial` garantiert die Reihenfolge.
      */
     test('should hide the section when the flag is off', async ({ page }) => {
-        await setzeFlag(page, false);
+        await setzeFeatureFlag(page, 'PREISZEITREIHE', false);
         try {
             await navigateViaMenu(page, '/tarife');
             await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
@@ -431,7 +400,7 @@ test.describe('Preiszeitreihe - Feature-Flag', () => {
             await expect(page.locator('.zev-table').first()).toBeVisible({ timeout: 15000 });
             await expect(page.locator(PANEL)).toHaveCount(0);
         } finally {
-            await setzeFlag(page, true);
+            await setzeFeatureFlag(page, 'PREISZEITREIHE', true);
         }
     });
 });

@@ -1,5 +1,10 @@
 import { test, expect, Page } from '@playwright/test';
-import { openHamburgerMenu, waitForFormResult, navigateToEinstellungen } from './helpers';
+import {
+    openHamburgerMenu,
+    waitForFormResult,
+    navigateToEinstellungen,
+    klickeFeatureFlag,
+} from './helpers';
 
 /**
  * tests / feature-flag-upload.spec.ts
@@ -62,18 +67,8 @@ function resetButton(page: Page): ReturnType<Page['locator']> {
  * message. Returns true if a toggle was performed.
  */
 async function setUploadFlag(page: Page, enabled: boolean): Promise<boolean> {
-    const checkbox = page.locator(UPLOAD_CHECKBOX);
-    if ((await checkbox.isChecked()) === enabled) {
-        return false; // already in desired state, no PUT would fire
-    }
-    const putResponse = page.waitForResponse(
-        r => r.url().includes(FLAG_ENDPOINT) && r.request().method() === 'PUT', { timeout: 15000 });
-    const reloadGet = page.waitForResponse(
-        r => r.url().endsWith(EFFECTIVE_FLAGS_GET) && r.request().method() === 'GET', { timeout: 15000 });
-    await checkbox.click();
-    await putResponse;
-    await reloadGet.catch(() => console.log('setUploadFlag: no reload GET detected'));
-    return waitForFormResult(page);
+    // null = schon im gewuenschten Zustand, kein PUT
+    return (await klickeFeatureFlag(page, UPLOAD_FLAG_KEY, enabled)) ?? false;
 }
 
 /**

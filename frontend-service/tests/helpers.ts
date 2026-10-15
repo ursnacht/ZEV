@@ -530,3 +530,44 @@ export async function navigateToEinstellungen(page: Page): Promise<void> {
     // Kann schon fertig sein - dann ist "hidden" sofort erfuellt oder der Text nie erschienen
     await page.locator('p:has-text("...")').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => undefined);
 }
+
+/**
+ * Klickt die Checkbox eines Feature-Flags auf der **bereits offenen** Einstellungsseite, sofern
+ * sie nicht schon `aktiv` ist, und wartet auf das `PUT` **und** das anschliessende Nachladen der
+ * effektiven Flags - erst danach kennt die reaktive Navigation den neuen Stand.
+ *
+ * @returns Ergebnis der Meldung (`waitForFormResult`), oder `null`, wenn nichts zu tun war
+ */
+export async function klickeFeatureFlag(page: Page, flag: string, aktiv: boolean): Promise<boolean | null> {
+    const checkbox = page.locator(`#flag-${flag}`);
+    if ((await checkbox.isChecked()) === aktiv) {
+        return null;
+    }
+    const put = page.waitForResponse(
+        r => r.url().includes(`/api/feature-flags/${flag}`) && r.request().method() === 'PUT',
+        { timeout: 15000 });
+    const nachladen = page.waitForResponse(
+        r => r.url().endsWith('/api/feature-flags') && r.request().method() === 'GET',
+        { timeout: 15000 });
+    await checkbox.click();
+    await put;
+    await nachladen.catch(() => console.log(`klickeFeatureFlag(${flag}): kein Nachladen der Flags erkannt`));
+    return waitForFormResult(page);
+}
+
+/**
+ * Oeffnet die Einstellungen und schaltet ein Feature-Flag auf `aktiv`.
+ *
+ * Fuer Suiten, die ein Flag als Vorbedingung brauchen: Den Rueckgabewert merken und im
+ * `afterAll` wiederherstellen.
+ *
+ * @returns Zustand des Flags **vor** dem Aufruf
+ */
+export async function setzeFeatureFlag(page: Page, flag: string, aktiv: boolean): Promise<boolean> {
+    await navigateToEinstellungen(page);
+    const checkbox = page.locator(`#flag-${flag}`);
+    await checkbox.waitFor({ state: 'visible', timeout: 15000 });
+    const vorher = await checkbox.isChecked();
+    await klickeFeatureFlag(page, flag, aktiv);
+    return vorher;
+}

@@ -1,5 +1,10 @@
 import { test, expect, Locator, Page } from '@playwright/test';
-import { clickKebabMenuItem, navigateViaMenu, waitForFormResult } from './helpers';
+import {
+    clickKebabMenuItem,
+    navigateViaMenu,
+    waitForFormResult,
+    setzeFeatureFlag,
+} from './helpers';
 
 /**
  * tests / nebenkosten-abrechnung.spec.ts
@@ -499,40 +504,9 @@ let debitorenGebucht = false;
 // Feature-Flag: Vorbedingung dieser Suite
 // ---------------------------------------------------------------------------
 
-const NK_FLAG_CHECKBOX = '#flag-NEBENKOSTENABRECHNUNG';
-const NK_FLAG_ENDPOINT = '/api/feature-flags/NEBENKOSTENABRECHNUNG';
-const EFFECTIVE_FLAGS_GET = '/api/feature-flags';
 
 /** Zustand des Flags vor dieser Suite — wird am Ende wiederhergestellt. */
 let nkFlagVorher: boolean | null = null;
-
-/**
- * Schaltet das Flag `NEBENKOSTENABRECHNUNG` über die Einstellungen und wartet auf das `PUT`
- * **und** das anschliessende Nachladen der effektiven Flags — erst danach kennt die reaktive
- * Navigation den neuen Stand. Liefert den Zustand **vor** dem Aufruf.
- */
-async function setzeNkFlag(page: Page, aktiv: boolean): Promise<boolean> {
-    await navigateViaMenu(page, '/einstellungen');
-    const checkbox = page.locator(NK_FLAG_CHECKBOX);
-    await checkbox.waitFor({ state: 'visible', timeout: 15000 });
-
-    const vorher = await checkbox.isChecked();
-    if (vorher === aktiv) {
-        return vorher;
-    }
-
-    const put = page.waitForResponse(
-        r => r.url().includes(NK_FLAG_ENDPOINT) && r.request().method() === 'PUT',
-        { timeout: 15000 });
-    const nachladen = page.waitForResponse(
-        r => r.url().endsWith(EFFECTIVE_FLAGS_GET) && r.request().method() === 'GET',
-        { timeout: 15000 });
-    await checkbox.click();
-    await put;
-    await nachladen.catch(() => console.log('setzeNkFlag: kein Nachladen der Flags erkannt'));
-    await waitForFormResult(page);
-    return vorher;
-}
 
 /**
  * Der Bereich Nebenkosten liegt hinter einem Flag, dessen **Default `false`** ist
@@ -552,7 +526,7 @@ test.beforeAll(async ({ browser }, testInfo) => {
     }
     const page = await browser.newPage();
     try {
-        nkFlagVorher = await setzeNkFlag(page, true);
+        nkFlagVorher = await setzeFeatureFlag(page, 'NEBENKOSTENABRECHNUNG', true);
     } finally {
         await page.close();
     }
@@ -567,7 +541,7 @@ test.afterAll(async ({ browser }, testInfo) => {
     }
     const page = await browser.newPage();
     try {
-        await setzeNkFlag(page, false);
+        await setzeFeatureFlag(page, 'NEBENKOSTENABRECHNUNG', false);
     } catch (error) {
         console.error(`Feature-Flag konnte nicht zurueckgesetzt werden: ${error}`);
     } finally {
