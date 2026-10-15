@@ -10,6 +10,7 @@ import ch.nacht.entity.Zustandsgroesse;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.GeraetezustandRepository;
 import ch.nacht.repository.ZaehlerRohdatenRepository;
+import ch.nacht.util.Ortszeit;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -246,7 +247,7 @@ public class MqttIngestService {
         zustand.setWert(wert);
         // Aus der Anwendung, nicht aus dem DB-DEFAULT: Sonst haenge der Wert an der Zeitzone der
         // Datenbank-Session, und das System haette seine vierte Zeitkonvention.
-        zustand.setEmpfangenAm(LocalDateTime.now());
+        zustand.setEmpfangenAm(Ortszeit.jetzt());
         geraetezustandRepository.save(zustand);
     }
 
@@ -291,7 +292,7 @@ public class MqttIngestService {
             row.setZaehlerstandEinspeisung(einspeisung);
         }
         row.setSeriennummer(normalisiereSeriennummer(p.getSeriennummer()));
-        row.setEmpfangenAm(LocalDateTime.now());
+        row.setEmpfangenAm(Ortszeit.jetzt());
         row.setVerarbeitet(false);
         rohdatenRepository.save(row);
     }

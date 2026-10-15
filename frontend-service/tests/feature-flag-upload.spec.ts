@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { navigateViaMenu, openHamburgerMenu, waitForFormResult } from './helpers';
+import { openHamburgerMenu, waitForFormResult, navigateToEinstellungen } from './helpers';
 
 /**
  * tests / feature-flag-upload.spec.ts
@@ -41,9 +41,8 @@ const EFFECTIVE_FLAGS_GET = '/api/feature-flags';
  * Navigate to the Einstellungen page and wait for the Feature-Flags table
  * (identified by the MESSWERTE_UPLOAD checkbox) to be rendered.
  */
-async function navigateToEinstellungen(page: Page): Promise<void> {
-    await navigateViaMenu(page, '/einstellungen');
-    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
+async function oeffneFeatureFlags(page: Page): Promise<void> {
+    await navigateToEinstellungen(page);
     await page.locator(UPLOAD_CHECKBOX).waitFor({ state: 'visible', timeout: 15000 });
 }
 
@@ -103,7 +102,7 @@ async function resetUploadFlag(page: Page): Promise<void> {
  */
 async function ensureUploadFlagDefault(page: Page): Promise<void> {
     try {
-        await navigateToEinstellungen(page);
+        await oeffneFeatureFlags(page);
         await resetUploadFlag(page);
         await expect(page.locator(UPLOAD_CHECKBOX)).toBeChecked({ timeout: 10000 }).catch(() => {});
     } catch (error) {
@@ -121,7 +120,7 @@ test.afterEach(async ({ page }) => {
 
 test.describe('Feature-Flag Upload - Verwaltung in Einstellungen', () => {
     test('should show the Feature-Flags section with an active upload toggle', async ({ page }) => {
-        await navigateToEinstellungen(page);
+        await oeffneFeatureFlags(page);
 
         await expect(uploadRow(page)).toBeVisible();
         await expect(page.locator(UPLOAD_CHECKBOX)).toBeVisible();
@@ -133,7 +132,7 @@ test.describe('Feature-Flag Upload - Verwaltung in Einstellungen', () => {
 
 test.describe('Feature-Flag Upload - Deaktivieren', () => {
     test('should deactivate upload flag and hide the navigation menu entry', async ({ page }) => {
-        await navigateToEinstellungen(page);
+        await oeffneFeatureFlags(page);
         await expect(page.locator(UPLOAD_CHECKBOX)).toBeChecked();
 
         // Flag deaktivieren -> Erfolgsmeldung; nach Reload-GET ist die Navbar reaktiv aktualisiert
@@ -152,7 +151,7 @@ test.describe('Feature-Flag Upload - Route-Guard', () => {
     test('should redirect /upload to /startseite when flag is deactivated', async ({ page }) => {
         test.setTimeout(90000); // direkter goto kann einen Keycloak-Silent-Auth-Roundtrip auslösen
 
-        await navigateToEinstellungen(page);
+        await oeffneFeatureFlags(page);
         await setUploadFlag(page, false);
         await expect(page.locator(UPLOAD_CHECKBOX)).not.toBeChecked({ timeout: 10000 });
 
@@ -170,7 +169,7 @@ test.describe('Feature-Flag Upload - Reaktivieren', () => {
         test.setTimeout(90000);
 
         // Zunächst deaktivieren, damit eine Überschreibung existiert
-        await navigateToEinstellungen(page);
+        await oeffneFeatureFlags(page);
         await setUploadFlag(page, false);
         await expect(page.locator(UPLOAD_CHECKBOX)).not.toBeChecked({ timeout: 10000 });
 

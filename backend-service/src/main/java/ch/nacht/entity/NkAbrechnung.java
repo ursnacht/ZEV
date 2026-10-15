@@ -1,5 +1,7 @@
 package ch.nacht.entity;
 
+import ch.nacht.util.Ortszeit;
+
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -82,7 +84,7 @@ public class NkAbrechnung {
     private boolean abgerechnet = false;
 
     @Column(name = "erstellt_am", nullable = false)
-    private LocalDateTime erstelltAm = LocalDateTime.now();
+    private LocalDateTime erstelltAm = Ortszeit.jetzt();
 
     public NkAbrechnung() {
     }

@@ -4,6 +4,7 @@ import ch.nacht.dto.OpenMeteoResponseDTO;
 import ch.nacht.dto.SteuerKonfigurationDTO;
 import ch.nacht.entity.MeldungLevel;
 import ch.nacht.repository.EinstrahlungsprognoseRepository;
+import ch.nacht.util.Ortszeit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -194,7 +195,7 @@ public class EinstrahlungsprognoseAbrufService {
                     + " Intervallen - erwartet werden hoechstens " + MAX_INTERVALLE);
         }
 
-        LocalDateTime abgerufenAm = LocalDateTime.now();
+        LocalDateTime abgerufenAm = Ortszeit.jetzt();
         int geschrieben = 0;
         for (int i = 0; i < zeiten.size(); i++) {
             Double wert = werte.get(i);

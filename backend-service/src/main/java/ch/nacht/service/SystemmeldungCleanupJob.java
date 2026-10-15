@@ -1,5 +1,7 @@
 package ch.nacht.service;
 
+import ch.nacht.util.Ortszeit;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,7 +35,7 @@ public class SystemmeldungCleanupJob {
     /** Läuft täglich (Default 03:00); Cron über {@code systemmeldung.retention.cron} konfigurierbar. */
     @Scheduled(cron = "${systemmeldung.retention.cron:0 0 3 * * *}")
     public void bereinige() {
-        LocalDateTime cutoff = LocalDateTime.now().minusDays(retentionTage);
+        LocalDateTime cutoff = Ortszeit.jetzt().minusDays(retentionTage);
         int geloescht = systemmeldungService.loescheErledigteAelterAls(cutoff);
         log.info("Systemmeldung-Retention: {} erledigte Einträge älter als {} Tage gelöscht (cutoff={})",
                 geloescht, retentionTage, cutoff);

@@ -1,6 +1,6 @@
 import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
 import { TranslatePipe } from '../../pipes/translate.pipe';
-import { toIsoDate } from '../../utils/date-utils';
+import { quartal } from '../../utils/date-utils';
 
 interface Quarter {
   label: string;      // z.B. "Q3/2024"
@@ -72,15 +72,7 @@ export class QuarterSelectorComponent implements OnInit {
    * Erstellt ein Quarter-Objekt für das angegebene Jahr und Quartal.
    */
   private createQuarter(year: number, quarter: number): Quarter {
-    const startMonth = (quarter - 1) * 3;
-    const von = new Date(year, startMonth, 1);
-    const bis = new Date(year, startMonth + 3, 0); // Letzter Tag des Quartals
-
-    return {
-      label: `Q${quarter}/${year}`,
-      von: toIsoDate(von),
-      bis: toIsoDate(bis)
-    };
+    return { label: `Q${quarter}/${year}`, ...quartal(year, quarter) };
   }
 
   /**

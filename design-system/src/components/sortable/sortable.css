@@ -26,6 +26,24 @@
   opacity: 0.9;
 }
 
+/*
+ * Eigene, schmale Vorschau fuer *cdkDragPreview - statt der kopierten Tabellenzeile.
+ *
+ * Die CDK-Vorgabe klont die ganze <tr> an den <body>. Ausserhalb der Tabelle verlieren die Zellen
+ * ihre Spaltenbreiten, und die Inhalte rutschen ohne Abstand ineinander ("ZEV PV Tarif Q1/20250.20000
+ * / kWh01.01.2026..."). Die Vorschau zeigt nur, was man zum Wiedererkennen braucht, mit Abstand.
+ * Hintergrund und Schatten kommen von .cdk-drag-preview oben (die Klasse haengt das CDK an).
+ */
+.zev-sortable__vorschau {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  color: var(--color-gray-800);
+  white-space: nowrap;
+}
+
 /* Der freie Platz, an dem die Zeile landen wird */
 .cdk-drag-placeholder {
   opacity: 0.4;

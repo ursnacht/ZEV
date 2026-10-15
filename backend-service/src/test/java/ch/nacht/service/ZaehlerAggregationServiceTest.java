@@ -9,6 +9,7 @@ import ch.nacht.entity.ZaehlerRohdaten;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
 import ch.nacht.repository.ZaehlerRohdatenRepository;
+import ch.nacht.util.Ortszeit;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
@@ -44,7 +45,7 @@ import static org.mockito.Mockito.*;
  * {@code zev = 0}, {@code quelle = MQTT}, Upsert in {@code messwerte}.
  *
  * <p>Kein Request-Scope: {@code org_id} wird explizit aus der Einheit übernommen. Da der Job
- * {@code LocalDateTime.now()} verwendet, werden die frühesten Rohdaten auf das aktuelle
+ * {@code Ortszeit.jetzt()} verwendet, werden die frühesten Rohdaten auf das aktuelle
  * Quartalsende gelegt (genau ein abgeschlossenes Intervall wird verarbeitet). Referenz- und
  * Intervallend-Stand werden über den tatsächlich angefragten Zeitstempel aufgelöst
  * (robust gegenüber Quartalsgrenzen).
@@ -132,7 +133,7 @@ public class ZaehlerAggregationServiceTest {
 
     /** Verdrahtet Catch-up für genau ein abgeschlossenes Intervall (frühester Stand = letztes Quartalsende). */
     private void stubCatchUpEinInterval() {
-        LocalDateTime letztesQuartalsende = floorAufQuartal(LocalDateTime.now());
+        LocalDateTime letztesQuartalsende = floorAufQuartal(Ortszeit.jetzt());
         ZaehlerRohdaten earliest = new ZaehlerRohdaten(ORG_ID, EINHEIT_ID, letztesQuartalsende,
                 BigDecimal.ZERO, BigDecimal.ZERO);
 
@@ -161,7 +162,7 @@ public class ZaehlerAggregationServiceTest {
     }
 
     private ZaehlerRohdaten rohdaten(String bezug, String einspeisung) {
-        return new ZaehlerRohdaten(ORG_ID, EINHEIT_ID, LocalDateTime.now(),
+        return new ZaehlerRohdaten(ORG_ID, EINHEIT_ID, Ortszeit.jetzt(),
                 new BigDecimal(bezug), new BigDecimal(einspeisung));
     }
 
@@ -317,7 +318,7 @@ public class ZaehlerAggregationServiceTest {
 
     @Test
     void aggregiere_LeeresIntervall_KeinEintrag() {
-        LocalDateTime letztesQuartalsende = floorAufQuartal(LocalDateTime.now());
+        LocalDateTime letztesQuartalsende = floorAufQuartal(Ortszeit.jetzt());
         ZaehlerRohdaten earliest = new ZaehlerRohdaten(ORG_ID, EINHEIT_ID, letztesQuartalsende,
                 BigDecimal.ZERO, BigDecimal.ZERO);
         when(rohdatenRepository.findEinheitIdsWithUnverarbeitet()).thenReturn(List.of(EINHEIT_ID));
@@ -452,7 +453,7 @@ public class ZaehlerAggregationServiceTest {
      */
     @Test
     void aggregiere_MehrereIntervalle_VerteilfensterVonFruehestemBisSpaetestemBeginn() {
-        LocalDateTime q = floorAufQuartal(LocalDateTime.now());
+        LocalDateTime q = floorAufQuartal(Ortszeit.jetzt());
         stubCatchUpZeitreihe(
                 rohdaten(q.minusMinutes(45), "100.0", "0.0", null),
                 rohdaten(q.minusMinutes(30), "110.0", "0.0", null),
@@ -730,7 +731,7 @@ public class ZaehlerAggregationServiceTest {
     void aggregiere_OfflineLueckeUeberTausch_NurUebergangsintervallOhneMesswert() {
         // Arrange – letzter Stand des alten Zählers (Serie A) bei T0, erster Stand des neuen
         // Zählers (Serie B) erst 5 Intervalle später; dazwischen keine Daten.
-        LocalDateTime q = floorAufQuartal(LocalDateTime.now());
+        LocalDateTime q = floorAufQuartal(Ortszeit.jetzt());
         stubCatchUpZeitreihe(
                 rohdaten(q.minusMinutes(90), "1000.0", "0.0", "SN-A"),  // T0 (letzter alter Stand)
                 rohdaten(q.minusMinutes(15), "50.0", "0.0", "SN-B"),    // T5 (erster neuer Stand)
@@ -754,7 +755,7 @@ public class ZaehlerAggregationServiceTest {
     @Test
     void aggregiere_RuecktauschAufAltenZaehler_ZweiUebergangsintervalleOhneMesswert() {
         // Arrange – A → B → A (Rücktausch): jeder Wechsel wird eigenständig behandelt
-        LocalDateTime q = floorAufQuartal(LocalDateTime.now());
+        LocalDateTime q = floorAufQuartal(Ortszeit.jetzt());
         stubCatchUpZeitreihe(
                 rohdaten(q.minusMinutes(60), "100.0", "0.0", "SN-A"),
                 rohdaten(q.minusMinutes(45), "110.0", "0.0", "SN-A"),  // A→A: Delta 10
@@ -781,7 +782,7 @@ public class ZaehlerAggregationServiceTest {
     @Test
     void aggregiere_LueckenlosOhneAusfall_KeineSystemmeldung() {
         // Referenz liegt im unmittelbar vorangehenden Intervall → keine Lücke.
-        LocalDateTime q = floorAufQuartal(LocalDateTime.now());
+        LocalDateTime q = floorAufQuartal(Ortszeit.jetzt());
         stubCatchUpZeitreihe(
                 rohdaten(q.minusMinutes(15), "100.0", "0.0", null),
                 rohdaten(q, "110.0", "0.0", null));
@@ -796,7 +797,7 @@ public class ZaehlerAggregationServiceTest {
     @Test
     void aggregiere_EinIntervallOhneDaten_ErfasstInfoMeldung() {
         // Lücke von genau einem Intervall: Stand bei q-30 fehlt.
-        LocalDateTime q = floorAufQuartal(LocalDateTime.now());
+        LocalDateTime q = floorAufQuartal(Ortszeit.jetzt());
         stubCatchUpZeitreihe(
                 rohdaten(q.minusMinutes(30), "100.0", "0.0", null),
                 rohdaten(q, "130.0", "0.0", null));
@@ -815,7 +816,7 @@ public class ZaehlerAggregationServiceTest {
     @Test
     void aggregiere_MehrereIntervalleOhneDaten_ErfasstWarnMeldung() {
         // Lücke über drei Intervalle (q-60 → q).
-        LocalDateTime q = floorAufQuartal(LocalDateTime.now());
+        LocalDateTime q = floorAufQuartal(Ortszeit.jetzt());
         stubCatchUpZeitreihe(
                 rohdaten(q.minusMinutes(60), "100.0", "0.0", null),
                 rohdaten(q, "190.0", "0.0", null));

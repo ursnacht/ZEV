@@ -185,12 +185,23 @@ export function blaettereZeitraum(von: string, bis: string, richtung: 1 | -1): {
  */
 export function vorquartal(heute: Date = new Date()): { von: string; bis: string } {
   let jahr = heute.getFullYear();
-  let quartal = Math.ceil((heute.getMonth() + 1) / 3) - 1;
-  if (quartal < 1) {
-    quartal = 4;
+  let nummer = Math.ceil((heute.getMonth() + 1) / 3) - 1;
+  if (nummer < 1) {
+    nummer = 4;
     jahr--;
   }
-  const startMonat = (quartal - 1) * 3;
+  return quartal(jahr, nummer);
+}
+
+/**
+ * Ein Quartal als ISO-Zeitraum, z.B. `quartal(2026, 3)` → 01.07.–30.09.2026.
+ *
+ * Die eine Stelle für die Quartalsgrenzen — der Quartal-Selektor und `vorquartal` rechnen damit.
+ *
+ * @param nummer 1–4
+ */
+export function quartal(jahr: number, nummer: number): { von: string; bis: string } {
+  const startMonat = (nummer - 1) * 3;
   // Tag 0 des Folgemonats = letzter Tag des Quartals
   return { von: toIsoDate(new Date(jahr, startMonat, 1)), bis: toIsoDate(new Date(jahr, startMonat + 3, 0)) };
 }
@@ -206,11 +217,13 @@ export function monatsende(iso: string): string {
   return datum ? toIsoDate(new Date(datum.getFullYear(), datum.getMonth() + 1, 0)) : '';
 }
 
-function isoZuDatum(iso: string): Date | null {
+/** ISO-Datum (`yyyy-MM-dd`) als lokales Datum; `null` bei ungültiger Eingabe. */
+export function isoZuDatum(iso: string): Date | null {
   const teile = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? '');
   return teile ? new Date(Number(teile[1]), Number(teile[2]) - 1, Number(teile[3])) : null;
 }
 
-function plusTage(datum: Date, tage: number): Date {
+/** Datum plus `tage` Kalendertage (negativ: zurück), unabhängig von der Sommerzeit. */
+export function plusTage(datum: Date, tage: number): Date {
   return new Date(datum.getFullYear(), datum.getMonth(), datum.getDate() + tage);
 }

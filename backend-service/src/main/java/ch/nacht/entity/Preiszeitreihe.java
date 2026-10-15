@@ -1,5 +1,7 @@
 package ch.nacht.entity;
 
+import ch.nacht.util.Ortszeit;
+
 import jakarta.persistence.*;
 import org.hibernate.annotations.Check;
 import jakarta.validation.constraints.NotNull;
@@ -95,7 +97,7 @@ public class Preiszeitreihe {
     @PrePersist
     @PreUpdate
     void setzeAktualisierungszeitpunkt() {
-        this.aktualisiertAm = LocalDateTime.now();
+        this.aktualisiertAm = Ortszeit.jetzt();
     }
 
     public Long getId() {

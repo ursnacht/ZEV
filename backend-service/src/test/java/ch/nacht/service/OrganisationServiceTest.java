@@ -2,6 +2,7 @@ package ch.nacht.service;
 
 import ch.nacht.entity.Organisation;
 import ch.nacht.repository.OrganisationRepository;
+import ch.nacht.util.Ortszeit;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -123,7 +124,7 @@ public class OrganisationServiceTest {
         when(organisationRepository.findByKeycloakOrgId(keycloakOrgId)).thenReturn(Optional.empty());
         when(organisationRepository.save(any(Organisation.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        LocalDateTime before = LocalDateTime.now().minusSeconds(1);
+        LocalDateTime before = Ortszeit.jetzt().minusSeconds(1);
 
         // Act
         organisationService.findOrCreate(keycloakOrgId, "Test");

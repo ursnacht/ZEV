@@ -3,6 +3,7 @@ package ch.nacht.service;
 import ch.nacht.entity.MeldungLevel;
 import ch.nacht.entity.Systemmeldung;
 import ch.nacht.repository.SystemmeldungRepository;
+import ch.nacht.util.Ortszeit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -148,7 +149,7 @@ public class SystemmeldungService {
 
         if (erledigt) {
             meldung.setErledigt(true);
-            meldung.setErledigtAm(LocalDateTime.now());
+            meldung.setErledigtAm(Ortszeit.jetzt());
             meldung.setErledigtAutomatisch(false);
         } else {
             if (systemmeldungRepository.existsByOrgIdAndMeldungKeyAndErledigtFalse(
@@ -204,7 +205,7 @@ public class SystemmeldungService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void erfasse(Long orgId, MeldungLevel level, String kategorie, String meldungKey, String parameter) {
-        LocalDateTime jetzt = LocalDateTime.now();
+        LocalDateTime jetzt = Ortszeit.jetzt();
         Optional<Systemmeldung> offen =
                 systemmeldungRepository.findByOrgIdAndMeldungKeyAndErledigtFalse(orgId, meldungKey);
         if (offen.isPresent()) {
@@ -240,7 +241,7 @@ public class SystemmeldungService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void erfasseAudit(Long orgId, MeldungLevel level, String kategorie, String meldungKey, String parameter) {
-        LocalDateTime jetzt = LocalDateTime.now();
+        LocalDateTime jetzt = Ortszeit.jetzt();
         Systemmeldung neu = new Systemmeldung(level, kategorie, meldungKey, kuerze(parameter), jetzt, jetzt);
         neu.setOrgId(orgId);
         neu.setErledigt(true);
@@ -271,7 +272,7 @@ public class SystemmeldungService {
      */
     @Transactional
     public int autoResolve(Long orgId, String meldungKey) {
-        int anzahl = systemmeldungRepository.autoResolve(orgId, meldungKey, LocalDateTime.now());
+        int anzahl = systemmeldungRepository.autoResolve(orgId, meldungKey, Ortszeit.jetzt());
         if (anzahl > 0) {
             log.info("Auto-Resolve: {} Systemmeldung(en) erledigt (org={}, key={})", anzahl, orgId, meldungKey);
         }

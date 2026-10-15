@@ -77,6 +77,7 @@
   Die Kopfzeile nennt die Zahl der Tarife; ein leeres Panel zeigt „Keine Tarife".
 * **Reihenfolge:**
   * Verschieben per **Drag & Drop am Griff** (Angular CDK), **nur innerhalb eines Panels**. Die Gruppe tauscht dabei nur ihre eigenen Plätze; Tarife anderer Panels behalten ihren Platz.
+  * Beim Ziehen zeigt die Vorschau **nur Tariftyp und Bezeichnung**, mit Abstand (`.zev-sortable__vorschau`). Die kopierte ganze Zeile verlöre ausserhalb der Tabelle ihre Spaltenbreiten, und die Inhalte rutschten ineinander.
   * Gespeichert wird sofort, und zwar nur die **eine Verschiebung**: `PUT /api/tarife/{id}/verschieben?vor={zielId}` bzw. `?nach={zielId}` (nach oben vor den neuen Nachfolger, nach unten hinter den neuen Vorgänger; Permission `tarife:manage` wie die übrige Tarifverwaltung). Der Server verschiebt den Tarif und rückt nur die Plätze **zwischen** Start und Ziel um eins nach. Bei einem Fehler zeigt die Liste wieder den gespeicherten Stand.
   * **Warum nicht die ganze Reihenfolge des Panels senden:** Zwei gleichzeitige Sitzungen überschrieben sich damit gegenseitig mit ihrem veralteten Stand — beobachtet im E2E-Lauf mit Chromium und Firefox parallel.
   * Die **Spaltensortierung** per Klick auf die Spaltenköpfe **entfällt** — die Tabelle zeigt immer die Reihenfolge der Rechnung.

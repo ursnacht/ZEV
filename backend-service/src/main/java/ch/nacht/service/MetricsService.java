@@ -2,6 +2,7 @@ package ch.nacht.service;
 
 import ch.nacht.entity.Metrik;
 import ch.nacht.repository.MetrikRepository;
+import ch.nacht.util.Ortszeit;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Gauge;
@@ -13,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -118,7 +118,7 @@ public class MetricsService {
     private void persistTimestampMetric(String name, Instant timestamp) {
         try {
             // Als lesbarer ISO-8601 Timestamp speichern (z.B. "2025-12-07T16:30:00")
-            LocalDateTime ldt = LocalDateTime.ofInstant(timestamp, ZoneId.systemDefault());
+            LocalDateTime ldt = LocalDateTime.ofInstant(timestamp, Ortszeit.ZONE);
             String jsonValue = objectMapper.writeValueAsString(Map.of("value", ldt.toString()));
             saveMetrik(name, jsonValue);
             log.debug("Zeitstempel-Metrik '{}' persistiert: {}", name, ldt);
@@ -181,7 +181,7 @@ public class MetricsService {
     @Transactional
     private void persistTimestampMetricWithEinheit(String name, Instant timestamp, String einheitName) {
         try {
-            LocalDateTime ldt = LocalDateTime.ofInstant(timestamp, ZoneId.systemDefault());
+            LocalDateTime ldt = LocalDateTime.ofInstant(timestamp, Ortszeit.ZONE);
             Map<String, Object> valueMap = new HashMap<>();
             valueMap.put("value", ldt.toString());
             valueMap.put("einheit", einheitName);
@@ -255,7 +255,7 @@ public class MetricsService {
      */
     public LocalDateTime getLetzterMessdatenUploadAsLocalDateTime() {
         Instant instant = letzterMessdatenUpload.get();
-        return instant != null ? LocalDateTime.ofInstant(instant, ZoneId.systemDefault()) : null;
+        return instant != null ? LocalDateTime.ofInstant(instant, Ortszeit.ZONE) : null;
     }
 
     /**
@@ -277,7 +277,7 @@ public class MetricsService {
      */
     public LocalDateTime getLetzteSolarverteilungAsLocalDateTime() {
         Instant instant = letzteSolarverteilung.get();
-        return instant != null ? LocalDateTime.ofInstant(instant, ZoneId.systemDefault()) : null;
+        return instant != null ? LocalDateTime.ofInstant(instant, Ortszeit.ZONE) : null;
     }
 
     /**

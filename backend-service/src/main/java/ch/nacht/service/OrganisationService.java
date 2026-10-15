@@ -2,13 +2,13 @@ package ch.nacht.service;
 
 import ch.nacht.entity.Organisation;
 import ch.nacht.repository.OrganisationRepository;
+import ch.nacht.util.Ortszeit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -51,7 +51,7 @@ public class OrganisationService {
         Organisation newOrg = new Organisation();
         newOrg.setKeycloakOrgId(keycloakOrgId);
         newOrg.setName(name != null ? name : keycloakOrgId.toString());
-        newOrg.setErstelltAm(LocalDateTime.now());
+        newOrg.setErstelltAm(Ortszeit.jetzt());
         Organisation saved = organisationRepository.save(newOrg);
         log.info("Neue Organisation auto-provisioniert: keycloak_org_id={}, id={}", keycloakOrgId, saved.getId());
         return saved;

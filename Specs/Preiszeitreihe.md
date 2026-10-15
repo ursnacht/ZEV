@@ -52,6 +52,7 @@
 1. Beim Öffnen der Seite zeigt das Diagramm die Auswahl **TAG** = heute.
 2. Der Benutzer wechselt auf **WOCHE** / **MONAT** oder setzt **Datum von / Datum bis**.
 3. Mit **‹ / ›** blättert er um genau eine Spanne zurück/vor (Tag / Woche / Monat bzw. die Länge des gewählten Zeitraums).
+   Ein frei gewählter Zeitraum aus **ganzen Monaten** blättert um seine Anzahl Monate (Q1 → Q2, Monatsende angepasst), jeder andere um seine Anzahl Tage — dieselbe Regel wie in der Statistik (`blaettereZeitraum` in `utils/date-utils.ts`). Ein vertauschter Zeitraum wird nicht verschoben.
 4. Innerhalb der geladenen Spanne kann er mit Maus/Touch **zoomen und verschieben** (ECharts `dataZoom`), ohne dass neu geladen wird.
 
 ### FR-2: Persistierung

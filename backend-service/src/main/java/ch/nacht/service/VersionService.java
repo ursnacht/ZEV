@@ -1,5 +1,7 @@
 package ch.nacht.service;
 
+import ch.nacht.util.Ortszeit;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -8,7 +10,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -62,6 +63,6 @@ public class VersionService {
         if (props == null || props.getTime() == null) {
             return null;
         }
-        return props.getTime().atZone(ZoneId.systemDefault()).format(BUILD_FORMAT);
+        return props.getTime().atZone(Ortszeit.ZONE).format(BUILD_FORMAT);
     }
 }

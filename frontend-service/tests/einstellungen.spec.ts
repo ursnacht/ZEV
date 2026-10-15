@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { navigateViaMenu, waitForFormResult } from './helpers';
+import { waitForFormResult, navigateToEinstellungen } from './helpers';
 
 /**
  * tests / einstellungen.spec.ts
@@ -13,25 +13,6 @@ interface EinstellungenFormData {
     stellerStrasse: string;
     stellerPlz: string;
     stellerOrt: string;
-}
-
-/**
- * Helper function to navigate to Einstellungen page
- */
-async function navigateToEinstellungen(page: Page): Promise<void> {
-    await navigateViaMenu(page, '/einstellungen');
-
-    // Wait for page to load (either form or loading indicator)
-    const container = page.locator('.zev-container h1');
-    await container.waitFor({ state: 'visible', timeout: 15000 });
-
-    // Wait for loading to finish
-    const loadingText = page.locator('p:has-text("...")');
-    try {
-        await loadingText.waitFor({ state: 'hidden', timeout: 10000 });
-    } catch {
-        // Loading may already be done
-    }
 }
 
 /**

@@ -197,6 +197,35 @@ describe('PreiszeitreiheChartComponent', () => {
       expect(component.bis).toBe('2026-05-15');
     });
 
+    /**
+     * Ein frei gewaehlter Zeitraum aus ganzen Monaten blaettert um seine Anzahl Monate - dieselbe
+     * Regel wie in der Statistik (`blaettereZeitraum`). Vorher um die Anzahl Tage: Aus Q1
+     * (01.01.-31.03., 90 Tage) wurde 01.04.-29.06. statt Q2.
+     */
+    it('should move a free period of whole months by its number of months', () => {
+      component.spanne = 'FREI';
+      component.von = '2026-01-01';
+      component.bis = '2026-03-31';
+
+      component.blaettere(1);
+
+      expect(component.von).toBe('2026-04-01');
+      expect(component.bis).toBe('2026-06-30');
+    });
+
+    /** Ein vertauschter Zeitraum wird nicht verschoben - und nicht neu geladen. */
+    it('should not page a reversed period', () => {
+      component.spanne = 'FREI';
+      component.von = '2026-05-12';
+      component.bis = '2026-05-10';
+      preiszeitreiheServiceSpy.getPunkte.mockClear();
+
+      component.blaettere(1);
+
+      expect(component.von).toBe('2026-05-12');
+      expect(preiszeitreiheServiceSpy.getPunkte).not.toHaveBeenCalled();
+    });
+
     it('should reload after paging', () => {
       preiszeitreiheServiceSpy.getPunkte.mockClear();
 

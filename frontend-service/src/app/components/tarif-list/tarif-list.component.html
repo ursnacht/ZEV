@@ -74,6 +74,18 @@
                       (cdkDropListDropped)="onDrop(gruppe, $event)">
                       @for (tarif of gruppen[gruppe]; track tarif.id) {
                         <tr cdkDrag>
+                          <!-- Eigene Vorschau beim Ziehen: nur Tariftyp und Bezeichnung. Die
+                               CDK-Vorgabe kopiert die ganze Zeile an den <body>; ausserhalb der
+                               Tabelle verlieren die Zellen ihre Breiten, und alles rutscht ohne
+                               Abstand zusammen. -->
+                          <ng-template cdkDragPreview>
+                            <div class="zev-sortable__vorschau">
+                              <span class="tarif-typ-badge" [class.tarif-typ-badge--zev]="tarif.tariftyp === 'ZEV'" [class.tarif-typ-badge--vnb]="tarif.tariftyp === 'VNB'" [class.tarif-typ-badge--grundgebuehr]="tarif.tariftyp === 'GRUNDGEBUEHR'">
+                                {{ ('TARIFTYP_' + tarif.tariftyp) | translate }}
+                              </span>
+                              <span>{{ tarif.bezeichnung }}</span>
+                            </div>
+                          </ng-template>
                           <td class="zev-table__griff" cdkDragHandle
                             [attr.aria-label]="'TARIF_VERSCHIEBEN' | translate">
                             <app-icon name="menu"></app-icon>

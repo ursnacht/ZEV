@@ -9,6 +9,7 @@ import ch.nacht.entity.ZaehlerRohdaten;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
 import ch.nacht.repository.ZaehlerRohdatenRepository;
+import ch.nacht.util.Ortszeit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
@@ -81,8 +82,9 @@ public class ZaehlerAggregationService {
         metrics.recordAggregationRun();
         // Lokale Zeit – konsistent mit den lokal gespeicherten Rohdaten-Zeitstempeln
         // (Pi sendet lokale Zeit mit Offset, verbatim übernommen) und dem messwerte-Raster.
-        // Voraussetzung: Backend/Container läuft in der lokalen Zone (TZ=Europe/Zurich).
-        LocalDateTime jetzt = LocalDateTime.now();
+        // Ortszeit.jetzt() statt LocalDateTime.now(): unabhaengig von der Zone der JVM - frueher
+        // war TZ=Europe/Zurich im Container die Voraussetzung.
+        LocalDateTime jetzt = Ortszeit.jetzt();
         log.info("Aggregation start}");
         LocalDateTime letzteGrenze = floorAufQuartal(jetzt); // letztes abgeschlossenes Intervallende
         int erzeugt = 0;

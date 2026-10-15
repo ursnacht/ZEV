@@ -520,3 +520,13 @@ export async function navigateToTarifpositionen(page: Page): Promise<void> {
     await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
     await page.locator('#einheitAuswahl').waitFor({ state: 'visible', timeout: 15000 });
 }
+
+/**
+ * Oeffnet die Einstellungen und wartet, bis sie geladen sind (der Ladetext "..." verschwindet).
+ */
+export async function navigateToEinstellungen(page: Page): Promise<void> {
+    await navigateViaMenu(page, '/einstellungen');
+    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
+    // Kann schon fertig sein - dann ist "hidden" sofort erfuellt oder der Text nie erschienen
+    await page.locator('p:has-text("...")').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => undefined);
+}

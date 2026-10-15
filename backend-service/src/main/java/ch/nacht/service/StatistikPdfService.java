@@ -4,6 +4,7 @@ import ch.nacht.dto.MonatsStatistikDTO;
 import ch.nacht.dto.StatistikDTO;
 import ch.nacht.entity.Translation;
 import ch.nacht.repository.TranslationRepository;
+import ch.nacht.util.Ortszeit;
 import net.sf.jasperreports.engine.*;
 import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
 import net.sf.jasperreports.engine.util.JRLoader;
@@ -14,7 +15,6 @@ import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -110,7 +110,7 @@ public class StatistikPdfService {
             zeitraum = ersterMonat.getVon().format(formatter) + " - " + letzterMonat.getBis().format(formatter);
         }
 
-        String generiertAm = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
+        String generiertAm = Ortszeit.jetzt().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
 
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("STATISTIK", statistik);

@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList, moveItemInArray } from '@angular/cdk/drag-drop';
+import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList, moveItemInArray, CdkDragPreview } from '@angular/cdk/drag-drop';
 import { TarifService } from '../../services/tarif.service';
 import { Tarif, TarifTyp, ValidationResult, preisEinheitKey } from '../../models/tarif.model';
 import { formatTarifLuecke } from '../../utils/tarif-luecke.util';
@@ -23,7 +23,7 @@ export type TarifGruppe = 'zukuenftig' | 'aktuell' | 'alt';
   standalone: true,
   imports: [CommonModule, TarifFormComponent, TranslatePipe, SwissDatePipe, KebabMenuComponent,
     ColumnResizeDirective, IconComponent, PreiszeitreiheChartComponent, FeatureFlagDirective,
-    CdkDropList, CdkDrag, CdkDragHandle],
+    CdkDropList, CdkDrag, CdkDragHandle, CdkDragPreview],
   templateUrl: './tarif-list.component.html',
   styleUrls: ['./tarif-list.component.css']
 })

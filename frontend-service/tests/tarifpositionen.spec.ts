@@ -3,12 +3,13 @@ import {
     E2E_MIETENDE,
     clickKebabMenuItem,
     loescheZeileMitText,
-    navigateViaMenu,
     raeumeMitWiederholung,
     waitForFormResult,
     waitForTableWithData,
-    oeffneTarifPanels,
     navigateToTarifpositionen,
+    navigateToEinheiten,
+    navigateToMieter,
+    navigateToTarife,
 } from './helpers';
 
 /**
@@ -55,14 +56,12 @@ let einheitenMitPositionen: string[] = [];
 // Navigation und Meldungen
 // ---------------------------------------------------------------------------
 
-async function navigateTo(page: Page, route: string): Promise<void> {
-    await navigateViaMenu(page, route);
-    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
-    if (route === '/tarife') {
-        // Die Testtarife liegen im zugeklappten Panel "Zukuenftige Tarife"
-        await oeffneTarifPanels(page);
-    }
-}
+/** Die Listen, die der Aufraeumer kennt - je mit dem zentralen Navigationshelfer. */
+const NAVIGATION: Record<string, (page: Page) => Promise<void>> = {
+    '/einheiten': navigateToEinheiten,
+    '/mieter': navigateToMieter,
+    '/tarife': navigateToTarife,
+};
 
 /**
  * Wartet, bis keine Meldung mehr steht. Zwingend vor jedem Absenden: Erfolgsmeldungen blenden
@@ -144,7 +143,11 @@ async function createZusatzTarif(page: Page, bezeichnung: string, einheit: Menge
 
 async function deleteZeileByName(page: Page, route: string, name: string): Promise<boolean> {
     try {
-        await navigateTo(page, route);
+        const navigiere = NAVIGATION[route];
+        if (!navigiere) {
+            throw new Error(`Keine Navigation fuer ${route} hinterlegt`);
+        }
+        await navigiere(page);
         await closeOpenForm(page);
         await waitForTableWithData(page, 10000);
     } catch (error) {
@@ -161,7 +164,7 @@ async function deleteZeileByName(page: Page, route: string, name: string): Promi
 /** Legt eine eigene Konsumenten-Einheit an - produktive Stammdaten bleiben unberührt. */
 async function createWohnung(page: Page): Promise<void> {
     createdEinheitNames.push(WOHNUNG_NAME);
-    await navigateTo(page, '/einheiten');
+    await navigateToEinheiten(page);
     await waitForTableWithData(page, 10000);
     await closeOpenForm(page);
 
@@ -181,7 +184,7 @@ async function createWohnung(page: Page): Promise<void> {
 /** Ordnet der Wohnung einen Mieter zu - ohne Mieter erschiene keine Position auf einer Rechnung. */
 async function createMieter(page: Page): Promise<void> {
     createdMieterNames.push(MIETER_NAME);
-    await navigateTo(page, '/mieter');
+    await navigateToMieter(page);
     await waitForTableWithData(page, 10000);
     await closeOpenForm(page);
 
@@ -325,7 +328,7 @@ test.afterEach(async ({ page, browserName }) => {
 
 test.describe('Tarifpositionen - Tariftyp Zusatzleistung', () => {
     test('should show the unit field only for ZUSATZ and require it', async ({ page }) => {
-        await navigateTo(page, '/tarife');
+        await navigateToTarife(page);
         await waitForTableWithData(page, 10000);
         await page.locator('button.zev-button--primary').first().click();
         await expect(page.locator('form')).toBeVisible();
@@ -374,7 +377,7 @@ test.describe('Tarifpositionen - Tariftyp Zusatzleistung', () => {
     test('should allow two overlapping zusatz tariffs', async ({ page }) => {
         // Sauna und Waschküche teilen sich den Typ und müssen gleichzeitig gültig sein - die
         // Überschneidungsprüfung ist für ZUSATZ ausgenommen (Specs/Tarifpositionen.md FR-1.2).
-        await navigateTo(page, '/tarife');
+        await navigateToTarife(page);
         await waitForTableWithData(page, 10000);
 
         await createZusatzTarif(page, SAUNA, 'STUECK', '5.00000');
@@ -415,7 +418,7 @@ test.describe('Tarifpositionen - Erfassung für Konsumenten', () => {
     });
 
     test('should record a zusatz position for a consumer', async ({ page }) => {
-        await navigateTo(page, '/tarife');
+        await navigateToTarife(page);
         await waitForTableWithData(page, 10000);
         await createZusatzTarif(page, SAUNA, 'STUECK', '5.00000');
 

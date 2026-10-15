@@ -1,5 +1,7 @@
 package ch.nacht.entity;
 
+import ch.nacht.util.Ortszeit;
+
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -42,13 +44,13 @@ public class Metrik {
     public Metrik(String name, String value) {
         this.name = name;
         this.value = value;
-        this.zeitstempel = LocalDateTime.now();
+        this.zeitstempel = Ortszeit.jetzt();
     }
 
     @PrePersist
     @PreUpdate
     protected void onUpdate() {
-        this.zeitstempel = LocalDateTime.now();
+        this.zeitstempel = Ortszeit.jetzt();
     }
 
     public Long getId() {

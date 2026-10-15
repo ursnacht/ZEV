@@ -3,6 +3,7 @@ package ch.nacht.util;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,5 +34,15 @@ public class OrtszeitTest {
         LocalDate nachher = LocalDate.now(ZoneId.of("Europe/Zurich"));
 
         assertTrue(!heute.isBefore(vorher) && !heute.isAfter(nachher));
+    }
+
+    /** {@code jetzt()} liegt zwischen zwei Messungen in Ortszeit - nicht in der Zone der JVM. */
+    @Test
+    void jetzt_IstDerZeitpunktInOrtszeit() {
+        LocalDateTime vorher = LocalDateTime.now(ZoneId.of("Europe/Zurich"));
+        LocalDateTime jetzt = Ortszeit.jetzt();
+        LocalDateTime nachher = LocalDateTime.now(ZoneId.of("Europe/Zurich"));
+
+        assertTrue(!jetzt.isBefore(vorher) && !jetzt.isAfter(nachher));
     }
 }
