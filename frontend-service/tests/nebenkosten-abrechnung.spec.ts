@@ -217,7 +217,7 @@ async function ziehePositionNachOben(page: Page, index: number): Promise<void> {
     const zeilen = page.locator('.nk-positionen tbody tr');
     await zeilen.nth(index - 1).scrollIntoViewIfNeeded();
 
-    const griff = zeilen.nth(index).locator('.nk-positionen__griff');
+    const griff = zeilen.nth(index).locator('.zev-table__griff');
     const ziel = await zeilen.nth(index - 1).boundingBox();
     const start = await griff.boundingBox();
     if (!ziel || !start) {

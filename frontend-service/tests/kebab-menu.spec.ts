@@ -1,7 +1,15 @@
 import { test as baseTest, expect, Locator, Page } from '@playwright/test';
 import {
-    clickKebabMenuItem, closeKebabMenu, closeKebabMenuWithEsc, loescheZeileMitText, navigateViaMenu,
-    openKebabMenu, waitForFormResult, waitForTableWithData, oeffneTarifPanels } from './helpers';
+    clickKebabMenuItem,
+    closeKebabMenu,
+    closeKebabMenuWithEsc,
+    loescheZeileMitText,
+    navigateViaMenu,
+    openKebabMenu,
+    waitForFormResult,
+    waitForTableWithData,
+    navigateToTarife,
+} from './helpers';
 
 /**
  * tests / kebab-menu.spec.ts
@@ -59,17 +67,6 @@ const test = baseTest.extend<{ tarifTracker: TarifTracker }>({
             `Testdaten blieben in der Datenbank zurueck: ${gescheitert.join(', ')}`).toEqual([]);
     }
 });
-
-/**
- * Helper function to navigate to Tarif management page
- */
-async function navigateToTarife(page: Page): Promise<void> {
-    await navigateViaMenu(page, '/tarife');
-    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
-    // Wait for table to load
-    await oeffneTarifPanels(page);
-    await waitForTableWithData(page, 10000);
-}
 
 /**
  * Helper function to navigate to Einheiten management page

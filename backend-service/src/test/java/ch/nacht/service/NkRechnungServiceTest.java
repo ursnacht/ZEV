@@ -324,10 +324,11 @@ class NkRechnungServiceTest {
     /**
      * <b>Jede</b> Mengeneinheit hat einen Uebersetzungsschluessel — auch eine kuenftig ergaenzte.
      *
-     * <p>Der Waechter statt eines Tests je Wert: {@code MENGENEINHEIT_KEYS} ist eine
-     * {@code Map.of} ohne Rueckfall. Fehlt ein Eintrag, liefert {@code get} still {@code null},
-     * die Einheitenspalte der Rechnung bleibt leer und der Betrag daneben steht ohne Bezugsgroesse
-     * da — ein Fehler, den niemand meldet. Genau das drohte beim Ergaenzen von {@code M2}.
+     * <p>Der Waechter statt eines Tests je Wert: Die Keys sind Konstruktorparameter von
+     * {@code Mengeneinheit} (frueher eine {@code Map.of} hier im Service, deren {@code get} bei
+     * einem fehlenden Eintrag still {@code null} lieferte - die Einheitenspalte blieb leer, der
+     * Betrag stand ohne Bezugsgroesse da). Der Test bleibt, damit auch ein Schluessel {@code null}
+     * auffiele. Genau das drohte beim Ergaenzen von {@code M2}.
      *
      * <p>Geprueft wird, DASS ein Schluessel da ist, nicht WELCHER: {@code MONAT} traegt
      * {@code MONATE}, weil die Rechnung die Mehrzahl zeigt („12 Monate"). Eine Gleichsetzung mit

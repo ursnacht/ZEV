@@ -26,7 +26,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
@@ -49,23 +48,6 @@ import java.util.Optional;
 public class NkRechnungService {
 
     private static final Logger log = LoggerFactory.getLogger(NkRechnungService.class);
-
-    /**
-     * Uebersetzungsschluessel je Mengeneinheit — vollstaendig und ohne Rueckfall.
-     *
-     * <p>Bewusst kein {@code default}-Zweig auf {@code KWH}: Ein neuer Enum-Wert waere sonst
-     * stillschweigend als Kilowattstunden beschriftet. Die Zahl stimmte, die Einheit daneben nicht.
-     * Dieselbe Zuordnung wie im Frontend ({@code tarif.model.ts}, {@code MENGENEINHEIT_KEYS}).
-     */
-    private static final Map<Mengeneinheit, String> MENGENEINHEIT_KEYS = Map.of(
-            Mengeneinheit.KWH, "KWH",
-            Mengeneinheit.MONAT, "MONATE",
-            Mengeneinheit.TAG, "TAGE",
-            Mengeneinheit.STUECK, "STUECK",
-            Mengeneinheit.M3, "M3",
-            Mengeneinheit.M2, "M2",
-            Mengeneinheit.CHF, "CHF"
-    );
 
     private final NkAbrechnungService nkAbrechnungService;
     private final NkRechnungPdfService nkRechnungPdfService;
@@ -340,10 +322,10 @@ public class NkRechnungService {
      */
     private String mengeneinheitKey(NkZeileDTO zeile) {
         if (zeile.getEinheit() != null) {
-            return MENGENEINHEIT_KEYS.get(zeile.getEinheit());
+            return zeile.getEinheit().mehrzahlKey();
         }
         if (zeile.getArt() == NkPositionsart.ANTEIL || zeile.getArt() == NkPositionsart.ZUSCHLAG) {
-            return MENGENEINHEIT_KEYS.get(Mengeneinheit.CHF);
+            return Mengeneinheit.CHF.mehrzahlKey();
         }
         return null;
     }

@@ -1,4 +1,4 @@
-import { blaettereZeitraum, formatSwissDate, formatSwissDateTime, parseSwissDate, swissToIsoDate } from './date-utils';
+import { blaettereZeitraum, formatSwissDate, formatSwissDateTime, parseSwissDate, swissToIsoDate, toIsoDate } from './date-utils';
 
 describe('Date Utils', () => {
   describe('formatSwissDate', () => {
@@ -79,6 +79,21 @@ describe('Date Utils', () => {
     it('should return null for non-numeric parts', () => {
       expect(parseSwissDate('ab.01.2024')).toBeNull();
       expect(parseSwissDate('15.ab.2024')).toBeNull();
+    });
+  });
+
+  describe('toIsoDate', () => {
+    it('should format a local date as YYYY-MM-DD with leading zeros', () => {
+      expect(toIsoDate(new Date(2026, 0, 5))).toBe('2026-01-05');
+    });
+
+    /**
+     * Der Grund fuer die Funktion: kurz nach Mitternacht Ortszeit ist es in UTC noch der Vortag.
+     * `toISOString()` lieferte dann das falsche Datum, `toIsoDate` das lokale.
+     */
+    it('should use the local date, not the UTC date, shortly after midnight', () => {
+      const kurzNachMitternacht = new Date(2026, 9, 15, 0, 30);
+      expect(toIsoDate(kurzNachMitternacht)).toBe('2026-10-15');
     });
   });
 

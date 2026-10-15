@@ -8,7 +8,7 @@ import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
 import { WithMessage } from '../../utils/with-message';
 import { formatSwissNumber } from '../../utils/number-utils';
-import { formatSwissDateTime } from '../../utils/date-utils';
+import { formatSwissDateTime, toIsoDate } from '../../utils/date-utils';
 import { chartFarben } from '../../utils/chart-farben';
 import { ladeECharts } from '../../utils/echarts-loader';
 
@@ -76,18 +76,18 @@ export class PreiszeitreiheChartComponent extends WithMessage
     const heute = new Date();
     this.spanne = spanne;
     if (spanne === 'TAG') {
-      this.von = this.alsIso(heute);
+      this.von = toIsoDate(heute);
       this.bis = this.von;
     } else if (spanne === 'WOCHE') {
       const montag = new Date(heute);
       // getDay(): 0 = Sonntag. Die Woche beginnt am Montag, deshalb der Sonntag-Sonderfall.
       const versatz = (heute.getDay() + 6) % 7;
       montag.setDate(heute.getDate() - versatz);
-      this.von = this.alsIso(montag);
-      this.bis = this.alsIso(this.plusTage(montag, 6));
+      this.von = toIsoDate(montag);
+      this.bis = toIsoDate(this.plusTage(montag, 6));
     } else if (spanne === 'MONAT') {
-      this.von = this.alsIso(new Date(heute.getFullYear(), heute.getMonth(), 1));
-      this.bis = this.alsIso(new Date(heute.getFullYear(), heute.getMonth() + 1, 0));
+      this.von = toIsoDate(new Date(heute.getFullYear(), heute.getMonth(), 1));
+      this.bis = toIsoDate(new Date(heute.getFullYear(), heute.getMonth() + 1, 0));
     }
     this.lade();
   }
@@ -105,12 +105,12 @@ export class PreiszeitreiheChartComponent extends WithMessage
     }
     if (this.spanne === 'MONAT') {
       const ziel = new Date(von.getFullYear(), von.getMonth() + richtung, 1);
-      this.von = this.alsIso(ziel);
-      this.bis = this.alsIso(new Date(ziel.getFullYear(), ziel.getMonth() + 1, 0));
+      this.von = toIsoDate(ziel);
+      this.bis = toIsoDate(new Date(ziel.getFullYear(), ziel.getMonth() + 1, 0));
     } else {
       const tage = Math.round((bis.getTime() - von.getTime()) / 86400000) + 1;
-      this.von = this.alsIso(this.plusTage(von, richtung * tage));
-      this.bis = this.alsIso(this.plusTage(bis, richtung * tage));
+      this.von = toIsoDate(this.plusTage(von, richtung * tage));
+      this.bis = toIsoDate(this.plusTage(bis, richtung * tage));
     }
     this.lade();
   }
@@ -322,11 +322,6 @@ export class PreiszeitreiheChartComponent extends WithMessage
   /** `dd.MM.yyyy HH:mm` über `utils/date-utils.ts` — dort für alle Diagramme gemeinsam. */
   private formatiereZeit(datum: Date): string {
     return formatSwissDateTime(datum);
-  }
-
-  private alsIso(datum: Date): string {
-    const zwei = (wert: number) => String(wert).padStart(2, '0');
-    return `${datum.getFullYear()}-${zwei(datum.getMonth() + 1)}-${zwei(datum.getDate())}`;
   }
 
   private ausIso(iso: string): Date | null {

@@ -1,6 +1,7 @@
 package ch.nacht.dto;
 
 import ch.nacht.entity.Steuerregel;
+import ch.nacht.entity.Steuerverfahren;
 import ch.nacht.entity.Steuerzustand;
 
 import java.math.BigDecimal;
@@ -52,7 +53,7 @@ public class SteuerentscheidDTO {
      *
      * <p>In der Schattenrechnung durchgehend {@code REGEL} (Specs/Ladeplanung.md, FR-1a).
      */
-    private String verfahren;
+    private Steuerverfahren verfahren;
 
     /**
      * Was die Merit-Order <b>entschieden haette</b>; {@code null}, wenn sie nicht rechnen konnte.
@@ -60,7 +61,7 @@ public class SteuerentscheidDTO {
      * <p>Bestimmt den Entscheid nicht. Der Vergleich mit {@link #batterieladung} ist der Zweck der
      * Schattenrechnung.
      */
-    private String ladeplanBatterieladung;
+    private Steuerzustand ladeplanBatterieladung;
 
     /** Erwarteter PV-Ueberschuss dieses Intervalls in kWh — nicht der gemessene. */
     private BigDecimal prognoseUeberschuss;
@@ -259,19 +260,19 @@ public class SteuerentscheidDTO {
         this.mindestAbstand = mindestAbstand;
     }
 
-    public String getVerfahren() {
+    public Steuerverfahren getVerfahren() {
         return verfahren;
     }
 
-    public void setVerfahren(String verfahren) {
+    public void setVerfahren(Steuerverfahren verfahren) {
         this.verfahren = verfahren;
     }
 
-    public String getLadeplanBatterieladung() {
+    public Steuerzustand getLadeplanBatterieladung() {
         return ladeplanBatterieladung;
     }
 
-    public void setLadeplanBatterieladung(String ladeplanBatterieladung) {
+    public void setLadeplanBatterieladung(Steuerzustand ladeplanBatterieladung) {
         this.ladeplanBatterieladung = ladeplanBatterieladung;
     }
 

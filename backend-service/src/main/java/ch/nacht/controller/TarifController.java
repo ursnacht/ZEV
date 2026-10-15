@@ -83,6 +83,18 @@ public class TarifController {
         }
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteTarif(@PathVariable Long id) {
+        log.info("Deleting tarif with id: {}", id);
+        if (tarifService.deleteTarif(id)) {
+            log.info("Successfully deleted tarif with id: {}", id);
+            return ResponseEntity.noContent().build();
+        } else {
+            log.warn("Cannot delete - tarif not found with id: {}", id);
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     /**
      * Verschiebt einen Tarif direkt vor oder hinter einen anderen (Specs/Tarifverwaltung.md, FR-4).
      *
@@ -102,18 +114,6 @@ public class TarifController {
         } catch (IllegalArgumentException e) {
             log.warn("Failed to move tarif {}: {}", id, e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
-        }
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteTarif(@PathVariable Long id) {
-        log.info("Deleting tarif with id: {}", id);
-        if (tarifService.deleteTarif(id)) {
-            log.info("Successfully deleted tarif with id: {}", id);
-            return ResponseEntity.noContent().build();
-        } else {
-            log.warn("Cannot delete - tarif not found with id: {}", id);
-            return ResponseEntity.notFound().build();
         }
     }
 

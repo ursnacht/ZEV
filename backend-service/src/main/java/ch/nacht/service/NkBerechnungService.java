@@ -8,19 +8,18 @@ import ch.nacht.dto.NkZeileDTO;
 import ch.nacht.entity.NkAbrechnung;
 import ch.nacht.entity.NkAkonto;
 import ch.nacht.entity.Mengeneinheit;
-import ch.nacht.entity.Mengeneinheit;
 import ch.nacht.entity.NkPerson;
 import ch.nacht.entity.NkPosition;
 import ch.nacht.entity.NkPositionsart;
 import ch.nacht.entity.NkVerbrauch;
 import ch.nacht.entity.NkZusatz;
+import ch.nacht.util.Zeitraum;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -185,7 +184,7 @@ public class NkBerechnungService {
      * @return Anzahl Tage
      */
     public long tageImZeitraum(LocalDate von, LocalDate bis) {
-        return ChronoUnit.DAYS.between(von, bis) + 1;
+        return Zeitraum.tageInklusive(von, bis);
     }
 
     /**
@@ -239,7 +238,7 @@ public class NkBerechnungService {
         if (beginn.isAfter(ende)) {
             return 0;
         }
-        return ChronoUnit.DAYS.between(beginn, ende) + 1;
+        return Zeitraum.tageInklusive(beginn, ende);
     }
 
     /**
@@ -267,7 +266,7 @@ public class NkBerechnungService {
         while (!monat.isAfter(letzter)) {
             LocalDate monatsBeginn = monat.atDay(1).isBefore(beginn) ? beginn : monat.atDay(1);
             LocalDate monatsEnde = monat.atEndOfMonth().isAfter(ende) ? ende : monat.atEndOfMonth();
-            long tage = ChronoUnit.DAYS.between(monatsBeginn, monatsEnde) + 1;
+            long tage = Zeitraum.tageInklusive(monatsBeginn, monatsEnde);
             summe = summe.add(BigDecimal.valueOf(tage)
                     .divide(BigDecimal.valueOf(monat.lengthOfMonth()), ZWISCHEN_SCALE, RoundingMode.HALF_UP));
             monat = monat.plusMonths(1);

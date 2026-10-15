@@ -5,6 +5,7 @@ import { Mieter } from '../../models/mieter.model';
 import { Einheit } from '../../models/einheit.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
+import { toIsoDate } from '../../utils/date-utils';
 
 @Component({
   selector: 'app-mieter-form',
@@ -35,7 +36,8 @@ export class MieterFormComponent implements OnInit {
       this.formData = { ...this.mieter, einheitIds: [...(this.mieter.einheitIds ?? [])] };
     } else {
       // Set default mietbeginn to today
-      const today = new Date().toISOString().split('T')[0];
+      // Ortszeit, nicht toISOString(): Das ist UTC und lieferte kurz nach Mitternacht den Vortag
+      const today = toIsoDate(new Date());
       this.formData.mietbeginn = today;
     }
   }

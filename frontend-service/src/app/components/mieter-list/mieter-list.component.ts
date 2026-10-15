@@ -177,8 +177,8 @@ export class MieterListComponent extends WithMessage implements OnInit {
     if (!column) return;
 
     this.mieter.sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
+      let aValue: string | undefined;
+      let bValue: string | undefined;
 
       if (column === 'plzOrt') {
         aValue = `${a.plz || ''} ${a.ort || ''}`.trim();
@@ -187,17 +187,16 @@ export class MieterListComponent extends WithMessage implements OnInit {
         aValue = this.getEinheitNamen(a);
         bValue = this.getEinheitNamen(b);
       } else {
-        aValue = (a as any)[column];
-        bValue = (b as any)[column];
+        aValue = a[column];
+        bValue = b[column];
       }
 
-      if (aValue === null || aValue === undefined || aValue === '') return 1;
-      if (bValue === null || bValue === undefined || bValue === '') return -1;
+      // Leere Werte ans Ende - `== null` faengt auch das null, das das Backend schickt
+      if (aValue == null || aValue === '') return 1;
+      if (bValue == null || bValue === '') return -1;
 
-      if (typeof aValue === 'string') {
-        aValue = aValue.toLowerCase();
-        bValue = bValue.toLowerCase();
-      }
+      aValue = aValue.toLowerCase();
+      bValue = bValue.toLowerCase();
 
       if (aValue < bValue) {
         return this.sortDirection === 'asc' ? -1 : 1;

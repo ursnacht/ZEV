@@ -7,6 +7,7 @@ import { Mieter } from '../../models/mieter.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
 import { FeatureFlagService } from '../../services/feature-flag.service';
+import { toIsoDate } from '../../utils/date-utils';
 
 @Component({
   selector: 'app-debitorkontrolle-form',
@@ -52,7 +53,8 @@ export class DebitorkontrolleFormComponent implements OnInit {
       this.formData = { herkunft: 'ZEV', ...this.debitor };
       this.updateEinheitName();
     } else {
-      const today = new Date().toISOString().split('T')[0];
+      // Ortszeit, nicht toISOString(): Das ist UTC und lieferte kurz nach Mitternacht den Vortag
+      const today = toIsoDate(new Date());
       this.formData.datumVon = today;
       this.formData.datumBis = today;
     }

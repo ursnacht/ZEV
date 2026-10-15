@@ -200,7 +200,7 @@ Claude Code verwendet diese Dateien als Referenz für konsistente Code-Generieru
 |-----|---------|
 | Model | `tarif.model.ts` |
 | Service | `tarif.service.ts` |
-| List Component | `tarif-list/` |
+| List Component | `mieter-list/` |
 | Form Component | `tarif-form/` |
 
 ### Bash-Kommandos

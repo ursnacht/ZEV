@@ -13,6 +13,7 @@ import ch.nacht.entity.TarifTyp;
 import ch.nacht.entity.Tarifposition;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
+import ch.nacht.util.Zeitraum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -23,8 +24,8 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Year;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -48,6 +49,9 @@ public class RechnungService {
 
     /** Kleinste Muenze der Rechnung - der Endbetrag ist immer ein Vielfaches davon. */
     private static final BigDecimal FUENF_RAPPEN = new BigDecimal("0.05");
+
+    /** Nachkommastellen eines anteiligen Betrags (Jahrespreis); gerundet wird erst der Endbetrag. */
+    private static final int BETRAG_SCALE = 10;
 
     private final EinheitRepository einheitRepository;
     private final MesswerteRepository messwerteRepository;
@@ -310,16 +314,6 @@ public class RechnungService {
     }
 
     /**
-     * Hat der Mieter eine Wohnung? Nur dann erscheinen seine Ladestrom-Positionen dort und die
-     * Ladestation braucht keine eigene Rechnung.
-     *
-     * @param mieter Tenant
-     * @return true if a CONSUMER unit is assigned to the tenant
-     */
-    /** Nachkommastellen eines anteiligen Betrags (Jahrespreis); gerundet wird erst der Endbetrag. */
-    private static final int BETRAG_SCALE = 10;
-
-    /**
      * Anteil eines Jahrespreises nach Tagen: je Kalenderjahr Tage / Tage dieses Jahres (365 bzw.
      * 366). Ein Zeitraum ueber den Jahreswechsel wird am 1. Januar geteilt.
      */
@@ -329,7 +323,7 @@ public class RechnungService {
         while (!start.isAfter(bis)) {
             LocalDate jahresende = LocalDate.of(start.getYear(), 12, 31);
             LocalDate ende = bis.isBefore(jahresende) ? bis : jahresende;
-            long tage = ChronoUnit.DAYS.between(start, ende) + 1;
+            long tage = Zeitraum.tageInklusive(start, ende);
             summe = summe.add(jahrespreis.multiply(BigDecimal.valueOf(tage))
                     .divide(BigDecimal.valueOf(start.lengthOfYear()), BETRAG_SCALE, RoundingMode.HALF_UP));
             start = ende.plusDays(1);
@@ -338,12 +332,19 @@ public class RechnungService {
     }
 
     /**
-     * Darstellung beim Jahrespreis (FR-6): Preis "CHF / Jahr", die Menge in Worten ("3 Monate",
-     * "92 Tage"; Einzahl bei 1).
+     * Anteil eines Jahrespreises nach Monaten: Monate / 12. Fuer Tarifpositionen und die
+     * Grundgebuehr nach Monaten - vorher stand die Rechnung an beiden Stellen.
      */
-    private TarifZeileDTO alsJahrespreis(boolean jahrespreis, boolean proTag, BigDecimal menge, TarifZeileDTO zeile) {
+    private BigDecimal jahresanteilNachMonaten(BigDecimal jahrespreis, BigDecimal monate) {
+        return jahrespreis.multiply(monate).divide(BigDecimal.valueOf(12), BETRAG_SCALE, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Darstellung beim Jahrespreis (FR-6): Preis "CHF / Jahr". Die Menge in Worten ("3 Monate",
+     * "92 Tage"; Einzahl bei 1) ergaenzt {@code schliesseZeilenAb} fuer alle Zeilen.
+     */
+    private TarifZeileDTO alsJahrespreis(boolean jahrespreis, TarifZeileDTO zeile) {
         if (jahrespreis) {
-            // Die Menge in Worten ("3 Monate") ergaenzt schliesseZeilenAb fuer alle Zeilen
             zeile.setPreisEinheit("JAHR");
         }
         return zeile;
@@ -360,27 +361,9 @@ public class RechnungService {
      */
     private void schliesseZeilenAb(RechnungDTO rechnung) {
         for (TarifZeileDTO zeile : rechnung.getTarifZeilen()) {
-            zeile.setMengeEinheit(mengeEinheitKey(zeile.getMengeneinheit(), zeile.getMenge()));
+            zeile.setMengeEinheit(Mengeneinheit.keyFuer(zeile.getMengeneinheit(), zeile.getMenge()));
         }
         sortiereZeilen(rechnung);
-    }
-
-    /**
-     * Uebersetzungs-Key der Einheit in der Mengenspalte (Specs/RechnungenGenerieren.md): Monat und
-     * Tag mit Einzahl und Mehrzahl ("1 Monat", "3 Monate"), alle uebrigen wie die Mengeneinheit
-     * selbst ("123 kWh", "5 Stück").
-     */
-    static String mengeEinheitKey(String mengeneinheit, BigDecimal menge) {
-        if (mengeneinheit == null) {
-            return null;
-        }
-        String key = mengeneinheit.toUpperCase(java.util.Locale.ROOT);
-        boolean eins = menge != null && menge.compareTo(BigDecimal.ONE) == 0;
-        return switch (key) {
-            case "MONAT" -> eins ? "MONAT" : "MONATE";
-            case "TAG" -> eins ? "TAG" : "TAGE";
-            default -> key;
-        };
     }
 
     /**
@@ -389,12 +372,19 @@ public class RechnungService {
      * Bei gleicher Reihenfolge bleibt die Reihenfolge der Berechnung erhalten.
      */
     private void sortiereZeilen(RechnungDTO rechnung) {
-        rechnung.getTarifZeilen().sort(java.util.Comparator
+        rechnung.getTarifZeilen().sort(Comparator
                 .comparingInt(TarifZeileDTO::getReihenfolge)
                 .thenComparing(TarifZeileDTO::getVon,
-                        java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())));
+                        Comparator.nullsLast(Comparator.naturalOrder())));
     }
 
+    /**
+     * Hat der Mieter eine Wohnung? Nur dann erscheinen seine Ladestrom-Positionen dort und die
+     * Ladestation braucht keine eigene Rechnung.
+     *
+     * @param mieter Tenant
+     * @return true if a CONSUMER unit is assigned to the tenant
+     */
     private boolean hatWohnung(Mieter mieter) {
         return mieterService.getEinheitIds(mieter.getId()).stream()
                 .map(einheitRepository::findFirstById)
@@ -492,12 +482,12 @@ public class RechnungService {
             // Jahrespreis (nur ZUSATZ pro Monat): Monate / 12 des Jahrespreises (FR-6)
             boolean jahrespreis = position.getTarif().isPreisProJahr();
             BigDecimal betrag = jahrespreis
-                    ? preis.multiply(menge).divide(BigDecimal.valueOf(12), BETRAG_SCALE, RoundingMode.HALF_UP)
+                    ? jahresanteilNachMonaten(preis, menge)
                     : menge.multiply(preis);
 
             LocalDate[] zeitraum = zeitraumDerPositionszeile(position);
 
-            rechnung.addTarifZeile(alsJahrespreis(jahrespreis, false, menge, mitReihenfolge(position.getTarif(), new TarifZeileDTO(
+            rechnung.addTarifZeile(alsJahrespreis(jahrespreis, mitReihenfolge(position.getTarif(), new TarifZeileDTO(
                     bezeichnungMitQuellReferenz(position),
                     zeitraum[0],
                     zeitraum[1],
@@ -584,7 +574,7 @@ public class RechnungService {
             // (Specs/Tarifverwaltung.md, FR-3).
             boolean proTag = Mengeneinheit.TAG.name().equals(tarif.effektiveMengeneinheit());
             long anzahl = proTag
-                    ? ChronoUnit.DAYS.between(effVon, effBis) + 1
+                    ? Zeitraum.tageInklusive(effVon, effBis)
                     : zaehleVolleMonate(effVon, effBis);
             if (anzahl <= 0) {
                 continue;
@@ -601,10 +591,10 @@ public class RechnungService {
             } else if (proTag) {
                 betrag = jahresanteilNachTagen(preis, effVon, effBis);
             } else {
-                betrag = preis.multiply(menge).divide(BigDecimal.valueOf(12), BETRAG_SCALE, RoundingMode.HALF_UP);
+                betrag = jahresanteilNachMonaten(preis, menge);
             }
 
-            rechnung.addTarifZeile(alsJahrespreis(tarif.isPreisProJahr(), proTag, menge, mitReihenfolge(tarif, new TarifZeileDTO(
+            rechnung.addTarifZeile(alsJahrespreis(tarif.isPreisProJahr(), mitReihenfolge(tarif, new TarifZeileDTO(
                     tarif.getBezeichnung(),
                     effVon,
                     effBis,

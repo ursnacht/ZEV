@@ -505,38 +505,6 @@ describe('EinspeisesteuerungComponent', () => {
       });
     });
 
-    /**
-     * <b>Die Kennzahl der Schattenrechnung.</b> Weichen die Verfahren selten ab, ist der Gewinn
-     * klein und das Regelwerk genuegt — dann waere das Umschalten die falsche Entscheidung.
-     */
-    describe('abweichungen', () => {
-      it('should count only intervals where both methods disagree', () => {
-        component.entscheide = [
-          mitLadeplan('2026-10-03T10:00:00', 'GESPERRT', 'FREI'),   // abweichend
-          mitLadeplan('2026-10-03T10:15:00', 'FREI', 'FREI'),       // gleich
-          mitLadeplan('2026-10-03T10:30:00', 'FREI', 'GESPERRT'),   // abweichend
-          entscheid('2026-10-03T10:45:00')                          // nicht gerechnet
-        ];
-
-        expect(component.abweichungen()).toBe(2);
-      });
-
-      /**
-       * Ein nicht gerechnetes Intervall ist <b>keine</b> Abweichung.
-       *
-       * <p>Sonst zaehlte jede Nacht und jeder Rueckfall mit, und die Kennzahl saehe nach einem
-       * grossen Unterschied aus, wo gar nichts verglichen wurde.
-       */
-      it('should not count intervals the merit order could not plan', () => {
-        component.entscheide = [
-          entscheid('2026-10-03T02:00:00', { batterieladung: 'FREI' }),
-          entscheid('2026-10-03T02:15:00', { batterieladung: 'GESPERRT' })
-        ];
-
-        expect(component.abweichungen()).toBe(0);
-      });
-    });
-
     describe('Zustandsband', () => {
       /** Ohne Schattenrechnung bleibt es bei zwei Baendern — wie vor der Ladeplanung. */
       it('should not draw the shadow band without planning results', () => {

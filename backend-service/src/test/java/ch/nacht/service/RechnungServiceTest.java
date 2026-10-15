@@ -1930,15 +1930,4 @@ public class RechnungServiceTest {
         assertEquals(List.of("KWH", "KWH", "MONATE"),
             rechnung.getTarifZeilen().stream().map(TarifZeileDTO::getMengeEinheit).toList());
     }
-
-    @Test
-    void mengeEinheitKey_EinzahlUndMehrzahl() {
-        assertEquals("MONAT", RechnungService.mengeEinheitKey("MONAT", BigDecimal.ONE));
-        assertEquals("MONATE", RechnungService.mengeEinheitKey("MONAT", new BigDecimal("3")));
-        assertEquals("TAG", RechnungService.mengeEinheitKey("TAG", BigDecimal.ONE));
-        assertEquals("TAGE", RechnungService.mengeEinheitKey("TAG", new BigDecimal("92")));
-        assertEquals("KWH", RechnungService.mengeEinheitKey("KWH", new BigDecimal("1")));
-        assertEquals("STUECK", RechnungService.mengeEinheitKey("STUECK", new BigDecimal("4")));
-        assertNull(RechnungService.mengeEinheitKey(null, BigDecimal.TEN));
-    }
 }

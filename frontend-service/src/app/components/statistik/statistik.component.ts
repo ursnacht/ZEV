@@ -1,8 +1,8 @@
 import { Component, OnInit } from '@angular/core';
-import { blaettereZeitraum } from '../../utils/date-utils';
-import { LoadingIndicatorComponent } from '../loading-indicator/loading-indicator.component';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { blaettereZeitraum, toIsoDate } from '../../utils/date-utils';
+import { LoadingIndicatorComponent } from '../loading-indicator/loading-indicator.component';
 import { WithMessage } from '../../utils/with-message';
 import { StatistikService } from '../../services/statistik.service';
 import { Statistik, MonatsStatistik, TagMitAbweichung, EinheitSummen } from '../../models/statistik.model';
@@ -87,22 +87,15 @@ export class StatistikComponent extends WithMessage implements OnInit {
       year--;
     }
     const startMonth = (quarter - 1) * 3;
-    this.dateFrom = this.formatDate(new Date(year, startMonth, 1));
-    this.dateTo = this.formatDate(new Date(year, startMonth + 3, 0));
-  }
-
-  private formatDate(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    this.dateFrom = toIsoDate(new Date(year, startMonth, 1));
+    this.dateTo = toIsoDate(new Date(year, startMonth + 3, 0));
   }
 
   onDateFromChange(): void {
     if (this.dateFrom) {
       const date = new Date(this.dateFrom);
       const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-      this.dateTo = this.formatDate(lastDay);
+      this.dateTo = toIsoDate(lastDay);
     }
   }
 
@@ -118,11 +111,11 @@ export class StatistikComponent extends WithMessage implements OnInit {
    * <p>Auch ein zweiter Klick lädt: Für den laufenden Tag kommen laufend Messwerte dazu, „Heute"
    * ist damit zugleich „aktualisieren".
    *
-   * <p>Über {@link formatDate} statt {@code toISOString()}: Letzteres liefert das UTC-Datum, und
+   * <p>Über {@link toIsoDate} statt {@code toISOString()}: Letzteres liefert das UTC-Datum, und
    * kurz nach Mitternacht stünde dann der Vortag im Feld.
    */
   onHeute(): void {
-    const heute = this.formatDate(new Date());
+    const heute = toIsoDate(new Date());
     this.dateFrom = heute;
     this.dateTo = heute;
     this.onSubmit();
@@ -212,10 +205,6 @@ export class StatistikComponent extends WithMessage implements OnInit {
   }
 
   /**
-   * CSV-Download der 15-Min-Werte einer Consumer-Einheit für den Monat. Der Dateiname wird
-   * benutzerfreundlich aus Einheiten-Name + Monat gebildet (bereinigt).
-   */
-  /**
    * Zeitraum für den CSV-Dateinamen: der Monat (`2024-02`), wenn `von` und `bis` darin liegen,
    * sonst `von_bis`.
    *
@@ -227,6 +216,10 @@ export class StatistikComponent extends WithMessage implements OnInit {
     return vonMonat === monat.bis.substring(0, 7) ? vonMonat : `${monat.von}_${monat.bis}`;
   }
 
+  /**
+   * CSV-Download der 15-Min-Werte einer Consumer-Einheit für den Monat. Der Dateiname wird
+   * benutzerfreundlich aus Einheiten-Name + Monat gebildet (bereinigt).
+   */
   onDownloadCsv(monat: MonatsStatistik, einheit: EinheitSummen): void {
     const sprache = this.translationService.getCurrentLanguage();
     this.statistikService.exportCsv(einheit.einheitId, monat.von, monat.bis, sprache).subscribe({

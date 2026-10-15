@@ -5,6 +5,7 @@ import ch.nacht.dto.SimulationDTO;
 import ch.nacht.dto.SteuerentscheidDTO;
 import ch.nacht.service.ProduktionsprognoseService;
 import ch.nacht.service.SteuerungService;
+import ch.nacht.util.Zeitraum;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +21,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 /**
@@ -135,7 +135,7 @@ public class SteuerungController {
         if (anfrage.von().isAfter(anfrage.bis())) {
             return ResponseEntity.badRequest().body("von muss vor oder gleich bis liegen");
         }
-        long tage = ChronoUnit.DAYS.between(anfrage.von(), anfrage.bis()) + 1;
+        long tage = Zeitraum.tageInklusive(anfrage.von(), anfrage.bis());
         if (tage > MAX_TAGE) {
             return ResponseEntity.badRequest()
                     .body("Zeitraum umfasst " + tage + " Tage; erlaubt sind hoechstens " + MAX_TAGE);

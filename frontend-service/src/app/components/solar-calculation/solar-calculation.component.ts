@@ -11,6 +11,7 @@ import { SwissNumberPipe } from '../../pipes/swiss-number.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
 import { IconComponent } from '../icon/icon.component';
+import { toIsoDate } from '../../utils/date-utils';
 
 @Component({
   selector: 'app-solar-calculation',
@@ -60,21 +61,14 @@ export class SolarCalculationComponent extends WithMessage implements OnInit, On
       year--;
     }
     const startMonth = (quarter - 1) * 3;
-    this.dateFrom = this.formatDate(new Date(year, startMonth, 1));
-    this.dateTo = this.formatDate(new Date(year, startMonth + 3, 0));
-  }
-
-  private formatDate(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    this.dateFrom = toIsoDate(new Date(year, startMonth, 1));
+    this.dateTo = toIsoDate(new Date(year, startMonth + 3, 0));
   }
 
   onDateFromChange(): void {
     if (this.dateFrom) {
       const date = new Date(this.dateFrom);
-      this.dateTo = this.formatDate(new Date(date.getFullYear(), date.getMonth() + 1, 0));
+      this.dateTo = toIsoDate(new Date(date.getFullYear(), date.getMonth() + 1, 0));
     }
   }
 

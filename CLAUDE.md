@@ -108,7 +108,7 @@ Bei der Code-Generierung diese Dateien als Vorlage verwenden und deren Struktur 
 |---------------------|-------------------------------------------------------------------------------|
 | Model               | `frontend-service/src/app/models/tarif.model.ts`                              |
 | Service             | `frontend-service/src/app/services/tarif.service.ts`                          |
-| List-Component      | `frontend-service/src/app/components/tarif-list/`                             |
+| List-Component      | `frontend-service/src/app/components/mieter-list/`                            |
 | Form-Component      | `frontend-service/src/app/components/tarif-form/`                             |
 | Directive           | `frontend-service/src/app/directives/column-resize.directive.ts`              |
 | Pipe                | `frontend-service/src/app/pipes/swiss-date.pipe.ts`                           |
@@ -124,6 +124,9 @@ Bei der Code-Generierung diese Dateien als Vorlage verwenden und deren Struktur 
 | Neuer Plan             | Vorlage                                   |
 |------------------------|-------------------------------------------|
 | Feature-Umsetzungsplan | `Specs/Tarifverwaltung_Umsetzungsplan.md` |
+
+`tarif-list` ist bewusst **keine** List-Vorlage mehr: Sie ist fachspezifisch (Panels nach Zeitraum,
+Drag & Drop) und hat keine Spaltensortierung.
 
 ## Specifications
 

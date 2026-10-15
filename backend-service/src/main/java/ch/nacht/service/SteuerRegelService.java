@@ -201,15 +201,6 @@ public class SteuerRegelService {
     }
 
     /**
-     * Die wirksame Untergrenze des Ladezustands — angehoben, solange die Freigabe schon gilt.
-     *
-     * <p>Das ist die ganze Hysterese: <b>ein</b> Schwellwert, der sich verschiebt, statt zweier
-     * Regeln. Fiel der Ladezustand unter den Mindestwert, gilt bis
-     * {@code socMinimum + socHysterese} weiter freigegeben; danach greifen die Preisregeln wieder.
-     *
-     * <p>Ohne Hysterese (fehlend oder 0) ist die Grenze schlicht der Mindestwert.
-     */
-    /**
      * Greift {@code SOC_TIEF}? — der Speicher ist zu leer, um noch zu warten.
      *
      * <p><b>Eine Prüfung für beide Verfahren.</b> Die Regelkaskade nutzt sie als Regel 2, die
@@ -228,8 +219,17 @@ public class SteuerRegelService {
                 && soc.compareTo(grenze(socMinimum, socHysterese, socTiefGaltZuvor)) < 0;
     }
 
+    /**
+     * Die wirksame Untergrenze des Ladezustands — angehoben, solange die Freigabe schon gilt.
+     *
+     * <p>Das ist die ganze Hysterese: <b>ein</b> Schwellwert, der sich verschiebt, statt zweier
+     * Regeln. Fiel der Ladezustand unter den Mindestwert, gilt bis
+     * {@code socMinimum + socHysterese} weiter freigegeben; danach greifen die Preisregeln wieder.
+     *
+     * <p>Ohne Hysterese (fehlend oder 0) ist die Grenze schlicht der Mindestwert.
+     */
     private static BigDecimal grenze(BigDecimal socMinimum, BigDecimal socHysterese,
-                              boolean socTiefGaltZuvor) {
+                                     boolean socTiefGaltZuvor) {
         if (!socTiefGaltZuvor || socHysterese == null) {
             return socMinimum;
         }

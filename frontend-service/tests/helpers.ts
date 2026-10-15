@@ -483,3 +483,16 @@ export async function oeffneTarifPanels(page: Page): Promise<void> {
         await zu.first().click();
     }
 }
+
+/**
+ * Oeffnet die Tarifverwaltung mit allen Panels und wartet auf die Tabelle.
+ *
+ * <p>Vorher stand diese Funktion in fuenf Spec-Dateien als Kopie - und jede musste einzeln um
+ * {@link oeffneTarifPanels} ergaenzt werden, als die Panels kamen.
+ */
+export async function navigateToTarife(page: Page): Promise<void> {
+    await navigateViaMenu(page, '/tarife');
+    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
+    await oeffneTarifPanels(page);
+    await waitForTableWithData(page, 10000);
+}

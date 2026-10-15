@@ -18,7 +18,7 @@ import { IconComponent } from '../icon/icon.component';
 import { WithMessage } from '../../utils/with-message';
 import { chartFarben } from '../../utils/chart-farben';
 import { ladeECharts } from '../../utils/echarts-loader';
-import { formatSwissDateTime } from '../../utils/date-utils';
+import { formatSwissDateTime, toIsoDate } from '../../utils/date-utils';
 import { formatSwissNumber } from '../../utils/number-utils';
 
 type EChartsCore = Awaited<ReturnType<typeof ladeECharts>>;
@@ -519,10 +519,7 @@ export class EinspeisesteuerungComponent extends WithMessage
    * eine 0 sähe aus wie „keine Sonne erwartet".
    */
   summeErwarteteErzeugung(): number | null {
-    const werte = this.prognose
-      .map(p => p.erwarteteErzeugung)
-      .filter((w): w is number => w != null);
-    return werte.length === 0 ? null : werte.reduce((summe, w) => summe + w, 0);
+    return this.summeErwartet(this.prognose);
   }
 
   /**
@@ -543,8 +540,15 @@ export class EinspeisesteuerungComponent extends WithMessage
       return null;
     }
     const letzterBeginn = new Date(this.entscheide[this.entscheide.length - 1].zeit).getTime();
-    const werte = this.prognose
-      .filter(p => new Date(p.zeit).getTime() <= letzterBeginn)
+    return this.summeErwartet(this.prognose.filter(p => new Date(p.zeit).getTime() <= letzterBeginn));
+  }
+
+  /**
+   * Summe der erwarteten Erzeugung der Punkte — `null`, wenn keiner eine trägt (kein Faktor
+   * gelernt): Eine 0 sähe aus wie „keine Sonne erwartet".
+   */
+  private summeErwartet(punkte: Prognosepunkt[]): number | null {
+    const werte = punkte
       .map(p => p.erwarteteErzeugung)
       .filter((w): w is number => w != null);
     return werte.length === 0 ? null : werte.reduce((summe, w) => summe + w, 0);
@@ -563,7 +567,7 @@ export class EinspeisesteuerungComponent extends WithMessage
     }
     const letzter = this.entscheide[this.entscheide.length - 1];
     const ende = new Date(new Date(letzter.zeit).getTime() + INTERVALL_MS);
-    const zeit = `${String(ende.getHours()).padStart(2, '0')}:${String(ende.getMinutes()).padStart(2, '0')}`;
+    const zeit = formatSwissDateTime(ende).slice(-5);
     return this.translationService.translate('STEUERUNG_BIS_ZEIT').replace('{0}', zeit);
   }
 
@@ -719,7 +723,6 @@ export class EinspeisesteuerungComponent extends WithMessage
 
     return {
       animation: false,
-      // Rechts mehr Platz als links: Dort liegen ZWEI Achsen nebeneinander (kWh und Ladezustand).
       // Rechts mehr Platz als links: Dort liegen ZWEI Achsen nebeneinander (kWh und Ladezustand).
       // Unten richtet sich der Platz nach der Legende - siehe `platzUnten()`.
       grid: { left: 60, right: 115, top: 20, bottom: this.platzUnten() },
@@ -972,17 +975,6 @@ export class EinspeisesteuerungComponent extends WithMessage
   }
 
   /**
-   * Intervalle, in denen die beiden Verfahren **verschieden** entschieden hätten.
-   *
-   * <p>Das ist die eigentliche Kennzahl der Schattenrechnung: Weichen sie selten ab, ist der
-   * Gewinn klein und das Regelwerk genügt.
-   */
-  abweichungen(): number {
-    return this.entscheide.filter(e => e.ladeplanBatterieladung != null
-        && e.ladeplanBatterieladung !== e.batterieladung).length;
-  }
-
-  /**
    * Höchste dargestellte Menge — die Bezugsgrösse für alles unterhalb der Nulllinie.
    *
    * <p>Die Mengen-Achse skaliert mit den Daten. Damit ein Zustandsband immer denselben Anteil der
@@ -1132,17 +1124,12 @@ export class EinspeisesteuerungComponent extends WithMessage
   // ==================== Datum ====================
 
   private heuteIso(): string {
-    return this.alsIso(new Date());
+    return toIsoDate(new Date());
   }
 
   private verschiebe(tage: number): string {
     const datum = new Date(this.datum + 'T12:00:00');
     datum.setDate(datum.getDate() + tage);
-    return this.alsIso(datum);
-  }
-
-  private alsIso(datum: Date): string {
-    const zwei = (wert: number) => String(wert).padStart(2, '0');
-    return `${datum.getFullYear()}-${zwei(datum.getMonth() + 1)}-${zwei(datum.getDate())}`;
+    return toIsoDate(datum);
   }
 }

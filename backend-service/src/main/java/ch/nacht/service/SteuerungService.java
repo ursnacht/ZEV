@@ -1,8 +1,8 @@
 package ch.nacht.service;
 
+import ch.nacht.dto.PrognosepunktDTO;
 import ch.nacht.dto.SimulationDTO;
 import ch.nacht.dto.SteuerKonfigurationDTO;
-import ch.nacht.dto.PrognosepunktDTO;
 import ch.nacht.dto.SteuerentscheidDTO;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.FeatureFlag;
@@ -988,10 +988,8 @@ public class SteuerungService {
         dto.setMindestAbstand(entscheid.getMindestAbstand());
         // Die Plangroessen der Schattenrechnung (FR-1a). Sie sind durchweg nullbar: beim Rueckfall,
         // und bei jedem Entscheid aus der Zeit vor V169.
-        dto.setVerfahren(entscheid.getVerfahren() == null ? null
-                : entscheid.getVerfahren().name());
-        dto.setLadeplanBatterieladung(entscheid.getLadeplanBatterieladung() == null ? null
-                : entscheid.getLadeplanBatterieladung().name());
+        dto.setVerfahren(entscheid.getVerfahren());
+        dto.setLadeplanBatterieladung(entscheid.getLadeplanBatterieladung());
         dto.setPrognoseUeberschuss(entscheid.getPrognoseUeberschuss());
         dto.setGti(entscheid.getGti());
         dto.setPrognoseFaktor(entscheid.getPrognoseFaktor());

@@ -1,6 +1,12 @@
 import { test, expect, Page } from '@playwright/test';
 import {
-    clickKebabMenuItem, loescheZeileMitText, navigateViaMenu, waitForFormResult, waitForTableWithData, oeffneTarifPanels } from './helpers';
+    clickKebabMenuItem,
+    loescheZeileMitText,
+    navigateViaMenu,
+    waitForFormResult,
+    waitForTableWithData,
+    navigateToTarife,
+} from './helpers';
 
 /**
  * tests / tarif-verwaltung.spec.ts
@@ -44,19 +50,6 @@ function generateTestTarifName(prefix: string = 'E2E Test'): string {
         throw new Error(`Tarif-Bezeichnung "${name}" ist laenger als die 50 Zeichen des Felds`);
     }
     return name;
-}
-
-/**
- * Helper function to navigate to Tarif management page
- */
-async function navigateToTarife(page: Page): Promise<void> {
-    await navigateViaMenu(page, '/tarife');
-
-    // Wait for Tarife page to load - use the container's h1, not navbar
-    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
-    // Wait for table to load
-    await oeffneTarifPanels(page);
-    await waitForTableWithData(page, 10000);
 }
 
 /**

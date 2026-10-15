@@ -141,58 +141,6 @@ public class TarifService {
     }
 
     /**
-     * Verschiebt einen Tarif direkt vor oder hinter einen anderen (Specs/Tarifverwaltung.md, FR-4).
-     *
-     * <p>Geaendert werden nur der verschobene Tarif und die Plaetze <b>zwischen</b> Start und Ziel -
-     * sie ruecken um eins nach. Bewusst keine ganze Liste: Zwei gleichzeitige Sitzungen
-     * ueberschrieben sich sonst gegenseitig mit ihrem veralteten Stand (beobachtet im E2E-Lauf mit
-     * zwei Browsern). So bleibt eine andere Verschiebung erhalten, solange sie nicht denselben
-     * Bereich betrifft.
-     *
-     * @param id     Tarif, der verschoben wird
-     * @param vorId  Ziel: direkt <b>vor</b> diesen Tarif (oder {@code null})
-     * @param nachId Ziel: direkt <b>hinter</b> diesen Tarif (oder {@code null})
-     * @throws IllegalArgumentException wenn nicht genau ein Ziel angegeben ist, Tarif oder Ziel
-     *                                  unbekannt sind (auch mandantenfremd) oder beide gleich sind
-     */
-    @Transactional
-    public void verschiebe(Long id, Long vorId, Long nachId) {
-        hibernateFilterService.enableOrgFilter();
-        if ((vorId == null) == (nachId == null)) {
-            throw new IllegalArgumentException("Genau ein Ziel angeben: vor oder nach");
-        }
-        Long zielId = vorId != null ? vorId : nachId;
-        if (zielId.equals(id)) {
-            throw new IllegalArgumentException("Ein Tarif kann nicht relativ zu sich selbst verschoben werden");
-        }
-        // findFirstById statt findById: Nur eine Abfrage sieht den orgFilter
-        Tarif tarif = tarifRepository.findFirstById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Unbekannter Tarif"));
-        Tarif ziel = tarifRepository.findFirstById(zielId)
-                .orElseThrow(() -> new IllegalArgumentException("Unbekanntes Ziel"));
-
-        int alt = tarif.getReihenfolge();
-        int z = ziel.getReihenfolge();
-        int neu;
-        if (alt > z) {
-            // nach vorn: die Plaetze ab dem Ziel (vor) bzw. hinter dem Ziel (nach) ruecken nach hinten
-            neu = vorId != null ? z : z + 1;
-            if (neu < alt) {
-                tarifRepository.verschiebeReihenfolgeBereich(tarif.getOrgId(), neu, alt - 1, 1);
-            }
-        } else {
-            // nach hinten: die Plaetze bis zum Ziel (nach) bzw. vor dem Ziel (vor) ruecken nach vorn
-            neu = nachId != null ? z : z - 1;
-            if (neu > alt) {
-                tarifRepository.verschiebeReihenfolgeBereich(tarif.getOrgId(), alt + 1, neu, -1);
-            }
-        }
-        // Nur die Spalte, nicht die Entity - siehe TarifRepository.setzeReihenfolge
-        tarifRepository.setzeReihenfolge(tarif.getOrgId(), id, neu);
-        log.info("Tarif {} verschoben: Reihenfolge {} -> {}", id, alt, neu);
-    }
-
-    /**
      * Überschneidungsprüfung je Tariftyp (Specs/Tarifverwaltung.md, FR-2):
      *
      * <ul>
@@ -277,6 +225,58 @@ public class TarifService {
         }
         log.warn("Tariff not found for deletion: {}", id);
         return false;
+    }
+
+    /**
+     * Verschiebt einen Tarif direkt vor oder hinter einen anderen (Specs/Tarifverwaltung.md, FR-4).
+     *
+     * <p>Geaendert werden nur der verschobene Tarif und die Plaetze <b>zwischen</b> Start und Ziel -
+     * sie ruecken um eins nach. Bewusst keine ganze Liste: Zwei gleichzeitige Sitzungen
+     * ueberschrieben sich sonst gegenseitig mit ihrem veralteten Stand (beobachtet im E2E-Lauf mit
+     * zwei Browsern). So bleibt eine andere Verschiebung erhalten, solange sie nicht denselben
+     * Bereich betrifft.
+     *
+     * @param id     Tarif, der verschoben wird
+     * @param vorId  Ziel: direkt <b>vor</b> diesen Tarif (oder {@code null})
+     * @param nachId Ziel: direkt <b>hinter</b> diesen Tarif (oder {@code null})
+     * @throws IllegalArgumentException wenn nicht genau ein Ziel angegeben ist, Tarif oder Ziel
+     *                                  unbekannt sind (auch mandantenfremd) oder beide gleich sind
+     */
+    @Transactional
+    public void verschiebe(Long id, Long vorId, Long nachId) {
+        hibernateFilterService.enableOrgFilter();
+        if ((vorId == null) == (nachId == null)) {
+            throw new IllegalArgumentException("Genau ein Ziel angeben: vor oder nach");
+        }
+        Long zielId = vorId != null ? vorId : nachId;
+        if (zielId.equals(id)) {
+            throw new IllegalArgumentException("Ein Tarif kann nicht relativ zu sich selbst verschoben werden");
+        }
+        // findFirstById statt findById: Nur eine Abfrage sieht den orgFilter
+        Tarif tarif = tarifRepository.findFirstById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Unbekannter Tarif"));
+        Tarif ziel = tarifRepository.findFirstById(zielId)
+                .orElseThrow(() -> new IllegalArgumentException("Unbekanntes Ziel"));
+
+        int alt = tarif.getReihenfolge();
+        int z = ziel.getReihenfolge();
+        int neu;
+        if (alt > z) {
+            // nach vorn: die Plaetze ab dem Ziel (vor) bzw. hinter dem Ziel (nach) ruecken nach hinten
+            neu = vorId != null ? z : z + 1;
+            if (neu < alt) {
+                tarifRepository.verschiebeReihenfolgeBereich(tarif.getOrgId(), neu, alt - 1, 1);
+            }
+        } else {
+            // nach hinten: die Plaetze bis zum Ziel (nach) bzw. vor dem Ziel (vor) ruecken nach vorn
+            neu = nachId != null ? z : z - 1;
+            if (neu > alt) {
+                tarifRepository.verschiebeReihenfolgeBereich(tarif.getOrgId(), alt + 1, neu, -1);
+            }
+        }
+        // Nur die Spalte, nicht die Entity - siehe TarifRepository.setzeReihenfolge
+        tarifRepository.setzeReihenfolge(tarif.getOrgId(), id, neu);
+        log.info("Tarif {} verschoben: Reihenfolge {} -> {}", id, alt, neu);
     }
 
     /**

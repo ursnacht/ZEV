@@ -1,5 +1,7 @@
 package ch.nacht.entity;
 
+import ch.nacht.util.PreiszeitreiheZeit;
+
 import jakarta.persistence.*;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
@@ -62,7 +64,7 @@ public class Debitor {
      * - wie der Betrag. Manuell erfasst: Erfassungsdatum.
      */
     @Column(name = "erstellt_am", nullable = false)
-    private LocalDate erstelltAm = LocalDate.now();
+    private LocalDate erstelltAm = LocalDate.now(PreiszeitreiheZeit.ZONE);
 
     @NotNull(message = "Herkunft is required")
     @Enumerated(EnumType.STRING)
@@ -70,14 +72,6 @@ public class Debitor {
     private Debitorherkunft herkunft = Debitorherkunft.ZEV;
 
     public Debitor() {
-    }
-
-    public LocalDate getErstelltAm() {
-        return erstelltAm;
-    }
-
-    public void setErstelltAm(LocalDate erstelltAm) {
-        this.erstelltAm = erstelltAm;
     }
 
     public Long getId() {
@@ -134,6 +128,14 @@ public class Debitor {
 
     public void setZahldatum(LocalDate zahldatum) {
         this.zahldatum = zahldatum;
+    }
+
+    public LocalDate getErstelltAm() {
+        return erstelltAm;
+    }
+
+    public void setErstelltAm(LocalDate erstelltAm) {
+        this.erstelltAm = erstelltAm;
     }
 
     public Debitorherkunft getHerkunft() {

@@ -19,6 +19,7 @@ import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.comp
 import { ColumnResizeDirective } from '../../directives/column-resize.directive';
 import { IconComponent } from '../icon/icon.component';
 import { FeatureFlagService } from '../../services/feature-flag.service';
+import { toIsoDate } from '../../utils/date-utils';
 
 @Component({
   selector: 'app-debitorkontrolle-list',
@@ -153,15 +154,8 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
       year--;
     }
     const startMonth = (quarter - 1) * 3;
-    this.dateFrom = this.formatDate(new Date(year, startMonth, 1));
-    this.dateTo = this.formatDate(new Date(year, startMonth + 3, 0));
-  }
-
-  private formatDate(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    this.dateFrom = toIsoDate(new Date(year, startMonth, 1));
+    this.dateTo = toIsoDate(new Date(year, startMonth + 3, 0));
   }
 
   loadEinheiten(): void {
@@ -270,7 +264,7 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
     } else {
       const date = new Date();
       date.setDate(date.getDate() - offsetDays);
-      zahldatum = this.formatDate(date);
+      zahldatum = toIsoDate(date);
     }
 
     const updated: Debitor = { ...debitor, zahldatum };

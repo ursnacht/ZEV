@@ -61,7 +61,7 @@ Die Struktur jeder Datei wird aus den **Template-Dateien in CLAUDE.md** übernom
 | DTO | `backend-service/src/main/java/ch/nacht/dto/DebitorDTO.java` |
 | Angular Model | `frontend-service/src/app/models/tarif.model.ts` |
 | Angular Service | `frontend-service/src/app/services/tarif.service.ts` |
-| List-Component | `frontend-service/src/app/components/tarif-list/` |
+| List-Component | `frontend-service/src/app/components/mieter-list/` |
 | Form-Component | `frontend-service/src/app/components/tarif-form/` |
 
 ### Verbindliche Regeln Backend
@@ -94,7 +94,10 @@ Die Struktur jeder Datei wird aus den **Template-Dateien in CLAUDE.md** übernom
 * `subscribe({ next, error })` Objekt-Syntax (nicht `.subscribe(data => ...)`)
 * Success-Messages verschwinden nach 5 Sekunden (`setTimeout`), Error-Messages bleiben
 * Kopieren: `const { id, ...ohneId } = entity` Pattern
-* Error-Handling: `error.error || 'FALLBACK_KEY'` (Backend-Meldung oder Fallback)
+* Error-Handling: `error.error?.error || error.error || 'FALLBACK_KEY'` (Backend-Meldung oder Fallback).
+  Beide Formen kommen vor: Controller antworten mit reinem Text (`badRequest().body(e.getMessage())`),
+  der `GlobalExceptionHandler` mit `{ "error": "…" }`. Nur `error.error` zeigte im zweiten Fall
+  `[object Object]` statt der Meldung.
 * Nach jeder Mutation `load[Entities]()` aufrufen
 * Methoden-Reihenfolge: `ngOnInit` → `load` → `onCreateNew` → `onEdit` → `onCopy` → `onDelete` → `onMenuAction` → `onFormSubmit` → `onFormCancel` → `onSort` → `showMessage` → `dismissMessage`
 

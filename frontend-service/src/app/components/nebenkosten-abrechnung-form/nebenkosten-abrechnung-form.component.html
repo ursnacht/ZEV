@@ -113,7 +113,7 @@
           <tbody cdkDropList (cdkDropListDropped)="onDrop($event)" [cdkDropListDisabled]="gesperrt">
             @for (position of positionen; track trackZeile($index, position); let i = $index) {
               <tr cdkDrag [cdkDragDisabled]="gesperrt">
-                <td class="nk-positionen__griff" cdkDragHandle
+                <td class="zev-table__griff" cdkDragHandle
                   [attr.aria-label]="'NK_VERSCHIEBEN' | translate">
                   <div class="nk-positionen__feld nk-positionen__feld--ohne-titel
                               nk-positionen__feld--symbol">

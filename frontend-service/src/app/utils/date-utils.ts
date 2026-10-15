@@ -90,15 +90,19 @@ export function parseSwissDate(dateString: string): Date | null {
  */
 export function swissToIsoDate(swissDate: string): string {
   const date = parseSwissDate(swissDate);
-  if (!date) {
-    return '';
-  }
+  return date ? toIsoDate(date) : '';
+}
 
-  const year = date.getFullYear();
+/**
+ * Lokales Datum als ISO-Datum `YYYY-MM-DD` — aus den Datumsteilen der **Ortszeit**.
+ *
+ * <p>Nicht `toISOString()`: Das liefert das UTC-Datum, und kurz nach Mitternacht stünde dann der
+ * Vortag im Feld. Die eine Stelle für diese Umrechnung — vorher stand sie in neun Dateien.
+ */
+export function toIsoDate(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
-
-  return `${year}-${month}-${day}`;
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 /**
@@ -154,7 +158,7 @@ export function blaettereZeitraum(von: string, bis: string, richtung: 1 | -1): {
   }
 
   if (von === bis) {
-    return { von: datumZuIso(plusTage(start, richtung)), bis: datumZuIso(plusTage(ende, richtung)) };
+    return { von: toIsoDate(plusTage(start, richtung)), bis: toIsoDate(plusTage(ende, richtung)) };
   }
 
   const ganzeMonate = start.getDate() === 1 && plusTage(ende, 1).getDate() === 1;
@@ -164,20 +168,16 @@ export function blaettereZeitraum(von: string, bis: string, richtung: 1 | -1): {
     const neuVon = new Date(start.getFullYear(), start.getMonth() + versatz, 1);
     // Tag 0 des Folgemonats = letzter Tag des Monats - passt das Monatsende automatisch an
     const neuBis = new Date(ende.getFullYear(), ende.getMonth() + versatz + 1, 0);
-    return { von: datumZuIso(neuVon), bis: datumZuIso(neuBis) };
+    return { von: toIsoDate(neuVon), bis: toIsoDate(neuBis) };
   }
 
   const tage = Math.round((ende.getTime() - start.getTime()) / 86_400_000) + 1;
-  return { von: datumZuIso(plusTage(start, richtung * tage)), bis: datumZuIso(plusTage(ende, richtung * tage)) };
+  return { von: toIsoDate(plusTage(start, richtung * tage)), bis: toIsoDate(plusTage(ende, richtung * tage)) };
 }
 
 function isoZuDatum(iso: string): Date | null {
   const teile = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? '');
   return teile ? new Date(Number(teile[1]), Number(teile[2]) - 1, Number(teile[3])) : null;
-}
-
-function datumZuIso(datum: Date): string {
-  return `${datum.getFullYear()}-${String(datum.getMonth() + 1).padStart(2, '0')}-${String(datum.getDate()).padStart(2, '0')}`;
 }
 
 function plusTage(datum: Date, tage: number): Date {

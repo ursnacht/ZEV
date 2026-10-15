@@ -1,5 +1,6 @@
 import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { toIsoDate } from '../../utils/date-utils';
 
 interface Quarter {
   label: string;      // z.B. "Q3/2024"
@@ -77,19 +78,9 @@ export class QuarterSelectorComponent implements OnInit {
 
     return {
       label: `Q${quarter}/${year}`,
-      von: this.formatDate(von),
-      bis: this.formatDate(bis)
+      von: toIsoDate(von),
+      bis: toIsoDate(bis)
     };
-  }
-
-  /**
-   * Formatiert ein Datum als YYYY-MM-DD String.
-   */
-  private formatDate(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
   }
 
   /**

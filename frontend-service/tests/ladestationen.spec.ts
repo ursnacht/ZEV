@@ -1,7 +1,13 @@
 import { test, expect, Locator, Page } from '@playwright/test';
 import {
-    E2E_MIETENDE, clickKebabMenuItem, navigateViaMenu, raeumeMitWiederholung,
-    waitForFormResult, waitForTableWithData, oeffneTarifPanels } from './helpers';
+    E2E_MIETENDE,
+    clickKebabMenuItem,
+    navigateViaMenu,
+    raeumeMitWiederholung,
+    waitForFormResult,
+    waitForTableWithData,
+    navigateToTarife,
+} from './helpers';
 
 /**
  * tests / ladestationen.spec.ts
@@ -99,13 +105,6 @@ async function navigateToEinheiten(page: Page): Promise<void> {
 async function navigateToMieter(page: Page): Promise<void> {
     await navigateViaMenu(page, '/mieter');
     await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
-    await waitForTableWithData(page, 10000);
-}
-
-async function navigateToTarife(page: Page): Promise<void> {
-    await navigateViaMenu(page, '/tarife');
-    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
-    await oeffneTarifPanels(page);
     await waitForTableWithData(page, 10000);
 }
 

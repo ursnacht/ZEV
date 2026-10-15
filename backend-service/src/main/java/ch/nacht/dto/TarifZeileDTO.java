@@ -2,6 +2,8 @@ package ch.nacht.dto;
 
 import ch.nacht.entity.TarifTyp;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -29,7 +31,7 @@ public class TarifZeileDTO {
      * Reihenfolge des Tarifs dieser Zeile (Specs/Tarifverwaltung.md, FR-4) - nur zum Sortieren
      * der Zeilen im {@code RechnungService}, nicht Teil der API.
      */
-    @com.fasterxml.jackson.annotation.JsonIgnore
+    @JsonIgnore
     private int reihenfolge;
 
     /**

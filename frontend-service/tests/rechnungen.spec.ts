@@ -1,6 +1,12 @@
 import { test as baseTest, expect, Locator, Page } from '@playwright/test';
 import {
-    getPreviousQuarter, loescheZeileMitText, navigateViaMenu, waitForFormResult, waitForTableWithData, oeffneTarifPanels } from './helpers';
+    getPreviousQuarter,
+    loescheZeileMitText,
+    navigateViaMenu,
+    waitForFormResult,
+    waitForTableWithData,
+    navigateToTarife,
+} from './helpers';
 
 /**
  * tests / rechnungen.spec.ts
@@ -79,13 +85,6 @@ const test = baseTest.extend<{ tarifTracker: TarifTracker }>({
 async function navigateToRechnungen(page: Page): Promise<void> {
     await navigateViaMenu(page, '/rechnungen');
     await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
-}
-
-async function navigateToTarife(page: Page): Promise<void> {
-    await navigateViaMenu(page, '/tarife');
-    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
-    await oeffneTarifPanels(page);
-    await waitForTableWithData(page, 10000);
 }
 
 /**

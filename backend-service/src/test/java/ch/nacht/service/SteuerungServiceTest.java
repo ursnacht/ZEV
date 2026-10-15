@@ -58,6 +58,9 @@ import static org.mockito.Mockito.*;
  * {@code SteuerRegelServiceTest}. Hier zaehlt nur, mit welchen Zahlen sie gefragt wird.
  */
 @ExtendWith(MockitoExtension.class)
+// LENIENT: setUp() stubbt die Grundlage eines Job-Laufs (Konfiguration, Flag, Regel, Messwerte,
+// Speicher) fuer ALLE Tests. Die Tests der Rueckrechnung und der Fehlerfaelle brauchen davon nur
+// einen Teil; strikt liefen sie an "unnecessary stubbing" auf, ohne dass etwas falsch waere.
 @MockitoSettings(strictness = Strictness.LENIENT)
 public class SteuerungServiceTest {
 

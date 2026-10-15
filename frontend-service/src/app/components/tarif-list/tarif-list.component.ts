@@ -209,8 +209,9 @@ export class TarifListComponent implements OnInit {
         this.showMessage('TARIF_REIHENFOLGE_GESPEICHERT', 'success');
         this.loadTarife();
       },
-      error: () => {
-        this.showMessage('FEHLER_REIHENFOLGE_TARIF', 'error');
+      error: (error) => {
+        // Meldung des Backends (z.B. unbekannter Tarif) vor dem Fallback - wie die anderen Handler
+        this.showMessage(error.error?.error || error.error || 'FEHLER_REIHENFOLGE_TARIF', 'error');
         this.loadTarife();
       }
     });

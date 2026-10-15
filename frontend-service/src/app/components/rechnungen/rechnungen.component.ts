@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
-import { LoadingIndicatorComponent } from '../loading-indicator/loading-indicator.component';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { LoadingIndicatorComponent } from '../loading-indicator/loading-indicator.component';
 import { WithMessage } from '../../utils/with-message';
 import { RechnungService, GeneratedRechnung } from '../../services/rechnung.service';
 import { Einheit } from '../../models/einheit.model';
@@ -15,12 +15,13 @@ import { TarifLuecke } from '../../models/tarif.model';
 import { formatTarifLuecke } from '../../utils/tarif-luecke.util';
 import { FeatureFlagDirective } from '../../directives/feature-flag.directive';
 import { RouterLink } from '@angular/router';
+import { toIsoDate } from '../../utils/date-utils';
 
 @Component({
   selector: 'app-rechnungen',
   standalone: true,
-  imports: [LoadingIndicatorComponent, CommonModule, FormsModule, TranslatePipe, QuarterSelectorComponent, IconComponent,
-    EinheitSelectorComponent, FeatureFlagDirective, RouterLink],
+  imports: [CommonModule, FormsModule, TranslatePipe, QuarterSelectorComponent, IconComponent,
+    EinheitSelectorComponent, FeatureFlagDirective, RouterLink, LoadingIndicatorComponent],
   templateUrl: './rechnungen.component.html',
   styleUrls: ['./rechnungen.component.css']
 })
@@ -61,22 +62,15 @@ export class RechnungenComponent extends WithMessage implements OnInit {
       year--;
     }
     const startMonth = (quarter - 1) * 3;
-    this.dateFrom = this.formatDate(new Date(year, startMonth, 1));
-    this.dateTo = this.formatDate(new Date(year, startMonth + 3, 0));
-  }
-
-  private formatDate(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    this.dateFrom = toIsoDate(new Date(year, startMonth, 1));
+    this.dateTo = toIsoDate(new Date(year, startMonth + 3, 0));
   }
 
   onDateFromChange(): void {
     if (this.dateFrom) {
       const date = new Date(this.dateFrom);
       const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-      this.dateTo = this.formatDate(lastDay);
+      this.dateTo = toIsoDate(lastDay);
     }
   }
 

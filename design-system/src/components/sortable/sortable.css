@@ -1,9 +1,10 @@
 /**
  * Sortierbare Tabellenzeilen (Drag & Drop mit Angular CDK, `cdkDropList`/`cdkDrag`).
  *
- * Erster Einsatz: Reihenfolge der Tarife (Specs/Tarifverwaltung.md, FR-4). Die Nebenkosten-Maske
- * hatte dieselben Regeln noch komponentenlokal - die CDK-Klassen (`cdk-drag-preview`) haengt
- * Angular aber an den <body>, wo komponentenlokale Styles nicht hinreichen. Deshalb global hier.
+ * Verwendet von der Tarif-Reihenfolge (Specs/Tarifverwaltung.md, FR-4) und den Positionen der
+ * Nebenkostenabrechnung. Global, weil Angular die CDK-Klassen (`cdk-drag-preview`) an den <body>
+ * haengt, wo komponentenlokale Styles nicht hinreichen. Die frueheren lokalen Kopien in der
+ * Nebenkosten-Maske sind entfernt - eine Fassung, die nicht auseinanderlaufen kann.
  */
 
 /* Griff-Zelle: schmale Spalte mit dem Zieh-Symbol */

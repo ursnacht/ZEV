@@ -113,8 +113,9 @@ public interface TarifRepository extends JpaRepository<Tarif, Long> {
     /**
      * Setzt den Platz eines einzelnen Tarifs - als Update der einen Spalte statt ueber die Entity.
      * Sonst prueft Hibernate beim Commit die Bean Validation des ganzen Tarifs, und ein Tarif mit
-     * einem Altbestand-Wert ausserhalb der heutigen Regeln (auf Hene: Preis 0) liesse sich nicht
-     * mehr umsortieren.
+     * einem Altbestand-Wert ausserhalb der jeweils geltenden Regeln liesse sich nicht mehr
+     * umsortieren. Anlass war ein Tarif mit Preis 0 auf Hene; seit V179 ist 0 erlaubt
+     * ({@code @PositiveOrZero}), der Grund fuer das Spalten-Update bleibt fuer kuenftige Regeln.
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE Tarif t SET t.reihenfolge = :reihenfolge WHERE t.id = :id AND t.orgId = :orgId")
