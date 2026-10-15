@@ -1,7 +1,7 @@
 package ch.nacht.service;
 
 import ch.nacht.entity.FeatureFlag;
-import ch.nacht.util.PreiszeitreiheZeit;
+import ch.nacht.util.Ortszeit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,7 +97,7 @@ public class SteuerungJob {
      * der JVM und ginge still daneben, sobald der Container anders konfiguriert ist.
      */
     private LocalDateTime letztesAbgeschlossenesIntervall() {
-        LocalDateTime jetzt = LocalDateTime.now(PreiszeitreiheZeit.ZONE)
+        LocalDateTime jetzt = LocalDateTime.now(Ortszeit.ZONE)
                 .truncatedTo(ChronoUnit.MINUTES);
         int minute = jetzt.getMinute();
         LocalDateTime beginnDesLaufenden = jetzt.withMinute(minute - minute % INTERVALL_MINUTEN);

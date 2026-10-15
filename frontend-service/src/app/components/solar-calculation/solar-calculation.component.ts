@@ -11,7 +11,7 @@ import { SwissNumberPipe } from '../../pipes/swiss-number.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
 import { IconComponent } from '../icon/icon.component';
-import { toIsoDate } from '../../utils/date-utils';
+import { vorquartal, monatsende } from '../../utils/date-utils';
 
 @Component({
   selector: 'app-solar-calculation',
@@ -53,22 +53,14 @@ export class SolarCalculationComponent extends WithMessage implements OnInit, On
    * (im Q1 wird Q4 des Vorjahres gesetzt).
    */
   private setDefaultDates(): void {
-    const now = new Date();
-    let year = now.getFullYear();
-    let quarter = Math.ceil((now.getMonth() + 1) / 3) - 1;
-    if (quarter < 1) {
-      quarter = 4;
-      year--;
-    }
-    const startMonth = (quarter - 1) * 3;
-    this.dateFrom = toIsoDate(new Date(year, startMonth, 1));
-    this.dateTo = toIsoDate(new Date(year, startMonth + 3, 0));
+    const { von, bis } = vorquartal();
+    this.dateFrom = von;
+    this.dateTo = bis;
   }
 
   onDateFromChange(): void {
     if (this.dateFrom) {
-      const date = new Date(this.dateFrom);
-      this.dateTo = toIsoDate(new Date(date.getFullYear(), date.getMonth() + 1, 0));
+      this.dateTo = monatsende(this.dateFrom);
     }
   }
 

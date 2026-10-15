@@ -15,6 +15,7 @@ import ch.nacht.exception.TarifLuecke;
 import ch.nacht.exception.TarifLueckenException;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
+import ch.nacht.util.Ortszeit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -1670,7 +1671,7 @@ public class RechnungServiceTest {
         assertEquals("Test AG", rechnung.getStellerName());
         assertEquals("Teststrasse 1", rechnung.getStellerStrasse());
         assertEquals("3000 Bern", rechnung.getStellerPlzOrt());
-        assertEquals(LocalDate.now(), rechnung.getErstellungsdatum());
+        assertEquals(Ortszeit.heute(), rechnung.getErstellungsdatum());
     }
 
     @Test

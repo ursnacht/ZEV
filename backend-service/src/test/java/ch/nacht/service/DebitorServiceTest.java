@@ -9,7 +9,7 @@ import ch.nacht.repository.DebitorRepository;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MieterEinheitRepository;
 import ch.nacht.repository.MieterRepository;
-import ch.nacht.util.PreiszeitreiheZeit;
+import ch.nacht.util.Ortszeit;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -205,7 +205,7 @@ public class DebitorServiceTest {
 
         DebitorDTO result = debitorService.create(dto);
 
-        assertEquals(LocalDate.now(PreiszeitreiheZeit.ZONE), result.getErstelltAm());
+        assertEquals(Ortszeit.heute(), result.getErstelltAm());
     }
 
     @Test
@@ -487,7 +487,7 @@ public class DebitorServiceTest {
 
         verify(organizationContextService).getCurrentOrgId();
         verify(debitorRepository).upsert(eq(10L), eq(new BigDecimal("125.50")), eq(VON), eq(BIS), eq(ORG_ID), eq("ZEV"),
-            eq(LocalDate.now(PreiszeitreiheZeit.ZONE)));
+            eq(Ortszeit.heute()));
     }
 
     // ==================== Helpers ====================
@@ -573,6 +573,6 @@ public class DebitorServiceTest {
                 Debitorherkunft.NK);
 
         verify(debitorRepository).upsert(eq(10L), eq(new BigDecimal("812.35")), eq(VON), eq(BIS), eq(ORG_ID), eq("NK"),
-            eq(LocalDate.now(PreiszeitreiheZeit.ZONE)));
+            eq(Ortszeit.heute()));
     }
 }

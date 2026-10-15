@@ -1,7 +1,14 @@
 import { test, expect, Locator, Page } from '@playwright/test';
 import {
-    E2E_MIETENDE, clickKebabMenuItem, loescheZeileMitText, navigateViaMenu,
-    raeumeMitWiederholung, waitForFormResult, waitForTableWithData, oeffneTarifPanels
+    E2E_MIETENDE,
+    clickKebabMenuItem,
+    loescheZeileMitText,
+    navigateViaMenu,
+    raeumeMitWiederholung,
+    waitForFormResult,
+    waitForTableWithData,
+    oeffneTarifPanels,
+    navigateToTarifpositionen,
 } from './helpers';
 
 /**
@@ -203,11 +210,6 @@ async function createMieter(page: Page): Promise<void> {
 // ---------------------------------------------------------------------------
 // Tarifpositionen
 // ---------------------------------------------------------------------------
-
-async function navigateToTarifpositionen(page: Page): Promise<void> {
-    await navigateTo(page, '/tarifpositionen');
-    await page.locator('#einheitAuswahl').waitFor({ state: 'visible', timeout: 15000 });
-}
 
 function nurLadestationenCheckbox(page: Page): Locator {
     return page.locator('#nurLadestationen');

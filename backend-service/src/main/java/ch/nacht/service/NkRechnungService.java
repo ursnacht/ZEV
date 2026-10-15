@@ -17,6 +17,7 @@ import ch.nacht.entity.Mieter;
 import ch.nacht.entity.NkAbrechnung;
 import ch.nacht.exception.FeatureDisabledException;
 import ch.nacht.repository.MieterRepository;
+import ch.nacht.util.Ortszeit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -249,7 +250,7 @@ public class NkRechnungService {
         rechnung.setBezeichnung(abrechnung.getBezeichnung());
         rechnung.setVon(abrechnung.getDatumVon());
         rechnung.setBis(abrechnung.getDatumBis());
-        rechnung.setErstellungsdatum(LocalDate.now());
+        rechnung.setErstellungsdatum(Ortszeit.heute());
 
         rechnung.setMieterId(block.getMieterId());
         rechnung.setMieterName(block.getName());

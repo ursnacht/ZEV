@@ -1,7 +1,11 @@
 import { test, expect, Locator, Page } from '@playwright/test';
 import {
-    clickKebabMenuItem, navigateViaMenu, raeumeMitWiederholung, waitForFormResult,
-    waitForTableWithData
+    clickKebabMenuItem,
+    raeumeMitWiederholung,
+    waitForFormResult,
+    waitForTableWithData,
+    navigateToEinheiten,
+    navigateToMieter,
 } from './helpers';
 
 /**
@@ -51,21 +55,6 @@ function generateTestEinheitName(suffix: string): string {
  */
 function generateTestMieterName(prefix: string = 'E2E Mieter'): string {
     return `${prefix} ${test.info().project.name} ${RUN_ID} ${Date.now()}`;
-}
-
-/**
- * Helper function to navigate to Mieter management page
- */
-async function navigateToMieter(page: Page): Promise<void> {
-    await navigateViaMenu(page, '/mieter');
-    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
-    await waitForTableWithData(page, 10000);
-}
-
-async function navigateToEinheiten(page: Page): Promise<void> {
-    await navigateViaMenu(page, '/einheiten');
-    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
-    await waitForTableWithData(page, 10000);
 }
 
 /**

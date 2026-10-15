@@ -7,7 +7,7 @@ import ch.nacht.repository.DebitorRepository;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MieterEinheitRepository;
 import ch.nacht.repository.MieterRepository;
-import ch.nacht.util.PreiszeitreiheZeit;
+import ch.nacht.util.Ortszeit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -102,7 +102,7 @@ public class DebitorService {
         debitor.setZahldatum(dto.getZahldatum());
         debitor.setHerkunft(herkunftOderZev(dto));
         // Manuell erfasst: Erfassungsdatum - ein mitgeschickter Wert wird nicht uebernommen
-        debitor.setErstelltAm(LocalDate.now(PreiszeitreiheZeit.ZONE));
+        debitor.setErstelltAm(Ortszeit.heute());
         Debitor saved = debitorRepository.save(debitor);
         log.info("Created debitor entry id={} for mieterId={}", saved.getId(), saved.getMieterId());
         return toDTO(saved);
@@ -170,7 +170,7 @@ public class DebitorService {
                                    Debitorherkunft herkunft) {
         Long orgId = organizationContextService.getCurrentOrgId();
         // Datum der Rechnungsgenerierung; bei bezahlten Forderungen laesst das Upsert es stehen
-        debitorRepository.upsert(mieterId, betrag, datumVon, datumBis, orgId, herkunft.name(), LocalDate.now(PreiszeitreiheZeit.ZONE));
+        debitorRepository.upsert(mieterId, betrag, datumVon, datumBis, orgId, herkunft.name(), Ortszeit.heute());
         log.info("Upserted debitor for mieterId={}, datumVon={}, betrag={}, herkunft={}",
                 mieterId, datumVon, betrag, herkunft);
     }

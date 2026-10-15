@@ -96,7 +96,7 @@ export function swissToIsoDate(swissDate: string): string {
 /**
  * Lokales Datum als ISO-Datum `YYYY-MM-DD` — aus den Datumsteilen der **Ortszeit**.
  *
- * <p>Nicht `toISOString()`: Das liefert das UTC-Datum, und kurz nach Mitternacht stünde dann der
+ * Nicht `toISOString()`: Das liefert das UTC-Datum, und kurz nach Mitternacht stünde dann der
  * Vortag im Feld. Die eine Stelle für diese Umrechnung — vorher stand sie in neun Dateien.
  */
 export function toIsoDate(date: Date): string {
@@ -173,6 +173,37 @@ export function blaettereZeitraum(von: string, bis: string, richtung: 1 | -1): {
 
   const tage = Math.round((ende.getTime() - start.getTime()) / 86_400_000) + 1;
   return { von: toIsoDate(plusTage(start, richtung * tage)), bis: toIsoDate(plusTage(ende, richtung * tage)) };
+}
+
+/**
+ * Das **vorangehende** Quartal als ISO-Zeitraum — im Q1 das Q4 des Vorjahres.
+ *
+ * Vorbelegung der Zeitraum-Filter (Statistik, Rechnungen, Debitoren, Messwerte-Grafik,
+ * Solarberechnung). Stand vorher in fünf Komponenten als gleicher Block.
+ *
+ * @param heute Bezugsdatum, für Tests; Vorgabe ist jetzt
+ */
+export function vorquartal(heute: Date = new Date()): { von: string; bis: string } {
+  let jahr = heute.getFullYear();
+  let quartal = Math.ceil((heute.getMonth() + 1) / 3) - 1;
+  if (quartal < 1) {
+    quartal = 4;
+    jahr--;
+  }
+  const startMonat = (quartal - 1) * 3;
+  // Tag 0 des Folgemonats = letzter Tag des Quartals
+  return { von: toIsoDate(new Date(jahr, startMonat, 1)), bis: toIsoDate(new Date(jahr, startMonat + 3, 0)) };
+}
+
+/**
+ * Letzter Tag des Monats eines ISO-Datums (`2024-02-10` → `2024-02-29`); `''` bei ungültigem Datum.
+ *
+ * Für „Bis" nach einer Änderung von „Von". Gelesen als **lokales** Datum, nicht über
+ * `new Date(iso)` — das deutet ein reines Datum als UTC-Mitternacht.
+ */
+export function monatsende(iso: string): string {
+  const datum = isoZuDatum(iso);
+  return datum ? toIsoDate(new Date(datum.getFullYear(), datum.getMonth() + 1, 0)) : '';
 }
 
 function isoZuDatum(iso: string): Date | null {

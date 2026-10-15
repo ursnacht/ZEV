@@ -15,7 +15,7 @@ import { TarifLuecke } from '../../models/tarif.model';
 import { formatTarifLuecke } from '../../utils/tarif-luecke.util';
 import { FeatureFlagDirective } from '../../directives/feature-flag.directive';
 import { RouterLink } from '@angular/router';
-import { toIsoDate } from '../../utils/date-utils';
+import { vorquartal, monatsende } from '../../utils/date-utils';
 
 @Component({
   selector: 'app-rechnungen',
@@ -54,23 +54,14 @@ export class RechnungenComponent extends WithMessage implements OnInit {
    * (im Q1 wird Q4 des Vorjahres gesetzt).
    */
   private setDefaultDates(): void {
-    const now = new Date();
-    let year = now.getFullYear();
-    let quarter = Math.ceil((now.getMonth() + 1) / 3) - 1;
-    if (quarter < 1) {
-      quarter = 4;
-      year--;
-    }
-    const startMonth = (quarter - 1) * 3;
-    this.dateFrom = toIsoDate(new Date(year, startMonth, 1));
-    this.dateTo = toIsoDate(new Date(year, startMonth + 3, 0));
+    const { von, bis } = vorquartal();
+    this.dateFrom = von;
+    this.dateTo = bis;
   }
 
   onDateFromChange(): void {
     if (this.dateFrom) {
-      const date = new Date(this.dateFrom);
-      const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-      this.dateTo = toIsoDate(lastDay);
+      this.dateTo = monatsende(this.dateFrom);
     }
   }
 

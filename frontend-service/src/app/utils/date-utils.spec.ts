@@ -1,4 +1,4 @@
-import { blaettereZeitraum, formatSwissDate, formatSwissDateTime, parseSwissDate, swissToIsoDate, toIsoDate } from './date-utils';
+import { blaettereZeitraum, formatSwissDate, formatSwissDateTime, parseSwissDate, swissToIsoDate, toIsoDate, vorquartal, monatsende } from './date-utils';
 
 describe('Date Utils', () => {
   describe('formatSwissDate', () => {
@@ -79,6 +79,35 @@ describe('Date Utils', () => {
     it('should return null for non-numeric parts', () => {
       expect(parseSwissDate('ab.01.2024')).toBeNull();
       expect(parseSwissDate('15.ab.2024')).toBeNull();
+    });
+  });
+
+  describe('vorquartal', () => {
+    it('should return the previous quarter', () => {
+      expect(vorquartal(new Date(2026, 9, 15))).toEqual({ von: '2026-07-01', bis: '2026-09-30' });
+    });
+
+    /** Im Q1 ist das Vorquartal das Q4 des Vorjahres. */
+    it('should return Q4 of the previous year in Q1', () => {
+      expect(vorquartal(new Date(2026, 1, 10))).toEqual({ von: '2025-10-01', bis: '2025-12-31' });
+    });
+
+    it('should end Q1 on 31 March', () => {
+      expect(vorquartal(new Date(2026, 4, 1))).toEqual({ von: '2026-01-01', bis: '2026-03-31' });
+    });
+  });
+
+  describe('monatsende', () => {
+    it('should return the last day of the month', () => {
+      expect(monatsende('2026-04-10')).toBe('2026-04-30');
+    });
+
+    it('should handle February in a leap year', () => {
+      expect(monatsende('2028-02-01')).toBe('2028-02-29');
+    });
+
+    it('should return an empty string for an invalid date', () => {
+      expect(monatsende('')).toBe('');
     });
   });
 

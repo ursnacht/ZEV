@@ -1,6 +1,6 @@
 package ch.nacht.entity;
 
-import ch.nacht.util.PreiszeitreiheZeit;
+import ch.nacht.util.Ortszeit;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.DecimalMin;
@@ -64,7 +64,7 @@ public class Debitor {
      * - wie der Betrag. Manuell erfasst: Erfassungsdatum.
      */
     @Column(name = "erstellt_am", nullable = false)
-    private LocalDate erstelltAm = LocalDate.now(PreiszeitreiheZeit.ZONE);
+    private LocalDate erstelltAm = Ortszeit.heute();
 
     @NotNull(message = "Herkunft is required")
     @Enumerated(EnumType.STRING)

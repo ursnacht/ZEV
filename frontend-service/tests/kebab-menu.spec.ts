@@ -4,11 +4,11 @@ import {
     closeKebabMenu,
     closeKebabMenuWithEsc,
     loescheZeileMitText,
-    navigateViaMenu,
     openKebabMenu,
     waitForFormResult,
     waitForTableWithData,
     navigateToTarife,
+    navigateToEinheiten,
 } from './helpers';
 
 /**
@@ -67,14 +67,6 @@ const test = baseTest.extend<{ tarifTracker: TarifTracker }>({
             `Testdaten blieben in der Datenbank zurueck: ${gescheitert.join(', ')}`).toEqual([]);
     }
 });
-
-/**
- * Helper function to navigate to Einheiten management page
- */
-async function navigateToEinheiten(page: Page): Promise<void> {
-    await navigateViaMenu(page, '/einheiten');
-    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
-}
 
 /**
  * Helper to create a unique test tariff name.

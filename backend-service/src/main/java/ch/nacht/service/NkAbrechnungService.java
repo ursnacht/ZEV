@@ -29,6 +29,7 @@ import ch.nacht.repository.NkPersonRepository;
 import ch.nacht.repository.NkPositionRepository;
 import ch.nacht.repository.NkVerbrauchRepository;
 import ch.nacht.repository.NkZusatzRepository;
+import ch.nacht.util.Zeitraum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -774,7 +775,7 @@ public class NkAbrechnungService {
      * zulässig und genau der Leerstand.
      */
     private void pruefeNenner(NkAbrechnung abrechnung, List<NkMieterBasisDTO> mieter) {
-        long tageImZeitraum = berechnungService.tageImZeitraum(
+        long tageImZeitraum = Zeitraum.tageInklusive(
                 abrechnung.getDatumVon(), abrechnung.getDatumBis());
         long nenner = (long) abrechnung.getAnzahlWohnungen() * tageImZeitraum;
 
@@ -818,7 +819,7 @@ public class NkAbrechnungService {
             }
         }
 
-        long tageImZeitraum = berechnungService.tageImZeitraum(
+        long tageImZeitraum = Zeitraum.tageInklusive(
                 abrechnung.getDatumVon(), abrechnung.getDatumBis());
         long nenner = (long) abrechnung.getAnzahlPersonen() * tageImZeitraum;
 

@@ -13,6 +13,7 @@ import ch.nacht.entity.TarifTyp;
 import ch.nacht.entity.Tarifposition;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MesswerteRepository;
+import ch.nacht.util.Ortszeit;
 import ch.nacht.util.Zeitraum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -225,7 +226,7 @@ public class RechnungService {
         // Time period (effective period for this tenant)
         rechnung.setVon(von);
         rechnung.setBis(bis);
-        rechnung.setErstellungsdatum(LocalDate.now());
+        rechnung.setErstellungsdatum(Ortszeit.heute());
 
         // Get tariffs for the period
         List<Tarif> zevTarife = tarifService.getTarifeForZeitraum(TarifTyp.ZEV, von, bis);
@@ -286,7 +287,7 @@ public class RechnungService {
         rechnung.setMesspunkt(einheit.getMesspunkt());
         rechnung.setVon(von);
         rechnung.setBis(bis);
-        rechnung.setErstellungsdatum(LocalDate.now());
+        rechnung.setErstellungsdatum(Ortszeit.heute());
 
         // Producers are only charged GRUNDGEBUEHR tariffs explicitly flagged for producers
         List<Tarif> tarife = tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis).stream()
@@ -418,7 +419,7 @@ public class RechnungService {
         rechnung.setMieterPlzOrt(plzOrt.isEmpty() ? null : plzOrt);
         rechnung.setVon(von);
         rechnung.setBis(bis);
-        rechnung.setErstellungsdatum(LocalDate.now());
+        rechnung.setErstellungsdatum(Ortszeit.heute());
 
         BigDecimal total = berechneTarifpositionsZeilen(rechnung, mieter, von, bis);
         BigDecimal endBetrag = roundTo5Rappen(total);

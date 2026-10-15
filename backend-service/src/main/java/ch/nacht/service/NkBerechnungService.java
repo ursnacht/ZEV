@@ -81,7 +81,7 @@ public class NkBerechnungService {
                                     List<NkPerson> personen,
                                     List<NkMieterBasisDTO> mieter) {
 
-        long tageImZeitraum = tageImZeitraum(abrechnung.getDatumVon(), abrechnung.getDatumBis());
+        long tageImZeitraum = Zeitraum.tageInklusive(abrechnung.getDatumVon(), abrechnung.getDatumBis());
         long nenner = (long) abrechnung.getAnzahlWohnungen() * tageImZeitraum;
         // Eigener Nenner: Die Umlage pro Person zaehlt Koepfe, nicht Wohnungen.
         long nennerPerson = (long) nullSicher(abrechnung.getAnzahlPersonen(), 0) * tageImZeitraum;
@@ -174,17 +174,6 @@ public class NkBerechnungService {
                 .setScale(GELD_SCALE, RoundingMode.HALF_UP));
 
         return ergebnis;
-    }
-
-    /**
-     * Tage eines Zeitraums, beide Enden eingeschlossen.
-     *
-     * @param von Beginn
-     * @param bis Ende
-     * @return Anzahl Tage
-     */
-    public long tageImZeitraum(LocalDate von, LocalDate bis) {
-        return Zeitraum.tageInklusive(von, bis);
     }
 
     /**

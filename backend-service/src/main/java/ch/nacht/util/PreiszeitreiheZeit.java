@@ -18,8 +18,8 @@ import java.time.ZoneOffset;
  */
 public final class PreiszeitreiheZeit {
 
-    /** Zone der Anzeige. Bewusst fest: Die Anwendung rechnet durchgaengig in Schweizer Ortszeit. */
-    public static final ZoneId ZONE = ZoneId.of("Europe/Zurich");
+    /** Zone der Anzeige — die Zone der Anwendung ({@link Ortszeit#ZONE}). */
+    public static final ZoneId ZONE = Ortszeit.ZONE;
 
     private PreiszeitreiheZeit() {
     }

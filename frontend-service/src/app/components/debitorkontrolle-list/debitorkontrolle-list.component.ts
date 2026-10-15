@@ -19,7 +19,7 @@ import { KebabMenuComponent, KebabMenuItem } from '../kebab-menu/kebab-menu.comp
 import { ColumnResizeDirective } from '../../directives/column-resize.directive';
 import { IconComponent } from '../icon/icon.component';
 import { FeatureFlagService } from '../../services/feature-flag.service';
-import { toIsoDate } from '../../utils/date-utils';
+import { toIsoDate, vorquartal } from '../../utils/date-utils';
 
 @Component({
   selector: 'app-debitorkontrolle-list',
@@ -146,16 +146,9 @@ export class DebitorkontrolleListComponent extends WithMessage implements OnInit
    * (im Q1 wird Q4 des Vorjahres gesetzt).
    */
   private setDefaultQuarter(): void {
-    const now = new Date();
-    let year = now.getFullYear();
-    let quarter = Math.ceil((now.getMonth() + 1) / 3) - 1;
-    if (quarter < 1) {
-      quarter = 4;
-      year--;
-    }
-    const startMonth = (quarter - 1) * 3;
-    this.dateFrom = toIsoDate(new Date(year, startMonth, 1));
-    this.dateTo = toIsoDate(new Date(year, startMonth + 3, 0));
+    const { von, bis } = vorquartal();
+    this.dateFrom = von;
+    this.dateTo = bis;
   }
 
   loadEinheiten(): void {

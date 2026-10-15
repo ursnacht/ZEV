@@ -61,25 +61,6 @@ public class NkBerechnungServiceTest {
         testMieter2 = new NkMieterBasisDTO(2L, "Bruno Bedacht", JAHR_VON, null, 1, new BigDecimal("200.00"));
     }
 
-    // ==================== tageImZeitraum ====================
-
-    @Test
-    void tageImZeitraum_GanzesJahr_Returns365() {
-        assertEquals(365, berechnungService.tageImZeitraum(JAHR_VON, JAHR_BIS));
-    }
-
-    @Test
-    void tageImZeitraum_Schaltjahr_Returns366() {
-        assertEquals(366, berechnungService.tageImZeitraum(
-                LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31)));
-    }
-
-    @Test
-    void tageImZeitraum_EinTag_Returns1() {
-        // Beide Enden eingeschlossen - ein Zeitraum von einem Tag ist ein Tag, nicht null.
-        assertEquals(1, berechnungService.tageImZeitraum(JAHR_VON, JAHR_VON));
-    }
-
     // ==================== miettageImZeitraum ====================
 
     @Test

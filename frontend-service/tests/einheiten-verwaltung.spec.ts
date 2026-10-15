@@ -1,6 +1,10 @@
 import { test, expect, Locator, Page } from '@playwright/test';
 import {
-    clickKebabMenuItem, navigateViaMenu, raeumeMitWiederholung, waitForFormResult, waitForTableWithData
+    clickKebabMenuItem,
+    raeumeMitWiederholung,
+    waitForFormResult,
+    waitForTableWithData,
+    navigateToEinheiten,
 } from './helpers';
 
 /**
@@ -28,15 +32,6 @@ let createdEinheitNames: string[] = [];
  * darüber hinaus stillschweigend gekürzt — die Zeile wäre danach nicht mehr auffindbar.
  */
 const RUN_ID = Date.now().toString().slice(-6);
-
-/**
- * Helper function to navigate to Einheiten management page
- */
-async function navigateToEinheiten(page: Page): Promise<void> {
-    await navigateViaMenu(page, '/einheiten');
-    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
-    await waitForTableWithData(page, 10000);
-}
 
 /**
  * Eindeutiger Einheiten-Name, hart auf die 30 Zeichen des Formularfelds begrenzt.

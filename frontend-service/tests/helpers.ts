@@ -496,3 +496,27 @@ export async function navigateToTarife(page: Page): Promise<void> {
     await oeffneTarifPanels(page);
     await waitForTableWithData(page, 10000);
 }
+
+/** Oeffnet die Einheitenverwaltung und wartet auf die Tabelle. */
+export async function navigateToEinheiten(page: Page): Promise<void> {
+    await navigateViaMenu(page, '/einheiten');
+    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
+    await waitForTableWithData(page, 10000);
+}
+
+/** Oeffnet die Mieterverwaltung und wartet auf die Tabelle. */
+export async function navigateToMieter(page: Page): Promise<void> {
+    await navigateViaMenu(page, '/mieter');
+    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
+    await waitForTableWithData(page, 10000);
+}
+
+/**
+ * Oeffnet die Tarifpositionen und wartet auf die Einheiten-Auswahl - eine Tabelle gibt es erst,
+ * wenn eine Einheit gewaehlt ist.
+ */
+export async function navigateToTarifpositionen(page: Page): Promise<void> {
+    await navigateViaMenu(page, '/tarifpositionen');
+    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
+    await page.locator('#einheitAuswahl').waitFor({ state: 'visible', timeout: 15000 });
+}

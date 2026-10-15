@@ -8,7 +8,8 @@ import java.time.temporal.ChronoUnit;
  *
  * <p>Die Tage eines Zeitraums <b>einschliesslich beider Enden</b> standen in RechnungService,
  * NkBerechnungService und SteuerungController an sechs Stellen als
- * {@code DAYS.between(von, bis) + 1}. Das {@code + 1}
+ * {@code DAYS.between(von, bis) + 1}; dazu kam {@code NkBerechnungService.tageImZeitraum} als
+ * Durchreicher, der jetzt ebenfalls entfallen ist. Das {@code + 1}
  * ist genau die Stelle, an der eine Kopie einmal fehlt.
  */
 public final class Zeitraum {

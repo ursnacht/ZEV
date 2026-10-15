@@ -7,6 +7,9 @@ import {
     waitForFormResult,
     waitForTableWithData,
     navigateToTarife,
+    navigateToEinheiten,
+    navigateToMieter,
+    navigateToTarifpositionen,
 } from './helpers';
 
 /**
@@ -95,24 +98,6 @@ function mieterName(suffix: string): string {
 // ---------------------------------------------------------------------------
 // Navigation
 // ---------------------------------------------------------------------------
-
-async function navigateToEinheiten(page: Page): Promise<void> {
-    await navigateViaMenu(page, '/einheiten');
-    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
-    await waitForTableWithData(page, 10000);
-}
-
-async function navigateToMieter(page: Page): Promise<void> {
-    await navigateViaMenu(page, '/mieter');
-    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
-    await waitForTableWithData(page, 10000);
-}
-
-async function navigateToTarifpositionen(page: Page): Promise<void> {
-    await navigateViaMenu(page, '/tarifpositionen');
-    await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
-    await page.locator('#einheitAuswahl').waitFor({ state: 'visible', timeout: 15000 });
-}
 
 // ---------------------------------------------------------------------------
 // Meldungen
