@@ -41,7 +41,10 @@ der aktuelle Stand war nur noch mit der ganzen Geschichte zu lesen. Aufräumen v
     - **Design System zuerst prüfen** (siehe Block unten) – kein UI-CSS ohne diese Prüfung.
 6. **Kompiliere und teste** – Frontend-Build und betroffene Unit-Tests müssen grün sein (Befehle: `.claude/commands/2_umsetzung.md`, Abschnitt „Validierung").
     - Jedes neue oder geänderte Akzeptanzkriterium bekommt einen Test, und der Verweis steht am Kriterium (`Specs/SPEC.md`, Abschnitt 3). **Die Checkbox setzt du nicht selbst.**
-7. **Akzeptanzkriterien prüfen** – `/7_akzeptanzkriterien-check` als Sub-Agent, beschränkt auf die in diesem Durchgang neuen oder geänderten Kriterien (im Prompt aufzählen). Er setzt die Checkboxen; ⚠️ OHNE TEST oder ❌ FEHLT beheben und erneut prüfen. Seinen Bericht unverändert weitergeben.
+7. **Prüfen – Anforderungen und Vorlagen**, zwei Sub-Agenten **parallel** (in einer Nachricht starten):
+    - `/7_akzeptanzkriterien-check`, beschränkt auf die in diesem Durchgang neuen oder geänderten Kriterien (im Prompt aufzählen). Er setzt die Checkboxen; ⚠️ OHNE TEST oder ❌ FEHLT beheben und erneut prüfen.
+    - `/9_vorlagen-check` auf die nicht committeten Änderungen. ❌ und ⚠️ beheben (oder im Code begründen) und erneut prüfen.
+    - Beide Berichte unverändert weitergeben.
 8. **Sichtprüfung im Browser** (bei UI-Änderungen) – siehe Block unten. Ohne UI-Änderung (reines Backend, nur Spec) entfällt sie; das im Abschlussbericht ausdrücklich sagen.
 
 ## ⚖️ Kurzer Weg – Änderungen ohne neues Verhalten
@@ -49,7 +52,7 @@ Der Aufwand soll zur Änderung passen. **Ohne neues oder geändertes Verhalten**
 Text- oder Stilkorrekturen (z.B. eine Schaltfläche verschieben, eine Beschriftung ändern, einen
 Abstand korrigieren) – gilt:
 
-* **Schritt 7 entfällt** (kein Akzeptanzkriterien-Check per Sub-Agent). Ein bestehendes Kriterium,
+* **Schritt 7 entfällt** (kein Akzeptanzkriterien- und kein Vorlagen-Check per Sub-Agent). Ein bestehendes Kriterium,
   das die Änderung betrifft, wird angepasst; seine Checkbox und sein Test-Verweis bleiben, sofern
   der Test weiterhin grün ist.
 * **Kein neuer Test nur für die Position** eines Elements. Bestehende Tests anpassen, die an der
@@ -108,6 +111,7 @@ ausserhalb des sichtbaren Bereichs.
 * Implementiere die neuen Anforderungen im Anwendungscode
 * Passe die bestehenden Tests falls nötig an
 * Neue/geänderte Akzeptanzkriterien mit Test-Verweis, Checkboxen von `/7_akzeptanzkriterien-check` gesetzt
+* `/9_vorlagen-check` ohne offene ❌/⚠️
 * Bei UI-Änderungen: Sichtprüfung im Browser durchgeführt (Screenshot angesehen) – oder begründet, warum nicht
 
 ## Referenz

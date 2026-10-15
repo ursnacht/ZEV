@@ -15,8 +15,9 @@ Setze einen Umsetzungsplan schrittweise um.
 5. **Aktualisiere den Status** - Markiere die Phase mit `[x]` als erledigt
 6. **Wiederhole** - Fahre mit der nächsten Phase fort
 7. **Abschluss** - Im Schlussbericht die nächsten Schritte nennen: Tests mit `/3`–`/5` (tragen die
-   Test-Verweise in die Spec ein), danach **`/7_akzeptanzkriterien-check` vor dem Commit** – erst
-   er setzt die Checkboxen. Ohne ihn bleibt offen, ob die Spec erfüllt ist.
+   Test-Verweise in die Spec ein), danach **vor dem Commit** `/7_akzeptanzkriterien-check` (erst
+   er setzt die Checkboxen) und `/9_vorlagen-check` (Vorlagentreue, Redundanz). Ohne sie bleibt
+   offen, ob die Spec erfüllt ist und der Code den Vorlagen folgt.
 
 ## Konventionen
 * **Design System (WICHTIG):**

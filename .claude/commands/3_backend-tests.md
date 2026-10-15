@@ -248,6 +248,33 @@ Beispiele:
 * ArgumentCaptor für komplexe Argument-Validierungen verwenden
 * Post-Test Teardown: Testdaten löschen
 
+### Ausnahme: Service-Integrationstest für Transaktionsverhalten
+Service-Logik wird mit Mockito getestet – **ausser** dort, wo das Verhalten an der
+**Transaktionsgrenze** hängt. Dort ist ein Mock blind: Er hat keinen Transaktions-Proxy.
+
+**Wann nötig** – eine der Fragen trifft zu:
+* Fängt der Service einen Fehler ab, der aus einer anderen `@Transactional`-Bean oder einem
+  Repository kommt, und soll danach trotzdem etwas **committet** werden?
+* Nutzt er `REQUIRES_NEW`, `TransactionTemplate` oder `noRollbackFor`?
+* Muss ein Teil eines Ablaufs bestehen bleiben, wenn ein anderer scheitert?
+
+**Belegt:** Die Schattenrechnung der Ladeplanung fing Fehler ab, aber die teilnehmende Transaktion
+war da schon rollback-only – der Entscheid wäre verloren gegangen (`Specs/Ladeplanung.md`,
+Anhang A.14). Alle Unit-Tests waren grün; erst der Integrationstest scheitert am alten Code mit
+`UnexpectedRollbackException`.
+
+**Vorlage:** `backend-service/src/test/java/ch/nacht/service/SteuerungServiceTransaktionIT.java`
+* `@DataJpaTest` + `@Import` der beteiligten Services – weiterhin **kein** `@SpringBootTest`.
+* `@Transactional(propagation = Propagation.NOT_SUPPORTED)` auf der Klasse: Ohne das nähme der
+  Service an der Testtransaktion teil, und der Commit, um den es geht, fände nie statt.
+* Den Fehler aus einer **echten** Bean mit `@Transactional` werfen (Unterklasse als `@Bean` in einer
+  `@TestConfiguration`), nicht aus einem `@MockitoBean`.
+* Testdaten in `@BeforeEach` per `TransactionTemplate` committen und in `@AfterEach` **gezielt**
+  löschen (nur die eigenen Zeilen, z.B. per `org_id`) – es gibt keinen automatischen Rollback.
+* **Gegenprobe:** Den Test einmal gegen den fehlerhaften Zustand laufen lassen (Fix vorübergehend
+  zurücknehmen) und bestätigen, dass er scheitert – sonst ist nicht gezeigt, dass er den Fehler
+  erkennt.
+
 ### Controller Test Struktur
 
 ```java
@@ -301,7 +328,7 @@ public class XxxControllerTest {
 
 | Komponente | Unit Test | Integration Test |
 |------------|-----------|------------------|
-| Service-Logik | Ja | Nein |
+| Service-Logik | Ja | Nur für Transaktionsverhalten (siehe Ausnahme oben) |
 | Repository | Nein | Ja (@DataJpaTest) |
 | Controller | Optional | Ja (@WebMvcTest) |
 | Utility-Klassen | Ja | Nein |

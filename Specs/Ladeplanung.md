@@ -478,7 +478,8 @@ Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten**:
       transaktionalen Bean entsteht (Hintergrund: Anhang A.14).
       (Test: SteuerungServiceTest#werteIntervallAus_PrognoseWirft_EntscheidWirdTrotzdemGeschrieben;
       SteuerungServiceTest#werteIntervallAus_SchattenTransaktionScheitertBeimCommit_EntscheidWirdTrotzdemGeschrieben;
-      SteuerungServiceTest#werteIntervallAus_SchattenrechnungLaeuftInEigenerLesenderTransaktion)
+      SteuerungServiceTest#werteIntervallAus_SchattenrechnungLaeuftInEigenerLesenderTransaktion;
+      SteuerungServiceTransaktionIT#werteIntervallAus_PrognoseWirftInIhrerTransaktion_EntscheidIstCommittet)
 * [ ] **Bei negativem Preis** ist `einspeisung = GESPERRT`, über die Ladung entscheidet die
       Merit-Order — nicht mehr pauschal `FREI` wie in der Regelkaskade.
 * [ ] **Unter dem Mindest-Ladezustand** ist `batterieladung = FREI`, ohne dass der Plan gefragt wird

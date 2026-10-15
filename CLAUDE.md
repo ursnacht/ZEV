@@ -100,6 +100,7 @@ Bei der Code-Generierung diese Dateien als Vorlage verwenden und deren Struktur 
 | DTO             | `backend-service/src/main/java/ch/nacht/dto/DebitorDTO.java`                 |
 | Service Test    | `backend-service/src/test/java/ch/nacht/service/TarifServiceTest.java`       |
 | Controller Test | `backend-service/src/test/java/ch/nacht/controller/TarifControllerTest.java` |
+| Transaktions-IT | `backend-service/src/test/java/ch/nacht/service/SteuerungServiceTransaktionIT.java` (nur für Verhalten an der Transaktionsgrenze, siehe `/3_backend-tests`) |
 
 ### Frontend
 

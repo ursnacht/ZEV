@@ -95,60 +95,16 @@ cd backend-service && mvn test -Dtest=<GeändertesKlassenTest> -q 2>&1 | tail -2
 cd backend-service && mvn test -Dtest=JasperTemplateCompileTest -q 2>&1 | tail -20
 ```
 
-#### 3.3 Backend-Konventionen prüfen
+#### 3.3–3.5 Vorlagen, Konventionen und Migrationen
 
-Für jede geänderte `*Service.java`:
-- [ ] `hibernateFilterService.enableOrgFilter()` am Anfang **jeder** Methode?
-- [ ] `@Transactional(readOnly = true)` für Lese-Methoden?
-- [ ] `@Transactional` für Schreib-Methoden?
-- [ ] Neue Entities: `orgId` via `organizationContextService.getCurrentOrgId()` gesetzt?
-- [ ] Delete-Methoden geben `boolean` zurück?
-- [ ] Methoden-Reihenfolge: `getAll` → `getById` → `save` → `delete` → Business-Logic?
+Die Prüfungen stehen **an einer Stelle**: `.claude/commands/9_vorlagen-check.md`, Phase 2
+(Struktur wie die Vorlage, Backend, Frontend, Migrationen inkl. Blocker bei geänderter
+bestehender Migration, Tests, Redundanz, begründete Abweichungen). Hier auf den Diff
+`main...HEAD` anwenden und die Befunde in die Tabellen „Konventions-Check" und „Migrations" des
+Berichts übernehmen.
 
-Für jede geänderte `*Controller.java`:
-- [ ] `@PreAuthorize` auf Klassen-Ebene (nicht pro Methode)?
-- [ ] POST gibt `HttpStatus.CREATED` zurück?
-- [ ] DELETE gibt `204 No Content` oder `404 Not Found` zurück?
-- [ ] `catch (IllegalArgumentException e)` → `badRequest().body(e.getMessage())`?
-- [ ] Richtige Permission in `@PreAuthorize("hasAuthority('<permission>')")` — passend zu `Specs/Berechtigungen.md`?
-
-Für jede neue `*Entity.java`:
-- [ ] `@FilterDef` und `@Filter` für Multi-Tenancy vorhanden?
-- [ ] `org_id` Feld vorhanden?
-- [ ] Zugehörige Flyway-Migration vorhanden?
-
-#### 3.4 Frontend-Konventionen prüfen
-
-Für jede geänderte `*.component.ts`:
-- [ ] Standalone Component (`standalone: true`)?
-- [ ] Neue Control-Flow-Syntax (`@if`, `@for`) – kein `*ngIf`/`*ngFor`?
-- [ ] `subscribe({ next, error })` Objekt-Syntax (nicht `.subscribe(data => ...)`)?
-- [ ] Kein hartcodierter UI-Text (alles via `TranslatePipe` / `TranslationService`)?
-- [ ] Error-Messages bleiben, Success-Messages verschwinden nach 5 Sekunden?
-
-Für jede geänderte `*.service.ts`:
-- [ ] HTTP-URL korrekt (kein trailing slash, kein hardcoded Port ausser in Tests)?
-
-Für jede neue Route in `app.routes.ts`:
-- [ ] `AuthGuard` mit korrekter Permission (`data: { permissions: [...] }`) konfiguriert?
-- [ ] Menüeintrag in `navigation.component.html` vorhanden?
-
-#### 3.5 Migrations prüfen
-
-**Zuerst — Blocker, falls verletzt:** Ändert der Diff eine **bestehende** Migration?
-```bash
-git diff main...HEAD --name-status -- backend-service/src/main/resources/db/migration/ | grep -v '^A'
-```
-Jede Zeile ausser `A` (neu hinzugefügt) ist ein **❌ Blocker**: Bereits ausgeführte Migrationen dürfen
-nie geändert werden — die Checksum-Prüfung bricht sonst beim nächsten Start (CLAUDE.md). Korrektur
-gehört in eine neue Migration.
-
-Für jede neue `V*.sql`:
-- [ ] Versionsnummer ist höher als alle bestehenden Migrationen?
-- [ ] `COMMENT ON COLUMN` für alle neuen Spalten vorhanden?
-- [ ] Multi-Tenancy: `org_id BIGINT NOT NULL` in neuen Tabellen?
-- [ ] Naming-Konvention: `V[nummer]__[beschreibung].sql`?
-- [ ] Übersetzungs-Inserts: deutsche Texte mit Umlauten (`ä`/`ö`/`ü`) statt `ae`/`oe`/`ue`?
+> Früher standen die Checklisten hier und in `/2_umsetzung` doppelt. Seit `/9_vorlagen-check`
+> auch ohne PR prüft, lebt die Liste dort — eine zweite Fassung liefe auseinander.
 
 #### 3.6 Sicherheits-Check
 
