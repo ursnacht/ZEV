@@ -80,6 +80,8 @@ public class SteuerentscheidDTO {
 
     /** Freie Batteriekapazitaet in kWh beim Entscheid. */
     private BigDecimal kapazitaetFrei;
+    /** Erwarteter Verbrauch (Lastprofil) des Intervalls in kWh; {@code null} vor V183 und beim Rueckfall. */
+    private BigDecimal prognoseLastprofil;
 
     public SteuerentscheidDTO() {
     }
@@ -322,5 +324,13 @@ public class SteuerentscheidDTO {
 
     public void setKapazitaetFrei(BigDecimal kapazitaetFrei) {
         this.kapazitaetFrei = kapazitaetFrei;
+    }
+
+    public BigDecimal getPrognoseLastprofil() {
+        return prognoseLastprofil;
+    }
+
+    public void setPrognoseLastprofil(BigDecimal prognoseLastprofil) {
+        this.prognoseLastprofil = prognoseLastprofil;
     }
 }

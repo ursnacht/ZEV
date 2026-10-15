@@ -80,7 +80,7 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
                                          speicherwert, soc_minimum, soc_hysterese, mindest_abstand,
                                          verfahren, ladeplan_batterieladung, prognose_ueberschuss,
                                          gti, prognose_faktor, rang, rang_benoetigt,
-                                         kapazitaet_frei,
+                                         kapazitaet_frei, prognose_lastprofil,
                                          erstellt_am)
         VALUES (:orgId, :zeitVon, :preis, :preisTiefRest, :produktion, :verbrauch, :bezug,
                 :ruecklieferung, :soc, :speicherLadung, :speicherEntladung, :ueberschuss,
@@ -88,6 +88,7 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
                 :socMinimum, :socHysterese, :mindestAbstand,
                 :verfahren, :ladeplanBatterieladung, :prognoseUeberschuss,
                 :gti, :prognoseFaktor, :rang, :rangBenoetigt, :kapazitaetFrei,
+                :prognoseLastprofil,
                 now())
         ON CONFLICT (org_id, zeit_von)
         DO UPDATE SET preis           = EXCLUDED.preis,
@@ -116,6 +117,7 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
                       rang            = EXCLUDED.rang,
                       rang_benoetigt  = EXCLUDED.rang_benoetigt,
                       kapazitaet_frei = EXCLUDED.kapazitaet_frei,
+                      prognose_lastprofil = EXCLUDED.prognose_lastprofil,
                       erstellt_am     = now()
         """, nativeQuery = true)
     void upsert(
@@ -146,6 +148,7 @@ public interface SteuerentscheidRepository extends JpaRepository<Steuerentscheid
         @Param("prognoseFaktor") BigDecimal prognoseFaktor,
         @Param("rang") Integer rang,
         @Param("rangBenoetigt") Integer rangBenoetigt,
-        @Param("kapazitaetFrei") BigDecimal kapazitaetFrei
+        @Param("kapazitaetFrei") BigDecimal kapazitaetFrei,
+        @Param("prognoseLastprofil") BigDecimal prognoseLastprofil
     );
 }

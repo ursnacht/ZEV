@@ -248,6 +248,17 @@ public class Steuerentscheid {
     private BigDecimal prognoseFaktor;
 
     /**
+     * Erwarteter Verbrauch (Lastprofil) dieses Intervalls in kWh zum Zeitpunkt des Entscheids.
+     *
+     * <p>Mit {@link #gti} und {@link #prognoseFaktor} laesst sich {@link #prognoseUeberschuss}
+     * nachrechnen: {@code max(0, gti × Faktor − Lastprofil)}. Vor allem misst er den Fehler der
+     * Verbrauchsprognose fuer <b>jedes</b> Intervall - laut Testwoche eine ebenso grosse
+     * Fehlerquelle wie das Wetter (Specs/Ladeplanung.md, Anhang A.8).
+     */
+    @Column(name = "prognose_lastprofil", precision = 12, scale = 3)
+    private BigDecimal prognoseLastprofil;
+
+    /**
      * Platz dieses Intervalls in der Merit-Order des Resttages.
      *
      * <p>Zusammen mit {@link #rangBenoetigt} erklärt er den Entscheid vollständig: „Rang 34,
@@ -436,6 +447,14 @@ public class Steuerentscheid {
 
     public void setKapazitaetFrei(BigDecimal kapazitaetFrei) {
         this.kapazitaetFrei = kapazitaetFrei;
+    }
+
+    public BigDecimal getPrognoseLastprofil() {
+        return prognoseLastprofil;
+    }
+
+    public void setPrognoseLastprofil(BigDecimal prognoseLastprofil) {
+        this.prognoseLastprofil = prognoseLastprofil;
     }
 
     public BigDecimal getSpeicherLadung() {

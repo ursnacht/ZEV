@@ -322,6 +322,7 @@ Entscheiden aus der Zeit davor fehlen):
 | `rang` | INTEGER | Platz des Intervalls in der Merit-Order des Resttages |
 | `rang_benoetigt` | INTEGER | wie viele Intervalle gebraucht wurden, um die Kapazität zu decken |
 | `kapazitaet_frei` | NUMERIC(12,3) | freie Kapazität in kWh beim Entscheid |
+| `prognose_lastprofil` | NUMERIC(12,3) | erwarteter Verbrauch (Lastprofil) **dieses** Intervalls in kWh (V183). Mit `gti` und `prognose_faktor` lässt sich `prognose_ueberschuss` nachrechnen, und der Fehler der Verbrauchsprognose wird für **jedes** Intervall messbar, nicht nur für jene mit erwartetem Überschuss (Hintergrund: Anhang A.16) |
 
 > **Warum `rang` und `rang_benoetigt` statt eines Kennzeichens.** „Rang 34, gebraucht werden 12"
 > erklärt den Entscheid vollständig und macht ihn nachprüfbar — ein blosses `GESPERRT` nicht. Das
@@ -538,8 +539,11 @@ Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten**:
 * [ ] Eine Batteriekapazität von **0** wirkt wie eine fehlende.
 * [ ] Ein Entscheid nach Merit-Order trägt `verfahren = MERIT_ORDER` **und** Rang, benötigte
       Anzahl, Einstrahlung, Prognose, Faktor und freie Kapazität.
-* [ ] Aus Einstrahlung und Faktor lässt sich die erwartete Erzeugung nachrechnen — die drei Werte
-      stehen im selben Datensatz.
+* [ ] Der Datensatz trägt Einstrahlung, Faktor und Lastprofil — daraus lassen sich erwartete
+      Erzeugung (`gti × prognose_faktor`) und erwarteter Überschuss
+      (`max(0, Erzeugung − prognose_lastprofil)`) nachrechnen
+      (Test: SteuerentscheidRepositoryIT#upsert_SchreibtDiePlangroessen;
+      SteuerungServiceTest#werteIntervallAus_UnterMindestLadezustand_SchattenFreiOhnePlan)
 
 **Anzeige**
 
@@ -1133,3 +1137,17 @@ Kapazität bleiben erhalten, weil die Auswertung von erwartetem und tatsächlich
 
 **Festgelegt dabei:** Die Hysterese gilt für die vorgeschaltete Regel genauso wie in der Kaskade.
 Die Spec liess das offen; zwei verschiedene Grenzen hätten wieder Scheinabweichungen erzeugt.
+
+### A.16 Lastprofil im Steuerentscheid (FR-5; 15.10.2026)
+
+Das Akzeptanzkriterium lautete: „Aus Einstrahlung und Faktor lässt sich die erwartete Erzeugung
+nachrechnen — die drei Werte stehen im selben Datensatz." FR-5 speicherte aber `gti`,
+`prognose_faktor` und `prognose_ueberschuss` — den **Überschuss**, nicht die Erzeugung. Weil das
+Lastprofil fehlte und `max(0, …)` den negativen Teil abschneidet, liess sich der gespeicherte
+Überschuss nicht nachrechnen. Die Auswertung (A.8) konnte den Verbrauchsfehler deshalb nur für
+Intervalle mit erwartetem Überschuss bestimmen — obwohl die Testwoche das Lastprofil als ebenso
+grosse Fehlerquelle wie das Wetter zeigte (07.10.: Verbrauch 43 % über dem Profil).
+
+Seit V183 trägt jeder Entscheid mit Schattenrechnung `prognose_lastprofil`. In der Abfrage aus A.8
+lässt sich `verbrauch_erwartet` damit für alle Intervalle ab V183 als `sum(prognose_lastprofil)`
+rechnen. Entscheide davor bleiben ohne Lastprofil.

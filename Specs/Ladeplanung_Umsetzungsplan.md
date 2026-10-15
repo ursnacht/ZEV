@@ -200,3 +200,15 @@ nach.
 |  [x]   | 2. Tests | `SteuerungServiceTest`: unter Minimum → FREI ohne Plan; Hysterese nach `SOC_TIEF` → weiterhin FREI; über Minimum ohne vorherige Freigabe → Plan wird gefragt |
 
 Anlass: Scheinabweichungen am 09.10.2026, 09:00–10:45 (Spec, Anhang A.15).
+
+---
+
+## Nachtrag 15.10.2026 — Lastprofil im Steuerentscheid
+
+| Status | Phase | Beschreibung |
+|--------|-------|--------------|
+|  [x]   | 1. DB-Migration | `V183__Steuerentscheid_Prognose_Lastprofil.sql`: Spalte `prognose_lastprofil NUMERIC(12,3)`, nullable, mit Kommentar |
+|  [x]   | 2. Backend | `Steuerentscheid`/`SteuerentscheidDTO`: Feld `prognoseLastprofil`; Upsert um die Spalte erweitert (INSERT, VALUES, DO UPDATE); Schattenrechnung übernimmt `PrognosepunktDTO.getLastprofil()` |
+|  [x]   | 3. Tests | `SteuerentscheidRepositoryIT` (geschrieben, ohne Plan leer, zweiter Lauf leert), `SteuerungServiceTest` (Lastprofil im Upsert), `SteuerentscheidUpsertQueryTest` prüft Spalten gegen Platzhalter |
+
+Anlass: Widerspruch zwischen Akzeptanzkriterium und FR-5 (Spec, Anhang A.16).

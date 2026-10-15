@@ -371,7 +371,8 @@ class SteuerentscheidRepositoryIT extends AbstractIntegrationTest {
                 w.schwellwert(), w.speicherwert(), w.socMinimum(), w.socHysterese(),
                 w.mindestAbstand(),
                 verfahren, ladeplanBatterieladung, prognoseUeberschuss, gti, prognoseFaktor,
-                rang, rangBenoetigt, rang == null ? null : new BigDecimal("12.345"));
+                rang, rangBenoetigt, rang == null ? null : new BigDecimal("12.345"),
+                rang == null ? null : new BigDecimal("0.375"));
     }
 
     /** Vergleicht Spalte fuer Spalte — bewusst ohne Schleife, damit die Meldung die Spalte nennt. */
@@ -432,6 +433,7 @@ class SteuerentscheidRepositoryIT extends AbstractIntegrationTest {
         assertThat(s.getRang()).isEqualTo(34);
         assertThat(s.getRangBenoetigt()).isEqualTo(12);
         assertThat(s.getKapazitaetFrei()).isEqualByComparingTo(new BigDecimal("12.345"));
+        assertThat(s.getPrognoseLastprofil()).isEqualByComparingTo(new BigDecimal("0.375"));
     }
 
     /**
@@ -471,6 +473,7 @@ class SteuerentscheidRepositoryIT extends AbstractIntegrationTest {
         assertThat(s.getRang()).isNull();
         assertThat(s.getRangBenoetigt()).isNull();
         assertThat(s.getKapazitaetFrei()).isNull();
+        assertThat(s.getPrognoseLastprofil()).isNull();
     }
 
     /**
@@ -490,5 +493,6 @@ class SteuerentscheidRepositoryIT extends AbstractIntegrationTest {
         Steuerentscheid s = steuerentscheidRepository.findAll().getFirst();
         assertThat(s.getRang()).isNull();
         assertThat(s.getLadeplanBatterieladung()).isNull();
+        assertThat(s.getPrognoseLastprofil()).isNull();
     }
 }

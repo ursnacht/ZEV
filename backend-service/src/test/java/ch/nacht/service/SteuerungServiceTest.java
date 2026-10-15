@@ -205,7 +205,7 @@ public class SteuerungServiceTest {
                 eq(new BigDecimal("0.200")), eq(new BigDecimal("2.100")), any(),
                 eq(new BigDecimal("0.800")), eq(new BigDecimal("0.100")),
                 any(), any(), any(), any(), any(), any(), any(), any(), any(),
-                any(), any(), any(), any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     /**
@@ -223,7 +223,7 @@ public class SteuerungServiceTest {
         assertEquals(0, BigDecimal.ZERO.compareTo(eingabe.getValue().verbrauch()));
         verify(steuerentscheidRepository).upsert(eq(ORG_ID), eq(ZEHN_UHR), any(), any(), any(),
                 any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
-                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     // ==================== Schattenrechnung isoliert (Specs/Ladeplanung.md, FR-1a) ====================
@@ -243,7 +243,7 @@ public class SteuerungServiceTest {
         verify(steuerentscheidRepository).upsert(eq(ORG_ID), eq(ZEHN_UHR), any(), any(), any(),
                 any(), any(), any(), any(), any(), any(), any(),
                 eq("LADEN"), eq("FREI"), eq("FREI"), any(), any(), any(), any(), any(),
-                eq("REGEL"), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull());
+                eq("REGEL"), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull());
     }
 
     /**
@@ -264,7 +264,7 @@ public class SteuerungServiceTest {
         verify(steuerentscheidRepository).upsert(eq(ORG_ID), eq(ZEHN_UHR), any(), any(), any(),
                 any(), any(), any(), any(), any(), any(), any(),
                 eq("LADEN"), eq("FREI"), eq("FREI"), any(), any(), any(), any(), any(),
-                eq("REGEL"), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull());
+                eq("REGEL"), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull());
     }
 
     /**
@@ -286,7 +286,7 @@ public class SteuerungServiceTest {
                 any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
                 any(), any(), any(), any(), any(),
                 eq("REGEL"), eq("FREI"), eq(new BigDecimal("0.661")), eq(new BigDecimal("400")),
-                eq(new BigDecimal("0.005")), isNull(), isNull(), eq(new BigDecimal("34.272")));
+                eq(new BigDecimal("0.005")), isNull(), isNull(), eq(new BigDecimal("34.272")), eq(new BigDecimal("0.250")));
     }
 
     /**
@@ -309,7 +309,7 @@ public class SteuerungServiceTest {
         verify(steuerentscheidRepository).upsert(eq(ORG_ID), eq(ZEHN_UHR), any(), any(), any(),
                 any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
                 any(), any(), any(), any(), any(),
-                eq("REGEL"), eq("FREI"), any(), any(), any(), isNull(), isNull(), any());
+                eq("REGEL"), eq("FREI"), any(), any(), any(), isNull(), isNull(), any(), any());
     }
 
     /**
@@ -328,7 +328,7 @@ public class SteuerungServiceTest {
         verify(steuerentscheidRepository).upsert(eq(ORG_ID), eq(ZEHN_UHR), any(), any(), any(),
                 any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
                 any(), any(), any(), any(), any(),
-                eq("REGEL"), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull());
+                eq("REGEL"), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull());
     }
 
     /**
@@ -549,13 +549,14 @@ public class SteuerungServiceTest {
                 .thenReturn(Optional.of(soc(DATUM.atTime(10, 14), wert)));
     }
 
-    /** Ein Prognosepunkt mit Einstrahlung 400 W/m2 und Faktor 0.005. */
+    /** Ein Prognosepunkt mit Einstrahlung 400 W/m2, Faktor 0.005 und Lastprofil 0.250 kWh. */
     private PrognosepunktDTO prognosepunkt(LocalDateTime zeit, String ueberschuss) {
         PrognosepunktDTO punkt = new PrognosepunktDTO();
         punkt.setZeit(zeit);
         punkt.setGti(new BigDecimal("400"));
         punkt.setFaktor(new BigDecimal("0.005"));
         punkt.setErwarteterUeberschuss(new BigDecimal(ueberschuss));
+        punkt.setLastprofil(new BigDecimal("0.250"));
         return punkt;
     }
 

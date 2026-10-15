@@ -185,7 +185,8 @@ public class SteuerungService {
                 socHysterese, mindestAbstand,
                 Steuerverfahren.REGEL.name(), schatten.batterieladungName(),
                 schatten.prognoseUeberschuss(), schatten.gti(), schatten.faktor(),
-                schatten.rang(), schatten.rangBenoetigt(), schatten.kapazitaetFrei());
+                schatten.rang(), schatten.rangBenoetigt(), schatten.kapazitaetFrei(),
+                schatten.lastprofil());
 
         // Auf INFO und mit den Eingangsgroessen: Ein Entscheid ohne die Zahlen, aus denen er
         // entstand, laesst sich im Nachhinein nicht pruefen - und genau diese Pruefung war noetig,
@@ -359,11 +360,12 @@ public class SteuerungService {
      */
     private record Schattenrechnung(Steuerzustand batterieladung, BigDecimal prognoseUeberschuss,
                                     BigDecimal gti, BigDecimal faktor, Integer rang,
-                                    Integer rangBenoetigt, BigDecimal kapazitaetFrei) {
+                                    Integer rangBenoetigt, BigDecimal kapazitaetFrei,
+                                    BigDecimal lastprofil) {
 
         /** Nichts gerechnet — eine Voraussetzung fehlte oder die Rechnung schlug fehl. */
         static Schattenrechnung leer() {
-            return new Schattenrechnung(null, null, null, null, null, null, null);
+            return new Schattenrechnung(null, null, null, null, null, null, null, null);
         }
 
         String batterieladungName() {
@@ -457,7 +459,8 @@ public class SteuerungService {
             // braucht sie auch fuer diese Intervalle. Kein Rang: Es wurde nichts geplant.
             if (socTief) {
                 return new Schattenrechnung(Steuerzustand.FREI, hier.getErwarteterUeberschuss(),
-                        hier.getGti(), hier.getFaktor(), null, null, kapazitaetFrei);
+                        hier.getGti(), hier.getFaktor(), null, null, kapazitaetFrei,
+                        hier.getLastprofil());
             }
 
             TreeMap<LocalDateTime, BigDecimal> preise =
@@ -489,7 +492,7 @@ public class SteuerungService {
 
             return new Schattenrechnung(plan.batterieladung(), hier.getErwarteterUeberschuss(),
                     hier.getGti(), hier.getFaktor(), plan.rang(), plan.rangBenoetigt(),
-                    plan.kapazitaetFrei());
+                    plan.kapazitaetFrei(), hier.getLastprofil());
         } catch (RuntimeException e) {
             log.warn("Schattenrechnung fuer org={} {} fehlgeschlagen - Entscheid bleibt gueltig: {}",
                     orgId, zeitVon, e.getMessage());
@@ -996,6 +999,7 @@ public class SteuerungService {
         dto.setRang(entscheid.getRang());
         dto.setRangBenoetigt(entscheid.getRangBenoetigt());
         dto.setKapazitaetFrei(entscheid.getKapazitaetFrei());
+        dto.setPrognoseLastprofil(entscheid.getPrognoseLastprofil());
         return dto;
     }
 
