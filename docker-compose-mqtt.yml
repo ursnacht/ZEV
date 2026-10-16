@@ -44,6 +44,11 @@ services:
       # Entrypoint die gehashte passwd. Muss MQTT_BROKER_USERNAME (Backend) und –
       # fuer den Pi – den Publisher-User enthalten.
       - MOSQUITTO_USERS=${MOSQUITTO_USERS}
+    volumes:
+      # Persistenz (persistence true in mosquitto.conf): Die gepufferten Nachrichten der
+      # dauerhaften Backend-Sitzung (mqtt.clean-session=false) ueberstehen so auch einen
+      # Neustart des Brokers, nicht nur einen des Backends.
+      - mosquitto-data:/mosquitto/data
     networks:
       - zev-network
     restart: unless-stopped
@@ -248,6 +253,7 @@ services:
 
 volumes:
   postgres-data:
+  mosquitto-data:
   caddy-data:
   caddy-config:
 networks:
