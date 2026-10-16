@@ -391,8 +391,8 @@ vorliegt.
 > weitere Grösse dazu, ist Weglassen die richtige Antwort, nicht noch kleinere Schrift.
 
 > **Die Einstrahlung bleibt trotzdem sichtbar** — als eigene Spalte in der Protokolltabelle und im
-> Tooltip. Dort steht sie neben dem Umrechnungsfaktor, und beide zusammen erklären, wie aus
-> W/m² die erwartete Kilowattstunde wurde. Wer der Prognose misstraut, kann das nachrechnen.
+> Tooltip, neben der erwarteten Erzeugung. Der Umrechnungsfaktor wird nicht angezeigt; er steht im
+> Datensatz (`prognose_faktor`), sodass sich die erwartete Kilowattstunde nachrechnen lässt.
 
 * Der Hinweis auf den Trockenlauf bleibt unverändert stehen.
 
@@ -521,7 +521,8 @@ Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten**:
 * [x] Ist die API nicht erreichbar, bleibt die vorhandene Prognose stehen; der Fehler erscheint als
       Systemmeldung und der Job läuft beim nächsten Mal weiter.
       (Test: EinstrahlungsprognoseAbrufServiceTest#abrufen_ApiAntwortetMitFehler_MeldetUndGibtNullZurueck)
-* [ ] Der Steuerungs-Job ruft **keine** externe Schnittstelle auf.
+* [x] Der Steuerungs-Job ruft **keine** externe Schnittstelle auf
+      (Test: ArchitectureTest#steuerungRuftKeineExterneSchnittstelleAuf)
 * [x] Der Abruf erfolgt je Mandant mit dessen Standort und Ausrichtung.
       (Test: EinstrahlungsprognoseAbrufServiceTest#abrufen_BautUrlAusKonfiguration; EinstrahlungsprognoseAbrufServiceTest#abrufen_SetztMandantenfilterMitUebergebenerOrgId)
 
@@ -567,8 +568,11 @@ Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten**:
 
 **Anzeige**
 
-* [ ] Die **Einstrahlung in W/m²** steht in der Protokolltabelle und im Tooltip, nicht im Diagramm.
-      (Test: einspeisesteuerung.component.spec.ts › tooltip › should show the forecast for an interval with neither decision nor price — die Tabellenspalte prüft noch kein Test)
+* [x] Die **Einstrahlung in W/m²** steht in der Protokolltabelle und im Tooltip.
+      (Test: einspeisesteuerung.component.spec.ts › tooltip › should show the forecast for an interval with neither decision nor price;
+      einspeisesteuerung.component.spec.ts › Einstrahlung in der Tabelle › should render the irradiance of the matching forecast in its own column;
+      einspeisesteuerung.component.spec.ts › Einstrahlung in der Tabelle › should leave the cell empty without a forecast for the interval;
+      einspeisesteuerung.component.spec.ts › tooltip › should show the irradiance of the matching forecast for an interval with a decision)
 * [x] Ein Tag ohne Prognose zeigt die Linie **nicht**, statt sie auf 0 zu zeichnen.
       (Test: einspeisesteuerung.component.spec.ts › prognoseReihe › should return an empty series without forecast data)
 * [x] Fehlt die Prognose nur für einzelne Intervalle, setzt die Linie dort **aus**, statt über die
@@ -590,10 +594,16 @@ Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten**:
 * [x] Alle Endpunkte verlangen `tarife:manage` (403 ohne)
       (Test: ControllerAuthorizationTest#steuerungsEndpunkte_withoutTarifeManage_forbidden;
       ControllerAuthorizationTest#getEntscheide_withTarifeManage_reachesController)
-* [ ] Bei ausgeschaltetem Feature-Flag `EINSPEISESTEUERUNG` antworten sie mit `403`, und der
+* [x] Bei ausgeschaltetem Feature-Flag `EINSPEISESTEUERUNG` antworten sie mit `403`, und der
       Abruf-Job läuft nicht
-      (Test: ControllerAuthorizationTest#getPrognose_featureDisabled_forbidden — den Abruf-Job prüft
-      noch kein Test)
+      (Test: ControllerAuthorizationTest#getPrognose_featureDisabled_forbidden;
+      ProduktionsprognoseServiceTest#getPrognose_FeatureDeaktiviert_WirftFeatureDisabledException;
+      EinstrahlungsprognoseJobTest#hole_KeinMandantMitFlag_RuftDieApiNichtAuf;
+      EinstrahlungsprognoseJobTest#hole_ZweiMandantenMitFlag_RuftJedenAb;
+      FeatureFlagServiceTest#getOrgIdsMitAktivemFlag_OverrideFalse_LaesstOrganisationWeg;
+      SteuerungServiceTest#getEntscheide_FeatureDeaktiviert_WirftFeatureDisabledException;
+      SteuerungServiceTest#getEntscheideSimuliert_FeatureDeaktiviert_WirftFeatureDisabledException;
+      SteuerungServiceTest#simuliere_FeatureDeaktiviert_WirftFeatureDisabledException)
 
 **Nach dem Umschalten (Stufe 2, noch nicht aktiv)**
 
@@ -1209,3 +1219,12 @@ Beim Akzeptanzkriterien-Check vom 15.10.2026 als „umformulieren" vorgeschlagen
   Produktion, auf derselben kWh-Achse" und „Das Diagramm bekommt keine vierte y-Achse".
 * **Gestrichen, weil doppelt zu §7 (Abgrenzung):** „Es wird nichts geschaltet: kein MQTT-Publish,
   kein Schreibpfad zur Anlage."
+
+### A.18 „Nicht im Diagramm" und der Umrechnungsfaktor in der Anzeige (FR-7; 16.10.2026)
+
+* Das Kriterium lautete „Die Einstrahlung in W/m² steht in der Protokolltabelle und im Tooltip,
+  **nicht im Diagramm**". Der letzte Teil ist dieselbe Designentscheidung wie die gestrichene
+  „keine vierte y-Achse" (A.17) und steht in FR-7; er ist aus dem Kriterium entfallen.
+* FR-7 sagte, die Einstrahlung stehe „neben dem Umrechnungsfaktor". Angezeigt wird der Faktor aber
+  weder in der Tabelle noch im Tooltip. Der Satz ist an die Anzeige angepasst; nachrechenbar bleibt
+  die erwartete Erzeugung über den gespeicherten `prognose_faktor`.

@@ -232,6 +232,29 @@ class ArchitectureTest {
     @DisplayName("Abhängigkeiten")
     class DependencyTests {
 
+        /**
+         * Die Steuerung liest nur aus der Datenbank, sie ruft keine externe Schnittstelle auf
+         * (Specs/Ladeplanung.md, FR-2). Diese Entkopplung ist die Bedingung für den externen
+         * Dienst: Hinge ein Abruf im Job-Pfad, naehme jede Stoerung von Open-Meteo die Steuerung
+         * mit. Die Versuchung ist real - bei fehlender Prognose "schnell nachladen".
+         */
+        @Test
+        @DisplayName("Steuerung ruft keine externe Schnittstelle auf")
+        void steuerungRuftKeineExterneSchnittstelleAuf() {
+            ArchRule rule = noClasses()
+                .that().haveSimpleNameStartingWith("Steuer")
+                .or().haveSimpleName("LadeplanService")
+                .or().haveSimpleName("ProduktionsprognoseService")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                    "org.springframework.web.client..",
+                    "org.springframework.web.reactive.function.client..",
+                    "java.net.http.."
+                )
+                .orShould().dependOnClassesThat().haveSimpleNameEndingWith("AbrufService");
+
+            rule.check(importedClasses);
+        }
+
         @Test
         @DisplayName("Entities sollten keine anderen Schichten importieren")
         void entitiesShouldNotImportOtherLayers() {

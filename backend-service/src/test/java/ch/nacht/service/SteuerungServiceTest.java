@@ -739,6 +739,27 @@ public class SteuerungServiceTest {
         verify(messwerteRepository, never()).sumBilanzKomponentenPerZeitBetween(any(), any());
     }
 
+    /** Ohne Flag liefert die Tagesansicht keine Entscheide - auch keine gespeicherten. */
+    @Test
+    void getEntscheide_FeatureDeaktiviert_WirftFeatureDisabledException() {
+        when(featureFlagService.isEnabled(ORG_ID, FeatureFlag.EINSPEISESTEUERUNG)).thenReturn(false);
+
+        assertThrows(FeatureDisabledException.class, () -> steuerungService.getEntscheide(DATUM));
+
+        verifyNoInteractions(steuerentscheidRepository);
+    }
+
+    /** Ohne Flag rechnet auch die Tages-Rueckrechnung nicht. */
+    @Test
+    void getEntscheideSimuliert_FeatureDeaktiviert_WirftFeatureDisabledException() {
+        when(featureFlagService.isEnabled(ORG_ID, FeatureFlag.EINSPEISESTEUERUNG)).thenReturn(false);
+
+        assertThrows(FeatureDisabledException.class, () -> steuerungService.getEntscheideSimuliert(
+                DATUM, new BigDecimal("0.05"), null, null));
+
+        verify(messwerteRepository, never()).sumBilanzKomponentenPerZeitBetween(any(), any());
+    }
+
     // ==================== Hilfsmittel ====================
 
     /** Zeile wie {@code sumBilanzKomponentenPerZeitBetween}: {@code [zeit (Beginn), produktion, verbrauch, bezug, ruecklieferung]}. */
