@@ -203,7 +203,19 @@ log_dest file /mosquitto/log/mosquitto.log
 # Keine anonymen Verbindungen!
 allow_anonymous false
 password_file /mosquitto/config/passwordfile
+
+# Puffer fuer die dauerhafte Sitzung des Backends (mqtt.clean-session=false):
+# ~1050 Nachrichten pro Stunde (18 Zaehler, etwa jede Minute). Der Standard von
+# 1000 je Client reicht nur fuer rund eine Stunde Unterbruch; 100000 fuer ~4 Tage.
+max_queued_messages 100000
+# Sitzung einer nicht mehr benutzten Client-ID nach 14 Tagen verwerfen
+persistent_client_expiration 14d
 ```
+
+> **Wozu `persistence`:** Die dauerhafte Sitzung des Backends hält der Broker im
+> Speicher. Für einen **Neustart des Backends** (Update) genügt das. Damit die
+> gepufferten Nachrichten auch einen **Neustart des Brokers** überstehen, braucht es
+> `persistence true` mit einem Volume für `/mosquitto/data/`.
 
 ### 3. docker-compose (Container Manager → Projekt)
 
@@ -263,6 +275,9 @@ schliesst der nächste übertragene Stand die Lücke, die Gesamtsumme bleibt kor
 (nur die zeitliche Auflösung sinkt kurz). Der frühere MQTT-Nachteil („puffert nur
 begrenzt" → QoS 1/2 + `persistence` + `clean_session false` nötig) entfällt damit
 weitgehend — **QoS 0/1 genügt**, ein Store-and-Forward-Puffer ist optional.
+Damit bei einem Update des Backends auch die 15-Minuten-Auflösung erhalten bleibt,
+verbindet es sich mit dauerhafter Sitzung (`mqtt.clean-session=false`, Standard)
+und QoS 1; der Broker puffert dann bis `max_queued_messages` (Abschnitt 2).
 
 ### Wo läuft der Broker? — Varianten A/B/C
 

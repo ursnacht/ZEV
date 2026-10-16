@@ -42,6 +42,17 @@ public class MqttConfig {
     @Value("${mqtt.qos:1}")
     private int qos;
 
+    /**
+     * {@code false} = dauerhafte Sitzung: Der Broker behält das Abo über einen Neustart des Backends
+     * hinweg und sammelt die QoS-1-Nachrichten, bis es wieder verbunden ist. Mit {@code true} verwarf
+     * er sie, solange das Backend fehlte - die Energie blieb dank absoluter Zählerstände zwar
+     * erhalten, fiel aber gebündelt ins nächste Intervall (MQTT-Integration.md, FR-1.5).
+     *
+     * <p>Setzt eine feste Client-ID voraus, die nur <b>eine</b> Instanz je Broker verwendet.
+     */
+    @Value("${mqtt.clean-session:false}")
+    private boolean cleanSession;
+
     @Bean
     public MqttPahoClientFactory mqttClientFactory() {
         DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
@@ -52,7 +63,7 @@ public class MqttConfig {
             options.setPassword(password.toCharArray());
         }
         options.setAutomaticReconnect(true);
-        options.setCleanSession(true);
+        options.setCleanSession(cleanSession);
         factory.setConnectionOptions(options);
         return factory;
     }

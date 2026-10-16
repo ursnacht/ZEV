@@ -8,3 +8,6 @@ mqtt:
   client-id: ${MQTT_CLIENT_ID:zev-backend-subscriber}
   topic: ${MQTT_TOPIC:zev/+/+/messwert}
   qos: ${MQTT_QOS:1}
+  # false = dauerhafte Sitzung: der Broker puffert die Nachrichten, solange das Backend fehlt
+  # (z. B. beim Update). Client-ID darf je Broker nur von einer Instanz benutzt werden.
+  clean-session: ${MQTT_CLEAN_SESSION:false}

@@ -24,6 +24,7 @@
 2. Verbindungsparameter (URL, Username, Passwort, Client-ID, QoS) über `application.yml` / Environment — **keine Secrets im Code**.
 3. Subscribe mit Wildcard auf alle Messwert-Topics (FR-2).
 4. Bei Verbindungsabbruch automatischer Reconnect mit Exponential Backoff.
+5. **Dauerhafte Sitzung** (`mqtt.clean-session`, Standard `false`, Env `MQTT_CLEAN_SESSION`): Der Broker behält das Abo des Backends über dessen Neustart hinweg und stellt die QoS-1-Nachrichten zu, die in der Zwischenzeit eintrafen. So bleibt bei einem Update auch die 15-Minuten-Auflösung erhalten, nicht nur die Energie. Voraussetzung: Die Client-ID wird je Broker von **genau einer** Backend-Instanz verwendet; der Broker begrenzt die Warteschlange (`max_queued_messages`, siehe `docs/Netzwerk-Topologie-Hene.md`).
 
 > **Profil-Aktivierung (`@Profile("mqtt")`):** Das Bean, das sich mit dem Broker verbindet und die Messwerte einliest (MQTT-Subscriber/Inbound-Adapter samt Message-Handler), ist **nur aktiv, wenn das Spring-Boot-Profil `mqtt` gesetzt ist** (`@Profile("mqtt")`; aktiviert via `SPRING_PROFILES_ACTIVE=mqtt` bzw. `spring.profiles.active`). Ohne dieses Profil (Default, Tests, lokale Entwicklung) startet **kein** MQTT-Client — es wird keine Broker-Verbindung aufgebaut, das Backend läuft unverändert nur mit CSV-Upload. So bleibt die MQTT-Anbindung optional und Umgebungen ohne erreichbaren Broker starten fehlerfrei.
 
@@ -209,6 +210,9 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 * [ ] Nach der Solarverteilung gilt `zev = zev_calculated`, wo `zev = 0` war (MQTT-Werte); gemessene CSV-Werte (`zev ≠ 0`) bleiben unverändert (FR-9).
 * [ ] Nach jedem Aggregationslauf wird je betroffenem Mandant die Solarverteilung für den behandelten Zeitraum automatisch ausgeführt (`calculateSolarDistributionForOrg`, `orgFilter` explizit gesetzt); ohne verarbeitetes Intervall erfolgt kein Verteilungsaufruf. Ein Fehler bei einem Mandanten bricht die übrigen nicht ab.
 
+**Verbindung:**
+* [ ] Ohne `MQTT_CLEAN_SESSION` verbindet sich das Backend mit dauerhafter Sitzung (`cleanSession = false`); mit `MQTT_CLEAN_SESSION=true` ohne (Test: MqttConfigTest#applicationMqttYml_OhneUmgebungsvariable_DauerhafteSitzung, MqttConfigTest#mqttClientFactory_CleanSessionFalse_DauerhafteSitzung, MqttConfigTest#mqttClientFactory_CleanSessionTrue_SitzungOhnePuffer)
+
 **Monitoring & Kompatibilität:**
 * [ ] MQTT-Metriken unter `/actuator/prometheus`; `/actuator/health/mqtt` zeigt Status.
 * [ ] **Genau ein** Intervall ohne Zählerdaten → Systemmeldung `MQTT_ZAEHLER_LUECKE` mit Level **INFO**, Kategorie `SYSTEMMELDUNG_KATEGORIE_MQTT`, Parameter mit Einheiten-Name und Zeitraum; der Messwert des Folgeintervalls enthält den gesamten Lückenverbrauch.
@@ -230,6 +234,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 
 ### NFR-3: Zuverlässigkeit
 * **Verlusttoleranz durch absolute Zählerstände:** Eine verlorene Nachricht führt **nicht** zu Datenverlust (die Differenzbildung ist selbstheilend). Daher genügt **QoS 0/1**; ein aufwändiger Store-and-Forward-Puffer/Bridge (Variante C) ist **nicht erforderlich** (Broker auf dem NAS = Variante B genügt).
+* **Neustart des Backends:** Die dauerhafte Sitzung (FR-1.5) lässt den Broker die Nachrichten puffern, solange das Backend fehlt. Nach dem Wiederverbinden kann eine Nachricht doppelt ankommen (QoS 1 = mindestens einmal); das ist unkritisch, siehe nächster Punkt.
 * Duplikate idempotent über Unique-Constraint (`einheit_id`, `zeit`).
 * Bei DB-Fehler: Rohdaten nicht als verarbeitet markieren, erneuter Versuch.
 
@@ -251,6 +256,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 | Wiederaufnahme nach **längerem Unterbruch** (Pi/Broker offline, ggf. mehrere Tage) | **kein Datenverlust** — die Differenz zum letzten Vor-Unterbruch-Stand deckt den gesamten Zeitraum; der kumulierte Verbrauch fällt gebündelt als **ein** grosser `total` in das erste Intervall mit Meldung nach Wiederaufnahme (Auflösungsverlust, bewusster Trade-off der absoluten Stände). Der Referenzstand wird über `findFirstByEinheitIdAndZeitLessThanEqualOrderByZeitDesc` **unabhängig vom `verarbeitet`-Flag** gefunden; der Catch-up-Loop startet erst beim ersten unverarbeiteten Stand (die leeren Intervalle des Unterbruchs werden nicht durchlaufen). **Voraussetzung:** der Vor-Unterbruch-Stand existiert noch (Retention darf ihn nicht löschen, s. §8). |
 | Register-Stand < Referenz (Reset/Überlauf/Zählertausch) | Aggregation **je Register**: betroffenes Delta (`ΔBezug`/`ΔEinspeisung`) auf 0, Referenz neu setzen, WARN (negatives `total` aus Einspeisung bleibt gültig) |
 | Broker nicht erreichbar | Reconnect mit Exponential Backoff |
+| Backend-Neustart (Update) | Broker puffert die Nachrichten in der dauerhaften Sitzung und stellt sie beim Wiederverbinden zu; die Intervalle bleiben vollständig. Läuft die Warteschlange über (`max_queued_messages`) oder startet auch der Broker neu (ohne `persistence`), gilt der Fall „Verlorene Nachricht(en)“ |
 | DB nicht erreichbar | Nachricht nicht markieren, Retry |
 | Keine neue Meldung im Intervall | kein `messwerte`-Eintrag |
 | Job-Ausfall/Neustart | nächster Lauf verarbeitet alle unverarbeiteten Rohdaten |
@@ -263,7 +269,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
   - Mosquitto-Broker auf dem NAS betriebsbereit (siehe `docs/Netzwerk-Topologie-Hene.md`, Abschnitt „MQTT-Broker auf dem NAS betreiben").
   - VPN-Verbindung zwischen Pi und NAS; **separater Reader-/Publisher-Prozess** auf dem Pi (Out of Scope, `Specs/Pi-Gateway-Software.md`).
 * **Neue Dependencies (Backend):** `spring-integration-mqtt` + Eclipse Paho (`org.eclipse.paho.client.mqttv3`).
-* **Backend-Konfiguration (`application.yml`):** `mqtt.broker.url/username/password`, `mqtt.topics.messwerte=zev/+/+/messwert`, `mqtt.qos` (Secrets via Env). Der MQTT-Subscriber ist über das Spring-Profil **`mqtt`** zugeschaltet (`@Profile("mqtt")`, siehe FR-1); ohne aktives Profil wird keine Broker-Verbindung aufgebaut.
+* **Backend-Konfiguration (`application.yml`):** `mqtt.broker.url/username/password`, `mqtt.topics.messwerte=zev/+/+/messwert`, `mqtt.qos`, `mqtt.clean-session` (Secrets via Env). Der MQTT-Subscriber ist über das Spring-Profil **`mqtt`** zugeschaltet (`@Profile("mqtt")`, siehe FR-1); ohne aktives Profil wird keine Broker-Verbindung aufgebaut.
 * **Neuer Code:** MQTT-Subscriber/Handler, Topic-/Payload-Parser, `ZaehlerRohdaten`-Entity + Repository, Aggregations-/Delta-Service (Scheduled), Health-Indicator, Prometheus-Metriken.
 * **Erweiterung:** `messwerte` um `quelle`.
 * **Wiederverwendet:** `Einheit`/`Messwerte`, `SolarDistribution` (unverändert), `MetricsService`, Grafana/Prometheus-Stack.
