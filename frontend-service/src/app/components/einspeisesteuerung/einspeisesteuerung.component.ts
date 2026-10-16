@@ -225,7 +225,7 @@ export class EinspeisesteuerungComponent extends WithMessage
         this.loading = false;
         this.entscheide = [];
         this.entscheideNeusteZuerst = [];
-        this.showMessage(error.error || 'STEUERUNG_FEHLER_LADEN', 'error');
+        this.showMessage(error.error?.error || error.error || 'STEUERUNG_FEHLER_LADEN', 'error');
       }
     });
   }
@@ -465,7 +465,7 @@ export class EinspeisesteuerungComponent extends WithMessage
       error: (error) => {
         this.simulationLaeuft = false;
         this.simulation = null;
-        this.showMessage(error.error || 'STEUERUNG_FEHLER_SIMULATION', 'error');
+        this.showMessage(error.error?.error || error.error || 'STEUERUNG_FEHLER_SIMULATION', 'error');
       }
     });
   }

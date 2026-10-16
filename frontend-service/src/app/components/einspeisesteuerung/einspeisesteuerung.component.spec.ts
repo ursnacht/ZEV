@@ -181,6 +181,27 @@ describe('EinspeisesteuerungComponent', () => {
       expect(component.entscheide).toEqual([]);
       expect(component.messageType).toBe('error');
     });
+
+    /** Der GlobalExceptionHandler liefert `{ "error": KEY }` - sonst stand "[object Object]" da. */
+    it('should show the key from the error body when loading fails', () => {
+      steuerungServiceSpy.getEntscheide.mockReturnValue(
+        throwError(() => ({ error: { error: 'FEATURE_FLAG_DEAKTIVIERT' } })));
+
+      component.ladeTag();
+
+      expect(component.message).toBe('FEATURE_FLAG_DEAKTIVIERT');
+    });
+
+    it('should show the key from the error body when the simulation fails', () => {
+      steuerungServiceSpy.simuliere.mockReturnValue(
+        throwError(() => ({ error: { error: 'FEATURE_FLAG_DEAKTIVIERT' } })));
+      component.simulationSchwellwert = 0.05;
+
+      component.rechneNach();
+
+      expect(component.simulationLaeuft).toBe(false);
+      expect(component.message).toBe('FEATURE_FLAG_DEAKTIVIERT');
+    });
   });
 
   // ==================== Die Preisreihe ====================
@@ -238,6 +259,44 @@ describe('EinspeisesteuerungComponent', () => {
       ];
 
       expect(privat().optionen().series[0].data.length).toBe(2);
+    });
+  });
+
+  // ==================== Einstrahlung in der Protokolltabelle (Specs/Ladeplanung.md, FR-7) ====================
+
+  describe('Einstrahlung in der Tabelle', () => {
+    /**
+     * Die Einstrahlung (W/m²) steht als eigene Spalte im Protokoll - neben der gemessenen
+     * Produktion, damit sich die Prognose nachrechnen laesst. Ganzzahlig: W/m² mit Nachkommastellen
+     * waere Scheingenauigkeit.
+     */
+    it('should render the irradiance of the matching forecast in its own column', () => {
+      steuerungServiceSpy.getEntscheide.mockReturnValue(of([entscheid('2026-10-15T12:00:00')]));
+      steuerungServiceSpy.getPrognose.mockReturnValue(of([prognosepunkt('2026-10-15T12:00:00', 640.4)]));
+
+      component.ladeTag();
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      const kopf = Array.from(el.querySelectorAll('table.zev-table thead th')).map(th => th.textContent ?? '');
+      const spalte = kopf.findIndex(text => text.includes('LADEPLANUNG_EINSTRAHLUNG'));
+      expect(spalte).toBeGreaterThan(-1);
+      // Die Einheit steht im Spaltenkopf - die Zelle selbst traegt nur die Zahl
+      expect(kopf[spalte]).toContain('W/m²');
+      const zelle = el.querySelectorAll('table.zev-table tbody tr')[0].querySelectorAll('td')[spalte];
+      expect(zelle.textContent?.trim()).toBe('640');
+    });
+
+    /**
+     * Ohne Prognose fuer DIESES Intervall bleibt die Zelle leer - keine 0, die "keine Sonne" hiesse.
+     * Die Prognose eines anderen Intervalls darf nicht hineinrutschen.
+     */
+    it('should leave the cell empty without a forecast for the interval', () => {
+      steuerungServiceSpy.getPrognose.mockReturnValue(of([prognosepunkt('2026-10-15T12:15:00', 700)]));
+      component.ladeTag();
+
+      expect(component.einstrahlung(entscheid('2026-10-15T12:00:00'))).toBe('');
+      expect(component.einstrahlung(entscheid('2026-10-15T12:15:00'))).toBe('700');
     });
   });
 
@@ -304,6 +363,20 @@ describe('EinspeisesteuerungComponent', () => {
 
       expect(text).not.toContain('STEUERUNG_NOCH_KEIN_ENTSCHEID');
       expect(text).toContain('STEUERUNG_UEBERSCHUSS');
+    });
+
+    /**
+     * Auch fuer ein Intervall MIT Entscheid nennt der Tooltip die Einstrahlung - aus der Prognose
+     * genau dieses Intervalls. Die eines Nachbarintervalls darf nicht hineinrutschen.
+     */
+    it('should show the irradiance of the matching forecast for an interval with a decision', () => {
+      steuerungServiceSpy.getEntscheide.mockReturnValue(of([
+        entscheid('2026-10-15T12:00:00'), entscheid('2026-10-15T12:15:00')]));
+      steuerungServiceSpy.getPrognose.mockReturnValue(of([prognosepunkt('2026-10-15T12:00:00', 640.4)]));
+      component.ladeTag();
+
+      expect(privat().tooltip(ms('2026-10-15T12:00:00'))).toContain('LADEPLANUNG_EINSTRAHLUNG: 640');
+      expect(privat().tooltip(ms('2026-10-15T12:15:00'))).not.toContain('LADEPLANUNG_EINSTRAHLUNG');
     });
 
     /** Morgen liegt oft NUR die Prognose vor - der Tooltip nennt sie, statt leer zu bleiben. */

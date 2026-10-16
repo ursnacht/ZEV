@@ -639,6 +639,10 @@ wie der NK-Eintrag).
 5. **Entscheidungsprotokoll** als `zev-table` unterhalb des Diagramms: Zeit, Preis, erwarteter
    Tiefstpreis, Produktion, Verbrauch, Überschuss, Regel, Batterieladung, Einspeisung. Beträge und
    Mengen rechtsbündig (`zev-table__number`).
+   * **Die Spaltenköpfe nennen die Einheit** (kWh, W/m², %, CHF/kWh) als zweite Zeile in
+     `zev-text--muted`; die Zellen tragen nur die Zahl. Die Einheit steht im Kopf und nicht in der
+     Übersetzung, weil dieselben Schlüssel in Legende, Tagessummen und Tooltip vorkommen, wo der
+     Wert die Einheit schon trägt.
    * **Neuste Einträge oben** (absteigend nach Zeit). Beim heutigen Tag steht damit das zuletzt
      ausgewertete Intervall an erster Stelle, statt am Ende von bis zu 96 Zeilen.
      > **Das Diagramm behält die aufsteigende Reihenfolge.** Seine Zeitachse läuft nach rechts, und

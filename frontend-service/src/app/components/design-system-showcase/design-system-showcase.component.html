@@ -1066,6 +1066,30 @@
       </tbody>
     </table>
   </div>
+
+  <div class="subsection">
+    <h3>Scroll-Bereich (breite Tabelle, .zev-table-scroll)</h3>
+    <div class="zev-table-scroll">
+      <table class="zev-table">
+        <thead>
+          <tr>
+            <th>Zeit</th>
+            @for (i of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]; track i) {
+              <th class="zev-table__number">Spalte {{ i }}<br><span class="zev-text--muted">kWh</span></th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>12:00</td>
+            @for (i of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]; track i) {
+              <td class="zev-table__number">1'234.567</td>
+            }
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </section>
 
 <!-- Collapsible Section -->

@@ -46,7 +46,7 @@ Die folgende Tabelle ist ein **Überblick, nicht vollständig**. Massgeblich (Qu
 | Formulare | `.zev-form-container`, `.zev-form-group`, `.zev-form-row`, `.zev-form-actions`, `.zev-form-section`, `.zev-date-range-row` |
 | Inputs | `.zev-input`, `.zev-select`, `.zev-form-error`, `.zev-form-hint` |
 | Buttons | `.zev-button`, `.zev-button--primary`, `.zev-button--secondary`, `.zev-button--danger`, `.zev-button--compact` |
-| Tabellen | `.zev-table`, `.zev-table__header--sortable`, `.zev-table__sort-indicator`, `.zev-table--compact`, `.zev-table--auto` (Inhaltsbreite), `.zev-table__number` (rechtsbündig) |
+| Tabellen | `.zev-table`, `.zev-table__header--sortable`, `.zev-table__sort-indicator`, `.zev-table--compact`, `.zev-table--auto` (Inhaltsbreite), `.zev-table__number` (rechtsbündig), `.zev-table-scroll` (Rahmen um breite Tabellen, scrollt seitwärts) |
 | Paginierung | `.zev-pagination` (zentriert), `.zev-pagination--start` (linksbündig), `.zev-pagination--inline` (in einer Aktionszeile, ohne Abstand oben) |
 | Messages | `.zev-message`, `.zev-message--success`, `.zev-message--error`, `.zev-message--dismissible` |
 | Navigation | `.zev-navbar`, `.zev-navbar__link`, `.zev-navbar__link--active`, `.zev-hamburger` |

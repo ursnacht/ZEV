@@ -53,6 +53,12 @@
   width: auto;
 }
 
+/* Scroll-Bereich für breite Tabellen: Die Tabelle scrollt seitwärts in ihrem Rahmen, statt über
+   die Karte hinauszuragen und auf dem Handy die ganze Seite seitwärts zu schieben. */
+.zev-table-scroll {
+  overflow-x: auto;
+}
+
 /* Table Actions */
 .zev-table-actions {
   display: flex;

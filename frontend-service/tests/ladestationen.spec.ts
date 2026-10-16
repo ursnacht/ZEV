@@ -10,6 +10,7 @@ import {
     navigateToEinheiten,
     navigateToMieter,
     navigateToTarifpositionen,
+    einheitInAuswahl,
 } from './helpers';
 
 /**
@@ -422,8 +423,7 @@ async function deletePositionen(page: Page, einheitName: string): Promise<void> 
         page.removeAllListeners('dialog');
         await navigateToTarifpositionen(page);
         // Die Einheit kann bereits gelöscht sein (Cascade räumt die Positionen dann mit auf)
-        const option = page.locator('#einheitAuswahl option').filter({ hasText: einheitName });
-        if (await option.count() === 0) {
+        if (!await einheitInAuswahl(page, einheitName)) {
             return;
         }
         await selectEinheit(page, einheitName);

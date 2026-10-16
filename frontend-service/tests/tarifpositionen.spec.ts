@@ -10,6 +10,7 @@ import {
     navigateToEinheiten,
     navigateToMieter,
     navigateToTarife,
+    einheitInAuswahl,
 } from './helpers';
 
 /**
@@ -238,8 +239,7 @@ async function deletePositionen(page: Page, einheitName: string): Promise<void> 
         page.removeAllListeners('dialog');
         await navigateToTarifpositionen(page);
         await nurLadestationenCheckbox(page).uncheck();
-        const option = page.locator('#einheitAuswahl option').filter({ hasText: einheitName });
-        if (await option.count() === 0) {
+        if (!await einheitInAuswahl(page, einheitName)) {
             return;
         }
         await selectEinheit(page, einheitName);

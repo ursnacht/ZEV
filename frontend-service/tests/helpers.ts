@@ -522,6 +522,19 @@ export async function navigateToTarifpositionen(page: Page): Promise<void> {
 }
 
 /**
+ * Ob die Einheit in der Auswahl der Tarifpositionen steht - mit Warten.
+ *
+ * <p>Die Auswahl ist sichtbar, bevor die Einheiten geladen sind. Ein sofortiges {@code count()}
+ * lieferte deshalb 0: Das Aufraeumen hielt die Einheit fuer geloescht, liess ihre Positionen
+ * stehen, und die sperrten danach Mieter, Einheiten und Tarif.
+ */
+export async function einheitInAuswahl(page: Page, einheitName: string): Promise<boolean> {
+    return page.locator('#einheitAuswahl option').filter({ hasText: einheitName }).first()
+        .waitFor({ state: 'attached', timeout: 10000 })
+        .then(() => true).catch(() => false);
+}
+
+/**
  * Oeffnet die Einstellungen und wartet, bis sie geladen sind (der Ladetext "..." verschwindet).
  */
 export async function navigateToEinstellungen(page: Page): Promise<void> {

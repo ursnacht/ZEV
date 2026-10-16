@@ -17,8 +17,7 @@ import { IconComponent } from '../icon/icon.component';
   selector: 'app-datenbank-ansicht',
   standalone: true,
   imports: [CommonModule, FormsModule, TranslatePipe, IconComponent],
-  templateUrl: './datenbank-ansicht.component.html',
-  styleUrls: ['./datenbank-ansicht.component.css']
+  templateUrl: './datenbank-ansicht.component.html'
 })
 export class DatenbankAnsichtComponent extends WithMessage implements OnInit {
   tabellen: string[] = [];
