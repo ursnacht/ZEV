@@ -15,6 +15,8 @@ import ch.nacht.service.SystemmeldungService;
 import ch.nacht.service.OrganisationService;
 import ch.nacht.service.OrganizationContextService;
 import ch.nacht.service.PreiszeitreiheService;
+import ch.nacht.service.ProduktionsprognoseService;
+import ch.nacht.service.SteuerungService;
 import ch.nacht.service.TarifpositionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,7 +61,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest({EinstellungenController.class, FeatureFlagController.class, TarifpositionController.class,
         EinheitController.class, MieterController.class, NkAbrechnungController.class,
-        NkRechnungController.class, SystemmeldungController.class, PreiszeitreiheController.class})
+        NkRechnungController.class, SystemmeldungController.class, PreiszeitreiheController.class,
+        SteuerungController.class})
 @Import(SecurityConfig.class)
 @TestPropertySource(properties = "app.cors.allowed-origins=http://localhost:4200")
 class ControllerAuthorizationTest {
@@ -96,6 +99,12 @@ class ControllerAuthorizationTest {
 
     @MockitoBean
     private PreiszeitreiheService preiszeitreiheService;
+
+    @MockitoBean
+    private SteuerungService steuerungService;
+
+    @MockitoBean
+    private ProduktionsprognoseService produktionsprognoseService;
 
     @MockitoBean
     private OrganizationContextService organizationContextService;
@@ -620,5 +629,64 @@ class ControllerAuthorizationTest {
                 .andExpect(status().isUnauthorized());
 
         verify(preiszeitreiheService, never()).download();
+    }
+
+    // ==================== Einspeisesteuerung / Ladeplanung: tarife:manage ====================
+    // Specs/Ladeplanung.md NFR-2, Specs/Einspeisesteuerung.md: alle Endpunkte der Steuerung -
+    // Entscheide, Rueckrechnung, Prognose, Simulation - nur mit tarife:manage.
+
+    @Test
+    void getEntscheide_withTarifeManage_reachesController() throws Exception {
+        when(steuerungService.getEntscheide(any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/einspeisesteuerung/entscheide?datum=2026-10-15")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("tarife:manage"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void steuerungsEndpunkte_withoutTarifeManage_forbidden() throws Exception {
+        SimpleGrantedAuthority nurLesen = new SimpleGrantedAuthority("messwerte:read");
+
+        mockMvc.perform(get("/api/einspeisesteuerung/entscheide?datum=2026-10-15")
+                        .with(jwt().authorities(nurLesen)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/einspeisesteuerung/entscheide/simuliert?datum=2026-10-15&schwellwert=0.05")
+                        .with(jwt().authorities(nurLesen)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/einspeisesteuerung/prognose?datum=2026-10-15")
+                        .with(jwt().authorities(nurLesen)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/einspeisesteuerung/simulation")
+                        .with(jwt().authorities(nurLesen))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"von\":\"2026-10-01\",\"bis\":\"2026-10-15\",\"schwellwert\":0.05}"))
+                .andExpect(status().isForbidden());
+
+        verify(steuerungService, never()).getEntscheide(any());
+        verify(steuerungService, never()).getEntscheideSimuliert(any(), any(), any(), any());
+        verify(produktionsprognoseService, never()).getPrognose(any());
+        verify(steuerungService, never()).simuliere(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void getEntscheide_unauthenticated_unauthorized() throws Exception {
+        mockMvc.perform(get("/api/einspeisesteuerung/entscheide?datum=2026-10-15"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * Mit Permission, aber ausgeschaltetem Feature-Flag: 403, nicht 500 - der Service wirft
+     * {@code FeatureDisabledException}, der GlobalExceptionHandler bildet sie ab.
+     */
+    @Test
+    void getPrognose_featureDisabled_forbidden() throws Exception {
+        when(produktionsprognoseService.getPrognose(any()))
+                .thenThrow(new ch.nacht.exception.FeatureDisabledException("FEATURE_DISABLED"));
+
+        mockMvc.perform(get("/api/einspeisesteuerung/prognose?datum=2026-10-15")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("tarife:manage"))))
+                .andExpect(status().isForbidden());
     }
 }

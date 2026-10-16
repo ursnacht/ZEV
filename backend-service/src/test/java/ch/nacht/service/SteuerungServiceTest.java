@@ -11,6 +11,7 @@ import ch.nacht.entity.Geraetezustand;
 import ch.nacht.entity.Preiszeitreihe;
 import ch.nacht.entity.Steuerentscheid;
 import ch.nacht.entity.Steuerregel;
+import ch.nacht.entity.Steuerverfahren;
 import ch.nacht.entity.Steuerzustand;
 import ch.nacht.entity.Zustandsgroesse;
 import ch.nacht.exception.FeatureDisabledException;
@@ -314,21 +315,227 @@ public class SteuerungServiceTest {
 
     /**
      * Ohne vorherige Freigabe gilt die einfache Grenze: 22 % liegt darueber, also fragt die
-     * Schattenrechnung den Plan (hier ohne Preise fuer den Resttag -> Rueckfall, Schatten leer).
+     * Schattenrechnung den Plan - und protokolliert dessen Entscheid, nicht das FREI von SOC_TIEF.
      */
     @Test
     void werteIntervallAus_UeberMindestLadezustand_SchattenFragtDenPlan() {
-        mitVoraussetzungenDerSchattenrechnung();
+        mitVollstaendigerSchattenrechnung();
         mitLadezustand("22.0");
-        when(produktionsprognoseService.getPrognose(ORG_ID, DATUM))
-                .thenReturn(List.of(prognosepunkt(ZEHN_UHR, "0.661")));
 
         steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
 
+        verify(ladeplanService).plane(any(), eq(ZEHN_UHR), any());
         verify(steuerentscheidRepository).upsert(eq(ORG_ID), eq(ZEHN_UHR), any(), any(), any(),
                 any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
                 any(), any(), any(), any(), any(),
-                eq("REGEL"), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull());
+                eq("REGEL"), eq("GESPERRT"), any(), any(), any(), eq(1), eq(1), any(), any());
+    }
+
+    // ==================== Schattenrechnung: Erfolgsfall (Specs/Ladeplanung.md, FR-1a) ====================
+
+    /**
+     * Der Kern der Schattenrechnung: Die Merit-Order haette GESPERRT, die Kaskade entscheidet FREI.
+     * Geschrieben wird der Entscheid der Kaskade - die Merit-Order steht nur daneben, samt allen
+     * Plangroessen. Verwechselte jemand die beiden Spalten, wuerde die Schattenrechnung schalten.
+     */
+    @Test
+    void werteIntervallAus_MeritOrderSperrt_KaskadeBestimmtDenEntscheid() {
+        mitVoraussetzungenDerSchattenrechnung();
+        when(produktionsprognoseService.getPrognose(ORG_ID, DATUM)).thenReturn(List.of(
+                prognosepunkt(ZEHN_UHR, "0.661"),
+                prognosepunkt(VIERTEL_NACH_ZEHN, "1.200")));
+        // 10:00 und 10:15 Ortszeit = 08:00 und 08:15 UTC (Sommerzeit)
+        when(preiszeitreiheRepository.findByZeitraum(any(), any())).thenReturn(List.of(
+                preis(LocalDateTime.of(2026, 9, 25, 8, 0), "0.190"),
+                preis(LocalDateTime.of(2026, 9, 25, 8, 15), "0.170")));
+        when(ladeplanService.plane(any(), eq(ZEHN_UHR), any())).thenReturn(new LadeplanService.Plan(
+                Steuerzustand.GESPERRT, 25, 21, new BigDecimal("20.400")));
+
+        steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
+
+        // Kaskade (setUp): LADEN, FREI/FREI - sie bestimmt den Entscheid; die Merit-Order daneben
+        verify(steuerentscheidRepository).upsert(eq(ORG_ID), eq(ZEHN_UHR), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(), any(),
+                eq("LADEN"), eq("FREI"), eq("FREI"), any(), any(), any(), any(), any(),
+                eq("REGEL"), eq("GESPERRT"), eq(new BigDecimal("0.661")), eq(new BigDecimal("400")),
+                eq(new BigDecimal("0.005")), eq(25), eq(21), eq(new BigDecimal("20.400")),
+                eq(new BigDecimal("0.250")));
+    }
+
+    /**
+     * Der Plan bekommt das ausgewertete Intervall und die folgenden des Tages - keine frueheren,
+     * und keines ohne Preis. Die freie Kapazitaet ist {@code kapazitaet x (1 - soc/100)}.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void werteIntervallAus_PlanBekommtDenResttagAbDemAusgewertetenIntervall() {
+        mitVoraussetzungenDerSchattenrechnung();
+        LocalDateTime zehnUhrDreissig = DATUM.atTime(10, 30);
+        when(produktionsprognoseService.getPrognose(ORG_ID, DATUM)).thenReturn(List.of(
+                prognosepunkt(DATUM.atTime(9, 45), "0.500"),   // frueher - gehoert nicht dazu
+                prognosepunkt(ZEHN_UHR, "0.661"),
+                prognosepunkt(VIERTEL_NACH_ZEHN, "1.200"),
+                prognosepunkt(zehnUhrDreissig, "1.300")));     // ohne Preis - entfaellt
+        when(preiszeitreiheRepository.findByZeitraum(any(), any())).thenReturn(List.of(
+                preis(LocalDateTime.of(2026, 9, 25, 7, 45), "0.200"),
+                preis(LocalDateTime.of(2026, 9, 25, 8, 0), "0.190"),
+                preis(LocalDateTime.of(2026, 9, 25, 8, 15), "0.170")));
+        when(ladeplanService.plane(any(), any(), any())).thenReturn(new LadeplanService.Plan(
+                Steuerzustand.FREI, 2, 3, new BigDecimal("20.400")));
+
+        steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
+
+        ArgumentCaptor<List<LadeplanService.Intervall>> resttag = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<BigDecimal> kapazitaetFrei = ArgumentCaptor.forClass(BigDecimal.class);
+        verify(ladeplanService).plane(resttag.capture(), eq(ZEHN_UHR), kapazitaetFrei.capture());
+        assertEquals(List.of(ZEHN_UHR, VIERTEL_NACH_ZEHN),
+                resttag.getValue().stream().map(LadeplanService.Intervall::zeit).toList());
+        // 40.8 kWh x (1 - 50/100)
+        assertEquals(0, new BigDecimal("20.400").compareTo(kapazitaetFrei.getValue()));
+    }
+
+    // ==================== Schattenrechnung: Rueckfall je Voraussetzung (FR-4) ====================
+
+    /** Ohne Standort und Ausrichtung keine Prognose - die Merit-Order rechnet nicht. */
+    @Test
+    void werteIntervallAus_OhneStandort_SchattenLeer() {
+        mitVollstaendigerSchattenrechnung();
+        konfiguration.setBreitengrad(null);
+
+        steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
+
+        pruefeSchattenLeer();
+    }
+
+    /** Ohne Speicher-Einheit gibt es nichts zu laden. */
+    @Test
+    void werteIntervallAus_OhneSpeicherEinheit_SchattenLeer() {
+        mitVollstaendigerSchattenrechnung();
+        when(einheitRepository.existsByTyp(EinheitTyp.SPEICHER)).thenReturn(false);
+
+        steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
+
+        pruefeSchattenLeer();
+    }
+
+    /** Ohne Ladezustand keine freie Kapazitaet. */
+    @Test
+    void werteIntervallAus_OhneLadezustand_SchattenLeer() {
+        mitVollstaendigerSchattenrechnung();
+        when(geraetezustandRepository.findFirstByEinheitIdAndGroesseAndZeitLessThanOrderByZeitDesc(
+                SPEICHER_ID, Zustandsgroesse.SOC, VIERTEL_NACH_ZEHN)).thenReturn(Optional.empty());
+
+        steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
+
+        pruefeSchattenLeer();
+    }
+
+    /** Ohne Batteriekapazitaet keine freie Kapazitaet. */
+    @Test
+    void werteIntervallAus_OhneKapazitaet_SchattenLeer() {
+        mitVollstaendigerSchattenrechnung();
+        konfiguration.setBatteriekapazitaet(null);
+
+        steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
+
+        pruefeSchattenLeer();
+    }
+
+    /** Kapazitaet 0 wirkt wie eine fehlende - sie ergaebe dauerhaft einen leeren Plan. */
+    @Test
+    void werteIntervallAus_KapazitaetNull_WieFehlend() {
+        mitVollstaendigerSchattenrechnung();
+        konfiguration.setBatteriekapazitaet(BigDecimal.ZERO);
+
+        steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
+
+        pruefeSchattenLeer();
+    }
+
+    /**
+     * Fehlt Faktor oder Lastprofil, liefert die Prognose den Punkt, aber ohne erwarteten
+     * Ueberschuss - auch dann rechnet die Merit-Order nicht. Ohne diese Wache plante sie mit einem
+     * Resttag ohne das ausgewertete Intervall, und niemand saehe es.
+     */
+    @Test
+    void werteIntervallAus_OhneErwartetenUeberschuss_SchattenLeer() {
+        mitVollstaendigerSchattenrechnung();
+        PrognosepunktDTO ohneUeberschuss = prognosepunkt(ZEHN_UHR, "0.661");
+        ohneUeberschuss.setErwarteterUeberschuss(null);
+        // Der Folgepunkt HAT Ueberschuss und Preis: Ohne die Wache entstuende daraus ein Resttag,
+        // und geplant wuerde - nur die Wache fuer DIESES Intervall verhindert das.
+        when(produktionsprognoseService.getPrognose(ORG_ID, DATUM)).thenReturn(List.of(
+                ohneUeberschuss, prognosepunkt(VIERTEL_NACH_ZEHN, "1.200")));
+        when(preiszeitreiheRepository.findByZeitraum(any(), any())).thenReturn(List.of(
+                preis(LocalDateTime.of(2026, 9, 25, 8, 0), "0.190"),
+                preis(LocalDateTime.of(2026, 9, 25, 8, 15), "0.170")));
+
+        steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
+
+        pruefeSchattenLeer();
+    }
+
+    /** Ohne Ausrichtung (nur der Azimut fehlt) gibt es keine Prognose - Standort allein genuegt nicht. */
+    @Test
+    void werteIntervallAus_OhneAusrichtung_SchattenLeer() {
+        mitVollstaendigerSchattenrechnung();
+        konfiguration.setAzimut(null);
+
+        steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
+
+        pruefeSchattenLeer();
+    }
+
+    /**
+     * Bei negativem Preis rechnet die Schattenrechnung weiter: Die Kaskade sperrt die Einspeisung
+     * ({@code PREIS_NEGATIV}), die Merit-Order haelt daneben fest, was sie fuer die Ladung entschiede.
+     * Das ist die heutige Form des Zielverhaltens nach dem Umschalten (Kriterium „Nach dem
+     * Umschalten"): Dort entscheidet sie die Ladung dann selbst.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void werteIntervallAus_NegativerPreis_SchattenrechnungRechnetWeiter() {
+        mitVollstaendigerSchattenrechnung();
+        // Ein wirklich negativer Preis - ein kuenftiger Filter darauf beim Aufbau des Resttags fiele auf
+        when(preiszeitreiheRepository.findByZeitraum(any(), any()))
+                .thenReturn(List.of(preis(LocalDateTime.of(2026, 9, 25, 8, 0), "-0.020")));
+        when(steuerRegelService.entscheide(any(), any(), any(), any(), any(), any()))
+                .thenReturn(new SteuerRegelService.Entscheid(Steuerregel.PREIS_NEGATIV,
+                        Steuerzustand.FREI, Steuerzustand.GESPERRT, new BigDecimal("1.000")));
+
+        steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
+
+        ArgumentCaptor<List<LadeplanService.Intervall>> resttag = ArgumentCaptor.forClass(List.class);
+        verify(ladeplanService).plane(resttag.capture(), eq(ZEHN_UHR), any());
+        assertEquals(0, new BigDecimal("-0.020").compareTo(resttag.getValue().get(0).preis()),
+                "das Intervall mit negativem Preis gehoert in den Plan");
+        verify(steuerentscheidRepository).upsert(eq(ORG_ID), eq(ZEHN_UHR), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(), any(),
+                eq("PREIS_NEGATIV"), eq("FREI"), eq("GESPERRT"), any(), any(), any(), any(), any(),
+                eq("REGEL"), eq("GESPERRT"), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    /** Ohne Prognosepunkt fuer DIESES Intervall rechnet sie nicht. */
+    @Test
+    void werteIntervallAus_OhnePrognoseFuerDasIntervall_SchattenLeer() {
+        mitVollstaendigerSchattenrechnung();
+        when(produktionsprognoseService.getPrognose(ORG_ID, DATUM))
+                .thenReturn(List.of(prognosepunkt(VIERTEL_NACH_ZEHN, "1.200")));
+
+        steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
+
+        pruefeSchattenLeer();
+    }
+
+    /** Ohne Preise fuer den Resttag keine Reihenfolge - eine willkuerliche waere schlimmer. */
+    @Test
+    void werteIntervallAus_OhnePreise_SchattenLeer() {
+        mitVollstaendigerSchattenrechnung();
+        when(preiszeitreiheRepository.findByZeitraum(any(), any())).thenReturn(List.of());
+
+        steuerungService.werteIntervallAus(ORG_ID, ZEHN_UHR);
+
+        pruefeSchattenLeer();
     }
 
     /**
@@ -464,6 +671,27 @@ public class SteuerungServiceTest {
         assertEquals(new BigDecimal("55"), zehnUhr.getSoc(), "letzter Wert VOR 10:15");
     }
 
+    /**
+     * Die Rueckrechnung kennzeichnet ihre Entscheide als Regel-Entscheide - und stuetzt sich nicht
+     * auf {@code zev.einstrahlungsprognose}: Dort stuende die nachtraeglich geholte Fassung, die das
+     * eingetretene Wetter schon kennt (Specs/Ladeplanung.md, FR-8).
+     */
+    @Test
+    void getEntscheideSimuliert_KennzeichnetRegelUndLiestKeinePrognose() {
+        when(messwerteRepository.sumBilanzKomponentenPerZeitBetween(any(), any()))
+                .thenReturn(zeilen(bilanz(ZEHN_UHR, "3.000", "1.000", "0", "2.000")));
+        when(preiszeitreiheRepository.findByZeitraum(any(), any())).thenReturn(List.of(
+                preis(LocalDateTime.of(2026, 9, 25, 8, 0), "0.111")));
+
+        List<SteuerentscheidDTO> dtos = steuerungService.getEntscheideSimuliert(
+                DATUM, new BigDecimal("0.05"), null, null);
+
+        assertFalse(dtos.isEmpty());
+        dtos.forEach(dto -> assertEquals(Steuerverfahren.REGEL, dto.getVerfahren()));
+        verifyNoInteractions(produktionsprognoseService);
+        verifyNoInteractions(ladeplanService);
+    }
+
     /** Ohne Messwerte gibt es keine nachgerechneten Entscheide — und keine Speicherabfrage. */
     @Test
     void getEntscheideSimuliert_OhneMesswerte_LiefertLeereListe() {
@@ -541,6 +769,30 @@ public class SteuerungServiceTest {
         when(geraetezustandRepository.findFirstByEinheitIdAndGroesseAndZeitLessThanOrderByZeitDesc(
                 SPEICHER_ID, Zustandsgroesse.SOC, VIERTEL_NACH_ZEHN))
                 .thenReturn(Optional.of(soc(DATUM.atTime(10, 14), "50.0")));
+    }
+
+    /** Alle Voraussetzungen plus Prognose und Preise - die Schattenrechnung kaeme bis zum Plan. */
+    private void mitVollstaendigerSchattenrechnung() {
+        mitVoraussetzungenDerSchattenrechnung();
+        when(produktionsprognoseService.getPrognose(ORG_ID, DATUM))
+                .thenReturn(List.of(prognosepunkt(ZEHN_UHR, "0.661")));
+        when(preiszeitreiheRepository.findByZeitraum(any(), any()))
+                .thenReturn(List.of(preis(LocalDateTime.of(2026, 9, 25, 8, 0), "0.190")));
+        when(ladeplanService.plane(any(), any(), any())).thenReturn(new LadeplanService.Plan(
+                Steuerzustand.GESPERRT, 1, 1, new BigDecimal("20.400")));
+    }
+
+    /**
+     * Rueckfall: Der Entscheid der Kaskade wird geschrieben, alle Schattenwerte sind {@code null},
+     * {@code verfahren = REGEL}, und der Plan wird gar nicht erst gefragt.
+     */
+    private void pruefeSchattenLeer() {
+        verify(ladeplanService, never()).plane(any(), any(), any());
+        verify(steuerentscheidRepository).upsert(eq(ORG_ID), eq(ZEHN_UHR), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(), any(),
+                eq("LADEN"), eq("FREI"), eq("FREI"), any(), any(), any(), any(), any(),
+                eq("REGEL"), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(),
+                isNull());
     }
 
     private void mitLadezustand(String wert) {

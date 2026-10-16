@@ -469,11 +469,16 @@ Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten**:
 
 **Schattenrechnung (FR-1a)**
 
-* [ ] `batterieladung` und `einspeisung` stammen in dieser Stufe **unverändert** aus der
-      Regelkaskade — die Merit-Order ändert keinen geltenden Entscheid.
-* [ ] `verfahren` trägt durchgehend `REGEL`.
-* [ ] `ladeplan_batterieladung` trägt, was die Merit-Order entschieden hätte — und `NULL`, wenn
-      eine Voraussetzung fehlte.
+* [x] `batterieladung` und `einspeisung` stammen in dieser Stufe **unverändert** aus der
+      Regelkaskade — die Merit-Order ändert keinen geltenden Entscheid
+      (Test: SteuerungServiceTest#werteIntervallAus_MeritOrderSperrt_KaskadeBestimmtDenEntscheid)
+* [x] `verfahren` trägt durchgehend `REGEL`
+      (Test: SteuerungServiceTest#werteIntervallAus_MeritOrderSperrt_KaskadeBestimmtDenEntscheid;
+      SteuerungServiceTest#werteIntervallAus_OhnePreise_SchattenLeer)
+* [x] `ladeplan_batterieladung` trägt, was die Merit-Order entschieden hätte — und `NULL`, wenn
+      eine Voraussetzung fehlte
+      (Test: SteuerungServiceTest#werteIntervallAus_MeritOrderSperrt_KaskadeBestimmtDenEntscheid;
+      SteuerungServiceTest#werteIntervallAus_OhneStandort_SchattenLeer)
 * [x] Ein Fehler in der Merit-Order lässt den Entscheid der Kaskade **unberührt**: Der Job schreibt
       ihn trotzdem, mit `ladeplan_batterieladung = NULL` — auch wenn der Fehler in einer
       transaktionalen Bean entsteht (Hintergrund: Anhang A.14).
@@ -481,16 +486,20 @@ Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten**:
       SteuerungServiceTest#werteIntervallAus_SchattenTransaktionScheitertBeimCommit_EntscheidWirdTrotzdemGeschrieben;
       SteuerungServiceTest#werteIntervallAus_SchattenrechnungLaeuftInEigenerLesenderTransaktion;
       SteuerungServiceTransaktionIT#werteIntervallAus_PrognoseWirftInIhrerTransaktion_EntscheidIstCommittet)
-* [ ] **Bei negativem Preis** ist `einspeisung = GESPERRT`, über die Ladung entscheidet die
-      Merit-Order — nicht mehr pauschal `FREI` wie in der Regelkaskade.
-* [ ] **Unter dem Mindest-Ladezustand** ist `batterieladung = FREI`, ohne dass der Plan gefragt wird
+* [x] **Bei negativem Preis** rechnet die Schattenrechnung weiter: Die Kaskade sperrt die
+      Einspeisung (`PREIS_NEGATIV`), `ladeplan_batterieladung` hält fest, was die Merit-Order für
+      die Ladung entschiede
+      (Test: SteuerungServiceTest#werteIntervallAus_NegativerPreis_SchattenrechnungRechnetWeiter;
+      LadeplanServiceTest#plane_NegativerPreisStehtVorn)
+* [x] **Unter dem Mindest-Ladezustand** ist `batterieladung = FREI`, ohne dass der Plan gefragt wird
       — mit derselben Hysterese wie die Regelkaskade; in der Schattenrechnung entsprechend
       `ladeplan_batterieladung = FREI` ohne Rang
       (Test: SteuerungServiceTest#werteIntervallAus_UnterMindestLadezustand_SchattenFreiOhnePlan;
       SteuerungServiceTest#werteIntervallAus_HystereseNachSocTief_SchattenWeiterhinFreiOhnePlan;
       SteuerungServiceTest#werteIntervallAus_UeberMindestLadezustand_SchattenFragtDenPlan)
-* [ ] Der Plan umfasst das **ausgewertete** Intervall und alle folgenden des gleichen Ortstages —
-      keine früheren.
+* [x] Der Plan umfasst das **ausgewertete** Intervall und alle folgenden des gleichen Ortstages —
+      keine früheren
+      (Test: SteuerungServiceTest#werteIntervallAus_PlanBekommtDenResttagAbDemAusgewertetenIntervall)
 
 **Der Fall, der das Verfahren ausgelöst hat**
 
@@ -518,8 +527,11 @@ Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten**:
 
 **Umrechnungsfaktor**
 
-* [ ] Der Faktor ist das Verhältnis der Summen (gemessene Erzeugung zu Einstrahlung) über die
-      letzten *n* Tage, nur über Intervalle mit `gti > 0`.
+* [x] Der Faktor ist das Verhältnis der Summen (gemessene Erzeugung zu Einstrahlung) über die
+      letzten *n* Tage, nur über Intervalle mit `gti > 0`
+      (Test: ProduktionsprognoseServiceTest#getPrognose_UngleicheEinstrahlung_VerhaeltnisDerSummen;
+      EinstrahlungsprognoseRepositoryIT#findGtiJeIntervall_LiefertNurHelleIntervalle;
+      ProduktionsprognoseServiceTest#getPrognose_MitHistorieTage_LerntUeberDenErfasstenZeitraum)
 * [x] Mit weniger als **150 Intervallen mit `gti > 0`** im Lernfenster gibt es **keinen** Faktor
       → Rückfall. (Test: ProduktionsprognoseServiceTest#getPrognose_WenigerAlsMinPunkte_LaesstErwarteteErzeugungLeer;
       ProduktionsprognoseServiceTest#getPrognose_GenauMinPunkte_LerntFaktor; ProduktionsprognoseServiceTest#getPrognose_OhneFaktor_KeinErwarteterUeberschuss)
@@ -533,26 +545,30 @@ Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten**:
 
 **Rückfall**
 
-* [ ] Fehlt Standort, Ausrichtung, Prognose, Faktor, Lastprofil, Kapazität, Speicher-Einheit,
+* [x] Fehlt Standort, Ausrichtung, Prognose, Faktor, Lastprofil, Kapazität, Speicher-Einheit,
       Ladezustand **oder Preise für den Resttag**, entscheidet die Regelkaskade — und der Entscheid
-      trägt `verfahren = REGEL`.
-* [ ] Eine Batteriekapazität von **0** wirkt wie eine fehlende.
-* [ ] Ein Entscheid nach Merit-Order trägt `verfahren = MERIT_ORDER` **und** Rang, benötigte
-      Anzahl, Einstrahlung, Prognose, Faktor und freie Kapazität.
-* [ ] Der Datensatz trägt Einstrahlung, Faktor und Lastprofil — daraus lassen sich erwartete
+      trägt `verfahren = REGEL`
+      (Test: SteuerungServiceTest#werteIntervallAus_OhneStandort_SchattenLeer;
+      SteuerungServiceTest#werteIntervallAus_OhneSpeicherEinheit_SchattenLeer;
+      SteuerungServiceTest#werteIntervallAus_OhneLadezustand_SchattenLeer;
+      SteuerungServiceTest#werteIntervallAus_OhneKapazitaet_SchattenLeer;
+      SteuerungServiceTest#werteIntervallAus_OhnePrognoseFuerDasIntervall_SchattenLeer;
+      SteuerungServiceTest#werteIntervallAus_OhnePreise_SchattenLeer;
+      SteuerungServiceTest#werteIntervallAus_OhneAusrichtung_SchattenLeer;
+      SteuerungServiceTest#werteIntervallAus_OhneErwartetenUeberschuss_SchattenLeer)
+* [x] Eine Batteriekapazität von **0** wirkt wie eine fehlende
+      (Test: SteuerungServiceTest#werteIntervallAus_KapazitaetNull_WieFehlend)
+* [x] Der Datensatz trägt Einstrahlung, Faktor und Lastprofil — daraus lassen sich erwartete
       Erzeugung (`gti × prognose_faktor`) und erwarteter Überschuss
       (`max(0, Erzeugung − prognose_lastprofil)`) nachrechnen
       (Test: SteuerentscheidRepositoryIT#upsert_SchreibtDiePlangroessen;
+      SteuerentscheidRepositoryIT#upsert_FaktorBehaeltAchtNachkommastellen;
       SteuerungServiceTest#werteIntervallAus_UnterMindestLadezustand_SchattenFreiOhnePlan)
 
 **Anzeige**
 
-* [ ] Die Tabelle nennt je Intervall das Verfahren; Merit-Order- und Regel-Entscheide sind
-      unterscheidbar.
-* [ ] Das Diagramm zeigt die **erwartete Erzeugung** als eigene, gestrichelte Linie neben der
-      gemessenen Produktion, auf **derselben** kWh-Achse.
-* [ ] Das Diagramm bekommt **keine vierte y-Achse**.
 * [ ] Die **Einstrahlung in W/m²** steht in der Protokolltabelle und im Tooltip, nicht im Diagramm.
+      (Test: einspeisesteuerung.component.spec.ts › tooltip › should show the forecast for an interval with neither decision nor price — die Tabellenspalte prüft noch kein Test)
 * [x] Ein Tag ohne Prognose zeigt die Linie **nicht**, statt sie auf 0 zu zeichnen.
       (Test: einspeisesteuerung.component.spec.ts › prognoseReihe › should return an empty series without forecast data)
 * [x] Fehlt die Prognose nur für einzelne Intervalle, setzt die Linie dort **aus**, statt über die
@@ -562,17 +578,39 @@ Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten**:
 
 **Rückrechnung**
 
-* [ ] Die Rückrechnung liefert für zurückliegende Tage **Regel-Entscheide** und kennzeichnet sie
-      als solche.
-* [ ] Sie stützt sich **nicht** auf `zev.einstrahlungsprognose` — dort stünde die nachträglich
-      geholte Fassung.
+* [x] Die Rückrechnung liefert für zurückliegende Tage **Regel-Entscheide** und kennzeichnet sie
+      als solche (`verfahren = REGEL`)
+      (Test: SteuerungServiceTest#getEntscheideSimuliert_KennzeichnetRegelUndLiestKeinePrognose)
+* [x] Sie stützt sich **nicht** auf `zev.einstrahlungsprognose` — dort stünde die nachträglich
+      geholte Fassung
+      (Test: SteuerungServiceTest#getEntscheideSimuliert_KennzeichnetRegelUndLiestKeinePrognose)
 
 **Sicherheit und Flag**
 
-* [ ] Alle Endpunkte verlangen `tarife:manage` (403 ohne).
+* [x] Alle Endpunkte verlangen `tarife:manage` (403 ohne)
+      (Test: ControllerAuthorizationTest#steuerungsEndpunkte_withoutTarifeManage_forbidden;
+      ControllerAuthorizationTest#getEntscheide_withTarifeManage_reachesController)
 * [ ] Bei ausgeschaltetem Feature-Flag `EINSPEISESTEUERUNG` antworten sie mit `403`, und der
-      Abruf-Job läuft nicht.
-* [ ] Es wird **nichts** geschaltet: kein MQTT-Publish, kein Schreibpfad zur Anlage.
+      Abruf-Job läuft nicht
+      (Test: ControllerAuthorizationTest#getPrognose_featureDisabled_forbidden — den Abruf-Job prüft
+      noch kein Test)
+
+**Nach dem Umschalten (Stufe 2, noch nicht aktiv)**
+
+> Diese Kriterien beschreiben das Zielverhalten, wenn die Merit-Order die Kaskade ersetzt
+> (Entscheid frühestens mit der Auswertung im Frühling 2027, FR-1a). In der Schattenstufe gelten
+> sie bewusst **nicht** — `verfahren` ist dort durchgehend `REGEL`.
+
+* [ ] **Bei negativem Preis** ist `einspeisung = GESPERRT`, über die Ladung entscheidet die
+      Merit-Order — nicht mehr pauschal `FREI` wie in der Regelkaskade.
+* [ ] Ein Entscheid nach Merit-Order trägt `verfahren = MERIT_ORDER` **und** Rang, benötigte
+      Anzahl, Einstrahlung, Prognose, Faktor und freie Kapazität.
+* [ ] Die Tabelle nennt je Intervall das Verfahren; Merit-Order- und Regel-Entscheide sind
+      unterscheidbar.
+* [ ] Die Protokolltabelle zeigt zusätzlich **Rang**, **benötigt** und **Kapazität frei** (FR-7);
+      heute stehen Rang und benötigt nur im Tooltip.
+* [ ] Die **Nachrechnung** (`/entscheide/simuliert`, `/simulation`, Schaltfläche „Nachrechnen")
+      ist ausgebaut — siehe §8.
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
@@ -717,6 +755,12 @@ Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten**:
   **Erste Antwort (11.10.2026):** in Franken gerechnet rund 0.80 CHF pro Woche im Oktober, ein
   Fehltag (Speicher am Abend nicht voll) hebt ihn auf — vorerst nicht umschalten, erneut auswerten
   im Frühling (FR-1a, Anhang A.9).
+* **Bleibt die Nachrechnung?** Entscheid vom 16.10.2026: **vorerst ja**, ohne weiteren Ausbau. Sie
+  ist das einzige Werkzeug, um die Kaskade nachzujustieren (z.B. bei anderen Preisverläufen im
+  Winter), und die Kaskade entscheidet bis zur Frühlingsauswertung weiter. Die Schattenrechnung
+  ersetzt sie nicht: Sie vergleicht die Verfahren mit den **aktuellen** Einstellungen. **Fällt die
+  Frühlingsauswertung zugunsten der Merit-Order aus, wird die Nachrechnung mit dem Umschalten
+  ausgebaut** (Kriterium im Block „Nach dem Umschalten"); bleibt die Kaskade, bleibt sie.
 * **Bleibt die Regelkaskade dauerhaft?** Sie ist Rückfall — ob sie nach einer Erprobungszeit
   entfällt oder bestehen bleibt, ist noch nicht entschieden.
 * **Wie oft ändert sich die Prognose wirklich?** `meteoswiss_icon_ch1` wird alle drei Stunden neu
@@ -1151,3 +1195,17 @@ grosse Fehlerquelle wie das Wetter zeigte (07.10.: Verbrauch 43 % über dem Prof
 Seit V183 trägt jeder Entscheid mit Schattenrechnung `prognose_lastprofil`. In der Abfrage aus A.8
 lässt sich `verbrauch_erwartet` damit für alle Intervalle ab V183 als `sum(prognose_lastprofil)`
 rechnen. Entscheide davor bleiben ohne Lastprofil.
+
+### A.17 Entfernte und verschobene Akzeptanzkriterien (§3; 16.10.2026)
+
+Beim Akzeptanzkriterien-Check vom 15.10.2026 als „umformulieren" vorgeschlagen und so umgesetzt:
+
+* **Verschoben in „Nach dem Umschalten (Stufe 2)":** negativer Preis entscheidet die Ladung per
+  Merit-Order, Entscheid mit `verfahren = MERIT_ORDER`, Verfahren-Spalte in der Tabelle. Sie
+  widersprachen in der Schattenstufe dem Kriterium „`verfahren` trägt durchgehend `REGEL`". Für den
+  negativen Preis steht im aktuellen Teil die Schattenform (die Schattenrechnung rechnet weiter).
+* **Gestrichen, weil eine Designentscheidung ohne Fehlerrisiko** (sie stehen in FR-7):
+  „Das Diagramm zeigt die erwartete Erzeugung als eigene, gestrichelte Linie neben der gemessenen
+  Produktion, auf derselben kWh-Achse" und „Das Diagramm bekommt keine vierte y-Achse".
+* **Gestrichen, weil doppelt zu §7 (Abgrenzung):** „Es wird nichts geschaltet: kein MQTT-Publish,
+  kein Schreibpfad zur Anlage."

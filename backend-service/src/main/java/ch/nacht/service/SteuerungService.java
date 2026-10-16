@@ -958,6 +958,9 @@ public class SteuerungService {
         dto.setRegel(n.entscheid().regel());
         dto.setBatterieladung(n.entscheid().batterieladung());
         dto.setEinspeisung(n.entscheid().einspeisung());
+        // Die Rueckrechnung rechnet nur die Kaskade nach, nie die Merit-Order (Specs/Ladeplanung.md,
+        // FR-8) - und sagt das ausdruecklich, statt das Verfahren leer zu lassen.
+        dto.setVerfahren(Steuerverfahren.REGEL);
         dto.setSoc(n.soc());
         dto.setSchwellwert(schwellwert);
         dto.setSpeicherwert(speicherwert);

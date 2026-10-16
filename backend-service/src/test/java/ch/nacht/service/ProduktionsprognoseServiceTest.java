@@ -391,6 +391,31 @@ public class ProduktionsprognoseServiceTest {
     }
 
     /**
+     * Der Faktor ist das Verhaeltnis der <b>Summen</b>, nicht das Mittel der Verhaeltnisse
+     * (Specs/Ladeplanung.md, FR-3) - helle Intervalle zaehlen mehr, und genau auf die kommt es an.
+     *
+     * <p>Mit ungleicher Einstrahlung unterscheiden sich die beiden Rechnungen: Je 1.000 kWh bei
+     * 100 und 300 W/m² ergeben als Summenverhaeltnis 2.000 / 400 = 0.005, als Mittel der
+     * Verhaeltnisse (0.010 + 0.00333) / 2 = 0.00667. Alle uebrigen Faktor-Tests arbeiten mit
+     * gleicher Einstrahlung je Intervall und koennten den Unterschied nicht zeigen.
+     *
+     * <p>Intervalle ohne Messwert zaehlen nicht mit - auch nicht im Nenner.
+     */
+    @Test
+    void getPrognose_UngleicheEinstrahlung_VerhaeltnisDerSummen() {
+        List<Object[]> historie = gtiPunkte(MIN_PUNKTE);
+        historie.set(1, new Object[]{beginn(1), new BigDecimal("300.00")});
+        when(prognoseRepository.findGtiJeIntervall(any(), any())).thenReturn(historie);
+        messwerte(
+                messwert(beginn(0), "1.000"),   // 100 W/m²
+                messwert(beginn(1), "1.000"));  // 300 W/m²
+
+        PrognosepunktDTO punkt = einzigerPunkt();
+
+        assertEquals(new BigDecimal("0.00500000"), punkt.getFaktor());
+    }
+
+    /**
      * Keine Messwerte in der Historie → Einstrahlungssumme 0 → kein Faktor.
      *
      * <p>Ohne diese Wache teilte der Service durch 0.
