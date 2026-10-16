@@ -1,0 +1,95 @@
+"""Lese-Retry bei Fehlern der Modbus-Bibliothek (Specs/Pi-Gateway-Software.md, FR-1.6).
+
+Ausführen (im Verzeichnis ``pi-gateway``): ``python -m unittest discover -s tests -t .``
+"""
+
+from __future__ import annotations
+
+import unittest
+from unittest import mock
+
+from pymodbus.exceptions import ModbusIOException
+
+from gateway.main import _read_with_retry
+from gateway.models import MeterConfig, ReadError, RegisterSpec
+from gateway.readers.modbus_reader import ModbusReader
+
+
+def _antwort(registers: list[int]) -> mock.Mock:
+    """Eine fehlerfreie Modbus-Antwort mit den gegebenen Registern."""
+    antwort = mock.Mock()
+    antwort.isError.return_value = False
+    antwort.registers = registers
+    return antwort
+
+
+def _reader() -> ModbusReader:
+    """Ein Konsument ohne Einspeisung-Register: genau ein Modbus-Zugriff je Read."""
+    config = MeterConfig(
+        messpunkt="Batterie-Test",
+        protokoll="modbus-tcp",
+        register_bezug=RegisterSpec(addr=0x5000),
+        register_einspeisung=None,
+        host="127.0.0.1",
+    )
+    reader = ModbusReader(config)
+    reader._client = mock.Mock()
+    reader._client.connect.return_value = True
+    return reader
+
+
+# float32 big-endian 0x42C80000 = 100.0
+_HUNDERT = [0x42C8, 0x0000]
+
+
+def _abgeschnitten() -> ModbusIOException:
+    """Wie pymodbus eine abgeschnittene Antwort meldet. Je Aufruf neu - eine geworfene Instanz
+    sammelt Traceback und Kontext an."""
+    return ModbusIOException("Unable to decode frame: byte_count 4 > length of packet 3")
+
+
+class ModbusReaderTest(unittest.TestCase):
+
+    def test_read_AbgeschnitteneAntwort_WirftReadError(self) -> None:
+        """Die Exception der Bibliothek kommt als ReadError heraus, nicht als unerwarteter."""
+        reader = _reader()
+        ursache = _abgeschnitten()
+        reader._client.read_holding_registers.side_effect = ursache
+
+        with self.assertRaises(ReadError) as kontext:
+            reader.read()
+
+        self.assertIn("Batterie-Test", str(kontext.exception))
+        self.assertIs(kontext.exception.__cause__, ursache)
+        reader._client.close.assert_called_once()
+
+
+class ReadWithRetryTest(unittest.TestCase):
+
+    @mock.patch("gateway.main.time.sleep")
+    def test_readWithRetry_AbgeschnitteneAntwortDannErfolg_LiefertStand(self, _sleep) -> None:
+        """Beobachtet am 16.10.2026 bei 'Batterie-Hene': der zweite Versuch gelingt."""
+        reader = _reader()
+        reader._client.read_holding_registers.side_effect = [_abgeschnitten(), _antwort(_HUNDERT)]
+
+        stand = _read_with_retry(reader, attempts=2)
+
+        self.assertIsNotNone(stand)
+        self.assertEqual(100.0, stand.zaehlerstand_bezug)
+        self.assertEqual(2, reader._client.read_holding_registers.call_count)
+
+    @mock.patch("gateway.main.time.sleep")
+    def test_readWithRetry_ImmerAbgeschnitten_UebersprungenNachAllenVersuchen(self, _sleep) -> None:
+        reader = _reader()
+        reader._client.read_holding_registers.side_effect = [_abgeschnitten(), _abgeschnitten()]
+
+        with self.assertLogs("gateway", level="WARNING") as logs:
+            stand = _read_with_retry(reader, attempts=2)
+
+        self.assertIsNone(stand)
+        self.assertEqual(2, reader._client.read_holding_registers.call_count)
+        self.assertTrue(any("nach 2 Versuch(en)" in zeile for zeile in logs.output))
+
+
+if __name__ == "__main__":
+    unittest.main()

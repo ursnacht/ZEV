@@ -27,6 +27,8 @@
    * **Begründung:** Am eingesetzten Kommunikationsmodul **WAGO 879-9000** ist **kein RTU-Response-Timeout einstellbar** (nur Baudrate/Parität der RS485-Seite, s. `docs/Netzwerk-Topologie-Hene.md`). Sporadische `exception_code=11` lassen sich daher nur client-seitig kompensieren.
    * **Unschädlich:** Es werden **absolute** Zählerstände publiziert – ein doppelt gelesener Stand kann nichts verfälschen (keine Delta-Bildung auf dem Pi, FR-2).
    * **Ablauf:** zwischen zwei Versuchen **0,5 s** Pause; jeder Versuch baut die Verbindung neu auf. Fehlgeschlagene Zwischenversuche werden auf `INFO` geloggt (mit Versuchszähler), der endgültige Fehlschlag auf `WARN`.
+   * **Als fehlgeschlagener Read gelten auch Exceptions der Modbus-Bibliothek** (`ModbusException`, z. B. `ModbusIOException` bei einer abgeschnittenen Antwort: „Unable to decode frame … byte_count 4 > length of packet 3“). Der Reader übersetzt sie in einen `ReadError`; der Retry greift wie bei einer Fehler-Response.
+     > Es ist derselbe sporadische Fehler der RTU-Strecke, nur meldet ihn pymodbus als Exception statt als Fehler-Response. Beobachtet am Speicher („Batterie-Hene“).
    * **Kein Retry** bei unerwarteten Exceptions (Programmierfehler) – dort ist ein zweiter Versuch aussichtslos.
    * **Zeitbudget:** `read_timeout × read_attempts` (+ Pausen) je Zähler muss deutlich unter dem `publish_interval` bleiben; ungültige Angaben (`0`, negativ, nicht-ganzzahlig, Boolean) führen zu `ConfigError` **beim Start**. Der wirksame Wert steht in der Start-Log-Zeile.
 7. **`register.einspeisung` optional (Nachtrag):** **Konsumenten** speisen nicht ein – dort ist der Block `register.einspeisung` **weglassbar**. Fehlt er, wird das Register **nicht gelesen** und im Payload **`zaehlerstandEinspeisung: 0`** publiziert.
@@ -153,6 +155,7 @@
 * [ ] Sind für einzelne Zähler eigene `read_timeout`-Werte konfiguriert, werden **genau diese** Zähler beim Start zusätzlich mit ihrem Wert genannt; ohne Abweichung erscheint **keine** solche Zeile.
 * [ ] Ein fehlgeschlagener Read wird gemäss `read_attempts` **wiederholt**; gelingt der zweite Versuch, wird der Messwert publiziert und der Zyklus zählt als Erfolg.
 * [ ] Mit `read_attempts: 1` findet **kein** Wiederholversuch statt (bisheriges Verhalten); ohne Angabe gilt **2**.
+* [x] Wirft die Modbus-Bibliothek beim Lesen eine Exception (z. B. `ModbusIOException` bei abgeschnittener Antwort), wird der Read wie ein Modbus-Fehler wiederholt; gelingt der zweite Versuch, wird der Stand publiziert (Test: test_modbus_reader.py › ModbusReaderTest › test_read_AbgeschnitteneAntwort_WirftReadError; test_modbus_reader.py › ReadWithRetryTest › test_readWithRetry_AbgeschnitteneAntwortDannErfolg_LiefertStand)
 * [ ] Scheitern alle Versuche, wird der Zähler in diesem Zyklus übersprungen (`WARN` mit Anzahl der Versuche) – die übrigen Zähler laufen unbeeinflusst weiter.
 * [ ] Ungültige `read_attempts` (`0`, negativ, nicht-ganzzahlig, Boolean, String) führen zu einem `ConfigError` **beim Start**.
 * [ ] Die Start-Log-Zeile nennt die wirksame Anzahl **Lese-Versuche**.
@@ -196,6 +199,7 @@
 |----------|-----------|
 | Zähler (Modbus/gPlug) nicht erreichbar | Loggen, diesen Zyklus überspringen, Retry (nächster Stand schliesst die Lücke) |
 | Teilweiser/fehlgeschlagener Read | Messwert dieser Quelle verwerfen, nicht publizieren |
+| Abgeschnittene Antwort (`ModbusIOException` der Bibliothek) | Wie ein fehlgeschlagener Read: Retry gemäss `read_attempts`, danach überspringen (FR-1.6) |
 | Zählerüberlauf / Rücksprung / Zählerwechsel | Rohstand wird publiziert; Erkennung/Behandlung im **Backend** (Differenz < 0) |
 | Broker/VPN nicht erreichbar | Verlust unkritisch; optional puffern (Variante C / Queue) für Auflösung |
 | Puffer voll (falls Pufferung aktiv) | Definiertes Verhalten (z.B. älteste verwerfen + WARN) |

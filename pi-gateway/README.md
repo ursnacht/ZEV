@@ -304,4 +304,6 @@ journalctl -u pi-gateway.service -f
   Read-Loop mit Fehlerisolation je Zähler, Reconnect/Backoff, Heartbeat-Logging, systemd.
 - **Später:** gPlug-Reader (BKW), optionale Pufferung (aktuell nicht nötig – absolute
   Stände sind verlusttolerant).
-- **Tests:** werden separat erstellt (nicht Teil der Umsetzung).
+- **Tests:** `tests/` (unittest, keine Zusatzpakete), im Verzeichnis `pi-gateway` ausführen:
+  `python -m unittest discover -s tests -t .` – bisher nur der Lese-Retry bei Fehlern der
+  Modbus-Bibliothek (FR-1.6).

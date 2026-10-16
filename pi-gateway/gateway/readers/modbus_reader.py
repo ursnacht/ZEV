@@ -12,6 +12,7 @@ import struct
 from datetime import datetime, timezone
 
 from pymodbus.client import ModbusTcpClient
+from pymodbus.exceptions import ModbusException
 
 from ..models import MeterConfig, MeterReading, ReadError, RegisterSpec
 from .base import Reader
@@ -96,11 +97,21 @@ class ModbusReader(Reader):
 
     def _read_float(self, register: RegisterSpec, rolle: str) -> float:
         anzahl = _REGISTERS_PER_TYP[register.typ]
-        response = self._client.read_holding_registers(
-            address=register.addr,
-            count=anzahl,
-            slave=self.config.unit_id,
-        )
+        try:
+            response = self._client.read_holding_registers(
+                address=register.addr,
+                count=anzahl,
+                slave=self.config.unit_id,
+            )
+        except ModbusException as exc:
+            # pymodbus meldet nicht jeden Fehler als Fehler-Response: eine abgeschnittene
+            # Antwort ("Unable to decode frame ... byte_count 4 > length of packet 3") kommt
+            # als ModbusIOException. Das ist derselbe sporadische Fehler der RTU-Strecke wie
+            # exception_code=11 - als ReadError greift der Retry (FR-1.6).
+            raise ReadError(
+                f"'{self.messpunkt}' {rolle}: Modbus-Fehler bei Register "
+                f"0x{register.addr:04X} – {exc}"
+            ) from exc
         if response.isError():
             # Timeout und Exception-Response unterscheiden: bei einer Exception-Response hat
             # das Gerät/der Hub GEANTWORTET (z. B. code 11 = Gateway target device failed to
