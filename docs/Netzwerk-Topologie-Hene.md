@@ -198,6 +198,7 @@ https://github.com/sukesh-ak/setup-mosquitto-with-docker
 listener 1883
 persistence true
 persistence_location /mosquitto/data/
+autosave_interval 300          # alle 5 Min. speichern (Standard 30)
 log_dest file /mosquitto/log/mosquitto.log
 
 # Keine anonymen Verbindungen!
