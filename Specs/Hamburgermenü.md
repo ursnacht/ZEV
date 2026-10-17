@@ -2,7 +2,7 @@
 
 ## 1. Ziel & Kontext - Warum wird das Feature benötigt?
 * **Was soll erreicht werden:** Ein einheitlich gestaltetes Menü, in dem die täglich gebrauchten Seiten vorne stehen und die selten gebrauchten Admin-Seiten in einem zugeklappten Untermenü „Admin“ liegen.
-* **Warum machen wir das:** Das Menü ist mit über 15 Einträgen lang geworden. Solarverteilung, Systemmeldungen, Einstellungen, Übersetzungen und Lizenzen braucht man selten; zugeklappt verkürzen sie das Menü, ohne zu verschwinden.
+* **Warum machen wir das:** Das Menü ist mit über 15 Einträgen lang geworden. Einheiten, Solarverteilung, Systemmeldungen, Einstellungen, Übersetzungen und Lizenzen braucht man selten; zugeklappt verkürzen sie das Menü, ohne zu verschwinden.
 * **Ausgangslage:** Alle Einträge stehen flach untereinander. Die meisten Einträge zeigt das Menü unabhängig von den Permissions; erst die Route weist ab.
 
 ## 2. Funktionale Anforderungen (FR) - Was soll das System tun?
@@ -15,15 +15,16 @@
 
    | Untereintrag     | Route                | Permission (aus `app.routes.ts`) | Icon        |
    |------------------|----------------------|----------------------------------|-------------|
+   | Einheiten        | `/einheiten`         | `einheit:read`                   | `grid`      |
    | Solarverteilung  | `/solar-calculation` | `messwerte:write`                | `zap`       |
    | Systemmeldungen  | `/systemmeldungen`   | `systemmeldungen:read`           | `file-text` |
    | Einstellungen    | `/einstellungen`     | `einstellungen:write`            | `settings`  |
    | Übersetzungen    | `/translations`      | `translations:manage`            | `globe`     |
    | Lizenzen         | `/lizenzen`          | `lizenzen:read`                  | `shield`    |
 
-   Diese Einträge stehen nicht mehr in der ersten Ebene. „Admin“ steht nach „Einheiten“, vor Dark Mode, Sprachwahl und Logout.
+   Diese Einträge stehen nicht mehr in der ersten Ebene. „Admin“ steht nach „Statistik“, vor Dark Mode, Sprachwahl und Logout. (Hintergrund: Anhang A.4)
 2. **Sichtbarkeit:** Ein Untereintrag erscheint nur mit der Permission seiner Route. „Admin“ erscheint nur, wenn **mindestens ein** Untereintrag erlaubt ist.
-   > Die Permissions liest das Menü aus der Routen-Konfiguration, damit Menü und Route nicht unterschiedlich entscheiden. Da `zev_user` alle `*:read`-Permissions hat, sieht jeder angemeldete Benutzer „Admin“ mit mindestens Systemmeldungen und Lizenzen.
+   > Die Permissions liest das Menü aus der Routen-Konfiguration, damit Menü und Route nicht unterschiedlich entscheiden. Da `zev_user` alle `*:read`-Permissions hat, sieht jeder angemeldete Benutzer „Admin“ mit mindestens Einheiten, Systemmeldungen und Lizenzen.
 3. **Zugeklappt:** „Admin“ ist zugeklappt – beim Laden, nach jeder Navigation und bei jedem Öffnen des Menüs. Ein Klick auf „Admin“ klappt auf bzw. zu; „Admin“ selbst navigiert nicht. Nach einem Klick auf einen Eintrag ausserhalb von „Admin“ ist es also zugeklappt, wie nach einem Neuladen.
    > Auch ein Klick auf die bereits aktive Seite klappt zu: Er löst keine Navigation aus, deshalb gilt die Regel auch beim Öffnen des Menüs. (Hintergrund: Anhang A.3)
 4. **Ausnahme:** Liegt die aktuelle Seite im Untermenü, ist es aufgeklappt – sonst wäre der aktive Eintrag nicht zu sehen. Ein Klick auf einen Untereintrag lässt „Admin“ deshalb offen.
@@ -46,7 +47,7 @@
 |---------|---------|----------|
 | `ADMIN` | Admin   | Admin    |
 
-Die Untereinträge behalten ihre bestehenden Keys (`SOLAR_DISTRIBUTION`, `SYSTEMMELDUNGEN`, `EINSTELLUNGEN`, `TRANSLATION_EDITOR`, `LIZENZEN`).
+Die Untereinträge behalten ihre bestehenden Keys (`EINHEITEN_VERWALTUNG`, `SOLAR_DISTRIBUTION`, `SYSTEMMELDUNGEN`, `EINSTELLUNGEN`, `TRANSLATION_EDITOR`, `LIZENZEN`).
 
 ### Layout & Navigation
 * **Menüeintrag:** `frontend-service/src/app/components/navigation/navigation.component.html`
@@ -58,9 +59,9 @@ Die Untereinträge behalten ihre bestehenden Keys (`SOLAR_DISTRIBUTION`, `SYSTEM
 * [x] Dark Mode, Sprachwahl und Logout tragen dieselbe Klasse `.zev-navbar__link` wie die übrigen Einträge (Nachweis: navigation.component.html:149, :155, :161)
 
 ### Untermenü „Admin“
-* [x] Mit allen Permissions zeigt „Admin“ die fünf Untereinträge in der Reihenfolge Solarverteilung, Systemmeldungen, Einstellungen, Übersetzungen, Lizenzen; keiner davon steht in der ersten Ebene (Test: navigation.component.spec.ts › Admin-Untermenü › should list the five admin entries in order inside the submenu)
+* [x] Mit allen Permissions zeigt „Admin“ die sechs Untereinträge in der Reihenfolge Einheiten, Solarverteilung, Systemmeldungen, Einstellungen, Übersetzungen, Lizenzen; keiner davon steht in der ersten Ebene (Test: navigation.component.spec.ts › Admin-Untermenü › should list the six admin entries in order inside the submenu)
 * [x] Ohne die Permission eines Untereintrags fehlt dieser Untereintrag, die übrigen bleiben (Test: navigation.component.spec.ts › Admin-Untermenü › should show only the entries the user is permitted to open; navigation.component.spec.ts › Admin-Untermenü › should take the permissions of the entries from the routes)
-* [x] Ohne jede der fünf Permissions fehlt „Admin“ ganz (Test: navigation.component.spec.ts › Admin-Untermenü › should hide Admin when no entry is permitted)
+* [x] Ohne jede der sechs Permissions fehlt „Admin“ ganz (Test: navigation.component.spec.ts › Admin-Untermenü › should hide Admin when no entry is permitted)
 * [x] „Admin“ ist nach dem Laden zugeklappt; ein Klick klappt auf, ein zweiter zu (Test: navigation.component.spec.ts › Admin-Untermenü › should start collapsed and toggle on click)
 * [x] Liegt die aufgerufene Seite im Untermenü, ist es aufgeklappt (Test: navigation.component.spec.ts › Admin-Untermenü › should open the submenu when the current page lies in it; navigation.component.spec.ts › Admin-Untermenü › should keep the submenu closed on a page outside of it)
 * [x] Nach einem Klick auf einen Eintrag ausserhalb von „Admin“ ist „Admin“ zugeklappt; nach einem Klick auf einen Untereintrag bleibt es offen (Test: navigation.component.spec.ts › Admin-Untermenü › should collapse Admin after navigating to a page outside of it; navigation.component.spec.ts › Admin-Untermenü › should keep Admin open after navigating to a page inside of it)
@@ -81,7 +82,7 @@ Die Untereinträge behalten ihre bestehenden Keys (`SOLAR_DISTRIBUTION`, `SYSTEM
 * Routen und URLs bleiben unverändert; Lesezeichen funktionieren weiter.
 
 ## 5. Edge Cases & Fehlerbehandlung
-* Benutzer ohne jede der fünf Permissions → kein „Admin“ (theoretisch; `zev_user` hat `lizenzen:read`).
+* Benutzer ohne jede der sechs Permissions → kein „Admin“ (theoretisch; `zev_user` hat `einheit:read` und `lizenzen:read`).
 * Aufruf einer Admin-Seite per URL oder Neuladen → Untermenü beim Öffnen des Menüs aufgeklappt (FR-2.4).
 * Klick auf die bereits aktive Seite ausserhalb von „Admin“ → keine Navigation; „Admin“ ist beim nächsten Öffnen des Menüs zugeklappt (FR-2.3).
 * Rollen ändern sich in der Sitzung → wirkt erst nach erneutem Anmelden (Rollen stehen im Token, `PermissionDirective`).
@@ -109,3 +110,6 @@ Das Untermenü „Nebenkosten“ wurde entfernt, weil es die einzige echte Seite
 
 ### A.3 Zuklappen nach einem Klick ausserhalb (FR-2.3, 17.10.2026)
 Vorher galt: „Admin“ ist standardmässig zugeklappt und klappt auf, wenn die aufgerufene Seite darin liegt. Einmal aufgeklappt, blieb es aber über jede Navigation hinweg offen – auch nach einem Klick auf einen Eintrag ausserhalb. Zugeklappt war es erst nach einem Neuladen. Gewünscht ist, dass sich ein Klick wie ein Neuladen verhält. Der Zustand ergibt sich deshalb jetzt bei jeder Navigation und bei jedem Öffnen des Menüs aus der aktuellen Seite.
+
+### A.4 Einheiten im Untermenü (FR-2.1, 17.10.2026)
+Zuerst lagen nur Solarverteilung, Systemmeldungen, Einstellungen, Übersetzungen und Lizenzen in „Admin“; „Einheiten“ stand in der ersten Ebene, und „Admin“ folgte darauf. Auch die Einheiten werden selten gepflegt. Sie stehen jetzt als Stammdaten zuoberst im Untermenü, und „Admin“ folgt auf „Statistik“.

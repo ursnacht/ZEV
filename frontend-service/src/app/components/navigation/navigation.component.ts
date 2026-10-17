@@ -74,6 +74,7 @@ export class NavigationComponent implements OnInit, OnDestroy {
    * (Specs/Hamburgermenü.md, FR-2).
    */
   readonly adminEintraege: MenueEintrag[] = [
+    eintrag('/einheiten', 'EINHEITEN_VERWALTUNG', 'grid'),
     eintrag('/solar-calculation', 'SOLAR_DISTRIBUTION', 'zap'),
     eintrag('/systemmeldungen', 'SYSTEMMELDUNGEN', 'file-text'),
     eintrag('/einstellungen', 'EINSTELLUNGEN', 'settings'),

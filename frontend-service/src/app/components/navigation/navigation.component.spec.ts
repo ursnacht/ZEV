@@ -24,7 +24,7 @@ describe('NavigationComponent', () => {
   let component: NavigationComponent;
 
   const ALLE_ADMIN_PERMISSIONS = [
-    'messwerte:write', 'systemmeldungen:read', 'einstellungen:write', 'translations:manage',
+    'einheit:read', 'messwerte:write', 'systemmeldungen:read', 'einstellungen:write', 'translations:manage',
     'lizenzen:read'
   ];
 
@@ -71,12 +71,12 @@ describe('NavigationComponent', () => {
     Array.from(wurzel?.querySelectorAll('a') ?? []).map(a => a.getAttribute('href') ?? '');
 
   describe('Admin-Untermenü', () => {
-    it('should list the five admin entries in order inside the submenu', async () => {
+    it('should list the six admin entries in order inside the submenu', async () => {
       await baue(ALLE_ADMIN_PERMISSIONS);
 
       expect(adminToggle()?.textContent).toContain('ADMIN');
       expect(hrefs(submenu())).toEqual([
-        '/solar-calculation', '/systemmeldungen', '/einstellungen', '/translations', '/lizenzen'
+        '/einheiten', '/solar-calculation', '/systemmeldungen', '/einstellungen', '/translations', '/lizenzen'
       ]);
       // In der ersten Ebene steht keiner davon mehr
       const ersteEbene = Array.from(el().querySelectorAll('.zev-navbar__menu > li > a'))
