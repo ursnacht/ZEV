@@ -12,6 +12,30 @@ import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
 import { FeatureFlagDirective } from '../../directives/feature-flag.directive';
 import { PermissionDirective } from '../../directives/permission.directive';
+import { routes } from '../../app.routes';
+
+/** Ein Untereintrag des Menüs: Route, Beschriftung (Translation-Key), Icon und Permissions. */
+export interface MenueEintrag {
+  route: string;
+  key: string;
+  icon: string;
+  permissions: string[];
+}
+
+/**
+ * Die Permissions einer Route, gelesen aus der Routen-Konfiguration.
+ *
+ * <p>Eine Quelle für Menü und `AuthGuard`: Stünden sie hier ein zweites Mal, könnte das Menü
+ * einen Eintrag zeigen, den die Route abweist - oder umgekehrt.
+ */
+function permissionsDerRoute(route: string): string[] {
+  const pfad = route.replace(/^\//, '');
+  return (routes.find(r => r.path === pfad)?.data?.['permissions'] as string[] | undefined) ?? [];
+}
+
+function eintrag(route: string, key: string, icon: string): MenueEintrag {
+  return { route, key, icon, permissions: permissionsDerRoute(route) };
+}
 
 @Component({
   selector: 'app-navigation',
@@ -46,19 +70,26 @@ export class NavigationComponent implements OnInit, OnDestroy {
   private ersteNavigationSteht = true;
 
   /**
-   * Aufklapp-Zustand eines Untermenues.
-   *
-   * <p><b>Derzeit von keinem Menueeintrag verwendet</b> und dennoch mit Absicht hier: Seit FR-3
-   * fuehrt "Nebenkosten" direkt auf die Abrechnung, das Untermenue ist weg. Die Mechanik bleibt
-   * auf ausdrueckliche Weisung erhalten, damit ein kuenftiges Untermenue nur wieder angeschlossen
-   * werden muss, statt neu geschrieben zu werden.
-   *
-   * <p>Dasselbe gilt fuer die Umgebung: Die Untermenue-Variante im Design System
-   * (`design-system/src/components/navigation/`) samt Showcase und der E2E-Helfer
-   * `oeffneUntermenue` in `tests/helpers.ts` sind unangetastet. Der Helfer merkt von sich aus,
-   * dass kein Untermenue mehr da ist, und tut nichts.
+   * Die selten gebrauchten Seiten im Untermenü "Admin", in Anzeigereihenfolge
+   * (Specs/Hamburgermenü.md, FR-2).
    */
-  isNebenkostenOpen = false;
+  readonly adminEintraege: MenueEintrag[] = [
+    eintrag('/solar-calculation', 'SOLAR_DISTRIBUTION', 'zap'),
+    eintrag('/systemmeldungen', 'SYSTEMMELDUNGEN', 'file-text'),
+    eintrag('/einstellungen', 'EINSTELLUNGEN', 'settings'),
+    eintrag('/translations', 'TRANSLATION_EDITOR', 'globe'),
+    eintrag('/lizenzen', 'LIZENZEN', 'shield')
+  ];
+
+  /** "Admin" erscheint mit einer dieser Permissions - also mit mindestens einem Untereintrag. */
+  readonly adminPermissions: string[] =
+    [...new Set(this.adminEintraege.flatMap(e => e.permissions))];
+
+  /**
+   * Aufklapp-Zustand von "Admin": zugeklappt, ausser die aktuelle Seite liegt darin. Ein Klick auf
+   * "Admin" schaltet um - bis zur naechsten Navigation oder zum naechsten Oeffnen des Menues.
+   */
+  isAdminOpen = false;
 
   @HostListener('window:scroll')
   onWindowScroll(): void {
@@ -76,9 +107,9 @@ export class NavigationComponent implements OnInit, OnDestroy {
     }
     this.currentLang = this.translationService.currentLang();
 
-    // Beim Laden der Seite NUR das Untermenue - das Hauptmenue bleibt zu (siehe
+    // Beim Laden der Seite NUR den Zustand des Untermenues setzen - das Hauptmenue bleibt zu (siehe
     // oeffneMenueBeiNavigation).
-    this.oeffneUntermenueFuer(this.router.url);
+    this.setzeUntermenueFuer(this.router.url);
 
     // Listen for route changes
     this.routerSubscription = this.router.events.pipe(
@@ -108,7 +139,7 @@ export class NavigationComponent implements OnInit, OnDestroy {
    * geoeffnet.
    */
   private oeffneMenueBeiNavigation(url: string): void {
-    this.oeffneUntermenueFuer(url);
+    this.setzeUntermenueFuer(url);
 
     if (this.ersteNavigationSteht) {
       this.ersteNavigationSteht = false;
@@ -120,16 +151,16 @@ export class NavigationComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Klappt das Untermenue auf, in dem die aufgerufene Seite liegt.
+   * Setzt "Admin" auf den Zustand, den die Seite vorgibt: aufgeklappt genau dann, wenn sie darin
+   * liegt (FR-2.3, FR-2.4).
    *
-   * <p>Anders als das Hauptmenue auch beim <b>Laden</b>: Sonst waere der aktive Eintrag nach einem
-   * Reload nicht sichtbar. Ohne Untermenue im Menue bleibt das ohne Wirkung; die Zeile gehoert zur
-   * erhaltenen Mechanik (siehe isNebenkostenOpen).
+   * <p>Beim Laden, nach jeder Navigation und beim Oeffnen des Menues - so verhaelt sich das Menue
+   * nach einem Klick wie nach einem Reload. Das Oeffnen braucht es zusaetzlich: Ein Klick auf die
+   * bereits aktive Seite loest keine Navigation aus.
    */
-  private oeffneUntermenueFuer(url: string): void {
-    if (url.startsWith('/nebenkosten')) {
-      this.isNebenkostenOpen = true;
-    }
+  private setzeUntermenueFuer(url: string): void {
+    this.isAdminOpen = this.adminEintraege.some(e => url === e.route
+        || url.startsWith(e.route + '/') || url.startsWith(e.route + '?'));
   }
 
   private extractOrganization(): void {
@@ -187,6 +218,9 @@ export class NavigationComponent implements OnInit, OnDestroy {
 
   toggleMenu() {
     this.isMenuOpen = !this.isMenuOpen;
+    if (this.isMenuOpen) {
+      this.setzeUntermenueFuer(this.router.url);
+    }
   }
 
   closeMenu() {
@@ -194,12 +228,9 @@ export class NavigationComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Klappt ein Untermenue auf/zu.
-   *
-   * <p>Zurzeit ruft es niemand - siehe {@link isNebenkostenOpen}. Ein Elterneintrag, der nur
-   * aufklappt, braucht einen Button und keinen Link; ein Eintrag, der navigiert, einen Link.
+   * Klappt "Admin" auf/zu. Der Elterneintrag ist ein Button, kein Link: Er navigiert nicht.
    */
-  toggleNebenkosten(): void {
-    this.isNebenkostenOpen = !this.isNebenkostenOpen;
+  toggleAdmin(): void {
+    this.isAdminOpen = !this.isAdminOpen;
   }
 }

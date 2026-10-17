@@ -180,19 +180,26 @@ a.zev-navbar__link:hover {
   transform: rotate(180deg);
 }
 
+/* Zugeklappt auch unsichtbar: Sonst blieben die Untereintraege trotz max-height 0 per Tab
+   fokussierbar. visibility schaltet erst nach dem Zuklappen um (Verzoegerung), damit die
+   Animation sichtbar bleibt; beim Aufklappen sofort. */
 .zev-navbar__submenu {
   list-style: none;
   padding: 0;
   margin: 0;
   overflow: hidden;
   max-height: 0;
-  transition: max-height var(--transition-fast) ease-in-out;
+  visibility: hidden;
+  transition: max-height var(--transition-fast) ease-in-out,
+    visibility 0s linear var(--transition-fast);
 }
 
 .zev-navbar__submenu--open {
   /* Grosszuegig bemessen: reicht fuer die absehbare Zahl an Untereintraegen und
      erlaubt die Animation, die mit height:auto nicht moeglich waere. */
   max-height: 20rem;
+  visibility: visible;
+  transition: max-height var(--transition-fast) ease-in-out, visibility 0s;
 }
 
 /* Untereintraege eingerueckt, damit die Hierarchie ohne Linien erkennbar ist. */

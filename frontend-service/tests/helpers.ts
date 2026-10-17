@@ -157,13 +157,10 @@ export async function openHamburgerMenu(page: Page): Promise<void> {
 }
 
 /**
- * Klappt das Untermenü auf, in dem der Eintrag liegt (z.B. Nebenkosten).
+ * Klappt das Untermenü auf, in dem der Eintrag liegt (z.B. Admin).
  *
- * Zwingend VOR dem Klick auf den Eintrag: Ein eingeklapptes Untermenü ist
- * `max-height: 0` mit `overflow: hidden` — der Eintrag behält damit eine Bounding-Box und gilt
- * für Playwright als sichtbar. Der Klick geht auf seine Mitte, die weggeschnitten ist, und trifft
- * die Umschalt-Schaltfläche darüber: Das Menü klappt auf, navigiert wird aber nicht. Der Test
- * scheitert dann erst später beim Warten auf die URL, und die Meldung nennt nur das Symptom.
+ * Zwingend VOR dem Klick auf den Eintrag: Ein eingeklapptes Untermenü ist `visibility: hidden`
+ * (Design System, `.zev-navbar__submenu`), sein Eintrag also weder sichtbar noch klickbar.
  *
  * Tut nichts, wenn der Eintrag nicht in einem Untermenü liegt oder es bereits offen ist.
  */
@@ -197,8 +194,11 @@ export async function navigateViaMenu(page: Page, href: string): Promise<void> {
     await navigateToHome(page);
     await openHamburgerMenu(page);
     const menuLink = page.locator(`a[href="${href}"]`);
-    await menuLink.waitFor({ state: 'visible', timeout: 5000 });
+    // Erst aufklappen: Ein zugeklapptes Untermenue ist unsichtbar (visibility: hidden), das
+    // Warten auf den sichtbaren Link liefe sonst in den Timeout.
+    await menuLink.waitFor({ state: 'attached', timeout: 5000 });
     await oeffneUntermenue(page, href);
+    await menuLink.waitFor({ state: 'visible', timeout: 5000 });
     // Das Hamburger-Menü kann bei vielen Einträgen scrollen -> Eintrag zuerst in den
     // Sichtbereich bringen. Falls das Overlay in headless zeitweise nicht klickbar ist
     // (z.B. Cold-Start-Layout), sauber auf direkte Navigation zurückfallen.

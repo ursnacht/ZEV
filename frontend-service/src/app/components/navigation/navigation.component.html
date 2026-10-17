@@ -98,13 +98,6 @@
        </a>
       </li>
       <li>
-        <a routerLink="/solar-calculation" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
-          (click)="closeMenu()">
-          <app-icon name="zap"></app-icon>
-          {{ 'SOLAR_DISTRIBUTION' | translate }}
-        </a>
-      </li>
-      <li>
         <a routerLink="/chart" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
           <app-icon name="bar-chart-2"></app-icon>
@@ -119,39 +112,38 @@
         </a>
       </li>
       <li>
-        <a routerLink="/systemmeldungen" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
-          (click)="closeMenu()">
-          <app-icon name="file-text"></app-icon>
-          {{ 'SYSTEMMELDUNGEN' | translate }}
-        </a>
-      </li>
-      <li>
         <a routerLink="/einheiten" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
           (click)="closeMenu()">
           <app-icon name="grid"></app-icon>
           {{ 'EINHEITEN_VERWALTUNG' | translate }}
         </a>
       </li>
-      <li>
-        <a routerLink="/einstellungen" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
-          (click)="closeMenu()">
-          <app-icon name="settings"></app-icon>
-          {{ 'EINSTELLUNGEN' | translate }}
-        </a>
-      </li>
-      <li>
-        <a routerLink="/translations" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
-          (click)="closeMenu()">
-          <app-icon name="globe"></app-icon>
-          {{ 'TRANSLATION_EDITOR' | translate }}
-        </a>
-      </li>
-      <li>
-        <a routerLink="/lizenzen" routerLinkActive="zev-navbar__link--active" class="zev-navbar__link"
-          (click)="closeMenu()">
-          <app-icon name="shield"></app-icon>
-          {{ 'LIZENZEN' | translate }}
-        </a>
+      <!-- Selten gebrauchte Seiten, zugeklappt (Specs/Hamburgermenü.md, FR-2). "Admin" erscheint
+           nur, wenn mindestens ein Untereintrag erlaubt ist; jeder Untereintrag mit der Permission
+           seiner Route. -->
+      <li *appPermission="adminPermissions">
+        <button type="button"
+          class="zev-navbar__link zev-navbar__submenu-toggle"
+          [class.zev-navbar__submenu-toggle--open]="isAdminOpen"
+          [attr.aria-expanded]="isAdminOpen"
+          (click)="toggleAdmin()">
+          <span class="zev-navbar__submenu-label">
+            <app-icon name="tool"></app-icon>
+            {{ 'ADMIN' | translate }}
+          </span>
+          <app-icon name="chevron-down" class="zev-navbar__submenu-icon"></app-icon>
+        </button>
+        <ul class="zev-navbar__submenu" [class.zev-navbar__submenu--open]="isAdminOpen">
+          @for (eintrag of adminEintraege; track eintrag.route) {
+            <li *appPermission="eintrag.permissions">
+              <a [routerLink]="eintrag.route" routerLinkActive="zev-navbar__link--active"
+                class="zev-navbar__link" (click)="closeMenu()">
+                <app-icon [name]="eintrag.icon"></app-icon>
+                {{ eintrag.key | translate }}
+              </a>
+            </li>
+          }
+        </ul>
       </li>
       <li>
         <button (click)="toggleDarkMode()" class="zev-navbar__link">
