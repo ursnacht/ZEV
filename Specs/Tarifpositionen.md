@@ -29,8 +29,9 @@
 
 1. Ein Benutzer legt in der **Tarifverwaltung** einen Tarif vom Typ **`ZUSATZ`** an. Zusätzlich zu
    Bezeichnung, Preis und Gültigkeit wählt er eine **Mengeneinheit**: `kWh`, `Monat` oder `Stück`.
-   Das Feld erscheint **nur** bei diesem Typ — analog zum Feld „Produzent verrechnen", das nur bei
-   `GRUNDGEBUEHR` sichtbar ist.
+   Bei `ZEV`, `VNB` und `LADESTROM` ist das Feld ausgeblendet, weil deren Einheit aus dem Typ
+   folgt; die Grundgebühr bietet Monat oder Tag an (`Specs/Tarifverwaltung.md`, FR-3; Hintergrund:
+   Anhang A.10).
 2. **Mehrere `ZUSATZ`-Tarife dürfen gleichzeitig gültig sein.** Die Überschneidungsprüfung
    greift für diesen Typ **nicht**: Sauna, Waschküche und Gästezimmer sind alle vom Typ `ZUSATZ`
    und müssen nebeneinander bestehen. Für `ZEV`, `VNB` und `GRUNDGEBUEHR` gilt
@@ -100,8 +101,9 @@
 * **Tarifverwaltung**
   - `ZUSATZ` erscheint im Typ-Dropdown.
   - Bei ausgewähltem `ZUSATZ` erscheint ein zusätzliches Dropdown **Mengeneinheit**
-    (kWh / Monat / Stück) mit Hinweistext. Umschalten auf einen anderen Typ blendet es wieder aus
-    und verwirft den Wert. Vorlage: der nur bei `GRUNDGEBUEHR` sichtbare Block
+    (kWh / Monat / Stück) mit Hinweistext. Umschalten auf `ZEV`, `VNB` oder `LADESTROM` blendet es
+    wieder aus und verwirft den Wert; bei der Grundgebühr zeigt es Monat und Tag
+    (`Specs/Tarifverwaltung.md`, FR-3). Vorlage: der nur bei `GRUNDGEBUEHR` sichtbare Block
     „Produzent verrechnen" in `tarif-form.component.html`.
   - Ein `ZUSATZ`-Tarif mit Mengeneinheit **Monat** kann einen **Jahrespreis** tragen, der anteilig
     verrechnet wird (`Specs/Tarifverwaltung.md`, FR-6).
@@ -131,48 +133,50 @@
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
 ### Tarif
-* [ ] In der Tarifverwaltung lässt sich ein Tarif vom Typ `ZUSATZ` mit Mengeneinheit `kWh`,
-      `Monat` oder `Stück` anlegen, bearbeiten und löschen.
-* [ ] Das Feld **Mengeneinheit** ist **nur** bei Typ `ZUSATZ` sichtbar und dort **Pflicht**;
-      ohne Auswahl ist das Speichern nicht möglich (Serverseitig `400`, Formular deaktiviert).
-* [ ] **Zwei `ZUSATZ`-Tarife mit überlappender Gültigkeit lassen sich beide speichern.**
-* [ ] Zwei `LADESTROM`-Tarife mit überlappender Gültigkeit werden **abgewiesen**, auch mit
+* [x] In der Tarifverwaltung lässt sich ein Tarif vom Typ `ZUSATZ` mit Mengeneinheit `kWh`,
+      `Monat` oder `Stück` anlegen, bearbeiten und löschen. (Test: tarif-form.component.spec.ts › mengeneinheit (ZUSATZ, GRUNDGEBUEHR) › should offer kWh, month and piece for ZUSATZ; Test: tarif-form.component.spec.ts › mengeneinheit (ZUSATZ, GRUNDGEBUEHR) › should keep the unit of an existing ZUSATZ tariff and save a changed one; Test: TarifServiceTest#deleteTarif_Exists_ReturnsTrue; E2E: tarifpositionen.spec.ts › should show and require the unit field for ZUSATZ, not for LADESTROM; E2E: tarifpositionen.spec.ts › should allow two overlapping zusatz tariffs; E2E: tarifpositionen.spec.ts › afterEach (löscht die angelegten `ZUSATZ`-Tarife über die Maske, scheitert sichtbar bei Rückstand))
+* [x] Das Feld **Mengeneinheit** ist bei Typ `ZUSATZ` sichtbar und dort **Pflicht** (kWh, Monat,
+      Stück), bei `ZEV`, `VNB` und `LADESTROM` ausgeblendet; ohne Auswahl ist das Speichern eines
+      `ZUSATZ`-Tarifs nicht möglich (Serverseitig `400`, Formular deaktiviert). Für die
+      Grundgebühr gilt `Specs/Tarifverwaltung.md`, FR-3. (Test: TarifServiceTest#saveTarif_ZusatzOhneMengeneinheit_ThrowsException; Test: TarifControllerTest#createTarif_OverlappingTarif_ReturnsBadRequest (IllegalArgumentException → 400); Test: tarif-form.component.spec.ts › mengeneinheit (ZUSATZ, GRUNDGEBUEHR) › should not require a unit for the fixed types; Test: tarif-form.component.spec.ts › mengeneinheit (ZUSATZ, GRUNDGEBUEHR) › should render the unit dropdown for ZUSATZ but not for the fixed types; Test: tarif-form.component.spec.ts › mengeneinheit (ZUSATZ, GRUNDGEBUEHR) › should be invalid while a ZUSATZ tariff has no unit; E2E: tarifpositionen.spec.ts › should show and require the unit field for ZUSATZ, not for LADESTROM)
+* [x] **Zwei `ZUSATZ`-Tarife mit überlappender Gültigkeit lassen sich beide speichern.** (Test: TarifServiceTest#saveTarif_ZweiUeberlappendeZusatzTarife_SavesBoth; E2E: tarifpositionen.spec.ts › should allow two overlapping zusatz tariffs)
+* [x] Zwei `LADESTROM`-Tarife mit überlappender Gültigkeit werden **abgewiesen**, auch mit
       anderer Bezeichnung; für `ZEV`/`VNB`/`GRUNDGEBUEHR` gelten die Kriterien von
-      `Specs/Tarifverwaltung.md`, FR-2.
-* [ ] Ein `ZUSATZ`-Tarif, auf den Positionen verweisen, lässt sich **nicht** löschen (bestehende
-      Regel, Meldung mit Anzahl).
+      `Specs/Tarifverwaltung.md`, FR-2. (Test: TarifServiceTest#saveTarif_LadestromUeberschneidung_ThrowsException; Test: TarifServiceTest#saveTarif_OverlappingTarifGleicheBezeichnung_ThrowsException; Test: TarifServiceTest#saveTarif_VnbNetznutzungNebenEnergielieferung_SavesSuccessfully; Test: TarifServiceTest#saveTarif_DreiGrundgebuehren_PruefungJeBezeichnung; E2E: ladestromtarif.spec.ts › should reject a second LADESTROM tariff with overlapping validity but accept an adjacent one)
+* [x] Ein `ZUSATZ`-Tarif, auf den Positionen verweisen, lässt sich **nicht** löschen (bestehende
+      Regel, Meldung mit Anzahl). (Test: TarifServiceTest#deleteTarif_MitTarifpositionen_ThrowsException; E2E: ladestationen.spec.ts › should refuse deleting a tariff that positions refer to)
 
 ### Erfassung
-* [ ] Beim Öffnen der Seite Tarifpositionen ist die Checkbox „Nur Ladestationen" **gesetzt** und
-      die Einheiten-Auswahl enthält **ausschliesslich** Ladestationen.
-* [ ] Nach dem Abwählen der Checkbox enthält die Auswahl zusätzlich die **Konsumenten**-Einheiten;
-      Produzenten und Bilanz-Einheiten (Bezug/Rücklieferung) erscheinen **nie**.
-* [ ] Bei gewählter **Konsumenten**-Einheit sind ausschliesslich `ZUSATZ`-Tarife wählbar;
-      `LADESTROM` erscheint dort **nicht**.
-* [ ] Bei gewählter **Ladestations**-Einheit sind `LADESTROM` und `ZUSATZ` wählbar,
-      `GRUNDGEBUEHR` dagegen nicht.
-* [ ] Wird die Checkbox bei gewählter Konsumenten-Einheit wieder gesetzt, ist **keine** Einheit
-      mehr ausgewählt und die Positionsliste ist leer.
-* [ ] Beschriftung und Hinweis des Mengenfelds nennen die Mengeneinheit des gewählten Tarifs
-      (`kWh` / `Monate` / `Stück`).
-* [ ] Für dieselbe Einheit und dasselbe Quartal lassen sich **mehrere `ZUSATZ`-Positionen mit
-      verschiedenen Tarifen** erfassen (z.B. Sauna und Waschküche).
-* [ ] Eine **zweite Position mit demselben `ZUSATZ`-Tarif** für dieselbe Einheit und dasselbe
-      Quartal wird **abgewiesen** (Meldung, kein Datensatz).
-* [ ] Das Erfassen einer Position an einer Einheit vom Typ `PRODUCER`, `BEZUG` oder
-      `RUECKLIEFERUNG` wird serverseitig **abgewiesen** (`400`), auch bei manipuliertem Request.
+* [x] Beim Öffnen der Seite Tarifpositionen ist die Checkbox „Nur Ladestationen" **gesetzt** und
+      die Einheiten-Auswahl enthält **ausschliesslich** Ladestationen. (Test: tarifposition-list.component.spec.ts › nurLadestationen (Checkbox) › should be checked by default and offer charging stations only; Test: tarifposition-list.component.spec.ts › einheiten-auswahl › should offer only einheiten of type LADESTATION; E2E: tarifpositionen.spec.ts › should offer consumers only when the filter is unchecked)
+* [x] Nach dem Abwählen der Checkbox enthält die Auswahl zusätzlich die **Konsumenten**-Einheiten;
+      Produzenten und Bilanz-Einheiten (Bezug/Rücklieferung) erscheinen **nie**. (Test: tarifposition-list.component.spec.ts › nurLadestationen (Checkbox) › should add the consumers when unchecked, but never producers; Test: tarifposition-list.component.spec.ts › einheiten-auswahl › should offer only einheiten of type LADESTATION; E2E: tarifpositionen.spec.ts › should offer consumers only when the filter is unchecked)
+* [x] Bei gewählter **Konsumenten**-Einheit sind ausschliesslich `ZUSATZ`-Tarife wählbar;
+      `LADESTROM` erscheint dort **nicht**. (Test: tarifposition-list.component.spec.ts › tarifeFuerAuswahl › should offer only zusatz for a consumer; Test: TarifpositionServiceTest#saveTarifposition_KonsumentMitLadestromTarif_ThrowsException; E2E: tarifpositionen.spec.ts › should record a zusatz position for a consumer)
+* [x] Bei gewählter **Ladestations**-Einheit sind `LADESTROM` und `ZUSATZ` wählbar,
+      `GRUNDGEBUEHR` dagegen nicht. (Test: tarifposition-list.component.spec.ts › tarifeFuerAuswahl › should offer ladestrom and zusatz for a charging station; Test: TarifpositionServiceTest#saveTarifposition_GrundgebuehrTariftyp_ThrowsException; E2E: ladestromtarif.spec.ts › should offer only manually captured tariff types and reject a negative quantity)
+* [x] Wird die Checkbox bei gewählter Konsumenten-Einheit wieder gesetzt, ist **keine** Einheit
+      mehr ausgewählt und die Positionsliste ist leer. (Test: tarifposition-list.component.spec.ts › nurLadestationen (Checkbox) › should reset a consumer selection when checked again; E2E: tarifpositionen.spec.ts › should offer consumers only when the filter is unchecked)
+* [x] Beschriftung und Hinweis des Mengenfelds nennen die Mengeneinheit des gewählten Tarifs
+      (`kWh` / `Monate` / `Stück`). (Test: tarifposition-form.component.spec.ts › mengeneinheit nach Tarif › should label a ladestrom position in kWh; Test: tarifposition-form.component.spec.ts › mengeneinheit nach Tarif › should label a zusatz position in months; Test: tarifposition-form.component.spec.ts › mengeneinheit nach Tarif › should label a zusatz position in pieces; Test: tarifposition-form.component.spec.ts › mengeneinheit nach Tarif › should render the unit in the label; E2E: tarifpositionen.spec.ts › should record a zusatz position for a consumer)
+* [x] Für dieselbe Einheit und dasselbe Quartal lassen sich **mehrere `ZUSATZ`-Positionen mit
+      verschiedenen Tarifen** erfassen (z.B. Sauna und Waschküche). (Test: TarifpositionServiceTest#saveTarifposition_ZweiZusatzPositionenVerschiedenerTarife_SavesBoth)
+* [x] Eine **zweite Position mit demselben `ZUSATZ`-Tarif** für dieselbe Einheit und dasselbe
+      Quartal wird **abgewiesen** (Meldung, kein Datensatz). (Test: TarifpositionServiceTest#saveTarifposition_ZweitePositionMitDemselbenZusatzTarif_ThrowsException; Test: TarifpositionControllerTest#createTarifposition_DuplicatePosition_ReturnsBadRequest; Test: tarifposition-list.component.spec.ts › onFormSubmit - create › should show the duplicate message from the server and keep the form open)
+* [x] Das Erfassen einer Position an einer Einheit vom Typ `PRODUCER`, `BEZUG` oder
+      `RUECKLIEFERUNG` wird serverseitig **abgewiesen** (`400`), auch bei manipuliertem Request. (Test: TarifpositionServiceTest#saveTarifposition_EinheitVomTypProducer_ThrowsException; Test: TarifpositionServiceTest#saveTarifposition_EinheitVomTypBezug_ThrowsException; Test: TarifpositionServiceTest#saveTarifposition_EinheitVomTypRuecklieferung_ThrowsException; Test: TarifpositionControllerTest#createTarifposition_EinheitNichtVomTypLadestation_ReturnsBadRequest)
 
 ### Rechnung
-* [ ] Eine `ZUSATZ`-Position an einer Konsumenten-Einheit erscheint auf der Rechnung des Mieters
-      als eigene Zeile mit der **am Tarif hinterlegten Mengeneinheit**.
-* [ ] Mehrere `ZUSATZ`-Positionen desselben Quartals erscheinen als **mehrere Zeilen**.
-* [ ] Eine Position mit **Menge = 0** erzeugt **keine** Rechnungszeile (bestehende Regel).
-* [ ] Die automatische Grundgebühr und die ZEV-/VNB-Zeilen bleiben unverändert.
+* [x] Eine `ZUSATZ`-Position an einer Konsumenten-Einheit erscheint auf der Rechnung des Mieters
+      als eigene Zeile mit der **am Tarif hinterlegten Mengeneinheit**. (Test: RechnungServiceTest#berechneRechnung_ZusatzPositionenAnWohnung_JeEigeneZeileMitEinheitDesTarifs; RechnungServiceTest#berechneRechnung_ZusatzMitJahrespreis_MonateDurchZwoelf; Test: RechnungServiceTest#berechneRechnungen_WohnungUndLadestationAusgewaehlt_ErzeugtGenauEineRechnung; Test: MengeneinheitTest#keyFuer_EinzahlUndMehrzahl)
+* [x] Mehrere `ZUSATZ`-Positionen desselben Quartals erscheinen als **mehrere Zeilen**. (Test: RechnungServiceTest#berechneRechnung_ZusatzPositionenAnWohnung_JeEigeneZeileMitEinheitDesTarifs; RechnungServiceTest#berechneRechnungen_MieterMitZweiLadestationen_BeidePositionenAlsEigeneZeile)
+* [x] Eine Position mit **Menge = 0** erzeugt **keine** Rechnungszeile (bestehende Regel). (Test: TarifpositionRepositoryIT#shouldExcludePositionsWithMengeZero; E2E: ladestromtarif.spec.ts › should bill a charging unit whose tenant has no apartment, but not for a zero quantity)
+* [x] Die automatische Grundgebühr und die ZEV-/VNB-Zeilen bleiben unverändert. (Test: RechnungServiceTest#berechneRechnung_LadestromZeilen_AfterZevVnbAndBeforeGrundgebuehr; Test: RechnungServiceTest#berechneRechnung_KeineTarifpositionen_RechnungUnveraendert)
 
 ### Sicherheit / Mandant
-* [ ] Erfassen/Ändern/Löschen von Positionen erfordert `rechnungen:manage`, das Anlegen von
-      Tarifen `tarife:manage`; ohne diese Permission → `403`.
-* [ ] Ein Mandant sieht ausschliesslich seine eigenen Tarife und Positionen (`org_id`).
+* [x] Erfassen/Ändern/Löschen von Positionen erfordert `rechnungen:manage`, das Anlegen von
+      Tarifen `tarife:manage`; ohne diese Permission → `403`. (Test: ControllerAuthorizationTest#updateTarifposition_withMieterReadOnly_forbidden; Test: ControllerAuthorizationTest#getTarife_withMieterReadOnly_forbidden; Test: ControllerAuthorizationTest#createTarif_withRechnungenManageOnly_forbidden; Test: ControllerAuthorizationTest#getTarife_withTarifeManage_reachesController; Test: ControllerAuthorizationTest#getTarife_unauthenticated_unauthorized; Test: ControllerAuthorizationTest#createTarifposition_withMieterReadOnly_forbidden; Test: ControllerAuthorizationTest#deleteTarifposition_withMieterReadOnly_forbidden; Test: ControllerAuthorizationTest#createTarifposition_withRechnungenManage_reachesController)
+* [x] Ein Mandant sieht ausschliesslich seine eigenen Tarife und Positionen (`org_id`). (Test: TarifRepositoryIT#shouldNotSeeTarifOfOtherOrgWhenOrgFilterEnabled; Test: TarifpositionRepositoryIT#shouldNotSeeTarifpositionOfOtherOrgWhenOrgFilterEnabled)
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
@@ -353,3 +357,10 @@ FR-6 vom 10./11.10.2026) Teile dieser Spec abgelöst hat. Vorher stand hier:
 * Edge Case: Beim Wechsel weg von `ZUSATZ` wird die Mengeneinheit immer `NULL`.
 
 Ergänzt wurde der Verweis auf den Jahrespreis für `ZUSATZ` pro Monat (Tarifverwaltung FR-6).
+
+### A.10 Mengeneinheit nicht mehr nur bei `ZUSATZ` (FR-1.1, FR-3, 18.10.2026)
+Vorher hiess es: „Das Feld erscheint **nur** bei diesem Typ" (FR-1.1), „Umschalten auf einen anderen
+Typ blendet es wieder aus und verwirft den Wert" (FR-3) und im Akzeptanzkriterium „Das Feld
+**Mengeneinheit** ist **nur** bei Typ `ZUSATZ` sichtbar". Seit `Specs/Tarifverwaltung.md`, FR-3
+(10.10.2026) zeigt die Tarifmaske das Feld auch bei der Grundgebühr (Monat, Tag). Aufgefallen beim
+Akzeptanzkriterien-Check vom 18.10.2026.

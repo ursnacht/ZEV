@@ -327,7 +327,7 @@ test.afterEach(async ({ page, browserName }) => {
 // ---------------------------------------------------------------------------
 
 test.describe('Tarifpositionen - Tariftyp Zusatzleistung', () => {
-    test('should show the unit field only for ZUSATZ and require it', async ({ page }) => {
+    test('should show and require the unit field for ZUSATZ, not for LADESTROM', async ({ page }) => {
         await navigateToTarife(page);
         await waitForTableWithData(page, 10000);
         await page.locator('button.zev-button--primary').first().click();

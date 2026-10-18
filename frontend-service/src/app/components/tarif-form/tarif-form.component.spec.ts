@@ -91,7 +91,7 @@ describe('TarifFormComponent', () => {
       expect(component.brauchtMengeneinheit).toBe(true);
     });
 
-    it('should render the unit dropdown only for ZUSATZ', () => {
+    it('should render the unit dropdown for ZUSATZ but not for the fixed types', () => {
       component.formData.tariftyp = TarifTyp.LADESTROM;
       fixture.detectChanges();
       expect(fixture.nativeElement.querySelector('#mengeneinheit')).toBeNull();
@@ -193,6 +193,25 @@ describe('TarifFormComponent', () => {
       component.onTariftypChange();
 
       expect(component.formData.mengeneinheit).toBeUndefined();
+    });
+
+    it('should keep the unit of an existing ZUSATZ tariff and save a changed one', () => {
+      // Specs/Tarifpositionen.md, Tarif: ZUSATZ-Tarif bearbeiten
+      const saveSpy = vi.spyOn(component.save, 'emit');
+      component.tarif = {
+        id: 9, bezeichnung: 'Sauna', tariftyp: TarifTyp.ZUSATZ, mengeneinheit: Mengeneinheit.STUECK,
+        preis: 5, gueltigVon: '2026-01-01', gueltigBis: '2026-12-31'
+      };
+      component.ngOnInit();
+      fixture.detectChanges();
+      expect(component.formData.mengeneinheit).toBe(Mengeneinheit.STUECK);
+      expect(fixture.nativeElement.querySelector('#mengeneinheit')).not.toBeNull();
+
+      component.formData.mengeneinheit = Mengeneinheit.MONAT;
+      component.onSubmit();
+
+      expect(saveSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 9, tariftyp: TarifTyp.ZUSATZ, mengeneinheit: Mengeneinheit.MONAT }));
     });
 
     it('should keep the unit while staying on ZUSATZ', () => {

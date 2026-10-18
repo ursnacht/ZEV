@@ -1912,6 +1912,44 @@ public class RechnungServiceTest {
         assertEquals("MONATE", zeile.getMengeEinheit());
     }
 
+    /**
+     * Specs/Tarifpositionen.md, Rechnung: Zusatz-Positionen an der Wohnung selbst (nicht an einer
+     * Ladestation) erscheinen je als eigene Zeile mit der Einheit ihres Tarifs.
+     */
+    @Test
+    void berechneRechnung_ZusatzPositionenAnWohnung_JeEigeneZeileMitEinheitDesTarifs() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 3, 31);
+        Mieter mieter = mieterMitMesswerten(von, bis);
+        Tarif sauna = new Tarif("Sauna", TarifTyp.ZUSATZ, new BigDecimal("5.00000"),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31));
+        sauna.setId(201L);
+        sauna.setMengeneinheit(Mengeneinheit.STUECK);
+        Tarif waschkueche = new Tarif("Waschküche", TarifTyp.ZUSATZ, new BigDecimal("12.00000"),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31));
+        waschkueche.setId(202L);
+        waschkueche.setMengeneinheit(Mengeneinheit.MONAT);
+        Tarifposition saunaPosition = tarifposition(sauna, consumer, 2024, 1, "4");
+        Tarifposition waschPosition = tarifposition(waschkueche, consumer, 2024, 1, "3");
+        waschPosition.setId(2L);
+        when(tarifpositionService.getFuerRechnung(anyCollection(), eq(von), eq(bis)))
+            .thenReturn(List.of(saunaPosition, waschPosition));
+
+        List<TarifZeileDTO> zusatz = rechnungService.berechneRechnung(consumer, mieter, von, bis)
+            .getTarifZeilen().stream().filter(z -> z.getTyp() == TarifTyp.ZUSATZ).toList();
+
+        assertEquals(2, zusatz.size());
+        TarifZeileDTO saunaZeile = zusatz.stream()
+            .filter(z -> z.getBezeichnung().startsWith("Sauna")).findFirst().orElseThrow();
+        TarifZeileDTO waschZeile = zusatz.stream()
+            .filter(z -> z.getBezeichnung().startsWith("Waschküche")).findFirst().orElseThrow();
+        assertEquals("STUECK", saunaZeile.getMengeEinheit());
+        assertBetrag("4", saunaZeile.getMenge());
+        assertBetrag("20", saunaZeile.getBetrag());
+        assertEquals("MONATE", waschZeile.getMengeEinheit());
+        assertBetrag("36", waschZeile.getBetrag());
+    }
+
     // ─── Einheit in der Mengenspalte (Specs/RechnungenGenerieren.md) ───────────
 
     @Test

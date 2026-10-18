@@ -710,7 +710,7 @@ test.describe('Ladestromtarif - Tarifpositionen', () => {
         await selectEinheit(page, LADESTATION_NAME);
         await openPositionsForm(page);
 
-        // Manuell erfassbar sind LADESTROM und GRUNDGEBUEHR (Specs/Ladestromtarif.md FR-6)
+        // Manuell erfassbar sind LADESTROM und ZUSATZ (Specs/Tarifpositionen.md, FR-2)
         const optionen = await page.locator('#tarifId option').allTextContents();
         const waehlbar = optionen.map(o => o.trim()).filter(o => !/wählen|select/i.test(o));
         expect(waehlbar.length).toBeGreaterThan(0);

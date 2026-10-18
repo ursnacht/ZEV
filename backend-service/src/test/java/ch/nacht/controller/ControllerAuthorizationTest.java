@@ -17,6 +17,7 @@ import ch.nacht.service.OrganizationContextService;
 import ch.nacht.service.PreiszeitreiheService;
 import ch.nacht.service.ProduktionsprognoseService;
 import ch.nacht.service.SteuerungService;
+import ch.nacht.service.TarifService;
 import ch.nacht.service.TarifpositionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,7 +60,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Authentifizierung → 401. Deckt insbesondere die Abgrenzung {@code org_admin} (darf Einstellungen,
  * aber keine Feature-Flags) ab.
  */
-@WebMvcTest({EinstellungenController.class, FeatureFlagController.class, TarifpositionController.class,
+@WebMvcTest({EinstellungenController.class, FeatureFlagController.class, TarifController.class,
+        TarifpositionController.class,
         EinheitController.class, MieterController.class, NkAbrechnungController.class,
         NkRechnungController.class, SystemmeldungController.class, PreiszeitreiheController.class,
         SteuerungController.class})
@@ -78,6 +80,9 @@ class ControllerAuthorizationTest {
 
     @MockitoBean
     private NkRechnungService nkRechnungService;
+
+    @MockitoBean
+    private TarifService tarifService;
 
     @MockitoBean
     private TarifpositionService tarifpositionService;
@@ -233,6 +238,20 @@ class ControllerAuthorizationTest {
     }
 
     @Test
+    void updateTarifposition_withMieterReadOnly_forbidden() throws Exception {
+        // Die GET-Methoden desselben Controllers erlauben mieter:read auf Methodenebene - eine
+        // dorthin kopierte Ueberschreibung am PUT fiele ohne diesen Test nicht auf
+        mockMvc.perform(put("/api/tarifpositionen/1")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("mieter:read")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"einheitId\":1,\"tarifId\":1,\"jahr\":2026,\"quartal\":1,\"menge\":10}"))
+                .andExpect(status().isForbidden());
+
+        verify(tarifpositionService, never()).saveTarifposition(any());
+    }
+
+    @Test
     void deleteTarifposition_withMieterReadOnly_forbidden() throws Exception {
         mockMvc.perform(delete("/api/tarifpositionen/1")
                         .with(jwt().authorities(new SimpleGrantedAuthority("mieter:read")))
@@ -250,6 +269,49 @@ class ControllerAuthorizationTest {
                         .with(jwt().authorities(new SimpleGrantedAuthority("rechnungen:manage")))
                         .with(csrf()))
                 .andExpect(status().isNoContent());
+    }
+
+    // ==================== Tarife: tarife:manage ====================
+    // Specs/Tarifpositionen.md, Sicherheit: Tarife anlegen nur mit tarife:manage (org_admin,
+    // zev_admin). TarifControllerTest laeuft ohne Security-Filter und deckt das nicht ab.
+
+    @Test
+    void getTarife_withTarifeManage_reachesController() throws Exception {
+        when(tarifService.getAllTarife()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/tarife")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("tarife:manage"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getTarife_withMieterReadOnly_forbidden() throws Exception {
+        // zev_user: liest Mieter und Positionen, verwaltet aber keine Tarife
+        mockMvc.perform(get("/api/tarife")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("mieter:read"))))
+                .andExpect(status().isForbidden());
+
+        verify(tarifService, never()).getAllTarife();
+    }
+
+    @Test
+    void getTarife_unauthenticated_unauthorized() throws Exception {
+        mockMvc.perform(get("/api/tarife"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void createTarif_withRechnungenManageOnly_forbidden() throws Exception {
+        // Positionen erfassen darf, wer rechnungen:manage hat - Tarife anlegen nicht
+        mockMvc.perform(post("/api/tarife")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("rechnungen:manage")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"bezeichnung\":\"Sauna\",\"tariftyp\":\"ZUSATZ\",\"mengeneinheit\":\"STUECK\","
+                                + "\"preis\":5,\"gueltigVon\":\"2026-01-01\",\"gueltigBis\":\"2026-12-31\"}"))
+                .andExpect(status().isForbidden());
+
+        verify(tarifService, never()).saveTarif(any());
     }
 
     // ==================== Einheiten (inkl. Ladestationen): einheit:write ====================

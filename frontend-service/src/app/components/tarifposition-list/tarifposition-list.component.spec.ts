@@ -50,6 +50,11 @@ describe('TarifpositionListComponent', () => {
     {
       id: 2, bezeichnung: 'VNB Tarif', tariftyp: TarifTyp.VNB,
       preis: 0.342, gueltigVon: '2026-01-01', gueltigBis: '2026-12-31'
+    },
+    // Ohne ihn koennte der Test, dass die Grundgebuehr nicht angeboten wird, nie scheitern
+    {
+      id: 4, bezeichnung: 'Messtarif', tariftyp: TarifTyp.GRUNDGEBUEHR,
+      preis: 5, gueltigVon: '2026-01-01', gueltigBis: '2026-12-31'
     }
   ];
 
@@ -141,8 +146,8 @@ describe('TarifpositionListComponent', () => {
     });
 
     it('should only offer manually captured tariff types', () => {
-      // Erfassbar ist LADESTROM; ZEV, VNB und GRUNDGEBUEHR nicht - deren Mengen kommen aus
-      // Messwerten bzw. der Laufzeit (Begruendung siehe TarifTyp.GRUNDGEBUEHR).
+      // Erfassbar sind LADESTROM und ZUSATZ; ZEV, VNB und GRUNDGEBUEHR nicht - deren Mengen kommen
+      // aus Messwerten bzw. der Laufzeit (Begruendung siehe TarifTyp.GRUNDGEBUEHR).
       const typen = component.tarife.map(t => t.tariftyp);
       expect(typen).toContain(TarifTyp.LADESTROM);
       expect(typen).not.toContain(TarifTyp.GRUNDGEBUEHR);
