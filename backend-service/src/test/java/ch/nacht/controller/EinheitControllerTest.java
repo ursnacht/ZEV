@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -231,6 +232,58 @@ public class EinheitControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(einheit)))
                 .andExpect(status().isBadRequest());
+    }
+
+    /** Bean-Validation antwortet mit einem Feld-Rumpf { "<feld>": "<Meldung>" }, nicht mit { "error": ... }. */
+    @Test
+    public void createEinheit_InvalidName_LiefertFeldRumpf() throws Exception {
+        mockMvc.perform(post("/api/einheit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"\",\"typ\":\"CONSUMER\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.name").isString())
+                .andExpect(jsonPath("$.error").doesNotExist());
+
+        verify(einheitService, never()).createEinheit(any());
+    }
+
+    @Test
+    public void createEinheit_NameMitEinemZeichen_ReturnsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/einheit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new Einheit("A", EinheitTyp.CONSUMER))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.name", is("Name must be between 2 and 30 characters")));
+
+        verify(einheitService, never()).createEinheit(any());
+    }
+
+    @Test
+    public void createEinheit_NameMit31Zeichen_ReturnsBadRequest() throws Exception {
+        // name ist VARCHAR(30)
+        mockMvc.perform(post("/api/einheit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new Einheit("N".repeat(31), EinheitTyp.CONSUMER))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.name", is("Name must be between 2 and 30 characters")));
+
+        verify(einheitService, never()).createEinheit(any());
+    }
+
+    /** Gegenprobe zu den Grenzen: 2 und 30 Zeichen sind zulaessig. */
+    @Test
+    public void createEinheit_NameMit2Und30Zeichen_ReturnsCreated() throws Exception {
+        when(einheitService.createEinheit(any(Einheit.class)))
+                .thenReturn(new Einheit("AB", EinheitTyp.CONSUMER));
+
+        mockMvc.perform(post("/api/einheit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new Einheit("AB", EinheitTyp.CONSUMER))))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/einheit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new Einheit("N".repeat(30), EinheitTyp.CONSUMER))))
+                .andExpect(status().isCreated());
     }
 
     @Test
