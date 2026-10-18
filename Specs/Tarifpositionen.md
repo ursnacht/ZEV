@@ -5,30 +5,23 @@
 > Anker an der Einheit in [`Specs/Ladestationen.md`](./Ladestationen.md). Dieses Dokument
 > beschreibt die **Verallgemeinerung**: einen frei konfigurierbaren Tariftyp `ZUSATZ` mit eigener
 > Mengeneinheit, der auch für **Konsumenten** erfassbar ist. Es ergänzt die beiden Dokumente und
-> ersetzt sie nicht; für alles, was hier nicht steht, gilt weiterhin `Ladestromtarif.md`.
+> ersetzt sie nicht; für alles, was hier nicht steht, gilt `Ladestromtarif.md`.
 
 ## 1. Ziel & Kontext - Warum wird das Feature benötigt?
 
-* **Was soll erreicht werden:** Ein neuer Tariftyp **`ZUSATZ`**, bei dem neben Bezeichnung und
+* **Was soll erreicht werden:** Ein Tariftyp **`ZUSATZ`**, bei dem neben Bezeichnung und
   Preis auch die **Mengeneinheit** (kWh, Monat, Stück) frei gewählt wird. Positionen dieses Typs
   lassen sich nicht nur an Ladestationen, sondern auch an **Konsumenten-Einheiten** erfassen. Die
-  Erfassungsmaske bekommt dafür eine Checkbox, die den Normalfall (nur Ladestationen) vom
+  Erfassungsmaske hat dafür eine Checkbox, die den Normalfall (nur Ladestationen) vom
   Ausnahmefall trennt.
-* **Warum machen wir das:** Bisher ist jede manuell erfasste Menge an einen fest verdrahteten
-  Zweck gebunden: `LADESTROM` rechnet kWh, `GRUNDGEBUEHR` rechnet Monate. Wiederkehrende
-  Nebenkosten ausserhalb dieses Rasters — Sauna, Waschküche, Gästezimmer, einmalige
-  Dienstleistungen — brauchten bisher je einen neuen Tariftyp samt Code- und DDL-Änderung. Mit
+* **Warum machen wir das:** Ohne `ZUSATZ` war jede manuell erfasste Menge an einen fest
+  verdrahteten Zweck gebunden: `LADESTROM` rechnet kWh, `GRUNDGEBUEHR` rechnet Monate.
+  Wiederkehrende Nebenkosten ausserhalb dieses Rasters — Sauna, Waschküche, Gästezimmer,
+  einmalige Dienstleistungen — brauchten je einen neuen Tariftyp samt Code- und DDL-Änderung. Mit
   `ZUSATZ` genügt ein Datensatz in der Tarifverwaltung.
-* **Aktueller Stand:**
-  - `TarifTyp` kennt `ZEV`, `VNB`, `GRUNDGEBUEHR`, `LADESTROM`; manuell erfassbar ist allein
-    `{ LADESTROM }` (`TarifTyp.MANUELL_ERFASST`). Warum die Grundgebühr **nicht** dazugehört:
-    [`Ladestromtarif.md`](./Ladestromtarif.md) FR-6.
-  - Die Mengeneinheit einer Rechnungszeile ist **abgeleitet**: `TarifTyp.mengeneinheit()` liefert
-    `MONAT` für `GRUNDGEBUEHR`, sonst `KWH`. Am Tarif selbst gibt es kein Einheiten-Feld.
-  - `TarifpositionService.resolveEinheit` weist jede Einheit ab, die **nicht** vom Typ
-    `LADESTATION` ist; die Auswahl auf `/tarifpositionen` zeigt entsprechend nur Ladestationen.
-  - `TarifService.saveTarif` weist einen zweiten Tarif **desselben Typs** mit überlappender
-    Gültigkeit ab (`existsOverlappingTarif`).
+* **Ausgangslage:** Manuell erfassbar war allein `LADESTROM`, die Mengeneinheit einer
+  Rechnungszeile folgte aus dem Tariftyp, und Positionen gab es nur an Ladestationen
+  (Hintergrund: Anhang A.1).
 
 ## 2. Funktionale Anforderungen (FR) - Was soll das System tun?
 
@@ -36,12 +29,14 @@
 
 1. Ein Benutzer legt in der **Tarifverwaltung** einen Tarif vom Typ **`ZUSATZ`** an. Zusätzlich zu
    Bezeichnung, Preis und Gültigkeit wählt er eine **Mengeneinheit**: `kWh`, `Monat` oder `Stück`.
-   Das Feld erscheint **nur** bei diesem Typ — analog zum bestehenden Feld
-   „Produzent verrechnen", das nur bei `GRUNDGEBUEHR` sichtbar ist.
+   Das Feld erscheint **nur** bei diesem Typ — analog zum Feld „Produzent verrechnen", das nur bei
+   `GRUNDGEBUEHR` sichtbar ist.
 2. **Mehrere `ZUSATZ`-Tarife dürfen gleichzeitig gültig sein.** Die Überschneidungsprüfung
    greift für diesen Typ **nicht**: Sauna, Waschküche und Gästezimmer sind alle vom Typ `ZUSATZ`
-   und müssen nebeneinander bestehen. Für `ZEV`, `VNB`, `GRUNDGEBUEHR` und `LADESTROM` bleibt die
-   Prüfung unverändert.
+   und müssen nebeneinander bestehen. Für `ZEV`, `VNB` und `GRUNDGEBUEHR` gilt
+   `Specs/Tarifverwaltung.md`, FR-2 (mehrere gleichzeitig gültig, abgewiesen wird nur eine
+   Überschneidung mit gleicher Bezeichnung); bei `LADESTROM` wird jede Überschneidung abgewiesen
+   (Hintergrund: Anhang A.9).
 3. Er öffnet die Seite **Tarifpositionen**. Oberhalb der Einheiten-Auswahl steht eine Checkbox
    **„Nur Ladestationen"**, die **standardmässig gesetzt** ist:
    - **gesetzt (Normalfall):** Die Einheiten-Auswahl zeigt ausschliesslich Einheiten vom Typ
@@ -50,69 +45,73 @@
    Zeigt ein Sprung aus der Einheiten-Verwaltung (`?einheitId=…`) auf einen **Konsumenten**,
    wird die Checkbox **automatisch abgewählt** — sonst landete der Benutzer auf einer Seite ohne
    die Einheit, die er angeklickt hat.
+   Die Stellung der Checkbox wird **nicht gespeichert**: Sie steht bei jedem Seitenaufruf wieder
+   auf „Nur Ladestationen", weil das der Normalfall ist (Hintergrund: Anhang A.6).
 4. Welche Tarife wählbar sind, richtet sich nach dem **Typ der gewählten Einheit**:
    - `LADESTATION` → `LADESTROM`, `ZUSATZ`
    - `CONSUMER` → **nur** `ZUSATZ`
-   Begründung: Ladestrom gehört fachlich an eine Ladestation. Für eine Wohnung bleibt damit
-   ausschliesslich der frei konfigurierbare Typ — genau der Ausnahmefall, den die Checkbox
-   freischaltet.
-5. Er erfasst die Position wie bisher: Tarif, Jahr + Quartal, Menge. **Beschriftung und Hinweis
-   des Mengenfelds nennen die Einheit des gewählten Tarifs** (kWh / Monate / Stück).
+   > Ladestrom gehört fachlich an eine Ladestation. Für eine Wohnung bleibt damit ausschliesslich
+   > der frei konfigurierbare Typ — genau der Ausnahmefall, den die Checkbox freischaltet.
+5. Er erfasst die Position wie bei Ladestrom: Tarif, Jahr + Quartal, Menge. **Beschriftung und
+   Hinweis des Mengenfelds nennen die Einheit des gewählten Tarifs** (kWh / Monate / Stück).
 6. Bei der **Rechnungserzeugung** erscheinen `ZUSATZ`-Positionen wie die übrigen Positionen als
    eigene Zeilen — mit der am Tarif hinterlegten Mengeneinheit und dem Quartal der Position,
    **eingeschränkt auf die Gültigkeit des Tarifs** (`Ladestromtarif.md`, FR-3). Für
-   Konsumenten-Einheiten greift dabei der bestehende Weg: Die Positionen **aller** Einheiten
-   eines Mieters landen auf dessen Rechnung.
+   Konsumenten-Einheiten gilt der Weg aus `Ladestationen.md`: Die Positionen **aller** Einheiten
+   eines Mieters landen auf dessen Rechnung. Die Reihenfolge der Zeilen bestimmt die
+   Tarifverwaltung (`Specs/Tarifverwaltung.md`, FR-4; Hintergrund: Anhang A.7).
 
 ### FR-2: Persistierung
 
-* **Neuer Enum-Wert `TarifTyp.ZUSATZ`.** Die Spalte `zev.tarif.tariftyp` ist `VARCHAR(20)`
+* **Enum-Wert `TarifTyp.ZUSATZ`.** Die Spalte `zev.tarif.tariftyp` ist `VARCHAR(20)`
   (`EnumType.STRING`) und trägt den CHECK-Constraint `tarif_tariftyp_check`, der die erlaubten
-  Werte **explizit aufzählt** (zuletzt `V102`). Er **muss** um `ZUSATZ` erweitert werden — sonst
-  scheitert das Anlegen mit `DataIntegrityViolationException`. Die Spaltenlänge genügt.
+  Werte **explizit aufzählt** und `ZUSATZ` enthält. Ohne diesen Eintrag scheitert das Anlegen mit
+  `DataIntegrityViolationException`. Die Spaltenlänge genügt.
   > Achtung: `Tarif.tariftyp` trägt im Code `@Column(length = 10)`, die Datenbank hat aber
-  > `VARCHAR(20)`. `ZUSATZ` passt in beides; die Abweichung ist hier nur zu beachten, falls
+  > `VARCHAR(20)`. `ZUSATZ` passt in beides; die Abweichung ist nur zu beachten, falls
   > später ein längerer Wert dazukommt.
-* **Neue Spalte `zev.tarif.mengeneinheit VARCHAR(10)`, nullable.** Zulässige Werte `KWH`,
-  `MONAT`, `STUECK`; CHECK-Constraint entsprechend. **Pflicht nur für `ZUSATZ`** — bei allen
-  anderen Typen bleibt sie `NULL`, weil deren Einheit aus dem Typ folgt. Die Pflicht wird im
-  **Service** geprüft (nicht als DB-Constraint), damit die Regel an einer Stelle steht.
-* **Ableitung der Mengeneinheit:** `TarifTyp.mengeneinheit()` bleibt die Quelle für
-  `ZEV`/`VNB`/`LADESTROM` (`KWH`) und `GRUNDGEBUEHR` (`MONAT`). Für `ZUSATZ` gilt der Wert aus der
-  neuen Spalte. Bestehende Tarife werden **nicht** migriert.
-* **`MANUELL_ERFASST`** wird zu `{ LADESTROM, ZUSATZ }`.
+* **Spalte `zev.tarif.mengeneinheit VARCHAR(10)`, nullable**, mit CHECK-Constraint.
+  * `ZUSATZ`: **Pflicht**, `KWH`, `MONAT` oder `STUECK`.
+  * `GRUNDGEBUEHR`: `MONAT` oder `TAG`, ohne Angabe `MONAT` (`Specs/Tarifverwaltung.md`, FR-3).
+  * Alle anderen Typen: `NULL`, weil deren Einheit aus dem Typ folgt.
+
+  Die Regeln prüft der **Service** (nicht ein DB-Constraint je Typ), damit sie an einer Stelle
+  stehen.
+* **Ableitung der Mengeneinheit:** `TarifTyp.mengeneinheit()` ist die Quelle für
+  `ZEV`/`VNB`/`LADESTROM` (`KWH`). Für `ZUSATZ` und `GRUNDGEBUEHR` gilt der Wert aus der Spalte.
+* **`MANUELL_ERFASST`** ist `{ LADESTROM, ZUSATZ }`.
 * **Eindeutigkeit einer Position — typabhängig:**
   | Tariftyp | Regel |
   |----------|-------|
-  | `LADESTROM` | höchstens **eine** Position je Einheit, Quartal und **Tariftyp** (unverändert) |
+  | `LADESTROM` | höchstens **eine** Position je Einheit, Quartal und **Tariftyp** |
   | `ZUSATZ` | höchstens **eine** Position je Einheit, Quartal und **Tarif** |
-  Für `ZUSATZ` je Typ zu prüfen wäre sinnlos: Man könnte dann pro Quartal nur eine einzige
-  Zusatzposition erfassen. Der bestehende DB-Constraint
-  `UNIQUE (org_id, einheit_id, tarif_id, jahr, quartal)` deckt die `ZUSATZ`-Regel bereits ab —
-  **keine DDL-Änderung an `tarifposition` nötig**.
-* **Keine Änderung an der Tabelle `tarifposition`.** Menge, Erfassungsart, Quell-Referenz und
-  Bemerkung bleiben wie sie sind; die Bedeutung steckt weiterhin ausschliesslich im Tarif.
-* **Flyway:** Umgesetzt in fünf Migrationen — `V111` (CHECK-Constraint, Spalte `mengeneinheit`,
-  Übersetzungen), `V112` (Platzhalter der Einheiten-Auswahl), `V113` (Schlüssel-Namensraum
-  korrigiert: `TARIFTYP_*` sind Tariftypen, `TYP_*` Einheitentypen), `V114` (Preis-Hinweis
-  einheitneutral), `V115` (Hinweis bei leerer Einheiten-Auswahl). Die nächste freie Nummer ist **vor** dem Anlegen über den `zev-db`-MCP-Server
-  zu prüfen; eine bereits ausgeführte Migration wird nie nachträglich geändert.
+  > Für `ZUSATZ` je Typ zu prüfen wäre sinnlos: Man könnte dann pro Quartal nur eine einzige
+  > Zusatzposition erfassen. Der DB-Constraint `UNIQUE (org_id, einheit_id, tarif_id, jahr, quartal)`
+  > deckt die `ZUSATZ`-Regel ab — an `tarifposition` braucht es dafür keine DDL.
+* **Tabelle `tarifposition`:** Menge, Erfassungsart, Quell-Referenz und Bemerkung gelten für
+  `ZUSATZ` wie für `LADESTROM`; die Bedeutung steckt ausschliesslich im Tarif.
+* **Flyway:** `V111` (CHECK-Constraint, Spalte `mengeneinheit`, Übersetzungen), `V112`
+  (Platzhalter der Einheiten-Auswahl), `V113` (Schlüssel-Namensraum: `TARIFTYP_*` sind
+  Tariftypen, `TYP_*` Einheitentypen), `V114` (Preis-Hinweis einheitneutral), `V115` (Hinweis bei
+  leerer Einheiten-Auswahl) (Hintergrund: Anhang A.3).
 
 ### FR-3: Layout
 
 * **Tarifverwaltung**
-  - `ZUSATZ` erscheint im bestehenden Typ-Dropdown.
+  - `ZUSATZ` erscheint im Typ-Dropdown.
   - Bei ausgewähltem `ZUSATZ` erscheint ein zusätzliches Dropdown **Mengeneinheit**
     (kWh / Monat / Stück) mit Hinweistext. Umschalten auf einen anderen Typ blendet es wieder aus
-    und verwirft den Wert. Vorlage: der bestehende, nur bei `GRUNDGEBUEHR` sichtbare Block
+    und verwirft den Wert. Vorlage: der nur bei `GRUNDGEBUEHR` sichtbare Block
     „Produzent verrechnen" in `tarif-form.component.html`.
+  - Ein `ZUSATZ`-Tarif mit Mengeneinheit **Monat** kann einen **Jahrespreis** tragen, der anteilig
+    verrechnet wird (`Specs/Tarifverwaltung.md`, FR-6).
   - **Preis-Label und -Hinweis folgen der Einheit:** `Preis (CHF/kWh)`, `(CHF/Monat)`,
     `(CHF/Stück)` — und nur `(CHF)`, solange ein Zusatz-Tarif noch keine Einheit hat. Der
-    Hinweistext darunter nennt deshalb nur noch das Zahlenformat statt „pro kWh".
+    Hinweistext darunter nennt deshalb nur das Zahlenformat statt „pro kWh".
   - Die Tarif-Liste zeigt die Einheit **beim Preis** je Zeile (`5.00 / Stück`) statt in der
-    Spaltenüberschrift. Die lautete bisher fest „(CHF/kWh)" und war damit schon für die
-    Grundgebühr falsch; eine eigene, bei vier von fünf Typen leere Spalte wäre der schlechtere
-    Tausch.
+    Spaltenüberschrift.
+    > Eine eigene, bei vier von fünf Typen leere Spalte wäre der schlechtere Tausch (Hintergrund:
+    > Anhang A.2).
 * **Tarifpositionen**
   - **Checkbox „Nur Ladestationen"** oberhalb der Einheiten-Auswahl, Design-System-Klassen
     `.zev-checkbox-item` + `.zev-checkbox` (Vorlage: `tarif-form`), mit Hinweistext, der den
@@ -122,8 +121,8 @@
     bleibt).
   - Die Einheiten-Auswahl nennt bei gemischter Liste den **Typ** je Eintrag, damit Wohnung und
     Ladestation unterscheidbar sind.
-  - Liste und Formular bleiben im Übrigen unverändert; die Anzeige der Mengeneinheit **je Zeile**
-    und im Mengen-Label existiert bereits.
+  - Liste und Formular zeigen die Mengeneinheit **je Zeile** und im Mengen-Label, wie bei
+    Ladestrom.
 * **Rechnung (Web + PDF):** keine strukturelle Änderung — es kommen nur Zeilen dazu. Die
   `mengeneinheit` der Zeile stammt aus dem Tarif.
 * Alle Texte via `TranslationService`/`TranslatePipe`; Zahlenformatierung nach
@@ -137,8 +136,9 @@
 * [ ] Das Feld **Mengeneinheit** ist **nur** bei Typ `ZUSATZ` sichtbar und dort **Pflicht**;
       ohne Auswahl ist das Speichern nicht möglich (Serverseitig `400`, Formular deaktiviert).
 * [ ] **Zwei `ZUSATZ`-Tarife mit überlappender Gültigkeit lassen sich beide speichern.**
-* [ ] Zwei `LADESTROM`-Tarife (bzw. `ZEV`/`VNB`/`GRUNDGEBUEHR`) mit überlappender Gültigkeit
-      werden weiterhin **abgewiesen** — die Ausnahme gilt ausschliesslich für `ZUSATZ`.
+* [ ] Zwei `LADESTROM`-Tarife mit überlappender Gültigkeit werden **abgewiesen**, auch mit
+      anderer Bezeichnung; für `ZEV`/`VNB`/`GRUNDGEBUEHR` gelten die Kriterien von
+      `Specs/Tarifverwaltung.md`, FR-2.
 * [ ] Ein `ZUSATZ`-Tarif, auf den Positionen verweisen, lässt sich **nicht** löschen (bestehende
       Regel, Meldung mit Anzahl).
 
@@ -177,17 +177,17 @@
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
 ### NFR-1: Performance
-* Die Einheiten-Auswahl lädt bei abgewählter Checkbox zusätzlich die Konsumenten-Einheiten — eine
-  bereits vorhandene Abfrage (`getAllEinheiten`), nur ein anderer Filter im Frontend. Keine
+* Die Einheiten-Auswahl lädt bei abgewählter Checkbox zusätzlich die Konsumenten-Einheiten — mit
+  derselben Abfrage (`getAllEinheiten`), nur ein anderer Filter im Frontend. Keine
   zusätzliche Last.
-* Die Rechnungserzeugung bleibt unverändert: dieselbe indizierte Abfrage über
-  (`einheit_id`, Zeitraum), nur mit potenziell mehr Treffern je Einheit.
+* Die Rechnungserzeugung nutzt dieselbe indizierte Abfrage über (`einheit_id`, Zeitraum), nur mit
+  potenziell mehr Treffern je Einheit.
 
 ### NFR-2: Sicherheit
 * **Permissions:** Tarife verwalten `tarife:manage` (Fachrollen `org_admin`, `zev_admin`);
   Positionen schreiben `rechnungen:manage`, lesen `mieter:read` (Fachrollen `zev_user`,
-  `org_admin`, `zev_admin`) — unverändert gegenüber heute. Backend durchgängig
-  `@PreAuthorize("hasAuthority('…')")`, Frontend zusätzlich über `AuthGuard`.
+  `org_admin`, `zev_admin`). Backend durchgängig `@PreAuthorize("hasAuthority('…')")`, Frontend
+  zusätzlich über `AuthGuard`.
 * **Multi-Tenancy:** `org_id` an Tarif und Position, `@Filter(name = "orgFilter")`, im Service
   `hibernateFilterService.enableOrgFilter()`. `orgId` stammt **immer** aus dem
   Organisations-Kontext, nie aus dem Request.
@@ -198,8 +198,9 @@
   was sonst verboten wäre.
 
 ### NFR-3: Kompatibilität
-* **Rückwärtskompatibel:** Die neue Spalte ist nullable, bestehende Tarife bleiben unverändert
-  und behalten ihre abgeleitete Mengeneinheit. Bestehende Positionen sind nicht betroffen.
+* **Rückwärtskompatibel:** Die Spalte `mengeneinheit` ist nullable; mit `ZUSATZ` wurden
+  bestehende Tarife **nicht** migriert. Bestehende Positionen sind nicht betroffen. (Die
+  Grundgebühren hat später `V176` auf `MONAT` gesetzt, `Specs/Tarifverwaltung.md`, FR-3.)
 * **Rollback:** Die Migration ist additiv (neuer Enum-Wert, neue nullable Spalte). Ein Rückfall
   auf die Vorversion funktioniert, solange keine `ZUSATZ`-Tarife angelegt wurden — danach wären
   deren Positionen für die alte Version unbekannt. Das ist der übliche Vorbehalt bei neuen
@@ -210,7 +211,7 @@
 | Fall | Verhalten |
 |------|-----------|
 | `ZUSATZ`-Tarif ohne Mengeneinheit gespeichert (manipulierter Request) | `400` mit verständlicher Meldung, kein Datensatz |
-| Tariftyp von `ZUSATZ` auf einen anderen geändert | Mengeneinheit wird verworfen (`NULL`); bestehende Positionen behalten ihren Tarif und zeigen künftig die abgeleitete Einheit |
+| Tariftyp von `ZUSATZ` auf einen anderen geändert | Mengeneinheit wird verworfen (`NULL`), beim Wechsel auf `GRUNDGEBUEHR` mit `MONAT` vorbelegt (`Specs/Tarifverwaltung.md`, FR-3); bestehende Positionen behalten ihren Tarif und zeigen künftig die Einheit des neuen Typs |
 | Kein `ZUSATZ`-Tarif vorhanden, Checkbox abgewählt, Konsument gewählt | Hinweis „kein erfassbarer Tarif vorhanden" statt leerer Auswahl |
 | Keine erfassbare Einheit vorhanden | Hinweistext statt leerer Auswahl, **passend zur Checkbox**: „keine Ladestation erfasst" bzw. „keine erfassbare Einheit erfasst" |
 | Quell-Referenz an einer Wohnung | Wird wie bei der Ladestation aus dem `messpunkt` vorbelegt — dort die RFID, hier die Zählernummer. Bleibt frei änderbar |
@@ -219,6 +220,7 @@
 | Menge < 0 | abgewiesen; Menge = 0 speicherbar, erzeugt keine Rechnungszeile |
 | Tarif mit Positionen löschen | abgewiesen, Meldung mit Anzahl (bestehende Regel) |
 | Einheit mit Positionen löschen | Positionen werden mitgelöscht (`ON DELETE CASCADE`, bestehende Regel) |
+| Tarif, dessen Gültigkeit das Quartal der Position nicht berührt (z.B. Q3/2026 mit einem erst 2030 gültigen Tarif) | Position ist erfassbar — es gibt keine Prüfung beim Speichern; die Rechnung weist in diesem Fall das Quartal aus (`RechnungService.zeitraumDerPositionszeile`), weil ein umgekehrter Zeitraum („30.09. – 01.07.") nach einem Fehler aussähe (Hintergrund: Anhang A.5) |
 | Leere Liste | Hinweistext statt leerer Tabelle |
 | Netzwerkfehler | Meldung über den Message-Bereich, Formulareingaben bleiben erhalten |
 | Gleichzeitige Bearbeitung derselben Position | Letzter Schreibvorgang gewinnt (wie im übrigen System; kein optimistisches Sperren) |
@@ -233,7 +235,7 @@
   Zusatzfeld als Vorlage).
 * **Betroffener Code:**
   - Backend: `entity/TarifTyp.java` (Wert + `MANUELL_ERFASST` + `mengeneinheit()`),
-    `entity/Tarif.java` (Spalte `mengeneinheit`), `entity/Mengeneinheit.java` *(neu)*,
+    `entity/Tarif.java` (Spalte `mengeneinheit`), `entity/Mengeneinheit.java`,
     `service/TarifService.java` (Überschneidungsprüfung ausnehmen, Pflichtfeld prüfen),
     `service/TarifpositionService.java` (zulässige Einheitentypen, Eindeutigkeit je Typ/Tarif),
     `service/RechnungService.java` (Mengeneinheit aus dem Tarif statt aus dem Typ),
@@ -246,12 +248,13 @@
     `TarifControllerTest`, die zugehörigen Frontend-Specs sowie
     `tests/ladestromtarif.spec.ts` — dort wird geprüft, welche Tarife und Einheiten die Maske
     anbietet
-* **Datenmigration:** keine. Neue Spalte nullable, bestehende Tarife und Positionen bleiben
-  unverändert. Neue Übersetzungen für Typ, Mengeneinheiten, Checkbox und Fehlermeldungen.
+* **Datenmigration:** für `ZUSATZ` keine. Die Spalte ist nullable, bestehende Tarife und
+  Positionen bleiben unverändert. Übersetzungen für Typ, Mengeneinheiten, Checkbox und
+  Fehlermeldungen. Die Grundgebühren setzt `V176` auf `MONAT` (`Specs/Tarifverwaltung.md`, FR-3).
 
 ## 7. Abgrenzung / Out of Scope
 
-* **Produzenten-Einheiten** bleiben aussen vor. Ihre Rechnung enthält heute ausschliesslich
+* **Produzenten-Einheiten** bleiben aussen vor. Ihre Rechnung enthält ausschliesslich
   Grundgebühr-Zeilen (`berechneProduzentenRechnung` ruft die Positionen gar nicht ab); sie
   aufzunehmen wäre eine eigene Änderung an der Rechnungslogik.
 * **Bilanz-Einheiten** (`BEZUG`, `RUECKLIEFERUNG`) werden grundsätzlich nicht verrechnet.
@@ -259,9 +262,10 @@
   Überschneidungsregel und daran, dass jeder gültige Grundgebühr-Tarif automatisch auf jede
   Konsumenten-Rechnung geschrieben wird (`Ladestromtarif.md` FR-6). Der Anwendungsfall wird von
   `ZUSATZ` mit Mengeneinheit *Monat* abgedeckt.
-* **Bestehende Typen werden nicht umgestellt.** `LADESTROM` und `GRUNDGEBUEHR` behalten ihre
-  abgeleitete Mengeneinheit; die neue Spalte bleibt bei ihnen leer. Eine Vereinheitlichung wäre
-  möglich, brächte aber eine Datenmigration ohne fachlichen Gewinn.
+* **`LADESTROM`, `ZEV` und `VNB` werden nicht umgestellt.** Sie behalten ihre abgeleitete
+  Mengeneinheit; die Spalte bleibt bei ihnen leer. Eine Vereinheitlichung wäre möglich, brächte
+  aber eine Datenmigration ohne fachlichen Gewinn. Die Grundgebühr trägt ihre Einheit in der
+  Spalte (`Specs/Tarifverwaltung.md`, FR-3).
 * **Kein automatischer Import** von `ZUSATZ`-Mengen; die Erfassung bleibt manuell.
 * **Keine Preisstaffelung, keine Rabatte, keine Mengenrabatte** — ein Tarif hat genau einen Preis.
 * **Kein Mehrwertsteuer-Ausweis** je Position.
@@ -269,27 +273,83 @@
   rundet jede Menge mit `Math.round(...)` auf ganze Zahlen — eingeführt für Ladestrom-kWh, damit
   eine Rechnung keine gemischten Konventionen zeigt. Für `Monat` und `Stück` ist das ohnehin
   richtig; für eine `ZUSATZ`-Menge in kWh mit Nachkommastellen ist der Verlust **bewusst in Kauf
-  genommen** (entschieden 19.08.2026). Erfassbar bleiben Nachkommastellen — sie wirken sich nur
-  nicht auf den Rechnungsbetrag aus.
+  genommen** (Anhang A.4). Erfassbar bleiben Nachkommastellen — sie wirken sich nur nicht auf den
+  Rechnungsbetrag aus.
+* **Keine Prüfung beim Speichern, ob die Gültigkeit des Tarifs das Quartal der Position berührt**
+  (siehe Edge Cases, Anhang A.5).
 
 ## 8. Offene Fragen
 
-* **Keine Prüfung, ob der Tarif im Quartal der Position gültig ist.**
-  `TarifpositionService.saveTarifposition` prüft Einheitentyp, zulässigen Tariftyp und
-  Eindeutigkeit — nicht aber, ob die Gültigkeit des Tarifs das gewählte Quartal überhaupt
-  berührt. Eine Position für Q3/2026 mit einem erst 2030 gültigen Tarif ist damit erfassbar.
-  Auf der Rechnung fällt das nicht auf: `RechnungService.zeitraumDerPositionszeile` weist in
-  diesem Fall das Quartal aus, weil ein umgekehrter Zeitraum („30.09. – 01.07.") nach einem
-  Fehler aussähe. *Entscheid 20.08.2026: vorerst so belassen* — die Kombination entsteht nur
-  durch bewusste Fehlbedienung. Die Prüfung beim Speichern (`400` bei fehlender Überschneidung)
-  wäre der saubere Weg und würde die Rückfallregel zur reinen Absicherung machen.
-* **Stellung der Checkbox merken?** *Annahme:* nein — sie steht bei jedem Seitenaufruf wieder auf
-  „nur Ladestationen", weil das der Normalfall ist. (Der Mehrfachverrechnungs-Hinweis derselben
-  Seite merkt sich sein Wegklicken dagegen in `localStorage`; das ist bewusst anders, weil es dort
-  um eine einmalige Erklärung geht.)
-* **Sortierung der Zeilen auf der Rechnung:** Positionen erscheinen heute nach ZEV/VNB und vor der
-  Grundgebühr, in der Reihenfolge der Abfrage. *Annahme:* unverändert. Ob mehrere
-  `ZUSATZ`-Zeilen fachlich sortiert werden sollen (z.B. alphabetisch), ist offen.
-* **Bezeichnungslänge:** `tarif.bezeichnung` ist auf **30 Zeichen** begrenzt. Für sprechende
-  Zusatz-Bezeichnungen („Waschküche Gemeinschaftsraum") könnte das knapp werden. *Annahme:*
-  bleibt unverändert; eine Verlängerung wäre eine eigene, einfache Migration.
+* keine — die bisherigen Fragen und ihre Antworten stehen in Anhang A.5 bis A.8.
+
+## Anhang A – Entscheidungen und Verlauf
+
+### A.1 Ausgangslage vor `ZUSATZ`
+* `TarifTyp` kannte `ZEV`, `VNB`, `GRUNDGEBUEHR`, `LADESTROM`; manuell erfassbar war allein
+  `{ LADESTROM }` (`TarifTyp.MANUELL_ERFASST`). Warum die Grundgebühr **nicht** dazugehört:
+  [`Ladestromtarif.md`](./Ladestromtarif.md) FR-6.
+* Die Mengeneinheit einer Rechnungszeile war **abgeleitet**: `TarifTyp.mengeneinheit()` lieferte
+  `MONAT` für `GRUNDGEBUEHR`, sonst `KWH`. Am Tarif selbst gab es kein Einheiten-Feld.
+* `TarifpositionService.resolveEinheit` wies jede Einheit ab, die **nicht** vom Typ
+  `LADESTATION` war; die Auswahl auf `/tarifpositionen` zeigte entsprechend nur Ladestationen.
+* `TarifService.saveTarif` wies einen zweiten Tarif **desselben Typs** mit überlappender
+  Gültigkeit ab (`existsOverlappingTarif`).
+* Der CHECK-Constraint `tarif_tariftyp_check` war zuletzt mit `V102` gesetzt worden und musste um
+  `ZUSATZ` erweitert werden; an der Tabelle `tarifposition` änderte sich nichts.
+
+### A.2 Einheit beim Preis statt in der Spaltenüberschrift (FR-3)
+Die Spaltenüberschrift der Tarif-Liste lautete fest „(CHF/kWh)" und war damit schon für die
+Grundgebühr falsch. Statt einer eigenen, bei vier von fünf Typen leeren Spalte steht die Einheit
+seither beim Preis je Zeile.
+
+### A.3 Migrationen (FR-2)
+Umgesetzt in fünf Migrationen (`V111`–`V115`, Inhalt siehe FR-2). Hinweis aus der Planung: Die
+nächste freie Nummer ist **vor** dem Anlegen über den `zev-db`-MCP-Server zu prüfen; eine bereits
+ausgeführte Migration wird nie nachträglich geändert.
+
+### A.4 Gebrochene Mengen (Abgrenzung, Entscheid vom 19.08.2026)
+Die Rundung jeder Positionsmenge auf ganze Zahlen gilt auch für `ZUSATZ`-Mengen in kWh; der
+Verlust der Nachkommastellen auf der Rechnung wurde am 19.08.2026 bewusst in Kauf genommen.
+
+### A.5 Keine Gültigkeitsprüfung beim Speichern (Edge Cases, Entscheid vom 20.08.2026)
+Frage: Soll `TarifpositionService.saveTarifposition` prüfen, ob die Gültigkeit des Tarifs das
+gewählte Quartal berührt? Geprüft werden Einheitentyp, zulässiger Tariftyp und Eindeutigkeit,
+nicht aber die Gültigkeit. Auf der Rechnung fällt eine solche Position nicht auf, weil
+`RechnungService.zeitraumDerPositionszeile` dann das Quartal ausweist.
+*Entscheid 20.08.2026: vorerst so belassen* — die Kombination entsteht nur durch bewusste
+Fehlbedienung. Die Prüfung beim Speichern (`400` bei fehlender Überschneidung) wäre der saubere
+Weg und würde die Rückfallregel zur reinen Absicherung machen.
+
+### A.6 Stellung der Checkbox merken? (FR-1.3)
+Frage: Soll sich die Seite die Stellung der Checkbox „Nur Ladestationen" merken? *Annahme:*
+nein — sie steht bei jedem Seitenaufruf wieder auf „nur Ladestationen", weil das der Normalfall
+ist. Der Mehrfachverrechnungs-Hinweis derselben Seite merkt sich sein Wegklicken dagegen in
+`localStorage`; das ist bewusst anders, weil es dort um eine einmalige Erklärung geht.
+
+### A.7 Sortierung der Zeilen auf der Rechnung (FR-1.6)
+Frage: Sollen mehrere `ZUSATZ`-Zeilen fachlich sortiert werden (z.B. alphabetisch)? Damals
+erschienen Positionen nach ZEV/VNB und vor der Grundgebühr, in der Reihenfolge der Abfrage;
+*Annahme:* unverändert. Beantwortet durch `Specs/Tarifverwaltung.md`, FR-4 (11.10.2026): Die
+Zeilen stehen in der Reihenfolge der Tarife, die der Admin festlegt.
+
+### A.8 Bezeichnungslänge
+Frage: `tarif.bezeichnung` war auf **30 Zeichen** begrenzt — reicht das für sprechende
+Zusatz-Bezeichnungen („Waschküche Gemeinschaftsraum")? *Annahme:* unverändert; eine Verlängerung
+wäre eine eigene, einfache Migration. Beantwortet durch `Specs/RechnungenGenerieren.md`
+(10.10.2026): seither 50 Zeichen (`Specs/Tarifverwaltung.md`, Anhang A.2).
+
+### A.9 Abgleich mit der Tarifverwaltung (FR-1.2, FR-2, NFR-3, Abgrenzung, Edge Cases, 18.10.2026)
+Bei der Konsolidierung am 18.10.2026 nachgeführt, weil `Specs/Tarifverwaltung.md` (FR-2, FR-3 und
+FR-6 vom 10./11.10.2026) Teile dieser Spec abgelöst hat. Vorher stand hier:
+* FR-1.2: „Für `ZEV`, `VNB`, `GRUNDGEBUEHR` und `LADESTROM` bleibt die Prüfung unverändert."
+  Akzeptanzkriterium: „Zwei `LADESTROM`-Tarife (bzw. `ZEV`/`VNB`/`GRUNDGEBUEHR`) mit
+  überlappender Gültigkeit werden weiterhin abgewiesen — die Ausnahme gilt ausschliesslich für
+  `ZUSATZ`."
+* FR-2: Spalte `mengeneinheit` mit zulässigen Werten `KWH`, `MONAT`, `STUECK`, „Pflicht nur für
+  `ZUSATZ` — bei allen anderen Typen bleibt sie `NULL`"; `TarifTyp.mengeneinheit()` als Quelle
+  auch für `GRUNDGEBUEHR` (`MONAT`).
+* NFR-3, Abschnitt 6 und Abgrenzung: Bestehende Typen — auch `GRUNDGEBUEHR` — werden nicht
+  umgestellt und behalten ihre abgeleitete Mengeneinheit; keine Datenmigration.
+* Edge Case: Beim Wechsel weg von `ZUSATZ` wird die Mengeneinheit immer `NULL`.
+
+Ergänzt wurde der Verweis auf den Jahrespreis für `ZUSATZ` pro Monat (Tarifverwaltung FR-6).
