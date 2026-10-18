@@ -448,4 +448,73 @@ describe('EinheitListComponent', () => {
       expect(component.message).toBe('');
     }));
   });
+
+  // Specs/Einheitenverwaltung.md, Abschnitt 3: Formular nach Abweisung, Sortierung, Darstellung
+  describe('rejected save', () => {
+    it('should keep the form open when create fails', () => {
+      component.showForm = true;
+      einheitServiceSpy.createEinheit.mockReturnValue(throwError(() => ({ error: { error: 'EINHEIT_BILANZ_TYP_EXISTIERT' } })));
+
+      component.onFormSubmit({ name: 'Netzbezug 2', typ: EinheitTyp.BEZUG });
+
+      expect(component.showForm).toBe(true);
+      expect(component.messageType).toBe('error');
+    });
+
+    it('should keep the form open when update fails', () => {
+      component.showForm = true;
+      einheitServiceSpy.updateEinheit.mockReturnValue(throwError(() => new Error('Update failed')));
+
+      component.onFormSubmit(mockEinheiten[0]);
+
+      expect(component.showForm).toBe(true);
+      expect(component.messageType).toBe('error');
+    });
+  });
+
+  describe('onSort - empty values', () => {
+    it('should keep empty values at the end when sorting descending', () => {
+      component.einheiten = [
+        { id: 1, name: 'A', typ: EinheitTyp.CONSUMER, messpunkt: undefined },
+        { id: 2, name: 'B', typ: EinheitTyp.CONSUMER, messpunkt: 'MP-001' },
+        { id: 3, name: 'C', typ: EinheitTyp.CONSUMER, messpunkt: 'MP-002' }
+      ];
+
+      component.onSort('messpunkt');
+      component.onSort('messpunkt');
+
+      expect(component.sortDirection).toBe('desc');
+      expect(component.einheiten.map(e => e.messpunkt)).toEqual(['MP-002', 'MP-001', undefined]);
+    });
+  });
+
+  describe('template', () => {
+    const element = (): HTMLElement => fixture.nativeElement;
+
+    it('should show the columns ID, Name, Typ, Messpunkt and a kebab menu per row', () => {
+      const koepfe = Array.from(element().querySelectorAll('.zev-table thead th'))
+        .map(th => th.textContent?.replace(/[▲▼]/g, '').trim());
+
+      expect(koepfe).toEqual(['ID', 'NAME', 'TYP', 'MESSPUNKT', '']);
+      expect(element().querySelectorAll('.zev-table tbody tr app-kebab-menu').length).toBe(mockEinheiten.length);
+    });
+
+    it('should show "-" for an empty messpunkt', () => {
+      einheitServiceSpy.getAllEinheiten.mockReturnValue(of([{ id: 9, name: 'Ohne', typ: EinheitTyp.CONSUMER }]));
+      component.loadEinheiten();
+      fixture.detectChanges();
+
+      const zellen = element().querySelectorAll('.zev-table tbody tr td');
+      expect(zellen[3].textContent?.trim()).toBe('-');
+    });
+
+    it('should show KEINE_EINHEITEN_VORHANDEN instead of the table when the list is empty', () => {
+      einheitServiceSpy.getAllEinheiten.mockReturnValue(of([]));
+      component.loadEinheiten();
+      fixture.detectChanges();
+
+      expect(element().querySelector('.zev-table')).toBeNull();
+      expect(element().textContent).toContain('KEINE_EINHEITEN_VORHANDEN');
+    });
+  });
 });

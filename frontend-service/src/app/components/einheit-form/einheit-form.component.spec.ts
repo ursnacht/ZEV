@@ -276,4 +276,88 @@ describe('EinheitFormComponent', () => {
       expect(component.formData.messpunkt).toBe('MP-3B');
     });
   });
+
+  // Specs/Einheitenverwaltung.md, FR-3/FR-4: Verhalten im gerenderten Formular
+  describe('template', () => {
+    const element = (): HTMLElement => fixture.nativeElement;
+    const submitButton = (): HTMLButtonElement => element().querySelector('button[type="submit"]')!;
+    const fehler = (): HTMLElement | null => element().querySelector('.zev-form-error');
+    const checkbox = (): HTMLInputElement | null => element().querySelector('#nebenkostenRelevant');
+
+    it('should disable submit and show NAME_IST_ERFORDERLICH when name is empty', () => {
+      component.formData = { ...component.formData, name: '' };
+      fixture.detectChanges();
+
+      expect(submitButton().disabled).toBe(true);
+      expect(fehler()?.textContent).toContain('NAME_IST_ERFORDERLICH');
+    });
+
+    it('should disable submit and show NAME_IST_ERFORDERLICH when name is only whitespace', () => {
+      component.formData = { ...component.formData, name: '   ' };
+      fixture.detectChanges();
+
+      expect(submitButton().disabled).toBe(true);
+      expect(fehler()?.textContent).toContain('NAME_IST_ERFORDERLICH');
+    });
+
+    it('should enable submit and hide the error when name is filled', () => {
+      component.formData = { ...component.formData, name: 'Wohnung A' };
+      fixture.detectChanges();
+
+      expect(submitButton().disabled).toBe(false);
+      expect(fehler()).toBeNull();
+    });
+
+    it('should show the checked nebenkosten checkbox for a new CONSUMER', async () => {
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(component.formData.nebenkostenRelevant).toBe(true);
+      expect(checkbox()).not.toBeNull();
+      expect(checkbox()!.checked).toBe(true);
+    });
+
+    it('should hide the nebenkosten checkbox for every type other than CONSUMER', () => {
+      for (const typ of Object.values(EinheitTyp).filter(t => t !== EinheitTyp.CONSUMER)) {
+        component.formData = { ...component.formData, typ };
+        fixture.detectChanges();
+
+        expect(checkbox(), typ).toBeNull();
+      }
+    });
+
+    it('should treat a missing nebenkostenRelevant as true', () => {
+      // Bestandsdaten vor V123 tragen das Feld nicht
+      component.einheit = { id: 5, name: 'Alt', typ: EinheitTyp.CONSUMER } as Einheit;
+      component.ngOnInit();
+
+      expect(component.formData.nebenkostenRelevant).toBe(true);
+    });
+
+    it('should keep nebenkostenRelevant when the type changes and the checkbox is hidden', () => {
+      vi.spyOn(component.save, 'emit');
+      component.formData = { name: 'Allgemein', typ: EinheitTyp.CONSUMER, nebenkostenRelevant: false };
+      fixture.detectChanges();
+
+      component.formData.typ = EinheitTyp.PRODUCER;
+      fixture.detectChanges();
+      expect(checkbox()).toBeNull();
+
+      component.onSubmit();
+      expect(component.save.emit).toHaveBeenCalledWith(
+        expect.objectContaining({ typ: EinheitTyp.PRODUCER, nebenkostenRelevant: false }));
+    });
+
+    it('should show MESSPUNKT_HINT_LADESTATION for LADESTATION and MESSPUNKT_HINT otherwise', () => {
+      const hinweis = () => element().querySelector('#messpunkt ~ .zev-form-hint')?.textContent?.trim();
+
+      component.formData = { ...component.formData, typ: EinheitTyp.LADESTATION };
+      fixture.detectChanges();
+      expect(hinweis()).toBe('MESSPUNKT_HINT_LADESTATION');
+
+      component.formData = { ...component.formData, typ: EinheitTyp.CONSUMER };
+      fixture.detectChanges();
+      expect(hinweis()).toBe('MESSPUNKT_HINT');
+    });
+  });
 });
