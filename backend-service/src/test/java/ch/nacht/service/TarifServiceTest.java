@@ -547,9 +547,35 @@ public class TarifServiceTest {
         TarifService.ValidationResult result = tarifService.validateQuartale();
 
         assertFalse(result.valid());
-        assertFalse(result.luecken().isEmpty());
+        // Nur das Quartal mit Tarif wird geprueft (Specs/TarifValidierung.md, FR-1.2)
+        assertEquals(1, result.luecken().size());
         assertThat(result.luecken().get(0).periode(), containsString("Q1/2024"));
         assertTrue(result.luecken().get(0).luecken().stream().anyMatch(l -> l.tarifTyp().equals("VNB")));
+    }
+
+    /**
+     * Specs/TarifValidierung.md, FR-1.5: Welche Quartale geprueft werden, bestimmen die Tarife aller
+     * Typen - auf Luecken geprueft werden aber nur ZEV und VNB. Ein Quartal mit nur einer
+     * Grundgebuehr meldet deshalb die fehlenden ZEV- und VNB-Tarife, nie eine fehlende Grundgebuehr.
+     */
+    @Test
+    void validateQuartale_NurGrundgebuehrImQuartal_PrueftZevUndVnb() {
+        Tarif grundgebuehr = new Tarif("Messtarif", TarifTyp.GRUNDGEBUEHR, new BigDecimal("5.00000"),
+            LocalDate.of(2024, 4, 1), LocalDate.of(2024, 6, 30));
+        when(tarifRepository.findAllByOrderByTariftypAscGueltigVonDesc())
+            .thenReturn(Collections.singletonList(grundgebuehr));
+        when(tarifRepository.findByTariftypAndZeitraumOverlapping(any(), any(), any()))
+            .thenReturn(Collections.emptyList());
+
+        TarifService.ValidationResult result = tarifService.validateQuartale();
+
+        assertFalse(result.valid());
+        assertEquals(1, result.luecken().size());
+        assertThat(result.luecken().get(0).periode(), containsString("Q2/2024"));
+        assertEquals(List.of("ZEV", "VNB"),
+            result.luecken().get(0).luecken().stream().map(l -> l.tarifTyp()).toList());
+        verify(tarifRepository, never())
+            .findByTariftypAndZeitraumOverlapping(eq(TarifTyp.GRUNDGEBUEHR), any(), any());
     }
 
     @Test

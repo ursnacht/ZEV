@@ -555,6 +555,8 @@ describe('TarifListComponent', () => {
       expect(component.messageType).toBe('error');
       expect(component.validationErrors.length).toBe(1);
       expect(component.validationErrors[0]).toContain('Q1/2024');
+      // Mehrsprachig ueber denselben Key wie die Rechnungsseite (Specs/TarifValidierung.md, FR-1.7)
+      expect(component.validationErrors[0]).toContain('TARIF_LUECKE_VNB');
     });
 
     it('should set message as persistent when validation fails', () => {

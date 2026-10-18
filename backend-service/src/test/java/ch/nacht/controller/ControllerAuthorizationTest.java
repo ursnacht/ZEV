@@ -301,6 +301,16 @@ class ControllerAuthorizationTest {
     }
 
     @Test
+    void validateTarife_withMieterReadOnly_forbidden() throws Exception {
+        // Specs/TarifValidierung.md, NFR-2: dieselbe Permission wie die Tarifverwaltung
+        mockMvc.perform(get("/api/tarife/validate?modus=quartale")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("mieter:read"))))
+                .andExpect(status().isForbidden());
+
+        verify(tarifService, never()).validateQuartale();
+    }
+
+    @Test
     void createTarif_withRechnungenManageOnly_forbidden() throws Exception {
         // Positionen erfassen darf, wer rechnungen:manage hat - Tarife anlegen nicht
         mockMvc.perform(post("/api/tarife")

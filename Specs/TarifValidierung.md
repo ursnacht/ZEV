@@ -27,10 +27,10 @@
 * `GET /api/tarife/validate?modus=quartale|jahre` (Permission wie die übrige Tarifverwaltung, NFR-2).
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
-* [ ] Die Button stehen rechts vom grünen Button zum Erfassen neuer Tarife.
-* [ ] Die Validierung deckt immer ganze Quartale ab, für die mind. ein Tarif existiert.
-* [ ] Es wird eine Fehlermeldung angezeigt, wenn eine Validierung fehlschlägt.
-* [ ] Die angezeigten Lücken-Meldungen sind mehrsprachig (Translation-Keys statt hartcodierter deutscher Texte); dieselben Keys werden auch beim Generieren von Rechnungen verwendet.
+* [x] Die Buttons „Quartale validieren" und „Jahre validieren" sind vorhanden. (E2E: tarif-verwaltung.spec.ts › Tarif Management - Validation Buttons › should display validation buttons)
+* [x] Die Validierung deckt immer ganze Quartale ab, für die mind. ein Tarif existiert. (Test: TarifServiceTest#validateQuartale_GapInQuarter_ReturnsInvalidWithErrors; TarifServiceTest#validateQuartale_MissingTarifInQuarter_ReturnsInvalidWithErrors; TarifServiceTest#validateQuartale_NoTarife_ReturnsValidWithMessage; TarifServiceTest#validateQuartale_NurGrundgebuehrImQuartal_PrueftZevUndVnb)
+* [x] Es wird eine Fehlermeldung angezeigt, wenn eine Validierung fehlschlägt. (Test: tarif-list.component.spec.ts › onValidateQuartale › should show error message with errors when invalid; tarif-list.component.spec.ts › onValidateJahre › should show multiple errors when invalid)
+* [x] Die angezeigten Lücken-Meldungen sind mehrsprachig (Translation-Keys statt hartcodierter deutscher Texte); dieselben Keys werden auch beim Generieren von Rechnungen verwendet. (Test: tarif-list.component.spec.ts › onValidateQuartale › should show error message with errors when invalid; rechnungen.component.spec.ts › onGenerate › should build a translated message from structured tariff gaps)
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
@@ -70,3 +70,6 @@ Bei der Konsolidierung wurden Imperative ins Präsens gesetzt, ohne den Inhalt z
 
 ### A.4 Geprüfte Tariftypen (FR-1.5, 18.10.2026)
 FR-1.5 lautete: „Die Prüfung erfolgt immer für alle Tariftypen." Das stimmte am 13.01.2026, als es nur `ZEV` und `VNB` gab. Mit `GRUNDGEBUEHR`, `LADESTROM` und `ZUSATZ` kamen Typen dazu, die keine lückenlose Abdeckung brauchen; `TarifService.findTarifLuecken` prüft seither nur `ZEV` und `VNB`. Bei der Konsolidierung am 18.10.2026 an den Code und an `Specs/Tarifverwaltung.md` (FR-2: Lückenprüfung je Typ; FR-7: Grundgebühr optional) angeglichen.
+
+### A.5 Kriterium zur Position der Buttons ersetzt (FR-3, 18.10.2026)
+Das Kriterium lautete: „Die Button stehen rechts vom grünen Button zum Erfassen neuer Tarife." Die Position ist eine Designentscheidung und steht in FR-3; ein Test dafür schützte vor keinem realen Fehler. Beim Akzeptanzkriterien-Check vom 18.10.2026 ersetzt durch „Die Buttons sind vorhanden".
