@@ -463,6 +463,550 @@ ON CONFLICT (key) DO NOTHING;
 
 ---
 
+## Ergänzung 22.01.2026: Tarif kopieren (Spec FR-9)
+
+> Bis 18.10.2026 eigener Plan `Specs/Tarifverwaltung-Tarif-kopieren_Umsetzungsplan.md` zur Spec
+> `Specs/Tarifverwaltung-Tarif-kopieren.md`; beide sind in die Tarifverwaltung übernommen. Die
+> Nummern unten (FR-1 bis FR-3) sind die der damaligen Spec — heute **FR-9**.
+
+### Zusammenfassung
+
+Erweiterung der bestehenden Tarifverwaltung um eine "Kopieren"-Funktion im Kebab-Menü. Beim Kopieren wird das Tarif-Formular mit den Werten des ausgewählten Tarifs vorausgefüllt geöffnet (ohne ID), sodass der Benutzer einen neuen Tarif basierend auf einem bestehenden erstellen kann.
+
+---
+
+### Betroffene Komponenten
+
+| Typ | Datei | Änderungsart |
+|-----|-------|--------------|
+| Frontend Component | `frontend-service/src/app/components/tarif-list/tarif-list.component.ts` | Änderung |
+| Frontend Icons | `frontend-service/src/app/components/icon/icons.ts` | Änderung |
+| DB Migration | `backend-service/src/main/resources/db/migration/V35__Add_Kopieren_Translation.sql` | Neu |
+
+---
+
+### Phasen-Tabelle
+
+| Status | Phase | Beschreibung |
+|--------|-------|--------------|
+| [x] | 1. Icon hinzufügen | "copy" Icon zur Icon-Registry hinzufügen |
+| [x] | 2. Kebab-Menü erweitern | Menüpunkt "Kopieren" zwischen "Bearbeiten" und "Löschen" einfügen |
+| [x] | 3. Kopier-Logik implementieren | `onCopy()` Methode implementieren, die Tarif ohne ID ins Formular lädt |
+| [x] | 4. Übersetzung hinzufügen | Flyway-Migration für Translation-Key "KOPIEREN" |
+
+---
+
+### Detailbeschreibung der Phasen
+
+#### Phase 1: Icon hinzufügen
+
+**Datei:** `frontend-service/src/app/components/icon/icons.ts`
+
+Feather Icon "copy" hinzufügen:
+
+```typescript
+'copy': '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>',
+```
+
+#### Phase 2: Kebab-Menü erweitern
+
+**Datei:** `frontend-service/src/app/components/tarif-list/tarif-list.component.ts`
+
+Menüpunkte anpassen (Zeile 31-34):
+
+```typescript
+menuItems: KebabMenuItem[] = [
+  { label: 'BEARBEITEN', action: 'edit', icon: 'edit-2' },
+  { label: 'KOPIEREN', action: 'copy', icon: 'copy' },
+  { label: 'LOESCHEN', action: 'delete', danger: true, icon: 'trash-2' }
+];
+```
+
+#### Phase 3: Kopier-Logik implementieren
+
+**Datei:** `frontend-service/src/app/components/tarif-list/tarif-list.component.ts`
+
+Neue Methode `onCopy()` hinzufügen:
+
+```typescript
+onCopy(tarif: Tarif): void {
+  // Kopie ohne ID erstellen - wird als neuer Tarif behandelt
+  const { id, ...tarifOhneId } = tarif;
+  this.selectedTarif = { ...tarifOhneId } as Tarif;
+  this.showForm = true;
+}
+```
+
+Switch-Case in `onMenuAction()` erweitern (Zeile 82-91):
+
+```typescript
+onMenuAction(action: string, tarif: Tarif): void {
+  switch (action) {
+    case 'edit':
+      this.onEdit(tarif);
+      break;
+    case 'copy':
+      this.onCopy(tarif);
+      break;
+    case 'delete':
+      this.onDelete(tarif.id);
+      break;
+  }
+}
+```
+
+#### Phase 4: Übersetzung hinzufügen
+
+**Datei:** `backend-service/src/main/resources/db/migration/V[XX]__Add_Kopieren_Translation.sql`
+
+```sql
+INSERT INTO zev.translation (key, deutsch, englisch) VALUES
+('KOPIEREN', 'Kopieren', 'Copy')
+ON CONFLICT (key) DO NOTHING;
+```
+
+---
+
+### Validierungen
+
+#### Frontend-Validierungen
+- Keine zusätzlichen Validierungen erforderlich
+- Bestehende Formular-Validierungen greifen beim kopierten Tarif
+
+#### Backend-Validierungen
+- Keine zusätzlichen Validierungen erforderlich
+- Bestehende Überlappungsprüfung greift beim Speichern des kopierten Tarifs
+
+---
+
+### Offene Punkte / Annahmen
+
+1. **Annahme:** Beim Kopieren werden alle Felder übernommen ausser der ID
+2. **Annahme:** Die Gültigkeitsdaten werden 1:1 übernommen - der Benutzer muss diese ggf. anpassen, um Überlappungskonflikte zu vermeiden
+3. **Annahme:** Die Übersetzung "KOPIEREN" existiert noch nicht in der Datenbank
+4. **Annahme:** Das Formular zeigt beim kopierten Tarif den Titel "Neuer Tarif" (da keine ID vorhanden)
+
+## Ergänzung 20.03.2026 und 09.06.2026: Grundgebühr und Rechnungen für Produzenten (Spec FR-7, FR-8)
+
+> Bis 18.10.2026 eigener Plan `Specs/Tarifverwaltung-Grundgebuehr_Umsetzungsplan.md` zur Spec
+> `Specs/Tarifverwaltung-Grundgebuehr.md`; beide sind in die Tarifverwaltung übernommen. Die
+> Nummern unten sind die der damaligen Spec: FR-1, FR-2, FR-4 bis FR-8 → heute **FR-7**,
+> FR-3 (Produzenten) → heute **FR-8**. Die „Erweiterung: Konfigurierbare
+> Produzenten-Verrechnung (FR-7)" stammt vom 09.06.2026. Die Grundgebühr nach Monaten wurde am
+> 10.10.2026 um „pro Tag" ergänzt (siehe unten, Spec FR-3).
+
+### Zusammenfassung
+
+Einführung des neuen Tariftyps `GRUNDGEBUEHR` (monatlicher Festpreis pro Stromzähler). Die Grundgebühr ergänzt die bestehenden kWh-basierten Tariftypen ZEV und VNB und wird pro Einheit (Consumer **und** Producer) in Anzahl ganzer Kalendermonate berechnet. Produzenten erhalten dabei erstmals eigene Rechnungen mit ausschliesslich Grundgebühr-Positionen.
+
+---
+
+### Betroffene Komponenten
+
+| Typ | Datei | Änderungsart |
+|-----|-------|--------------|
+| Backend Enum | `backend-service/src/main/java/ch/nacht/entity/TarifTyp.java` | Änderung |
+| Backend DTO | `backend-service/src/main/java/ch/nacht/dto/TarifZeileDTO.java` | Änderung |
+| Backend Service | `backend-service/src/main/java/ch/nacht/service/RechnungService.java` | Änderung |
+| Backend Report | `backend-service/src/main/resources/reports/rechnung.jrxml` | Änderung |
+| Frontend Enum/Model | `frontend-service/src/app/models/tarif.model.ts` | Änderung |
+| Frontend Component | `frontend-service/src/app/components/tarif-form/tarif-form.component.ts` | Änderung |
+| Frontend Component | `frontend-service/src/app/components/rechnungen/rechnungen.component.ts` | Änderung |
+| Frontend Template | `frontend-service/src/app/components/rechnungen/rechnungen.component.html` | Änderung |
+| DB Migration | `backend-service/src/main/resources/db/migration/V49__Add_Grundgebuehr_Translations.sql` | Neu |
+
+> **Keine DB-Migration für TarifTyp nötig:** Die Spalte `tariftyp` in `zev.tarif` ist `VARCHAR`, kein DB-Enum. Der neue Wert `GRUNDGEBUEHR` wird automatisch akzeptiert.
+
+---
+
+### Phasen-Tabelle
+
+| Status | Phase | Beschreibung |
+|--------|-------|--------------|
+| [x] | 1. Backend – TarifTyp Enum | `GRUNDGEBUEHR` als neuen Wert in `TarifTyp.java` ergänzen |
+| [x] | 2. Backend – TarifZeileDTO | Feld `mengeneinheit` (String) hinzufügen; wird für PDF-Zeile benötigt (kWh vs. Monate) |
+| [x] | 3. Backend – RechnungService | Grundgebühr-Berechnung (volle Monate) + PRODUCER-Support in `berechneRechnungen` |
+| [x] | 4. Backend – rechnung.jrxml | Statisches `CHF / kWh` durch dynamisches `$F{mengeneinheit}` ersetzen; Field deklarieren |
+| [x] | 5. Frontend – tarif.model.ts | `GRUNDGEBUEHR` zum `TarifTyp`-Enum ergänzen |
+| [x] | 6. Frontend – TarifFormComponent | `GRUNDGEBUEHR`-Option im Tariftyp-Dropdown ergänzen |
+| [x] | 7. Frontend – RechnungenComponent | Alle Einheiten (CONSUMER + PRODUCER) laden und mit Typ-Label anzeigen |
+| [x] | 8. Übersetzungen | Flyway-Migration V49 für neue Translation-Keys |
+
+---
+
+### Detailbeschreibung der Phasen
+
+#### Phase 1: Backend – TarifTyp Enum
+
+**Datei:** `backend-service/src/main/java/ch/nacht/entity/TarifTyp.java`
+
+```java
+public enum TarifTyp {
+    ZEV,
+    VNB,
+    GRUNDGEBUEHR
+}
+```
+
+---
+
+#### Phase 2: Backend – TarifZeileDTO
+
+**Datei:** `backend-service/src/main/java/ch/nacht/dto/TarifZeileDTO.java`
+
+Neues Feld `mengeneinheit` (String) ergänzen:
+- Für ZEV/VNB-Zeilen: `"kWh"`
+- Für GRUNDGEBUEHR-Zeilen: `"MONAT"`
+
+**Konstruktor anpassen:**
+```java
+public TarifZeileDTO(String bezeichnung, LocalDate von, LocalDate bis,
+                     double menge, double preis, double betrag,
+                     TarifTyp typ, String mengeneinheit) { ... }
+```
+
+**Bestehende Aufrufe in `RechnungService.berechneTarifZeilen` anpassen:**
+```java
+new TarifZeileDTO(
+    tarif.getBezeichnung(), effectiveVon, effectiveBis,
+    menge, preis, betrag, typ, "kWh"
+)
+```
+
+---
+
+#### Phase 3: Backend – RechnungService
+
+**Datei:** `backend-service/src/main/java/ch/nacht/service/RechnungService.java`
+
+##### 3a: Neue Methode `berechneGrundgebuehrZeilen`
+
+Berechnet Grundgebühr-Zeilen pro Tarif. Gezählt werden **vollständige Kalendermonate** im Überschneidungszeitraum von Tarifgültigkeit und Rechnungsperiode.
+
+**Definition: vollständiger Kalendermonat** = erster und letzter Tag des Kalendermonats liegen beide im effektiven Zeitraum.
+
+```java
+private double berechneGrundgebuehrZeilen(RechnungDTO rechnung,
+                                           LocalDate von, LocalDate bis,
+                                           List<Tarif> tarife) {
+    double total = 0.0;
+
+    for (Tarif tarif : tarife) {
+        LocalDate effVon = tarif.getGueltigVon().isBefore(von) ? von : tarif.getGueltigVon();
+        LocalDate effBis = tarif.getGueltigBis().isAfter(bis) ? bis : tarif.getGueltigBis();
+
+        int monate = zaehleVolleMonate(effVon, effBis);
+        if (monate <= 0) continue;
+
+        double preis = tarif.getPreis().doubleValue();
+        double betrag = monate * preis;
+
+        rechnung.addTarifZeile(new TarifZeileDTO(
+            tarif.getBezeichnung(), effVon, effBis,
+            monate, preis, betrag, TarifTyp.GRUNDGEBUEHR, "MONAT"
+        ));
+        total += betrag;
+    }
+    return total;
+}
+
+/**
+ * Zählt vollständige Kalendermonate im Zeitraum [von, bis] (inklusiv).
+ * Ein Monat gilt als vollständig, wenn sein erster und letzter Tag im Zeitraum liegen.
+ */
+private int zaehleVolleMonate(LocalDate von, LocalDate bis) {
+    int count = 0;
+    LocalDate monthStart = von.withDayOfMonth(1);
+    while (!monthStart.isAfter(bis)) {
+        LocalDate monthEnd = monthStart.withDayOfMonth(
+            monthStart.getMonth().length(java.time.Year.isLeap(monthStart.getYear()))
+        );
+        if (!monthStart.isBefore(von) && !monthEnd.isAfter(bis)) {
+            count++;
+        }
+        monthStart = monthStart.plusMonths(1);
+    }
+    return count;
+}
+```
+
+##### 3b: `berechneRechnung` um Grundgebühr erweitern
+
+In der bestehenden Methode `berechneRechnung` nach den ZEV/VNB-Zeilen:
+```java
+// GRUNDGEBUEHR (optional - kein Fehler wenn kein Tarif vorhanden)
+List<Tarif> grundgebuehrTarife = tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis);
+if (!grundgebuehrTarife.isEmpty()) {
+    totalBetrag += berechneGrundgebuehrZeilen(rechnung, von, bis, grundgebuehrTarife);
+}
+```
+
+##### 3c: `berechneRechnungen` – PRODUCER-Support
+
+Aktuell: nur CONSUMER-Einheiten verarbeitet. Neu: PRODUCER-Einheiten erhalten ausschliesslich Grundgebühr-Positionen.
+
+```java
+for (Long einheitId : einheitIds) {
+    einheitRepository.findById(einheitId).ifPresent(einheit -> {
+        if (einheit.getTyp() == EinheitTyp.CONSUMER) {
+            // Bestehende Logik unverändert
+            List<Mieter> mieter = mieterService.getMieterForQuartal(einheitId, von, bis);
+            if (mieter.isEmpty()) {
+                rechnungen.add(berechneRechnung(einheit, null, von, bis));
+            } else {
+                for (Mieter m : mieter) {
+                    LocalDate effVon = ...;
+                    LocalDate effBis = ...;
+                    rechnungen.add(berechneRechnung(einheit, m, effVon, effBis));
+                }
+            }
+        } else if (einheit.getTyp() == EinheitTyp.PRODUCER) {
+            // Nur Grundgebühr für Produzenten
+            RechnungDTO rechnung = berechneProduzentenRechnung(einheit, von, bis);
+            if (!rechnung.getTarifZeilen().isEmpty()) {
+                rechnungen.add(rechnung);
+            }
+        }
+    });
+}
+```
+
+##### 3d: Neue Methode `berechneProduzentenRechnung`
+
+```java
+private RechnungDTO berechneProduzentenRechnung(Einheit einheit, LocalDate von, LocalDate bis) {
+    RechnungDTO rechnung = new RechnungDTO();
+    rechnung.setEinheitId(einheit.getId());
+    rechnung.setEinheitName(einheit.getName());
+    rechnung.setMesspunkt(einheit.getMesspunkt());
+    rechnung.setVon(von);
+    rechnung.setBis(bis);
+    rechnung.setErstellungsdatum(LocalDate.now());
+
+    List<Tarif> tarife = tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis);
+    double total = berechneGrundgebuehrZeilen(rechnung, von, bis, tarife);
+    double endBetrag = RechnungService.roundTo5Rappen(total);
+    rechnung.setTotalBetrag(total);
+    rechnung.setRundung(endBetrag - total);
+    rechnung.setEndBetrag(endBetrag);
+
+    EinstellungenDTO einstellungen = einstellungenService.getEinstellungenOrThrow();
+    RechnungKonfigurationDTO config = einstellungen.getRechnung();
+    rechnung.setZahlungsfrist(config.getZahlungsfrist());
+    rechnung.setIban(config.getIban());
+    RechnungKonfigurationDTO.StellerDTO steller = config.getSteller();
+    rechnung.setStellerName(steller.getName());
+    rechnung.setStellerStrasse(steller.getStrasse());
+    rechnung.setStellerPlzOrt(steller.getPlz() + " " + steller.getOrt());
+
+    return rechnung;
+}
+```
+
+##### 3e: Tarif-Validierung für Konsumenten einschränken
+
+Die Methode `validateTarifAbdeckung` (für ZEV/VNB) soll nur aufgerufen werden, wenn CONSUMER-Einheiten im Request vorhanden sind:
+
+```java
+boolean hasConsumers = einheitIds.stream()
+    .anyMatch(id -> einheitRepository.findById(id)
+        .map(e -> e.getTyp() == EinheitTyp.CONSUMER)
+        .orElse(false));
+
+if (hasConsumers) {
+    tarifService.validateTarifAbdeckung(von, bis);
+}
+```
+
+> **Hinweis:** Performance-Optimierung möglich (Einheiten einmalig laden), aber für die Umsetzung reicht die einfachere Variante.
+
+---
+
+#### Phase 4: Backend – rechnung.jrxml
+
+**Datei:** `backend-service/src/main/resources/reports/rechnung.jrxml`
+
+##### 4a: Field-Deklaration ergänzen
+
+```xml
+<field name="mengeneinheit" class="java.lang.String"/>
+```
+
+##### 4b: Statisches `CHF / kWh` durch dynamisches Feld ersetzen
+
+Aktuell (staticText):
+```xml
+<element kind="staticText" ...>
+    <text><![CDATA[CHF / kWh]]></text>
+```
+
+Neu (textField):
+```xml
+<element kind="textField" ...>
+    <expression><![CDATA["CHF / " + $F{mengeneinheit}]]></expression>
+```
+
+> **Build-Hinweis:** Nach Änderung am JRXML muss `mvn compile` ausgeführt werden, damit das compilierte `.jasper`-File neu generiert wird.
+
+---
+
+#### Phase 5: Frontend – tarif.model.ts
+
+**Datei:** `frontend-service/src/app/models/tarif.model.ts`
+
+```typescript
+export enum TarifTyp {
+  ZEV = 'ZEV',
+  VNB = 'VNB',
+  GRUNDGEBUEHR = 'GRUNDGEBUEHR'
+}
+```
+
+---
+
+#### Phase 6: Frontend – TarifFormComponent
+
+**Datei:** `frontend-service/src/app/components/tarif-form/tarif-form.component.ts`
+
+```typescript
+tarifTypOptions = [
+  { value: TarifTyp.ZEV, label: 'ZEV (Solarstrom)' },
+  { value: TarifTyp.VNB, label: 'VNB (Netzstrom)' },
+  { value: TarifTyp.GRUNDGEBUEHR, label: 'Grundgebühr (CHF/Monat/Zähler)' }
+];
+```
+
+> Alle Label-Texte im Template über `TranslatePipe` ausgeben – die hardcodierten Labels hier dienen nur als Fallback im `value`-Binding. Wenn das Template bereits `translate` verwendet, Labels durch Translation-Keys ersetzen.
+
+---
+
+#### Phase 7: Frontend – RechnungenComponent
+
+**Datei:** `frontend-service/src/app/components/rechnungen/rechnungen.component.ts`
+
+##### 7a: Alle Einheiten laden (nicht nur CONSUMER)
+
+```typescript
+// Vorher: this.consumers = data.filter(...)
+// Neu:
+this.einheiten = data
+  .sort((a, b) => {
+    // Erst nach Typ (CONSUMER vor PRODUCER), dann nach Name
+    if (a.typ !== b.typ) return a.typ === EinheitTyp.CONSUMER ? -1 : 1;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+```
+
+- Property `consumers` → umbenennen in `einheiten` (inkl. Template-Referenzen)
+- `allSelected()` / `someSelected()` / `onSelectAllToggle()` auf `einheiten` anpassen
+
+##### 7b: Template anpassen
+
+- Sektion-Label von `KONSUMENTEN_WAEHLEN` → `EINHEITEN_WAEHLEN`
+- Jede Zeile zeigt Typ-Label in eckigen Klammern: `[Konsument]` / `[Produzent]`
+- Verwendung der vorhandenen Translation-Keys `KONSUMENT` / `PRODUZENT`
+
+```html
+<!-- Template-Ausschnitt -->
+<label>
+  <input type="checkbox" [checked]="selectedEinheitIds.has(e.id!)"
+         (change)="onEinheitToggle(e.id!)">
+  {{ e.name }} [{{ (e.typ === 'CONSUMER' ? 'KONSUMENT' : 'PRODUZENT') | translate }}]
+</label>
+```
+
+---
+
+#### Phase 8: DB Migration – Übersetzungen
+
+**Datei:** `backend-service/src/main/resources/db/migration/V49__Add_Grundgebuehr_Translations.sql`
+
+```sql
+INSERT INTO zev.translation (key, deutsch, englisch) VALUES
+-- Neuer Tariftyp
+('TARIFTYP_GRUNDGEBUEHR',      'Grundgebühr (CHF/Monat/Zähler)',        'Basic Fee (CHF/month/meter)'),
+('TARIFTYP_HINT_GRUNDGEBUEHR', 'Monatlicher Festpreis pro Stromzähler', 'Monthly fixed price per electricity meter'),
+
+-- PDF-Einheit für Grundgebühr
+('MONATE',                     'Monate',                                 'Months'),
+
+-- Rechnungsformular (Einheiten statt nur Konsumenten)
+('EINHEITEN_WAEHLEN',          'Einheiten auswählen',                   'Select Units'),
+('KEINE_EINHEITEN_VORHANDEN',  'Keine Einheiten vorhanden',             'No units available')
+
+ON CONFLICT (key) DO NOTHING;
+```
+
+---
+
+### Validierungen
+
+#### Frontend-Validierungen
+1. **Tarifformular – unveränderter Bestand:** Preis > 0, alle Pflichtfelder, Datum von ≤ Datum bis
+2. **Rechnungsformular:** mind. eine Einheit ausgewählt (bestehend; Logik bleibt unverändert)
+
+#### Backend-Validierungen
+1. **TarifService.saveTarif:** Keine überlappenden Tarife desselben Typs (bestehend; gilt auch für GRUNDGEBUEHR automatisch)
+2. **RechnungService:** ZEV/VNB-Validierung (`validateTarifAbdeckung`) nur wenn CONSUMER-Einheiten im Request – kein Fehler bei reiner PRODUCER-Selektion
+3. **GRUNDGEBUEHR ist optional:** Kein Fehler, wenn kein Tarif vorhanden; Grundgebühr-Zeilen werden einfach nicht hinzugefügt
+4. **Volle Monate:** Rechnungszeitraum < 1 Monat → 0 Monate → keine GRUNDGEBUEHR-Zeile
+
+---
+
+### Offene Punkte / Annahmen
+
+1. **Annahme:** `PREIS_HINT` im Tarifformular ("CHF pro kWh") passt nicht für GRUNDGEBUEHR. Da der Hint statisch ist, bleibt er vorerst unverändert – der User sieht den neuen Tariftyp-Label und den Dropdown-Eintrag als ausreichende Kontextualisierung. Falls gewünscht, kann ein typ-spezifischer Hint in einer Folge-Phase ergänzt werden.
+2. **Annahme:** Das `.jasper`-File wird via Maven-Build neu kompiliert. Die `jrxml`-Datei ist Source of Truth; das `.jasper`-File wird **nicht** manuell gepflegt.
+3. **Annahme:** Produzenten-Rechnungen ohne Grundgebühr (leere tarifZeilen) werden **nicht** generiert (defensive Filterung in `berechneRechnungen`).
+4. **Annahme:** Da GRUNDGEBUEHR in der Quartals-/Jahresvalidierung optional ist, wird `validateTarifAbdeckung` **nicht** für GRUNDGEBUEHR aufgerufen – konsistent mit Spec-Entscheid.
+5. **Annahme:** Die `mengeneinheit` für kWh-Zeilen wird direkt im bestehenden `berechneTarifZeilen`-Aufruf als Literal `"kWh"` gesetzt (kein separater Translation-Key nötig, da das PDF-Layout bereits `CHF / kWh` als bekannte Einheit zeigt).
+
+---
+
+### Erweiterung: Konfigurierbare Produzenten-Verrechnung (FR-7)
+
+Ein `GRUNDGEBUEHR`-Tarif erhält das Flag `produzentVerrechnen`. Konsumenten zahlen die Grundgebühr immer; Produzenten nur bei `produzentVerrechnen = true`. Standardwert `false` (auch für bestehende Tarife).
+
+#### Betroffene Komponenten
+
+| Typ | Datei | Änderungsart |
+|-----|-------|--------------|
+| Backend Entity | `backend-service/src/main/java/ch/nacht/entity/Tarif.java` | Änderung |
+| Backend Service | `backend-service/src/main/java/ch/nacht/service/RechnungService.java` | Änderung |
+| DB Migration | `backend-service/src/main/resources/db/migration/V62__Add_Produzent_Verrechnen_To_Tarif.sql` | Neu |
+| DB Migration | `backend-service/src/main/resources/db/migration/V63__Add_Produzent_Verrechnen_Translations.sql` | Neu |
+| Frontend Model | `frontend-service/src/app/models/tarif.model.ts` | Änderung |
+| Frontend Component | `frontend-service/src/app/components/tarif-form/tarif-form.component.ts` | Änderung |
+| Frontend Template | `frontend-service/src/app/components/tarif-form/tarif-form.component.html` | Änderung |
+| Frontend Template | `frontend-service/src/app/components/tarif-list/tarif-list.component.html` | Änderung |
+| DB Migration | `backend-service/src/main/resources/db/migration/V64__Add_Tarif_Produzent_Spalte_Translations.sql` | Neu |
+
+#### Phasen-Tabelle
+
+| Status | Phase | Beschreibung |
+|--------|-------|--------------|
+| [x] | E1. Backend – Entity | Feld `produzentVerrechnen` (Spalte `produzent_verrechnen`, default `false`) in `Tarif.java` |
+| [x] | E2. Backend – Migration V62 | Spalte `produzent_verrechnen BOOLEAN NOT NULL DEFAULT FALSE` zu `zev.tarif` |
+| [x] | E3. Backend – RechnungService | `berechneProduzentenRechnung` filtert GRUNDGEBUEHR-Tarife auf `produzentVerrechnen = true`; Konsumenten-Pfad unverändert |
+| [x] | E4. Frontend – Model | `produzentVerrechnen?: boolean` zum `Tarif`-Interface |
+| [x] | E5. Frontend – TarifForm | Default `produzentVerrechnen: false`; Checkbox nur bei Tariftyp `GRUNDGEBUEHR` sichtbar |
+| [x] | E6. Übersetzungen V63 | Keys `TARIF_PRODUZENT_VERRECHNEN`, `TARIF_PRODUZENT_VERRECHNEN_HINT` |
+| [x] | E7. Frontend – TarifList | Spalte „Produzenten" in der Übersichtstabelle: deaktivierte Checkbox (`[checked]`/`disabled`) für GRUNDGEBUEHR, sonst „–" |
+| [x] | E8. Übersetzungen V64 | Keys `TARIF_PRODUZENT_VERRECHNEN_SPALTE`, `JA`, `NEIN` |
+| [x] | E9. Tests | RechnungServiceTest (Produzent flagged/not-flagged, Konsument ignoriert Flag); tarif-form spec (Default, Checkbox-Sichtbarkeit) |
+
+#### Detailbeschreibung
+
+**E3 – RechnungService:** Nur der Produzenten-Pfad wird angepasst. In `berechneProduzentenRechnung`:
+```java
+List<Tarif> tarife = tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis).stream()
+        .filter(Tarif::isProduzentVerrechnen)
+        .toList();
+```
+Die bestehende defensive Filterung (`if (!rechnung.getTarifZeilen().isEmpty())` in `berechneRechnungen`) sorgt dafür, dass Produzenten ohne freigegebene Tarife keine Rechnung erhalten.
+
+**E5 – TarifForm:** Checkbox via `@if (formData.tariftyp === TarifTyp.GRUNDGEBUEHR)`. Das Enum wird als `readonly TarifTyp = TarifTyp;` im Component exponiert, damit es im Template referenzierbar ist.
+
 ## Ergänzung 10.10.2026: Mehrere gleichzeitig gültige Tarife je Typ (Spec FR-2)
 
 Die Regel „3. Keine Überlappung: Pro Tariftyp darf nur ein Tarif für einen Tag gültig sein" gilt nur noch für `LADESTROM`.

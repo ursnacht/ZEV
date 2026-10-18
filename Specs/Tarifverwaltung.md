@@ -1,8 +1,8 @@
 # Tarifverwaltung
 
 ## 1. Ziel & Kontext - Warum wird das Feature benötigt?
-* **Was soll erreicht werden:** Die Tarife können sich von Quartal zu Quartal ändern. Dies muss berücksichtigt werden.
-* **Warum machen wir das:** Beim Erstellen der Rechnungen müssen die Tarife verwendet werden, die für den Zeitraum der Rechnung gültig sind.
+* **Was soll erreicht werden:** Die Tarife können sich von Quartal zu Quartal ändern. Dies muss berücksichtigt werden. Neben den verbrauchsabhängigen Tarifen (ZEV, VNB) gibt es eine **Grundgebühr** pro Stromzähler, die auch Produzenten verrechnet werden kann (FR-7, FR-8), und Tarife lassen sich durch **Kopieren** erfassen (FR-9).
+* **Warum machen wir das:** Beim Erstellen der Rechnungen müssen die Tarife verwendet werden, die für den Zeitraum der Rechnung gültig sind. Energieversorger verlangen neben dem Arbeitspreis (CHF/kWh) auch eine Grundgebühr pro Zähler; sie muss Konsumenten und — wo vereinbart — Produzenten verrechnet werden.
 * **Ausgangslage:** Die Tarife waren ohne Gültigkeitsbereich in `application.yml` spezifiziert (Hintergrund: Anhang A.1).
 
 ## 2. Funktionale Anforderungen (FR) - Was soll das System tun?
@@ -97,18 +97,47 @@
   Als Preis steht der **Jahrespreis** mit „CHF / Jahr". Die vier Quartalsrechnungen ergeben zusammen genau den Jahrespreis (nach Tagen auf 10 Nachkommastellen; gerundet wird wie immer nur der Endbetrag). Menge × Preis ergibt hier bewusst nicht direkt den Betrag — „pro Jahr" in der Preisspalte erklärt den Anteil.
 * **PDF-Layout:** Die Mengenspalte ist 65 pt breit für „92 Tage", die Bezeichnung 265 pt; der Zeitraum wandert ab 52 Zeichen in die zweite Zeile (`RechnungZeilenText`) (Hintergrund: Anhang A.7).
 
+### FR-7: Tariftyp Grundgebühr
+* **Tariftyp `GRUNDGEBUEHR`:** ein Festpreis **pro Stromzähler**, der zusätzlich zu den verbrauchsabhängigen `ZEV`- und `VNB`-Tarifen auf der Rechnung steht. `bezeichnung`, `preis`, `gueltig_von` und `gueltig_bis` werden wie bei den anderen Tariftypen erfasst; Genauigkeit `preis` 5 Nachkommastellen.
+* **Menge und Betrag** richten sich nach der Mengeneinheit (FR-3: volle Kalendermonate oder Tage) und gegebenenfalls nach dem Jahrespreis (FR-6). Der Teilzeitraum ist der Schnitt aus Gültigkeit des Tarifs und Rechnungszeitraum.
+* **Bei Konsumenten** wird jede gültige Grundgebühr verrechnet, automatisch und ohne Erfassung einer Position.
+* **Optional:** Fehlt ein `GRUNDGEBUEHR`-Tarif für den Rechnungszeitraum, wird keine Grundgebühr berechnet — kein Fehler. Die Lückenprüfung (Edge Cases, `Specs/TarifValidierung.md`) prüft nur `ZEV` und `VNB`.
+* **Flag „Auch Produzenten verrechnen" (`produzentVerrechnen`, Spalte `produzent_verrechnen`):**
+  * In der Tarifmaske als **Checkbox**, sichtbar nur beim Tariftyp `GRUNDGEBUEHR`; Standard `false`.
+  * Konsumenten zahlen die Grundgebühr unabhängig vom Flag; Produzenten nur bei `true` (FR-8).
+* **Tarif-Übersicht:** Die Spalte „Produzenten" zeigt bei `GRUNDGEBUEHR`-Tarifen den Wert des Flags als **deaktivierte (read-only) Checkbox** — angehakt = `true`. Bearbeitet wird das Flag nur in der Tarifmaske. Bei allen anderen Tariftypen steht „–".
+* **Darstellung auf der Rechnung (PDF):** im gleichen Zeilenlayout wie `ZEV`/`VNB`, kein eigener Abschnitt — Bezeichnung | Zeitraum | Menge mit Einheit | Preis | Betrag. Die Reihenfolge bestimmt FR-4. Der `endBetrag` enthält die Grundgebühr.
+* Läuft ein `GRUNDGEBUEHR`-Tarif mitten in der Rechnungsperiode ab, entstehen zwei Zeilen (wie bei `ZEV`/`VNB`).
+* (Hintergrund: Anhang A.9)
+
+### FR-8: Rechnungen für Produzenten
+* Produzenten (`EinheitTyp.PRODUCER`) erhalten eigene Rechnungen, die **ausschliesslich** `GRUNDGEBUEHR`-Zeilen enthalten — nur für Tarife mit `produzentVerrechnen = true` (FR-7). Keine `ZEV`/`VNB`-Zeilen, auch nicht bei vorhandenen Messwerten.
+* Im Rechnungsformular stehen Produzenten **in derselben Liste** wie die Konsumenten, mit Typ-Anzeige.
+* Produzenten haben keinen Mieter; die Rechnung wird auf die Einheit ausgestellt (kein Mieterblock auf dem PDF).
+* Hat ein ausgewählter Produzent keinen für Produzenten freigegebenen `GRUNDGEBUEHR`-Tarif, wird für ihn **keine Rechnung** erzeugt (kein Fehler).
+* Ein Produzent ohne Messwerte erhält trotzdem seine Rechnung mit den Grundgebühr-Zeilen.
+* (Hintergrund: Anhang A.9)
+
+### FR-9: Tarif kopieren
+1. Der Benutzer wählt im Kebab-Menü eines Tarifs „Kopieren" (Reihenfolge: Bearbeiten – **Kopieren** – Löschen, mit passendem Icon).
+2. Das System öffnet die Maske „Neuer Tarif", deren Felder die Werte des kopierten Tarifs enthalten.
+3. Der Benutzer kann Anpassungen machen und „Erfassen" oder „Abbrechen" klicken.
+* Beim Kopieren findet keine zusätzliche automatische Validierung statt; beim Erfassen gelten die üblichen Prüfungen (FR-2, FR-3, FR-5, FR-6).
+* (Hintergrund: Anhang A.10)
+
 ### Datenmodell & Persistierung
 * **Tabelle:** `zev.tarif` (ID aus einer Sequenz). Alle Spalten sind Pflicht:
   * **Bezeichnung:** maximale Länge 50 Zeichen (Anhang A.2), Beispiele: "vZEV PV Tarif" oder "Strombezug EWB"
   * **Tariftyp:**
     * "ZEV" für Strombezug aus dem ZEV (`messwerte.zev_calculated`)
     * "VNB" für Strombezug vom Verteilnetzbetreiber (`messwerte.total - messwerte.zev_calculated`)
-    * "GRUNDGEBUEHR" für eine fixe Grundgebühr (z.B. Messgebühr, Netznutzungspauschale)
+    * "GRUNDGEBUEHR" für eine fixe Grundgebühr (z.B. Messgebühr, Netznutzungspauschale), FR-7
     * "LADESTROM" für Strom an Ladestationen (`Specs/Ladestromtarif.md`)
     * "ZUSATZ" für Tarifpositionen, die an der Position gewählt werden (`Specs/Tarifpositionen.md`)
   * **Tarif:** Genauigkeit 5 Nachkommastellen
   * **gueltig_von:** Datum
   * **gueltig_bis:** Datum
+* **`tarif.produzent_verrechnen BOOLEAN NOT NULL DEFAULT false`** (FR-7); bestehende Grundgebühr-Tarife wurden mit `false` initialisiert.
 * **`tarif.mengeneinheit`** (FR-3): `MONAT` oder `TAG` bei der Grundgebühr. Migration `V176__Grundgebuehr_Pro_Tag.sql`: CHECK-Constraint um `TAG` erweitert, bestehende Grundgebühren auf `MONAT` gesetzt, Spaltenkommentar, Übersetzungen `TAG` („Tag"/„Day"), `TAGE`, `GRUNDGEBUEHR_EINHEIT_HINT`.
 * **`tarif.reihenfolge INTEGER NOT NULL`** (FR-4, je Mandant fortlaufend). Migration `V178__Tarif_Reihenfolge.sql` belegt sie mit der vorherigen Reihenfolge der Rechnung (ZEV, VNB, Ladestrom, Zusatz, Grundgebühr; je Typ nach Beginn und Bezeichnung) — bestehende Rechnungen sehen danach gleich aus. Übersetzungen ebenda.
 * **Preis** (FR-5): `@PositiveOrZero`; Meldung aus V179.
@@ -130,6 +159,8 @@
   * `VNB` → hellorangefarbener Hintergrund, dunkle Schrift (`.tarif-typ-badge--vnb`)
   * `GRUNDGEBUEHR` → anthrazitfarbener Hintergrund (#424242), weisse Schrift (`.tarif-typ-badge--grundgebuehr`)
   * `LADESTROM`, `ZUSATZ` → Grunddarstellung ohne eigene Farbe (`.tarif-typ-badge`)
+* **Spalte „Produzenten"** in der Tarif-Übersicht (FR-7).
+* **Kebab-Menü** je Tarif: Bearbeiten – Kopieren – Löschen (FR-9).
 * **Design System:** `sortable.css` (`.zev-table__griff`, Stile der CDK-Drag-Vorschau — global, weil Angular die Vorschau an den `<body>` hängt).
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
@@ -182,32 +213,68 @@
 * [x] Ohne Jahrespreis bleibt die Rechnung wie bisher (Menge × Preis, „CHF / Monat").
 * [x] Ein Jahrespreis bei ZEV, VNB, Ladestrom oder Zusatz pro Stück/kWh wird abgewiesen.
 
+### Grundgebühr (FR-7)
+* [ ] In der Tarifverwaltung kann ein Tarif mit Typ „Grundgebühr" erfasst, bearbeitet und gelöscht werden.
+* [ ] In der Dropdown-Liste der Tariftypen erscheint der Eintrag „Grundgebühr".
+* [ ] Beim Generieren von Rechnungen wird die Grundgebühr für Konsumenten berechnet; für Produzenten nur bei freigegebenem Tarif (FR-8).
+* [ ] Die Anzahl Monate wird korrekt berechnet (z. B. 01.01.–31.03. = 3 Monate).
+* [ ] Läuft ein `GRUNDGEBUEHR`-Tarif mitten in einer Rechnungsperiode ab, werden zwei separate Zeilen erzeugt (analog ZEV/VNB).
+* [ ] Beim Tariftyp „Grundgebühr" wird im Tarifformular eine Checkbox „Auch Produzenten verrechnen" angezeigt; bei `ZEV`/`VNB` nicht.
+* [ ] Das Flag beeinflusst die Verrechnung bei Konsumenten **nicht** (Konsumenten zahlen die Grundgebühr immer).
+* [ ] In der Tarif-Übersichtstabelle zeigt die Spalte „Produzenten" für `GRUNDGEBUEHR`-Tarife eine deaktivierte Checkbox (angehakt = freigegeben) und für `ZEV`/`VNB` einen Platzhalter „–".
+* [ ] Der `endBetrag` auf der Rechnung enthält die Grundgebühr.
+* [ ] Fehlt ein `GRUNDGEBUEHR`-Tarif für den Rechnungszeitraum, wird keine Grundgebühr berechnet (kein Fehler, da der Typ optional ist).
+* [ ] Alle neuen UI-Texte kommen aus dem `TranslationService` (keine hardcodierten Strings).
+
+### Rechnungen für Produzenten (FR-8)
+* [ ] Produzenten erscheinen im Rechnungsformular und können ausgewählt werden.
+* [ ] Für Produzenten wird eine Rechnung mit nur `GRUNDGEBUEHR`-Positionen generiert (keine ZEV/VNB-Zeilen).
+* [ ] Ein `GRUNDGEBUEHR`-Tarif mit `produzentVerrechnen = true` wird Produzenten verrechnet; ein Tarif mit `false` nicht.
+* [ ] Hat ein ausgewählter Produzent nur nicht-freigegebene `GRUNDGEBUEHR`-Tarife, wird für ihn keine Rechnung erzeugt.
+
+### Tarif kopieren (FR-9)
+* [ ] Kebabmenü hat weiteren Eintrag "Kopieren": Bearbeiten - **Kopieren** - Löschen
+* [ ] Die Felder sind mit den Daten des kopierten Tarifes abgefüllt
+* [ ] Der Benutzer kann "Erfassen" oder "Abbrechen" klicken
+
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
 ### NFR-1: Performance
 * Optimierte Berechnung der Rechnungsbeträge: Gehe für die Berechnung der Kosten nicht Zeile für Zeile der messwerte.zeit vor, sondern bilde Teil-Zeitbereiche gemäss Gültigkeit der Tarife.
+* Die Grundgebühr verlängert die Rechnungsgenerierung nicht merklich: keine zusätzlichen DB-Queries pro Zeile, die Tarife werden einmalig geladen (FR-7).
 
 ### NFR-2: Sicherheit
 * Die Tarifverwaltung verlangt die Permission `tarife:manage` (Route `/tarife` und Endpunkte); sie haben die Fachrollen `org_admin` und `zev_admin` (`Specs/Berechtigungen.md`, Hintergrund: Anhang A.8).
 * Das Verschieben (FR-4) verlangt `tarife:manage`; die Überschneidungsprüfung (FR-2) und das Verschieben sehen nur Tarife des eigenen Mandanten.
+* Rechnungen — auch für Produzenten (FR-8) — verlangen `rechnungen:manage` (`Specs/RechnungenGenerieren.md`, `Specs/Berechtigungen.md`).
+* **Multi-Tenancy:** Alle Tarife tragen `org_id`; der Hibernate-Filter wird angewendet.
 
 ### NFR-3: Kompatibilität
 * Die Migrationen V176 und V178 ändern bestehende Rechnungen nicht: Grundgebühren rechnen weiter pro Monat, die Reihenfolge der Rechnung bleibt.
+* Rechnungen für Konsumenten ohne `GRUNDGEBUEHR`-Tarif werden korrekt berechnet (FR-7).
+* Das `TarifZeileDTO` trägt die Einheit der Menge (kWh, Monate, Tage …), ohne bestehende Felder zu ändern.
 
 ## 5. Edge Cases & Fehlerbehandlung
 * Es muss für den gesamten Zeitbereich der Rechnung ein gültiger Tarif **je Typ** (ZEV, VNB) vorhanden sein; mehrere gleichzeitig gültige Tarife eines Typs decken den Zeitraum gemeinsam ab (FR-2). Falls dies nicht der Fall ist, soll eine Fehlermeldung angezeigt werden.
 * Fehler beim Verschieben → die Liste zeigt wieder den gespeicherten Stand (FR-4).
 * Tarif mit Altbestand-Werten ausserhalb der heutigen Regeln → lässt sich trotzdem verschieben (FR-4).
+* Kein `GRUNDGEBUEHR`-Tarif vorhanden → keine Grundgebühr, keine Fehlermeldung (FR-7).
+* Grundgebühr pro Monat bei Teilmonat (Mieter zieht Mitte Monat ein/aus) → nur vollständige Kalendermonate zählen; ein Monat ist vollständig, wenn sein erster und letzter Tag im effektiven Zeitraum liegen (FR-3).
+* Rechnungszeitraum unter einem Monat bei Grundgebühr pro Monat → 0 Monate, die Zeile wird nicht ausgegeben.
+* Produzent ohne Messwerte → Rechnung mit den Grundgebühr-Zeilen (FR-8); Produzent mit Mieter ist nicht vorgesehen, kein Mieterblock.
+* Netzwerkfehler beim PDF-Download → bestehende Fehlerbehandlung, keine Spezialbehandlung.
 
 ## 6. Abhängigkeiten & betroffene Funktionalität
 * **Verwandte Specs:** `Specs/RechnungenGenerieren.md` (Rechnung, Länge der Bezeichnung), `Specs/TarifValidierung.md` (Lückenprüfung), `Specs/Ladestromtarif.md` (`LADESTROM`), `Specs/Tarifpositionen.md` (`ZUSATZ`).
-* **Betroffener Code:** Rechnungserzeugung und PDF (`RechnungZeilenText`), Tarifmaske und Tarifliste, Design System (`sortable.css`, `.zev-collapsible--overflow-visible`, `.zev-kebab-menu--up`), Komponente `app-kebab-menu` (wirkt auf allen Listen).
+* **Betroffener Code:** `TarifTyp` (`GRUNDGEBUEHR`), `RechnungService` (Grundgebühr, Produzenten-Rechnungen), `RechnungDTO`/`TarifZeileDTO` (Einheit der Menge), `rechnung.jrxml`, Rechnungsformular (Produzenten-Auswahl), Rechnungserzeugung und PDF (`RechnungZeilenText`), Tarifmaske und Tarifliste, Design System (`sortable.css`, `.zev-collapsible--overflow-visible`, `.zev-kebab-menu--up`), Komponente `app-kebab-menu` (wirkt auf allen Listen).
 * **Datenmigration:** V176 (Mengeneinheit), V178 (Reihenfolge), V179 (Preis 0), V180 (Jahrespreis) — siehe Datenmodell.
 
 ## 7. Abgrenzung / Out of Scope
 * Keine Lückenprüfung je Bezeichnung und keine Gruppierung oder Zwischensumme der Bestandteile (FR-2).
 * `TAG` nur für die ZEV-Stromrechnung, nicht für die Nebenkostenabrechnung (FR-3).
 * Kein Verschieben zwischen Panels (FR-4).
+* Grundgebühr: keine Berechnung nach Einheitsgrösse oder Leistung (immer Festpreis), keine Anzeige auf der Statistikseite, keine Historisierung von Rechnungen in der Datenbank (`RechnungenGenerieren.md`); Produzenten erhalten eigene Rechnungen statt einer Zeile auf einer Konsumenten-Rechnung (FR-7, FR-8).
+* Kopieren: keine automatische Validierung beim Kopieren selbst (FR-9).
 
 ## 8. Offene Fragen
 * keine
@@ -237,3 +304,27 @@ Für „92 Tage" wurde die Mengenspalte im PDF von 35 auf 65 pt verbreitert, die
 
 ### A.8 Berechtigung und Menü (NFR-2, FR-1, 18.10.2026)
 Die ursprüngliche Spec verlangte die Rolle `zev_admin` und nannte als Menüplatz „unterhalb /einheiten“. Mit der Umstellung auf Permissions (`Specs/Berechtigungen.md`) verlangt die Tarifverwaltung `tarife:manage`, das auch `org_admin` hat. „Einheiten“ liegt seit 17.10.2026 im Untermenü „Admin“ (`Specs/Hamburgermenü.md`), die Tarifverwaltung blieb auf der ersten Ebene. Bei der Konsolidierung am 18.10.2026 nachgeführt, ebenso der Tabellenname (`zev.tarif` statt „tarife“), die Tariftypen `LADESTROM` und `ZUSATZ` sowie die Grundgebühr in FR-2, deren Menge seit FR-3/FR-6 nicht mehr nur „volle Monate“ ist.
+
+### A.9 Grundgebühr und Rechnungen für Produzenten (FR-7, FR-8; zusammengeführt am 18.10.2026)
+Die Grundgebühr war eine eigene Spec, `Specs/Tarifverwaltung-Grundgebuehr.md` (Inhalt im Git-Verlauf). Ausgangslage damals: Es gab nur `ZEV` und `VNB`, beide pro kWh; Produzenten erhielten keine Rechnungen. Bei der Zusammenführung abgelöst bzw. angepasst:
+* **„Festpreis pro Stromzähler und Monat (CHF/Monat)", „Anzahl der vollständigen Kalendermonate", „Menge (Anzahl Monate, Einheit Monate) | Preis (CHF/Monat)"** — seit FR-3 (10.10.2026) auch pro Tag, seit FR-6 (11.10.2026) als Jahrespreis.
+* **„GRUNDGEBUEHR-Zeilen werden nach den ZEV- und VNB-Zeilen aufgeführt"** — seit FR-4 (11.10.2026) bestimmt die Reihenfolge der Tarife.
+* **„Tarifverwaltung (inkl. GRUNDGEBUEHR) ist nur mit Rolle zev_admin zugänglich; Rechnungsgenerierung für Produzenten ebenfalls nur mit zev_admin"** — seit der Umstellung auf Permissions: `tarife:manage` bzw. `rechnungen:manage`.
+* **„Die Tarifvalidierung (validateTarifAbdeckung) wird um GRUNDGEBUEHR erweitert (separater Validierungsaufruf)"** — durch die Antwort auf die offene Frage (Typ optional) überholt; die Lückenprüfung prüft nur ZEV und VNB.
+* **Abgrenzung „Automatische Aufteilung der Grundgebühr bei Mieterwechsel innerhalb eines Monats (wird nur auf volle Monate gerechnet)"** — seit FR-3 (10.10.2026) mit der Mengeneinheit `TAG` taggenau möglich; für `MONAT` gilt weiter: nur volle Monate.
+* **Spalte „Produzenten": „Für ZEV/VNB-Tarife wird ein Platzhalter angezeigt"** — gilt für alle Typen ausser `GRUNDGEBUEHR`, also auch `LADESTROM` und `ZUSATZ`.
+* **Persistierung:** Kein neues Datenbankschema; Migration für den Enum-Wert (sofern als DB-Enum gespeichert) und für die Spalte `produzent_verrechnen`.
+* **Datenmigration:** keine; der Typ wurde nur für neue Tarife genutzt.
+* **Betroffener Code damals:** `TarifTyp`, `TarifService` (Laden der Grundgebühr), `RechnungService` (`berechneRechnung`/`berechneTarifZeilen`, `berechneRechnungen` für PRODUCER), `RechnungDTO`/`TarifZeileDTO`, `rechnung.jrxml`, `TarifFormComponent`, `RechnungenComponent`.
+
+Offene Fragen und Antworten:
+* Pflicht oder optional? → **optional** (kein Fehler ohne Tarif).
+* Ganze oder partielle Monate? → **volle Monate** (später ergänzt um „pro Tag", FR-3).
+* Produzenten im Rechnungsformular in derselben Liste oder separat? → **gleiche Liste mit Typ-Label**.
+* Grundgebühr in der Quartals-/Jahresvalidierung mitprüfen? → **nein, optional**.
+* Eigener Abschnitt im PDF? → **kein eigener Abschnitt**.
+
+Zuordnung der alten Nummern: Grundgebühr FR-1 (Tariftyp), FR-2 (Berechnung), FR-4 (PDF), FR-5 (UI), FR-6 (Persistierung), FR-7 (Flag), FR-8 (Spalte) → **FR-7**; Grundgebühr FR-3 (Produzenten-Rechnungen) → **FR-8**. NFR-1 → NFR-1, NFR-2 und NFR-4 → NFR-2, NFR-3 → NFR-3.
+
+### A.10 Tarif kopieren (FR-9; zusammengeführt am 18.10.2026)
+War eine eigene Spec, `Specs/Tarifverwaltung-Tarif-kopieren.md` („Erweiterung Tarifverwaltung", Inhalt im Git-Verlauf). Ziel: einen neuen Tarif durch Kopieren eines bestehenden erfassen, aus Gründen der Benutzerfreundlichkeit; vorher mussten alle Felder manuell erfasst werden. Persistierung, Performance, Kompatibilität und Edge Cases waren leer, Sicherheit „wie bisher". Zuordnung: Kopieren FR-1 (Ablauf) und FR-3 (Layout) → **FR-9**.

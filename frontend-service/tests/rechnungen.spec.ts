@@ -229,7 +229,7 @@ test.describe('Rechnungen - Navigation and Display', () => {
     });
 });
 
-test.describe('Rechnungen - Einheiten Auswahl (FR-3: Produzenten)', () => {
+test.describe('Rechnungen - Einheiten Auswahl (Specs/Tarifverwaltung.md FR-8: Produzenten)', () => {
     test('should show type labels [KONSUMENT] or [PRODUZENT] for units', async ({ page }) => {
         await navigateToRechnungen(page);
         const items = await einheitItemsOrFail(page);

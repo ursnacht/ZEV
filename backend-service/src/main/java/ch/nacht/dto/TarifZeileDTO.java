@@ -25,7 +25,7 @@ public class TarifZeileDTO {
     private BigDecimal preis;      // CHF/kWh
     private BigDecimal betrag;     // CHF
     private TarifTyp typ;
-    private String mengeneinheit; // "kWh" for ZEV/VNB, "Monate" for GRUNDGEBUEHR
+    private String mengeneinheit; // z.B. "KWH", "MONAT", "TAG" (Specs/Tarifverwaltung.md, FR-3)
 
     /**
      * Reihenfolge des Tarifs dieser Zeile (Specs/Tarifverwaltung.md, FR-4) - nur zum Sortieren

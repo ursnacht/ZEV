@@ -235,7 +235,7 @@
   Überschneidungsprüfung), [`Specs/Ladestromtarif.md`](./Ladestromtarif.md) (Tabelle
   `tarifposition`, Erfassungsmaske, Rechnungsintegration),
   [`Specs/Ladestationen.md`](./Ladestationen.md) (Anker an der Einheit, Mehrfachzuordnung),
-  [`Specs/Tarifverwaltung-Grundgebuehr.md`](./Tarifverwaltung-Grundgebuehr.md) (typabhängiges
+  [`Specs/Tarifverwaltung.md`](./Tarifverwaltung.md), FR-7 (Grundgebühr; typabhängiges
   Zusatzfeld als Vorlage).
 * **Betroffener Code:**
   - Backend: `entity/TarifTyp.java` (Wert + `MANUELL_ERFASST` + `mengeneinheit()`),
