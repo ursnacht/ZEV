@@ -43,7 +43,7 @@
 
 ### FR-3: Grundgebühr pro Monat oder pro Tag
 * **User Story:** Als Admin möchte ich eine Grundgebühr der ZEV-Stromrechnung **taggenau** abrechnen können, weil Lieferanten Grundtarife in CHF pro Tag und Zähler angeben und ein Mieterwechsel mitten im Monat sonst einen ganzen Monat ausfallen lässt.
-* **Lösung:** Ein `GRUNDGEBUEHR`-Tarif trägt eine **Mengeneinheit**: `MONAT` oder `TAG`. Kein eigener Tariftyp — alles, was an der Grundgebühr hängt (FR-2, „Produzent verrechnen", automatische Aufnahme auf jede Rechnung), gilt für beide.
+* **Lösung:** Ein `GRUNDGEBUEHR`-Tarif (FR-7) trägt eine **Mengeneinheit**: `MONAT` oder `TAG`. Kein eigener Tariftyp — alles, was an der Grundgebühr hängt (FR-2, „Produzent verrechnen", automatische Aufnahme auf jede Rechnung), gilt für beide.
 
   | Mengeneinheit | Menge auf der Rechnung | Preis |
   |---|---|---|
@@ -126,7 +126,7 @@
 * (Hintergrund: Anhang A.10)
 
 ### Datenmodell & Persistierung
-* **Tabelle:** `zev.tarif` (ID aus einer Sequenz). Alle Spalten sind Pflicht:
+* **Tabelle:** `zev.tarif` (ID aus einer Sequenz). Diese Spalten sind Pflicht:
   * **Bezeichnung:** maximale Länge 50 Zeichen (Anhang A.2), Beispiele: "vZEV PV Tarif" oder "Strombezug EWB"
   * **Tariftyp:**
     * "ZEV" für Strombezug aus dem ZEV (`messwerte.zev_calculated`)
@@ -170,7 +170,7 @@
 * [x] Drei `GRUNDGEBUEHR`-Tarife (Energielieferung, Netznutzung, Messtarif) mit gleicher Gültigkeit lassen sich speichern.
 * [x] Ein zweiter Tarif desselben Typs mit **gleicher Bezeichnung** und überschneidender Gültigkeit wird abgewiesen („Tarif überschneidet sich mit bestehendem Tarif gleicher Bezeichnung"); auch bei anderer Gross-/Kleinschreibung oder Leerzeichen am Rand.
 * [x] Beim Bearbeiten eines Tarifs zählt er nicht als Überschneidung mit sich selbst.
-* [x] Ein zweiter `LADESTROM`-Tarif mit überschneidender Gültigkeit wird weiterhin abgewiesen, auch mit anderer Bezeichnung.
+* [x] Ein zweiter `LADESTROM`-Tarif mit überschneidender Gültigkeit wird abgewiesen, auch mit anderer Bezeichnung.
 * [x] Auf der Rechnung erscheinen zwei gleichzeitig gültige `VNB`-Tarife als zwei Zeilen mit derselben Menge; drei Grundgebühren als drei Zeilen; das Total ist ihre Summe.
 * [x] Die Überschneidungsprüfung sieht nur Tarife des eigenen Mandanten.
 
@@ -179,9 +179,9 @@
 * [x] Eine andere Mengeneinheit als Monat oder Tag wird bei der Grundgebühr abgewiesen („Für die Grundgebühr ist nur die Mengeneinheit MONAT oder TAG zulässig").
 * [x] Grundgebühr pro Tag, ganzes Q3 2026: Menge 92, Einheit „Tag", Betrag 92 × Preis.
 * [x] Grundgebühr pro Tag, gültig ab 16.08.2026, Rechnung Q3: Menge 46.
-* [x] Grundgebühr pro Monat, gültig ab 16.08.2026, Rechnung Q3: Menge 1 (nur September) — unverändert.
+* [x] Grundgebühr pro Monat, gültig ab 16.08.2026, Rechnung Q3: Menge 1 (nur September).
 * [x] Bestehende Grundgebühren rechnen nach der Migration wie bisher (Mengeneinheit `MONAT`).
-* [x] Die Tarifmaske bietet bei der Grundgebühr nur Monat und Tag an, bei ZUSATZ weiterhin kWh, Monat, Stück; bei jedem Wechsel des Typs wird die Einheit neu gesetzt — Grundgebühr: Monat vorbelegt; ZUSATZ: leer, muss bewusst gewählt werden (die Vorbelegung „Monat" der Grundgebühr wandert nicht in einen ZUSATZ-Tarif).
+* [x] Die Tarifmaske bietet bei der Grundgebühr nur Monat und Tag an, bei ZUSATZ kWh, Monat, Stück; bei jedem Wechsel des Typs wird die Einheit neu gesetzt — Grundgebühr: Monat vorbelegt; ZUSATZ: leer, muss bewusst gewählt werden (die Vorbelegung „Monat" der Grundgebühr wandert nicht in einen ZUSATZ-Tarif).
 * [x] Auf der Rechnung (PDF) steht „CHF / Tag".
 
 ### Reihenfolge und Panels (FR-4)
@@ -189,7 +189,7 @@
 * [x] Ein Tarif von 01.10. des Vorjahres bis 31.12. dieses Jahres steht im Panel des aktuellen Jahres.
 * [x] Innerhalb eines Panels lässt sich ein Tarif am Griff verschieben; die neue Reihenfolge bleibt nach dem Neuladen erhalten.
 * [x] Zwischen Panels lässt sich nicht verschieben (je Panel eine eigene Drop-Liste).
-* [x] Die Spaltenköpfe sind nicht mehr sortierbar.
+* [x] Die Spaltenköpfe sind nicht sortierbar.
 * [x] Das Kebab-Menü der unteren Zeilen wird nicht abgeschnitten: Die Panels schneiden nicht ab (`.zev-collapsible--overflow-visible`), und das Menü klappt allgemein **nach oben** auf, wenn darunter bis zum nächsten abschneidenden Element (Panel, scrollende Tabelle nach Spaltenbreiten-Änderung) oder zum Fensterrand zu wenig Platz ist (`app-kebab-menu`, `.zev-kebab-menu--up`) — auf allen Listen.
 * [x] Auf der Rechnung stehen die Zeilen in der Reihenfolge der Tarife, auch über Typen hinweg (z.B. Grundgebühr vor Strombezug).
 * [x] Ein neuer VNB-Tarif steht direkt hinter dem letzten VNB-Tarif; ein Bearbeiten ändert den Platz nicht.
@@ -210,7 +210,7 @@
 * [x] Über den Jahreswechsel wird je Kalenderjahr mit dessen Tagen gerechnet.
 * [x] Zusatz-Tarif pro Monat mit Jahrespreis: Betrag = Jahrespreis × erfasste Monate / 12.
 * [x] Auf der Rechnung: Menge „3 Monate", Preis 120.00000, Einheit „CHF / Jahr".
-* [x] Ohne Jahrespreis bleibt die Rechnung wie bisher (Menge × Preis, „CHF / Monat").
+* [x] Ohne Jahrespreis gilt Menge × Preis mit „CHF / Monat".
 * [x] Ein Jahrespreis bei ZEV, VNB, Ladestrom oder Zusatz pro Stück/kWh wird abgewiesen.
 
 ### Grundgebühr (FR-7)
@@ -224,7 +224,7 @@
 * [ ] In der Tarif-Übersichtstabelle zeigt die Spalte „Produzenten" für `GRUNDGEBUEHR`-Tarife eine deaktivierte Checkbox (angehakt = freigegeben) und für `ZEV`/`VNB` einen Platzhalter „–".
 * [ ] Der `endBetrag` auf der Rechnung enthält die Grundgebühr.
 * [ ] Fehlt ein `GRUNDGEBUEHR`-Tarif für den Rechnungszeitraum, wird keine Grundgebühr berechnet (kein Fehler, da der Typ optional ist).
-* [ ] Alle neuen UI-Texte kommen aus dem `TranslationService` (keine hardcodierten Strings).
+* [ ] Alle UI-Texte der Grundgebühr kommen aus dem `TranslationService` (keine hardcodierten Strings).
 
 ### Rechnungen für Produzenten (FR-8)
 * [ ] Produzenten erscheinen im Rechnungsformular und können ausgewählt werden.
@@ -244,8 +244,8 @@
 * Die Grundgebühr verlängert die Rechnungsgenerierung nicht merklich: keine zusätzlichen DB-Queries pro Zeile, die Tarife werden einmalig geladen (FR-7).
 
 ### NFR-2: Sicherheit
-* Die Tarifverwaltung verlangt die Permission `tarife:manage` (Route `/tarife` und Endpunkte); sie haben die Fachrollen `org_admin` und `zev_admin` (`Specs/Berechtigungen.md`, Hintergrund: Anhang A.8).
-* Das Verschieben (FR-4) verlangt `tarife:manage`; die Überschneidungsprüfung (FR-2) und das Verschieben sehen nur Tarife des eigenen Mandanten.
+* Die Tarifverwaltung verlangt die Permission `tarife:manage` (Route `/tarife` und alle Endpunkte, auch das Verschieben, FR-4); sie haben die Fachrollen `org_admin` und `zev_admin` (`Specs/Berechtigungen.md`, Hintergrund: Anhang A.8).
+* Die Überschneidungsprüfung (FR-2) und das Verschieben (FR-4) sehen nur Tarife des eigenen Mandanten.
 * Rechnungen — auch für Produzenten (FR-8) — verlangen `rechnungen:manage` (`Specs/RechnungenGenerieren.md`, `Specs/Berechtigungen.md`).
 * **Multi-Tenancy:** Alle Tarife tragen `org_id`; der Hibernate-Filter wird angewendet.
 
@@ -255,7 +255,7 @@
 * Das `TarifZeileDTO` trägt die Einheit der Menge (kWh, Monate, Tage …), ohne bestehende Felder zu ändern.
 
 ## 5. Edge Cases & Fehlerbehandlung
-* Es muss für den gesamten Zeitbereich der Rechnung ein gültiger Tarif **je Typ** (ZEV, VNB) vorhanden sein; mehrere gleichzeitig gültige Tarife eines Typs decken den Zeitraum gemeinsam ab (FR-2). Falls dies nicht der Fall ist, soll eine Fehlermeldung angezeigt werden.
+* Es muss für den gesamten Zeitbereich der Rechnung ein gültiger Tarif **je Typ** (ZEV, VNB) vorhanden sein; mehrere gleichzeitig gültige Tarife eines Typs decken den Zeitraum gemeinsam ab (FR-2). Falls dies nicht der Fall ist, wird eine Fehlermeldung angezeigt.
 * Fehler beim Verschieben → die Liste zeigt wieder den gespeicherten Stand (FR-4).
 * Tarif mit Altbestand-Werten ausserhalb der heutigen Regeln → lässt sich trotzdem verschieben (FR-4).
 * Kein `GRUNDGEBUEHR`-Tarif vorhanden → keine Grundgebühr, keine Fehlermeldung (FR-7).
@@ -328,3 +328,6 @@ Zuordnung der alten Nummern: Grundgebühr FR-1 (Tariftyp), FR-2 (Berechnung), FR
 
 ### A.10 Tarif kopieren (FR-9; zusammengeführt am 18.10.2026)
 War eine eigene Spec, `Specs/Tarifverwaltung-Tarif-kopieren.md` („Erweiterung Tarifverwaltung", Inhalt im Git-Verlauf). Ziel: einen neuen Tarif durch Kopieren eines bestehenden erfassen, aus Gründen der Benutzerfreundlichkeit; vorher mussten alle Felder manuell erfasst werden. Persistierung, Performance, Kompatibilität und Edge Cases waren leer, Sicherheit „wie bisher". Zuordnung: Kopieren FR-1 (Ablauf) und FR-3 (Layout) → **FR-9**.
+
+### A.11 Glättung (18.10.2026)
+Bei der zweiten Konsolidierung nach der Zusammenführung wurden nur Formulierungen geglättet, Inhalt und Status der Kriterien blieben gleich. Vorher lauteten sie: „… wird **weiterhin** abgewiesen, auch mit anderer Bezeichnung" (FR-2); „Menge 1 (nur September) — **unverändert**" und „bei ZUSATZ **weiterhin** kWh, Monat, Stück" (FR-3); „Die Spaltenköpfe sind **nicht mehr** sortierbar" (FR-4); „Ohne Jahrespreis **bleibt die Rechnung wie bisher** (Menge × Preis, „CHF / Monat")" (FR-6); „Alle **neuen** UI-Texte kommen aus dem `TranslationService`" (FR-7). In NFR-2 wurden zwei Punkte zur Permission `tarife:manage` zusammengefasst; FR-3 verweist neu auf FR-7, und der erste Edge Case steht im Präsens („wird“ statt „soll … angezeigt werden“). Im Datenmodell hiess es „Alle Spalten sind Pflicht", gemeint waren die aufgezählten Grundspalten (`mengeneinheit` ist nullable).
