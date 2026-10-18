@@ -383,7 +383,9 @@ class TarifpositionRepositoryIT extends AbstractIntegrationTest {
 
     @Test
     void shouldDeletePositionsWhenEinheitIsDeleted() {
-        // ON DELETE CASCADE: mit der Einheit verschwinden ihre Positionen (§5)
+        // Prueft NICHT das ON DELETE CASCADE: Dieses Schema entsteht aus dem Mapping, der FK aus der
+        // Migration fehlt hier - deshalb loescht der Test die Positionen selbst. Das Kaskadieren
+        // prueft FlywaySchemaIT gegen das Schema aus den Migrationen.
         savePosition(ladestationB, ladestromTarif, 2026, 1, "10.000");
         savePosition(ladestationA, ladestromTarif, 2026, 1, "20.000");
 
