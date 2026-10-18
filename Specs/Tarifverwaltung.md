@@ -101,7 +101,7 @@
 * **Tariftyp `GRUNDGEBUEHR`:** ein Festpreis **pro Stromzähler**, der zusätzlich zu den verbrauchsabhängigen `ZEV`- und `VNB`-Tarifen auf der Rechnung steht. `bezeichnung`, `preis`, `gueltig_von` und `gueltig_bis` werden wie bei den anderen Tariftypen erfasst; Genauigkeit `preis` 5 Nachkommastellen.
 * **Menge und Betrag** richten sich nach der Mengeneinheit (FR-3: volle Kalendermonate oder Tage) und gegebenenfalls nach dem Jahrespreis (FR-6). Der Teilzeitraum ist der Schnitt aus Gültigkeit des Tarifs und Rechnungszeitraum.
 * **Bei Konsumenten** wird jede gültige Grundgebühr verrechnet, automatisch und ohne Erfassung einer Position.
-* **Optional:** Fehlt ein `GRUNDGEBUEHR`-Tarif für den Rechnungszeitraum, wird keine Grundgebühr berechnet — kein Fehler. Die Lückenprüfung (Edge Cases, `Specs/TarifValidierung.md`) prüft nur `ZEV` und `VNB`.
+* **Optional:** Fehlt ein `GRUNDGEBUEHR`-Tarif für den Rechnungszeitraum, wird keine Grundgebühr berechnet — kein Fehler. Die Lückenprüfung (`Specs/TarifValidierung.md`, FR-1.5) prüft nur `ZEV` und `VNB`.
 * **Flag „Auch Produzenten verrechnen" (`produzentVerrechnen`, Spalte `produzent_verrechnen`):**
   * In der Tarifmaske als **Checkbox**, sichtbar nur beim Tariftyp `GRUNDGEBUEHR`; Standard `false`.
   * Konsumenten zahlen die Grundgebühr unabhängig vom Flag; Produzenten nur bei `true` (FR-8).
