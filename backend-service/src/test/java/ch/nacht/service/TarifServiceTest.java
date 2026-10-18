@@ -320,6 +320,7 @@ public class TarifServiceTest {
         when(tarifRepository.existsOverlappingTarifMitBezeichnung(
             eq(TarifTyp.ZEV), eq("ZEV Tarif 2024 Updated"), any(), any(), eq(1L)
         )).thenReturn(false);
+        when(tarifRepository.findFirstById(1L)).thenReturn(Optional.of(zevTarif2024));
         when(tarifRepository.save(zevTarif2024)).thenReturn(zevTarif2024);
 
         Tarif result = tarifService.saveTarif(zevTarif2024);
@@ -328,6 +329,33 @@ public class TarifServiceTest {
         verify(tarifRepository).existsOverlappingTarifMitBezeichnung(
             eq(TarifTyp.ZEV), eq("ZEV Tarif 2024 Updated"), any(), any(), eq(1L)
         );
+    }
+
+    /** Eine ID, die im eigenen Mandanten nicht existiert, wird abgewiesen (FremdeIdBeimSpeichernIT). */
+    @Test
+    void saveTarif_IdNichtImEigenenMandanten_ThrowsException() {
+        when(tarifRepository.findFirstById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> tarifService.saveTarif(zevTarif2024));
+
+        verify(tarifRepository, never()).save(any());
+    }
+
+    /** Beim Aendern kommt der Mandant vom bestehenden Tarif, nicht aus dem Request-Body. */
+    @Test
+    void saveTarif_Update_UebernimmtOrgIdVomBestehendenTarif() {
+        Tarif bestehend = new Tarif("ZEV Tarif 2024", TarifTyp.ZEV, new BigDecimal("0.20000"),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31));
+        bestehend.setId(1L);
+        bestehend.setOrgId(5L);
+        zevTarif2024.setOrgId(99L);
+        when(tarifRepository.findFirstById(1L)).thenReturn(Optional.of(bestehend));
+        when(tarifRepository.save(zevTarif2024)).thenReturn(zevTarif2024);
+
+        tarifService.saveTarif(zevTarif2024);
+
+        assertEquals(5L, zevTarif2024.getOrgId());
+        verify(organizationContextService, never()).getCurrentOrgId();
     }
 
     @Test

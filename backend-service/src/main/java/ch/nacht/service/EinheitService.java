@@ -64,6 +64,9 @@ public class EinheitService {
             throw new IllegalStateException(fehlerKey);
         }
         pruefeLadestationMesspunkt(einheit, -1L);
+        // Eine mitgeschickte ID machte aus dem save ein merge, das den Datensatz ungefiltert
+        // ueber den Primaerschluessel laedt - auch den eines fremden Mandanten (FremdeIdBeimSpeichernIT).
+        einheit.setId(null);
         einheit.setOrgId(organizationContextService.getCurrentOrgId());
         return einheitRepository.save(einheit);
     }

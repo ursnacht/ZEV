@@ -95,10 +95,15 @@ public class TarifService {
             tarif.setOrgId(organizationContextService.getCurrentOrgId());
             tarif.setReihenfolge(naechsteReihenfolge(tarif));
         } else {
+            // Gefiltert laden: save mit gesetzter ID wird zu merge, und merge laedt ungefiltert -
+            // ohne diese Pruefung traefe eine fremde ID den Tarif eines anderen Mandanten
+            // (FremdeIdBeimSpeichernIT). Der Mandant kommt vom bestehenden Tarif, nie aus dem Body.
+            Tarif bestehend = tarifRepository.findFirstById(tarif.getId())
+                    .orElseThrow(() -> new IllegalArgumentException("Tarif nicht gefunden"));
+            tarif.setOrgId(bestehend.getOrgId());
             // Die Reihenfolge aendert nur onReihenfolge - ein mitgeschickter Wert waere ein
             // veralteter Stand der Liste, aus der das Formular geoeffnet wurde.
-            tarifRepository.findFirstById(tarif.getId())
-                    .ifPresent(bestehend -> tarif.setReihenfolge(bestehend.getReihenfolge()));
+            tarif.setReihenfolge(bestehend.getReihenfolge());
         }
 
         Tarif saved = tarifRepository.save(tarif);

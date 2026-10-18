@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -85,4 +86,16 @@ public interface EinheitRepository extends JpaRepository<Einheit, Long> {
      * @return Datensatz des eigenen Mandanten, sonst leer
      */
     Optional<Einheit> findFirstById(Long id);
+
+    /**
+     * Zaehlt, wie viele der IDs zu Einheiten gehoeren — <b>unter dem Mandantenfilter</b>
+     * (abgeleitete Abfrage, kein Laden ueber den Primaerschluessel).
+     *
+     * <p>Damit prueft {@code MieterService}, dass alle zugeordneten Einheiten dem eigenen
+     * Mandanten gehoeren: Eine fremde ID zaehlt nicht mit.
+     *
+     * @param ids Einheiten-IDs ohne Duplikate
+     * @return Anzahl der sichtbaren Einheiten unter diesen IDs
+     */
+    long countByIdIn(Collection<Long> ids);
 }

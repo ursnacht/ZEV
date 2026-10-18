@@ -427,4 +427,18 @@ public class MieterControllerTest {
                 .andExpect(jsonPath("$[0].einheitIds", hasSize(2)))
                 .andExpect(jsonPath("$[0].einheitIds[1]", is(900)));
     }
+
+    /** id und orgId aus dem Request-Body werden nicht uebernommen (FremdeIdBeimSpeichernIT). */
+    @Test
+    void createMieter_IdUndOrgIdImBody_WerdenIgnoriert() throws Exception {
+        when(mieterService.saveMieter(any(Mieter.class))).thenReturn(new Mieter());
+
+        mockMvc.perform(post("/api/mieter")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"id\":4711,\"orgId\":99,\"name\":\"Gekapert\",\"strasse\":\"Teststrasse 1\","
+                    + "\"plz\":\"3000\",\"ort\":\"Bern\",\"mietbeginn\":\"2024-01-01\",\"einheitIds\":[1]}"))
+                .andExpect(status().isCreated());
+
+        verify(mieterService).saveMieter(argThat(m -> m.getId() == null && m.getOrgId() == null));
+    }
 }

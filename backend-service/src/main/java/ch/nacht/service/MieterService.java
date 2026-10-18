@@ -2,6 +2,7 @@ package ch.nacht.service;
 
 import ch.nacht.entity.Mieter;
 import ch.nacht.entity.MieterEinheit;
+import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MieterEinheitRepository;
 import ch.nacht.repository.MieterRepository;
 import ch.nacht.repository.NkAkontoRepository;
@@ -37,6 +38,7 @@ public class MieterService {
 
     private final MieterRepository mieterRepository;
     private final MieterEinheitRepository mieterEinheitRepository;
+    private final EinheitRepository einheitRepository;
     private final TarifpositionRepository tarifpositionRepository;
     private final NkVerbrauchRepository nkVerbrauchRepository;
     private final NkZusatzRepository nkZusatzRepository;
@@ -47,6 +49,7 @@ public class MieterService {
 
     public MieterService(MieterRepository mieterRepository,
                          MieterEinheitRepository mieterEinheitRepository,
+                         EinheitRepository einheitRepository,
                          TarifpositionRepository tarifpositionRepository,
                          NkVerbrauchRepository nkVerbrauchRepository,
                          NkZusatzRepository nkZusatzRepository,
@@ -56,6 +59,7 @@ public class MieterService {
                          HibernateFilterService hibernateFilterService) {
         this.mieterRepository = mieterRepository;
         this.mieterEinheitRepository = mieterEinheitRepository;
+        this.einheitRepository = einheitRepository;
         this.tarifpositionRepository = tarifpositionRepository;
         this.nkVerbrauchRepository = nkVerbrauchRepository;
         this.nkZusatzRepository = nkZusatzRepository;
@@ -111,6 +115,11 @@ public class MieterService {
         if (einheitIds.isEmpty()) {
             throw new IllegalArgumentException("Mindestens eine Einheit ist erforderlich");
         }
+        // Die IDs kommen aus dem Request-Body: Ohne diese Pruefung liesse sich ein Mieter einer
+        // Einheit eines fremden Mandanten zuordnen (FremdeIdBeimSpeichernIT).
+        if (einheitRepository.countByIdIn(einheitIds) != einheitIds.size()) {
+            throw new IllegalArgumentException("Einheit nicht gefunden");
+        }
 
         Long excludeId = mieter.getId() != null ? mieter.getId() : -1L;
 
@@ -144,6 +153,13 @@ public class MieterService {
         // Set org_id for new tenant
         if (mieter.getId() == null) {
             mieter.setOrgId(organizationContextService.getCurrentOrgId());
+        } else {
+            // Gefiltert laden: save mit gesetzter ID wird zu merge, und merge laedt ungefiltert -
+            // ohne diese Pruefung traefe eine fremde ID den Mieter eines anderen Mandanten
+            // (FremdeIdBeimSpeichernIT). Der Mandant kommt vom bestehenden Mieter, nie aus dem Body.
+            Mieter bestehend = mieterRepository.findFirstById(mieter.getId())
+                    .orElseThrow(() -> new IllegalArgumentException("Mieter nicht gefunden"));
+            mieter.setOrgId(bestehend.getOrgId());
         }
 
         Mieter saved = mieterRepository.save(mieter);

@@ -1,5 +1,6 @@
 package ch.nacht.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -11,11 +12,16 @@ import org.hibernate.annotations.Filter;
 @Filter(name = "orgFilter", condition = "org_id = :orgId")
 public class Einheit {
 
+    // Nur lesbar fuer Jackson: Eine ID aus dem Request-Body machte aus dem save ein merge auf einen
+    // beliebigen, auch fremden Datensatz (FremdeIdBeimSpeichernIT). PUT nimmt die ID aus dem Pfad.
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "einheit_seq")
     @SequenceGenerator(name = "einheit_seq", sequenceName = "zev.einheit_seq", allocationSize = 1)
     private Long id;
 
+    // Nur lesbar fuer Jackson: Den Mandanten setzt der Service, nie der Request-Body.
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "org_id", nullable = false)
     private Long orgId;
 

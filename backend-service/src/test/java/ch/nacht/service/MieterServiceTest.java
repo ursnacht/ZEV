@@ -2,6 +2,7 @@ package ch.nacht.service;
 
 import ch.nacht.entity.Mieter;
 import ch.nacht.entity.MieterEinheit;
+import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.MieterEinheitRepository;
 import ch.nacht.repository.MieterRepository;
 import ch.nacht.repository.NkAkontoRepository;
@@ -21,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -40,6 +42,9 @@ public class MieterServiceTest {
 
     @Mock
     private MieterEinheitRepository mieterEinheitRepository;
+
+    @Mock
+    private EinheitRepository einheitRepository;
 
     @Mock
     private TarifpositionRepository tarifpositionRepository;
@@ -79,6 +84,10 @@ public class MieterServiceTest {
         testMieter.setPlz("3000");
         testMieter.setOrt("Bern");
         testMieter.setMietende(LocalDate.of(2024, 12, 31));
+
+        // Standard: Alle zugeordneten Einheiten gehoeren dem eigenen Mandanten
+        lenient().when(einheitRepository.countByIdIn(any()))
+                .thenAnswer(invocation -> (long) ((Collection<?>) invocation.getArgument(0)).size());
     }
 
     // ==================== getAllMieter Tests ====================
@@ -182,12 +191,52 @@ public class MieterServiceTest {
         assertEquals(3L, result.getId());
     }
 
+    /** Eine Einheit ausserhalb des eigenen Mandanten wird abgewiesen (FremdeIdBeimSpeichernIT). */
+    @Test
+    void saveMieter_EinheitNichtImEigenenMandanten_ThrowsException() {
+        testMieter.setEinheitIds(new ArrayList<>(List.of(1L, 2L)));
+        when(einheitRepository.countByIdIn(List.of(1L, 2L))).thenReturn(1L);
+
+        assertThrows(IllegalArgumentException.class, () -> mieterService.saveMieter(testMieter));
+
+        verify(mieterRepository, never()).save(any());
+        verify(mieterEinheitRepository, never()).save(any());
+    }
+
+    /** Eine ID, die im eigenen Mandanten nicht existiert, wird abgewiesen (FremdeIdBeimSpeichernIT). */
+    @Test
+    void saveMieter_IdNichtImEigenenMandanten_ThrowsException() {
+        when(mieterRepository.findFirstById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> mieterService.saveMieter(testMieter));
+
+        verify(mieterRepository, never()).save(any());
+        verify(mieterEinheitRepository, never()).deleteByMieterId(anyLong());
+    }
+
+    /** Beim Aendern kommt der Mandant vom bestehenden Mieter, nicht aus dem Request-Body. */
+    @Test
+    void saveMieter_Update_UebernimmtOrgIdVomBestehendenMieter() {
+        Mieter bestehend = new Mieter("Bestehend", LocalDate.of(2024, 1, 1), 1L);
+        bestehend.setId(1L);
+        bestehend.setOrgId(5L);
+        testMieter.setOrgId(99L);
+        when(mieterRepository.findFirstById(1L)).thenReturn(Optional.of(bestehend));
+        when(mieterRepository.save(any(Mieter.class))).thenReturn(testMieter);
+
+        mieterService.saveMieter(testMieter);
+
+        assertEquals(5L, testMieter.getOrgId());
+        verify(organizationContextService, never()).getCurrentOrgId();
+    }
+
     @Test
     void saveMieter_ExistingMieter_DoesNotOverwriteOrgId() {
         testMieter.setMietende(LocalDate.of(2025, 6, 30));
 
         when(mieterRepository.existsOverlappingMieterBounded(eq(1L), any(), any(), eq(1L)))
                 .thenReturn(false);
+        when(mieterRepository.findFirstById(1L)).thenReturn(Optional.of(testMieter));
         when(mieterRepository.save(any(Mieter.class))).thenReturn(testMieter);
 
         Mieter result = mieterService.saveMieter(testMieter);
@@ -527,6 +576,7 @@ public class MieterServiceTest {
 
         when(mieterRepository.existsOverlappingMieterBounded(anyLong(), any(), any(), eq(1L)))
                 .thenReturn(false);
+        when(mieterRepository.findFirstById(1L)).thenReturn(Optional.of(testMieter));
         when(mieterRepository.save(any(Mieter.class))).thenReturn(testMieter);
 
         Mieter result = mieterService.saveMieter(testMieter);

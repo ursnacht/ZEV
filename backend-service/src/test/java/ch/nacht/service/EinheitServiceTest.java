@@ -140,6 +140,20 @@ public class EinheitServiceTest {
         assertEquals(orgId, newEinheit.getOrgId());
     }
 
+    /** Eine mitgeschickte ID darf kein Update ausloesen (FremdeIdBeimSpeichernIT). */
+    @Test
+    void createEinheit_MitId_LegtNeueEinheitAn() {
+        Einheit newEinheit = new Einheit("Wohnung D", EinheitTyp.CONSUMER);
+        newEinheit.setId(4711L);
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(einheitRepository.save(newEinheit)).thenReturn(newEinheit);
+
+        einheitService.createEinheit(newEinheit);
+
+        assertNull(newEinheit.getId());
+        verify(einheitRepository).save(newEinheit);
+    }
+
     // ==================== updateEinheit Tests ====================
 
     @Test

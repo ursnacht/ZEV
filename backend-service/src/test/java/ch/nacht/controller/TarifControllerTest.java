@@ -349,4 +349,18 @@ public class TarifControllerTest {
                 .content(objectMapper.writeValueAsString(gratis)))
             .andExpect(status().isCreated());
     }
+
+    /** id und orgId aus dem Request-Body werden nicht uebernommen (FremdeIdBeimSpeichernIT). */
+    @Test
+    void createTarif_IdUndOrgIdImBody_WerdenIgnoriert() throws Exception {
+        when(tarifService.saveTarif(any(Tarif.class))).thenReturn(new Tarif());
+
+        mockMvc.perform(post("/api/tarife")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"id\":4711,\"orgId\":99,\"bezeichnung\":\"Gekapert\",\"tariftyp\":\"ZEV\","
+                    + "\"preis\":0.2,\"gueltigVon\":\"2024-01-01\",\"gueltigBis\":\"2024-12-31\"}"))
+            .andExpect(status().isCreated());
+
+        verify(tarifService).saveTarif(argThat(t -> t.getId() == null && t.getOrgId() == null));
+    }
 }

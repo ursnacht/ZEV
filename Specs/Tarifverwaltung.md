@@ -236,6 +236,11 @@
 * [x] Die Felder sind mit den Daten des kopierten Tarifes abgefüllt (Test: tarif-list.component.spec.ts › onCopy › should copy all properties except id; tarif-list.component.spec.ts › onCopy › should set selectedTarif without id and show form; tarif-form.component.spec.ts › initialization › should populate form with tarif data when input is provided)
 * [x] Der Benutzer kann "Erfassen" oder "Abbrechen" klicken (Test: tarif-form.component.spec.ts › events › should emit save event with form data on valid submit; tarif-form.component.spec.ts › events › should emit cancel event; tarif-list.component.spec.ts › onFormSubmit - create › should call createTarif when tarif has no id)
 
+### Mandantentrennung beim Speichern (NFR-2)
+* [ ] `id` und `orgId` im Body von `POST /api/tarife` werden nicht übernommen. (Test: TarifControllerTest#createTarif_IdUndOrgIdImBody_WerdenIgnoriert)
+* [ ] Speichern mit der ID eines Tarifs, der nicht zum eigenen Mandanten gehört, wird abgewiesen; der fremde Tarif bleibt unverändert. (Test: TarifServiceTest#saveTarif_IdNichtImEigenenMandanten_ThrowsException; Test: FremdeIdBeimSpeichernIT#saveTarif_MitFremderId_WirdAbgewiesenUndFremderTarifBleibtUnveraendert)
+* [ ] Beim Ändern bleibt der Tarif im eigenen Mandanten, auch wenn der Body eine andere `orgId` trägt. (Test: TarifServiceTest#saveTarif_Update_UebernimmtOrgIdVomBestehendenTarif; Test: FremdeIdBeimSpeichernIT#saveTarif_EigenerTarifMitFremderOrgId_BleibtImEigenenMandanten)
+
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
 ### NFR-1: Performance
@@ -245,6 +250,7 @@
 ### NFR-2: Sicherheit
 * Die Tarifverwaltung verlangt die Permission `tarife:manage` (Route `/tarife` und alle Endpunkte, auch das Verschieben, FR-4); sie haben die Fachrollen `org_admin` und `zev_admin` (`Specs/Berechtigungen.md`, Hintergrund: Anhang A.8).
 * Die Überschneidungsprüfung (FR-2) und das Verschieben (FR-4) sehen nur Tarife des eigenen Mandanten.
+* `id` und `orgId` aus dem Request-Body übernimmt der Server nicht (`@JsonProperty(access = READ_ONLY)`); `PUT` nimmt die ID aus dem Pfad. Beim Ändern lädt der Service den bestehenden Tarif unter dem Mandantenfilter – fehlt er, wird abgewiesen („Tarif nicht gefunden“) – und übernimmt dessen `org_id` (Hintergrund: Anhang A.13).
 * Rechnungen — auch für Produzenten (FR-8) — verlangen `rechnungen:manage` (`Specs/RechnungenGenerieren.md`, `Specs/Berechtigungen.md`).
 * **Multi-Tenancy:** Alle Tarife tragen `org_id`; der Hibernate-Filter wird angewendet.
 
@@ -335,3 +341,6 @@ Bei der zweiten Konsolidierung nach der Zusammenführung wurden nur Formulierung
 Beim Akzeptanzkriterien-Check vom 18.10.2026 als „kein Akzeptanzkriterium" erkannt und gestrichen:
 * FR-4: „Nach der Migration ist die Reihenfolge der Rechnung unverändert." — eine einmalige, längst ausgeführte Migration (V178); ein Test schützte vor nichts mehr. Die Aussage steht in NFR-3.
 * FR-7: „Alle neuen UI-Texte kommen aus dem `TranslationService` (keine hardcodierten Strings)." — eine allgemeine Konvention aus `Specs/generell.md`, die `/9_vorlagen-check` prüft; jetzt als Satz in FR-7.
+
+### A.13 Mitgeschickte `id` und `orgId` (NFR-2, 18.10.2026)
+Gefunden beim Security-Check zur Einheitenverwaltung (OWASP A01, `Specs/Einheitenverwaltung.md`, Anhang A.4). `saveTarif` dient für Anlegen und Ändern und setzte `org_id` nur bei `id == null`; sonst kam sie aus dem Request-Body, und der gefilterte Abgleich mit dem bestehenden Tarif war ein blosses `ifPresent`. Folgen: Ein `POST` mit fremder `id` und `orgId` überschrieb einen fremden Tarif (`save` → `merge` lädt ungefiltert), ein `PUT` mit fremder `orgId` schob einen eigenen Tarif in einen anderen Mandanten. `FremdeIdBeimSpeichernIT` war gegen den alten Code rot. Behoben durch die Regel in NFR-2.
