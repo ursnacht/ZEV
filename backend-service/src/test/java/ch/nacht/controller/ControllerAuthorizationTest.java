@@ -371,6 +371,45 @@ class ControllerAuthorizationTest {
     }
 
     @Test
+    void getAllEinheiten_withEinheitRead_ok() throws Exception {
+        // zev_user darf die Liste sehen (Route /einheiten: einheit:read)
+        when(einheitService.getAllEinheiten()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/einheit")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("einheit:read"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getAllEinheiten_withoutEinheitRead_forbidden() throws Exception {
+        mockMvc.perform(get("/api/einheit")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("mieter:read"))))
+                .andExpect(status().isForbidden());
+
+        verify(einheitService, never()).getAllEinheiten();
+    }
+
+    @Test
+    void deleteEinheit_withReadPermissionOnly_forbidden() throws Exception {
+        mockMvc.perform(delete("/api/einheit/1")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("einheit:read")))
+                        .with(csrf()))
+                .andExpect(status().isForbidden());
+
+        verify(einheitService, never()).deleteEinheit(any());
+    }
+
+    @Test
+    void getEinheitById_withReadPermissionOnly_forbidden() throws Exception {
+        // Der Einzelabruf erbt einheit:write von der Klasse (Specs/Einheitenverwaltung.md, Abschnitt 8)
+        mockMvc.perform(get("/api/einheit/1")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("einheit:read"))))
+                .andExpect(status().isForbidden());
+
+        verify(einheitService, never()).getEinheitById(any());
+    }
+
+    @Test
     void createEinheit_unauthenticated_unauthorized() throws Exception {
         mockMvc.perform(post("/api/einheit")
                         .with(csrf())

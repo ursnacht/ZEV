@@ -167,6 +167,24 @@ public class EinheitControllerTest {
     }
 
     @Test
+    public void getEinheitById_Found_ReturnsEinheit() throws Exception {
+        when(einheitService.getEinheitById(1L)).thenReturn(Optional.of(ladestation(1L, "RFID-001")));
+
+        mockMvc.perform(get("/api/einheit/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.messpunkt", is("RFID-001")));
+    }
+
+    /** Der Service liefert leer fuer unbekannte und fuer fremde IDs (findFirstById unter dem Filter). */
+    @Test
+    public void getEinheitById_NotFound_Returns404() throws Exception {
+        when(einheitService.getEinheitById(99L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/einheit/99"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     public void deleteEinheit_Exists_ReturnsNoContent() throws Exception {
         when(einheitService.deleteEinheit(1L)).thenReturn(true);
 

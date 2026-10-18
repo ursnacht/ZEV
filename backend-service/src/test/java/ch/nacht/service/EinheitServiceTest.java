@@ -345,6 +345,76 @@ public class EinheitServiceTest {
         verify(einheitRepository).save(neu);
     }
 
+    // ==================== Bilanz-Typen: hoechstens einer je Mandant ====================
+
+    @Test
+    void createEinheit_ZweiterBezug_ThrowsBilanzTypKey() {
+        Einheit neu = new Einheit("Netzbezug 2", EinheitTyp.BEZUG);
+        when(einheitRepository.existsByTyp(EinheitTyp.BEZUG)).thenReturn(true);
+
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> einheitService.createEinheit(neu));
+
+        assertEquals("EINHEIT_BILANZ_TYP_EXISTIERT", e.getMessage());
+        verify(einheitRepository, never()).save(any());
+    }
+
+    @Test
+    void createEinheit_ZweiteRuecklieferung_ThrowsBilanzTypKey() {
+        Einheit neu = new Einheit("Einspeisung 2", EinheitTyp.RUECKLIEFERUNG);
+        when(einheitRepository.existsByTyp(EinheitTyp.RUECKLIEFERUNG)).thenReturn(true);
+
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> einheitService.createEinheit(neu));
+
+        assertEquals("EINHEIT_BILANZ_TYP_EXISTIERT", e.getMessage());
+        verify(einheitRepository, never()).save(any());
+    }
+
+    @Test
+    void createEinheit_ErsterBezug_SavesSuccessfully() {
+        Einheit neu = new Einheit("Netzbezug", EinheitTyp.BEZUG);
+        when(einheitRepository.existsByTyp(EinheitTyp.BEZUG)).thenReturn(false);
+        when(organizationContextService.getCurrentOrgId()).thenReturn(testOrgId);
+        when(einheitRepository.save(neu)).thenReturn(neu);
+
+        einheitService.createEinheit(neu);
+
+        verify(einheitRepository).save(neu);
+    }
+
+    @Test
+    void updateEinheit_TypwechselZuBezugNebenAnderemBezug_ThrowsBilanzTypKey() {
+        Einheit bestehend = new Einheit("Allgemein", EinheitTyp.CONSUMER);
+        bestehend.setId(8L);
+        bestehend.setOrgId(testOrgId);
+        Einheit geaendert = new Einheit("Allgemein", EinheitTyp.BEZUG);
+        when(einheitRepository.findFirstById(8L)).thenReturn(Optional.of(bestehend));
+        when(einheitRepository.existsByTypAndIdNot(EinheitTyp.BEZUG, 8L)).thenReturn(true);
+
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> einheitService.updateEinheit(8L, geaendert));
+
+        assertEquals("EINHEIT_BILANZ_TYP_EXISTIERT", e.getMessage());
+        verify(einheitRepository, never()).save(any());
+    }
+
+    /** Die eigene Bilanz-Einheit zu bearbeiten ist kein zweiter Bezug: die Pruefung schliesst sie aus. */
+    @Test
+    void updateEinheit_EigenerBezug_SavesSuccessfully() {
+        Einheit bestehend = new Einheit("Netzbezug", EinheitTyp.BEZUG);
+        bestehend.setId(8L);
+        bestehend.setOrgId(testOrgId);
+        Einheit geaendert = new Einheit("Netzbezug neu", EinheitTyp.BEZUG);
+        when(einheitRepository.findFirstById(8L)).thenReturn(Optional.of(bestehend));
+        when(einheitRepository.existsByTypAndIdNot(EinheitTyp.BEZUG, 8L)).thenReturn(false);
+        when(einheitRepository.save(geaendert)).thenReturn(geaendert);
+
+        einheitService.updateEinheit(8L, geaendert);
+
+        verify(einheitRepository).save(geaendert);
+    }
+
     // ==================== Speicher: hoechstens einer je Mandant ====================
 
     @Test

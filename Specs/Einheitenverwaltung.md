@@ -171,75 +171,75 @@ Texte aus `zev.translation` (gelesen per `zev-db`):
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
 ### Anzeige
-* [ ] `/einheiten` zeigt Titel, Button „Neue Einheit erstellen“ und eine Tabelle. (E2E: einheiten-verwaltung.spec.ts › should display the einheiten management page with table and create button)
+* [x] `/einheiten` zeigt Titel, Button „Neue Einheit erstellen“ und eine Tabelle. (E2E: einheiten-verwaltung.spec.ts › should display the einheiten management page with table and create button)
 * [ ] Die Tabelle hat die Spalten ID, Name, Typ, Messpunkt und je Zeile ein Kebab-Menü.
-* [ ] Beim Öffnen werden die Einheiten geladen und als Zeilen angezeigt. (Test: einheit-list.component.spec.ts › initialization › should load einheiten on init; Test: einheit-list.component.spec.ts › loadEinheiten › should update einheiten array on success; E2E: einheiten-verwaltung.spec.ts › should display einheiten data in table rows)
-* [ ] `GET /api/einheit` liefert nur die Einheiten des eigenen Mandanten, nach Name aufsteigend. (Test: EinheitRepositoryIT#shouldNotSeeEinheitOfOtherOrgWhenOrgFilterEnabled; Test: EinheitRepositoryIT#shouldFindAllByOrderByNameAsc)
-* [ ] Die Typ-Spalte zeigt für alle sechs Typen den eigenen übersetzten Text (kein Typ fällt auf „Produzent“ zurück). (Test: einheit-typ.pipe.spec.ts › transform › should give every known type its own label; Test: einheit-typ.pipe.spec.ts › transform › should not label a LADESTATION as PRODUZENT)
+* [x] Beim Öffnen werden die Einheiten geladen und als Zeilen angezeigt. (Test: einheit-list.component.spec.ts › initialization › should load einheiten on init; Test: einheit-list.component.spec.ts › loadEinheiten › should update einheiten array on success; E2E: einheiten-verwaltung.spec.ts › should display einheiten data in table rows)
+* [ ] `GET /api/einheit` liefert nur die Einheiten des eigenen Mandanten, nach Name aufsteigend. (Test: EinheitRepositoryIT#shouldNotSeeEinheitOfOtherOrgWhenOrgFilterEnabled; Test: EinheitRepositoryIT#shouldFindAllByOrderByNameAsc – IT nicht ausgeführt)
+* [x] Die Typ-Spalte zeigt für alle sechs Typen den eigenen übersetzten Text (kein Typ fällt auf „Produzent“ zurück). (Test: einheit-typ.pipe.spec.ts › transform › should give every known type its own label; Test: einheit-typ.pipe.spec.ts › transform › should not label a LADESTATION as PRODUZENT)
 * [ ] Ein leerer Messpunkt erscheint in der Tabelle als `-`.
 * [ ] Ohne Einheiten erscheint `KEINE_EINHEITEN_VORHANDEN` statt der Tabelle.
-* [ ] Schlägt das Laden fehl, erscheint eine Fehlermeldung vom Typ `error`. (Test: einheit-list.component.spec.ts › loadEinheiten › should show error message on failure)
+* [x] Schlägt das Laden fehl, erscheint eine Fehlermeldung vom Typ `error`. (Test: einheit-list.component.spec.ts › loadEinheiten › should show error message on failure)
 
 ### Sortierung
-* [ ] Vorbelegt ist Name aufsteigend. (Test: einheit-list.component.spec.ts › initialization › should have default sort by name ascending)
-* [ ] Klick auf die aktive Spalte kehrt die Richtung um, Klick auf eine andere Spalte sortiert aufsteigend nach ihr. (Test: einheit-list.component.spec.ts › onSort › should toggle sort direction when clicking same column; Test: einheit-list.component.spec.ts › onSort › should set new column and reset direction to asc)
-* [ ] Die aktive Sortierspalte zeigt einen Pfeil. (E2E: einheiten-verwaltung.spec.ts › should sort einheiten by clicking on column headers)
-* [ ] Sortieren nach Name, Typ und Messpunkt ordnet die Zeilen entsprechend. (Test: einheit-list.component.spec.ts › onSort › should sort einheiten by name ascending; Test: einheit-list.component.spec.ts › onSort › should sort einheiten by typ descending; Test: einheit-list.component.spec.ts › onSort › should sort by messpunkt so RFIDs are groupable)
-* [ ] Leere Werte stehen beim aufsteigenden Sortieren am Ende. (Test: einheit-list.component.spec.ts › onSort › should handle null values in sort)
+* [x] Vorbelegt ist Name aufsteigend. (Test: einheit-list.component.spec.ts › initialization › should have default sort by name ascending)
+* [x] Klick auf die aktive Spalte kehrt die Richtung um, Klick auf eine andere Spalte sortiert aufsteigend nach ihr. (Test: einheit-list.component.spec.ts › onSort › should toggle sort direction when clicking same column; Test: einheit-list.component.spec.ts › onSort › should set new column and reset direction to asc)
+* [x] Die aktive Sortierspalte zeigt einen Pfeil. (E2E: einheiten-verwaltung.spec.ts › should sort einheiten by clicking on column headers)
+* [x] Sortieren nach Name, Typ und Messpunkt ordnet die Zeilen entsprechend. (Test: einheit-list.component.spec.ts › onSort › should sort einheiten by name ascending; Test: einheit-list.component.spec.ts › onSort › should sort einheiten by typ descending; Test: einheit-list.component.spec.ts › onSort › should sort by messpunkt so RFIDs are groupable)
+* [x] Leere Werte stehen beim aufsteigenden Sortieren am Ende. (Test: einheit-list.component.spec.ts › onSort › should handle null values in sort)
 * [ ] Leere Werte stehen auch beim absteigenden Sortieren am Ende.
 
 ### Erstellen
-* [ ] „Neue Einheit erstellen“ blendet die Liste aus und zeigt ein leeres Formular mit Name, Typ, Messpunkt, Erstellen und Abbrechen. (Test: einheit-list.component.spec.ts › onCreateNew › should set selectedEinheit to null and show form; E2E: einheiten-verwaltung.spec.ts › should show einheit form when clicking create button)
-* [ ] Das leere Formular ist mit Typ Konsument vorbelegt. (Test: einheit-form.component.spec.ts › initialization › should initialize with default form data when no einheit input)
-* [ ] Das Typ-Dropdown bietet jeden der sechs Typen genau einmal an. (Test: einheit-form.component.spec.ts › initialization › should offer every einheit type exactly once)
-* [ ] Bei leerem oder nur aus Leerzeichen bestehendem Namen wird nichts gesendet. (Test: einheit-form.component.spec.ts › events › should not emit save event when name is empty; Test: einheit-form.component.spec.ts › events › should not emit save event when name is only whitespace)
+* [x] „Neue Einheit erstellen“ blendet die Liste aus und zeigt ein leeres Formular mit Name, Typ, Messpunkt, Erstellen und Abbrechen. (Test: einheit-list.component.spec.ts › onCreateNew › should set selectedEinheit to null and show form; E2E: einheiten-verwaltung.spec.ts › should show einheit form when clicking create button)
+* [x] Das leere Formular ist mit Typ Konsument vorbelegt. (Test: einheit-form.component.spec.ts › initialization › should initialize with default form data when no einheit input)
+* [x] Das Typ-Dropdown bietet jeden der sechs Typen genau einmal an. (Test: einheit-form.component.spec.ts › initialization › should offer every einheit type exactly once)
+* [x] Bei leerem oder nur aus Leerzeichen bestehendem Namen wird nichts gesendet. (Test: einheit-form.component.spec.ts › events › should not emit save event when name is empty; Test: einheit-form.component.spec.ts › events › should not emit save event when name is only whitespace)
 * [ ] Bei leerem oder nur aus Leerzeichen bestehendem Namen ist „Erstellen“ gesperrt und `NAME_IST_ERFORDERLICH` steht unter dem Feld.
-* [ ] Eine Einheit ohne Messpunkt lässt sich speichern. (Test: einheit-form.component.spec.ts › optional fields › should allow submission without messpunkt)
+* [x] Eine Einheit ohne Messpunkt lässt sich speichern. (Test: einheit-form.component.spec.ts › optional fields › should allow submission without messpunkt)
 * [ ] Die Checkbox „Zählt als Wohnung“ erscheint nur beim Typ Konsument und ist beim Anlegen gesetzt.
 * [ ] Der Messpunkt-Hinweis wechselt beim Typ Ladestation auf `MESSPUNKT_HINT_LADESTATION`.
-* [ ] Nach erfolgreichem Anlegen schliesst das Formular, `EINHEIT_ERSTELLT` erscheint und die Liste wird neu geladen. (Test: einheit-list.component.spec.ts › onFormSubmit - create › should hide form after successful create; Test: einheit-list.component.spec.ts › onFormSubmit - create › should show success message after create; Test: einheit-list.component.spec.ts › onFormSubmit - create › should reload einheiten after create)
-* [ ] Neue Einheiten der Typen Konsument und Produzent erscheinen mit übersetztem Typ in der Liste. (E2E: einheiten-verwaltung.spec.ts › should create a new CONSUMER einheit successfully; E2E: einheiten-verwaltung.spec.ts › should create a new PRODUCER einheit successfully)
-* [ ] Das Backend setzt `org_id` aus dem Mandantenkontext. (Test: EinheitServiceTest#createEinheit_SetsOrgIdFromContext)
-* [ ] Ein leerer oder nur aus Leerzeichen bestehender Messpunkt wird als `null` gespeichert. (Test: EinheitServiceTest#createEinheit_LadestationMitLeeremMesspunkt_NormalisiertAufNull; Test: EinheitServiceTest#updateEinheit_LadestationMitLeeremMesspunkt_NormalisiertAufNull)
-* [ ] „Abbrechen“ schliesst das Formular ohne Speichern. (Test: einheit-list.component.spec.ts › onFormCancel › should hide form and clear selected einheit; E2E: einheiten-verwaltung.spec.ts › should cancel form and return to list)
+* [x] Nach erfolgreichem Anlegen schliesst das Formular, `EINHEIT_ERSTELLT` erscheint und die Liste wird neu geladen. (Test: einheit-list.component.spec.ts › onFormSubmit - create › should hide form after successful create; Test: einheit-list.component.spec.ts › onFormSubmit - create › should show success message after create; Test: einheit-list.component.spec.ts › onFormSubmit - create › should reload einheiten after create)
+* [x] Neue Einheiten der Typen Konsument und Produzent erscheinen mit übersetztem Typ in der Liste. (E2E: einheiten-verwaltung.spec.ts › should create a new CONSUMER einheit successfully; E2E: einheiten-verwaltung.spec.ts › should create a new PRODUCER einheit successfully)
+* [x] Das Backend setzt `org_id` aus dem Mandantenkontext. (Test: EinheitServiceTest#createEinheit_SetsOrgIdFromContext)
+* [x] Ein leerer oder nur aus Leerzeichen bestehender Messpunkt wird als `null` gespeichert. (Test: EinheitServiceTest#createEinheit_LadestationMitLeeremMesspunkt_NormalisiertAufNull; Test: EinheitServiceTest#updateEinheit_LadestationMitLeeremMesspunkt_NormalisiertAufNull)
+* [x] „Abbrechen“ schliesst das Formular ohne Speichern. (Test: einheit-list.component.spec.ts › onFormCancel › should hide form and clear selected einheit; E2E: einheiten-verwaltung.spec.ts › should cancel form and return to list)
 
 ### Bearbeiten
-* [ ] „Bearbeiten“ öffnet das Formular mit einer Kopie der Zeile, vorbelegt mit deren Werten. (Test: einheit-list.component.spec.ts › onEdit › should create a copy of the einheit; Test: einheit-form.component.spec.ts › initialization › should populate form with einheit data when input is provided)
+* [x] „Bearbeiten“ öffnet das Formular mit einer Kopie der Zeile, vorbelegt mit deren Werten. (Test: einheit-list.component.spec.ts › onEdit › should create a copy of the einheit; Test: einheit-form.component.spec.ts › initialization › should populate form with einheit data when input is provided)
 * [ ] Fehlt `nebenkostenRelevant` in den geladenen Daten, ist die Checkbox im Formular gesetzt.
-* [ ] Geänderte Werte werden gespeichert und in der Liste angezeigt; danach erscheint `EINHEIT_AKTUALISIERT`. (Test: einheit-list.component.spec.ts › onFormSubmit - update › should show success message after update; E2E: einheiten-verwaltung.spec.ts › should edit an existing einheit)
-* [ ] Das Backend übernimmt die ID aus dem Pfad und behält die `org_id` der bestehenden Einheit. (Test: EinheitServiceTest#updateEinheit_SetsIdFromPath; Test: EinheitServiceTest#updateEinheit_PreservesOrgId)
+* [x] Geänderte Werte werden gespeichert und in der Liste angezeigt; danach erscheint `EINHEIT_AKTUALISIERT`. (Test: einheit-list.component.spec.ts › onFormSubmit - update › should show success message after update; E2E: einheiten-verwaltung.spec.ts › should edit an existing einheit)
+* [x] Das Backend übernimmt die ID aus dem Pfad und behält die `org_id` der bestehenden Einheit. (Test: EinheitServiceTest#updateEinheit_SetsIdFromPath; Test: EinheitServiceTest#updateEinheit_PreservesOrgId)
 
 ### Löschen
-* [ ] „Löschen“ fragt per Dialog nach; bei Abbruch bleibt die Einheit erhalten. (Test: einheit-list.component.spec.ts › onDelete › should not delete when user cancels; E2E: einheiten-verwaltung.spec.ts › should show confirmation dialog when deleting einheit)
-* [ ] Nach Bestätigung wird die Einheit gelöscht, `EINHEIT_GELOESCHT` erscheint und die Liste wird neu geladen. (Test: einheit-list.component.spec.ts › onDelete › should reload einheiten after successful delete; Test: einheit-list.component.spec.ts › onDelete › should show success message after delete; E2E: einheiten-verwaltung.spec.ts › should delete einheit when confirmed)
-* [ ] Ist der Einheit ein Mieter zugeordnet, wird das Löschen abgewiesen; die Meldung des Servers mit der Anzahl erscheint, die Liste wird nicht neu geladen. (Test: EinheitServiceTest#deleteEinheit_MitZugeordnetenMietern_ThrowsException; Test: einheit-list.component.spec.ts › onDelete › should show the server message when the unit is still assigned to tenants; Test: einheit-list.component.spec.ts › onDelete › should not reload the einheiten when the delete is rejected)
+* [x] „Löschen“ fragt per Dialog nach; bei Abbruch bleibt die Einheit erhalten. (Test: einheit-list.component.spec.ts › onDelete › should not delete when user cancels; E2E: einheiten-verwaltung.spec.ts › should show confirmation dialog when deleting einheit)
+* [x] Nach Bestätigung wird die Einheit gelöscht, `EINHEIT_GELOESCHT` erscheint und die Liste wird neu geladen. (Test: einheit-list.component.spec.ts › onDelete › should reload einheiten after successful delete; Test: einheit-list.component.spec.ts › onDelete › should show success message after delete; E2E: einheiten-verwaltung.spec.ts › should delete einheit when confirmed)
+* [x] Ist der Einheit ein Mieter zugeordnet, wird das Löschen abgewiesen; die Meldung des Servers mit der Anzahl erscheint, die Liste wird nicht neu geladen. (Test: EinheitServiceTest#deleteEinheit_MitZugeordnetenMietern_ThrowsException; Test: einheit-list.component.spec.ts › onDelete › should show the server message when the unit is still assigned to tenants; Test: einheit-list.component.spec.ts › onDelete › should not reload the einheiten when the delete is rejected)
 
 ### Typspezifische Regeln (Anzeige der Fehler)
-* [ ] Lehnt das Backend das Speichern mit einem Fehler-Key in `error.error` ab, zeigt die Liste den übersetzten Text als Fehlermeldung. (Test: einheit-list.component.spec.ts › onFormSubmit - create › should translate the server key when the RFID is already used; Test: einheit-list.component.spec.ts › onFormSubmit - update › should translate the server key when the RFID is already used)
+* [x] Lehnt das Backend das Speichern mit einem Fehler-Key in `error.error` ab, zeigt die Liste den übersetzten Text als Fehlermeldung. (Test: einheit-list.component.spec.ts › onFormSubmit - create › should translate the server key when the RFID is already used; Test: einheit-list.component.spec.ts › onFormSubmit - update › should translate the server key when the RFID is already used)
 * [ ] Nach einem abgewiesenen Speichern bleibt das Formular offen.
-* [ ] Fehler-Keys der Service-Regeln kommen als `400` mit `{ "error": "<Key>" }`. (Test: EinheitControllerTest#createEinheit_ZweiterBilanzTyp_Returns400MitFehlerKey; Test: EinheitControllerTest#createEinheit_LadestationMitVergebenerRfid_Returns400MitFehlerKey)
-* [ ] `PRODUCER` unterliegt keiner Einmaligkeitsprüfung. (Test: EinheitServiceTest#createEinheit_Producer_PruefteKeineEinmaligkeit)
+* [x] Fehler-Keys der Service-Regeln kommen als `400` mit `{ "error": "<Key>" }`. (Test: EinheitControllerTest#createEinheit_ZweiterBilanzTyp_Returns400MitFehlerKey; Test: EinheitControllerTest#createEinheit_LadestationMitVergebenerRfid_Returns400MitFehlerKey)
+* [x] `PRODUCER` unterliegt keiner Einmaligkeitsprüfung. (Test: EinheitServiceTest#createEinheit_Producer_PruefteKeineEinmaligkeit)
 
 ### Tarifpositionen-Sprung
-* [ ] Der Kebab-Eintrag „Tarifpositionen“ navigiert auf `/tarifpositionen?einheitId=<id>`. (Test: einheit-list.component.spec.ts › onTarifpositionen › should navigate to the tarifpositionen page with the einheitId)
-* [ ] Das Kebab-Menü enthält Bearbeiten, Tarifpositionen und Löschen in dieser Reihenfolge. (Test: einheit-list.component.spec.ts › initialization › should have menu items for edit, tarifpositionen and delete)
+* [x] Der Kebab-Eintrag „Tarifpositionen“ navigiert auf `/tarifpositionen?einheitId=<id>`. (Test: einheit-list.component.spec.ts › onTarifpositionen › should navigate to the tarifpositionen page with the einheitId)
+* [x] Das Kebab-Menü enthält Bearbeiten, Tarifpositionen und Löschen in dieser Reihenfolge. (Test: einheit-list.component.spec.ts › initialization › should have menu items for edit, tarifpositionen and delete)
 
 ### Sicherheit & API
-* [ ] `POST /api/einheit` mit `einheit:write` erreicht den Controller (`201`). (Test: ControllerAuthorizationTest#createEinheit_withEinheitWrite_reachesController)
-* [ ] `POST /api/einheit` nur mit `einheit:read` (Rolle `zev_user`) → `403`, der Service wird nicht aufgerufen. (Test: ControllerAuthorizationTest#createEinheit_withReadPermissionOnly_forbidden)
-* [ ] `PUT /api/einheit/{id}` ohne `einheit:write` → `403`. (Test: ControllerAuthorizationTest#updateEinheit_withoutPermission_forbidden)
-* [ ] Nicht authentifiziert → `401`. (Test: ControllerAuthorizationTest#createEinheit_unauthenticated_unauthorized)
-* [ ] `GET /api/einheit` ist mit `einheit:read` erreichbar (`200`), `DELETE` und `GET /{id}` ohne `einheit:write` → `403`.
-* [ ] `POST` → `201`. (Test: EinheitControllerTest#createEinheit_ValidInput_ReturnsCreated)
-* [ ] `PUT` auf nicht existierende ID → `404`. (Test: EinheitControllerTest#updateEinheit_NotFound_Returns404; Test: EinheitServiceTest#updateEinheit_NotFound_ReturnsEmpty)
-* [ ] `DELETE` → `204`, auf nicht existierende ID → `404`. (Test: EinheitControllerTest#deleteEinheit_Exists_ReturnsNoContent; Test: EinheitControllerTest#deleteEinheit_NotFound_Returns404)
-* [ ] `GET /api/einheit/{id}` auf nicht existierende oder fremde ID → `404`.
-* [ ] `DELETE /api/einheit/{id}` auf die ID eines fremden Mandanten → `404`.
-* [ ] Leerer Name, fehlender Typ oder Messpunkt über 50 Zeichen → `400`. (Test: EinheitControllerTest#createEinheit_InvalidName_ReturnsBadRequest; Test: EinheitControllerTest#createEinheit_NullTyp_ReturnsBadRequest; Test: EinheitControllerTest#createEinheit_MesspunktZuLang_ReturnsBadRequest)
+* [x] `POST /api/einheit` mit `einheit:write` erreicht den Controller (`201`). (Test: ControllerAuthorizationTest#createEinheit_withEinheitWrite_reachesController)
+* [x] `POST /api/einheit` nur mit `einheit:read` (Rolle `zev_user`) → `403`, der Service wird nicht aufgerufen. (Test: ControllerAuthorizationTest#createEinheit_withReadPermissionOnly_forbidden)
+* [x] `PUT /api/einheit/{id}` ohne `einheit:write` → `403`. (Test: ControllerAuthorizationTest#updateEinheit_withoutPermission_forbidden)
+* [x] Nicht authentifiziert → `401`. (Test: ControllerAuthorizationTest#createEinheit_unauthenticated_unauthorized)
+* [ ] `GET /api/einheit` ist mit `einheit:read` erreichbar (`200`), `DELETE` und `GET /{id}` ohne `einheit:write` → `403`. (Test: ControllerAuthorizationTest#getAllEinheiten_withEinheitRead_ok; Test: ControllerAuthorizationTest#getAllEinheiten_withoutEinheitRead_forbidden; Test: ControllerAuthorizationTest#deleteEinheit_withReadPermissionOnly_forbidden; Test: ControllerAuthorizationTest#getEinheitById_withReadPermissionOnly_forbidden)
+* [x] `POST` → `201`. (Test: EinheitControllerTest#createEinheit_ValidInput_ReturnsCreated)
+* [x] `PUT` auf nicht existierende ID → `404`. (Test: EinheitControllerTest#updateEinheit_NotFound_Returns404; Test: EinheitServiceTest#updateEinheit_NotFound_ReturnsEmpty)
+* [x] `DELETE` → `204`, auf nicht existierende ID → `404`. (Test: EinheitControllerTest#deleteEinheit_Exists_ReturnsNoContent; Test: EinheitControllerTest#deleteEinheit_NotFound_Returns404)
+* [ ] `GET /api/einheit/{id}` auf nicht existierende oder fremde ID → `404`. (Test: EinheitControllerTest#getEinheitById_NotFound_Returns404; Test: EinheitServiceTest#getEinheitById_NotFound_ReturnsEmpty; Test: EinheitRepositoryIT#shouldNotSeeEinheitOfOtherOrgWhenOrgFilterEnabled – IT nicht ausgeführt)
+* [ ] `DELETE /api/einheit/{id}` auf die ID eines fremden Mandanten → `404`. (Test: EinheitControllerTest#deleteEinheit_NotFound_Returns404; Test: EinheitRepositoryIT#existsByIdSiehtNurDenEigenenMandanten – IT nicht ausgeführt)
+* [x] Leerer Name, fehlender Typ oder Messpunkt über 50 Zeichen → `400`. (Test: EinheitControllerTest#createEinheit_InvalidName_ReturnsBadRequest; Test: EinheitControllerTest#createEinheit_NullTyp_ReturnsBadRequest; Test: EinheitControllerTest#createEinheit_MesspunktZuLang_ReturnsBadRequest)
 * [ ] Name mit einem Zeichen oder über 30 Zeichen → `400`.
-* [ ] Die Einmaligkeitsprüfungen sehen nur den eigenen Mandanten. (Test: EinheitRepositoryIT#shouldNotLetBilanzTypOfOtherOrgBlockSingletonCheck; Test: EinheitRepositoryIT#shouldNotLetRfidOfOtherOrgBlockUniquenessCheck)
-* [ ] `id` und `orgId` im Body von `POST /api/einheit` werden nicht übernommen. (Test: EinheitControllerTest#createEinheit_IdUndOrgIdImBody_WerdenIgnoriert)
-* [ ] Eine beim Anlegen mitgeschickte ID erzeugt eine neue Einheit; die Einheit mit dieser ID – auch die eines fremden Mandanten – bleibt unverändert. (Test: EinheitServiceTest#createEinheit_MitId_LegtNeueEinheitAn; Test: FremdeIdBeimSpeichernIT#createEinheit_MitFremderId_LegtNeueEinheitAnUndLaesstFremdeUnveraendert)
+* [ ] Die Einmaligkeitsprüfungen sehen nur den eigenen Mandanten. (Test: EinheitRepositoryIT#shouldNotLetBilanzTypOfOtherOrgBlockSingletonCheck; Test: EinheitRepositoryIT#shouldNotLetRfidOfOtherOrgBlockUniquenessCheck – IT nicht ausgeführt)
+* [x] `id` und `orgId` im Body von `POST /api/einheit` werden nicht übernommen. (Test: EinheitControllerTest#createEinheit_IdUndOrgIdImBody_WerdenIgnoriert)
+* [x] Eine beim Anlegen mitgeschickte ID erzeugt eine neue Einheit; die Einheit mit dieser ID – auch die eines fremden Mandanten – bleibt unverändert. (Test: EinheitServiceTest#createEinheit_MitId_LegtNeueEinheitAn; Test: FremdeIdBeimSpeichernIT#createEinheit_MitFremderId_LegtNeueEinheitAnUndLaesstFremdeUnveraendert)
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
@@ -259,12 +259,12 @@ Texte aus `zev.translation` (gelesen per `zev-db`):
 ## 5. Edge Cases & Fehlerbehandlung
 
 * [ ] Leere Liste → Hinweis `KEINE_EINHEITEN_VORHANDEN` statt Tabelle (`einheit-list.component.html`).
-* [ ] Netzwerkfehler beim Laden → Fehlermeldung „Fehler beim Laden der Einheiten: …“ (`.zev-message--error`, bleibt bis zum Wegklicken).
-* [ ] Nicht existierende oder fremde ID bei `GET /{id}`, `PUT`, `DELETE` → `404` (Service liefert leer bzw. `false`).
-* [ ] Ungültige Werte → `400` aus der Bean-Validation, Rumpf `{ "<feld>": "<Meldung>" }`; die Liste zeigt dann den Fallback „Fehler beim Erstellen/Aktualisieren: “ + technische Meldung.
-* [ ] Zweite Bilanz-/Speicher-Einheit oder doppelte RFID → `400` mit Fehler-Key, übersetzt angezeigt (FR-6).
-* [ ] Löschen mit zugeordneten Mietern → abgewiesen (`400`, Meldung mit Anzahl).
-* [ ] Löschen ohne Mieter → Tarifpositionen und Gerätezustände werden mitgelöscht (`ON DELETE CASCADE`).
+* [x] Netzwerkfehler beim Laden → Fehlermeldung „Fehler beim Laden der Einheiten: …“ (`.zev-message--error`, bleibt bis zum Wegklicken). (Test: einheit-list.component.spec.ts › loadEinheiten › should show error message on failure)
+* [ ] Nicht existierende oder fremde ID bei `GET /{id}`, `PUT`, `DELETE` → `404` (Service liefert leer bzw. `false`). (Test: EinheitControllerTest#getEinheitById_NotFound_Returns404; Test: EinheitControllerTest#updateEinheit_NotFound_Returns404; Test: EinheitControllerTest#deleteEinheit_NotFound_Returns404; Test: EinheitRepositoryIT#shouldNotSeeEinheitOfOtherOrgWhenOrgFilterEnabled – IT nicht ausgeführt; Test: EinheitRepositoryIT#existsByIdSiehtNurDenEigenenMandanten – IT nicht ausgeführt)
+* [ ] Ungültige Werte → `400` aus der Bean-Validation, Rumpf `{ "<feld>": "<Meldung>" }`; die Liste zeigt dann den Fallback „Fehler beim Erstellen/Aktualisieren: “ + technische Meldung. (Test: EinheitControllerTest#createEinheit_InvalidName_ReturnsBadRequest; Test: einheit-list.component.spec.ts › onFormSubmit - create › should show error message on create failure; Test: einheit-list.component.spec.ts › onFormSubmit - update › should show error message on update failure)
+* [ ] Zweite Bilanz-/Speicher-Einheit oder doppelte RFID → `400` mit Fehler-Key, übersetzt angezeigt (FR-6). (Test: EinheitServiceTest#createEinheit_ZweiterBezug_ThrowsBilanzTypKey; Test: EinheitServiceTest#createEinheit_ZweiteRuecklieferung_ThrowsBilanzTypKey; Test: EinheitServiceTest#updateEinheit_TypwechselZuBezugNebenAnderemBezug_ThrowsBilanzTypKey; Test: EinheitServiceTest#createEinheit_ZweiterSpeicher_ThrowsMitEigenemKey; Test: EinheitServiceTest#createEinheit_LadestationMitVergebenerRfid_ThrowsException; Test: EinheitControllerTest#createEinheit_ZweiterBilanzTyp_Returns400MitFehlerKey; Test: einheit-list.component.spec.ts › onFormSubmit - create › should translate the server key when the RFID is already used)
+* [x] Löschen mit zugeordneten Mietern → abgewiesen (`400`, Meldung mit Anzahl). (Test: EinheitServiceTest#deleteEinheit_MitZugeordnetenMietern_ThrowsException; Test: einheit-list.component.spec.ts › onDelete › should show the server message when the unit is still assigned to tenants)
+* [ ] Löschen ohne Mieter → Tarifpositionen und Gerätezustände werden mitgelöscht (`ON DELETE CASCADE`). (Test: TarifpositionRepositoryIT#shouldDeletePositionsWhenEinheitIsDeleted – IT nicht ausgeführt)
 * [ ] Wechsel des Typs von Konsument auf einen anderen Typ blendet die Checkbox aus; der gesetzte Wert wird trotzdem mitgesendet (nur bei `CONSUMER` ausgewertet).
 * [ ] Gleichzeitige Bearbeitung → keine Versionsprüfung; der letzte Speichervorgang überschreibt.
 * [ ] Löschen einer Einheit mit Messwerten oder Zählerrohdaten → siehe Abschnitt 8.

@@ -90,6 +90,26 @@ class EinheitRepositoryIT extends AbstractIntegrationTest {
     }
 
     /**
+     * {@code EinheitService.deleteEinheit} prueft mit {@code existsById}, bevor es ungefiltert
+     * {@code deleteById} aufruft (Specs/Einheitenverwaltung.md, NFR-2). Das ist nur sicher, wenn
+     * {@code existsById} als Abfrage laeuft und damit dem Mandantenfilter unterliegt — liefe es
+     * ueber den Primaerschluessel wie {@code findById}, liesse sich die Einheit eines fremden
+     * Mandanten loeschen.
+     */
+    @Test
+    void existsByIdSiehtNurDenEigenenMandanten() {
+        Einheit eigene = einheitRepository.saveAndFlush(createEinheit("Eigene", EinheitTyp.CONSUMER));
+        Einheit fremde = einheitRepository.saveAndFlush(
+                einheitFuerOrg(FREMD_ORG_ID, "Fremde", EinheitTyp.CONSUMER, null));
+        entityManager.clear();
+
+        aktiviereOrgFilter(entityManager, TEST_ORG_ID);
+
+        assertThat(einheitRepository.existsById(eigene.getId())).isTrue();
+        assertThat(einheitRepository.existsById(fremde.getId())).isFalse();
+    }
+
+    /**
      * Die Bilanz-Typen sind je Mandant Singletons — der BEZUG eines Mandanten darf den eines
      * anderen nicht blockieren. Sonst koennte der zweite Mandant seinen Bilanzmesspunkt nie
      * anlegen, mit einer Meldung, die auf einen unsichtbaren Datensatz zeigt.
