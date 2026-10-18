@@ -42,6 +42,8 @@
 6. Bei Fehler bleibt das Formular offen; Meldung wie FR-3.10, Fallback „Fehler beim Aktualisieren: “ + technische Meldung.
 7. „Abbrechen“ schliesst das Formular ohne Speichern und zeigt wieder die Liste.
 
+> Bewusst ohne Versionsprüfung: Bearbeiten zwei Benutzer dieselbe Einheit gleichzeitig, überschreibt der letzte Speichervorgang den früheren (keine `@Version`, keine optimistische Sperre; Hintergrund: Anhang A.5).
+
 ### FR-5: Einheit löschen
 1. User wählt im Kebab-Menü „Löschen“; das System fragt per Browser-Dialog `CONFIRM_DELETE_EINHEIT`.
 2. Bricht der User ab, passiert nichts.
@@ -172,12 +174,12 @@ Texte aus `zev.translation` (gelesen per `zev-db`):
 
 ### Anzeige
 * [x] `/einheiten` zeigt Titel, Button „Neue Einheit erstellen“ und eine Tabelle. (E2E: einheiten-verwaltung.spec.ts › should display the einheiten management page with table and create button)
-* [ ] Die Tabelle hat die Spalten ID, Name, Typ, Messpunkt und je Zeile ein Kebab-Menü. (Test: einheit-list.component.spec.ts › template › should show the columns ID, Name, Typ, Messpunkt and a kebab menu per row)
+* [x] Die Tabelle hat die Spalten ID, Name, Typ, Messpunkt und je Zeile ein Kebab-Menü. (Test: einheit-list.component.spec.ts › template › should show the columns ID, Name, Typ, Messpunkt and a kebab menu per row)
 * [x] Beim Öffnen werden die Einheiten geladen und als Zeilen angezeigt. (Test: einheit-list.component.spec.ts › initialization › should load einheiten on init; Test: einheit-list.component.spec.ts › loadEinheiten › should update einheiten array on success; E2E: einheiten-verwaltung.spec.ts › should display einheiten data in table rows)
 * [x] `GET /api/einheit` liefert nur die Einheiten des eigenen Mandanten, nach Name aufsteigend. (Test: EinheitRepositoryIT#shouldNotSeeEinheitOfOtherOrgWhenOrgFilterEnabled; Test: EinheitRepositoryIT#shouldFindAllByOrderByNameAsc; Test: EinheitServiceTest#getAllEinheiten_ReturnsSortedList)
 * [x] Die Typ-Spalte zeigt für alle sechs Typen den eigenen übersetzten Text (kein Typ fällt auf „Produzent“ zurück). (Test: einheit-typ.pipe.spec.ts › transform › should give every known type its own label; Test: einheit-typ.pipe.spec.ts › transform › should not label a LADESTATION as PRODUZENT)
-* [ ] Ein leerer Messpunkt erscheint in der Tabelle als `-`. (Test: einheit-list.component.spec.ts › template › should show "-" for an empty messpunkt)
-* [ ] Ohne Einheiten erscheint `KEINE_EINHEITEN_VORHANDEN` statt der Tabelle. (Test: einheit-list.component.spec.ts › template › should show KEINE_EINHEITEN_VORHANDEN instead of the table when the list is empty)
+* [x] Ein leerer Messpunkt erscheint in der Tabelle als `-`. (Test: einheit-list.component.spec.ts › template › should show "-" for an empty messpunkt)
+* [x] Ohne Einheiten erscheint `KEINE_EINHEITEN_VORHANDEN` statt der Tabelle. (Test: einheit-list.component.spec.ts › template › should show KEINE_EINHEITEN_VORHANDEN instead of the table when the list is empty)
 * [x] Schlägt das Laden fehl, erscheint eine Fehlermeldung vom Typ `error`. (Test: einheit-list.component.spec.ts › loadEinheiten › should show error message on failure)
 
 ### Sortierung
@@ -186,17 +188,17 @@ Texte aus `zev.translation` (gelesen per `zev-db`):
 * [x] Die aktive Sortierspalte zeigt einen Pfeil. (E2E: einheiten-verwaltung.spec.ts › should sort einheiten by clicking on column headers)
 * [x] Sortieren nach Name, Typ und Messpunkt ordnet die Zeilen entsprechend. (Test: einheit-list.component.spec.ts › onSort › should sort einheiten by name ascending; Test: einheit-list.component.spec.ts › onSort › should sort einheiten by typ descending; Test: einheit-list.component.spec.ts › onSort › should sort by messpunkt so RFIDs are groupable)
 * [x] Leere Werte stehen beim aufsteigenden Sortieren am Ende. (Test: einheit-list.component.spec.ts › onSort › should handle null values in sort)
-* [ ] Leere Werte stehen auch beim absteigenden Sortieren am Ende. (Test: einheit-list.component.spec.ts › onSort - empty values › should keep empty values at the end when sorting descending)
+* [x] Leere Werte stehen auch beim absteigenden Sortieren am Ende. (Test: einheit-list.component.spec.ts › onSort - empty values › should keep empty values at the end when sorting descending)
 
 ### Erstellen
 * [x] „Neue Einheit erstellen“ blendet die Liste aus und zeigt ein leeres Formular mit Name, Typ, Messpunkt, Erstellen und Abbrechen. (Test: einheit-list.component.spec.ts › onCreateNew › should set selectedEinheit to null and show form; E2E: einheiten-verwaltung.spec.ts › should show einheit form when clicking create button)
 * [x] Das leere Formular ist mit Typ Konsument vorbelegt. (Test: einheit-form.component.spec.ts › initialization › should initialize with default form data when no einheit input)
 * [x] Das Typ-Dropdown bietet jeden der sechs Typen genau einmal an. (Test: einheit-form.component.spec.ts › initialization › should offer every einheit type exactly once)
 * [x] Bei leerem oder nur aus Leerzeichen bestehendem Namen wird nichts gesendet. (Test: einheit-form.component.spec.ts › events › should not emit save event when name is empty; Test: einheit-form.component.spec.ts › events › should not emit save event when name is only whitespace)
-* [ ] Bei leerem oder nur aus Leerzeichen bestehendem Namen ist „Erstellen“ gesperrt und `NAME_IST_ERFORDERLICH` steht unter dem Feld. (Test: einheit-form.component.spec.ts › template › should disable submit and show NAME_IST_ERFORDERLICH when name is empty; Test: einheit-form.component.spec.ts › template › should disable submit and show NAME_IST_ERFORDERLICH when name is only whitespace; Test: einheit-form.component.spec.ts › template › should enable submit and hide the error when name is filled)
+* [x] Bei leerem oder nur aus Leerzeichen bestehendem Namen ist „Erstellen“ gesperrt und `NAME_IST_ERFORDERLICH` steht unter dem Feld. (Test: einheit-form.component.spec.ts › template › should disable submit and show NAME_IST_ERFORDERLICH when name is empty; Test: einheit-form.component.spec.ts › template › should disable submit and show NAME_IST_ERFORDERLICH when name is only whitespace; Test: einheit-form.component.spec.ts › template › should enable submit and hide the error when name is filled)
 * [x] Eine Einheit ohne Messpunkt lässt sich speichern. (Test: einheit-form.component.spec.ts › optional fields › should allow submission without messpunkt)
-* [ ] Die Checkbox „Zählt als Wohnung“ erscheint nur beim Typ Konsument und ist beim Anlegen gesetzt. (Test: einheit-form.component.spec.ts › template › should show the checked nebenkosten checkbox for a new CONSUMER; Test: einheit-form.component.spec.ts › template › should hide the nebenkosten checkbox for every type other than CONSUMER)
-* [ ] Der Messpunkt-Hinweis wechselt beim Typ Ladestation auf `MESSPUNKT_HINT_LADESTATION`. (Test: einheit-form.component.spec.ts › template › should show MESSPUNKT_HINT_LADESTATION for LADESTATION and MESSPUNKT_HINT otherwise)
+* [x] Die Checkbox „Zählt als Wohnung“ erscheint nur beim Typ Konsument und ist beim Anlegen gesetzt. (Test: einheit-form.component.spec.ts › template › should show the checked nebenkosten checkbox for a new CONSUMER; Test: einheit-form.component.spec.ts › template › should hide the nebenkosten checkbox for every type other than CONSUMER)
+* [x] Der Messpunkt-Hinweis wechselt beim Typ Ladestation auf `MESSPUNKT_HINT_LADESTATION`. (Test: einheit-form.component.spec.ts › template › should show MESSPUNKT_HINT_LADESTATION for LADESTATION and MESSPUNKT_HINT otherwise)
 * [x] Nach erfolgreichem Anlegen schliesst das Formular, `EINHEIT_ERSTELLT` erscheint und die Liste wird neu geladen. (Test: einheit-list.component.spec.ts › onFormSubmit - create › should hide form after successful create; Test: einheit-list.component.spec.ts › onFormSubmit - create › should show success message after create; Test: einheit-list.component.spec.ts › onFormSubmit - create › should reload einheiten after create)
 * [x] Neue Einheiten der Typen Konsument und Produzent erscheinen mit übersetztem Typ in der Liste. (E2E: einheiten-verwaltung.spec.ts › should create a new CONSUMER einheit successfully; E2E: einheiten-verwaltung.spec.ts › should create a new PRODUCER einheit successfully)
 * [x] Das Backend setzt `org_id` aus dem Mandantenkontext. (Test: EinheitServiceTest#createEinheit_SetsOrgIdFromContext)
@@ -205,7 +207,7 @@ Texte aus `zev.translation` (gelesen per `zev-db`):
 
 ### Bearbeiten
 * [x] „Bearbeiten“ öffnet das Formular mit einer Kopie der Zeile, vorbelegt mit deren Werten. (Test: einheit-list.component.spec.ts › onEdit › should create a copy of the einheit; Test: einheit-form.component.spec.ts › initialization › should populate form with einheit data when input is provided)
-* [ ] Fehlt `nebenkostenRelevant` in den geladenen Daten, ist die Checkbox im Formular gesetzt. (Test: einheit-form.component.spec.ts › template › should treat a missing nebenkostenRelevant as true)
+* [x] Fehlt `nebenkostenRelevant` in den geladenen Daten, ist die Checkbox im Formular gesetzt. (Test: einheit-form.component.spec.ts › template › should treat a missing nebenkostenRelevant as true)
 * [x] Geänderte Werte werden gespeichert und in der Liste angezeigt; danach erscheint `EINHEIT_AKTUALISIERT`. (Test: einheit-list.component.spec.ts › onFormSubmit - update › should show success message after update; E2E: einheiten-verwaltung.spec.ts › should edit an existing einheit)
 * [x] Das Backend übernimmt die ID aus dem Pfad und behält die `org_id` der bestehenden Einheit. (Test: EinheitServiceTest#updateEinheit_SetsIdFromPath; Test: EinheitServiceTest#updateEinheit_PreservesOrgId)
 
@@ -216,7 +218,7 @@ Texte aus `zev.translation` (gelesen per `zev-db`):
 
 ### Typspezifische Regeln (Anzeige der Fehler)
 * [x] Lehnt das Backend das Speichern mit einem Fehler-Key in `error.error` ab, zeigt die Liste den übersetzten Text als Fehlermeldung. (Test: einheit-list.component.spec.ts › onFormSubmit - create › should translate the server key when the RFID is already used; Test: einheit-list.component.spec.ts › onFormSubmit - update › should translate the server key when the RFID is already used)
-* [ ] Nach einem abgewiesenen Speichern bleibt das Formular offen. (Test: einheit-list.component.spec.ts › rejected save › should keep the form open when create fails; Test: einheit-list.component.spec.ts › rejected save › should keep the form open when update fails)
+* [x] Nach einem abgewiesenen Speichern bleibt das Formular offen. (Test: einheit-list.component.spec.ts › rejected save › should keep the form open when create fails; Test: einheit-list.component.spec.ts › rejected save › should keep the form open when update fails)
 * [x] Fehler-Keys der Service-Regeln kommen als `400` mit `{ "error": "<Key>" }`. (Test: EinheitControllerTest#createEinheit_ZweiterBilanzTyp_Returns400MitFehlerKey; Test: EinheitControllerTest#createEinheit_LadestationMitVergebenerRfid_Returns400MitFehlerKey)
 * [x] `PRODUCER` unterliegt keiner Einmaligkeitsprüfung. (Test: EinheitServiceTest#createEinheit_Producer_PruefteKeineEinmaligkeit)
 
@@ -236,7 +238,7 @@ Texte aus `zev.translation` (gelesen per `zev-db`):
 * [x] `GET /api/einheit/{id}` auf nicht existierende oder fremde ID → `404`. (Test: EinheitControllerTest#getEinheitById_NotFound_Returns404; Test: EinheitServiceTest#getEinheitById_NotFound_ReturnsEmpty; Test: EinheitRepositoryIT#shouldNotSeeEinheitOfOtherOrgWhenOrgFilterEnabled)
 * [x] `DELETE /api/einheit/{id}` auf die ID eines fremden Mandanten → `404`. (Test: EinheitControllerTest#deleteEinheit_NotFound_Returns404; Test: EinheitServiceTest#deleteEinheit_NotExists_ReturnsFalse; Test: EinheitRepositoryIT#existsByIdSiehtNurDenEigenenMandanten)
 * [x] Leerer Name, fehlender Typ oder Messpunkt über 50 Zeichen → `400`. (Test: EinheitControllerTest#createEinheit_InvalidName_ReturnsBadRequest; Test: EinheitControllerTest#createEinheit_NullTyp_ReturnsBadRequest; Test: EinheitControllerTest#createEinheit_MesspunktZuLang_ReturnsBadRequest)
-* [ ] Name mit einem Zeichen oder über 30 Zeichen → `400`. (Test: EinheitControllerTest#createEinheit_NameMitEinemZeichen_ReturnsBadRequest; Test: EinheitControllerTest#createEinheit_NameMit31Zeichen_ReturnsBadRequest; Test: EinheitControllerTest#createEinheit_NameMit2Und30Zeichen_ReturnsCreated)
+* [x] Name mit einem Zeichen oder über 30 Zeichen → `400`. (Test: EinheitControllerTest#createEinheit_NameMitEinemZeichen_ReturnsBadRequest; Test: EinheitControllerTest#createEinheit_NameMit31Zeichen_ReturnsBadRequest; Test: EinheitControllerTest#createEinheit_NameMit2Und30Zeichen_ReturnsCreated)
 * [x] Die Einmaligkeitsprüfungen sehen nur den eigenen Mandanten. (Test: EinheitRepositoryIT#shouldNotLetBilanzTypOfOtherOrgBlockSingletonCheck; Test: EinheitRepositoryIT#shouldNotLetRfidOfOtherOrgBlockUniquenessCheck)
 * [x] `id` und `orgId` im Body von `POST /api/einheit` werden nicht übernommen. (Test: EinheitControllerTest#createEinheit_IdUndOrgIdImBody_WerdenIgnoriert)
 * [x] Eine beim Anlegen mitgeschickte ID erzeugt eine neue Einheit; die Einheit mit dieser ID – auch die eines fremden Mandanten – bleibt unverändert. (Test: EinheitServiceTest#createEinheit_MitId_LegtNeueEinheitAn; Test: FremdeIdBeimSpeichernIT#createEinheit_MitFremderId_LegtNeueEinheitAnUndLaesstFremdeUnveraendert)
@@ -258,16 +260,14 @@ Texte aus `zev.translation` (gelesen per `zev-db`):
 
 ## 5. Edge Cases & Fehlerbehandlung
 
-* [ ] Leere Liste → Hinweis `KEINE_EINHEITEN_VORHANDEN` statt Tabelle (`einheit-list.component.html`). (Test: einheit-list.component.spec.ts › template › should show KEINE_EINHEITEN_VORHANDEN instead of the table when the list is empty)
+* [x] Leere Liste → Hinweis `KEINE_EINHEITEN_VORHANDEN` statt Tabelle (`einheit-list.component.html`). (Test: einheit-list.component.spec.ts › template › should show KEINE_EINHEITEN_VORHANDEN instead of the table when the list is empty)
 * [x] Netzwerkfehler beim Laden → Fehlermeldung „Fehler beim Laden der Einheiten: …“ (`.zev-message--error`, bleibt bis zum Wegklicken). (Test: einheit-list.component.spec.ts › loadEinheiten › should show error message on failure)
 * [x] Nicht existierende oder fremde ID bei `GET /{id}`, `PUT`, `DELETE` → `404` (Service liefert leer bzw. `false`). (Test: EinheitControllerTest#getEinheitById_NotFound_Returns404; Test: EinheitControllerTest#updateEinheit_NotFound_Returns404; Test: EinheitControllerTest#deleteEinheit_NotFound_Returns404; Test: EinheitServiceTest#updateEinheit_NotFound_ReturnsEmpty; Test: EinheitRepositoryIT#shouldNotSeeEinheitOfOtherOrgWhenOrgFilterEnabled; Test: EinheitRepositoryIT#existsByIdSiehtNurDenEigenenMandanten)
-* [ ] Ungültige Werte → `400` aus der Bean-Validation, Rumpf `{ "<feld>": "<Meldung>" }`; die Liste zeigt dann den Fallback „Fehler beim Erstellen/Aktualisieren: “ + technische Meldung. (Test: EinheitControllerTest#createEinheit_InvalidName_ReturnsBadRequest; Test: EinheitControllerTest#createEinheit_InvalidName_LiefertFeldRumpf; Test: einheit-list.component.spec.ts › onFormSubmit - create › should show error message on create failure; Test: einheit-list.component.spec.ts › onFormSubmit - update › should show error message on update failure)
+* [x] Ungültige Werte → `400` aus der Bean-Validation, Rumpf `{ "<feld>": "<Meldung>" }`; die Liste zeigt dann den Fallback „Fehler beim Erstellen/Aktualisieren: “ + technische Meldung. (Test: EinheitControllerTest#createEinheit_InvalidName_ReturnsBadRequest; Test: EinheitControllerTest#createEinheit_InvalidName_LiefertFeldRumpf; Test: einheit-list.component.spec.ts › onFormSubmit - create › should show error message on create failure; Test: einheit-list.component.spec.ts › onFormSubmit - update › should show error message on update failure)
 * [x] Zweite Bilanz-/Speicher-Einheit oder doppelte RFID → `400` mit Fehler-Key, übersetzt angezeigt (FR-6). (Test: EinheitServiceTest#createEinheit_ZweiterBezug_ThrowsBilanzTypKey; Test: EinheitServiceTest#createEinheit_ZweiteRuecklieferung_ThrowsBilanzTypKey; Test: EinheitServiceTest#updateEinheit_TypwechselZuBezugNebenAnderemBezug_ThrowsBilanzTypKey; Test: EinheitServiceTest#createEinheit_ZweiterSpeicher_ThrowsMitEigenemKey; Test: EinheitServiceTest#createEinheit_LadestationMitVergebenerRfid_ThrowsException; Test: EinheitControllerTest#createEinheit_ZweiterBilanzTyp_Returns400MitFehlerKey; Test: einheit-list.component.spec.ts › onFormSubmit - create › should translate the server key when the RFID is already used)
 * [x] Löschen mit zugeordneten Mietern → abgewiesen (`400`, Meldung mit Anzahl). (Test: EinheitServiceTest#deleteEinheit_MitZugeordnetenMietern_ThrowsException; Test: einheit-list.component.spec.ts › onDelete › should show the server message when the unit is still assigned to tenants)
-* [ ] Löschen ohne Mieter → Tarifpositionen und Gerätezustände werden mitgelöscht (`ON DELETE CASCADE`). (Test: FlywaySchemaIT#einheitLoeschen_LoeschtTarifpositionenUndGeraetezustaendeMit)
-* [ ] Wechsel des Typs von Konsument auf einen anderen Typ blendet die Checkbox aus; der gesetzte Wert wird trotzdem mitgesendet (nur bei `CONSUMER` ausgewertet). (Test: einheit-form.component.spec.ts › template › should keep nebenkostenRelevant when the type changes and the checkbox is hidden)
-* [ ] Gleichzeitige Bearbeitung → keine Versionsprüfung; der letzte Speichervorgang überschreibt.
-* [ ] Löschen einer Einheit mit Messwerten oder Zählerrohdaten → siehe Abschnitt 8.
+* [x] Löschen ohne Mieter → Tarifpositionen und Gerätezustände werden mitgelöscht (`ON DELETE CASCADE`). (Test: FlywaySchemaIT#einheitLoeschen_LoeschtTarifpositionenUndGeraetezustaendeMit)
+* [x] Wechsel des Typs von Konsument auf einen anderen Typ blendet die Checkbox aus; der gesetzte Wert wird trotzdem mitgesendet (nur bei `CONSUMER` ausgewertet). (Test: einheit-form.component.spec.ts › template › should keep nebenkostenRelevant when the type changes and the checkbox is hidden)
 
 ## 6. Abhängigkeiten & betroffene Funktionalität
 * **Voraussetzungen:** Tabelle `zev.organisation` (FK `org_id`); Permissions `einheit:read`/`einheit:write` in Keycloak (`Specs/Berechtigungen.md`); Mandantenkontext (`OrganizationContextService`, `HibernateFilterService`, `Specs/Mandantenfähigkeit.md`); Übersetzungen in `zev.translation`.
@@ -327,3 +327,8 @@ Beim Reverse Engineering als Offene Frage festgehalten:
 Der Security-Check vom 18.10.2026 hat das bestätigt (OWASP A01): `save` mit gesetzter ID wird zu `merge`, und `merge` lädt den Datensatz über den Primärschlüssel, wo der Mandantenfilter nicht greift (vgl. A.2). Ein Benutzer mit `einheit:write` konnte so die Einheit eines fremden Mandanten überschreiben und dem eigenen zuschlagen. `FremdeIdBeimSpeichernIT` war gegen den alten Code rot (`createEinheit` gab die fremde ID zurück).
 
 Entscheid: `createEinheit` setzt die ID auf `null`, und `id`/`orgId` sind für Jackson nur lesbar. Ein Request-DTO wäre die gründlichere Lösung, hätte aber Controller, Frontend-Modell und Tests umgebaut; offen für später. Dieselbe Lücke bestand in `TarifService.saveTarif` und `MieterService.saveMieter` (`Specs/Tarifverwaltung.md`, Anhang A.13; `Specs/Mieterverwaltung.md`, Anhang A.1).
+
+### A.5 Zwei Edge Cases umformuliert (Abschnitt 5, FR-4, 18.10.2026)
+Beim Akzeptanzkriterien-Check vom 18.10.2026 als „kein Akzeptanzkriterium“ erkannt:
+* „Gleichzeitige Bearbeitung → keine Versionsprüfung; der letzte Speichervorgang überschreibt.“ – beschreibt das Fehlen einer Funktion; ein Test schützte vor nichts. Jetzt als Designentscheidung in FR-4.
+* „Löschen einer Einheit mit Messwerten oder Zählerrohdaten → siehe Abschnitt 8.“ – ein Verweis auf eine offene Frage, kein prüfbares Kriterium. Gestrichen; die Frage steht weiter in Abschnitt 8 und wird nach dem Entscheid mit dem gewählten Verhalten als Kriterium neu gefasst.
