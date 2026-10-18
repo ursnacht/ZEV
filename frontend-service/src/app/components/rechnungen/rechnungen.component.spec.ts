@@ -135,6 +135,32 @@ describe('RechnungenComponent', () => {
     });
   });
 
+  // Specs/Tarifverwaltung.md, FR-8: Produzenten stehen in derselben Liste und sind einzeln
+  // waehlbar; "Alle auswaehlen" erfasst nur Konsumenten und Ladestationen.
+  describe('Produzent in der Einheiten-Auswahl', () => {
+    const checkbox = (id: number): HTMLInputElement =>
+      fixture.nativeElement.querySelector(`#einheit-${id}`) as HTMLInputElement;
+
+    it('should list the producer and select it individually', () => {
+      expect(checkbox(3)).not.toBeNull();
+      expect(fixture.nativeElement.textContent).toContain('Solar Anlage');
+
+      checkbox(3).click();
+      fixture.detectChanges();
+
+      expect(component.selectedEinheitIds.has(3)).toBe(true);
+      expect(component.canGenerate()).toBe(true);
+    });
+
+    it('should leave the producer out of select all', () => {
+      (fixture.nativeElement.querySelector('#einheit-select-all') as HTMLInputElement).click();
+      fixture.detectChanges();
+
+      expect(component.selectedEinheitIds.has(1)).toBe(true);
+      expect(component.selectedEinheitIds.has(3)).toBe(false);
+    });
+  });
+
   describe('einheiten ohne rechnung', () => {
     beforeEach(() => {
       component.dateFrom = '2026-01-01';

@@ -1889,6 +1889,39 @@ public class RechnungServiceTest {
         assertEquals("MONATE", zeile.getMengeEinheit());
     }
 
+    /**
+     * Specs/Tarifverwaltung.md, FR-7: Laeuft eine Grundgebuehr mitten im Quartal ab und loest eine
+     * neue sie ab, entstehen zwei Zeilen - je mit dem eigenen Teilzeitraum und dessen vollen Monaten.
+     */
+    @Test
+    void berechneRechnung_GrundgebuehrWechseltImQuartal_ZweiZeilenMitTeilzeitraum() {
+        LocalDate von = LocalDate.of(2026, 7, 1);
+        LocalDate bis = LocalDate.of(2026, 9, 30);
+        Tarif alt = new Tarif("Messtarif alt", TarifTyp.GRUNDGEBUEHR, new BigDecimal("10.00000"),
+            LocalDate.of(2026, 1, 1), LocalDate.of(2026, 7, 31));
+        Tarif neu = new Tarif("Messtarif neu", TarifTyp.GRUNDGEBUEHR, new BigDecimal("12.00000"),
+            LocalDate.of(2026, 8, 1), LocalDate.of(2026, 12, 31));
+        lenient().when(tarifService.getTarifeForZeitraum(TarifTyp.GRUNDGEBUEHR, von, bis))
+            .thenReturn(List.of(alt, neu));
+
+        List<TarifZeileDTO> zeilen = rechnungService.berechneRechnung(consumer, null, von, bis)
+            .getTarifZeilen().stream().filter(z -> z.getTyp() == TarifTyp.GRUNDGEBUEHR).toList();
+
+        assertEquals(2, zeilen.size());
+        TarifZeileDTO juli = zeilen.stream()
+            .filter(z -> z.getBezeichnung().startsWith("Messtarif alt")).findFirst().orElseThrow();
+        TarifZeileDTO herbst = zeilen.stream()
+            .filter(z -> z.getBezeichnung().startsWith("Messtarif neu")).findFirst().orElseThrow();
+        assertEquals(LocalDate.of(2026, 7, 1), juli.getVon());
+        assertEquals(LocalDate.of(2026, 7, 31), juli.getBis());
+        assertBetrag("1", juli.getMenge());
+        assertBetrag("10", juli.getBetrag());
+        assertEquals(LocalDate.of(2026, 8, 1), herbst.getVon());
+        assertEquals(LocalDate.of(2026, 9, 30), herbst.getBis());
+        assertBetrag("2", herbst.getMenge());
+        assertBetrag("24", herbst.getBetrag());
+    }
+
     @Test
     void berechneRechnung_ZusatzMitJahrespreis_MonateDurchZwoelf() {
         LocalDate von = LocalDate.of(2024, 1, 1);

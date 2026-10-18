@@ -170,6 +170,40 @@ class JasperTemplateCompileTest {
         assertEquals("120.00000", textMit(print, "120.00000").getFullText());
     }
 
+    /**
+     * Grundgebuehr ohne Jahrespreis (Specs/Tarifverwaltung.md, FR-3 und FR-6): Die Preisspalte nennt
+     * die Mengeneinheit der Zeile - "CHF / Tag" bzw. "CHF / Monat".
+     */
+    @Test
+    void testRechnungTemplate_OhneJahrespreisZeigtCHFproTagUndMonat() throws Exception {
+        InputStream stream = getClass().getResourceAsStream("/reports/rechnung.jrxml");
+        JasperReport report = JasperCompileManager.compileReport(stream);
+
+        RechnungDTO rechnung = testRechnung();
+        rechnung.getTarifZeilen().get(0).setMengeEinheit("KWH");
+        TarifZeileDTO proTag = new TarifZeileDTO("Messtarif Tag", LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 3, 31), new BigDecimal("90"), new BigDecimal("0.30000"),
+                new BigDecimal("27"), TarifTyp.GRUNDGEBUEHR, "TAG");
+        proTag.setMengeEinheit("TAGE");
+        rechnung.addTarifZeile(proTag);
+        TarifZeileDTO proMonat = new TarifZeileDTO("Messtarif Monat", LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 3, 31), new BigDecimal("3"), new BigDecimal("8.00000"),
+                new BigDecimal("24"), TarifTyp.GRUNDGEBUEHR, "MONAT");
+        proMonat.setMengeEinheit("MONATE");
+        rechnung.addTarifZeile(proMonat);
+
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("RECHNUNG", rechnung);
+        parameters.put("TRANSLATIONS", Map.of("TAG", "Tag", "TAGE", "Tage", "MONAT", "Monat",
+                "MONATE", "Monate", "KWH", "kWh"));
+        parameters.put("QR_CODE_IMAGE", null);
+        JasperPrint print = JasperFillManager.fillReport(report, parameters,
+                new JRBeanCollectionDataSource(rechnung.getTarifZeilen()));
+
+        assertEquals("CHF / Tag", textMit(print, "CHF / Tag").getFullText());
+        assertEquals("CHF / Monat", textMit(print, "CHF / Monat").getFullText());
+    }
+
     /** Erstes Textelement, dessen Text mit {@code anfang} beginnt. */
     private static JRPrintText textMit(JasperPrint print, String anfang) {
         for (JRPrintPage page : print.getPages()) {

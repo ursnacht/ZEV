@@ -6,6 +6,8 @@ import { TarifService } from '../../services/tarif.service';
 import { TranslationService } from '../../services/translation.service';
 import { Mengeneinheit, Tarif, TarifTyp, ValidationResult } from '../../models/tarif.model';
 import { of, throwError } from 'rxjs';
+import { By } from '@angular/platform-browser';
+import { CdkDropList, CdkDropListGroup } from '@angular/cdk/drag-drop';
 
 describe('TarifListComponent', () => {
   let component: TarifListComponent;
@@ -337,6 +339,63 @@ describe('TarifListComponent', () => {
         t(7, `${jahr}-01-01`, `${jahr}-12-31`)
       ]);
       expect(gruppen.aktuell.map(x => x.id)).toEqual([9, 7]);
+    });
+  });
+
+  describe('Darstellung der Panels', () => {
+    const jahr = new Date().getFullYear();
+    const tarifeAllerPanels: Tarif[] = [
+      { id: 11, bezeichnung: 'Messtarif', tariftyp: TarifTyp.GRUNDGEBUEHR, preis: 5, produzentVerrechnen: true,
+        gueltigVon: `${jahr}-01-01`, gueltigBis: `${jahr}-12-31` },
+      { id: 12, bezeichnung: 'Netz', tariftyp: TarifTyp.GRUNDGEBUEHR, preis: 3, produzentVerrechnen: false,
+        gueltigVon: `${jahr}-01-01`, gueltigBis: `${jahr}-12-31` },
+      { id: 13, bezeichnung: 'ZEV Strom', tariftyp: TarifTyp.ZEV, preis: 0.2,
+        gueltigVon: `${jahr}-01-01`, gueltigBis: `${jahr}-12-31` },
+      { id: 14, bezeichnung: 'ZEV kuenftig', tariftyp: TarifTyp.ZEV, preis: 0.2,
+        gueltigVon: `${jahr + 1}-01-01`, gueltigBis: `${jahr + 1}-12-31` },
+      { id: 15, bezeichnung: 'ZEV alt', tariftyp: TarifTyp.ZEV, preis: 0.2,
+        gueltigVon: `${jahr - 1}-01-01`, gueltigBis: `${jahr - 1}-12-31` }
+    ];
+
+    beforeEach(() => {
+      tarifServiceSpy.getAllTarife.mockReturnValue(of(tarifeAllerPanels));
+      component.loadTarife();
+      component.offen = { zukuenftig: true, aktuell: true, alt: true };
+      fixture.detectChanges();
+    });
+
+    const zeile = (bezeichnung: string): HTMLTableRowElement =>
+      Array.from(fixture.nativeElement.querySelectorAll('tbody tr') as NodeListOf<HTMLTableRowElement>)
+        .find(tr => tr.textContent?.includes(bezeichnung))!;
+
+    // Specs/Tarifverwaltung.md, FR-7: Spalte "Produzenten"
+    it('should show the producer flag as a disabled checkbox for the Grundgebuehr', () => {
+      const an = zeile('Messtarif').querySelector('input[type="checkbox"]') as HTMLInputElement;
+      const aus = zeile('Netz').querySelector('input[type="checkbox"]') as HTMLInputElement;
+      expect(an.disabled).toBe(true);
+      expect(an.checked).toBe(true);
+      expect(aus.disabled).toBe(true);
+      expect(aus.checked).toBe(false);
+    });
+
+    it('should show a dash instead of the producer flag for other tariff types', () => {
+      const zev = zeile('ZEV Strom');
+      expect(zev.querySelector('input[type="checkbox"]')).toBeNull();
+      expect(zev.textContent).toContain('–');
+    });
+
+    // Specs/Tarifverwaltung.md, FR-4: verschoben wird nur innerhalb eines Panels
+    it('should give each panel its own drop list that is not connected to the others', () => {
+      const listen = fixture.debugElement.queryAll(By.directive(CdkDropList))
+        .map(d => d.injector.get(CdkDropList));
+      expect(listen.length).toBe(3);
+      expect(listen.map(l => l.data)).toEqual(
+        [component.gruppen.zukuenftig, component.gruppen.aktuell, component.gruppen.alt]);
+      for (const liste of listen) {
+        expect(liste.connectedTo).toEqual([]);
+      }
+      // Auch keine gemeinsame Gruppe, die alle Listen stillschweigend verbinden wuerde
+      expect(fixture.debugElement.queryAll(By.directive(CdkDropListGroup)).length).toBe(0);
     });
   });
 

@@ -108,6 +108,7 @@
 * **Tarif-Übersicht:** Die Spalte „Produzenten" zeigt bei `GRUNDGEBUEHR`-Tarifen den Wert des Flags als **deaktivierte (read-only) Checkbox** — angehakt = `true`. Bearbeitet wird das Flag nur in der Tarifmaske. Bei allen anderen Tariftypen steht „–".
 * **Darstellung auf der Rechnung (PDF):** im gleichen Zeilenlayout wie `ZEV`/`VNB`, kein eigener Abschnitt — Bezeichnung | Zeitraum | Menge mit Einheit | Preis | Betrag. Die Reihenfolge bestimmt FR-4. Der `endBetrag` enthält die Grundgebühr.
 * Läuft ein `GRUNDGEBUEHR`-Tarif mitten in der Rechnungsperiode ab, entstehen zwei Zeilen (wie bei `ZEV`/`VNB`).
+* Alle UI-Texte der Grundgebühr kommen aus dem `TranslationService` (`Specs/generell.md`).
 * (Hintergrund: Anhang A.9)
 
 ### FR-8: Rechnungen für Produzenten
@@ -166,76 +167,74 @@
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
 ### Mehrere gleichzeitig gültige Tarife (FR-2)
-* [x] Zwei `VNB`-Tarife „Energielieferung" und „Netznutzung" mit gleicher Gültigkeit lassen sich speichern.
-* [x] Drei `GRUNDGEBUEHR`-Tarife (Energielieferung, Netznutzung, Messtarif) mit gleicher Gültigkeit lassen sich speichern.
-* [x] Ein zweiter Tarif desselben Typs mit **gleicher Bezeichnung** und überschneidender Gültigkeit wird abgewiesen („Tarif überschneidet sich mit bestehendem Tarif gleicher Bezeichnung"); auch bei anderer Gross-/Kleinschreibung oder Leerzeichen am Rand.
-* [x] Beim Bearbeiten eines Tarifs zählt er nicht als Überschneidung mit sich selbst.
-* [x] Ein zweiter `LADESTROM`-Tarif mit überschneidender Gültigkeit wird abgewiesen, auch mit anderer Bezeichnung.
-* [x] Auf der Rechnung erscheinen zwei gleichzeitig gültige `VNB`-Tarife als zwei Zeilen mit derselben Menge; drei Grundgebühren als drei Zeilen; das Total ist ihre Summe.
-* [x] Die Überschneidungsprüfung sieht nur Tarife des eigenen Mandanten.
+* [x] Zwei `VNB`-Tarife „Energielieferung" und „Netznutzung" mit gleicher Gültigkeit lassen sich speichern. (Test: TarifServiceTest#saveTarif_VnbNetznutzungNebenEnergielieferung_SavesSuccessfully; TarifRepositoryIT#existsOverlappingTarifMitBezeichnung_NurGleicheBezeichnungZaehlt) (E2E: tarif-verwaltung.spec.ts › should accept an overlapping tariff of the same type with a different name)
+* [x] Drei `GRUNDGEBUEHR`-Tarife (Energielieferung, Netznutzung, Messtarif) mit gleicher Gültigkeit lassen sich speichern. (Test: TarifServiceTest#saveTarif_DreiGrundgebuehren_PruefungJeBezeichnung)
+* [x] Ein zweiter Tarif desselben Typs mit **gleicher Bezeichnung** und überschneidender Gültigkeit wird abgewiesen („Tarif überschneidet sich mit bestehendem Tarif gleicher Bezeichnung"); auch bei anderer Gross-/Kleinschreibung oder Leerzeichen am Rand. (Test: TarifServiceTest#saveTarif_OverlappingTarifGleicheBezeichnung_ThrowsException; TarifRepositoryIT#existsOverlappingTarifMitBezeichnung_NurGleicheBezeichnungZaehlt) (E2E: tarif-verwaltung.spec.ts › should show error when creating an overlapping tariff with the same name)
+* [x] Beim Bearbeiten eines Tarifs zählt er nicht als Überschneidung mit sich selbst. (Test: TarifServiceTest#saveTarif_UpdateExisting_ExcludesItself; TarifRepositoryIT#existsOverlappingTarifMitBezeichnung_NurGleicheBezeichnungZaehlt)
+* [x] Ein zweiter `LADESTROM`-Tarif mit überschneidender Gültigkeit wird abgewiesen, auch mit anderer Bezeichnung. (Test: TarifServiceTest#saveTarif_LadestromUeberschneidung_ThrowsException)
+* [x] Auf der Rechnung erscheinen zwei gleichzeitig gültige `VNB`-Tarife als zwei Zeilen mit derselben Menge; drei Grundgebühren als drei Zeilen; das Total ist ihre Summe. (Test: RechnungServiceTest#berechneRechnung_MehrereGleichzeitigGueltigeTarife_JeTarifEineZeile)
+* [x] Die Überschneidungsprüfung sieht nur Tarife des eigenen Mandanten. (Test: TarifRepositoryIT#shouldNotLetTarifOfOtherOrgBlockOverlapCheck)
 
 ### Grundgebühr pro Monat oder pro Tag (FR-3)
-* [x] Ein Grundgebühr-Tarif lässt sich mit Mengeneinheit „Tag" speichern; ohne Angabe gilt „Monat".
-* [x] Eine andere Mengeneinheit als Monat oder Tag wird bei der Grundgebühr abgewiesen („Für die Grundgebühr ist nur die Mengeneinheit MONAT oder TAG zulässig").
-* [x] Grundgebühr pro Tag, ganzes Q3 2026: Menge 92, Einheit „Tag", Betrag 92 × Preis.
-* [x] Grundgebühr pro Tag, gültig ab 16.08.2026, Rechnung Q3: Menge 46.
-* [x] Grundgebühr pro Monat, gültig ab 16.08.2026, Rechnung Q3: Menge 1 (nur September).
-* [x] Bestehende Grundgebühren rechnen nach der Migration wie bisher (Mengeneinheit `MONAT`).
-* [x] Die Tarifmaske bietet bei der Grundgebühr nur Monat und Tag an, bei ZUSATZ kWh, Monat, Stück; bei jedem Wechsel des Typs wird die Einheit neu gesetzt — Grundgebühr: Monat vorbelegt; ZUSATZ: leer, muss bewusst gewählt werden (die Vorbelegung „Monat" der Grundgebühr wandert nicht in einen ZUSATZ-Tarif).
-* [x] Auf der Rechnung (PDF) steht „CHF / Tag".
+* [x] Ein Grundgebühr-Tarif lässt sich mit Mengeneinheit „Tag" speichern; ohne Angabe gilt „Monat". (Test: TarifServiceTest#saveTarif_GrundgebuehrProTag_BleibtTag; TarifServiceTest#saveTarif_GrundgebuehrOhneMengeneinheit_GiltProMonat)
+* [x] Eine andere Mengeneinheit als Monat oder Tag wird bei der Grundgebühr abgewiesen („Für die Grundgebühr ist nur die Mengeneinheit MONAT oder TAG zulässig"). (Test: TarifServiceTest#saveTarif_GrundgebuehrMitStueck_ThrowsException)
+* [x] Grundgebühr pro Tag, ganzes Q3 2026: Menge 92, Einheit „Tag", Betrag 92 × Preis. (Test: RechnungServiceTest#berechneRechnung_GrundgebuehrProTag_ZaehltJedenTag)
+* [x] Grundgebühr pro Tag, gültig ab 16.08.2026, Rechnung Q3: Menge 46. (Test: RechnungServiceTest#berechneRechnung_GrundgebuehrProTag_ZaehltJedenTag)
+* [x] Grundgebühr pro Monat, gültig ab 16.08.2026, Rechnung Q3: Menge 1 (nur September). (Test: RechnungServiceTest#berechneRechnung_GrundgebuehrProTag_ZaehltJedenTag)
+* [x] Bestehende Grundgebühren rechnen nach der Migration wie bisher (Mengeneinheit `MONAT`). (Test: RechnungServiceTest#berechneRechnung_GrundgebuehrZeile_HasMonatMengeneinheit; RechnungServiceTest#berechneRechnung_GrundgebuehrFullQuarter_ThreeMonths) (Nachweis: V176__Grundgebuehr_Pro_Tag.sql:15)
+* [x] Die Tarifmaske bietet bei der Grundgebühr nur Monat und Tag an, bei ZUSATZ kWh, Monat, Stück; bei jedem Wechsel des Typs wird die Einheit neu gesetzt — Grundgebühr: Monat vorbelegt; ZUSATZ: leer, muss bewusst gewählt werden (die Vorbelegung „Monat" der Grundgebühr wandert nicht in einen ZUSATZ-Tarif). (Test: tarif-form.component.spec.ts › mengeneinheit (ZUSATZ, GRUNDGEBUEHR) › should offer month and day for the Grundgebuehr; tarif-form.component.spec.ts › mengeneinheit (ZUSATZ, GRUNDGEBUEHR) › should offer kWh, month and piece for ZUSATZ; tarif-form.component.spec.ts › mengeneinheit (ZUSATZ, GRUNDGEBUEHR) › should preselect month when switching to the Grundgebuehr; tarif-form.component.spec.ts › mengeneinheit (ZUSATZ, GRUNDGEBUEHR) › should not carry the month of the Grundgebuehr over to ZUSATZ; tarif-form.component.spec.ts › mengeneinheit (ZUSATZ, GRUNDGEBUEHR) › should drop day when switching from the Grundgebuehr to ZUSATZ)
+* [x] Auf der Rechnung (PDF) steht „CHF / Tag". (Test: JasperTemplateCompileTest#testRechnungTemplate_OhneJahrespreisZeigtCHFproTagUndMonat)
 
 ### Reihenfolge und Panels (FR-4)
-* [x] Die Tarifverwaltung zeigt drei Panels: Zukünftige Tarife, Tarife *aktuelles Jahr*, Frühere Tarife; beim Aufruf ist nur das aktuelle Jahr offen.
-* [x] Ein Tarif von 01.10. des Vorjahres bis 31.12. dieses Jahres steht im Panel des aktuellen Jahres.
-* [x] Innerhalb eines Panels lässt sich ein Tarif am Griff verschieben; die neue Reihenfolge bleibt nach dem Neuladen erhalten.
-* [x] Zwischen Panels lässt sich nicht verschieben (je Panel eine eigene Drop-Liste).
-* [x] Die Spaltenköpfe sind nicht sortierbar.
-* [x] Das Kebab-Menü der unteren Zeilen wird nicht abgeschnitten: Die Panels schneiden nicht ab (`.zev-collapsible--overflow-visible`), und das Menü klappt allgemein **nach oben** auf, wenn darunter bis zum nächsten abschneidenden Element (Panel, scrollende Tabelle nach Spaltenbreiten-Änderung) oder zum Fensterrand zu wenig Platz ist (`app-kebab-menu`, `.zev-kebab-menu--up`) — auf allen Listen.
-* [x] Auf der Rechnung stehen die Zeilen in der Reihenfolge der Tarife, auch über Typen hinweg (z.B. Grundgebühr vor Strombezug).
-* [x] Ein neuer VNB-Tarif steht direkt hinter dem letzten VNB-Tarif; ein Bearbeiten ändert den Platz nicht.
-* [x] `PUT /api/tarife/{id}/verschieben` weist fehlende oder doppelte Ziele, unbekannte (auch mandantenfremde) Tarife und ein Verschieben relativ zu sich selbst mit 400 ab.
-* [x] Eine Verschiebung ändert nur den verschobenen Tarif und die Plätze zwischen Start und Ziel; andere Tarife, auch anderer Mandanten, bleiben unberührt.
-* [x] Auch ein Tarif mit Altbestand-Werten ausserhalb der heutigen Regeln (auf Hene: „Grundgebühr Ladestation" mit Preis 0) lässt sich verschieben — die Reihenfolge wird als einzelne Spalte gesetzt, nicht über die Entity mit ihrer Bean Validation.
-* [x] Nach der Migration ist die Reihenfolge der Rechnung unverändert.
+* [x] Die Tarifverwaltung zeigt drei Panels: Zukünftige Tarife, Tarife *aktuelles Jahr*, Frühere Tarife; beim Aufruf ist nur das aktuelle Jahr offen. (Test: tarif-list.component.spec.ts › initialization › should open only the panel of the current year; tarif-list.component.spec.ts › gruppiere › should assign tariffs by validity to future, current and past) (E2E: tarif-verwaltung.spec.ts › should open only the panel of the current year)
+* [x] Ein Tarif von 01.10. des Vorjahres bis 31.12. dieses Jahres steht im Panel des aktuellen Jahres. (Test: tarif-list.component.spec.ts › gruppiere › should put a tariff spanning into the current year into the current panel)
+* [x] Innerhalb eines Panels lässt sich ein Tarif am Griff verschieben; die neue Reihenfolge bleibt nach dem Neuladen erhalten. (Test: tarif-list.component.spec.ts › onDrop › should move a tariff up before its new successor and reload) (E2E: tarif-verwaltung.spec.ts › should reorder tariffs by drag and drop and keep the order after reload)
+* [x] Zwischen Panels lässt sich nicht verschieben (je Panel eine eigene Drop-Liste). (Test: tarif-list.component.spec.ts › Darstellung der Panels › should give each panel its own drop list that is not connected to the others)
+* [x] Die Spaltenköpfe sind nicht sortierbar. (E2E: tarif-verwaltung.spec.ts › should open only the panel of the current year)
+* [x] Das Kebab-Menü der unteren Zeilen wird nicht abgeschnitten: Die Panels schneiden nicht ab (`.zev-collapsible--overflow-visible`), und das Menü klappt allgemein **nach oben** auf, wenn darunter bis zum nächsten abschneidenden Element (Panel, scrollende Tabelle nach Spaltenbreiten-Änderung) oder zum Fensterrand zu wenig Platz ist (`app-kebab-menu`, `.zev-kebab-menu--up`) — auf allen Listen. (Test: kebab-menu.component.spec.ts › nach oben aufklappen › should open upwards near the bottom of the window; kebab-menu.component.spec.ts › nach oben aufklappen › should open upwards at the bottom of a clipping container) (Nachweis: tarif-list.component.html:44)
+* [x] Auf der Rechnung stehen die Zeilen in der Reihenfolge der Tarife, auch über Typen hinweg (z.B. Grundgebühr vor Strombezug). (Test: RechnungServiceTest#berechneRechnung_ZeilenInDerReihenfolgeDerTarife)
+* [x] Ein neuer VNB-Tarif steht direkt hinter dem letzten VNB-Tarif; ein Bearbeiten ändert den Platz nicht. (Test: TarifServiceTest#saveTarif_Neu_KommtHinterDenLetztenTarifDesselbenTyps; TarifServiceTest#saveTarif_Update_BehaeltGespeicherteReihenfolge)
+* [x] `PUT /api/tarife/{id}/verschieben` weist fehlende oder doppelte Ziele, unbekannte (auch mandantenfremde) Tarife und ein Verschieben relativ zu sich selbst mit 400 ab. (Test: TarifServiceTest#verschiebe_OhneOderMitZweiZielen_ThrowsException; TarifServiceTest#verschiebe_UnbekannterOderFremderTarif_ThrowsException; TarifServiceTest#verschiebe_RelativZuSichSelbst_ThrowsException; TarifControllerTest#verschiebe_UnbekannterTarif_ReturnsBadRequest)
+* [x] Eine Verschiebung ändert nur den verschobenen Tarif und die Plätze zwischen Start und Ziel; andere Tarife, auch anderer Mandanten, bleiben unberührt. (Test: TarifServiceTest#verschiebe_NachVornVorZiel_RuecktDieDazwischenNach; TarifServiceTest#verschiebe_NachHintenHinterZiel_RuecktDieDazwischenVor; TarifRepositoryIT#verschiebeReihenfolgeBereich_NurBereichUndEigenerMandant)
+* [x] Auch ein Tarif mit Altbestand-Werten ausserhalb der heutigen Regeln (auf Hene: „Grundgebühr Ladestation" mit Preis 0) lässt sich verschieben — die Reihenfolge wird als einzelne Spalte gesetzt, nicht über die Entity mit ihrer Bean Validation. (Test: TarifRepositoryIT#setzeReihenfolge_TarifMitPreisNull_OhneBeanValidation; TarifServiceTest#verschiebe_NachVornVorZiel_RuecktDieDazwischenNach)
 
 ### Preis 0 (FR-5)
-* [x] Ein Tarif mit Preis 0 lässt sich anlegen und bearbeiten; ein negativer Preis wird abgewiesen (Backend `@PositiveOrZero`, Formular `min="0"`).
-* [x] Ein neues Formular zeigt ein leeres Preisfeld; ohne Preis bleibt Speichern gesperrt.
-* [x] Die Meldung lautet „Preis ist erforderlich und darf nicht negativ sein" (V179).
+* [x] Ein Tarif mit Preis 0 lässt sich anlegen und bearbeiten; ein negativer Preis wird abgewiesen (Backend `@PositiveOrZero`, Formular `min="0"`). (Test: TarifControllerTest#createTarif_PreisNull_ReturnsCreated; TarifControllerTest#createTarif_NegativePreis_ReturnsBadRequest; tarif-form.component.spec.ts › isFormValid › should return true when preis is zero (free service); tarif-form.component.spec.ts › isFormValid › should return false when preis is negative) (E2E: tarif-verwaltung.spec.ts › should show error for negative price)
+* [x] Ein neues Formular zeigt ein leeres Preisfeld; ohne Preis bleibt Speichern gesperrt. (Test: tarif-form.component.spec.ts › initialization › should initialize with default form data when no tarif input; tarif-form.component.spec.ts › isFormValid › should return false when preis is empty)
+* [x] Die Meldung lautet „Preis ist erforderlich und darf nicht negativ sein" (V179). (Nachweis: V179__Tarif_Preis_Null_Zulaessig.sql:4)
 
 ### Jahrespreis (FR-6)
-* [x] Grundgebühr 100.– pro Jahr nach Monaten: die vier Quartale ergeben zusammen genau 100.–.
-* [x] Nach Tagen 2026 (365) und 2028 (366): die Quartale ergeben zusammen den Jahrespreis.
-* [x] Nach Tagen, gültig ab 01.08.2026, Rechnung Q3: Menge „61 Tage", Betrag 61/365 des Jahrespreises.
-* [x] Über den Jahreswechsel wird je Kalenderjahr mit dessen Tagen gerechnet.
-* [x] Zusatz-Tarif pro Monat mit Jahrespreis: Betrag = Jahrespreis × erfasste Monate / 12.
-* [x] Auf der Rechnung: Menge „3 Monate", Preis 120.00000, Einheit „CHF / Jahr".
-* [x] Ohne Jahrespreis gilt Menge × Preis mit „CHF / Monat".
-* [x] Ein Jahrespreis bei ZEV, VNB, Ladestrom oder Zusatz pro Stück/kWh wird abgewiesen.
+* [x] Grundgebühr 100.– pro Jahr nach Monaten: die vier Quartale ergeben zusammen genau 100.–. (Test: RechnungServiceTest#berechneRechnung_JahrespreisNachMonaten_QuartaleErgebenGenauDenJahrespreis)
+* [x] Nach Tagen 2026 (365) und 2028 (366): die Quartale ergeben zusammen den Jahrespreis. (Test: RechnungServiceTest#berechneRechnung_JahrespreisNachTagen_QuartaleErgebenDenJahrespreis; RechnungServiceTest#berechneRechnung_JahrespreisNachTagen_SchaltjahrMit366Tagen)
+* [x] Nach Tagen, gültig ab 01.08.2026, Rechnung Q3: Menge „61 Tage", Betrag 61/365 des Jahrespreises. (Test: RechnungServiceTest#berechneRechnung_JahrespreisNachTagen_AnteiligAbMitteQuartal)
+* [x] Über den Jahreswechsel wird je Kalenderjahr mit dessen Tagen gerechnet. (Test: RechnungServiceTest#berechneRechnung_JahrespreisNachTagen_UeberJahreswechselJeJahrGeteilt)
+* [x] Zusatz-Tarif pro Monat mit Jahrespreis: Betrag = Jahrespreis × erfasste Monate / 12. (Test: RechnungServiceTest#berechneRechnung_ZusatzMitJahrespreis_MonateDurchZwoelf)
+* [x] Auf der Rechnung: Menge „3 Monate", Preis 120.00000, Einheit „CHF / Jahr". (Test: JasperTemplateCompileTest#testRechnungTemplate_JahrespreisZeigtMonateUndCHFproJahr; RechnungServiceTest#berechneRechnung_JahrespreisNachMonaten_ZeigtMonateUndCHFproJahr)
+* [x] Ohne Jahrespreis gilt Menge × Preis mit „CHF / Monat". (Test: RechnungServiceTest#berechneRechnung_OhneJahrespreis_KeineJahresAnzeige; Test: JasperTemplateCompileTest#testRechnungTemplate_OhneJahrespreisZeigtCHFproTagUndMonat)
+* [x] Ein Jahrespreis bei ZEV, VNB, Ladestrom oder Zusatz pro Stück/kWh wird abgewiesen. (Test: TarifServiceTest#saveTarif_JahrespreisBeiVnb_ThrowsException; TarifServiceTest#saveTarif_JahrespreisBeiZusatzProStueck_ThrowsException)
 
 ### Grundgebühr (FR-7)
-* [ ] In der Tarifverwaltung kann ein Tarif mit Typ „Grundgebühr" erfasst, bearbeitet und gelöscht werden.
-* [ ] In der Dropdown-Liste der Tariftypen erscheint der Eintrag „Grundgebühr".
-* [ ] Beim Generieren von Rechnungen wird die Grundgebühr für Konsumenten berechnet; für Produzenten nur bei freigegebenem Tarif (FR-8).
-* [ ] Die Anzahl Monate wird korrekt berechnet (z. B. 01.01.–31.03. = 3 Monate).
-* [ ] Läuft ein `GRUNDGEBUEHR`-Tarif mitten in einer Rechnungsperiode ab, werden zwei separate Zeilen erzeugt (analog ZEV/VNB).
-* [ ] Beim Tariftyp „Grundgebühr" wird im Tarifformular eine Checkbox „Auch Produzenten verrechnen" angezeigt; bei `ZEV`/`VNB` nicht.
-* [ ] Das Flag beeinflusst die Verrechnung bei Konsumenten **nicht** (Konsumenten zahlen die Grundgebühr immer).
-* [ ] In der Tarif-Übersichtstabelle zeigt die Spalte „Produzenten" für `GRUNDGEBUEHR`-Tarife eine deaktivierte Checkbox (angehakt = freigegeben) und für `ZEV`/`VNB` einen Platzhalter „–".
-* [ ] Der `endBetrag` auf der Rechnung enthält die Grundgebühr.
-* [ ] Fehlt ein `GRUNDGEBUEHR`-Tarif für den Rechnungszeitraum, wird keine Grundgebühr berechnet (kein Fehler, da der Typ optional ist).
-* [ ] Alle UI-Texte der Grundgebühr kommen aus dem `TranslationService` (keine hardcodierten Strings).
+* [x] In der Tarifverwaltung kann ein Tarif mit Typ „Grundgebühr" erfasst, bearbeitet und gelöscht werden. (E2E: tarif-verwaltung.spec.ts › should create a GRUNDGEBUEHR tariff successfully; tarif-verwaltung.spec.ts › should edit a GRUNDGEBUEHR tariff; tarif-verwaltung.spec.ts › should delete a GRUNDGEBUEHR tariff)
+* [x] In der Dropdown-Liste der Tariftypen erscheint der Eintrag „Grundgebühr". (Test: tarif-form.component.spec.ts › initialization › should have five tarif type options; tarif-form.component.spec.ts › i18n der Auswahllisten › should translate the tariff type options) (E2E: tarif-verwaltung.spec.ts › should show GRUNDGEBUEHR option in tarif type dropdown)
+* [x] Beim Generieren von Rechnungen wird die Grundgebühr für Konsumenten berechnet; für Produzenten nur bei freigegebenem Tarif (FR-8). (Test: RechnungServiceTest#berechneRechnungen_ConsumerGrundgebuehr_IgnoresProduzentFlag; RechnungServiceTest#berechneRechnungen_ProducerWithGrundgebuehr_GetsInvoice; RechnungServiceTest#berechneRechnungen_ProducerWithGrundgebuehrNotFlagged_NotIncluded)
+* [x] Die Anzahl Monate wird korrekt berechnet (z. B. 01.01.–31.03. = 3 Monate). (Test: RechnungServiceTest#berechneRechnung_GrundgebuehrFullQuarter_ThreeMonths)
+* [x] Läuft ein `GRUNDGEBUEHR`-Tarif mitten in einer Rechnungsperiode ab, werden zwei separate Zeilen erzeugt (analog ZEV/VNB). (Test: RechnungServiceTest#berechneRechnung_GrundgebuehrWechseltImQuartal_ZweiZeilenMitTeilzeitraum)
+* [x] Beim Tariftyp „Grundgebühr" wird im Tarifformular eine Checkbox „Auch Produzenten verrechnen" angezeigt; bei `ZEV`/`VNB` nicht. (Test: tarif-form.component.spec.ts › produzentVerrechnen checkbox › should render checkbox only for GRUNDGEBUEHR tariffs; tarif-form.component.spec.ts › produzentVerrechnen checkbox › should not render checkbox for ZEV/VNB tariffs)
+* [x] Das Flag beeinflusst die Verrechnung bei Konsumenten **nicht** (Konsumenten zahlen die Grundgebühr immer). (Test: RechnungServiceTest#berechneRechnungen_ConsumerGrundgebuehr_IgnoresProduzentFlag)
+* [x] In der Tarif-Übersichtstabelle zeigt die Spalte „Produzenten" für `GRUNDGEBUEHR`-Tarife eine deaktivierte Checkbox (angehakt = freigegeben) und für `ZEV`/`VNB` einen Platzhalter „–". (Test: tarif-list.component.spec.ts › Darstellung der Panels › should show the producer flag as a disabled checkbox for the Grundgebuehr; Test: tarif-list.component.spec.ts › Darstellung der Panels › should show a dash instead of the producer flag for other tariff types)
+* [x] Der `endBetrag` auf der Rechnung enthält die Grundgebühr. (Test: RechnungServiceTest#berechneRechnung_GrundgebuehrIncludedInTotal)
+* [x] Fehlt ein `GRUNDGEBUEHR`-Tarif für den Rechnungszeitraum, wird keine Grundgebühr berechnet (kein Fehler, da der Typ optional ist). (Test: RechnungServiceTest#berechneRechnung_GrundgebuehrOptional_NoErrorWhenNoTarif)
 
 ### Rechnungen für Produzenten (FR-8)
-* [ ] Produzenten erscheinen im Rechnungsformular und können ausgewählt werden.
-* [ ] Für Produzenten wird eine Rechnung mit nur `GRUNDGEBUEHR`-Positionen generiert (keine ZEV/VNB-Zeilen).
-* [ ] Ein `GRUNDGEBUEHR`-Tarif mit `produzentVerrechnen = true` wird Produzenten verrechnet; ein Tarif mit `false` nicht.
-* [ ] Hat ein ausgewählter Produzent nur nicht-freigegebene `GRUNDGEBUEHR`-Tarife, wird für ihn keine Rechnung erzeugt.
+* [x] Produzenten erscheinen im Rechnungsformular und können ausgewählt werden. (Test: rechnungen.component.spec.ts › Produzent in der Einheiten-Auswahl › should list the producer and select it individually)
+* [x] Für Produzenten wird eine Rechnung mit nur `GRUNDGEBUEHR`-Positionen generiert (keine ZEV/VNB-Zeilen). (Test: RechnungServiceTest#berechneRechnungen_ProducerHasNoZevVnbLines; RechnungServiceTest#berechneRechnungen_ProducerWithGrundgebuehr_GetsInvoice)
+* [x] Ein `GRUNDGEBUEHR`-Tarif mit `produzentVerrechnen = true` wird Produzenten verrechnet; ein Tarif mit `false` nicht. (Test: RechnungServiceTest#berechneRechnungen_ProducerWithGrundgebuehr_GetsInvoice; RechnungServiceTest#berechneRechnungen_ProducerWithGrundgebuehrNotFlagged_NotIncluded)
+* [x] Hat ein ausgewählter Produzent nur nicht-freigegebene `GRUNDGEBUEHR`-Tarife, wird für ihn keine Rechnung erzeugt. (Test: RechnungServiceTest#berechneRechnungen_ProducerWithGrundgebuehrNotFlagged_NotIncluded)
 
 ### Tarif kopieren (FR-9)
-* [ ] Kebabmenü hat weiteren Eintrag "Kopieren": Bearbeiten - **Kopieren** - Löschen
-* [ ] Die Felder sind mit den Daten des kopierten Tarifes abgefüllt
-* [ ] Der Benutzer kann "Erfassen" oder "Abbrechen" klicken
+* [x] Kebabmenü hat weiteren Eintrag "Kopieren": Bearbeiten - **Kopieren** - Löschen (Test: tarif-list.component.spec.ts › initialization › should have menu items for edit, copy and delete; tarif-list.component.spec.ts › onMenuAction › should call onCopy for copy action)
+* [x] Die Felder sind mit den Daten des kopierten Tarifes abgefüllt (Test: tarif-list.component.spec.ts › onCopy › should copy all properties except id; tarif-list.component.spec.ts › onCopy › should set selectedTarif without id and show form; tarif-form.component.spec.ts › initialization › should populate form with tarif data when input is provided)
+* [x] Der Benutzer kann "Erfassen" oder "Abbrechen" klicken (Test: tarif-form.component.spec.ts › events › should emit save event with form data on valid submit; tarif-form.component.spec.ts › events › should emit cancel event; tarif-list.component.spec.ts › onFormSubmit - create › should call createTarif when tarif has no id)
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
@@ -331,3 +330,8 @@ War eine eigene Spec, `Specs/Tarifverwaltung-Tarif-kopieren.md` („Erweiterung 
 
 ### A.11 Glättung (18.10.2026)
 Bei der zweiten Konsolidierung nach der Zusammenführung wurden nur Formulierungen geglättet, Inhalt und Status der Kriterien blieben gleich. Vorher lauteten sie: „… wird **weiterhin** abgewiesen, auch mit anderer Bezeichnung" (FR-2); „Menge 1 (nur September) — **unverändert**" und „bei ZUSATZ **weiterhin** kWh, Monat, Stück" (FR-3); „Die Spaltenköpfe sind **nicht mehr** sortierbar" (FR-4); „Ohne Jahrespreis **bleibt die Rechnung wie bisher** (Menge × Preis, „CHF / Monat")" (FR-6); „Alle **neuen** UI-Texte kommen aus dem `TranslationService`" (FR-7). In NFR-2 wurden zwei Punkte zur Permission `tarife:manage` zusammengefasst; FR-3 verweist neu auf FR-7, und der erste Edge Case steht im Präsens („wird“ statt „soll … angezeigt werden“). Im Datenmodell hiess es „Alle Spalten sind Pflicht", gemeint waren die aufgezählten Grundspalten (`mengeneinheit` ist nullable).
+
+### A.12 Zwei Kriterien gestrichen (FR-4, FR-7, 18.10.2026)
+Beim Akzeptanzkriterien-Check vom 18.10.2026 als „kein Akzeptanzkriterium" erkannt und gestrichen:
+* FR-4: „Nach der Migration ist die Reihenfolge der Rechnung unverändert." — eine einmalige, längst ausgeführte Migration (V178); ein Test schützte vor nichts mehr. Die Aussage steht in NFR-3.
+* FR-7: „Alle neuen UI-Texte kommen aus dem `TranslationService` (keine hardcodierten Strings)." — eine allgemeine Konvention aus `Specs/generell.md`, die `/9_vorlagen-check` prüft; jetzt als Satz in FR-7.
