@@ -25,6 +25,7 @@
 3. Subscribe mit Wildcard auf alle Messwert-Topics (FR-2).
 4. Bei Verbindungsabbruch automatischer Reconnect mit Exponential Backoff.
 5. **Dauerhafte Sitzung** (`mqtt.clean-session`, Standard `false`, Env `MQTT_CLEAN_SESSION`): Der Broker behält das Abo des Backends über dessen Neustart hinweg und stellt die QoS-1-Nachrichten zu, die in der Zwischenzeit eintrafen. So bleibt bei einem Update auch die 15-Minuten-Auflösung erhalten, nicht nur die Energie. Voraussetzung: Die Client-ID wird je Broker von **genau einer** Backend-Instanz verwendet; der Broker begrenzt die Warteschlange (`max_queued_messages`, siehe `docs/Netzwerk-Topologie-Hene.md`).
+6. **Wartezeit auf das Abo:** Beim Verbinden wartet das Backend bis zu **30 s** auf die Bestätigung des Abos (SUBACK; `MqttConfig.ABO_TIMEOUT_MS`). Mit dauerhafter Sitzung stellt der Broker nach einem Neustart zuerst die gepufferten Nachrichten zu; mit 5 s brach das Abo dabei ab („Error subscribing … Timed out (32000)“, lokal beobachtet am 19.10.2026). Das war harmlos, solange der Broker das Abo aus der Sitzung kannte – ohne Sitzung (erster Start, abgelaufene Sitzung, geleertes Broker-Volume) kämen still keine Messwerte.
 
 > **Profil-Aktivierung (`@Profile("mqtt")`):** Das Bean, das sich mit dem Broker verbindet und die Messwerte einliest (MQTT-Subscriber/Inbound-Adapter samt Message-Handler), ist **nur aktiv, wenn das Spring-Boot-Profil `mqtt` gesetzt ist** (`@Profile("mqtt")`; aktiviert via `SPRING_PROFILES_ACTIVE=mqtt` bzw. `spring.profiles.active`). Ohne dieses Profil (Default, Tests, lokale Entwicklung) startet **kein** MQTT-Client — es wird keine Broker-Verbindung aufgebaut, das Backend läuft unverändert nur mit CSV-Upload. So bleibt die MQTT-Anbindung optional und Umgebungen ohne erreichbaren Broker starten fehlerfrei.
 
@@ -211,6 +212,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 * [ ] Nach jedem Aggregationslauf wird je betroffenem Mandant die Solarverteilung für den behandelten Zeitraum automatisch ausgeführt (`calculateSolarDistributionForOrg`, `orgFilter` explizit gesetzt); ohne verarbeitetes Intervall erfolgt kein Verteilungsaufruf. Ein Fehler bei einem Mandanten bricht die übrigen nicht ab.
 
 **Verbindung:**
+* [ ] Das Backend wartet beim Verbinden bis zu 30 s auf die Bestätigung des Abos (Test: MqttConfigTest#mqttInbound_WartetDreissigSekundenAufDasAbo)
 * [ ] Ohne `MQTT_CLEAN_SESSION` verbindet sich das Backend mit dauerhafter Sitzung (`cleanSession = false`); mit `MQTT_CLEAN_SESSION=true` ohne (Test: MqttConfigTest#applicationMqttYml_OhneUmgebungsvariable_DauerhafteSitzung, MqttConfigTest#mqttClientFactory_CleanSessionFalse_DauerhafteSitzung, MqttConfigTest#mqttClientFactory_CleanSessionTrue_SitzungOhnePuffer)
 
 **Monitoring & Kompatibilität:**

@@ -4,7 +4,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.core.env.StandardEnvironment;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.mqtt.core.DefaultMqttPahoClientFactory;
+import org.springframework.integration.mqtt.inbound.MqttPahoMessageDrivenChannelAdapter;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.IOException;
@@ -39,6 +41,23 @@ class MqttConfigTest {
     @Test
     void mqttClientFactory_CleanSessionTrue_SitzungOhnePuffer() {
         assertTrue(factoryMit(true).getConnectionOptions().isCleanSession());
+    }
+
+    /**
+     * Specs/MQTT-Integration.md, FR-1.6: Nach einem Neustart stellt der Broker zuerst die
+     * gepufferten Nachrichten zu; 5 s reichten fuer das SUBACK nicht.
+     */
+    @Test
+    void mqttInbound_WartetDreissigSekundenAufDasAbo() {
+        MqttConfig config = new MqttConfig();
+        ReflectionTestUtils.setField(config, "clientId", "test-client");
+        ReflectionTestUtils.setField(config, "topic", "zev/+/+/messwert");
+        ReflectionTestUtils.setField(config, "qos", 1);
+
+        MqttPahoMessageDrivenChannelAdapter adapter =
+                config.mqttInbound(factoryMit(false), new DirectChannel());
+
+        assertEquals(30_000L, ((Number) ReflectionTestUtils.getField(adapter, "completionTimeout")).longValue());
     }
 
     /** Auf Hene ist {@code MQTT_CLEAN_SESSION} nicht gesetzt - dort gilt der Standard der Datei. */
