@@ -102,7 +102,7 @@ dieses Features.
    - „`<Name>` (Entladung, gemessen)" = Betrag der Summe der negativen `total`-Intervalle, Key `STATISTIK_ENTLADUNG`.
 
    > **Der Zusatz „gemessen" ist kein Schmuck — es gibt dieselbe Grösse bereits berechnet.**
-   > `Specs/Statistik-Kennzahlen.md` (Stufe 2) weist heute schon „Batterie geladen" und „Batterie
+   > `Specs/Statistik.md`, FR-13 (Stufe 2) weist heute schon „Batterie geladen" und „Batterie
    > entladen" aus, geschätzt aus der Bilanz über `Netto_i = P_i − C_i + B_i − R_i`
    > (`StatistikService.berechneBatterieKennzahlen`) — **ohne** dass eine Speicher-Einheit
    > existiert. Mit ihr stehen beide Grössen nebeneinander (Entscheid, s. §8): die eine aus vier
@@ -200,8 +200,8 @@ dieses Features.
 ## 6. Abhängigkeiten & betroffene Funktionalität
 * **Voraussetzungen:** MQTT-Integration (`Specs/MQTT-Integration.md`), Solarverteilung, Statistik inkl. Bilanzmesspunkt (`Specs/Bilanzmesspunkt.md`), Einheiten-Verwaltung.
 * **Berührt ausserdem:** `Specs/Bilanzmodell.md` (zwei Verteilmodi, FR-3a) und
-  `Specs/Statistik-Kennzahlen.md` (bereits vorhandene, aus der Bilanz geschätzte Batterie-Kennzahlen,
-  FR-4.2). Beide sind **nach** dieser Spec entstanden.
+  `Specs/Statistik.md`, FR-13 (bereits vorhandene, aus der Bilanz geschätzte Batterie-Kennzahlen;
+  hier FR-4.2). Beide sind **nach** dieser Spec entstanden.
 * **Betroffener Code (Backend):**
   - `entity/EinheitTyp.java` — Wert `SPEICHER`.
   - `service/EinheitService.java` — Eindeutigkeits-Validierung um `SPEICHER` erweitern, mit **eigenem** Fehler-Key `EINHEIT_SPEICHER_EXISTIERT` (Entscheid). **Das ist mehr als eine Mengen-Erweiterung:** Heute prüft eine einzige Bedingung über `BILANZ_TYPEN` und wirft den gemeinsamen Key `EINHEIT_BILANZ_TYP_EXISTIERT` (Zeilen 50 und 65). Für einen eigenen Key braucht es einen zweiten Zweig oder eine Zuordnung Typ → Key; `SPEICHER` einfach zu `BILANZ_TYPEN` hinzuzufügen ergäbe die falsche Meldung.
@@ -257,7 +257,7 @@ Geklärt (Review /0_anforderungen-check, zweite Runde am 13.09.2026 — die Spec
 * [x] **Doppelte Batterie-Kennzahlen — Entscheid: beide nebeneinander.** Die Statistik rechnet
   bereits ohne Speicher-Einheit `batterieGeladen`, `batterieEntladen` und `batterieWirkungsgrad`,
   geschätzt aus der Bilanz über `Netto_i = P_i − C_i + B_i − R_i`
-  (`Specs/Statistik-Kennzahlen.md` Stufe 2, `StatistikService.berechneBatterieKennzahlen`). Diese
+  (`Specs/Statistik.md`, FR-13 Stufe 2, `StatistikService.berechneBatterieKennzahlen`). Diese
   Spec ist älter und kannte sie nicht.
 
   **Beide Werte bleiben und stehen nebeneinander**, die gemessene Seite mit dem Zusatz „gemessen"
