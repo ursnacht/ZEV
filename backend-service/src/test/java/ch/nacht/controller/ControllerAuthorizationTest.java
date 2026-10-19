@@ -2,6 +2,7 @@ package ch.nacht.controller;
 
 import ch.nacht.config.SecurityConfig;
 import ch.nacht.dto.NkRechnungLaufDTO;
+import ch.nacht.dto.StatistikDTO;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.service.EinheitMatchingService;
@@ -16,6 +17,8 @@ import ch.nacht.service.OrganisationService;
 import ch.nacht.service.OrganizationContextService;
 import ch.nacht.service.PreiszeitreiheService;
 import ch.nacht.service.ProduktionsprognoseService;
+import ch.nacht.service.StatistikPdfService;
+import ch.nacht.service.StatistikService;
 import ch.nacht.service.SteuerungService;
 import ch.nacht.service.TarifService;
 import ch.nacht.service.TranslationService;
@@ -34,6 +37,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import org.springframework.data.domain.SliceImpl;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -42,6 +46,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -65,7 +70,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         TarifpositionController.class,
         EinheitController.class, MieterController.class, NkAbrechnungController.class,
         NkRechnungController.class, SystemmeldungController.class, PreiszeitreiheController.class,
-        SteuerungController.class, TranslationController.class})
+        SteuerungController.class, TranslationController.class, StatistikController.class})
 @Import(SecurityConfig.class)
 @TestPropertySource(properties = "app.cors.allowed-origins=http://localhost:4200")
 class ControllerAuthorizationTest {
@@ -111,6 +116,12 @@ class ControllerAuthorizationTest {
 
     @MockitoBean
     private TranslationService translationService;
+
+    @MockitoBean
+    private StatistikService statistikService;
+
+    @MockitoBean
+    private StatistikPdfService statistikPdfService;
 
     @MockitoBean
     private ProduktionsprognoseService produktionsprognoseService;
@@ -881,5 +892,97 @@ class ControllerAuthorizationTest {
                 .andExpect(status().isForbidden());
 
         verify(translationService, never()).importTranslations(any(), anyBoolean());
+    }
+
+    // ==================== Statistik: statistik:read ====================
+    // Spec Statistik.md: "Statistik bleibt mit statistik:read erreichbar". Gegenprobe ist jeweils eine
+    // fremde Lese-Permission (einheit:read): 403, und der Service wird nie aufgerufen.
+
+    private static final String STATISTIK_URL = "/api/statistik?von=2024-01-01&bis=2024-01-31";
+    private static final String STATISTIK_CSV_URL =
+            "/api/statistik/export/csv?einheitId=1&von=2024-01-01&bis=2024-01-31";
+    private static final String STATISTIK_PDF_URL = "/api/statistik/export/pdf?von=2024-01-01&bis=2024-01-31";
+
+    @Test
+    void getStatistik_withStatistikRead_ok() throws Exception {
+        when(statistikService.getStatistik(any(), any())).thenReturn(new StatistikDTO());
+
+        mockMvc.perform(get(STATISTIK_URL)
+                        .with(jwt().authorities(new SimpleGrantedAuthority("statistik:read"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getStatistik_withoutPermission_forbidden() throws Exception {
+        mockMvc.perform(get(STATISTIK_URL)
+                        .with(jwt().authorities(new SimpleGrantedAuthority("einheit:read"))))
+                .andExpect(status().isForbidden());
+
+        verify(statistikService, never()).getStatistik(any(), any());
+    }
+
+    @Test
+    void getStatistik_unauthenticated_unauthorized() throws Exception {
+        mockMvc.perform(get(STATISTIK_URL))
+                .andExpect(status().isUnauthorized());
+
+        verify(statistikService, never()).getStatistik(any(), any());
+    }
+
+    @Test
+    void getLetztesMessdatum_withStatistikRead_ok() throws Exception {
+        when(statistikService.ermittleLetztesMessdatum()).thenReturn(LocalDate.of(2024, 1, 31));
+
+        mockMvc.perform(get("/api/statistik/letztes-datum")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("statistik:read"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getLetztesMessdatum_withoutPermission_forbidden() throws Exception {
+        mockMvc.perform(get("/api/statistik/letztes-datum")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("einheit:read"))))
+                .andExpect(status().isForbidden());
+
+        verify(statistikService, never()).ermittleLetztesMessdatum();
+    }
+
+    @Test
+    void exportStatistikCsv_withStatistikRead_ok() throws Exception {
+        when(statistikService.exportMesswerteCsv(anyLong(), any(), any(), anyString()))
+                .thenReturn("a;b".getBytes());
+
+        mockMvc.perform(get(STATISTIK_CSV_URL)
+                        .with(jwt().authorities(new SimpleGrantedAuthority("statistik:read"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void exportStatistikCsv_withoutPermission_forbidden() throws Exception {
+        mockMvc.perform(get(STATISTIK_CSV_URL)
+                        .with(jwt().authorities(new SimpleGrantedAuthority("einheit:read"))))
+                .andExpect(status().isForbidden());
+
+        verify(statistikService, never()).exportMesswerteCsv(any(), any(), any(), any());
+    }
+
+    @Test
+    void exportStatistikPdf_withStatistikRead_ok() throws Exception {
+        when(statistikService.getStatistik(any(), any())).thenReturn(new StatistikDTO());
+        when(statistikPdfService.generatePdf(any(), anyString())).thenReturn(new byte[]{1, 2, 3});
+
+        mockMvc.perform(get(STATISTIK_PDF_URL)
+                        .with(jwt().authorities(new SimpleGrantedAuthority("statistik:read"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void exportStatistikPdf_withoutPermission_forbidden() throws Exception {
+        mockMvc.perform(get(STATISTIK_PDF_URL)
+                        .with(jwt().authorities(new SimpleGrantedAuthority("einheit:read"))))
+                .andExpect(status().isForbidden());
+
+        verify(statistikService, never()).getStatistik(any(), any());
+        verify(statistikPdfService, never()).generatePdf(any(), any());
     }
 }

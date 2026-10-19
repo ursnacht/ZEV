@@ -1,7 +1,9 @@
 import { createSpyObj, SpyObj } from '../../../testing/spy';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { fakeAsync, tick } from '../../../testing/fake-async';
 import { StatistikComponent } from './statistik.component';
+import { IconComponent } from '../icon/icon.component';
 import { StatistikService } from '../../services/statistik.service';
 import { TranslationService } from '../../services/translation.service';
 import { Statistik, MonatsStatistik, EinheitSummen } from '../../models/statistik.model';
@@ -97,6 +99,23 @@ describe('StatistikComponent', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  /** Rendert die Statistik mit genau den angegebenen offenen Panels (Monatsindex bzw. GESAMT). */
+  function rendere(statistik: Statistik, offen: number[] = []): HTMLElement {
+    component.statistik = statistik;
+    component.loading = false;
+    component.expandedMonthPanels.clear();
+    offen.forEach(i => component.expandedMonthPanels.add(i));
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  function heuteKnopf(): HTMLButtonElement {
+    const knoepfe = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'));
+    const heute = knoepfe.find(b => b.textContent?.trim() === 'HEUTE');
+    expect(heute).toBeTruthy();
+    return heute as HTMLButtonElement;
+  }
 
   describe('initialization', () => {
     it('should set default date range on init', () => {
@@ -240,6 +259,16 @@ describe('StatistikComponent', () => {
       component.onHeute();
 
       expect(statistikServiceSpy.getStatistik).toHaveBeenCalledTimes(1);
+    });
+
+    it('should disable the button while loading', () => {
+      component.loading = true;
+      fixture.detectChanges();
+      expect(heuteKnopf().disabled).toBe(true);
+
+      component.loading = false;
+      fixture.detectChanges();
+      expect(heuteKnopf().disabled).toBe(false);
     });
   });
 
@@ -1043,6 +1072,15 @@ describe('StatistikComponent', () => {
       expect(inhaltGesamt).not.toBeNull();
     });
 
+    it('should show the selected range in the header', () => {
+      const el = zeige({ ...mockStatistik, gesamt });
+
+      const kopf = el.querySelectorAll('.zev-panel--month')[0].querySelector('.zev-collapsible__header');
+      expect(kopf?.textContent).toContain('STATISTIK_GESAMTER_ZEITRAUM');
+      expect(kopf?.querySelector('.zev-panel__subtitle')?.textContent?.trim())
+        .toBe('(01.01.2024 - 31.03.2024)');
+    });
+
     it('should not render the total panel without totals', () => {
       const el = zeige({ ...mockStatistik, gesamt: undefined });
 
@@ -1111,6 +1149,121 @@ describe('StatistikComponent', () => {
       component.onBlaettern(1);
       expect(component.dateFrom).toBe('2026-10-01');
       expect(laden).not.toHaveBeenCalled();
+    });
+
+    it('should render chevron icons with translated title and aria-label', () => {
+      const pruefe = (id: string, icon: string, key: string) => {
+        const knopf = fixture.debugElement.query(By.css('#' + id));
+        expect(knopf).not.toBeNull();
+        const el = knopf.nativeElement as HTMLButtonElement;
+        expect(el.getAttribute('title')).toBe(key);
+        expect(el.getAttribute('aria-label')).toBe(key);
+        const symbol = knopf.query(By.directive(IconComponent));
+        expect(symbol.componentInstance.name).toBe(icon);
+      };
+
+      pruefe('zeitraumZurueck', 'chevron-left', 'ZEITRAUM_ZURUECK');
+      pruefe('zeitraumVor', 'chevron-right', 'ZEITRAUM_VOR');
+      expect(translationServiceSpy.translate).toHaveBeenCalledWith('ZEITRAUM_ZURUECK');
+      expect(translationServiceSpy.translate).toHaveBeenCalledWith('ZEITRAUM_VOR');
+    });
+  });
+
+  // ==================== Monats-Panels (FR-10) ====================
+
+  describe('Monats-Panels', () => {
+    it('should show month name, year, range and status dot in a collapsed header', () => {
+      const el = rendere(mockStatistik);
+
+      expect(el.querySelector('#monat-0')).toBeNull();
+      const kopf = el.querySelector('.zev-panel--month .zev-collapsible__header') as HTMLElement;
+      expect(kopf.textContent).toContain('FEBRUAR 2024');
+      expect(kopf.querySelector('.zev-panel__subtitle')?.textContent?.trim())
+        .toBe('(01.02.2024 - 29.02.2024)');
+      expect(kopf.querySelector('.zev-status-dot')?.classList).toContain('zev-status-dot--success');
+    });
+
+    it('should show an error dot in the collapsed header of an incomplete month', () => {
+      const el = rendere({ ...mockStatistik, monate: [{ ...mockMonat, datenVollstaendig: false }] });
+
+      const kopf = el.querySelector('.zev-panel--month .zev-collapsible__header') as HTMLElement;
+      expect(kopf.querySelector('.zev-status-dot')?.classList).toContain('zev-status-dot--error');
+    });
+  });
+
+  // ==================== Hinweise in der Summen-Tabelle (FR-9) ====================
+
+  describe('Summen-Tabelle Hinweise', () => {
+    function zeilen(el: HTMLElement): HTMLTableRowElement[] {
+      return Array.from(el.querySelectorAll('#monat-0 .zev-table--bars tbody tr'));
+    }
+
+    it('should give each of the five standard rows its own hint', () => {
+      const ohneBilanz: MonatsStatistik = {
+        ...mockMonat, bilanzBezugName: null, bilanzRuecklieferungName: null
+      };
+      const el = rendere({ ...mockStatistik, monate: [ohneBilanz] }, [0]);
+
+      const titel = zeilen(el).map(z => z.getAttribute('title'));
+      expect(titel).toEqual([
+        'PRODUKTION_TOTAL_HINWEIS',
+        'VERBRAUCH_TOTAL_HINWEIS',
+        'ZEV_PRODUCER_HINWEIS',
+        'ZEV_CONSUMER_HINWEIS',
+        'ZEV_CONSUMER_BERECHNET_HINWEIS'
+      ]);
+      expect(new Set(titel).size).toBe(5);
+    });
+
+    it('should add hinted balance rows only when balance units exist', () => {
+      const el = rendere(mockStatistik, [0]);
+
+      const titel = zeilen(el).map(z => z.getAttribute('title'));
+      expect(titel.length).toBe(7);
+      expect(titel.slice(5)).toEqual([
+        'STATISTIK_BILANZ_RUECKLIEFERUNG_HINWEIS',
+        'STATISTIK_BILANZ_BEZUG_HINWEIS'
+      ]);
+    });
+
+    it('should not render empty tooltips', () => {
+      const ohneBilanz: MonatsStatistik = {
+        ...mockMonat, bilanzBezugName: null, bilanzRuecklieferungName: null
+      };
+      for (const statistik of [mockStatistik, { ...mockStatistik, monate: [ohneBilanz] }]) {
+        const el = rendere(statistik, [0]);
+        for (const zeile of zeilen(el)) {
+          expect(zeile.getAttribute('title')?.trim()).toBeTruthy();
+        }
+      }
+    });
+  });
+
+  // ==================== Summen-Vergleich je Verteilmodus (FR-12 bis FR-16) ====================
+
+  describe('Summen-Vergleich', () => {
+    function vergleich(el: HTMLElement): { titel: boolean; eintraege: number } {
+      const ueberschriften = Array.from(el.querySelectorAll('#monat-0 h4')).map(h => h.textContent?.trim());
+      return {
+        titel: ueberschriften.includes('SUMMEN_VERGLEICH'),
+        eintraege: el.querySelectorAll('#monat-0 .zev-comparison-item').length
+      };
+    }
+
+    it('should hide the sum comparison in the balance mode', () => {
+      const el = rendere({ ...mockStatistik, verteilmodus: 'BILANZ' }, [0]);
+
+      expect(vergleich(el)).toEqual({ titel: false, eintraege: 0 });
+      expect(el.querySelector('#monat-0')?.textContent).toContain('STATISTIK_KENNZAHLEN');
+    });
+
+    it('should show the sum comparison in the producer measurement mode', () => {
+      const el = rendere({ ...mockStatistik, verteilmodus: 'PRODUCER_MESSUNG' }, [0]);
+
+      const ergebnis = vergleich(el);
+      expect(ergebnis.titel).toBe(true);
+      expect(ergebnis.eintraege).toBeGreaterThan(0);
+      expect(el.querySelector('#monat-0')?.textContent).toContain('STATISTIK_KENNZAHLEN');
     });
   });
 });

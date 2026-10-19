@@ -3,6 +3,7 @@ package ch.nacht.service;
 import ch.nacht.dto.MonatsStatistikDTO;
 import ch.nacht.dto.StatistikDTO;
 import ch.nacht.entity.Translation;
+import ch.nacht.entity.Verteilmodus;
 import ch.nacht.repository.TranslationRepository;
 
 import net.sf.jasperreports.engine.JRException;
@@ -21,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -41,11 +43,22 @@ class StatistikPdfServiceTest {
     @BeforeEach
     void setUp() throws JRException {
         TranslationRepository translations = mock(TranslationRepository.class);
-        Translation gesamt = new Translation();
-        gesamt.setKey("STATISTIK_GESAMTER_ZEITRAUM");
-        gesamt.setDeutsch("Gesamter Zeitraum");
-        gesamt.setEnglisch("Entire period");
-        when(translations.findAll()).thenReturn(List.of(gesamt));
+        when(translations.findAll()).thenReturn(List.of(
+                uebersetzung("STATISTIK_GESAMTER_ZEITRAUM", "Gesamter Zeitraum", "Entire period"),
+                uebersetzung("SUMMEN_VERGLEICH", "Summen-Vergleich", "Sum comparison"),
+                uebersetzung("STATISTIK_KENNZAHLEN", "Kennzahlen", "Key figures"),
+                uebersetzung("KENNZAHL_AUTARKIEGRAD", "Autarkiegrad", "Self-sufficiency"),
+                uebersetzung("KENNZAHL_EIGENVERBRAUCHSQUOTE", "Eigenverbrauchsquote", "Self-consumption rate"),
+                uebersetzung("KENNZAHL_NETZBEZUGSQUOTE", "Netzbezugsquote", "Grid supply rate"),
+                uebersetzung("KENNZAHL_EINSPEISEQUOTE", "Einspeisequote", "Feed-in rate"),
+                uebersetzung("KENNZAHL_ZEV_EIGENVERBRAUCH", "ZEV-Eigenverbrauch", "ZEV self-consumption"),
+                uebersetzung("KENNZAHL_AUTARKIEGRAD_GEMESSEN", "Autarkiegrad (gemessen)", "Self-sufficiency (measured)"),
+                uebersetzung("KENNZAHL_NETZBEZUGSQUOTE_GEMESSEN", "Netzbezugsquote (gemessen)", "Grid supply rate (measured)"),
+                uebersetzung("KENNZAHL_LUECKENHAFT", "lückenhaft", "incomplete"),
+                uebersetzung("KENNZAHL_LUECKE_MESSUNG_HINWEIS", "Messung zu günstig", "measurement too favourable"),
+                uebersetzung("KENNZAHL_LUECKE_VERTEILUNG_HINWEIS", "Verteilung zu ungünstig", "distribution too unfavourable"),
+                uebersetzung("KENNZAHL_BATTERIE_GELADEN", "Batterie geladen", "Battery charged"),
+                uebersetzung("KENNZAHL_BERECHNET_HINWEIS", "berechnet/geschätzt", "calculated/estimated")));
 
         OrganizationContextService kontext = mock(OrganizationContextService.class);
         when(kontext.getCurrentOrgName()).thenReturn("Test");
@@ -55,6 +68,14 @@ class StatistikPdfServiceTest {
         // Phase prepare-package, nach den Unit-Tests - ein Test saehe sonst ein veraltetes Template.
         // Genau das ist beim Schreiben dieses Tests passiert: Er lief gegen den alten Stand.
         pdfService.verwendeBerichte(kompiliere("statistik"), kompiliere("einheit-summen"));
+    }
+
+    private static Translation uebersetzung(String key, String deutsch, String englisch) {
+        Translation t = new Translation();
+        t.setKey(key);
+        t.setDeutsch(deutsch);
+        t.setEnglisch(englisch);
+        return t;
     }
 
     private JasperReport kompiliere(String name) throws JRException {
@@ -78,6 +99,32 @@ class StatistikPdfServiceTest {
                 zeitraum(2024, 2, LocalDate.of(2024, 2, 1), LocalDate.of(2024, 2, 29)))));
         statistik.setGesamt(zeitraum(0, 0, LocalDate.of(2024, 1, 1), LocalDate.of(2024, 2, 29)));
         return statistik;
+    }
+
+    /**
+     * Ein Monat mit den Quoten aus dem Beispiel der Spec (Cz=600, C=1000; Pz=900, P=1200), ohne
+     * Bilanz- und Batteriewerte. Die Tests schalten die Teile zu, um die es ihnen geht.
+     */
+    private static StatistikDTO einMonat(Verteilmodus modus) {
+        MonatsStatistikDTO monat = zeitraum(2024, 1, LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31));
+        monat.setAutarkiegrad(0.6);
+        monat.setEigenverbrauchsquote(0.75);
+        monat.setNetzbezugsquote(0.4);
+        monat.setEinspeisequote(0.25);
+        monat.setZevEigenverbrauch(600.0);
+
+        StatistikDTO statistik = new StatistikDTO();
+        statistik.setVerteilmodus(modus);
+        statistik.setMonate(new ArrayList<>(List.of(monat)));
+        return statistik;
+    }
+
+    private static MonatsStatistikDTO monat(StatistikDTO statistik) {
+        return statistik.getMonate().get(0);
+    }
+
+    private static boolean enthaelt(List<String> texte, String teil) {
+        return erstesVorkommen(texte, teil) >= 0;
     }
 
     /** Alle Texte des gefüllten Berichts, in Reihenfolge — auch die in Rahmen geschachtelten. */
@@ -172,5 +219,133 @@ class StatistikPdfServiceTest {
 
         assertTrue(pdf.length > 0);
         assertEquals("%PDF", new String(pdf, 0, 4));
+    }
+
+    // ==================== Kennzahlen im PDF (FR-12 bis FR-16) ====================
+
+    /** Die fünf Quoten-Kennzahlen stehen je Monat im PDF, mit Bezeichnung und Wert. */
+    @Test
+    void fuelle_ZeigtDieKennzahlen() throws Exception {
+        List<String> texte = texte(pdfService.fuelle(einMonat(Verteilmodus.BILANZ), "de"));
+
+        assertTrue(enthaelt(texte, "Kennzahlen"), texte.toString());
+        assertTrue(enthaelt(texte, "Autarkiegrad:"), texte.toString());
+        assertTrue(enthaelt(texte, "Eigenverbrauchsquote:"), texte.toString());
+        assertTrue(enthaelt(texte, "Netzbezugsquote:"), texte.toString());
+        assertTrue(enthaelt(texte, "Einspeisequote:"), texte.toString());
+        assertTrue(enthaelt(texte, "ZEV-Eigenverbrauch:"), texte.toString());
+        assertTrue(texte.contains("60.0 %"), texte.toString());
+        assertTrue(texte.contains("75.0 %"), texte.toString());
+        assertTrue(texte.contains("600.000 kWh"), texte.toString());
+    }
+
+    /** Mit BEZUG-Einheit erscheinen die gemessenen Zeilen samt Lücken-Hinweis — wie am Bildschirm. */
+    @Test
+    void fuelle_GemesseneKennzahlenMitLuecken_ZeigtZeilenUndHinweis() throws Exception {
+        StatistikDTO statistik = einMonat(Verteilmodus.PRODUCER_MESSUNG);
+        monat(statistik).setBilanzKennzahlenVerfuegbar(true);
+        monat(statistik).setAutarkiegradGemessen(0.962);
+        monat(statistik).setNetzbezugsquoteGemessen(0.038);
+        monat(statistik).setBilanzBezugLueckenhaft(true);
+
+        List<String> texte = texte(pdfService.fuelle(statistik, "de"));
+
+        assertTrue(enthaelt(texte, "Autarkiegrad (gemessen):"), texte.toString());
+        assertTrue(enthaelt(texte, "Netzbezugsquote (gemessen):"), texte.toString());
+        assertTrue(texte.contains("96.2 %"), texte.toString());
+        assertTrue(texte.contains("3.8 %"), texte.toString());
+        assertTrue(texte.contains("lückenhaft: Messung zu günstig"), texte.toString());
+    }
+
+    /** Hat die Verteilung Intervalle übersprungen, nennt der Hinweis die andere Richtung. */
+    @Test
+    void fuelle_GemesseneKennzahlenMitVerteilungsluecken_ZeigtVerteilungsHinweis() throws Exception {
+        StatistikDTO statistik = einMonat(Verteilmodus.BILANZ);
+        monat(statistik).setBilanzKennzahlenVerfuegbar(true);
+        monat(statistik).setAutarkiegradGemessen(0.962);
+        monat(statistik).setNetzbezugsquoteGemessen(0.038);
+        monat(statistik).setBilanzBezugLueckenhaft(true);
+        monat(statistik).setVerteilungLueckenhaft(true);
+
+        List<String> texte = texte(pdfService.fuelle(statistik, "de"));
+
+        assertTrue(texte.contains("lückenhaft: Verteilung zu ungünstig"), texte.toString());
+    }
+
+    /** Ohne Lücken: gemessene Zeilen ja, Hinweis nein. */
+    @Test
+    void fuelle_GemesseneKennzahlenOhneLuecken_KeinHinweis() throws Exception {
+        StatistikDTO statistik = einMonat(Verteilmodus.BILANZ);
+        monat(statistik).setBilanzKennzahlenVerfuegbar(true);
+        monat(statistik).setAutarkiegradGemessen(0.962);
+        monat(statistik).setNetzbezugsquoteGemessen(0.038);
+
+        List<String> texte = texte(pdfService.fuelle(statistik, "de"));
+
+        assertTrue(enthaelt(texte, "Autarkiegrad (gemessen):"), texte.toString());
+        assertFalse(enthaelt(texte, "lückenhaft"), texte.toString());
+    }
+
+    /** Ohne BEZUG-Einheit entfallen die gemessenen Zeilen ganz. */
+    @Test
+    void fuelle_OhneBezugEinheit_KeineGemessenenZeilen() throws Exception {
+        List<String> texte = texte(pdfService.fuelle(einMonat(Verteilmodus.BILANZ), "de"));
+
+        assertFalse(enthaelt(texte, "(gemessen)"), texte.toString());
+        assertFalse(enthaelt(texte, "lückenhaft"), texte.toString());
+    }
+
+    /** Batteriewerte aus der SPEICHER-Einheit sind gemessen: kein "berechnet"-Hinweis (FR-13a). */
+    @Test
+    void fuelle_BatterieGemessen_OhneBerechnetHinweis() throws Exception {
+        StatistikDTO statistik = einMonat(Verteilmodus.BILANZ);
+        monat(statistik).setBatterieKennzahlenVerfuegbar(true);
+        monat(statistik).setBatterieGemessen(true);
+        monat(statistik).setBatterieGeladen(100.0);
+        monat(statistik).setBatterieEntladen(92.0);
+        monat(statistik).setBatterieNetto(8.0);
+        monat(statistik).setBatterieWirkungsgrad(0.92);
+
+        List<String> texte = texte(pdfService.fuelle(statistik, "de"));
+
+        assertTrue(enthaelt(texte, "Batterie geladen:"), texte.toString());
+        assertFalse(enthaelt(texte, "berechnet/geschätzt"), texte.toString());
+    }
+
+    /** Batteriewerte aus der Energiebilanz (Residuum) tragen den "berechnet"-Hinweis. */
+    @Test
+    void fuelle_BatterieAusBilanz_MitBerechnetHinweis() throws Exception {
+        StatistikDTO statistik = einMonat(Verteilmodus.BILANZ);
+        monat(statistik).setBatterieKennzahlenVerfuegbar(true);
+        monat(statistik).setBatterieGemessen(false);
+        monat(statistik).setBatterieGeladen(7.0);
+        monat(statistik).setBatterieEntladen(3.0);
+        monat(statistik).setBatterieNetto(4.0);
+        monat(statistik).setBatterieWirkungsgrad(3.0 / 7.0);
+
+        List<String> texte = texte(pdfService.fuelle(statistik, "de"));
+
+        assertTrue(enthaelt(texte, "Batterie geladen:"), texte.toString());
+        assertTrue(enthaelt(texte, "berechnet/geschätzt"), texte.toString());
+    }
+
+    /** Bilanzmodus: Der Summen-Vergleich entfällt, die Kennzahlen ersetzen ihn. */
+    @Test
+    void fuelle_Bilanzmodus_OhneSummenVergleich() throws Exception {
+        List<String> texte = texte(pdfService.fuelle(einMonat(Verteilmodus.BILANZ), "de"));
+
+        assertFalse(enthaelt(texte, "Summen-Vergleich"), texte.toString());
+        assertFalse(enthaelt(texte, "A = B:"), texte.toString());
+        assertTrue(enthaelt(texte, "Kennzahlen"), texte.toString());
+    }
+
+    /** Producer-Messung: Der Summen-Vergleich bleibt, die Kennzahlen stehen zusätzlich. */
+    @Test
+    void fuelle_ProducerModus_MitSummenVergleich() throws Exception {
+        List<String> texte = texte(pdfService.fuelle(einMonat(Verteilmodus.PRODUCER_MESSUNG), "de"));
+
+        assertTrue(enthaelt(texte, "Summen-Vergleich"), texte.toString());
+        assertTrue(enthaelt(texte, "A = B:"), texte.toString());
+        assertTrue(enthaelt(texte, "Kennzahlen"), texte.toString());
     }
 }

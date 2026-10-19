@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -30,6 +31,8 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -203,6 +206,42 @@ public class StatistikServiceTest {
         assertEquals(1, result.getMonate().get(0).getMonat());
         assertEquals(2, result.getMonate().get(1).getMonat());
         assertEquals(3, result.getMonate().get(2).getMonat());
+    }
+
+    /**
+     * Multi-Tenancy: Der Mandantenfilter ist eingeschaltet, bevor die Statistik Messwerte oder
+     * Einheiten liest - sonst flössen Daten fremder Organisationen in die Summen.
+     */
+    @Test
+    void getStatistik_AktiviertMandantenfilterVorDemLesen() {
+        LocalDate von = LocalDate.of(2024, 1, 1);
+        LocalDate bis = LocalDate.of(2024, 1, 31);
+
+        when(messwerteRepository.findMaxZeit()).thenReturn(Optional.of(LocalDateTime.of(2024, 1, 31, 23, 45)));
+        when(einheitRepository.findAll()).thenReturn(Arrays.asList(producer, consumer1));
+        when(messwerteRepository.findDistinctEinheitenInRange(any(), any()))
+                .thenReturn(Arrays.asList(producer, consumer1));
+        when(messwerteRepository.findDistinctDatesInRange(any(), any())).thenReturn(Collections.emptyList());
+
+        statistikService.getStatistik(von, bis);
+
+        // getStatistik schaltet ihn selbst ein und ermittleLetztesMessdatum() nochmals -> atLeastOnce
+        InOrder reihenfolge = inOrder(hibernateFilterService, messwerteRepository, einheitRepository);
+        reihenfolge.verify(hibernateFilterService, atLeastOnce()).enableOrgFilter();
+        reihenfolge.verify(messwerteRepository).findMaxZeit();
+        reihenfolge.verify(einheitRepository).findAll();
+    }
+
+    @Test
+    void ermittleLetztesMessdatum_AktiviertMandantenfilterVorDemLesen() {
+        when(messwerteRepository.findMaxZeit()).thenReturn(Optional.of(LocalDateTime.of(2024, 1, 31, 23, 45)));
+
+        LocalDate result = statistikService.ermittleLetztesMessdatum();
+
+        assertEquals(LocalDate.of(2024, 1, 31), result);
+        InOrder reihenfolge = inOrder(hibernateFilterService, messwerteRepository);
+        reihenfolge.verify(hibernateFilterService).enableOrgFilter();
+        reihenfolge.verify(messwerteRepository).findMaxZeit();
     }
 
     /**
