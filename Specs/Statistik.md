@@ -133,7 +133,7 @@ Je Monat werden folgende KPIs berechnet und angezeigt. **Grundlage sind ausschli
 
 * Prozentwerte werden auf sinnvolle Genauigkeit gerundet (z.B. 1 Nachkommastelle) und mit `%` dargestellt. **Dezimaltrennzeichen ist der Punkt** (`.`), **Tausendertrennzeichen das Hochkomma** (`'`, Schweizer Konvention) – locale-unabhängig (Frontend `toFixed`, PDF `String.format(Locale.ROOT, …)` mit Gruppierungs-Ersatz `,`→`'`).
 * Die Quoten-KPIs (1–5) sind in beiden Verteilmodi verfügbar, sobald der jeweilige Nenner (`C` bzw. `P`) > 0 ist. Die gemessenen Quoten (6) setzen eine `BEZUG`-Einheit voraus; nur der Netto-Speicherfluss (7) und die Batterie-KPIs (FR-13) setzen zusätzlich Bilanz-Bezug **und** Rücklieferung voraus (ohne `SPEICHER`-Einheit, sonst FR-13a).
-* Fehlt eine benötigte Grösse (kein Producer → Nenner `P = 0`, kein Verbrauch → `C = 0`, bzw. für die Batterie-KPIs fehlende Bilanz-Daten – ohne `SPEICHER`-Einheit, sonst FR-13a), wird die betroffene Kennzahl als **„–“/n/a** angezeigt (kein Fehler, kein Abbruch).
+* Fehlt eine benötigte Grösse (kein Producer → Nenner `P = 0`, kein Verbrauch → `C = 0`), wird die betroffene Kennzahl als **„–“/n/a** angezeigt (kein Fehler, kein Abbruch). Fehlen für die Batterie-KPIs die Bilanz-Daten (ohne `SPEICHER`-Einheit, sonst FR-13a), entfällt der Batterie-Block (FR-13).
 
 ### FR-13: Batterie-Kennzahlen mit Pro-Intervall-Aggregation (Stufe 2)
 Zusätzlich zum Netto-Speicherfluss (FR-12.7) werden – getrennt – **geladene** und **entladene** Energie ausgewiesen. Diese lassen sich **nicht** aus den Monats-Summen ableiten, sondern erfordern eine **neue Aggregation je 15-Minuten-Intervall** (die vorhandenen Zeitraum-Summen-Queries genügen dafür nicht, s. Abschnitt 6):
@@ -193,109 +193,107 @@ Beim Speicher gilt `total = ΔLadung − ΔEntladung`; über den Zeitraum getren
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
 ### „Anzeigen“ (FR-2)
-* [x] „Anzeigen“ steht in derselben Zeile rechts neben dem letzten Quartalsknopf, mit sichtbarem Abstand.
-* [x] In der Zeile der Datumsfelder steht kein „Anzeigen“ mehr; dort bleiben ◀ / ▶, „Heute“ und „PDF exportieren“.
-* [x] Klick auf „Anzeigen“ lädt die Statistik des eingestellten Zeitraums.
-* [x] Andere Seiten mit Quartal-Selektor sehen unverändert aus.
+* [x] „Anzeigen“ steht in derselben Zeile rechts neben dem letzten Quartalsknopf, mit sichtbarem Abstand. (Test: quarter-selector.component.spec.ts › QuarterSelectorComponent - Aktions-Slot › should render projected content after the quarter buttons; E2E: statistik.spec.ts › Statistik Page - Heute › should set both dates to today and load immediately)
+* [x] In der Zeile der Datumsfelder steht kein „Anzeigen“ mehr; dort bleiben ◀ / ▶, „Heute“ und „PDF exportieren“. (E2E: statistik.spec.ts › Statistik Page - Heute › should set both dates to today and load immediately; E2E: statistik.spec.ts › Statistik Page › should display the statistics page with date selection form)
+* [x] Klick auf „Anzeigen“ lädt die Statistik des eingestellten Zeitraums. (Test: statistik.component.spec.ts › StatistikComponent › onSubmit › should call getStatistik with correct params; E2E: statistik.spec.ts › Statistik Page › should load and display statistics when date range is submitted)
+* [ ] Andere Seiten mit Quartal-Selektor sehen unverändert aus.
 
 ### „Heute“ (FR-3)
-* [x] Die Schaltfläche „Heute“ steht nach ◀ / ▶ („Anzeigen“ steht neben den Quartalen).
-* [ ] Ein Klick setzt „Datum von“ und „Datum bis“ auf das heutige Datum.
-* [ ] Das Datum ist das **lokale** Tagesdatum, nicht das UTC-Datum — kurz nach Mitternacht darf nicht der Vortag erscheinen.
-* [x] Ein Klick zeigt die Statistik des heutigen Tages sofort an (ohne „Anzeigen“).
-* [x] Ein weiterer Klick bei bereits gezeigtem heutigem Tag lädt neu (aktualisiert).
-* [x] Während des Ladens ist die Schaltfläche deaktiviert.
+* [x] Die Schaltfläche „Heute“ steht nach ◀ / ▶ („Anzeigen“ steht neben den Quartalen). (E2E: statistik.spec.ts › Statistik Page - Heute › should set both dates to today and load immediately)
+* [x] Ein Klick setzt „Datum von“ und „Datum bis“ auf das heutige Datum. (Test: statistik.component.spec.ts › StatistikComponent › onHeute › should set dateFrom and dateTo to today; E2E: statistik.spec.ts › Statistik Page - Heute › should set both dates to today and load immediately)
+* [x] Das Datum ist das **lokale** Tagesdatum, nicht das UTC-Datum — kurz nach Mitternacht darf nicht der Vortag erscheinen. (Test: statistik.component.spec.ts › StatistikComponent › onHeute › should use the local date shortly after midnight)
+* [x] Ein Klick zeigt die Statistik des heutigen Tages sofort an (ohne „Anzeigen“). (Test: statistik.component.spec.ts › StatistikComponent › onHeute › should load statistics for today immediately; E2E: statistik.spec.ts › Statistik Page - Heute › should set both dates to today and load immediately)
+* [x] Ein weiterer Klick bei bereits gezeigtem heutigem Tag lädt neu (aktualisiert). (Test: statistik.component.spec.ts › StatistikComponent › onHeute › should reload when today is already shown)
+* [ ] Während des Ladens ist die Schaltfläche deaktiviert.
 
 ### Blättern (FR-4)
-* [x] Links von „Heute“ stehen zwei Schaltflächen ◀ / ▶ (Icons `chevron-left`/`chevron-right`, übersetzte Beschriftung `ZEITRAUM_ZURUECK`/`ZEITRAUM_VOR` als Tooltip und `aria-label`).
-* [x] Ein Tag blättert um einen Tag, auch über Monats- und Jahresgrenzen.
-* [x] Ein ganzer Monat blättert monatsweise und passt das Monatsende an (Januar → Februar 28./29., Mai ← April 30.).
-* [x] Mehrere ganze Monate (Quartal, Jahr) blättern um ihre Anzahl Monate.
-* [x] Andere Zeiträume blättern um ihre Anzahl Tage; 01.–15. ist kein ganzer Monat (→ 16.–30.).
-* [x] Über die Zeitumstellung bleiben 7 Tage 7 Tage.
-* [x] Nach dem Blättern wird die Statistik sofort geladen.
-* [x] Während des Ladens und bei ungültigem Zeitraum (von > bis, leer) sind die Schaltflächen gesperrt.
+* [ ] Links von „Heute“ stehen zwei Schaltflächen ◀ / ▶ (Icons `chevron-left`/`chevron-right`, übersetzte Beschriftung `ZEITRAUM_ZURUECK`/`ZEITRAUM_VOR` als Tooltip und `aria-label`).
+* [x] Ein Tag blättert um einen Tag, auch über Monats- und Jahresgrenzen. (Test: date-utils.spec.ts › Date Utils › blaettereZeitraum › should move a single day by one day; Test: date-utils.spec.ts › Date Utils › blaettereZeitraum › should move a single day across month and year)
+* [x] Ein ganzer Monat blättert monatsweise und passt das Monatsende an (Januar → Februar 28./29., Mai ← April 30.). (Test: date-utils.spec.ts › Date Utils › blaettereZeitraum › should move a whole month and adjust the month end; Test: date-utils.spec.ts › Date Utils › blaettereZeitraum › should respect leap years)
+* [x] Mehrere ganze Monate (Quartal, Jahr) blättern um ihre Anzahl Monate. (Test: date-utils.spec.ts › Date Utils › blaettereZeitraum › should move a quarter by three months; Test: date-utils.spec.ts › Date Utils › blaettereZeitraum › should move a year by twelve months)
+* [x] Andere Zeiträume blättern um ihre Anzahl Tage; 01.–15. ist kein ganzer Monat (→ 16.–30.). (Test: date-utils.spec.ts › Date Utils › blaettereZeitraum › should move other ranges by their number of days; Test: date-utils.spec.ts › Date Utils › blaettereZeitraum › should not treat the 1st to a mid-month day as a whole month)
+* [x] Über die Zeitumstellung bleiben 7 Tage 7 Tage. (Test: date-utils.spec.ts › Date Utils › blaettereZeitraum › should count days correctly across the daylight saving change)
+* [x] Nach dem Blättern wird die Statistik sofort geladen. (Test: statistik.component.spec.ts › StatistikComponent › Blättern › should move a month forward and load immediately; E2E: statistik.spec.ts › Statistik Page - Blaettern › should page a whole month and load immediately)
+* [x] Während des Ladens und bei ungültigem Zeitraum (von > bis, leer) sind die Schaltflächen gesperrt. (Test: statistik.component.spec.ts › StatistikComponent › Blättern › should not move while loading or with an invalid range; Test: date-utils.spec.ts › Date Utils › blaettereZeitraum › should leave an invalid range unchanged)
 
 ### Ladeanzeige (FR-5)
-* [x] Während die Statistik berechnet wird, erscheint unter dem Formular ein Spinner mit dem Text „Statistik wird berechnet …“.
-* [x] Liegt schon eine Statistik vor und wird neu berechnet, bleibt sie stehen und wird gedimmt (`.zev-busy`) — kein Layout-Sprung.
-* [x] Ist die Berechnung fertig (oder fehlgeschlagen), verschwindet die Anzeige.
-* [x] Auf der Seite „Rechnungen“ erscheint während des Generierens dieselbe Anzeige mit „Rechnungen werden generiert …“.
-* [x] Die Anzeige erscheint erst nach **300 ms**; schnellere Antworten zeigen sie nicht (kein Aufblitzen).
-* [x] Screenreader: Die Anzeige ist `role="status"` mit `aria-live="polite"`, der Spinner selbst `aria-hidden`.
-* [x] Bei „weniger Bewegung“ (`prefers-reduced-motion`) dreht der Spinner langsamer.
-* [x] Die Texte sind übersetzt (V177).
-* [x] Der Design-System-Showcase zeigt die Anzeige (Standard und Inline) mit ihren CSS-Klassen.
+* [x] Während die Statistik berechnet wird, erscheint unter dem Formular ein Spinner mit dem Text „Statistik wird berechnet …“. (Test: statistik.component.spec.ts › StatistikComponent › Ladeanzeige › should show the loading indicator while loading)
+* [x] Ist die Berechnung fertig (oder fehlgeschlagen), verschwindet die Anzeige. (Test: statistik.component.spec.ts › StatistikComponent › Ladeanzeige › should not show the loading indicator when idle; Test: statistik.component.spec.ts › StatistikComponent › onSubmit › should set loading to false after success; Test: statistik.component.spec.ts › StatistikComponent › onSubmit › should set loading to false on error)
+* [x] Auf der Seite „Rechnungen“ erscheint während des Generierens dieselbe Anzeige mit „Rechnungen werden generiert …“. (Test: rechnungen.component.spec.ts › RechnungenComponent › Ladeanzeige › should show the loading indicator while generating)
+* [ ] Die Anzeige erscheint erst nach **300 ms**; schnellere Antworten zeigen sie nicht (kein Aufblitzen).
+* [x] Screenreader: Die Anzeige ist `role="status"` mit `aria-live="polite"`, der Spinner selbst `aria-hidden`. (Test: loading-indicator.component.spec.ts › LoadingIndicatorComponent › initialization › should announce itself as a status; Test: loading-indicator.component.spec.ts › LoadingIndicatorComponent › initialization › should render a spinner hidden from screen readers)
+* [ ] Bei „weniger Bewegung“ (`prefers-reduced-motion`) dreht der Spinner langsamer.
+* [x] Die Texte sind übersetzt (V177). (Nachweis: V177__Add_Ladeanzeige_Translations.sql:3-4)
+* [x] Der Design-System-Showcase zeigt die Anzeige (Standard und Inline) mit ihren CSS-Klassen. (Nachweis: design-system-showcase.component.html:375-394)
 
 ### Meldungen nach dem Laden (FR-6)
-* [x] Nach erfolgreichem Laden steht keine Meldung.
-* [x] Eine Fehlermeldung eines früheren Ladeversuchs verschwindet beim nächsten Laden.
-* [x] Ein Ladefehler wird weiterhin als Fehlermeldung angezeigt.
+* [x] Nach erfolgreichem Laden steht keine Meldung. (Test: statistik.component.spec.ts › StatistikComponent › onSubmit › should not show a message after loading)
+* [x] Eine Fehlermeldung eines früheren Ladeversuchs verschwindet beim nächsten Laden. (Test: statistik.component.spec.ts › StatistikComponent › onSubmit › should clear a previous error message when loading again)
+* [x] Ein Ladefehler wird weiterhin als Fehlermeldung angezeigt. (Test: statistik.component.spec.ts › StatistikComponent › onSubmit › should show error message on service failure; Test: statistik.component.spec.ts › StatistikComponent › message auto-dismiss › should not auto-dismiss error messages)
 
 ### Erklärende Hinweise in der Summen-Tabelle (FR-9)
 * [ ] Hovern über eine Zeile der Summen-Tabelle zeigt einen erklärenden Hinweis; jede der fünf Standard-Zeilen hat einen **eigenen**, inhaltlich passenden Text.
 * [ ] Sind Bilanz-Einheiten vorhanden, tragen auch deren Zeilen einen Hinweis; fehlen sie, entfallen die Zeilen samt Hinweis (keine leeren Tooltips).
-* [ ] Die Hinweise sind in DE und EN vorhanden und werden über den `TranslationService` geladen (keine Hardcodings im Template).
-* [ ] Alle Hinweis-Keys sind per Flyway-Migration angelegt: Die `TranslatePipe` fällt bei fehlendem Key auf den **Key-Namen** zurück (`TranslationService.translate`), ein Tooltip wie „PRODUKTION_TOTAL_HINWEIS“ wäre also direkt sichtbar und gilt als Fehler.
-* [ ] Werte, Balkenlängen, Sortierung und PDF-Ausgabe sind unverändert.
+* [x] Die Hinweise sind in DE und EN vorhanden und werden über den `TranslationService` geladen (keine Hardcodings im Template). (Nachweis: V99__Add_Statistik_Visualisierung_Hinweise_Translations.sql:4-10; statistik.component.html:194-294)
+* [x] Alle Hinweis-Keys sind per Flyway-Migration angelegt: Die `TranslatePipe` fällt bei fehlendem Key auf den **Key-Namen** zurück (`TranslationService.translate`), ein Tooltip wie „PRODUKTION_TOTAL_HINWEIS“ wäre also direkt sichtbar und gilt als Fehler. (Nachweis: V99__Add_Statistik_Visualisierung_Hinweise_Translations.sql:4-10)
 
 ### Monats-Panels (FR-10)
-* [ ] Nach dem Laden einer Statistik sind alle Monats-Panels zugeklappt; die Kopfzeilen aller Monate sind sichtbar, aber kein Monatsinhalt (Balken-Tabelle, Kennzahlen, „Summen pro Einheit“).
-* [ ] Ein Klick auf die Kopfleiste eines Monats klappt genau diesen Monat auf; die übrigen bleiben zugeklappt.
-* [ ] Ein erneuter Klick auf dieselbe Kopfleiste klappt den Monat wieder zu.
+* [x] Nach dem Laden einer Statistik sind alle Monats-Panels zugeklappt; die Kopfzeilen aller Monate sind sichtbar, aber kein Monatsinhalt (Balken-Tabelle, Kennzahlen, „Summen pro Einheit“). (Test: statistik.component.spec.ts › StatistikComponent › initialization › should start with every month panel collapsed; Test: statistik.component.spec.ts › StatistikComponent › Gesamt-Panel › should show the total panel expanded and the months collapsed; E2E: statistik.spec.ts › Statistik Page - Monthly Statistics › should start with all month panels collapsed and toggle them individually)
+* [x] Ein Klick auf die Kopfleiste eines Monats klappt genau diesen Monat auf; die übrigen bleiben zugeklappt. (Test: statistik.component.spec.ts › StatistikComponent › toggleMonthPanel › should handle multiple month panels independently; E2E: statistik.spec.ts › Statistik Page - Monthly Statistics › should start with all month panels collapsed and toggle them individually)
+* [x] Ein erneuter Klick auf dieselbe Kopfleiste klappt den Monat wieder zu. (Test: statistik.component.spec.ts › StatistikComponent › toggleMonthPanel › should collapse an expanded month panel; E2E: statistik.spec.ts › Statistik Page - Monthly Statistics › should start with all month panels collapsed and toggle them individually)
 * [ ] Die Kopfleiste zeigt auch im zugeklappten Zustand Monatsname, Jahr, Zeitraum und den Datenstatus-Punkt.
-* [ ] Kopfleiste und Inhalt verwenden den bestehenden Collapsible-Baustein des Design Systems – kein eigenes CSS für die Statistik-Seite.
-* [ ] Ein erneuter Abruf über „Anzeigen“ klappt alle Monate wieder zu.
-* [ ] Der Zustand von „Details anzeigen“ innerhalb eines Monats wird durch das Auf-/Zuklappen des Monats nicht verändert.
-* [ ] Die PDF-Ausgabe ist unverändert (alle Monate vollständig).
+* [x] Kopfleiste und Inhalt verwenden den bestehenden Collapsible-Baustein des Design Systems – kein eigenes CSS für die Statistik-Seite. (Nachweis: statistik.component.css:1-5 ohne Regeln; E2E: statistik.spec.ts › Statistik Page - Monthly Statistics › should start with all month panels collapsed and toggle them individually)
+* [x] Ein erneuter Abruf über „Anzeigen“ klappt alle Monate wieder zu. (Test: statistik.component.spec.ts › StatistikComponent › onSubmit › should collapse all month panels on submit)
+* [x] Der Zustand von „Details anzeigen“ innerhalb eines Monats wird durch das Auf-/Zuklappen des Monats nicht verändert. (Test: statistik.component.spec.ts › StatistikComponent › toggleMonthPanel › should not touch the details toggle of the same month)
+* [x] Die PDF-Ausgabe ist unverändert (alle Monate vollständig). (Test: StatistikPdfServiceTest#fuelle_MitGesamt_StehtVorDenMonaten; Test: StatistikPdfServiceTest#fuelle_OhneGesamt_NurMonate)
 
 ### Gesamt-Panel (FR-11)
 * [ ] Oberhalb der Monats-Panels steht ein Panel „Gesamter Zeitraum“ mit dem gewählten Zeitraum von–bis in der Kopfzeile.
-* [ ] Es ist nach dem Laden aufgeklappt, die Monate sind zugeklappt.
-* [ ] Es zeigt dieselben Bereiche wie ein aufgeklappter Monat.
-* [ ] Die Summen entsprechen dem ganzen Zeitraum; die Quoten sind aus den **Gesamtsummen** gerechnet, nicht aus den Monatsquoten gemittelt.
-* [ ] Bei angebrochenen Monaten am Rand trägt es genau den gewählten Zeitraum (z. B. 15.01.–10.02.).
-* [ ] „Details anzeigen“ im Gesamt-Panel hat einen eigenen Zustand, unabhängig von den Monaten.
-* [ ] Das PDF beginnt nach der Übersicht mit dem Block „Gesamter Zeitraum (von – bis)“, danach folgen die Monate; Inhalt wie ein Monatsblock.
-* [ ] Die Überschrift ist übersetzt („Entire period“ auf Englisch).
-* [ ] Ein PDF-Export ändert die Monatsliste der Seite nicht — auch nach mehreren Exporten erscheint das Gesamt-Panel auf der Seite genau einmal.
-* [ ] Der CSV-Download im Gesamt-Panel exportiert den ganzen Zeitraum; der Dateiname trägt dann von und bis statt eines Monats.
+* [x] Es ist nach dem Laden aufgeklappt, die Monate sind zugeklappt. (Test: statistik.component.spec.ts › StatistikComponent › onSubmit › should expand the total panel on submit; Test: statistik.component.spec.ts › StatistikComponent › Gesamt-Panel › should show the total panel expanded and the months collapsed; E2E: statistik.spec.ts › Statistik Page - Gesamter Zeitraum › should show the total panel above the months, expanded; E2E: statistik.spec.ts › Statistik Page - Gesamter Zeitraum › should re-expand the total panel on a new query)
+* [x] Es zeigt dieselben Bereiche wie ein aufgeklappter Monat. (Test: statistik.component.spec.ts › StatistikComponent › Gesamt-Panel › should render the same content as a month; E2E: statistik.spec.ts › Statistik Page - Gesamter Zeitraum › should show the total panel above the months, expanded)
+* [x] Die Summen entsprechen dem ganzen Zeitraum; die Quoten sind aus den **Gesamtsummen** gerechnet, nicht aus den Monatsquoten gemittelt. (Test: StatistikServiceTest#getStatistik_Gesamt_RechnetUeberDenGanzenZeitraum)
+* [x] Bei angebrochenen Monaten am Rand trägt es genau den gewählten Zeitraum (z. B. 15.01.–10.02.). (Test: StatistikServiceTest#getStatistik_Gesamt_TraegtDenGewaehltenZeitraum)
+* [x] „Details anzeigen“ im Gesamt-Panel hat einen eigenen Zustand, unabhängig von den Monaten. (Test: statistik.component.spec.ts › StatistikComponent › Gesamt-Panel › should keep the details state separate from the first month)
+* [x] Das PDF beginnt nach der Übersicht mit dem Block „Gesamter Zeitraum (von – bis)“, danach folgen die Monate; Inhalt wie ein Monatsblock. (Test: StatistikPdfServiceTest#fuelle_MitGesamt_StehtVorDenMonaten; Test: StatistikPdfServiceTest#generatePdf_MitGesamt_ErzeugtEinPdf)
+* [x] Die Überschrift ist übersetzt („Entire period“ auf Englisch). (Test: StatistikPdfServiceTest#fuelle_Englisch_UebersetztDieUeberschrift; Nachweis: V171__Add_Statistik_Gesamter_Zeitraum_Translation.sql:5-7)
+* [x] Ein PDF-Export ändert die Monatsliste der Seite nicht — auch nach mehreren Exporten erscheint das Gesamt-Panel auf der Seite genau einmal. (Test: StatistikPdfServiceTest#baender_VeraendertDieGecachteMonatslisteNicht)
+* [x] Der CSV-Download im Gesamt-Panel exportiert den ganzen Zeitraum; der Dateiname trägt dann von und bis statt eines Monats. (Test: statistik.component.spec.ts › StatistikComponent › onDownloadCsv › should name a multi-month export after its range)
 
 ### Kennzahlen (FR-12 bis FR-16)
-* [x] Je Monat wird ein Kennzahlen-Panel mit Autarkiegrad, Eigenverbrauchsquote, Netzbezugsquote, Einspeisequote und ZEV-Eigenverbrauch angezeigt.
-* [x] Die Quoten-KPIs (Autarkiegrad, Eigenverbrauchsquote, Netzbezugs-/Einspeisequote, ZEV-Eigenverbrauch) werden in **beiden** Verteilmodi identisch berechnet und benötigen **keinen** Bilanz-Bezug.
-* [x] **Autarkiegrad** = `summeConsumerZev / summeConsumerTotal`; Beispiel `Cz=600, C=1000` → `60.0 %`.
-* [x] **Eigenverbrauchsquote** = `summeProducerZev / summeProducerTotal`; Beispiel `Pz=900, P=1200` → `75.0 %`. Im Modus `BILANZ` entspricht `Pz` der nicht eingespeisten Produktion `max(0, P − R)` (Batterieladung zählt mit); im Modus `PRODUCER_MESSUNG` der direkt verteilten Produktion.
-* [x] **Netzbezugsquote** = `1 − Autarkiegrad` und **Einspeisequote** = `1 − Eigenverbrauchsquote`; im Beispiel `40.0 %` bzw. `25.0 %`.
-* [x] **ZEV-Eigenverbrauch** = `summeConsumerZev` (kWh); im Beispiel `600 kWh`.
-* [x] **Netto-Speicherfluss** = `Produktion − Verbrauch + Bezug − Rücklieferung`; Beispiel `P=1200, C=1000, B=400, R=300` → `+300 kWh` (Netto-Ladung).
-* [x] **Batterie geladen/entladen** werden aus der Pro-Intervall-Summe der positiven bzw. negativen Nettos gebildet; Beispiel je Intervall `+5 / −3 / +2` → geladen `7`, entladen `3`.
-* [x] **Round-Trip-Wirkungsgrad** = `entladen / geladen`; Beispiel `entladen=3, geladen=7` → `42.9 %`. Bei `geladen = 0` wird „–“ angezeigt (keine Division durch 0).
-* [x] Fehlt Producer (Nenner `P = 0`) → Eigenverbrauchsquote/Einspeisequote „–“; fehlt Verbrauch (Nenner `C = 0`) → Autarkiegrad/Netzbezugsquote „–“. Keine Exception, kein NaN/Infinity.
-* [ ] **Autarkiegrad (gemessen)** = `1 − bilanzBezug / summeConsumerTotal` und **Netzbezugsquote (gemessen)** = `bilanzBezug / summeConsumerTotal`; Beispiel `C=1000, B=38` → `96.2 %` bzw. `3.8 %`.
-* [ ] Die beiden gemessenen Zeilen stehen unmittelbar **hinter** ihrem gerechneten Gegenstück (Autarkiegrad → Autarkiegrad (gemessen); Netzbezugsquote → Netzbezugsquote (gemessen)).
-* [ ] Ohne `BEZUG`-Bilanz-Einheit entfallen beide Zeilen ganz (keine „–“-Zeilen); die übrigen Kennzahlen bleiben unverändert.
-* [ ] Bei `C = 0` entfallen die gemessenen Zeilen ebenso wie Autarkiegrad und Netzbezugsquote.
-* [ ] Deckt der `BEZUG` weniger 15-Min-Intervalle ab als die Konsumenten, tragen die **gemessenen** Zeilen die Kennzeichnung **„lückenhaft“**; der Wert wird trotzdem angezeigt.
-* [ ] Im Modus `BILANZ` tragen bei denselben Lücken **auch** die gerechneten Zeilen (Autarkiegrad, Netzbezugsquote) die Kennzeichnung – dort stammt der ZEV-Anteil ebenfalls aus den Bilanzdaten.
-* [ ] Im Modus `PRODUCER_MESSUNG` bleiben die gerechneten Zeilen bei Bilanz-Lücken **ungekennzeichnet**.
-* [ ] Die beiden Kennzeichnungen tragen **unterschiedliche** Hinweistexte: gemessen „zu günstig“, gerechnet „zu ungünstig“, jeweils mit dem Hinweis, dass der wahre Wert dazwischen liegt.
-* [ ] Die gemessenen Zeilen sind **nicht** als „berechnet/geschätzt“ gekennzeichnet – sie stammen aus einer Messung, nicht aus einem Residuum.
+* [x] Je Monat wird ein Kennzahlen-Panel mit Autarkiegrad, Eigenverbrauchsquote, Netzbezugsquote, Einspeisequote und ZEV-Eigenverbrauch angezeigt. (Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should omit the measured rows when there is no balance unit; E2E: statistik.spec.ts › Statistik Page - Monthly Statistics › should display monthly panels with data tables when statistics are loaded)
+* [x] Die Quoten-KPIs (Autarkiegrad, Eigenverbrauchsquote, Netzbezugs-/Einspeisequote, ZEV-Eigenverbrauch) werden in **beiden** Verteilmodi identisch berechnet und benötigen **keinen** Bilanz-Bezug. (Test: StatistikServiceTest#berechneKennzahlen_QuotenAusSummen_KorrektBerechnet; Test: StatistikServiceTest#berechneKennzahlen_KeineBilanzDaten_BatterieNichtVerfuegbar)
+* [x] **Autarkiegrad** = `summeConsumerZev / summeConsumerTotal`; Beispiel `Cz=600, C=1000` → `60.0 %`. (Test: StatistikServiceTest#berechneKennzahlen_QuotenAusSummen_KorrektBerechnet; Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should format quota rows as percent with 1 decimal and "%" unit)
+* [x] **Eigenverbrauchsquote** = `summeProducerZev / summeProducerTotal`; Beispiel `Pz=900, P=1200` → `75.0 %`. Im Modus `BILANZ` entspricht `Pz` der nicht eingespeisten Produktion `max(0, P − R)` (Batterieladung zählt mit); im Modus `PRODUCER_MESSUNG` der direkt verteilten Produktion. (Test: StatistikServiceTest#berechneKennzahlen_QuotenAusSummen_KorrektBerechnet; Test: MesswerteServiceTest#calculateSolarDistribution_Bilanz_MqttProducer_ProducerZevAusProduktionMinusRuecklieferung; Test: MesswerteServiceTest#calculateSolarDistribution_MqttProducer_ZevIstVerteilteMenge)
+* [x] **Netzbezugsquote** = `1 − Autarkiegrad` und **Einspeisequote** = `1 − Eigenverbrauchsquote`; im Beispiel `40.0 %` bzw. `25.0 %`. (Test: StatistikServiceTest#berechneKennzahlen_QuotenAusSummen_KorrektBerechnet; Test: StatistikServiceTest#berechneKennzahlen_NetzbezugsUndEinspeisequote_SindKomplemente)
+* [x] **ZEV-Eigenverbrauch** = `summeConsumerZev` (kWh); im Beispiel `600 kWh`. (Test: StatistikServiceTest#berechneKennzahlen_QuotenAusSummen_KorrektBerechnet; Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should format ZEV-Eigenverbrauch with 3 decimals and "kWh" unit)
+* [x] **Netto-Speicherfluss** = `Produktion − Verbrauch + Bezug − Rücklieferung`; Beispiel `P=1200, C=1000, B=400, R=300` → `+300 kWh` (Netto-Ladung). (Test: StatistikServiceTest#berechneKennzahlen_MitBilanzDaten_BatterieNettoBerechnet; Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should prefix positive Batterie-Netto with "+" and unit "kWh")
+* [x] **Batterie geladen/entladen** werden aus der Pro-Intervall-Summe der positiven bzw. negativen Nettos gebildet; Beispiel je Intervall `+5 / −3 / +2` → geladen `7`, entladen `3`. (Test: StatistikServiceTest#berechneBatterieKennzahlen_ProIntervallAggregation_GeladenEntladenWirkungsgrad)
+* [x] **Round-Trip-Wirkungsgrad** = `entladen / geladen`; Beispiel `entladen=3, geladen=7` → `42.9 %`. Bei `geladen = 0` wird „–“ angezeigt (keine Division durch 0). (Test: StatistikServiceTest#berechneBatterieKennzahlen_ProIntervallAggregation_GeladenEntladenWirkungsgrad; Test: StatistikServiceTest#berechneBatterieKennzahlen_GeladenNull_WirkungsgradNull; Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should render quota rows as "–" with empty unit when value is null)
+* [x] Fehlt Producer (Nenner `P = 0`) → Eigenverbrauchsquote/Einspeisequote „–“; fehlt Verbrauch (Nenner `C = 0`) → Autarkiegrad/Netzbezugsquote „–“. Keine Exception, kein NaN/Infinity. (Test: StatistikServiceTest#berechneKennzahlen_KeinProducer_EigenverbrauchsUndEinspeisequoteNull; Test: StatistikServiceTest#berechneKennzahlen_KeinVerbrauch_AutarkiegradUndNetzbezugsquoteNull; Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should render quota rows as "–" with empty unit when value is null)
+* [x] **Autarkiegrad (gemessen)** = `1 − bilanzBezug / summeConsumerTotal` und **Netzbezugsquote (gemessen)** = `bilanzBezug / summeConsumerTotal`; Beispiel `C=1000, B=38` → `96.2 %` bzw. `3.8 %`. (Test: StatistikServiceTest#berechneKennzahlen_MitBezugEinheit_GemesseneQuotenAusMessung; Test: StatistikServiceTest#berechneKennzahlen_GemesseneUndGerechneteQuote_SindJeweilsKomplemente; Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should format the measured figures as percentages)
+* [x] Die beiden gemessenen Zeilen stehen unmittelbar **hinter** ihrem gerechneten Gegenstück (Autarkiegrad → Autarkiegrad (gemessen); Netzbezugsquote → Netzbezugsquote (gemessen)). (Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should place each measured figure right after its calculated counterpart)
+* [x] Ohne `BEZUG`-Bilanz-Einheit entfallen beide Zeilen ganz (keine „–“-Zeilen); die übrigen Kennzahlen bleiben unverändert. (Test: StatistikServiceTest#berechneKennzahlen_OhneBezugEinheit_GemesseneQuotenNull; Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should omit the measured rows when there is no balance unit)
+* [ ] Bei `C = 0` entfallen die gemessenen Zeilen; Autarkiegrad und Netzbezugsquote zeigen „–“. (Test: StatistikServiceTest#berechneKennzahlen_KeinVerbrauch_GemesseneQuotenNull; Test: StatistikServiceTest#berechneKennzahlen_KeinVerbrauch_AutarkiegradUndNetzbezugsquoteNull)
+* [x] Deckt der `BEZUG` weniger 15-Min-Intervalle ab als die Konsumenten, tragen die **gemessenen** Zeilen die Kennzeichnung **„lückenhaft“**; der Wert wird trotzdem angezeigt. (Test: StatistikServiceTest#berechneKennzahlen_BezugMitLuecken_GemesseneZeilenGekennzeichnet; Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should mark the measured figures when the grid supply has gaps)
+* [x] Im Modus `BILANZ` tragen bei denselben Lücken **auch** die gerechneten Zeilen (Autarkiegrad, Netzbezugsquote) die Kennzeichnung – dort stammt der ZEV-Anteil ebenfalls aus den Bilanzdaten. (Test: StatistikServiceTest#berechneKennzahlen_BezugMitLueckenImBilanzmodus_AuchGerechneteZeilenGekennzeichnet; Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should mark the calculated figures too when the distribution skipped intervals)
+* [x] Im Modus `PRODUCER_MESSUNG` bleiben die gerechneten Zeilen bei Bilanz-Lücken **ungekennzeichnet**. (Test: StatistikServiceTest#berechneKennzahlen_BezugMitLueckenImProducerModus_GerechneteZeilenUnberuehrt; Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should leave the calculated figures unmarked outside the balance mode)
+* [x] Die beiden Kennzeichnungen tragen **unterschiedliche** Hinweistexte: gemessen „zu günstig“, gerechnet „zu ungünstig“, jeweils mit dem Hinweis, dass der wahre Wert dazwischen liegt. (Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should explain each gap with its own direction; Nachweis: V134__Statistik_Kennzahlen_Luecken_Richtung.sql, V137__Uebersetzungen_Mit_Umlauten.sql)
+* [x] Die gemessenen Zeilen sind **nicht** als „berechnet/geschätzt“ gekennzeichnet – sie stammen aus einer Messung, nicht aus einem Residuum. (Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should format the measured figures as percentages)
 * [ ] Beide Zeilen erscheinen auch im **PDF-Export**, mit demselben Lücken-Hinweis.
-* [x] Fehlt Bilanz-Bezug oder Rücklieferung (ohne `SPEICHER`-Einheit, sonst FR-13a) → nur die Batterie-KPIs (Netto-Speicherfluss, geladen/entladen/Wirkungsgrad) werden als **„–“** angezeigt; die Quoten-KPIs bleiben verfügbar.
-* [x] Batterie-Kennzahlen (inkl. Netto-Speicherfluss) sind als **„berechnet/geschätzt“** gekennzeichnet und werden nur bei vorhandenen Producer- **und** Bilanz-Daten (Bezug + Rücklieferung) gezeigt — **sofern keine `SPEICHER`-Einheit existiert**.
-* [x] **Mit `SPEICHER`-Einheit** stammen Ladung, Entladung, Netto und Wirkungsgrad aus deren Messwerten; Beispiel `geladen 100, entladen 92` → Netto `+8`, Wirkungsgrad `92.0 %`.
-* [x] Bei gemessenen Werten entfällt die Kennzeichnung **berechnet** — in der Web-Ansicht **und** im PDF.
-* [x] Eine `SPEICHER`-Einheit genügt: Die Kennzahlen erscheinen auch **ohne** Bilanz-Bezug und Rücklieferung.
-* [x] Eine `SPEICHER`-Einheit **ohne Messwerte** ergibt `0`/`0` und einen leeren Wirkungsgrad statt einer Division durch null.
-* [x] Ohne `SPEICHER`-Einheit bleibt das Verhalten **unverändert** (Residuum der Bilanz, Kennzeichnung berechnet).
-* [x] Im **Producer-Messung**-Modus bleibt der bestehende Summen-Vergleich erhalten; im **Bilanzmodus** wird er ausgeblendet und durch das Kennzahlen-Panel ersetzt.
-* [x] Die Kennzahlen erscheinen auch im **Statistik-PDF** (`statistik.jrxml`) je Monat mit derselben Modus-Logik wie am Bildschirm.
-* [x] Alle Texte via `TranslationService` (DE/EN); Prozentwerte mit `%`, kWh-Werte in kWh.
-* [x] Alle Kennzahlen (Prozent- und kWh-Werte) verwenden den **Punkt** als Dezimaltrennzeichen und – bei Werten ≥ 1000 – das **Hochkomma** (`'`) als Tausendertrennzeichen, am Bildschirm und im PDF, unabhängig von der Server-/Browser-Locale (`60.0 %`; `1'234.567 kWh`, nicht `60,0 %` / `1,234.567 kWh`).
-* [x] Die Kennzahlen werden **tabellarisch** dargestellt (`.zev-table`/`.zev-table--compact`/`.zev-table--auto`, **ohne Titelzeile**): drei Spalten Bezeichnung (links) | Wert (rechtsbündig, `.zev-table__number`) | Einheit (links). Die Tabelle nutzt Inhaltsbreite (`.zev-table--auto`), die Bezeichnungs-Spalte ist nicht überbreit. Keine komponenten-eigenen Ad-hoc-Styles; ausschliesslich Design-System-Klassen.
-* [x] Jede Kennzahl zeigt beim Hovern einen erklärenden Hinweis (`title`-Tooltip), der die Bedeutung der Kennzahl beschreibt; die Hinweistexte sind via `TranslationService` (DE/EN) übersetzt.
-* [x] Statistik bleibt mit `statistik:read` erreichbar; Multi-Tenancy unverändert.
+* [ ] Fehlt Bilanz-Bezug oder Rücklieferung (ohne `SPEICHER`-Einheit, sonst FR-13a) → der Batterie-Block (Netto-Speicherfluss, geladen/entladen/Wirkungsgrad) entfällt; die Quoten-KPIs bleiben verfügbar. (Test: StatistikServiceTest#berechneKennzahlen_KeineBilanzDaten_BatterieNichtVerfuegbar; Test: StatistikServiceTest#berechneKennzahlen_NurBezugOhneRuecklieferung_BatterieNichtVerfuegbar; Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should not include any battery rows when not available)
+* [x] Batterie-Kennzahlen (inkl. Netto-Speicherfluss) sind als **„berechnet/geschätzt“** gekennzeichnet und werden nur bei vorhandenen Producer- **und** Bilanz-Daten (Bezug + Rücklieferung) gezeigt — **sofern keine `SPEICHER`-Einheit existiert**. (Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should mark the battery figures as calculated when they come from the balance; Test: StatistikServiceTest#berechneKennzahlen_KeineBilanzDaten_BatterieNichtVerfuegbar; Test: StatistikServiceTest#berechneKennzahlen_NurBezugOhneRuecklieferung_BatterieNichtVerfuegbar)
+* [x] **Mit `SPEICHER`-Einheit** stammen Ladung, Entladung, Netto und Wirkungsgrad aus deren Messwerten; Beispiel `geladen 100, entladen 92` → Netto `+8`, Wirkungsgrad `92.0 %`. (Test: StatistikServiceTest#batterie_MitSpeicherEinheit_NimmtGemesseneWerte)
+* [ ] Bei gemessenen Werten entfällt die Kennzeichnung **berechnet** — in der Web-Ansicht **und** im PDF. (Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should not mark the battery figures when they are measured at the storage unit)
+* [x] Eine `SPEICHER`-Einheit genügt: Die Kennzahlen erscheinen auch **ohne** Bilanz-Bezug und Rücklieferung. (Test: StatistikServiceTest#batterie_MitSpeicherEinheitOhneBilanzdaten_TrotzdemVerfuegbar)
+* [x] Eine `SPEICHER`-Einheit **ohne Messwerte** ergibt `0`/`0` und einen leeren Wirkungsgrad statt einer Division durch null. (Test: StatistikServiceTest#batterie_SpeicherEinheitOhneMesswerte_NullenUndKeinWirkungsgrad)
+* [x] Ohne `SPEICHER`-Einheit bleibt das Verhalten **unverändert** (Residuum der Bilanz, Kennzeichnung berechnet). (Test: StatistikServiceTest#batterie_OhneSpeicherEinheit_BleibtBerechnet; Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should mark the battery figures as calculated when they come from the balance)
+* [ ] Im **Producer-Messung**-Modus bleibt der bestehende Summen-Vergleich erhalten; im **Bilanzmodus** wird er ausgeblendet und durch das Kennzahlen-Panel ersetzt.
+* [ ] Die Kennzahlen erscheinen auch im **Statistik-PDF** (`statistik.jrxml`) je Monat mit derselben Modus-Logik wie am Bildschirm.
+* [x] Alle Texte via `TranslationService` (DE/EN); Prozentwerte mit `%`, kWh-Werte in kWh. (Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should format quota rows as percent with 1 decimal and "%" unit; Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should format Batterie-Geladen/-Entladen as kWh with 3 decimals; Nachweis: V90__Add_Statistik_Kennzahlen_Translations.sql, V91__Add_Statistik_Kennzahlen_Hinweise_Translations.sql)
+* [x] Alle Kennzahlen (Prozent- und kWh-Werte) verwenden den **Punkt** als Dezimaltrennzeichen und – bei Werten ≥ 1000 – das **Hochkomma** (`'`) als Tausendertrennzeichen, am Bildschirm und im PDF, unabhängig von der Server-/Browser-Locale (`60.0 %`; `1'234.567 kWh`, nicht `60,0 %` / `1,234.567 kWh`). (Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should group thousands in a large ZEV-Eigenverbrauch value; Test: statistik.component.spec.ts › StatistikComponent › formatNumber › should group thousands with apostrophe; Test: PdfNumberFormatTest#kwh_ValueAtLeast1000_UsesApostropheAsThousandsSeparator; Test: PdfNumberFormatTest#percent_Fraction_OneDecimalWithPercentSign)
+* [x] Die Kennzahlen werden **tabellarisch** dargestellt (`.zev-table`/`.zev-table--compact`/`.zev-table--auto`, **ohne Titelzeile**): drei Spalten Bezeichnung (links) | Wert (rechtsbündig, `.zev-table__number`) | Einheit (links). Die Tabelle nutzt Inhaltsbreite (`.zev-table--auto`), die Bezeichnungs-Spalte ist nicht überbreit. Keine komponenten-eigenen Ad-hoc-Styles; ausschliesslich Design-System-Klassen. (E2E: statistik.spec.ts › Statistik Page - Monthly Statistics › should display monthly panels with data tables when statistics are loaded; Nachweis: statistik.component.html:298-318)
+* [x] Jede Kennzahl zeigt beim Hovern einen erklärenden Hinweis (`title`-Tooltip), der die Bedeutung der Kennzahl beschreibt; die Hinweistexte sind via `TranslationService` (DE/EN) übersetzt. (E2E: statistik.spec.ts › Statistik Page - Monthly Statistics › should render a non-empty title tooltip on every Kennzahl row; Test: statistik.component.spec.ts › StatistikComponent › getKennzahlen › should derive hintKey by appending _HINWEIS to labelKey)
+* [ ] Statistik bleibt mit `statistik:read` erreichbar; Multi-Tenancy unverändert.
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
@@ -317,9 +315,9 @@ Beim Speicher gilt `total = ΔLadung − ΔEntladung`; über den Zeitraum getren
 ## 5. Edge Cases & Fehlerbehandlung
 | Szenario | Verhalten |
 |----------|-----------|
-| Keine Producer-Einheit (P = 0) | Eigenverbrauchsquote/Einspeisequote → „–“; Batterie → „–“ (ohne `SPEICHER`-Einheit, sonst FR-13a); Autarkiegrad/Netzbezugsquote/ZEV-Eigenverbrauch bleiben (basieren auf Consumer-Summen) |
-| Keine Bilanz-Einheiten (Bezug/Rücklieferung) | Nur Batterie-KPIs (Netto-Speicherfluss, geladen/entladen/Wirkungsgrad) → „–“ (ohne `SPEICHER`-Einheit, sonst FR-13a); Quoten-KPIs bleiben verfügbar (modus-agnostisch aus ZEV-Summen); die Bilanz-Zeilen der Werte-Tabelle und ihre Vergleiche entfallen (FR-8.5) |
-| Nur Bezug, keine Rücklieferung | Quoten-KPIs ok; Batterie-KPIs → „–“ (Rücklieferung fehlt; ohne `SPEICHER`-Einheit, sonst FR-13a) |
+| Keine Producer-Einheit (P = 0) | Eigenverbrauchsquote/Einspeisequote → „–“; Batterie-Block entfällt (ohne `SPEICHER`-Einheit, sonst FR-13a); Autarkiegrad/Netzbezugsquote/ZEV-Eigenverbrauch bleiben (basieren auf Consumer-Summen) |
+| Keine Bilanz-Einheiten (Bezug/Rücklieferung) | Nur der Batterie-Block (Netto-Speicherfluss, geladen/entladen/Wirkungsgrad) entfällt (ohne `SPEICHER`-Einheit, sonst FR-13a); Quoten-KPIs bleiben verfügbar (modus-agnostisch aus ZEV-Summen); die Bilanz-Zeilen der Werte-Tabelle und ihre Vergleiche entfallen (FR-8.5) |
+| Nur Bezug, keine Rücklieferung | Quoten-KPIs ok; Batterie-Block entfällt (Rücklieferung fehlt; ohne `SPEICHER`-Einheit, sonst FR-13a) |
 | Verbrauch = 0 bzw. Produktion = 0 | betroffene Quote „–“ (keine Division durch 0) |
 | Batterie geladen = 0 | Round-Trip-Wirkungsgrad → „–“ (keine Division durch 0) |
 | Negativer Netto-Speicherfluss | als Netto-Entladung ausweisen (Vorzeichen/Label) |
@@ -417,3 +415,13 @@ In der Abgrenzung stand der Tippfehler „Kostsen/Tarif-Kennzahlen“ (jetzt „
 
 ### A.10 Batterie-Bedingungen präzisiert (FR-12, Abschnitte 3 und 5, 19.10.2026)
 Bei der Zusammenführung fiel auf: Mehrere Stellen verlangten für die Batterie-Kennzahlen Producer **und** Bilanz-Bezug **und** Rücklieferung, obwohl seit FR-13a eine `SPEICHER`-Einheit genügt – das Kriterium „Batterie-Kennzahlen … sofern keine `SPEICHER`-Einheit existiert“ sagte es schon. Auf Wunsch des Users ergänzt um „(ohne `SPEICHER`-Einheit, sonst FR-13a)“: FR-12 (Schluss, zwei Punkte), das Kriterium „Fehlt Bilanz-Bezug oder Rücklieferung …“, die Edge Cases „Keine Producer-Einheit“, „Keine Bilanz-Einheiten“, „Nur Bezug, keine Rücklieferung“ und die Antwort „Anzeige in beiden Modi“ (A.9). Der Checkbox-Status des Kriteriums bleibt.
+
+### A.11 Kriterium „gedimmt stehen bleiben“ gestrichen (FR-5, 19.10.2026)
+Das Kriterium lautete: „Liegt schon eine Statistik vor und wird neu berechnet, bleibt sie stehen und wird gedimmt (`.zev-busy`) — kein Layout-Sprung.“ Beim Akzeptanzkriterien-Check vom 19.10.2026 als ❌ gefunden: `onSubmit()` setzt die Statistik vor dem Laden auf `null`, sie verschwindet während der Berechnung (der Unit-Test „should set statistik to null before loading“ prüft genau das). Entscheid des Users: Kriterium streichen, das Verhalten bleibt. Das Binding `[class.zev-busy]="loading"` im Template wirkt damit nicht.
+
+### A.12 Drei Kriterien umformuliert (FR-9, FR-12, Abschnitt 5, 19.10.2026)
+Beim Akzeptanzkriterien-Check vom 19.10.2026 vorgeschlagen, vom User übernommen:
+* FR-9: „Werte, Balkenlängen, Sortierung und PDF-Ausgabe sind unverändert.“ – gestrichen: eine Additivitäts-Zusage, die FR-9 und Abschnitt 7 schon festhalten; ein Test schützte vor nichts.
+* Kennzahlen: „Bei `C = 0` entfallen die gemessenen Zeilen ebenso wie Autarkiegrad und Netzbezugsquote.“ – falsch formuliert: Nach FR-12 und Code bleiben Autarkiegrad und Netzbezugsquote als „–“ stehen.
+* Kennzahlen: „Fehlt Bilanz-Bezug oder Rücklieferung … → nur die Batterie-KPIs … werden als **„–“** angezeigt“ – nach FR-13 und Code entfällt der Batterie-Block. Ebenso angepasst: FR-12 (letzter Punkt: „bzw. für die Batterie-KPIs fehlende Bilanz-Daten … als „–“/n/a“) und die Edge Cases „Keine Producer-Einheit“ („Batterie → „–““), „Keine Bilanz-Einheiten“ („Nur Batterie-KPIs … → „–““), „Nur Bezug, keine Rücklieferung“ („Batterie-KPIs → „–““).
+
