@@ -53,7 +53,7 @@ public class TranslationController {
     @PreAuthorize("hasAuthority('translations:manage')")
     public ResponseEntity<Translation> createTranslation(@Valid @RequestBody Translation translation) {
         log.info("Creating new translation with key: {}", translation.getKey());
-        Translation saved = translationService.saveTranslation(translation);
+        Translation saved = translationService.createTranslation(translation);
         log.info("Created translation: {}", saved.getKey());
         return ResponseEntity.ok(saved);
     }

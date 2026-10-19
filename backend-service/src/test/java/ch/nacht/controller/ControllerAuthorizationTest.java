@@ -18,6 +18,7 @@ import ch.nacht.service.PreiszeitreiheService;
 import ch.nacht.service.ProduktionsprognoseService;
 import ch.nacht.service.SteuerungService;
 import ch.nacht.service.TarifService;
+import ch.nacht.service.TranslationService;
 import ch.nacht.service.TarifpositionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -64,7 +65,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         TarifpositionController.class,
         EinheitController.class, MieterController.class, NkAbrechnungController.class,
         NkRechnungController.class, SystemmeldungController.class, PreiszeitreiheController.class,
-        SteuerungController.class})
+        SteuerungController.class, TranslationController.class})
 @Import(SecurityConfig.class)
 @TestPropertySource(properties = "app.cors.allowed-origins=http://localhost:4200")
 class ControllerAuthorizationTest {
@@ -107,6 +108,9 @@ class ControllerAuthorizationTest {
 
     @MockitoBean
     private SteuerungService steuerungService;
+
+    @MockitoBean
+    private TranslationService translationService;
 
     @MockitoBean
     private ProduktionsprognoseService produktionsprognoseService;
@@ -789,5 +793,93 @@ class ControllerAuthorizationTest {
         mockMvc.perform(get("/api/einspeisesteuerung/prognose?datum=2026-10-15")
                         .with(jwt().authorities(new SimpleGrantedAuthority("tarife:manage"))))
                 .andExpect(status().isForbidden());
+    }
+
+    // ==================== Uebersetzungen: translations:read / translations:manage ====================
+    // Specs/Übersetzungsverwaltung.md, NFR-2: Lesen fuer alle Fachrollen (TranslatePipe),
+    // Verwalten nur mit translations:manage (zev_admin).
+
+    private static final String TRANSLATION_JSON = """
+            {"key":"TEST_KEY","deutsch":"Test","englisch":"Test"}
+            """;
+
+    @Test
+    void getTranslations_withTranslationsRead_ok() throws Exception {
+        when(translationService.getAllTranslations()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/translations")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("translations:read"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getTranslations_withoutTranslationsRead_forbidden() throws Exception {
+        mockMvc.perform(get("/api/translations")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("einheit:read"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void listTranslations_withTranslationsManage_ok() throws Exception {
+        when(translationService.getAllTranslations()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/translations/list")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("translations:manage"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void listTranslations_withReadOnly_forbidden() throws Exception {
+        mockMvc.perform(get("/api/translations/list")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("translations:read"))))
+                .andExpect(status().isForbidden());
+
+        verify(translationService, never()).getAllTranslations();
+    }
+
+    @Test
+    void createTranslation_withReadOnly_forbidden() throws Exception {
+        mockMvc.perform(post("/api/translations")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("translations:read")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(TRANSLATION_JSON))
+                .andExpect(status().isForbidden());
+
+        verify(translationService, never()).createTranslation(any());
+    }
+
+    @Test
+    void updateTranslation_withReadOnly_forbidden() throws Exception {
+        mockMvc.perform(put("/api/translations/TEST_KEY")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("translations:read")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(TRANSLATION_JSON))
+                .andExpect(status().isForbidden());
+
+        verify(translationService, never()).saveTranslation(any());
+    }
+
+    @Test
+    void deleteTranslation_withReadOnly_forbidden() throws Exception {
+        mockMvc.perform(delete("/api/translations/TEST_KEY")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("translations:read")))
+                        .with(csrf()))
+                .andExpect(status().isForbidden());
+
+        verify(translationService, never()).deleteTranslation(any());
+    }
+
+    @Test
+    void importTranslations_withReadOnly_forbidden() throws Exception {
+        mockMvc.perform(post("/api/translations/import")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("translations:read")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("[" + TRANSLATION_JSON + "]"))
+                .andExpect(status().isForbidden());
+
+        verify(translationService, never()).importTranslations(any(), anyBoolean());
     }
 }

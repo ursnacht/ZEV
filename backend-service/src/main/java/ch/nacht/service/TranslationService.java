@@ -4,6 +4,7 @@ import ch.nacht.entity.Translation;
 import ch.nacht.repository.TranslationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +26,25 @@ public class TranslationService {
 
     public List<Translation> getAllTranslations() {
         return translationRepository.findAllByOrderByKeyAsc();
+    }
+
+    /**
+     * Legt eine neue Übersetzung an. Ein bestehender Key wird abgewiesen
+     * (Specs/Übersetzungsverwaltung.md, FR-3).
+     *
+     * <p>Der Key ist der Primärschlüssel: Ohne diese Prüfung machte {@code save} aus dem Anlegen
+     * ein {@code merge} und überschriebe den bestehenden Text still.
+     *
+     * @throws DuplicateKeyException wenn der Key schon existiert ({@code 409} über den
+     *         {@code GlobalExceptionHandler})
+     */
+    @Transactional
+    public Translation createTranslation(Translation translation) {
+        if (translationRepository.existsById(translation.getKey())) {
+            log.warn("Translation key already exists: {}", translation.getKey());
+            throw new DuplicateKeyException("TRANSLATION_KEY_EXISTIERT");
+        }
+        return translationRepository.save(translation);
     }
 
     public Translation saveTranslation(Translation translation) {

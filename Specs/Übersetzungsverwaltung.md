@@ -25,6 +25,7 @@
 2. Admin füllt das Formular aus und klickt auf «Hinzufügen».
 3. System sendet `POST /api/translations` mit den eingegebenen Daten.
 4. Bei Erfolg: Neuer Eintrag erscheint sofort in der Tabelle; Formular wird zurückgesetzt.
+5. Existiert der Key bereits, weist das Backend das Anlegen mit `409` ab; der bestehende Text bleibt unverändert, die Tabelle erhält keine zweite Zeile (Hintergrund: Anhang A.5).
 
 ### FR-4: Übersetzung bearbeiten
 1. Admin klickt im Kebab-Menü einer Zeile auf «Bearbeiten».
@@ -91,52 +92,52 @@
 
 ### Anzeige & Suche
 * [x] Die Seite `/translations` ist nur mit der Permission `translations:manage` (Fachrolle `zev_admin`) zugänglich; ohne sie (z.B. `zev_user`, `org_admin`) weist der `AuthGuard` ab. (E2E: composite-roles.spec.ts › Composite-Roles: permission-basierter Zugriff › org_admin wird vom Übersetzungs-Editor weggeleitet (fehlt translations:manage))
-* [ ] Die Tabelle zeigt alle gespeicherten Übersetzungen alphabetisch nach Key sortiert.
-* [ ] Klick auf Spaltenheader sortiert die Tabelle auf- und absteigend; ein zweiter Klick kehrt die Richtung um.
-* [ ] Die Suchfunktion filtert die Tabelle live nach Key, Deutsch und Englisch (case-insensitive).
-* [ ] Die Anzeige `X / Y` zeigt die Anzahl der gefilterten und die Gesamtanzahl der Übersetzungen.
-* [ ] Bei leerer Suche wird die vollständige Liste angezeigt.
-* [ ] Bei leerem Übersetzungs-Datenbestand wird keine Tabelle angezeigt (Tabelle wird ausgeblendet).
+* [x] Die Tabelle zeigt alle gespeicherten Übersetzungen alphabetisch nach Key sortiert. (Test: translation-editor.component.spec.ts › TranslationEditorComponent › Anzeige & Sortierung › should show the translations sorted by key ascending on load)
+* [x] Klick auf Spaltenheader sortiert die Tabelle auf- und absteigend; ein zweiter Klick kehrt die Richtung um. (Test: translation-editor.component.spec.ts › TranslationEditorComponent › Anzeige & Sortierung › should reverse the direction on a second click on the same header; Test: translation-editor.component.spec.ts › TranslationEditorComponent › Anzeige & Sortierung › should sort ascending by a newly clicked column)
+* [x] Die Suchfunktion filtert die Tabelle live nach Key, Deutsch und Englisch (case-insensitive). (Test: translation-editor.component.spec.ts › TranslationEditorComponent › Suche › should filter live and case-insensitive by key, deutsch and englisch; an empty search shows all)
+* [x] Die Anzeige `X / Y` zeigt die Anzahl der gefilterten und die Gesamtanzahl der Übersetzungen. (Test: translation-editor.component.spec.ts › TranslationEditorComponent › Suche › should show the counter "filtered / total")
+* [x] Bei leerer Suche wird die vollständige Liste angezeigt. (Test: translation-editor.component.spec.ts › TranslationEditorComponent › Suche › should filter live and case-insensitive by key, deutsch and englisch; an empty search shows all)
+* [x] Bei leerem Übersetzungs-Datenbestand wird keine Tabelle angezeigt (Tabelle wird ausgeblendet). (Test: translation-editor.component.spec.ts › TranslationEditorComponent › Anzeige & Sortierung › should hide the table when there are no translations)
 
 ### Erstellen
-* [ ] Das Formular kann nur gespeichert werden, wenn das Feld «Key» nicht leer ist (Button deaktiviert).
+* [x] Das Formular kann nur gespeichert werden, wenn das Feld «Key» nicht leer ist (Button deaktiviert). (Test: translation-editor.component.spec.ts › TranslationEditorComponent › Erstellen › should disable the submit button while the key is empty; Test: translation-editor.component.spec.ts › TranslationEditorComponent › Erstellen › should not call the backend without a key)
 * [x] Nach erfolgreichem Erstellen erscheint der neue Eintrag sofort in der Tabelle. (E2E: translation-editor.spec.ts › Translation Editor - Delete Functionality via Kebab Menu › should delete translation when confirmed via kebab menu; E2E: translation-editor.spec.ts › Translation Editor - Save Functionality via Kebab Menu › should save translation changes via kebab menu)
-* [ ] Nach dem Erstellen ist das Formular zurückgesetzt (alle Felder leer).
-* [ ] Ein Key, der bereits existiert, führt zu einer Fehlermeldung (HTTP 409 / DB-Constraint-Fehler).
+* [x] Nach dem Erstellen ist das Formular zurückgesetzt (alle Felder leer). (Test: translation-editor.component.spec.ts › TranslationEditorComponent › Erstellen › should show the new entry and reset the form after creating)
+* [x] Ein Key, der bereits existiert, führt zu einer Fehlermeldung (HTTP 409 / DB-Constraint-Fehler). (Test: TranslationServiceTest#createTranslation_BestehenderKey_ThrowsUndSpeichertNicht; Test: TranslationControllerTest#createTranslation_BestehenderKey_Returns409; Test: translation-editor.component.spec.ts › TranslationEditorComponent › Erstellen › should not add a second row when the backend rejects an existing key (409))
 
 ### Bearbeiten
-* [ ] Klick auf «Bearbeiten» füllt das Formular mit den Werten der Zeile vor.
-* [ ] Das Key-Feld ist im Bearbeitungsmodus nicht editierbar (`readonly`).
+* [x] Klick auf «Bearbeiten» füllt das Formular mit den Werten der Zeile vor. (Test: translation-editor.component.spec.ts › TranslationEditorComponent › Bearbeiten › should prefill the form with a copy of the row and make the key readonly)
+* [x] Das Key-Feld ist im Bearbeitungsmodus nicht editierbar (`readonly`). (Test: translation-editor.component.spec.ts › TranslationEditorComponent › Bearbeiten › should prefill the form with a copy of the row and make the key readonly)
 * [x] Nach erfolgreichem Speichern wird der aktualisierte Text in der Tabelle angezeigt. (E2E: translation-editor.spec.ts › Translation Editor - Save Functionality via Kebab Menu › should save translation changes via kebab menu)
-* [ ] Klick auf «Abbrechen» setzt das Formular zurück, ohne Änderungen zu speichern.
+* [x] Klick auf «Abbrechen» setzt das Formular zurück, ohne Änderungen zu speichern. (Test: translation-editor.component.spec.ts › TranslationEditorComponent › Bearbeiten › should reset the form without saving on cancel)
 
 ### Löschen
-* [ ] Klick auf «Löschen» im Kebab-Menü öffnet eine Bestätigungsabfrage mit dem Key-Namen.
+* [x] Klick auf «Löschen» im Kebab-Menü öffnet eine Bestätigungsabfrage mit dem Key-Namen. (Test: translation-editor.component.spec.ts › TranslationEditorComponent › Löschen › should ask with the key name in the confirmation)
 * [x] Nach Bestätigung wird der Eintrag aus der Tabelle entfernt. (E2E: translation-editor.spec.ts › Translation Editor - Delete Functionality via Kebab Menu › should delete translation when confirmed via kebab menu)
 * [x] Nach dem Löschen wird der Übersetzungscache (TranslationService) neu geladen. (Test: translation.service.spec.ts › TranslationService › deleteTranslation › should make DELETE request and then reload translations)
 * [x] Bei Abbruch der Bestätigung bleibt der Eintrag unverändert bestehen. (E2E: translation-editor.spec.ts › Translation Editor - Delete Functionality via Kebab Menu › should not delete translation when cancelled via kebab menu)
 
 ### Export / Import
-* [ ] Klick auf «Exportieren» lädt eine Datei `uebersetzungen.csv` (Komma-getrennt, Kopfzeile `key,deutsch,englisch`) mit allen Übersetzungen herunter.
-* [ ] Der Export-Button ist deaktiviert, wenn keine Übersetzungen vorhanden sind.
-* [ ] Klick auf «Importieren» öffnet einen Datei-Dialog (nur `.csv`).
+* [x] Klick auf «Exportieren» lädt eine Datei `uebersetzungen.csv` (Komma-getrennt, Kopfzeile `key,deutsch,englisch`) mit allen Übersetzungen herunter. (Test: translation-editor.component.spec.ts › TranslationEditorComponent › Export › should download uebersetzungen.csv with BOM, header and all translations)
+* [x] Der Export-Button ist deaktiviert, wenn keine Übersetzungen vorhanden sind. (Test: translation-editor.component.spec.ts › TranslationEditorComponent › Export › should disable the export button when there are no translations)
+* [ ] Klick auf «Importieren» öffnet einen Datei-Dialog (nur `.csv`). (Test: translation-editor.component.spec.ts › TranslationEditorComponent › Import › should open the file dialog when clicking the import button; Test: translation-editor.component.spec.ts › TranslationEditorComponent › Import › should accept only csv files and default to overwrite = yes)
 * [x] Der Import einer zuvor exportierten CSV-Datei stellt exakt dieselben Übersetzungen wieder her (verlustfreier Round-Trip, auch bei Werten mit Kommas, Anführungszeichen und Zeilenumbrüchen). (Test: csv-utils.spec.ts › csv-utils › round-trip › should preserve tricky translation values; Test: csv-utils.spec.ts › csv-utils › parseCsv › should strip a leading BOM)
-* [ ] Rechts neben dem Import-Button stehen zwei Radio-Buttons «Ja»/«Nein» für «Bestehende Keys überschreiben» (Default: Ja).
-* [ ] Bei **«Ja»** überschreibt der Import bestehende Keys mit den Werten aus der Datei; neue Keys werden angelegt.
-* [ ] Bei **«Nein»** bleiben bestehende Keys unverändert; nur neue Keys werden angelegt; die Erfolgsmeldung zählt nur die tatsächlich angelegten Einträge.
-* [ ] In beiden Fällen bleiben nicht in der Datei enthaltene Keys unverändert (kein Löschen).
-* [ ] Nach erfolgreichem Import erscheint eine Erfolgsmeldung mit der Anzahl importierter Einträge; Tabelle und Übersetzungscache werden aktualisiert.
-* [ ] Eine Datei ohne verwertbare Datenzeile (leer / nur Kopfzeile) führt zu einer Fehlermeldung, ohne einen Backend-Call auszulösen.
-* [ ] Ein Eintrag ohne Key (bzw. Key > 200 Zeichen) führt zu `400`; es wird **nichts** gespeichert (atomar).
-* [ ] `POST /api/translations/import` ist nur für `translations:manage` zugänglich (sonst `403`).
-* [ ] Dieselbe Datei kann nach einem Import direkt erneut gewählt werden (Datei-Input wird zurückgesetzt).
+* [ ] Rechts neben dem Import-Button stehen zwei Radio-Buttons «Ja»/«Nein» für «Bestehende Keys überschreiben» (Default: Ja). (Test: translation-editor.component.spec.ts › TranslationEditorComponent › Import › should offer two radios Ja/Nein, preselect Ja and switch to false on Nein; Test: translation-editor.component.spec.ts › TranslationEditorComponent › Import › should accept only csv files and default to overwrite = yes)
+* [x] Bei **«Ja»** überschreibt der Import bestehende Keys mit den Werten aus der Datei; neue Keys werden angelegt. (Test: TranslationServiceTest#importTranslations_Ueberschreiben_SpeichertAlleEintraege)
+* [x] Bei **«Nein»** bleiben bestehende Keys unverändert; nur neue Keys werden angelegt; die Erfolgsmeldung zählt nur die tatsächlich angelegten Einträge. (Test: TranslationServiceTest#importTranslations_NichtUeberschreiben_UeberspringtBestehendeUndZaehltNurNeue; Test: TranslationControllerTest#importTranslations_ReichtUeberschreibenDurch_UndMeldetAnzahl)
+* [x] In beiden Fällen bleiben nicht in der Datei enthaltene Keys unverändert (kein Löschen). (Test: TranslationServiceTest#importTranslations_LoeschtKeineKeys)
+* [x] Nach erfolgreichem Import erscheint eine Erfolgsmeldung mit der Anzahl importierter Einträge; Tabelle und Übersetzungscache werden aktualisiert. (Test: translation-editor.component.spec.ts › TranslationEditorComponent › Import › should import the rows, report the count, reload the list and reset the file input; Test: translation.service.spec.ts › TranslationService › importTranslations › should POST the translations to /import with ueberschreiben=true and then reload)
+* [x] Eine Datei ohne verwertbare Datenzeile (leer / nur Kopfzeile) führt zu einer Fehlermeldung, ohne einen Backend-Call auszulösen. (Test: translation-editor.component.spec.ts › TranslationEditorComponent › Import › should show an error and not call the backend for a file with only the header)
+* [x] Ein Eintrag ohne Key (bzw. Key > 200 Zeichen) führt zu `400`; es wird **nichts** gespeichert (atomar). (Test: TranslationServiceTest#importTranslations_EintragOhneKey_ThrowsUndSpeichertNichts; Test: TranslationServiceTest#importTranslations_KeyUeber200Zeichen_ThrowsUndSpeichertNichts; Test: TranslationControllerTest#importTranslations_UngueltigerEintrag_Returns400MitKey)
+* [x] `POST /api/translations/import` ist nur für `translations:manage` zugänglich (sonst `403`). (Test: ControllerAuthorizationTest#importTranslations_withReadOnly_forbidden)
+* [x] Dieselbe Datei kann nach einem Import direkt erneut gewählt werden (Datei-Input wird zurückgesetzt). (Test: translation-editor.component.spec.ts › TranslationEditorComponent › Import › should import the rows, report the count, reload the list and reset the file input; Test: translation-editor.component.spec.ts › TranslationEditorComponent › Import › should show an error and not call the backend for a file with only the header)
 
 ### Backend API
-* [ ] `GET /api/translations` ist mit `translations:read` (alle Fachrollen) zugänglich und gibt `{de: {...}, en: {...}}` zurück.
-* [ ] `GET /api/translations/list` ist nur mit `translations:manage` zugänglich und gibt eine Liste von Translation-Objekten zurück.
-* [ ] `POST`, `PUT`, `DELETE` auf `/api/translations` sind nur mit `translations:manage` zugänglich (sonst `403`).
-* [ ] `PUT /api/translations/{key}` gibt HTTP 400 zurück, wenn der Key im Pfad nicht mit dem Key im Body übereinstimmt.
-* [ ] `DELETE /api/translations/{key}` gibt HTTP 404 zurück, wenn der Key nicht existiert.
+* [x] `GET /api/translations` ist mit `translations:read` (alle Fachrollen) zugänglich und gibt `{de: {...}, en: {...}}` zurück. (Test: ControllerAuthorizationTest#getTranslations_withTranslationsRead_ok; Test: ControllerAuthorizationTest#getTranslations_withoutTranslationsRead_forbidden; Test: TranslationControllerTest#getTranslations_LiefertDeUndEn)
+* [x] `GET /api/translations/list` ist nur mit `translations:manage` zugänglich und gibt eine Liste von Translation-Objekten zurück. (Test: ControllerAuthorizationTest#listTranslations_withTranslationsManage_ok; Test: ControllerAuthorizationTest#listTranslations_withReadOnly_forbidden)
+* [x] `POST`, `PUT`, `DELETE` auf `/api/translations` sind nur mit `translations:manage` zugänglich (sonst `403`). (Test: ControllerAuthorizationTest#createTranslation_withReadOnly_forbidden; Test: ControllerAuthorizationTest#updateTranslation_withReadOnly_forbidden; Test: ControllerAuthorizationTest#deleteTranslation_withReadOnly_forbidden)
+* [x] `PUT /api/translations/{key}` gibt HTTP 400 zurück, wenn der Key im Pfad nicht mit dem Key im Body übereinstimmt. (Test: TranslationControllerTest#updateTranslation_KeyImPfadUngleichKeyImBody_Returns400)
+* [x] `DELETE /api/translations/{key}` gibt HTTP 404 zurück, wenn der Key nicht existiert. (Test: TranslationControllerTest#deleteTranslation_UnbekannterKey_Returns404; Test: TranslationServiceTest#deleteTranslation_UnbekannterKey_ReturnsFalse)
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
@@ -214,3 +215,6 @@ Bei der Konsolidierung fielen Aussagen auf, die der Code überholt hatte; auf Wu
 * **Tabelle und Migrationen:** „`app.translation`“ (FR-6, Abschnitt 6) – das Schema heisst `zev`; „`V2__Create_Translation_Table.sql`“ – die Tabelle entsteht in `V10__Create_Translation_Table.sql` (`V2` legt `einheit` an); „aktuell: `V4__Add_Initial_Translations.sql`“ – eine solche Migration gibt es nicht (`V4` ordnet Spalten von `einheit` um), die ersten Übersetzungen kommen mit `V11`.
 * **Design-System-Klassen:** „`.app-form-container`“ (FR-7), „`.app-message--error`“ / „`.app-message--success`“ (Abschnitt 8) – das Präfix ist `zev-`.
 Die Akzeptanzkriterien zur Berechtigung behalten ihren Status `[ ]`; sie sind nur umformuliert.
+
+### A.5 Doppelter Key überschrieb still (FR-3, 19.10.2026)
+Beim Akzeptanzkriterien-Check vom 19.10.2026 als ❌ gefunden: `POST /api/translations` rief `save` auf. Da der Key der Primärschlüssel ist, machte Spring Data aus dem Anlegen ein `merge` und **überschrieb** den bestehenden Text, statt abzuweisen; das Frontend hängte zusätzlich eine zweite Zeile mit demselben Key an. Das Kriterium „Ein Key, der bereits existiert, führt zu einer Fehlermeldung (HTTP 409 / DB-Constraint-Fehler)“ und der Edge Case „Doppelter Key beim Erstellen“ verlangten das Gegenteil. Behoben mit `TranslationService.createTranslation` (prüft `existsById`, wirft `DuplicateKeyException` → `409` über den `GlobalExceptionHandler`); `TranslationServiceTest` war ohne die Prüfung rot. Eine Fehlermeldung in der Oberfläche gibt es weiterhin nicht – das ist die erste Offene Frage (Abschnitt 8).
