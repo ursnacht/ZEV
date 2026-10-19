@@ -73,23 +73,14 @@ public class MqttConfig {
         return new DirectChannel();
     }
 
-    /**
-     * Wartezeit auf die Bestaetigung des Abos (SUBACK) beim Verbinden (MQTT-Integration.md, FR-1.6).
-     *
-     * <p>Mit dauerhafter Sitzung schickt der Broker gleich nach dem Verbinden die gepufferten
-     * Nachrichten. Spring wartet im selben Paho-Thread auf das SUBACK, der sie verarbeitet; bei
-     * 5 s lief das nach einem Neustart in "Error subscribing ... Timed out (32000)". Harmlos,
-     * solange der Broker das Abo aus der Sitzung kennt - ohne Sitzung (erster Start, abgelaufene
-     * Sitzung, geleertes Broker-Volume) kaemen still keine Messwerte.
-     */
-    static final int ABO_TIMEOUT_MS = 30_000;
-
     @Bean
     public MqttPahoMessageDrivenChannelAdapter mqttInbound(MqttPahoClientFactory mqttClientFactory,
                                                            MessageChannel mqttInputChannel) {
         MqttPahoMessageDrivenChannelAdapter adapter =
                 new MqttPahoMessageDrivenChannelAdapter(clientId, mqttClientFactory, topic);
-        adapter.setCompletionTimeout(ABO_TIMEOUT_MS);
+        // Nach einem Neustart mit gepufferten Nachrichten meldet das Abo "Timed out (32000)" - erwartet und
+        // harmlos, eine laengere Wartezeit hilft nicht (MQTT-Integration.md, FR-1.6).
+        adapter.setCompletionTimeout(5000);
         adapter.setConverter(new DefaultPahoMessageConverter());
         adapter.setQos(qos);
         adapter.setOutputChannel(mqttInputChannel);
