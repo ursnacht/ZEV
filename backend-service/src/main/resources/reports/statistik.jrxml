@@ -397,7 +397,7 @@
 
             <!-- Quoten-KPIs (linke Spalte) -->
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333361" x="0" y="296" width="200" height="15" fontSize="9.0">
-                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_AUTARKIEGRAD") + ":"]]></expression>
+                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_AUTARKIEGRAD") + ($F{verteilungLueckenhaft} ? " (" + $P{TRANSLATIONS}.get("KENNZAHL_LUECKENHAFT") + ")" : "") + ":"]]></expression>
             </element>
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333362" x="200" y="296" width="75" height="15" fontSize="9.0" bold="true" hTextAlign="Right">
                 <expression><![CDATA[ch.nacht.util.PdfNumberFormat.percent($F{autarkiegrad})]]></expression>
@@ -409,7 +409,7 @@
                 <expression><![CDATA[ch.nacht.util.PdfNumberFormat.percent($F{eigenverbrauchsquote})]]></expression>
             </element>
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333365" x="0" y="328" width="200" height="15" fontSize="9.0">
-                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_NETZBEZUGSQUOTE") + ":"]]></expression>
+                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_NETZBEZUGSQUOTE") + ($F{verteilungLueckenhaft} ? " (" + $P{TRANSLATIONS}.get("KENNZAHL_LUECKENHAFT") + ")" : "") + ":"]]></expression>
             </element>
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333366" x="200" y="328" width="75" height="15" fontSize="9.0" bold="true" hTextAlign="Right">
                 <expression><![CDATA[ch.nacht.util.PdfNumberFormat.percent($F{netzbezugsquote})]]></expression>
@@ -430,7 +430,7 @@
             <!-- Gemessene Gegenstücke (linke Spalte; nur mit BEZUG-Bilanz-Einheit) -->
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333380" x="0" y="376" width="200" height="15" fontSize="9.0">
                 <printWhenExpression><![CDATA[$F{bilanzKennzahlenVerfuegbar}]]></printWhenExpression>
-                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_AUTARKIEGRAD_GEMESSEN") + ":"]]></expression>
+                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_AUTARKIEGRAD_GEMESSEN") + ($F{bilanzBezugLueckenhaft} ? " (" + $P{TRANSLATIONS}.get("KENNZAHL_LUECKENHAFT") + ")" : "") + ":"]]></expression>
             </element>
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333381" x="200" y="376" width="75" height="15" fontSize="9.0" bold="true" hTextAlign="Right">
                 <printWhenExpression><![CDATA[$F{bilanzKennzahlenVerfuegbar}]]></printWhenExpression>
@@ -438,17 +438,22 @@
             </element>
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333382" x="0" y="392" width="200" height="15" fontSize="9.0">
                 <printWhenExpression><![CDATA[$F{bilanzKennzahlenVerfuegbar}]]></printWhenExpression>
-                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_NETZBEZUGSQUOTE_GEMESSEN") + ":"]]></expression>
+                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_NETZBEZUGSQUOTE_GEMESSEN") + ($F{bilanzBezugLueckenhaft} ? " (" + $P{TRANSLATIONS}.get("KENNZAHL_LUECKENHAFT") + ")" : "") + ":"]]></expression>
             </element>
             <element kind="textField" uuid="33333333-3333-3333-3333-333333333383" x="200" y="392" width="75" height="15" fontSize="9.0" bold="true" hTextAlign="Right">
                 <printWhenExpression><![CDATA[$F{bilanzKennzahlenVerfuegbar}]]></printWhenExpression>
                 <expression><![CDATA[ch.nacht.util.PdfNumberFormat.percent($F{netzbezugsquoteGemessen})]]></expression>
             </element>
-            <!-- Lücken im gemessenen Netzbezug: ohne diesen Hinweis wirken die beiden Werte
-                 belastbarer, als sie sind. -->
-            <element kind="textField" uuid="33333333-3333-3333-3333-333333333384" x="0" y="408" width="290" height="20" forecolor="#999999" fontSize="7.0" italic="true">
-                <printWhenExpression><![CDATA[$F{bilanzKennzahlenVerfuegbar} && $F{bilanzBezugLueckenhaft}]]></printWhenExpression>
-                <expression><![CDATA[$P{TRANSLATIONS}.get("KENNZAHL_LUECKENHAFT") + ": " + $P{TRANSLATIONS}.get($F{verteilungLueckenhaft} ? "KENNZAHL_LUECKE_VERTEILUNG_HINWEIS" : "KENNZAHL_LUECKE_MESSUNG_HINWEIS")]]></expression>
+            <!-- Lücken im gemessenen Netzbezug: ohne diesen Hinweis wirken die Werte belastbarer,
+                 als sie sind. Wie am Bildschirm je Richtung ein eigener Hinweis (Specs/Statistik.md,
+                 FR-12.6): gemessene Zeilen zu günstig, gerechnete (nur Bilanzmodus) zu ungünstig.
+                 Volle Breite und StretchHeight, weil die Texte mehrere Zeilen lang sind; der
+                 Subreport darunter rückt mit (positionType Float). -->
+            <element kind="textField" uuid="33333333-3333-3333-3333-333333333384" x="0" y="408" width="555" height="20" forecolor="#999999" fontSize="7.0" italic="true" textAdjust="StretchHeight">
+                <printWhenExpression><![CDATA[($F{bilanzKennzahlenVerfuegbar} && $F{bilanzBezugLueckenhaft}) || $F{verteilungLueckenhaft}]]></printWhenExpression>
+                <expression><![CDATA[(($F{bilanzKennzahlenVerfuegbar} && $F{bilanzBezugLueckenhaft}) ? $P{TRANSLATIONS}.get("KENNZAHL_AUTARKIEGRAD_GEMESSEN") + ", " + $P{TRANSLATIONS}.get("KENNZAHL_NETZBEZUGSQUOTE_GEMESSEN") + " – " + $P{TRANSLATIONS}.get("KENNZAHL_LUECKENHAFT") + ": " + $P{TRANSLATIONS}.get("KENNZAHL_LUECKE_MESSUNG_HINWEIS") : "")
+                    + ((($F{bilanzKennzahlenVerfuegbar} && $F{bilanzBezugLueckenhaft}) && $F{verteilungLueckenhaft}) ? "\n" : "")
+                    + ($F{verteilungLueckenhaft} ? $P{TRANSLATIONS}.get("KENNZAHL_AUTARKIEGRAD") + ", " + $P{TRANSLATIONS}.get("KENNZAHL_NETZBEZUGSQUOTE") + " – " + $P{TRANSLATIONS}.get("KENNZAHL_LUECKENHAFT") + ": " + $P{TRANSLATIONS}.get("KENNZAHL_LUECKE_VERTEILUNG_HINWEIS") : "")]]></expression>
             </element>
 
             <!-- Batterie-KPIs (rechte Spalte). Quelle: SPEICHER-Einheit, sonst Energiebilanz
@@ -493,7 +498,7 @@
             </element>
 
             <!-- Subreport: Summen pro Einheit -->
-            <element kind="subreport" uuid="33333333-3333-3333-3333-333333333330" x="0" y="432" width="555" height="50">
+            <element kind="subreport" uuid="33333333-3333-3333-3333-333333333330" x="0" y="432" width="555" height="50" positionType="Float">
                 <printWhenExpression><![CDATA[$F{einheitSummen} != null && !$F{einheitSummen}.isEmpty()]]></printWhenExpression>
                 <parameter name="TRANSLATIONS">
                     <expression><![CDATA[$P{TRANSLATIONS}]]></expression>

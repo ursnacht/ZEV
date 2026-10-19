@@ -250,14 +250,23 @@ class StatistikPdfServiceTest {
 
         List<String> texte = texte(pdfService.fuelle(statistik, "de"));
 
-        assertTrue(enthaelt(texte, "Autarkiegrad (gemessen):"), texte.toString());
-        assertTrue(enthaelt(texte, "Netzbezugsquote (gemessen):"), texte.toString());
+        assertTrue(enthaelt(texte, "Autarkiegrad (gemessen)"), texte.toString());
+        assertTrue(enthaelt(texte, "Netzbezugsquote (gemessen)"), texte.toString());
         assertTrue(texte.contains("96.2 %"), texte.toString());
         assertTrue(texte.contains("3.8 %"), texte.toString());
-        assertTrue(texte.contains("lückenhaft: Messung zu günstig"), texte.toString());
+        assertTrue(texte.contains("Autarkiegrad (gemessen) (lückenhaft):"), texte.toString());
+        assertTrue(texte.contains("Netzbezugsquote (gemessen) (lückenhaft):"), texte.toString());
+        assertTrue(enthaelt(texte, "lückenhaft: Messung zu günstig"), texte.toString());
+        // Producer-Messung: die gerechneten Zeilen bleiben ungekennzeichnet (FR-12.6)
+        assertTrue(texte.contains("Autarkiegrad:"), texte.toString());
+        assertTrue(texte.contains("Netzbezugsquote:"), texte.toString());
+        assertFalse(enthaelt(texte, "Verteilung zu ungünstig"), texte.toString());
     }
 
-    /** Hat die Verteilung Intervalle übersprungen, nennt der Hinweis die andere Richtung. */
+    /**
+     * Bilanzmodus mit Lücken: wie am Bildschirm je Richtung ein eigener Hinweis (FR-12.6) — die
+     * gemessenen Zeilen „zu günstig“, die gerechneten „zu ungünstig“, beide gekennzeichnet.
+     */
     @Test
     void fuelle_GemesseneKennzahlenMitVerteilungsluecken_ZeigtVerteilungsHinweis() throws Exception {
         StatistikDTO statistik = einMonat(Verteilmodus.BILANZ);
@@ -269,7 +278,14 @@ class StatistikPdfServiceTest {
 
         List<String> texte = texte(pdfService.fuelle(statistik, "de"));
 
-        assertTrue(texte.contains("lückenhaft: Verteilung zu ungünstig"), texte.toString());
+        assertTrue(texte.contains("Autarkiegrad (lückenhaft):"), texte.toString());
+        assertTrue(texte.contains("Netzbezugsquote (lückenhaft):"), texte.toString());
+        assertTrue(texte.contains("Autarkiegrad (gemessen) (lückenhaft):"), texte.toString());
+        assertTrue(texte.contains("Netzbezugsquote (gemessen) (lückenhaft):"), texte.toString());
+        assertTrue(enthaelt(texte, "Autarkiegrad (gemessen), Netzbezugsquote (gemessen) – lückenhaft: Messung zu günstig"),
+                texte.toString());
+        assertTrue(enthaelt(texte, "Autarkiegrad, Netzbezugsquote – lückenhaft: Verteilung zu ungünstig"),
+                texte.toString());
     }
 
     /** Ohne Lücken: gemessene Zeilen ja, Hinweis nein. */
