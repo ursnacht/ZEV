@@ -39,20 +39,6 @@ public class EinheitController {
         return einheiten;
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<Einheit> getEinheitById(@PathVariable Long id) {
-        log.info("Fetching einheit with id: {}", id);
-        return einheitService.getEinheitById(id)
-                .map(einheit -> {
-                    log.info("Found einheit: {}", einheit.getName());
-                    return ResponseEntity.ok(einheit);
-                })
-                .orElseGet(() -> {
-                    log.warn("Einheit not found with id: {}", id);
-                    return ResponseEntity.notFound().build();
-                });
-    }
-
     @PostMapping
     public ResponseEntity<Einheit> createEinheit(@jakarta.validation.Valid @RequestBody Einheit einheit) {
         log.info("Creating new einheit: {}", einheit.getName());

@@ -25,17 +25,18 @@ public class Einheit {
     @Column(name = "org_id", nullable = false)
     private Long orgId;
 
-    @NotBlank(message = "Name is required")
-    @Size(min = 2, max = 30, message = "Name must be between 2 and 30 characters")
+    // Meldungen sind Translation-Keys: das Frontend uebersetzt den Feld-Rumpf (Specs/Einheitenverwaltung.md)
+    @NotBlank(message = "NAME_IST_ERFORDERLICH")
+    @Size(min = 2, max = 30, message = "EINHEIT_NAME_LAENGE")
     @Column(name = "name", length = 30, nullable = false)
     private String name;
 
-    @NotNull(message = "Typ is required")
+    @NotNull(message = "TYP_IST_ERFORDERLICH")
     @Enumerated(EnumType.STRING)
     @Column(name = "typ", nullable = false)
     private EinheitTyp typ = EinheitTyp.CONSUMER;
 
-    @Size(max = 50, message = "Messpunkt must not exceed 50 characters")
+    @Size(max = 50, message = "EINHEIT_MESSPUNKT_ZU_LANG")
     @Column(name = "messpunkt", length = 50)
     private String messpunkt;
 

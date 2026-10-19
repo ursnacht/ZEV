@@ -3,7 +3,9 @@ package ch.nacht.service;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.repository.EinheitRepository;
+import ch.nacht.repository.MesswerteRepository;
 import ch.nacht.repository.MieterEinheitRepository;
+import ch.nacht.repository.ZaehlerRohdatenRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,15 +33,21 @@ public class EinheitService {
 
     private final EinheitRepository einheitRepository;
     private final MieterEinheitRepository mieterEinheitRepository;
+    private final MesswerteRepository messwerteRepository;
+    private final ZaehlerRohdatenRepository zaehlerRohdatenRepository;
     private final OrganizationContextService organizationContextService;
     private final HibernateFilterService hibernateFilterService;
 
     public EinheitService(EinheitRepository einheitRepository,
                           MieterEinheitRepository mieterEinheitRepository,
+                          MesswerteRepository messwerteRepository,
+                          ZaehlerRohdatenRepository zaehlerRohdatenRepository,
                           OrganizationContextService organizationContextService,
                           HibernateFilterService hibernateFilterService) {
         this.einheitRepository = einheitRepository;
         this.mieterEinheitRepository = mieterEinheitRepository;
+        this.messwerteRepository = messwerteRepository;
+        this.zaehlerRohdatenRepository = zaehlerRohdatenRepository;
         this.organizationContextService = organizationContextService;
         this.hibernateFilterService = hibernateFilterService;
     }
@@ -124,6 +132,11 @@ public class EinheitService {
         if (zugeordneteMieter > 0) {
             throw new IllegalStateException(
                     "Einheit kann nicht gelöscht werden: " + zugeordneteMieter + " Mieter zugeordnet");
+        }
+        // messwerte und zaehler_rohdaten verweisen ohne ON DELETE auf die Einheit: Der FK wiese das
+        // Loeschen ab, aber nur als 409 mit allgemeinem Datenbanktext (Specs/Einheitenverwaltung.md, FR-5).
+        if (messwerteRepository.existsByEinheitId(id) || zaehlerRohdatenRepository.existsByEinheitId(id)) {
+            throw new IllegalStateException("EINHEIT_HAT_MESSWERTE");
         }
         einheitRepository.deleteById(id);
         return true;

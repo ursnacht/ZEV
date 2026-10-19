@@ -11,13 +11,15 @@
 1. User öffnet `/einheiten` (Menü „Admin“ › „Einheiten“).
 2. System lädt die Einheiten des eigenen Mandanten über `GET /api/einheit`, serverseitig nach Name aufsteigend sortiert (`EinheitRepository.findAllByOrderByNameAsc`).
 3. System zeigt eine Tabelle mit den Spalten **ID**, **Name**, **Typ** (übersetzt über `EinheitTypPipe`), **Messpunkt** (leer → `-`) und je Zeile ein Kebab-Menü.
+3a. Den Button „Neue Einheit erstellen“ und die Kebab-Einträge „Bearbeiten“ und „Löschen“ sieht nur, wer `einheit:write` hat; ohne die Permission bleibt im Kebab-Menü nur „Tarifpositionen“ (Hintergrund: Anhang A.6).
 4. Gibt es keine Einheiten, zeigt das System statt der Tabelle den Text `KEINE_EINHEITEN_VORHANDEN`.
 5. Schlägt das Laden fehl, zeigt das System eine Fehlermeldung (`.zev-message--error`, bleibt bis zum Wegklicken).
 
 ### FR-2: Liste sortieren
 1. Die Spalten ID, Name, Typ und Messpunkt sind sortierbar (`.zev-table__header--sortable`). Vorbelegt ist Name aufsteigend.
 2. Klick auf die aktive Spalte kehrt die Richtung um; Klick auf eine andere Spalte sortiert nach ihr aufsteigend.
-3. Sortiert wird clientseitig: Texte ohne Gross-/Kleinschreibung, die ID numerisch, der Typ nach dem **Enum-Wert** (`CONSUMER`, `LADESTATION`, …), nicht nach dem angezeigten Text. Leere Werte (`null`/`undefined`) stehen in beiden Richtungen am Ende.
+3. Sortiert wird clientseitig: Texte ohne Gross-/Kleinschreibung, die ID numerisch, der Typ nach dem **angezeigten, übersetzten Text** (`EinheitTypPipe`). Leere Werte (`null`/`undefined`) stehen in beiden Richtungen am Ende.
+3a. Nach dem Neuladen (Speichern, Löschen) gilt weiter die gewählte Spalte und Richtung, nicht die Reihenfolge des Servers.
 4. Die aktive Spalte trägt einen Pfeil `▲`/`▼` (`.zev-table__sort-indicator`).
 5. Die Spaltenbreiten sind veränderbar (`appColumnResize`, siehe `Specs/SpaltenbreiteVeränderbar.md`).
 
@@ -27,11 +29,11 @@
 3. User erfasst Name, Typ (Auswahl aller sechs Typen: Produzent, Konsument, Bezug VNB, Rücklieferung VNB, Ladestation, Speicher) und optional den Messpunkt.
 4. Der Hinweis unter dem Messpunkt lautet je nach Typ `MESSPUNKT_HINT` bzw. bei Ladestation `MESSPUNKT_HINT_LADESTATION` (RFID, siehe `Specs/Ladestationen.md`, FR-3).
 5. Nur beim Typ **Konsument** erscheint die Checkbox „Zählt als Wohnung in der Nebenkostenabrechnung“ (`EINHEIT_NEBENKOSTEN_RELEVANT`) mit Hinweistext; bei allen anderen Typen ist sie ausgeblendet. Bedeutung des Kennzeichens: `Specs/Nebenkosten/Abrechnung.md`, FR-2.
-6. Der Button „Erstellen“ ist gesperrt, solange der Name leer oder nur Leerzeichen ist; darunter steht dann `NAME_IST_ERFORDERLICH`.
+6. Der Button „Erstellen“ ist gesperrt, solange der Name (ohne Leerzeichen am Rand) kürzer als 2 Zeichen ist; darunter steht `NAME_IST_ERFORDERLICH` (leer) bzw. `EINHEIT_NAME_LAENGE` (1 Zeichen). Mehr als 30 Zeichen verhindert `maxlength`.
 7. User klickt „Erstellen“ → `POST /api/einheit`.
 8. Das Backend validiert (Abschnitt Validierungen), prüft die Einmaligkeit von `BEZUG`/`RUECKLIEFERUNG`/`SPEICHER`, normalisiert dann einen leeren bzw. nur aus Leerzeichen bestehenden Messpunkt auf `null`, prüft die RFID-Eindeutigkeit bei `LADESTATION` (FR-6), verwirft eine mitgeschickte `id`, setzt `org_id` aus dem Mandantenkontext und speichert – es entsteht immer eine neue Einheit (Hintergrund: Anhang A.4).
 9. Bei Erfolg: Formular schliesst, Erfolgsmeldung `EINHEIT_ERSTELLT` (verschwindet nach 5 s), Liste wird neu geladen.
-10. Bei Fehler bleibt das Formular offen; die Meldung ist der übersetzte Fehler-Key aus `error.error` des Backends, sonst der Text „Fehler beim Erstellen: “ + technische Meldung.
+10. Bei Fehler bleibt das Formular offen; die Meldung ist der übersetzte Fehler-Key des Backends – aus `{ "error": <Key> }` der Service-Regeln oder aus dem Feld-Rumpf `{ "<feld>": <Key> }` der Bean-Validation (erste Meldung) –, sonst der Text „Fehler beim Erstellen: “ + technische Meldung.
 
 ### FR-4: Einheit bearbeiten
 1. User wählt im Kebab-Menü einer Zeile „Bearbeiten“; das Formular öffnet sich mit einer Kopie der Zeile (Titel `EINHEIT_BEARBEITEN`, Button `AKTUALISIEREN`).
@@ -50,20 +52,21 @@
 3. Bestätigt er → `DELETE /api/einheit/{id}`.
 4. Existiert die Einheit (im eigenen Mandanten) nicht → `404`.
 5. Sind der Einheit Mieter zugeordnet, weist das Backend das Löschen ab (`400`, Meldung mit der Anzahl zugeordneter Mieter) – Regel aus `Specs/Ladestationen.md`, FR-2.
+5a. Hat die Einheit Messwerte oder Zählerrohdaten, weist das Backend das Löschen ab (`400` mit `EINHEIT_HAT_MESSWERTE`). Ohne diese Prüfung scheiterte es erst am Fremdschlüssel – als `409` mit allgemeinem Datenbanktext.
 6. Sonst wird die Einheit gelöscht (`204`); ihre Tarifpositionen und Gerätezustände verschwinden per `ON DELETE CASCADE` mit ihr.
 7. Bei Erfolg: Erfolgsmeldung `EINHEIT_GELOESCHT`, Liste wird neu geladen.
-8. Bei Fehler: Meldung ist `error.error.error`, sonst `error.error` (Text-Rumpf), sonst `FEHLER_LOESCHEN_EINHEIT`; die Liste wird nicht neu geladen.
+8. Bei Fehler: Meldung ist der übersetzte Key aus `error.error.error`, sonst der Text-Rumpf `error.error`, sonst `FEHLER_LOESCHEN_EINHEIT` (übersetzt); die Liste wird nicht neu geladen.
 
 ### FR-6: Typspezifische Regeln beim Speichern
 Die Regeln gehören den Features, die die Typen eingeführt haben; hier nur der Verweis:
 * `BEZUG` und `RUECKLIEFERUNG`: je Mandant höchstens eine Einheit pro Typ → `400` mit `EINHEIT_BILANZ_TYP_EXISTIERT` (`Specs/Bilanzmesspunkt.md`, FR-1.3).
 * `SPEICHER`: je Mandant höchstens eine Einheit → `400` mit `EINHEIT_SPEICHER_EXISTIERT` (`Specs/Batteriespeicher.md`, FR-1.3).
-* `LADESTATION`: Messpunkt (RFID) je Mandant eindeutig unter den Ladestationen → `400` mit `EINHEIT_MESSPUNKT_EXISTIERT` (`Specs/Ladestationen.md`, FR-2).
+* `LADESTATION`: Messpunkt (RFID) je Mandant eindeutig unter den Ladestationen → `400` mit `EINHEIT_MESSPUNKT_EXISTIERT` (`Specs/Ladestationen.md`, FR-2). Ohne RFID wird eine Ladestation trotzdem gespeichert; die Eindeutigkeit gilt nur für gesetzte Messpunkte.
 * `PRODUCER` und `CONSUMER`: keine Mengen- oder Messpunktbeschränkung.
 
 ### FR-7: Sprung zu den Tarifpositionen
 1. User wählt im Kebab-Menü einer Zeile „Tarifpositionen“.
-2. System navigiert auf `/tarifpositionen?einheitId=<id>` (Seite und Vorauswahl: `Specs/Ladestationen.md`, FR-3). Der Eintrag erscheint bei jeder Einheit, unabhängig vom Typ.
+2. System navigiert auf `/tarifpositionen?einheitId=<id>` (Seite und Vorauswahl: `Specs/Ladestationen.md`, FR-3, und `Specs/Tarifpositionen.md`). Der Eintrag erscheint bei jeder Einheit, unabhängig vom Typ und auch ohne `einheit:write`.
 
 ### Datenmodell & Persistierung
 * **Tabelle:** `zev.einheit` (Ist-Schema per `information_schema`/`pg_constraint`; Entity `backend-service/src/main/java/ch/nacht/entity/Einheit.java`)
@@ -97,18 +100,17 @@ Die Regeln gehören den Features, die die Typen eingeführt haben; hier nur der 
 
 ### API-Endpunkte
 
-> Klassenebene `@PreAuthorize("hasAuthority('einheit:write')")`; nur `GET /api/einheit` überschreibt mit `einheit:read` (`controller/EinheitController.java`). Request- und Response-Typ ist die Entity `Einheit` (kein DTO).
+> Klassenebene `@PreAuthorize("hasAuthority('einheit:write')")`; nur `GET /api/einheit` überschreibt mit `einheit:read` (`controller/EinheitController.java`). Request- und Response-Typ ist die Entity `Einheit` (kein DTO). Einen Einzelabruf `GET /api/einheit/{id}` gibt es nicht (Anhang A.6).
 
 | Methode | Pfad                   | Permission      | Request-Body                          | Response                  | Status-Codes                |
 |---------|------------------------|-----------------|---------------------------------------|---------------------------|-----------------------------|
 | GET     | `/api/einheit`         | `einheit:read`  | –                                     | `List<Einheit>` (Name ↑)  | 200 / 401 / 403             |
-| GET     | `/api/einheit/{id}`    | `einheit:write` | –                                     | `Einheit`                 | 200 / 401 / 403 / 404       |
 | POST    | `/api/einheit`         | `einheit:write` | `Einheit` (`@Valid`)                  | `Einheit`                 | 201 / 400 / 401 / 403       |
 | PUT     | `/api/einheit/{id}`    | `einheit:write` | `Einheit` (`@Valid`)                  | `Einheit`                 | 200 / 400 / 401 / 403 / 404 |
 | DELETE  | `/api/einheit/{id}`    | `einheit:write` | –                                     | –                         | 204 / 400 / 401 / 403 / 404 |
 | POST    | `/api/einheit/match`   | `einheit:write` | `EinheitMatchRequestDTO` (`filename`) | `EinheitMatchResponseDTO` | 200 / 400 / 401 / 403       |
 
-* **Fehlerrümpfe** (`exception/GlobalExceptionHandler.java`): Bean-Validation → `400` mit `{ "<feld>": "<Meldung>" }`; fachliche Regeln (`IllegalStateException`) → `400` mit `{ "error": "<Key oder Text>" }`; Datenbank-Constraint (`DataIntegrityViolationException`) → `409` mit Klartext-Rumpf.
+* **Fehlerrümpfe** (`exception/GlobalExceptionHandler.java`): Bean-Validation → `400` mit `{ "<feld>": "<Translation-Key>" }`; fachliche Regeln (`IllegalStateException`) → `400` mit `{ "error": "<Key oder Text>" }`; Datenbank-Constraint (`DataIntegrityViolationException`) → `409` mit Klartext-Rumpf.
 * **`id` und `orgId` im Request-Body** übernimmt der Server nicht (`@JsonProperty(access = READ_ONLY)` in `entity/Einheit.java`); `PUT` nimmt die ID aus dem Pfad. In der Antwort stehen beide Felder weiterhin (Anhang A.4).
 * **`POST /match`** gehört fachlich zum Messwerte-Upload (KI-Zuordnung über den Dateinamen, `Specs/Messwerte-mit-KI.md`) und wird hier nur aufgeführt, weil er im `EinheitController` liegt und `einheit:write` verlangt.
 
@@ -116,18 +118,19 @@ Die Regeln gehören den Features, die die Typen eingeführt haben; hier nur der 
 
 | Feld        | Regel                                                         | FE / BE | Fehlermeldung (Translation-Key / Text)                       |
 |-------------|---------------------------------------------------------------|---------|--------------------------------------------------------------|
-| `name`      | nicht leer / nicht nur Leerzeichen                            | FE + BE | FE: `NAME_IST_ERFORDERLICH`; BE: `400` „Name is required“ oder „Name must be between 2 and 30 characters“ (bei leerem Namen greifen `@NotBlank` und `@Size` zugleich; der Handler behält nur eine Meldung je Feld) |
-| `name`      | max. 30 Zeichen                                               | FE (`maxlength="30"`) + BE | BE: `400` „Name must be between 2 and 30 characters“ |
-| `name`      | min. 2 Zeichen                                                | BE      | `400` „Name must be between 2 and 30 characters“             |
-| `typ`       | Pflicht                                                       | FE (`required`, vorbelegt) + BE (`@NotNull`) | BE: `400` „Typ is required“            |
-| `messpunkt` | max. 50 Zeichen                                               | FE (`maxlength="50"`) + BE (`@Size`) | BE: `400` „Messpunkt must not exceed 50 characters“ |
+| `name`      | nicht leer / nicht nur Leerzeichen                            | FE + BE | `NAME_IST_ERFORDERLICH`; BE kann bei leerem Namen auch `EINHEIT_NAME_LAENGE` melden (`@NotBlank` und `@Size` greifen zugleich; der Handler behält nur eine Meldung je Feld) |
+| `name`      | max. 30 Zeichen                                               | FE (`maxlength="30"`) + BE | `EINHEIT_NAME_LAENGE`                       |
+| `name`      | min. 2 Zeichen                                                | FE + BE | `EINHEIT_NAME_LAENGE`                                        |
+| `typ`       | Pflicht                                                       | FE (`required`, vorbelegt) + BE (`@NotNull`) | `TYP_IST_ERFORDERLICH`                 |
+| `messpunkt` | max. 50 Zeichen                                               | FE (`maxlength="50"`) + BE (`@Size`) | `EINHEIT_MESSPUNKT_ZU_LANG`            |
 | `messpunkt` | leer / nur Leerzeichen → `null`                               | BE      | – (Normalisierung, `EinheitService.pruefeLadestationMesspunkt`) |
 | `typ`       | `BEZUG`/`RUECKLIEFERUNG` je Mandant einmal                     | BE      | `EINHEIT_BILANZ_TYP_EXISTIERT` (FR-6)                        |
 | `typ`       | `SPEICHER` je Mandant einmal                                  | BE      | `EINHEIT_SPEICHER_EXISTIERT` (FR-6)                          |
 | `messpunkt` | bei `LADESTATION` je Mandant eindeutig                         | BE (+ DB-Index) | `EINHEIT_MESSPUNKT_EXISTIERT` (FR-6)                 |
 | –           | Löschen nur ohne zugeordnete Mieter                            | BE      | Text „Einheit kann nicht gelöscht werden: <n> Mieter zugeordnet“ |
+| –           | Löschen nur ohne Messwerte und Zählerrohdaten                  | BE      | `EINHEIT_HAT_MESSWERTE` (FR-5.5a)                            |
 
-Quellen: `entity/Einheit.java` (Bean-Validation), `service/EinheitService.java`, `components/einheit-form/einheit-form.component.html`.
+Quellen: `entity/Einheit.java` (Bean-Validation; die Meldungen sind Translation-Keys), `service/EinheitService.java`, `components/einheit-form/einheit-form.component.html`.
 
 ### Übersetzungen (i18n)
 
@@ -160,15 +163,23 @@ Texte aus `zev.translation` (gelesen per `zev-db`):
 | `EINHEIT_SPEICHER_EXISTIERT`        | Es ist bereits eine Einheit vom Typ Speicher erfasst. Pro Mandant ist nur eine zulässig. | A storage unit already exists. Only one is allowed per tenant. |
 | `EINHEIT_MESSPUNKT_EXISTIERT`       | Diese RFID ist bereits einer anderen Ladestation zugeordnet | This RFID already belongs to another charging station |
 
-* `FEHLER_LOESCHEN_EINHEIT` wird im Code als Fallback verwendet, steht aber **nicht** in `zev.translation` (Abschnitt 8).
+Neu mit `V185__Add_Einheitenverwaltung_Fehler_Translations.sql` (Anhang A.6):
+
+| Key                         | Deutsch                                                         | Englisch                                        |
+|-----------------------------|-----------------------------------------------------------------|-------------------------------------------------|
+| `EINHEIT_NAME_LAENGE`       | Der Name muss 2 bis 30 Zeichen lang sein                        | Name must be between 2 and 30 characters        |
+| `TYP_IST_ERFORDERLICH`      | Typ ist erforderlich                                            | Type is required                                |
+| `EINHEIT_MESSPUNKT_ZU_LANG` | Der Messpunkt darf höchstens 50 Zeichen lang sein               | Measuring point must not exceed 50 characters   |
+| `FEHLER_LOESCHEN_EINHEIT`   | Fehler beim Löschen der Einheit                                 | Error deleting the unit                         |
+| `EINHEIT_HAT_MESSWERTE`     | Einheit kann nicht gelöscht werden: Es sind Messwerte vorhanden | Unit cannot be deleted: measurements exist      |
 
 ### Layout & Navigation
 * **Route:** `/einheiten` → `EinheitListComponent` (`data: { permissions: ['einheit:read'] }`, `frontend-service/src/app/app.routes.ts`)
-* **Menüeintrag:** Untermenü „Admin“, erster Eintrag, Label `EINHEITEN_VERWALTUNG`, Feather-Icon `grid` (`navigation.component.ts`, `adminEintraege`; Permissions aus der Route gelesen) – siehe `Specs/Hamburgermenü.md`, FR-2.
+* **Menüeintrag:** Untermenü „Admin“, erster Eintrag, Label `EINHEITEN_VERWALTUNG`, Feather-Icon `home` wie der Seitentitel (`navigation.component.ts`, `adminEintraege`; Permissions aus der Route gelesen) – siehe `Specs/Hamburgermenü.md`, FR-2.
 * **Seitentitel:** `EINHEITEN_VERWALTUNG` mit Feather-Icon `home`.
 * **Aufbau:** Liste und Formular auf derselben Seite, nie gleichzeitig sichtbar (`showForm`). Formular als eigene Komponente `EinheitFormComponent` (`@Input einheit`, `@Output save`/`cancel`).
-* **Kebab-Menü je Zeile:** Bearbeiten (`edit-2`), Tarifpositionen (`zap`), Löschen (`trash-2`, rot markiert).
-* **Design-System-Klassen:** `.zev-container`, `.zev-message` (`--success`/`--error`/`--clickable`, `__dismiss`), `.zev-button--primary`/`--secondary`, `.zev-table`, `.zev-table__header--sortable`, `.zev-table__sort-indicator`, `.zev-form-group`, `.zev-input`, `.zev-select`, `.zev-form-error`, `.zev-form-hint`, `.zev-checkbox-item`, `.zev-checkbox`, `.zev-form-actions--equal`. Der Formularrahmen nutzt die lokale Klasse `.form-container` (`einheit-form.component.css`).
+* **Kebab-Menü je Zeile:** Bearbeiten (`edit-2`), Tarifpositionen (`zap`), Löschen (`trash-2`, rot markiert); ohne `einheit:write` nur Tarifpositionen (FR-1.3a).
+* **Design-System-Klassen:** `.zev-container`, `.zev-message` (`--success`/`--error`/`--clickable`, `__dismiss`), `.zev-button--primary`/`--secondary`, `.zev-table`, `.zev-table__header--sortable`, `.zev-table__sort-indicator`, `.zev-form-group`, `.zev-input`, `.zev-select`, `.zev-form-error`, `.zev-form-hint`, `.zev-checkbox-item`, `.zev-checkbox`, `.zev-form-actions--equal`, `.zev-form-container` (Formularrahmen). Das Formular hat kein eigenes CSS.
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
@@ -182,6 +193,10 @@ Texte aus `zev.translation` (gelesen per `zev-db`):
 * [x] Ohne Einheiten erscheint `KEINE_EINHEITEN_VORHANDEN` statt der Tabelle. (Test: einheit-list.component.spec.ts › template › should show KEINE_EINHEITEN_VORHANDEN instead of the table when the list is empty)
 * [x] Schlägt das Laden fehl, erscheint eine Fehlermeldung vom Typ `error`. (Test: einheit-list.component.spec.ts › loadEinheiten › should show error message on failure)
 
+### Berechtigung in der Oberfläche
+* [x] Ohne `einheit:write` sind „Neue Einheit erstellen“ sowie „Bearbeiten“ und „Löschen“ im Kebab-Menü ausgeblendet; „Tarifpositionen“ bleibt. (Test: einheit-list.component.spec.ts › without einheit:write › should hide the create button; Test: einheit-list.component.spec.ts › without einheit:write › should offer only the tarifpositionen entry in the kebab menu)
+* [x] Mit `einheit:write` sind der Button und alle drei Kebab-Einträge sichtbar. (Test: einheit-list.component.spec.ts › with einheit:write › should show the create button and all kebab entries)
+
 ### Sortierung
 * [x] Vorbelegt ist Name aufsteigend. (Test: einheit-list.component.spec.ts › initialization › should have default sort by name ascending)
 * [x] Klick auf die aktive Spalte kehrt die Richtung um, Klick auf eine andere Spalte sortiert aufsteigend nach ihr. (Test: einheit-list.component.spec.ts › onSort › should toggle sort direction when clicking same column; Test: einheit-list.component.spec.ts › onSort › should set new column and reset direction to asc)
@@ -189,6 +204,8 @@ Texte aus `zev.translation` (gelesen per `zev-db`):
 * [x] Sortieren nach Name, Typ und Messpunkt ordnet die Zeilen entsprechend. (Test: einheit-list.component.spec.ts › onSort › should sort einheiten by name ascending; Test: einheit-list.component.spec.ts › onSort › should sort einheiten by typ descending; Test: einheit-list.component.spec.ts › onSort › should sort by messpunkt so RFIDs are groupable)
 * [x] Leere Werte stehen beim aufsteigenden Sortieren am Ende. (Test: einheit-list.component.spec.ts › onSort › should handle null values in sort)
 * [x] Leere Werte stehen auch beim absteigenden Sortieren am Ende. (Test: einheit-list.component.spec.ts › onSort - empty values › should keep empty values at the end when sorting descending)
+* [x] Die Typ-Spalte sortiert nach dem angezeigten Text, nicht nach dem Enum-Wert. (Test: einheit-list.component.spec.ts › onSort - typ by displayed text › should sort the type column by the translated label, not by the enum value; Test: einheit-list.component.spec.ts › onSort › should sort by typ with LADESTATION included)
+* [x] Nach dem Neuladen gilt die gewählte Sortierung weiter. (Test: einheit-list.component.spec.ts › loadEinheiten - keeps the chosen sort › should apply the chosen sort after reloading)
 
 ### Erstellen
 * [x] „Neue Einheit erstellen“ blendet die Liste aus und zeigt ein leeres Formular mit Name, Typ, Messpunkt, Erstellen und Abbrechen. (Test: einheit-list.component.spec.ts › onCreateNew › should set selectedEinheit to null and show form; E2E: einheiten-verwaltung.spec.ts › should show einheit form when clicking create button)
@@ -196,6 +213,9 @@ Texte aus `zev.translation` (gelesen per `zev-db`):
 * [x] Das Typ-Dropdown bietet jeden der sechs Typen genau einmal an. (Test: einheit-form.component.spec.ts › initialization › should offer every einheit type exactly once)
 * [x] Bei leerem oder nur aus Leerzeichen bestehendem Namen wird nichts gesendet. (Test: einheit-form.component.spec.ts › events › should not emit save event when name is empty; Test: einheit-form.component.spec.ts › events › should not emit save event when name is only whitespace)
 * [x] Bei leerem oder nur aus Leerzeichen bestehendem Namen ist „Erstellen“ gesperrt und `NAME_IST_ERFORDERLICH` steht unter dem Feld. (Test: einheit-form.component.spec.ts › template › should disable submit and show NAME_IST_ERFORDERLICH when name is empty; Test: einheit-form.component.spec.ts › template › should disable submit and show NAME_IST_ERFORDERLICH when name is only whitespace; Test: einheit-form.component.spec.ts › template › should enable submit and hide the error when name is filled)
+* [x] Bei einem Namen mit einem Zeichen ist „Erstellen“ gesperrt, `EINHEIT_NAME_LAENGE` steht unter dem Feld, und nichts wird gesendet; ab 2 Zeichen wird gesendet. (Test: einheit-form.component.spec.ts › template › should disable submit and show EINHEIT_NAME_LAENGE when name has one character; Test: einheit-form.component.spec.ts › name length › should not emit save for a name with one character; Test: einheit-form.component.spec.ts › name length › should emit save for a name with two characters)
+* [x] Eine Ladestation ohne RFID lässt sich speichern. (Test: einheit-form.component.spec.ts › einheit types › should allow a LADESTATION without RFID (the server saves it as well); Test: EinheitServiceTest#createEinheit_LadestationOhneMesspunkt_SkipsRfidCheck)
+* [x] Das Formular nutzt den Design-System-Rahmen `.zev-form-container`. (Test: einheit-form.component.spec.ts › name length › should use the design-system form container)
 * [x] Eine Einheit ohne Messpunkt lässt sich speichern. (Test: einheit-form.component.spec.ts › optional fields › should allow submission without messpunkt)
 * [x] Die Checkbox „Zählt als Wohnung“ erscheint nur beim Typ Konsument und ist beim Anlegen gesetzt. (Test: einheit-form.component.spec.ts › template › should show the checked nebenkosten checkbox for a new CONSUMER; Test: einheit-form.component.spec.ts › template › should hide the nebenkosten checkbox for every type other than CONSUMER)
 * [x] Der Messpunkt-Hinweis wechselt beim Typ Ladestation auf `MESSPUNKT_HINT_LADESTATION`. (Test: einheit-form.component.spec.ts › template › should show MESSPUNKT_HINT_LADESTATION for LADESTATION and MESSPUNKT_HINT otherwise)
@@ -214,6 +234,8 @@ Texte aus `zev.translation` (gelesen per `zev-db`):
 ### Löschen
 * [x] „Löschen“ fragt per Dialog nach; bei Abbruch bleibt die Einheit erhalten. (Test: einheit-list.component.spec.ts › onDelete › should not delete when user cancels; E2E: einheiten-verwaltung.spec.ts › should show confirmation dialog when deleting einheit)
 * [x] Nach Bestätigung wird die Einheit gelöscht, `EINHEIT_GELOESCHT` erscheint und die Liste wird neu geladen. (Test: einheit-list.component.spec.ts › onDelete › should reload einheiten after successful delete; Test: einheit-list.component.spec.ts › onDelete › should show success message after delete; E2E: einheiten-verwaltung.spec.ts › should delete einheit when confirmed)
+* [x] Hat die Einheit Messwerte oder Zählerrohdaten, wird das Löschen mit `EINHEIT_HAT_MESSWERTE` abgewiesen (`400`); die übersetzte Meldung erscheint. (Test: EinheitServiceTest#deleteEinheit_MitMesswerten_ThrowsEigenenKey; Test: EinheitServiceTest#deleteEinheit_MitZaehlerRohdaten_ThrowsEigenenKey; Test: EinheitControllerTest#deleteEinheit_MitMesswerten_Returns400MitFehlerKey; Test: einheit-list.component.spec.ts › translated server messages › should translate EINHEIT_HAT_MESSWERTE when the unit still has measurements)
+* [x] Ohne verwertbare Serverantwort erscheint der übersetzte Fallback `FEHLER_LOESCHEN_EINHEIT`. (Test: einheit-list.component.spec.ts › translated server messages › should translate the delete fallback FEHLER_LOESCHEN_EINHEIT)
 * [x] Ist der Einheit ein Mieter zugeordnet, wird das Löschen abgewiesen; die Meldung des Servers mit der Anzahl erscheint, die Liste wird nicht neu geladen. (Test: EinheitServiceTest#deleteEinheit_MitZugeordnetenMietern_ThrowsException; Test: einheit-list.component.spec.ts › onDelete › should show the server message when the unit is still assigned to tenants; Test: einheit-list.component.spec.ts › onDelete › should not reload the einheiten when the delete is rejected)
 
 ### Typspezifische Regeln (Anzeige der Fehler)
@@ -231,14 +253,14 @@ Texte aus `zev.translation` (gelesen per `zev-db`):
 * [x] `POST /api/einheit` nur mit `einheit:read` (Rolle `zev_user`) → `403`, der Service wird nicht aufgerufen. (Test: ControllerAuthorizationTest#createEinheit_withReadPermissionOnly_forbidden)
 * [x] `PUT /api/einheit/{id}` ohne `einheit:write` → `403`. (Test: ControllerAuthorizationTest#updateEinheit_withoutPermission_forbidden)
 * [x] Nicht authentifiziert → `401`. (Test: ControllerAuthorizationTest#createEinheit_unauthenticated_unauthorized)
-* [x] `GET /api/einheit` ist mit `einheit:read` erreichbar (`200`), `DELETE` und `GET /{id}` ohne `einheit:write` → `403`. (Test: ControllerAuthorizationTest#getAllEinheiten_withEinheitRead_ok; Test: ControllerAuthorizationTest#getAllEinheiten_withoutEinheitRead_forbidden; Test: ControllerAuthorizationTest#deleteEinheit_withReadPermissionOnly_forbidden; Test: ControllerAuthorizationTest#getEinheitById_withReadPermissionOnly_forbidden)
+* [x] `GET /api/einheit` ist mit `einheit:read` erreichbar (`200`), `DELETE` ohne `einheit:write` → `403`. (Test: ControllerAuthorizationTest#getAllEinheiten_withEinheitRead_ok; Test: ControllerAuthorizationTest#getAllEinheiten_withoutEinheitRead_forbidden; Test: ControllerAuthorizationTest#deleteEinheit_withReadPermissionOnly_forbidden)
 * [x] `POST` → `201`. (Test: EinheitControllerTest#createEinheit_ValidInput_ReturnsCreated)
 * [x] `PUT` auf nicht existierende ID → `404`. (Test: EinheitControllerTest#updateEinheit_NotFound_Returns404; Test: EinheitServiceTest#updateEinheit_NotFound_ReturnsEmpty)
 * [x] `DELETE` → `204`, auf nicht existierende ID → `404`. (Test: EinheitControllerTest#deleteEinheit_Exists_ReturnsNoContent; Test: EinheitControllerTest#deleteEinheit_NotFound_Returns404)
-* [x] `GET /api/einheit/{id}` auf nicht existierende oder fremde ID → `404`. (Test: EinheitControllerTest#getEinheitById_NotFound_Returns404; Test: EinheitServiceTest#getEinheitById_NotFound_ReturnsEmpty; Test: EinheitRepositoryIT#shouldNotSeeEinheitOfOtherOrgWhenOrgFilterEnabled)
+* [x] Einen Einzelabruf `GET /api/einheit/{id}` gibt es nicht. (Test: EinheitControllerTest#getEinheitById_GibtEsNicht)
 * [x] `DELETE /api/einheit/{id}` auf die ID eines fremden Mandanten → `404`. (Test: EinheitControllerTest#deleteEinheit_NotFound_Returns404; Test: EinheitServiceTest#deleteEinheit_NotExists_ReturnsFalse; Test: EinheitRepositoryIT#existsByIdSiehtNurDenEigenenMandanten)
 * [x] Leerer Name, fehlender Typ oder Messpunkt über 50 Zeichen → `400`. (Test: EinheitControllerTest#createEinheit_InvalidName_ReturnsBadRequest; Test: EinheitControllerTest#createEinheit_NullTyp_ReturnsBadRequest; Test: EinheitControllerTest#createEinheit_MesspunktZuLang_ReturnsBadRequest)
-* [x] Name mit einem Zeichen oder über 30 Zeichen → `400`. (Test: EinheitControllerTest#createEinheit_NameMitEinemZeichen_ReturnsBadRequest; Test: EinheitControllerTest#createEinheit_NameMit31Zeichen_ReturnsBadRequest; Test: EinheitControllerTest#createEinheit_NameMit2Und30Zeichen_ReturnsCreated)
+* [x] Name mit einem Zeichen oder über 30 Zeichen → `400` mit `EINHEIT_NAME_LAENGE`. (Test: EinheitControllerTest#createEinheit_NameMitEinemZeichen_ReturnsBadRequest; Test: EinheitControllerTest#createEinheit_NameMit31Zeichen_ReturnsBadRequest; Test: EinheitControllerTest#createEinheit_NameMit2Und30Zeichen_ReturnsCreated)
 * [x] Die Einmaligkeitsprüfungen sehen nur den eigenen Mandanten. (Test: EinheitRepositoryIT#shouldNotLetBilanzTypOfOtherOrgBlockSingletonCheck; Test: EinheitRepositoryIT#shouldNotLetRfidOfOtherOrgBlockUniquenessCheck)
 * [x] `id` und `orgId` im Body von `POST /api/einheit` werden nicht übernommen. (Test: EinheitControllerTest#createEinheit_IdUndOrgIdImBody_WerdenIgnoriert)
 * [x] Eine beim Anlegen mitgeschickte ID erzeugt eine neue Einheit; die Einheit mit dieser ID – auch die eines fremden Mandanten – bleibt unverändert. (Test: EinheitServiceTest#createEinheit_MitId_LegtNeueEinheitAn; Test: FremdeIdBeimSpeichernIT#createEinheit_MitFremderId_LegtNeueEinheitAnUndLaesstFremdeUnveraendert)
@@ -250,7 +272,7 @@ Texte aus `zev.translation` (gelesen per `zev-db`):
 
 ### NFR-2: Sicherheit
 * **Backend:** `@PreAuthorize("hasAuthority('einheit:write')")` auf Klassenebene von `EinheitController`; `GET /api/einheit` mit `@PreAuthorize("hasAuthority('einheit:read')")` auf Methodenebene.
-* **Frontend:** Route `/einheiten` mit `AuthGuard` und `data.permissions: ['einheit:read']`. Buttons und Kebab-Einträge zum Ändern sind nicht zusätzlich nach Permission ausgeblendet.
+* **Frontend:** Route `/einheiten` mit `AuthGuard` und `data.permissions: ['einheit:read']`. Button und Kebab-Einträge zum Ändern erscheinen nur mit `einheit:write` (`Keycloak.hasRealmRole`, wie in `systemmeldungen` und `einstellungen`) – das ist Bedienkomfort, die Sicherheitsgrenze bleibt das Backend.
 * **Fachrollen:** `einheit:read` – `zev_user`, `org_admin`, `zev_admin`; `einheit:write` – `org_admin`, `zev_admin` (`Specs/Berechtigungen.md`).
 * **Mandantentrennung:** `orgFilter` in jeder Service-Methode; Einzelzugriff beim Lesen und Ändern über `findFirstById` (`EinheitRepository.java`), beim Löschen über `existsById` (gefilterte Abfrage) vor `deleteById`; `org_id` setzt immer der Server (Anlegen: Mandantenkontext, Ändern: bestehende Einheit); `id` und `orgId` aus dem Request-Body werden nicht übernommen, und `createEinheit` verwirft eine `id` zusätzlich selbst (Anhang A.4).
 
@@ -262,8 +284,8 @@ Texte aus `zev.translation` (gelesen per `zev-db`):
 
 * [x] Leere Liste → Hinweis `KEINE_EINHEITEN_VORHANDEN` statt Tabelle (`einheit-list.component.html`). (Test: einheit-list.component.spec.ts › template › should show KEINE_EINHEITEN_VORHANDEN instead of the table when the list is empty)
 * [x] Netzwerkfehler beim Laden → Fehlermeldung „Fehler beim Laden der Einheiten: …“ (`.zev-message--error`, bleibt bis zum Wegklicken). (Test: einheit-list.component.spec.ts › loadEinheiten › should show error message on failure)
-* [x] Nicht existierende oder fremde ID bei `GET /{id}`, `PUT`, `DELETE` → `404` (Service liefert leer bzw. `false`). (Test: EinheitControllerTest#getEinheitById_NotFound_Returns404; Test: EinheitControllerTest#updateEinheit_NotFound_Returns404; Test: EinheitControllerTest#deleteEinheit_NotFound_Returns404; Test: EinheitServiceTest#updateEinheit_NotFound_ReturnsEmpty; Test: EinheitRepositoryIT#shouldNotSeeEinheitOfOtherOrgWhenOrgFilterEnabled; Test: EinheitRepositoryIT#existsByIdSiehtNurDenEigenenMandanten)
-* [x] Ungültige Werte → `400` aus der Bean-Validation, Rumpf `{ "<feld>": "<Meldung>" }`; die Liste zeigt dann den Fallback „Fehler beim Erstellen/Aktualisieren: “ + technische Meldung. (Test: EinheitControllerTest#createEinheit_InvalidName_ReturnsBadRequest; Test: EinheitControllerTest#createEinheit_InvalidName_LiefertFeldRumpf; Test: einheit-list.component.spec.ts › onFormSubmit - create › should show error message on create failure; Test: einheit-list.component.spec.ts › onFormSubmit - update › should show error message on update failure)
+* [x] Nicht existierende oder fremde ID bei `PUT`, `DELETE` → `404` (Service liefert leer bzw. `false`). (Test: EinheitControllerTest#updateEinheit_NotFound_Returns404; Test: EinheitControllerTest#deleteEinheit_NotFound_Returns404; Test: EinheitServiceTest#updateEinheit_NotFound_ReturnsEmpty; Test: EinheitRepositoryIT#shouldNotSeeEinheitOfOtherOrgWhenOrgFilterEnabled; Test: EinheitRepositoryIT#existsByIdSiehtNurDenEigenenMandanten)
+* [x] Ungültige Werte → `400` aus der Bean-Validation, Rumpf `{ "<feld>": "<Translation-Key>" }`; die Liste zeigt den übersetzten Key. Nur ohne verwertbaren Rumpf (z.B. Netzwerkfehler) erscheint „Fehler beim Erstellen/Aktualisieren: “ + technische Meldung. (Test: EinheitControllerTest#createEinheit_InvalidName_LiefertFeldRumpf; Test: einheit-list.component.spec.ts › translated server messages › should translate the field message of a Bean-Validation error; Test: einheit-list.component.spec.ts › onFormSubmit - create › should show error message on create failure; Test: einheit-list.component.spec.ts › onFormSubmit - update › should show error message on update failure)
 * [x] Zweite Bilanz-/Speicher-Einheit oder doppelte RFID → `400` mit Fehler-Key, übersetzt angezeigt (FR-6). (Test: EinheitServiceTest#createEinheit_ZweiterBezug_ThrowsBilanzTypKey; Test: EinheitServiceTest#createEinheit_ZweiteRuecklieferung_ThrowsBilanzTypKey; Test: EinheitServiceTest#updateEinheit_TypwechselZuBezugNebenAnderemBezug_ThrowsBilanzTypKey; Test: EinheitServiceTest#createEinheit_ZweiterSpeicher_ThrowsMitEigenemKey; Test: EinheitServiceTest#createEinheit_LadestationMitVergebenerRfid_ThrowsException; Test: EinheitControllerTest#createEinheit_ZweiterBilanzTyp_Returns400MitFehlerKey; Test: einheit-list.component.spec.ts › onFormSubmit - create › should translate the server key when the RFID is already used)
 * [x] Löschen mit zugeordneten Mietern → abgewiesen (`400`, Meldung mit Anzahl). (Test: EinheitServiceTest#deleteEinheit_MitZugeordnetenMietern_ThrowsException; Test: einheit-list.component.spec.ts › onDelete › should show the server message when the unit is still assigned to tenants)
 * [x] Löschen ohne Mieter → Tarifpositionen und Gerätezustände werden mitgelöscht (`ON DELETE CASCADE`). (Test: FlywaySchemaIT#einheitLoeschen_LoeschtTarifpositionenUndGeraetezustaendeMit)
@@ -291,22 +313,11 @@ Texte aus `zev.translation` (gelesen per `zev-db`):
 * **Bedeutung des Kennzeichens `nebenkosten_relevant`** für die Umlage: `Specs/Nebenkosten/Abrechnung.md`.
 * **`EinheitSelectorComponent`** (Auswahlliste anderer Seiten) gehört nicht zur Verwaltungsseite.
 * Kein Import/Export von Einheiten, keine Paginierung, keine Suche/Filter in der Liste.
+* **Vorerst nicht übersetzt** (Entscheid vom 19.10.2026, Anhang A.6): die Fallback-Präfixe „Fehler beim Laden der Einheiten: “, „Fehler beim Erstellen: “, „Fehler beim Aktualisieren: “ (`einheit-list.component.ts`) und die Löschschutz-Meldung „Einheit kann nicht gelöscht werden: <n> Mieter zugeordnet“ (`EinheitService.deleteEinheit`).
 
 ## 8. Offene Fragen
 
-* **Schreib-Buttons ohne `einheit:write`:** Ist: Die Route verlangt nur `einheit:read`; ein `zev_user` sieht „Neue Einheit erstellen“ und im Kebab „Bearbeiten“/„Löschen“, das Backend antwortet beim Speichern/Löschen mit `403`. Vermutlich gemeint: Schreibaktionen nur mit `einheit:write` anzeigen (z.B. `*appPermission`) – oder die Seite bewusst als Leseansicht mit Fehlermeldung beim Schreiben?
-* **Mindestlänge Name:** Ist: Das Backend verlangt 2–30 Zeichen (`@Size(min = 2)`), das Formular prüft nur „nicht leer“; ein Name mit einem Zeichen endet in `400` und der Meldung „Fehler beim Erstellen: Http failure response …“. Vermutlich gemeint: Formular prüft ebenfalls min. 2 Zeichen mit übersetzter Meldung – oder Mindestlänge im Backend entfernen?
-* **Validierungsfehler nicht übersetzt:** Ist: Bean-Validation liefert englische Texte („Name is required“) im Feld-Rumpf `{ "name": "…" }`; die Liste wertet nur `error.error.error` aus und zeigt sonst „Fehler beim Erstellen: “ + `error.message`. Vermutlich gemeint: übersetzte Feldmeldung.
-* **Hartcodierte Texte (Verstoss gegen `Specs/generell.md`):** „Fehler beim Laden der Einheiten: “, „Fehler beim Erstellen: “, „Fehler beim Aktualisieren: “ (`einheit-list.component.ts`) und die Löschschutz-Meldung „Einheit kann nicht gelöscht werden: <n> Mieter zugeordnet“ (`EinheitService.deleteEinheit`) sind nicht übersetzt. Vermutlich gemeint: Translation-Keys (beim Löschschutz mit Platzhalter für die Anzahl).
-* **`FEHLER_LOESCHEN_EINHEIT` fehlt:** Ist: Der Fallback beim Löschfehler zeigt den Key ungeprüft an (ohne `translate`), und der Key steht nicht in `zev.translation` – der Benutzer sieht „FEHLER_LOESCHEN_EINHEIT“ (z.B. bei `404`). Vermutlich gemeint: übersetzter Fallback mit Key in einer Migration.
-* **Löschen einer Einheit mit Messwerten:** Ist: `messwerte` und `zaehler_rohdaten` verweisen ohne `ON DELETE`-Klausel auf die Einheit; der Service prüft nur zugeordnete Mieter. Nach Code-Lesart scheitert das Löschen erst an der Datenbank und endet über den `GlobalExceptionHandler` als `409` mit dem generischen Klartext („…verletzt eine Regel der Datenbank…“); kein Test belegt das. Gewollt: Löschen abweisen mit eigener Meldung („Einheit hat Messwerte“) – oder Messwerte mitlöschen?
-* **`GET /api/einheit/{id}` verlangt `einheit:write`:** Ist: Der Einzelabruf erbt die Klassen-Permission, obwohl er nur liest (dokumentiert in `Specs/Berechtigungen.md`); im Frontend wird `getEinheitById` nirgends aufgerufen. Gewollt so – oder `einheit:read`, bzw. Endpunkt entfernen?
-* **Ladestation ohne RFID:** Ist: Eine Ladestation ohne Messpunkt wird gespeichert (Server prüft die Eindeutigkeit nur bei gesetztem Messpunkt). Der Kommentar im Test `einheit-form.component.spec.ts › should allow a LADESTATION without RFID (server rejects it, not the form)` behauptet, der Server weise das ab. Was gilt?
-* **Sortierung nach Typ:** Ist: Sortiert wird nach dem Enum-Wert (`BEZUG` < `CONSUMER` < `LADESTATION` < `PRODUCER` …), nicht nach dem angezeigten übersetzten Text. Gewollt?
-* **Sortierzustand nach Neuladen:** Ist: Nach Speichern/Löschen lädt die Liste neu in der Server-Reihenfolge (Name ↑), Spalte und Pfeil der zuletzt gewählten Sortierung bleiben aber stehen. Vermutlich gemeint: gewählte Sortierung nach dem Laden erneut anwenden.
-* **Kebab „Tarifpositionen“ bei jedem Typ:** Ist: Der Eintrag erscheint auch bei Konsumenten, Produzenten usw.; die Seite Tarifpositionen bietet laut `Specs/Ladestationen.md`, FR-3 nur Ladestationen an. Gewollt – oder nur bei `LADESTATION` anzeigen?
-* **Icons:** Ist: Menüeintrag mit Icon `grid`, Seitentitel mit Icon `home`. Gewollt unterschiedlich?
-* **Formularrahmen:** Ist: lokale Klasse `.form-container` mit eigenen Farben und ein lokal neu definiertes `.zev-form-hint` statt der Design-System-Klasse `.zev-form-container`. Gewollt?
+* Keine. Die Fragen aus dem Reverse Engineering sind beantwortet (Anhang A.6).
 
 ## Anhang A – Entscheidungen und Verlauf
 
@@ -332,3 +343,26 @@ Entscheid: `createEinheit` setzt die ID auf `null`, und `id`/`orgId` sind für J
 Beim Akzeptanzkriterien-Check vom 18.10.2026 als „kein Akzeptanzkriterium“ erkannt:
 * „Gleichzeitige Bearbeitung → keine Versionsprüfung; der letzte Speichervorgang überschreibt.“ – beschreibt das Fehlen einer Funktion; ein Test schützte vor nichts. Jetzt als Designentscheidung in FR-4.
 * „Löschen einer Einheit mit Messwerten oder Zählerrohdaten → siehe Abschnitt 8.“ – ein Verweis auf eine offene Frage, kein prüfbares Kriterium. Gestrichen; die Frage steht weiter in Abschnitt 8 und wird nach dem Entscheid mit dem gewählten Verhalten als Kriterium neu gefasst.
+
+### A.6 Antworten auf die offenen Fragen (19.10.2026)
+Die Fragen aus dem Reverse Engineering mit den Antworten des Users, im Wortlaut. Umgesetzt wie folgt:
+* Schreib-Buttons → FR-1.3a; Mindestlänge → FR-3.6; übersetzte Validierungsfehler → Validierungen, FR-3.10 (Bean-Validation-Meldungen sind jetzt Translation-Keys); `FEHLER_LOESCHEN_EINHEIT` und `EINHEIT_HAT_MESSWERTE` → FR-5, Migration `V185`.
+* `GET /api/einheit/{id}` wurde entfernt: Kein Client rief ihn auf (`einheit.service.ts#getEinheitById` war ungenutzt); `EinheitService.getEinheitById` bleibt, `MesswerteController` nutzt es intern.
+* Ladestation ohne RFID → „Messpunkt speichern“ heisst nach Rückfrage: ohne RFID speichern wie bisher (FR-6); der irreführende Testname ist korrigiert.
+* Typ-Sortierung und Sortierung nach dem Neuladen → FR-2.3/3a. Kebab „Tarifpositionen“ bleibt bei jedem Typ (FR-7); `Specs/Ladestationen.md` ist an den Code angeglichen (Anhang A.1 dort).
+* Icon → nach Rückfrage beide `home`, obwohl die Startseite im Menü dasselbe Icon trägt. Formularrahmen → `.zev-form-container`, lokales CSS entfernt.
+* Hartcodierte Texte → vorerst nicht (Abschnitt 7).
+
+* **Schreib-Buttons ohne `einheit:write`:** Ist: Die Route verlangt nur `einheit:read`; ein `zev_user` sieht „Neue Einheit erstellen“ und im Kebab „Bearbeiten“/„Löschen“, das Backend antwortet beim Speichern/Löschen mit `403`. Vermutlich gemeint: Schreibaktionen nur mit `einheit:write` anzeigen (z.B. `*appPermission`) – oder die Seite bewusst als Leseansicht mit Fehlermeldung beim Schreiben? --> Vermutung ist korrekt
+* **Mindestlänge Name:** Ist: Das Backend verlangt 2–30 Zeichen (`@Size(min = 2)`), das Formular prüft nur „nicht leer“; ein Name mit einem Zeichen endet in `400` und der Meldung „Fehler beim Erstellen: Http failure response …“. Vermutlich gemeint: Formular prüft ebenfalls min. 2 Zeichen mit übersetzter Meldung – oder Mindestlänge im Backend entfernen? --> Vermutung ist korrekt
+* **Validierungsfehler nicht übersetzt:** Ist: Bean-Validation liefert englische Texte („Name is required“) im Feld-Rumpf `{ "name": "…" }`; die Liste wertet nur `error.error.error` aus und zeigt sonst „Fehler beim Erstellen: “ + `error.message`. Vermutlich gemeint: übersetzte Feldmeldung.  --> Vermutung ist korrekt
+* **Hartcodierte Texte (Verstoss gegen `Specs/generell.md`):** „Fehler beim Laden der Einheiten: “, „Fehler beim Erstellen: “, „Fehler beim Aktualisieren: “ (`einheit-list.component.ts`) und die Löschschutz-Meldung „Einheit kann nicht gelöscht werden: <n> Mieter zugeordnet“ (`EinheitService.deleteEinheit`) sind nicht übersetzt. Vermutlich gemeint: Translation-Keys (beim Löschschutz mit Platzhalter für die Anzahl). --> lassen wir vorerst weg
+* **`FEHLER_LOESCHEN_EINHEIT` fehlt:** Ist: Der Fallback beim Löschfehler zeigt den Key ungeprüft an (ohne `translate`), und der Key steht nicht in `zev.translation` – der Benutzer sieht „FEHLER_LOESCHEN_EINHEIT“ (z.B. bei `404`). Vermutlich gemeint: übersetzter Fallback mit Key in einer Migration.  --> Vermutung ist korrekt
+* **Löschen einer Einheit mit Messwerten:** Ist: `messwerte` und `zaehler_rohdaten` verweisen ohne `ON DELETE`-Klausel auf die Einheit; der Service prüft nur zugeordnete Mieter. Nach Code-Lesart scheitert das Löschen erst an der Datenbank und endet über den `GlobalExceptionHandler` als `409` mit dem generischen Klartext („…verletzt eine Regel der Datenbank…“); kein Test belegt das. Gewollt: Löschen abweisen mit eigener Meldung („Einheit hat Messwerte“) – oder Messwerte mitlöschen? --> Löschen abweisen mit eigener Meldung („Einheit hat Messwerte“)
+* **`GET /api/einheit/{id}` verlangt `einheit:write`:** Ist: Der Einzelabruf erbt die Klassen-Permission, obwohl er nur liest (dokumentiert in `Specs/Berechtigungen.md`); im Frontend wird `getEinheitById` nirgends aufgerufen. Gewollt so – oder `einheit:read`, bzw. Endpunkt entfernen? --> Endpunkt entfernen, falls wirklich nicht gebraucht, sonst `einheit:read` 
+* **Ladestation ohne RFID:** Ist: Eine Ladestation ohne Messpunkt wird gespeichert (Server prüft die Eindeutigkeit nur bei gesetztem Messpunkt). Der Kommentar im Test `einheit-form.component.spec.ts › should allow a LADESTATION without RFID (server rejects it, not the form)` behauptet, der Server weise das ab. Was gilt? --> Messpunkt speichern
+* **Sortierung nach Typ:** Ist: Sortiert wird nach dem Enum-Wert (`BEZUG` < `CONSUMER` < `LADESTATION` < `PRODUCER` …), nicht nach dem angezeigten übersetzten Text. Gewollt? --> nach angezeigtem Text sortieren
+* **Sortierzustand nach Neuladen:** Ist: Nach Speichern/Löschen lädt die Liste neu in der Server-Reihenfolge (Name ↑), Spalte und Pfeil der zuletzt gewählten Sortierung bleiben aber stehen. Vermutlich gemeint: gewählte Sortierung nach dem Laden erneut anwenden. --> Vermutung ist korrekt
+* **Kebab „Tarifpositionen“ bei jedem Typ:** Ist: Der Eintrag erscheint auch bei Konsumenten, Produzenten usw.; die Seite Tarifpositionen bietet laut `Specs/Ladestationen.md`, FR-3 nur Ladestationen an. Gewollt – oder nur bei `LADESTATION` anzeigen? --> Immer anzeigen, Specs/Ladestationen gemäss Code anpassen
+* **Icons:** Ist: Menüeintrag mit Icon `grid`, Seitentitel mit Icon `home`. Gewollt unterschiedlich? --> nein, home ist korrekt
+* **Formularrahmen:** Ist: lokale Klasse `.form-container` mit eigenen Farben und ein lokal neu definiertes `.zev-form-hint` statt der Design-System-Klasse `.zev-form-container`. Gewollt? --> Design-System-Klasse verwenden

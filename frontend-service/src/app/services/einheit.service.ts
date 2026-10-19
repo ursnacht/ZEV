@@ -25,10 +25,6 @@ export class EinheitService {
     return this.http.get<Einheit[]>(this.apiUrl);
   }
 
-  getEinheitById(id: number): Observable<Einheit> {
-    return this.http.get<Einheit>(`${this.apiUrl}/${id}`);
-  }
-
   createEinheit(einheit: Einheit): Observable<Einheit> {
     return this.http.post<Einheit>(this.apiUrl, einheit);
   }

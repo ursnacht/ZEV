@@ -27,6 +27,9 @@ public interface ZaehlerRohdatenRepository extends JpaRepository<ZaehlerRohdaten
     /** Früheste noch nicht verarbeitete Messung einer Einheit (für Catch-up). */
     Optional<ZaehlerRohdaten> findFirstByEinheitIdAndVerarbeitetFalseOrderByZeitAsc(Long einheitId);
 
+    /** Hat die Einheit Zaehlerrohdaten? Blockiert ihr Loeschen (Specs/Einheitenverwaltung.md, FR-5). */
+    boolean existsByEinheitId(Long einheitId);
+
     /** Gibt es im Intervall (start, ende] eine neue Messung? */
     boolean existsByEinheitIdAndZeitGreaterThanAndZeitLessThanEqual(Long einheitId, LocalDateTime start, LocalDateTime ende);
 

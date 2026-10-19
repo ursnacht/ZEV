@@ -36,7 +36,7 @@
 
 1. Ein Benutzer legt in der **Einheiten-Verwaltung** eine Einheit vom Typ **Ladestation** an und trägt im Feld **Messpunkt** die **RFID** ein.
 2. In der **Mieterverwaltung** ordnet er dem Mieter neben der Wohnung zusätzlich diese Ladestations-Einheit zu. Ein Nutzer ohne Wohnung erhält einen Mieter-Datensatz, dem ausschliesslich die Ladestations-Einheit zugeordnet ist.
-3. Auf der Seite **Tarifpositionen** wählt er die **Einheit** (nur Einheiten vom Typ Ladestation stehen zur Auswahl), dann Tarif, Jahr + Quartal und die Menge in kWh. Die **Quell-Referenz** ist mit dem `messpunkt` der Einheit vorbelegt.
+3. Auf der Seite **Tarifpositionen** wählt er die **Einheit** (standardmässig nur Einheiten vom Typ Ladestation, über die Checkbox „Nur Ladestationen“ auch Konsumenten-Einheiten, `Specs/Tarifpositionen.md`), dann Tarif, Jahr + Quartal und die Menge in kWh. Die **Quell-Referenz** ist mit dem `messpunkt` der Einheit vorbelegt.
 4. Existiert für diese **Einheit**, dieses Quartal und diesen **Tariftyp** bereits eine Position, wird das abgewiesen — die bestehende ist zu bearbeiten.
 5. Bei der **Rechnungserzeugung** für Einheit + Mieter + Zeitraum werden die Positionen **aller Einheiten, die diesem Mieter zugeordnet sind** aufgenommen, deren Quartal sich mit dem Rechnungszeitraum überschneidet und deren Menge > 0 ist. Darstellung, Rundung und Einfluss auf Total/Rundung/Endbetrag bleiben wie in `Specs/Ladestromtarif.md` beschrieben.
    * Eine Rechnung entsteht wie bisher je `CONSUMER`- und `PRODUCER`-Einheit. Zusätzlich entsteht eine Rechnung für eine `LADESTATION`-Einheit, **wenn** ihrem Mieter keine `CONSUMER`-Einheit zugeordnet ist. Damit erhält ein Nutzer ohne Wohnung genau eine Rechnung, ein Mieter mit Wohnung genau eine — und niemand zweimal dieselbe Zeile.
@@ -68,9 +68,9 @@
 
 * **Einheiten-Verwaltung:** Der Typ **Ladestation** erscheint im bestehenden Typ-Dropdown. Der Hinweistext zum Feld Messpunkt weist für diesen Typ auf die RFID hin.
 * **Mieterverwaltung:** Das Mieter-Formular erlaubt die Zuordnung **mehrerer** Einheiten (Mehrfachauswahl statt Einzel-Dropdown). Mindestens eine Einheit ist Pflicht. Die Liste zeigt die zugeordneten Einheiten.
-* **Tarifpositionen:** Die Auswahl oben wechselt von **Mieter** auf **Einheit**; angeboten werden nur Einheiten vom Typ Ladestation. Die Liste bleibt unverändert (sortierbar, Spaltenbreiten veränderbar, Kebab mit Bearbeiten/Kopieren/Löschen). Die Quell-Referenz wird aus dem `messpunkt` vorbelegt.
-* **Kebab-Sprung:** Der Eintrag „Tarifpositionen" wandert von der Mieter- in die **Einheiten**-Verwaltung und springt mit `?einheitId=…`.
-* **Einheiten-Auswahllisten:** Ladestations-Einheiten erscheinen in der **Rechnungserzeugung** (nötig für den Nutzer ohne Wohnung, FR-1.5), im **Messwerte-Chart** und im **Messwerte-Upload** — entschieden: dort wird nichts ausgeblendet. Einzig die Seite Tarifpositionen zeigt **ausschliesslich** Ladestations-Einheiten.
+* **Tarifpositionen:** Die Auswahl oben wechselt von **Mieter** auf **Einheit**; angeboten werden standardmässig Einheiten vom Typ Ladestation, nach Abwählen der Checkbox „Nur Ladestationen“ zusätzlich die Konsumenten-Einheiten (`Specs/Tarifpositionen.md`; Hintergrund: Anhang A.1). Die Liste bleibt unverändert (sortierbar, Spaltenbreiten veränderbar, Kebab mit Bearbeiten/Kopieren/Löschen). Die Quell-Referenz wird aus dem `messpunkt` vorbelegt.
+* **Kebab-Sprung:** Der Eintrag „Tarifpositionen" wandert von der Mieter- in die **Einheiten**-Verwaltung und springt mit `?einheitId=…`. Er erscheint bei **jeder** Einheit, unabhängig vom Typ (`Specs/Einheitenverwaltung.md`, FR-7); zeigt er auf einen Konsumenten, wählt die Seite die Checkbox ab, bei anderen Typen bleibt die Auswahl leer.
+* **Einheiten-Auswahllisten:** Ladestations-Einheiten erscheinen in der **Rechnungserzeugung** (nötig für den Nutzer ohne Wohnung, FR-1.5), im **Messwerte-Chart** und im **Messwerte-Upload** — entschieden: dort wird nichts ausgeblendet. Einzig die Seite Tarifpositionen schränkt ein: auf Ladestationen, auf Wunsch zusätzlich Konsumenten.
 * Alle Texte via `TranslationService`/`TranslatePipe`, Zahlenformatierung nach `Specs/generell.md`.
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
@@ -90,7 +90,7 @@
 * [ ] Das Löschen eines Mieters wird **abgewiesen**, solange an einer ihm zugeordneten Einheit Tarifpositionen hängen; ohne Positionen ist es zulässig und lässt die Einheiten bestehen.
 
 ### Erfassung
-* [ ] Auf der Seite Tarifpositionen sind ausschliesslich Einheiten vom Typ **Ladestation** wählbar.
+* [ ] Auf der Seite Tarifpositionen sind standardmässig nur Einheiten vom Typ **Ladestation** wählbar; nach Abwählen von „Nur Ladestationen“ zusätzlich Konsumenten-Einheiten (`Specs/Tarifpositionen.md`).
 * [ ] Die Quell-Referenz ist beim Anlegen mit dem `messpunkt` der gewählten Einheit vorbelegt und änderbar.
 * [ ] Eine zweite Position für dieselbe **Einheit**, dasselbe Quartal und denselben **Tariftyp** wird abgewiesen — auch bei einem anderen `LADESTROM`-Tarif.
 * [ ] Zwei Positionen desselben Quartals für **zwei verschiedene** Ladestations-Einheiten desselben Mieters sind zulässig.
@@ -174,3 +174,8 @@
 * [ ] **Solarverteilung und Bilanz:** Die Annahme ist, dass Ladestations-Einheiten **nicht** an der Verteilung teilnehmen. Sobald der Ladestrom physisch hinter dem Hausanschluss bezogen wird, taucht er aber im BEZUG auf, ohne dass ihn ein Konsument beansprucht — der Vergleich in der Statistik würde „UNGLEICH" melden. Zu klären, sobald Messwerte fliessen (`Specs/Bilanzmodell.md`).
 * [ ] **Wachsende Zahl inaktiver Einheiten:** Bei jedem Mieterwechsel entsteht eine neue Ladestations-Einheit; alte bleiben für die Historie bestehen. Braucht es einen Aktiv-Filter in den Auswahllisten, oder genügt die Sortierung?
 * [ ] **Vertragspartner-Entität (Fernziel):** `Mieter` vermischt Mietverhältnis und Rechnungsempfänger. Fallen Wohnungs- und Ladestations-Nutzung zeitlich auseinander, entstehen zwei Datensätze derselben Person mit dupliziertem Namen und Adresse — und zwei Rechnungen. Eine eigene Vertragspartner-Entität räumt das auf; eigenes Vorhaben, das Rechnung, Debitor und Mieterverwaltung berührt.
+
+## Anhang A – Entscheidungen und Verlauf
+
+### A.1 Auswahl auf der Seite Tarifpositionen an den Code angeglichen (FR-3, 19.10.2026)
+FR-3 und das Kriterium lauteten: „angeboten werden nur Einheiten vom Typ Ladestation“ bzw. „Auf der Seite Tarifpositionen sind ausschliesslich Einheiten vom Typ **Ladestation** wählbar.“ Mit `Specs/Tarifpositionen.md` kam die Checkbox „Nur Ladestationen“ dazu, die auch Konsumenten-Einheiten anbietet; diese Spec war nicht nachgeführt. Bei der Klärung der Offenen Fragen der Einheitenverwaltung (`Specs/Einheitenverwaltung.md`, Anhang A.6) entschieden: Der Kebab-Eintrag „Tarifpositionen“ bleibt bei jeder Einheit, und diese Spec folgt dem Code.

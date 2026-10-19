@@ -15,7 +15,7 @@
 
    | Untereintrag     | Route                | Permission (aus `app.routes.ts`) | Icon        |
    |------------------|----------------------|----------------------------------|-------------|
-   | Einheiten        | `/einheiten`         | `einheit:read`                   | `grid`      |
+   | Einheiten        | `/einheiten`         | `einheit:read`                   | `home`      |
    | Solarverteilung  | `/solar-calculation` | `messwerte:write`                | `zap`       |
    | Systemmeldungen  | `/systemmeldungen`   | `systemmeldungen:read`           | `file-text` |
    | Einstellungen    | `/einstellungen`     | `einstellungen:write`            | `settings`  |

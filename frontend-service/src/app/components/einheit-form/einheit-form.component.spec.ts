@@ -208,7 +208,7 @@ describe('EinheitFormComponent', () => {
       }));
     });
 
-    it('should allow a LADESTATION without RFID (server rejects it, not the form)', () => {
+    it('should allow a LADESTATION without RFID (the server saves it as well)', () => {
       component.formData = {
         name: 'Ladestation ohne RFID',
         typ: EinheitTyp.LADESTATION
@@ -300,6 +300,14 @@ describe('EinheitFormComponent', () => {
       expect(fehler()?.textContent).toContain('NAME_IST_ERFORDERLICH');
     });
 
+    it('should disable submit and show EINHEIT_NAME_LAENGE when name has one character', () => {
+      component.formData = { ...component.formData, name: 'A' };
+      fixture.detectChanges();
+
+      expect(submitButton().disabled).toBe(true);
+      expect(fehler()?.textContent).toContain('EINHEIT_NAME_LAENGE');
+    });
+
     it('should enable submit and hide the error when name is filled', () => {
       component.formData = { ...component.formData, name: 'Wohnung A' };
       fixture.detectChanges();
@@ -358,6 +366,31 @@ describe('EinheitFormComponent', () => {
       component.formData = { ...component.formData, typ: EinheitTyp.CONSUMER };
       fixture.detectChanges();
       expect(hinweis()).toBe('MESSPUNKT_HINT');
+    });
+  });
+
+  describe('name length', () => {
+    it('should not emit save for a name with one character', () => {
+      vi.spyOn(component.save, 'emit');
+      component.formData = { name: ' A ', typ: EinheitTyp.CONSUMER };
+
+      component.onSubmit();
+
+      expect(component.save.emit).not.toHaveBeenCalled();
+    });
+
+    it('should emit save for a name with two characters', () => {
+      vi.spyOn(component.save, 'emit');
+      component.formData = { name: 'AB', typ: EinheitTyp.CONSUMER };
+
+      component.onSubmit();
+
+      expect(component.save.emit).toHaveBeenCalled();
+    });
+
+    it('should use the design-system form container', () => {
+      expect(fixture.nativeElement.querySelector('.zev-form-container')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('.form-container')).toBeNull();
     });
   });
 });

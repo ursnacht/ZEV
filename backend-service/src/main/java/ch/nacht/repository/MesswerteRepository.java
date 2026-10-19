@@ -16,6 +16,9 @@ import java.util.Optional;
 @Repository
 public interface MesswerteRepository extends JpaRepository<Messwerte, Long> {
 
+    /** Hat die Einheit Messwerte? Blockiert ihr Loeschen (Specs/Einheitenverwaltung.md, FR-5). */
+    boolean existsByEinheitId(Long einheitId);
+
     @Query("SELECT DISTINCT m.zeit FROM Messwerte m WHERE m.zeit BETWEEN :dateFrom AND :dateTo ORDER BY m.zeit")
     List<LocalDateTime> findDistinctZeitBetween(@Param("dateFrom") LocalDateTime dateFrom, @Param("dateTo") LocalDateTime dateTo);
 

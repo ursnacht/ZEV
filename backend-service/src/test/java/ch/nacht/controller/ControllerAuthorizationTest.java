@@ -400,16 +400,6 @@ class ControllerAuthorizationTest {
     }
 
     @Test
-    void getEinheitById_withReadPermissionOnly_forbidden() throws Exception {
-        // Der Einzelabruf erbt einheit:write von der Klasse (Specs/Einheitenverwaltung.md, Abschnitt 8)
-        mockMvc.perform(get("/api/einheit/1")
-                        .with(jwt().authorities(new SimpleGrantedAuthority("einheit:read"))))
-                .andExpect(status().isForbidden());
-
-        verify(einheitService, never()).getEinheitById(any());
-    }
-
-    @Test
     void createEinheit_unauthenticated_unauthorized() throws Exception {
         mockMvc.perform(post("/api/einheit")
                         .with(csrf())

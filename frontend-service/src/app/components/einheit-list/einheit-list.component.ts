@@ -1,4 +1,5 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
+import Keycloak from 'keycloak-js';
 import { WithMessage } from '../../utils/with-message';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
@@ -27,11 +28,18 @@ export class EinheitListComponent extends WithMessage implements OnInit {
   sortColumn: 'id' | 'name' | 'typ' | 'messpunkt' | null = 'name';
   sortDirection: 'asc' | 'desc' = 'asc';
 
+  /**
+   * Anlegen, Bearbeiten und Loeschen verlangen `einheit:write`; die Seite selbst nur `einheit:read`.
+   * Ohne die Permission sind die Aktionen ausgeblendet, statt beim Speichern mit 403 zu scheitern
+   * (Specs/Einheitenverwaltung.md, FR-1).
+   */
+  readonly canWrite = inject(Keycloak).hasRealmRole('einheit:write');
+
   menuItems: KebabMenuItem[] = [
     { label: 'BEARBEITEN', action: 'edit', icon: 'edit-2' },
     { label: 'TARIFPOSITIONEN', action: 'tarifpositionen', icon: 'zap' },
     { label: 'LOESCHEN', action: 'delete', danger: true, icon: 'trash-2' }
-  ];
+  ].filter(item => this.canWrite || item.action === 'tarifpositionen');
 
   constructor(
     private einheitService: EinheitService,
@@ -47,6 +55,8 @@ export class EinheitListComponent extends WithMessage implements OnInit {
     this.einheitService.getAllEinheiten().subscribe({
       next: (data) => {
         this.einheiten = data;
+        // Die gewaehlte Sortierung gilt auch nach Speichern/Loeschen, nicht nur die des Servers
+        this.sortiere();
       },
       error: (error) => {
         this.showMessage('Fehler beim Laden der Einheiten: ' + error.message, 'error');
@@ -74,9 +84,12 @@ export class EinheitListComponent extends WithMessage implements OnInit {
           this.loadEinheiten();
         },
         error: (error) => {
-          // Der Loeschschutz liefert die Anzahl zugeordneter Mieter im Body - `error.message`
-          // waere nur "Http failure response ...".
-          this.showMessage(error.error?.error || error.error || 'FEHLER_LOESCHEN_EINHEIT', 'error');
+          // Der Loeschschutz liefert einen Key ({ error }) oder den Text mit der Anzahl Mieter -
+          // `error.message` waere nur "Http failure response ...".
+          const meldung = error.error?.error
+            || (typeof error.error === 'string' && error.error)
+            || 'FEHLER_LOESCHEN_EINHEIT';
+          this.showMessage(this.translationService.translate(meldung), 'error');
         }
       });
     }
@@ -114,7 +127,7 @@ export class EinheitListComponent extends WithMessage implements OnInit {
           this.loadEinheiten();
         },
         error: (error) => {
-          const key = error.error?.error;
+          const key = this.fehlerKey(error);
           this.showMessage(key
             ? this.translationService.translate(key)
             : 'Fehler beim Aktualisieren: ' + error.message, 'error');
@@ -128,13 +141,28 @@ export class EinheitListComponent extends WithMessage implements OnInit {
           this.loadEinheiten();
         },
         error: (error) => {
-          const key = error.error?.error;
+          const key = this.fehlerKey(error);
           this.showMessage(key
             ? this.translationService.translate(key)
             : 'Fehler beim Erstellen: ' + error.message, 'error');
         }
       });
     }
+  }
+
+  /**
+   * Translation-Key aus der Fehlerantwort: `{ error: <Key> }` der Service-Regeln oder – bei der
+   * Bean-Validation – der Feld-Rumpf `{ <feld>: <Key> }`, von dem die erste Meldung genuegt.
+   */
+  private fehlerKey(error: any): string | undefined {
+    const rumpf = error?.error;
+    if (!rumpf || typeof rumpf !== 'object') {
+      return undefined;
+    }
+    if (typeof rumpf.error === 'string') {
+      return rumpf.error;
+    }
+    return Object.values(rumpf).find((wert): wert is string => typeof wert === 'string');
   }
 
   onFormCancel(): void {
@@ -149,10 +177,20 @@ export class EinheitListComponent extends WithMessage implements OnInit {
       this.sortColumn = column;
       this.sortDirection = 'asc';
     }
+    this.sortiere();
+  }
+
+  /** Wendet die gewaehlte Spalte und Richtung an; der Typ zaehlt mit dem angezeigten Text. */
+  private sortiere(): void {
+    const column = this.sortColumn;
+    if (!column) {
+      return;
+    }
+    const typText = new EinheitTypPipe(this.translationService);
 
     this.einheiten.sort((a, b) => {
-      let aValue: any = a[column];
-      let bValue: any = b[column];
+      let aValue: any = column === 'typ' ? typText.transform(a.typ) : a[column];
+      let bValue: any = column === 'typ' ? typText.transform(b.typ) : b[column];
 
       if (aValue === null || aValue === undefined) return 1;
       if (bValue === null || bValue === undefined) return -1;

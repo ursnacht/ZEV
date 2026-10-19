@@ -13,10 +13,12 @@
 
   @if (!showForm) {
     <div>
-      <button class="zev-button zev-button--primary" (click)="onCreateNew()">
-        <app-icon name="plus"></app-icon>
-        {{ 'NEUE_EINHEIT_ERSTELLEN' | translate }}
-      </button>
+      @if (canWrite) {
+        <button class="zev-button zev-button--primary" (click)="onCreateNew()">
+          <app-icon name="plus"></app-icon>
+          {{ 'NEUE_EINHEIT_ERSTELLEN' | translate }}
+        </button>
+      }
       @if (einheiten.length > 0) {
         <table class="zev-table" appColumnResize>
           <thead>

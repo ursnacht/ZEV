@@ -7,6 +7,7 @@ import { EinheitService } from '../../services/einheit.service';
 import { TranslationService } from '../../services/translation.service';
 import { Einheit, EinheitTyp } from '../../models/einheit.model';
 import { of, throwError } from 'rxjs';
+import Keycloak from 'keycloak-js';
 
 describe('EinheitListComponent', () => {
   let component: EinheitListComponent;
@@ -14,6 +15,10 @@ describe('EinheitListComponent', () => {
   let einheitServiceSpy: SpyObj<EinheitService>;
   let translationServiceSpy: SpyObj<TranslationService>;
   let routerSpy: SpyObj<Router>;
+
+  /** Realm-Rollen des Test-Benutzers; die Komponente liest sie beim Erzeugen. */
+  let rollen: string[];
+  const keycloakMock = { hasRealmRole: (rolle: string) => rollen.includes(rolle) } as unknown as Keycloak;
 
   const mockLadestation: Einheit = {
     id: 3, name: 'Ladestation 1', typ: EinheitTyp.LADESTATION, messpunkt: 'RFID-04711'
@@ -25,6 +30,7 @@ describe('EinheitListComponent', () => {
   ];
 
   beforeEach(async () => {
+    rollen = ['einheit:read', 'einheit:write'];
     einheitServiceSpy = createSpyObj<EinheitService>('EinheitService', [
       'getAllEinheiten', 'createEinheit', 'updateEinheit', 'deleteEinheit'
     ]);
@@ -40,7 +46,8 @@ describe('EinheitListComponent', () => {
       providers: [
         { provide: EinheitService, useValue: einheitServiceSpy },
         { provide: TranslationService, useValue: translationServiceSpy },
-        { provide: Router, useValue: routerSpy }
+        { provide: Router, useValue: routerSpy },
+        { provide: Keycloak, useValue: keycloakMock }
       ]
     }).compileComponents();
 
@@ -419,8 +426,9 @@ describe('EinheitListComponent', () => {
       component.einheiten = [...mockEinheiten, mockLadestation];
       component.sortColumn = null;
       component.onSort('typ');
+      // Sortiert nach dem angezeigten Text; der Mock liefert die Keys KONSUMENT < PRODUZENT < TYP_LADESTATION
       expect(component.einheiten.map(e => e.typ)).toEqual([
-        EinheitTyp.CONSUMER, EinheitTyp.LADESTATION, EinheitTyp.PRODUCER
+        EinheitTyp.CONSUMER, EinheitTyp.PRODUCER, EinheitTyp.LADESTATION
       ]);
     });
 
@@ -515,6 +523,101 @@ describe('EinheitListComponent', () => {
 
       expect(element().querySelector('.zev-table')).toBeNull();
       expect(element().textContent).toContain('KEINE_EINHEITEN_VORHANDEN');
+    });
+  });
+
+  // Specs/Einheitenverwaltung.md, Anhang A.6: Antworten auf die offenen Fragen
+  describe('without einheit:write', () => {
+    beforeEach(() => {
+      rollen = ['einheit:read'];
+      fixture = TestBed.createComponent(EinheitListComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+    });
+
+    it('should hide the create button', () => {
+      expect(fixture.nativeElement.textContent).not.toContain('NEUE_EINHEIT_ERSTELLEN');
+    });
+
+    it('should offer only the tarifpositionen entry in the kebab menu', () => {
+      expect(component.menuItems.map(i => i.action)).toEqual(['tarifpositionen']);
+    });
+  });
+
+  describe('with einheit:write', () => {
+    it('should show the create button and all kebab entries', () => {
+      expect(fixture.nativeElement.textContent).toContain('NEUE_EINHEIT_ERSTELLEN');
+      expect(component.menuItems.map(i => i.action)).toEqual(['edit', 'tarifpositionen', 'delete']);
+    });
+  });
+
+  describe('translated server messages', () => {
+    it('should translate the field message of a Bean-Validation error', () => {
+      component.showForm = true;
+      einheitServiceSpy.createEinheit.mockReturnValue(throwError(() => ({
+        status: 400, message: 'Http failure response', error: { name: 'EINHEIT_NAME_LAENGE' }
+      })));
+
+      component.onFormSubmit({ name: 'A', typ: EinheitTyp.CONSUMER });
+
+      expect(translationServiceSpy.translate).toHaveBeenCalledWith('EINHEIT_NAME_LAENGE');
+      expect(component.message).toBe('EINHEIT_NAME_LAENGE');
+      expect(component.showForm).toBe(true);
+    });
+
+    it('should translate the delete fallback FEHLER_LOESCHEN_EINHEIT', () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      einheitServiceSpy.deleteEinheit.mockReturnValue(throwError(() => ({ status: 404, error: null })));
+
+      component.onDelete(1);
+
+      expect(translationServiceSpy.translate).toHaveBeenCalledWith('FEHLER_LOESCHEN_EINHEIT');
+      expect(component.messageType).toBe('error');
+    });
+
+    it('should translate EINHEIT_HAT_MESSWERTE when the unit still has measurements', () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      einheitServiceSpy.deleteEinheit.mockReturnValue(throwError(() => ({
+        status: 400, error: { error: 'EINHEIT_HAT_MESSWERTE' }
+      })));
+
+      component.onDelete(1);
+
+      expect(translationServiceSpy.translate).toHaveBeenCalledWith('EINHEIT_HAT_MESSWERTE');
+      expect(component.message).toBe('EINHEIT_HAT_MESSWERTE');
+    });
+  });
+
+  describe('onSort - typ by displayed text', () => {
+    it('should sort the type column by the translated label, not by the enum value', () => {
+      // Englische Texte: Die Enum-Reihenfolge (BEZUG < CONSUMER < PRODUCER) weicht davon ab
+      const texte: Record<string, string> = { KONSUMENT: 'Consumer', TYP_BEZUG: 'Grid purchase', PRODUZENT: 'Producer' };
+      translationServiceSpy.translate.mockImplementation((key: string) => texte[key] ?? key);
+      component.einheiten = [
+        { id: 1, name: 'P', typ: EinheitTyp.PRODUCER },
+        { id: 2, name: 'B', typ: EinheitTyp.BEZUG },
+        { id: 3, name: 'C', typ: EinheitTyp.CONSUMER }
+      ];
+
+      component.onSort('typ');
+
+      expect(component.einheiten.map(e => e.typ))
+        .toEqual([EinheitTyp.CONSUMER, EinheitTyp.BEZUG, EinheitTyp.PRODUCER]);
+    });
+  });
+
+  describe('loadEinheiten - keeps the chosen sort', () => {
+    it('should apply the chosen sort after reloading', () => {
+      component.onSort('name');
+      expect(component.sortDirection).toBe('desc');
+
+      einheitServiceSpy.getAllEinheiten.mockReturnValue(of([
+        { id: 1, name: 'Anna', typ: EinheitTyp.CONSUMER },
+        { id: 2, name: 'Zora', typ: EinheitTyp.CONSUMER }
+      ]));
+      component.loadEinheiten();
+
+      expect(component.einheiten.map(e => e.name)).toEqual(['Zora', 'Anna']);
     });
   });
 });

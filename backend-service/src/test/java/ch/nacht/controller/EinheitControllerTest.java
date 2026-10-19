@@ -168,29 +168,29 @@ public class EinheitControllerTest {
     }
 
     @Test
-    public void getEinheitById_Found_ReturnsEinheit() throws Exception {
-        when(einheitService.getEinheitById(1L)).thenReturn(Optional.of(ladestation(1L, "RFID-001")));
-
-        mockMvc.perform(get("/api/einheit/1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.messpunkt", is("RFID-001")));
-    }
-
-    /** Der Service liefert leer fuer unbekannte und fuer fremde IDs (findFirstById unter dem Filter). */
-    @Test
-    public void getEinheitById_NotFound_Returns404() throws Exception {
-        when(einheitService.getEinheitById(99L)).thenReturn(Optional.empty());
-
-        mockMvc.perform(get("/api/einheit/99"))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
     public void deleteEinheit_Exists_ReturnsNoContent() throws Exception {
         when(einheitService.deleteEinheit(1L)).thenReturn(true);
 
         mockMvc.perform(delete("/api/einheit/1"))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    public void deleteEinheit_MitMesswerten_Returns400MitFehlerKey() throws Exception {
+        when(einheitService.deleteEinheit(1L)).thenThrow(new IllegalStateException("EINHEIT_HAT_MESSWERTE"));
+
+        mockMvc.perform(delete("/api/einheit/1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error", is("EINHEIT_HAT_MESSWERTE")));
+    }
+
+    /** Der Einzelabruf ist entfernt: niemand rief ihn auf (Specs/Einheitenverwaltung.md, Anhang A.6). */
+    @Test
+    public void getEinheitById_GibtEsNicht() throws Exception {
+        mockMvc.perform(get("/api/einheit/1"))
+                .andExpect(status().is4xxClientError());
+
+        verify(einheitService, never()).getEinheitById(any());
     }
 
     @Test
@@ -253,7 +253,7 @@ public class EinheitControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new Einheit("A", EinheitTyp.CONSUMER))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.name", is("Name must be between 2 and 30 characters")));
+                .andExpect(jsonPath("$.name", is("EINHEIT_NAME_LAENGE")));
 
         verify(einheitService, never()).createEinheit(any());
     }
@@ -265,7 +265,7 @@ public class EinheitControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new Einheit("N".repeat(31), EinheitTyp.CONSUMER))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.name", is("Name must be between 2 and 30 characters")));
+                .andExpect(jsonPath("$.name", is("EINHEIT_NAME_LAENGE")));
 
         verify(einheitService, never()).createEinheit(any());
     }

@@ -9,8 +9,7 @@ import { IconComponent } from '../icon/icon.component';
   selector: 'app-einheit-form',
   standalone: true,
   imports: [FormsModule, TranslatePipe, IconComponent],
-  templateUrl: './einheit-form.component.html',
-  styleUrls: ['./einheit-form.component.css']
+  templateUrl: './einheit-form.component.html'
 })
 export class EinheitFormComponent implements OnInit {
   @Input() einheit: Einheit | null = null;
@@ -43,8 +42,13 @@ export class EinheitFormComponent implements OnInit {
     }
   }
 
+  /** 2 bis 30 Zeichen, wie `@Size` an der Entity - sonst weist erst das Backend ab. */
+  isNameGueltig(): boolean {
+    return this.formData.name.trim().length >= 2;
+  }
+
   onSubmit(): void {
-    if (this.formData.name.trim()) {
+    if (this.isNameGueltig()) {
       this.save.emit(this.formData);
     }
   }

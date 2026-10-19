@@ -1,4 +1,4 @@
-<div class="form-container">
+<div class="zev-form-container">
   <h2>{{ formData.id ? ('EINHEIT_BEARBEITEN' | translate) : ('NEUE_EINHEIT_ERSTELLEN' | translate) }}</h2>
 
   <form (ngSubmit)="onSubmit()">
@@ -9,6 +9,10 @@
       @if (!formData.name.trim()) {
         <div class="zev-form-error">
           {{ 'NAME_IST_ERFORDERLICH' | translate }}
+        </div>
+      } @else if (!isNameGueltig()) {
+        <div class="zev-form-error">
+          {{ 'EINHEIT_NAME_LAENGE' | translate }}
         </div>
       }
     </div>
@@ -47,7 +51,7 @@
     }
 
     <div class="zev-form-actions zev-form-actions--equal">
-      <button type="submit" class="zev-button zev-button--primary" [disabled]="!formData.name.trim()">
+      <button type="submit" class="zev-button zev-button--primary" [disabled]="!isNameGueltig()">
         <app-icon name="check"></app-icon>
         {{ formData.id ? ('AKTUALISIEREN' | translate) : ('ERSTELLEN' | translate) }}
       </button>

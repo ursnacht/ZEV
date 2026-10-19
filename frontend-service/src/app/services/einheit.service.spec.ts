@@ -78,21 +78,6 @@ describe('EinheitService', () => {
     });
   });
 
-  describe('getEinheitById', () => {
-    it('should return a single einheit by id', () => {
-      const einheitId = 1;
-
-      service.getEinheitById(einheitId).subscribe(einheit => {
-        expect(einheit).toEqual(mockEinheit);
-        expect(einheit.id).toBe(einheitId);
-      });
-
-      const req = httpMock.expectOne(`${apiUrl}/${einheitId}`);
-      expect(req.request.method).toBe('GET');
-      req.flush(mockEinheit);
-    });
-  });
-
   describe('createEinheit', () => {
     it('should create a new einheit', () => {
       const newEinheit: Einheit = {

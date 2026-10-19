@@ -3,7 +3,9 @@ package ch.nacht.service;
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.repository.EinheitRepository;
+import ch.nacht.repository.MesswerteRepository;
 import ch.nacht.repository.MieterEinheitRepository;
+import ch.nacht.repository.ZaehlerRohdatenRepository;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +33,12 @@ public class EinheitServiceTest {
 
     @Mock
     private MieterEinheitRepository mieterEinheitRepository;
+
+    @Mock
+    private MesswerteRepository messwerteRepository;
+
+    @Mock
+    private ZaehlerRohdatenRepository zaehlerRohdatenRepository;
 
     @Mock
     private OrganizationContextService organizationContextService;
@@ -223,6 +231,31 @@ public class EinheitServiceTest {
                 () -> einheitService.deleteEinheit(1L));
 
         assertTrue(ex.getMessage().contains("2"), "Die Meldung nennt die Anzahl betroffener Mieter");
+        verify(einheitRepository, never()).deleteById(any());
+    }
+
+    @Test
+    void deleteEinheit_MitMesswerten_ThrowsEigenenKey() {
+        // Ohne diese Pruefung wiese erst der FK das Loeschen ab - als 409 mit Datenbanktext
+        when(einheitRepository.existsById(1L)).thenReturn(true);
+        when(messwerteRepository.existsByEinheitId(1L)).thenReturn(true);
+
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> einheitService.deleteEinheit(1L));
+
+        assertEquals("EINHEIT_HAT_MESSWERTE", e.getMessage());
+        verify(einheitRepository, never()).deleteById(any());
+    }
+
+    @Test
+    void deleteEinheit_MitZaehlerRohdaten_ThrowsEigenenKey() {
+        when(einheitRepository.existsById(1L)).thenReturn(true);
+        when(zaehlerRohdatenRepository.existsByEinheitId(1L)).thenReturn(true);
+
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> einheitService.deleteEinheit(1L));
+
+        assertEquals("EINHEIT_HAT_MESSWERTE", e.getMessage());
         verify(einheitRepository, never()).deleteById(any());
     }
 
