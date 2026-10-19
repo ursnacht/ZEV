@@ -652,7 +652,7 @@ prüft das mit (`3285` bleibt `3285`).
   `NkMieterAbrechnungDTO` (Backend). Das Modell spiegelt das DTO, und das DTO trägt den Wert
   weiterhin — es wird nur nicht mehr angezeigt. Ein Kommentar am Modellfeld sagt das.
 * Der Übersetzungs-Schlüssel `NK_HINWEIS_OHNE_WOHNUNG` bleibt in der Datenbank stehen: unbenutzt,
-  aber harmlos. Wer ihn los will, nimmt den Weg über `Specs/DeleteTranslations.md`.
+  aber harmlos. Wer ihn los will, nimmt den Weg über `Specs/Übersetzungsverwaltung.md`, FR-5.
 * Tests: drei Fälle in `NkAbrechnungServiceTest` (keine Einheit, nur abgewähltes Kennzeichen, nur
   Einheit falschen Typs); der bestehende Fall zum Kennzeichen ist umbenannt und prüft jetzt die
   Abwesenheit statt „0 Tage". Backend 1266 grün.
@@ -732,7 +732,7 @@ Ein Suchmuster-Fehlalarm zum Merken: „ausschliesslich" enthält `schliess` und
 falsch), `NK_SUMME_KOSTEN`, `NK_ZUSATZPOSITIONEN` (Anzeigetext der Sammelzeile — sie kommt aus der
 Maske, nicht vom Server, wie beim Zusatz „(Kopie)"), `NK_SUMME_KOSTEN_ABWEICHUNG` (Hinweis).
 `NK_SUMME_VERTEILT` und `NK_UMLAGE` werden nicht mehr verwendet; die Schlüssel bleiben in der
-Datenbank stehen (unbenutzt, aber harmlos — Weg dafür in `Specs/DeleteTranslations.md`).
+Datenbank stehen (unbenutzt, aber harmlos — Weg dafür in `Specs/Übersetzungsverwaltung.md`, FR-5).
 
 ### Kein CSS
 `.nk-kontrolle`, `.zev-table` und `.number` genügen; `<tfoot>` ist Standard-HTML und erbt die
