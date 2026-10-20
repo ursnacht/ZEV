@@ -7,12 +7,11 @@
   - Automatisierte, zeitnahe Datenerfassung statt manueller CSV-Uploads.
   - Weniger Fehlerquellen (kein manuelles Hochladen/Zuordnen).
   - Grundlage für spätere Live-Auswertungen.
-* **Aktueller Stand:**
-  - Messwerte kommen heute per **CSV-Upload** (`MesswerteService.processCsvUpload`, Spalten `zeit,total,zev` je Einheit, inkl. KI-gestütztem Einheiten-Matching). `zev_calculated` wird separat durch die **Solarverteilung** (`SolarDistribution`) berechnet.
-  - Die Zähler werden physisch bereits über einen **Raspberry Pi** ausgelesen (3× Wago via Modbus TCP, 1× BKW via gPlug) und heute per **SFTP** bereitgestellt (siehe `docs/Netzwerk-Topologie-Hene.md`).
-  - Ziel-Topologie: Der Pi ist MQTT-**Publisher**, der **Broker (Mosquitto) läuft auf dem NAS** (Variante B der Topologie-Doku), das ZEV-Backend ist **Subscriber**.
-  - Es gibt **noch keinen** MQTT-Code / keine MQTT-Dependency im Backend.
-  - **Erweiterung Nachbarhaus (20.10.2026):** Das Nachbarhaus wird in den ZEV bei Hene integriert. Seine Smartmeter tragen je einen **gPlugK**, der selbst per MQTT publiziert. Die gPlugs werden **ohne Pi** direkt an den Broker auf dem NAS angebunden und senden ihr eigenes Meldungsformat auf ein **zweites Topic** (`gPlug/…`), das das Backend zusätzlich abonniert (FR-10).
+* **Ausgangslage:**
+  - Ohne dieses Feature kommen Messwerte per **CSV-Upload** (`MesswerteService.processCsvUpload`, Spalten `zeit,total,zev` je Einheit, inkl. KI-gestütztem Einheiten-Matching). `zev_calculated` wird separat durch die **Solarverteilung** (`SolarDistribution`) berechnet.
+  - Die Zähler werden physisch über einen **Raspberry Pi** ausgelesen (3× Wago via Modbus TCP, 1× BKW via gPlug) und heute per **SFTP** bereitgestellt (siehe `docs/Netzwerk-Topologie-Hene.md`).
+  - Topologie: Der Pi ist MQTT-**Publisher**, der **Broker (Mosquitto) läuft auf dem NAS** (Variante B der Topologie-Doku), das ZEV-Backend ist **Subscriber**.
+  - **Nachbarhaus:** Das Nachbarhaus wird in den ZEV bei Hene integriert. Seine Smartmeter tragen je einen **gPlugK**, der selbst per MQTT publiziert. Die gPlugs werden **ohne Pi** direkt an den Broker auf dem NAS angebunden und senden ihr eigenes Meldungsformat auf ein **zweites Topic** (`gPlug/…`), das das Backend zusätzlich abonniert (FR-10).
 
 > **Designentscheidung – absolute Zählerstände statt Deltas:** Der Pi überträgt die **absoluten (kumulativen) Zählerstände**, nicht berechnete Deltas. Die **Delta-/Intervall-Berechnung erfolgt im Backend**. Vorteil: **verlusttolerant** — geht eine MQTT-Nachricht verloren, bleibt die Gesamtsumme korrekt (die Differenz zweier empfangener Stände erfasst den Verbrauch dazwischen weiterhin vollständig); es sinkt nur kurz die zeitliche Auflösung. Dadurch entfallen strenge QoS-/Pufferungs-Anforderungen (kein zwingender Store-and-Forward-Bridge, Variante C).
 
@@ -27,7 +26,7 @@
 4. Bei Verbindungsabbruch automatischer Reconnect mit Exponential Backoff.
 5. **Dauerhafte Sitzung** (`mqtt.clean-session`, Standard `false`, Env `MQTT_CLEAN_SESSION`): Der Broker behält das Abo des Backends über dessen Neustart hinweg und stellt die QoS-1-Nachrichten zu, die in der Zwischenzeit eintrafen. So bleibt bei einem Update auch die 15-Minuten-Auflösung erhalten, nicht nur die Energie. Voraussetzung: Die Client-ID wird je Broker von **genau einer** Backend-Instanz verwendet; der Broker begrenzt die Warteschlange (`max_queued_messages`, siehe `docs/Netzwerk-Topologie-Hene.md`).
 6. **Log-Meldung nach einem Neustart ist erwartet:** Hat der Broker Nachrichten gepuffert, erscheint beim Verbinden `Error subscribing to [zev/+/+/messwert] – Timed out waiting for a response from the server (32000)`. Sie ist harmlos: Spring wartet im Paho-Thread, der auch die eintreffenden Nachrichten verarbeitet, auf die Bestätigung des Abos (SUBACK); der Broker stellt aber zuerst die gepufferten Nachrichten zu, die Bestätigung kommt erst nach Ablauf der Wartezeit (`setCompletionTimeout(5000)`) durch. Das Abo besteht trotzdem, weil es in der Sitzung liegt – und gepufferte Nachrichten gibt es nur bei bestehender Sitzung. Ohne Sitzung (erster Start, abgelaufen, geleertes Broker-Volume) ist nichts gepuffert, und das Abo wird sofort bestätigt.
-   > Am 19.10.2026 lokal beobachtet. Eine Wartezeit von 30 s statt 5 s (Commit `4d8911b`, zurückgenommen) änderte nichts: Der Fehler kam nach 30 s statt nach 5 s, und die gepufferten Nachrichten stauten sich entsprechend länger. Die Meldung ganz zu vermeiden, hiesse, das Abo ausserhalb des Paho-Threads abzusetzen – für eine harmlose Meldung zu viel Eingriff.
+   > Eine längere Wartezeit hilft nicht, und das Abo ausserhalb des Paho-Threads abzusetzen, wäre für eine harmlose Meldung zu viel Eingriff (Hintergrund: Anhang A.4).
 
 > **Profil-Aktivierung (`@Profile("mqtt")`):** Das Bean, das sich mit dem Broker verbindet und die Messwerte einliest (MQTT-Subscriber/Inbound-Adapter samt Message-Handler), ist **nur aktiv, wenn das Spring-Boot-Profil `mqtt` gesetzt ist** (`@Profile("mqtt")`; aktiviert via `SPRING_PROFILES_ACTIVE=mqtt` bzw. `spring.profiles.active`). Ohne dieses Profil (Default, Tests, lokale Entwicklung) startet **kein** MQTT-Client — es wird keine Broker-Verbindung aufgebaut, das Backend läuft unverändert nur mit CSV-Upload. So bleibt die MQTT-Anbindung optional und Umgebungen ohne erreichbaren Broker starten fehlerfrei.
 
@@ -43,8 +42,8 @@ zev/{orgId}/{messpunkt}/messwert
 | `messwert` | Message-Typ | `messwert` |
 
 * Backend abonniert `zev/+/+/messwert`.
-* Der Pi adressiert die Einheit über den **Messpunkt** (physisch bekannt), nicht über die interne `einheit.id`. Das Backend löst die Einheit über **(`org_id`, `messpunkt`)** auf.
-* `{orgId}` folgt vorerst dem bestehenden `Messwerte`-Modell (internes `org_id` als `BIGINT`); Alternative (Keycloak-Alias/UUID) siehe Offene Fragen.
+* Der Pi adressiert die Einheit über den **Messpunkt** (physisch bekannt), nicht über die interne `einheit.id`. Das Backend löst die Einheit über **(`org_id`, `messpunkt`)** auf; `messpunkt` ist pro `org_id` eindeutig (Anhang A.2).
+* `{orgId}` ist das interne `org_id` (`BIGINT`), konsistent mit `messwerte`, `zaehler_rohdaten` und der Pi-Config; kein UUID-Mapping (Anhang A.2).
 
 ### FR-3: Payload-Format (JSON, absolute Zählerstände)
 Der Pi publiziert die **absoluten kumulativen Zählerstände** zum Messzeitpunkt:
@@ -60,10 +59,12 @@ Der Pi publiziert die **absoluten kumulativen Zählerstände** zum Messzeitpunkt
 | Feld | Typ | Pflicht | Beschreibung |
 |------|-----|---------|--------------|
 | `timestamp` | ISO 8601 (lokale Zeit mit Offset) | Ja | Zeitpunkt der Messung, z. B. `2026-06-19T14:30:00+02:00` |
-| `zaehlerstandBezug` | Decimal (kWh, kumulativ) | Ja | Absoluter Zählerstand Bezug/Verbrauch (monoton steigend) |
-| `zaehlerstandEinspeisung` | Decimal (kWh, kumulativ) | Ja | Absoluter Zählerstand Einspeisung (monoton steigend) |
+| `zaehlerstandBezug` | Decimal (kWh, kumulativ) | Ja | Absoluter Zählerstand Bezug/Verbrauch (monoton steigend), Wirkenergie **OBIS 1.8.0** |
+| `zaehlerstandEinspeisung` | Decimal (kWh, kumulativ) | Ja | Absoluter Zählerstand Einspeisung (monoton steigend), Wirkenergie **OBIS 2.8.0** |
 | `zustand` | Objekt: Grössenname → Zahl | **Nein** | **Momentanwerte** des Geräts, z. B. `{"soc": 87.5}` (`Specs/Gerätezustand.md`). Wird nur gesendet, wenn konfiguriert — **nie als leeres Objekt**. Welche Grössen es gibt, entscheidet das Backend; ein unbekannter Name wird dort verworfen, ohne die Nachricht zu kosten |
 | `seriennummer` | String (max. 64) | **Nein** | Seriennummer des liefernden Zählers (aus der Pi-Config je `messpunkt`); Signal für die **Zählertausch-Erkennung** (`Specs/Zaehlertausch-Erkennung.md`). Wird nur gesendet, wenn konfiguriert; fehlt sie, gilt das bisherige Verhalten |
+
+> Übertragen wird nur die **Wirkenergie** – keine Leistung, Blind- oder Scheingrössen (siehe `Specs/Pi-Gateway-Software.md`).
 
 > **`zustand` ist kein Zählerstand** und wird nirgends aggregiert. Die Pflichtfelder sind kumulativ,
 > das Backend bildet daraus Deltas je 15-Minuten-Intervall; ein Ladezustand beschreibt einen
@@ -86,7 +87,7 @@ Der Pi publiziert die **absoluten kumulativen Zählerstände** zum Messzeitpunkt
 > (`TZ=Europe/Zurich`, in den `docker-compose*.yml` gesetzt), damit `now()` auf demselben
 > Raster liegt wie die gespeicherten Zeitstempel.
 
-> Die Stände sind **kumulativ und monoton** (Ausnahme: Zähler-Reset/-tausch, siehe Aggregation/Edge Cases). Die Abbildung auf `messwerte` ist entschieden (FR-6.4): `total = ΔBezug − ΔEinspeisung` (vorzeichenbehaftet), `zev = 0` (Sentinel), `zev_calculated` bleibt Ergebnis der Solarverteilung (die `zev = 0` durch `zev_calculated` ersetzt, FR-9).
+> Die Stände sind **kumulativ und monoton** (Ausnahme: Zähler-Reset/-tausch, siehe Aggregation/Edge Cases). Die Abbildung auf `messwerte` regelt FR-6.4, den `zev`-Fallback FR-9.
 
 ### FR-4: Backend MQTT-Subscriber-Verarbeitung
 
@@ -132,11 +133,10 @@ CREATE INDEX idx_zaehler_rohdaten_unverarbeitet
 1. Scheduled Job (`0 5,20,35,50 * * * *`, d.h. jeweils **5 Minuten nach** der Viertelstunde) ermittelt das abgeschlossene 15-Minuten-Intervall. Der 5-Minuten-Versatz gibt spät eintreffenden MQTT-Nachrichten Zeit; die **verarbeiteten Intervallgrenzen bleiben quartalsgenau** (`:00/:15/:30/:45`).
 2. Pro Einheit **je Register die Differenz** über die Intervallgrenze bilden: `ΔBezug` und `ΔEinspeisung` = `(letzter Stand ≤ Intervallende) − (Referenzstand = letzter Stand ≤ vorheriges Intervallende)`.
 3. **Reset/Überlauf/Zählertausch:** Die Guard-Prüfung gilt **pro Register** — ist `ΔBezug` **oder** `ΔEinspeisung` < 0, wird das jeweilige Register-Delta **nicht negativ** übernommen (auf 0 gesetzt), die Referenz neu gesetzt und WARN geloggt. (Wichtig: nicht am Vorzeichen von `total` prüfen, da negatives `total` bei Einspeisung legitim ist – siehe Mapping unten.)
-4. **Mapping auf `messwerte`** (`zeit`, `total`, `einheit`, `org_id`) gemäss Entscheidung (§8):
+4. **Mapping auf `messwerte`** (`zeit`, `total`, `einheit`, `org_id`) gemäss Entscheidung (Anhang A.2):
    * `zeit` = **Beginn** des Intervalls, Ortszeit (Europe/Zurich) ohne Zone — der Wert für
      10:00–10:15 steht unter `10:00`, wie beim CSV-Import (`Specs/Messwerte-Zeitkonvention.md`,
-     FR-1). Bis zu jener Umstellung stempelte die Erfassung das **Ende**; diese Spec liess den
-     Stempel offen, und so entstand eine zweite Konvention.
+     FR-1; Hintergrund: Anhang A.3).
    * `total` = **vorzeichenbehafteter Netto-Wert**: `total = ΔBezug − ΔEinspeisung`. Bezug überwiegt → **positiv** (Verbrauch/Consumer); Einspeisung überwiegt → **negativ** (Produktion/Producer). Producer vs. Consumer wird also **über das Vorzeichen** unterschieden, ohne `einheit.typ`-Verzweigung.
    * `zev`:
      * **Consumer** (`einheit.typ = CONSUMER`): **0** (Sentinel „nicht gemessen"; wird nicht aus MQTT befüllt). Die Solarverteilung ersetzt `0` später durch `zev_calculated` (FR-9).
@@ -144,14 +144,14 @@ CREATE INDEX idx_zaehler_rohdaten_unverarbeitet
      * **Keine** Tabellen-/Constraint-Änderung nötig – `messwerte.zev` bleibt `NOT NULL`.
      * Dies ist die **einzige** typ-abhängige Verzweigung im Ingest; die `total`-Bildung bleibt vorzeichenbasiert ohne `einheit.typ`-Verzweigung.
    * `zev_calculated` = **NULL** beim Ingest; wird erst durch die **Solarverteilung** (`SolarDistribution`) berechnet. Diese setzt anschliessend `zev = zev_calculated`, sofern `zev = 0` (FR-9).
-5. Speichern mit `quelle = 'MQTT'` (FR-7); Insert/Upsert.
+5. Speichern mit `quelle = 'MQTT'` (FR-7); Insert/Upsert. Liegt für Einheit und `zeit` bereits ein CSV-Wert vor: Warnung loggen, **MQTT hat Vorrang** (Anhang A.2).
 6. Verarbeitete Rohdaten markieren: `verarbeitet = TRUE`, `verarbeitet_am = NOW()`; Referenzstand fortschreiben.
 7. **Unmittelbar nach der Aggregation** wird **je Mandant (`org_id`)** die **Solarverteilung** (FR-9) für den **behandelten Zeitraum** ausgeführt — d.h. für die Spanne `[frühester Intervall-Beginn … spätester Intervall-Beginn]` des jeweiligen Mandanten (die Stempel der erzeugten Messwerte, `Specs/Messwerte-Zeitkonvention.md`, FR-2) (echte Spanne, auch wenn nur ein 15-Minuten-Intervall verarbeitet wurde). Dadurch tragen die frisch aggregierten Messwerte sofort ihr `zev_calculated` (und – wo `zev = 0` – `zev`), ohne manuellen Anstoss über die UI.
    * Aufruf im `ZaehlerAggregationService` über `MesswerteService.calculateSolarDistributionForOrg(orgId, von, bis, algorithmus)`. Da **kein JWT/Request-Kontext** vorliegt, wird der Hibernate-`orgFilter` **explizit** mit der `org_id` versorgt (nicht aus `OrganizationContextService`); **kein** Fortschritts-Tracking.
    * **Algorithmus:** **`PROPORTIONAL`** (Verbraucher erhalten proportional zu ihrem Verbrauch); keine mandantenspezifische Wahl.
    * Fehler der Verteilung werden **pro Mandant** geloggt und brechen die Aggregation der übrigen Mandanten nicht ab.
 
-> **Profil-Aktivierung (`@Profile("mqtt")`):** Das Bean, das die Rohdaten periodisch aus `zaehler_rohdaten` liest und aggregiert (der `@Scheduled`-Aggregations-Job samt zugehörigem Service), ist **nur aktiv, wenn das Spring-Boot-Profil `mqtt` gesetzt ist** (`@Profile("mqtt")`; aktiviert via `SPRING_PROFILES_ACTIVE=mqtt` bzw. `spring.profiles.active`) — analog zum MQTT-Subscriber (FR-1). Ohne dieses Profil (Default, Tests, lokale Entwicklung) läuft **kein** Aggregations-Job; die `messwerte`-Tabelle wird ausschliesslich über den CSV-Upload befüllt.
+> **Profil-Aktivierung:** Der `@Scheduled`-Aggregations-Job samt Service ist wie der Subscriber nur mit Profil `mqtt` aktiv (FR-1). Ohne Profil läuft **kein** Aggregations-Job; die `messwerte`-Tabelle wird ausschliesslich über den CSV-Upload befüllt.
 
 > **Verlusttoleranz:** Fehlt in einem Intervall eine Meldung, fällt der Verbrauch ins nächste Intervall mit Meldung — die **Gesamtsumme bleibt korrekt**, nur die zeitliche Auflösung sinkt kurzzeitig. Das ist der zentrale Vorteil absoluter Stände gegenüber Deltas.
 
@@ -160,7 +160,7 @@ CREATE INDEX idx_zaehler_rohdaten_unverarbeitet
 ALTER TABLE zev.messwerte ADD COLUMN IF NOT EXISTS quelle VARCHAR(20) DEFAULT 'CSV';
 -- Mögliche Werte: 'CSV', 'MQTT', 'API'
 ```
-Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine** Änderung an `messwerte.zev` nötig: Der MQTT-Ingest setzt `zev = 0` (Sentinel) für Consumer bzw. `zev = total` für Producer (FR-6.4); die Spalte bleibt `NOT NULL`. Die Solarverteilung ersetzt `zev = 0` später durch `zev_calculated` (FR-9). Damit bleiben alle bestehenden Konsumenten von `messwerte.zev` (Statistik/Rechnung) unverändert kompatibel.
+Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine** Änderung an `messwerte.zev` nötig (`zev`-Werte: FR-6.4, Fallback: FR-9); alle bestehenden Konsumenten von `messwerte.zev` (Statistik/Rechnung) bleiben unverändert kompatibel.
 
 ### FR-8: Monitoring & Status
 1. Prometheus-Metriken (bestehende Infrastruktur, siehe `Specs/Metriken.md` / `MetricsService`):
@@ -179,6 +179,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
    * Bei einem `PRODUCER` sinkt damit die **ausgewiesene Produktion**, ohne dass der Anlage etwas fehlt. Genau das ist der Grund für die Meldung: Bis dahin stand der Fall nur in einer Logzeile und war im Betrieb unsichtbar — eine zu tief erscheinende Produktion liess sich nicht davon unterscheiden, dass die Anlage wirklich weniger lieferte.
    * Der Parameter nennt Einheit, Register, Intervall und die **verworfene Menge**. Ohne den Betrag liesse sich nicht abschätzen, ob es um Rundung oder um Kilowattstunden geht.
    * Eine fehlgeschlagene Meldung bricht die Aggregation **nicht** ab — dieselbe Abwägung wie beim Zählerwechsel.
+
 ### FR-9: Anpassung Solarverteilung (`zev`-Fallback)
 1. Die Solarverteilung (`SolarDistribution`) berechnet wie bisher `zev_calculated` pro Consumer/Intervall.
 2. **Neu:** Nach der Berechnung wird `zev = zev_calculated` gesetzt, **sofern `zev = 0`** (Sentinel für „nicht gemessen", von MQTT-importierten Consumer-Werten). Bereits gesetzte `zev`-Werte (z. B. aus CSV oder MQTT-**Producer**-Werte mit `zev = total`, `zev ≠ 0`) bleiben unverändert.
@@ -377,17 +378,37 @@ Die Smartmeter im Nachbarhaus tragen einen **gPlugK** (Auslesekopf für die Kund
 * Änderung der `zev_calculated`-**Berechnungslogik** (Verteilalgorithmus) — bleibt wie bisher. **Ausnahme (FR-9):** ein kleiner Zusatz setzt `zev = zev_calculated`, wo `zev = 0` (MQTT-Sentinel) — die eigentliche Verteilung ändert sich nicht.
 
 ## 8. Offene Fragen
-* [x] **Register → `messwerte`-Mapping:** übertragen wird die **Wirkenergie (kWh)** — Bezug **OBIS 1.8.0** (`zaehlerstandBezug`), Einspeisung **OBIS 2.8.0** (`zaehlerstandEinspeisung`); **keine** Leistung/Blind-/Scheingrössen (siehe `Pi-Gateway-Software.md`). → **Mapping entschieden (siehe FR-6):** `total = ΔBezug − ΔEinspeisung` (**vorzeichenbehaftet**: positiv = Verbrauch, negativ = Einspeisung); `zev = 0` (Sentinel, keine Tabellen-Änderung); `zev_calculated = NULL` beim Ingest, erst durch die Solarverteilung, die dann `zev = zev_calculated` setzt, wo `zev = 0` (FR-9).
-* [x] **`org_id`-Typ & Topic-Kennung:** → **internes `org_id` (BIGINT)**, konsistent mit `messwerte`/`zaehler_rohdaten` und der Pi-Config. Kein UUID-Mapping.
-* [x] **Messpunkt-Eindeutigkeit:** → **`messpunkt` ist pro `org_id` eindeutig**; Auflösung über `(org_id, messpunkt)` (Unique-Constraint auf `einheit`).
-* [x] **Producer vs. Consumer** (`einheit.typ`): → Der **`total`** wird **über das Vorzeichen** gebildet (Bezug positiv, Einspeisung negativ), **ohne** `einheit.typ`-Verzweigung und **ohne** getrennte Register/Topics. **Nachtrag:** Für den **`zev`**-Wert gibt es eine typ-abhängige Verzweigung — Producer: `zev = total`, Consumer: `zev = 0` (Sentinel) — damit die Statistik die Produktion korrekt ausweist (FR-6.4).
 * [ ] **Reset/Überlauf-Policy:** Genaue Erkennung (Schwellwert für „Rücksprung") **pro Register** (Bezug/Einspeisung) und Umgang (Referenz neu setzen, Delta = 0)? (Grundsatz in FR-6.3 festgelegt; Schwellwert-Details offen.) — **Betrieblicher Sonderfall Zählertausch:** siehe `docs/Zaehlertausch.md` (Einheit behalten, `messpunkt` anpassen, Offline-Zeit kurz halten, Zählerstände protokollieren; der Reset-Guard nullt **genau ein** Übergangsintervall — unabhängig von der Uhrzeit).
-* [ ] **Zählertausch-Erkennung (Blindspot):** Der Reset-Guard erkennt einen Tausch nur am **negativen** Delta. Startet der neue Zähler **höher** als der alte endete, ist das Delta positiv → der Sprung wird als echter Verbrauch verbucht (Bogus-Wert, keine Warnung). Aus den Werten allein nicht zuverlässig erkennbar → **explizites Signal nötig.** **Lösung spezifiziert in `Specs/Zaehlertausch-Erkennung.md`:** optionales Payload-Feld **`seriennummer`** (aus der Pi-Config je `messpunkt`) + neue Spalte `seriennummer` auf `zaehler_rohdaten`; die Aggregation setzt bei Serien-Wechsel eine neue Baseline (kein Delta über die Grenze, robust in beide Richtungen), bei fehlender Serie greift das heutige Verhalten. (Interim bis zur Umsetzung: neuen Zähler auf Endstand voreinstellen oder Übergangsintervall manuell korrigieren.)
+* [ ] **Zählertausch-Erkennung (Blindspot):** Der Reset-Guard erkennt einen Tausch nur am **negativen** Delta. Startet der neue Zähler **höher** als der alte endete, ist das Delta positiv → der Sprung wird als echter Verbrauch verbucht (Bogus-Wert, keine Warnung). Aus den Werten allein nicht zuverlässig erkennbar → **explizites Signal nötig.** **Lösung spezifiziert in `Specs/Zaehlertausch-Erkennung.md`:** optionales Payload-Feld **`seriennummer`** (aus der Pi-Config je `messpunkt`) + neue Spalte `seriennummer` auf `zaehler_rohdaten`; die Aggregation setzt bei Serien-Wechsel eine neue Baseline (kein Delta über die Grenze, robust in beide Richtungen), bei fehlender Serie greift das heutige Verhalten. (Interim-Vorgehen: Anhang A.2.)
 * [ ] **Prosumer im selben Intervall:** Verhalten, wenn `ΔBezug` **und** `ΔEinspeisung` > 0 (Netmetering)? Aktuelle Festlegung: Netto `total = ΔBezug − ΔEinspeisung` (FR-6.4) — genügt das fachlich?
-* [x] **`zev`-Behandlung / Verträglichkeit:** → **`zev = 0` beim Ingest** (kein NULL, kein Schema-Eingriff); die Solarverteilung ersetzt `0` durch `zev_calculated` (FR-9). Bestehende `zev`-Konsumenten bleiben kompatibel. Rest-Kante (gemessenes echtes `0`) siehe FR-9-Hinweis.
 * [ ] **Rohdaten-Retention:** Cleanup-Job nötig, ab welchem Alter (absolute Stände wachsen unbegrenzt)? --> **aufgenommen in `Specs/Datenaufbewahrung.md`** (FR-1/FR-2, Default 24 Monate; der Referenzstand-Guard unten ist dort als Akzeptanzkriterium verankert). **Wichtig (Wechselwirkung mit der Wiederaufnahme nach Unterbruch):** Ein Cleanup darf den **letzten Stand vor einer noch unverarbeiteten Lücke** nicht löschen — dieser ist die Referenz für die überbrückende Delta-Bildung nach Wiederaufnahme; wird er gelöscht, ginge der Verbrauch des Unterbruchs verloren (`referenz == null` → kein Messwert). Sichere Regel: nur **verarbeitete** Rohdaten löschen und pro Einheit mindestens den jüngsten Stand behalten.
 * [ ] **gPlug-Meldung verifizieren (FR-10.3):** Stimmen Objektname `z`, die Feldnamen und die Einheit kWh bei den Smartmetern im Nachbarhaus? Liefert `SMid` eine stabile Zählerkennung? Vor der Umsetzung eine echte Meldung mitschneiden.
 * [ ] **Netzwerkweg gPlug → NAS:** Liegen die gPlugs im selben Netz wie der NAS-Broker, oder braucht das Nachbarhaus einen VPN-Zugang? Ohne TLS-Unterstützung der gPlug-Firmware darf der Weg nicht offen über das Internet führen (NFR-2).
 * [ ] **Uhr des gPlug:** Sind Zeitzone und Sommerzeit (Tasmota `Timezone 99` mit Regeln für Europe/Zurich) sowie NTP eingestellt? Sonst ist `Time` um eine Stunde verschoben.
 * [ ] **Einheiten des Nachbarhauses:** Welche Typen haben die neuen Zähler (Consumer, Bilanzzähler, Producer)? Gehören sie zum bestehenden Mandanten von Hene (gleiche `orgId` im FullTopic)?
-* [x] **Mehrfach-Quelle pro Einheit:** Verhalten, wenn für dieselbe Einheit + Zeitpunkt sowohl CSV- als auch MQTT-Daten vorliegen? → **Warnung loggen, MQTT hat Vorrang.**
+
+## Anhang A – Entscheidungen und Verlauf
+
+### A.1 Ausgangslage bei der Spezifikation (Abschnitt 1)
+Bei der Spezifikation stand in „Aktueller Stand“: „Es gibt **noch keinen** MQTT-Code / keine MQTT-Dependency im Backend.“ Die Zähler-Daten wurden damals „heute per **SFTP** bereitgestellt“, und die MQTT-Topologie war „Ziel-Topologie“. Umgesetzt wurde das Feature gemäss `Specs/MQTT-Integration_Umsetzungsplan.md`.
+
+### A.2 Beantwortete offene Fragen (Abschnitt 8)
+* **Register → `messwerte`-Mapping:** übertragen wird die **Wirkenergie (kWh)** — Bezug **OBIS 1.8.0** (`zaehlerstandBezug`), Einspeisung **OBIS 2.8.0** (`zaehlerstandEinspeisung`); **keine** Leistung/Blind-/Scheingrössen (siehe `Pi-Gateway-Software.md`). → **Mapping entschieden (siehe FR-6):** `total = ΔBezug − ΔEinspeisung` (**vorzeichenbehaftet**: positiv = Verbrauch, negativ = Einspeisung); `zev = 0` (Sentinel, keine Tabellen-Änderung); `zev_calculated = NULL` beim Ingest, erst durch die Solarverteilung, die dann `zev = zev_calculated` setzt, wo `zev = 0` (FR-9). Jetzt in FR-3 (OBIS) und FR-6.4.
+* **`org_id`-Typ & Topic-Kennung:** FR-2 sagte zuvor: „`{orgId}` folgt vorerst dem bestehenden `Messwerte`-Modell (internes `org_id` als `BIGINT`); Alternative (Keycloak-Alias/UUID) siehe Offene Fragen.“ → **internes `org_id` (BIGINT)**, konsistent mit `messwerte`/`zaehler_rohdaten` und der Pi-Config. Kein UUID-Mapping. Jetzt in FR-2.
+* **Messpunkt-Eindeutigkeit:** → **`messpunkt` ist pro `org_id` eindeutig**; Auflösung über `(org_id, messpunkt)` (Unique-Constraint auf `einheit`). Jetzt in FR-2.
+* **Producer vs. Consumer** (`einheit.typ`): → Der **`total`** wird **über das Vorzeichen** gebildet (Bezug positiv, Einspeisung negativ), **ohne** `einheit.typ`-Verzweigung und **ohne** getrennte Register/Topics. **Nachtrag:** Für den **`zev`**-Wert gibt es eine typ-abhängige Verzweigung — Producer: `zev = total`, Consumer: `zev = 0` (Sentinel) — damit die Statistik die Produktion korrekt ausweist. Steht in FR-6.4.
+* **`zev`-Behandlung / Verträglichkeit:** → **`zev = 0` beim Ingest** (kein NULL, kein Schema-Eingriff); die Solarverteilung ersetzt `0` durch `zev_calculated` (FR-9). Bestehende `zev`-Konsumenten bleiben kompatibel. Rest-Kante (gemessenes echtes `0`) siehe FR-9-Hinweis. Steht in FR-6.4, FR-7 und FR-9.
+* **Mehrfach-Quelle pro Einheit:** Verhalten, wenn für dieselbe Einheit + Zeitpunkt sowohl CSV- als auch MQTT-Daten vorliegen? → **Warnung loggen, MQTT hat Vorrang.** Jetzt in FR-6.5.
+* **Zählertausch-Erkennung, Interim:** Bis zur Umsetzung von `Specs/Zaehlertausch-Erkennung.md` galt: neuen Zähler auf Endstand voreinstellen oder Übergangsintervall manuell korrigieren.
+* FR-3 nannte die Abbildung auf `messwerte` „entschieden (FR-6.4): `total = ΔBezug − ΔEinspeisung` (vorzeichenbehaftet), `zev = 0` (Sentinel), `zev_calculated` bleibt Ergebnis der Solarverteilung (die `zev = 0` durch `zev_calculated` ersetzt, FR-9)“; FR-7 wiederholte: „Der MQTT-Ingest setzt `zev = 0` (Sentinel) für Consumer bzw. `zev = total` für Producer (FR-6.4); die Spalte bleibt `NOT NULL`. Die Solarverteilung ersetzt `zev = 0` später durch `zev_calculated` (FR-9).“ Beides steht jetzt nur noch in FR-6.4 und FR-9.
+* FR-6 wiederholte die Profil-Aktivierung von FR-1 ausführlich („Das Bean, das die Rohdaten periodisch aus `zaehler_rohdaten` liest und aggregiert …, ist **nur aktiv, wenn das Spring-Boot-Profil `mqtt` gesetzt ist** (`@Profile("mqtt")`; aktiviert via `SPRING_PROFILES_ACTIVE=mqtt` bzw. `spring.profiles.active`)“); jetzt ein Verweis auf FR-1.
+
+### A.3 Zeitstempel der Aggregation (FR-6.4)
+Bis zur Umstellung durch `Specs/Messwerte-Zeitkonvention.md` stempelte die MQTT-Erfassung das **Ende** des Intervalls; diese Spec liess den Stempel offen, und so entstand eine zweite Konvention neben dem CSV-Import (Beginn).
+
+### A.4 Log-Meldung „Timed out (32000)“ (FR-1.6, 19.10.2026)
+Am 19.10.2026 lokal beobachtet. Eine Wartezeit von 30 s statt 5 s (Commit `4d8911b`, zurückgenommen) änderte nichts: Der Fehler kam nach 30 s statt nach 5 s, und die gepufferten Nachrichten stauten sich entsprechend länger. Die Meldung ganz zu vermeiden, hiesse, das Abo ausserhalb des Paho-Threads abzusetzen – für eine harmlose Meldung zu viel Eingriff.
+
+### A.5 gPlug-Anbindung (FR-10, 20.10.2026)
+Am 20.10.2026 ergänzt (Commit `6d55231`): Das Nachbarhaus wird in den ZEV bei Hene integriert. Vorgabe des Users: Auf den gPlugs wird nur der MQTT-Broker konfiguriert, die Meldungsstruktur bleibt; ein zweites Topic (`gPlug`) nimmt die Meldungen auf, das Backend liest sie aus und speichert die Rohdaten.
+
