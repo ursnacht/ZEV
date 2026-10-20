@@ -9,9 +9,9 @@
   - Grundlage für spätere Live-Auswertungen.
 * **Ausgangslage:**
   - Ohne dieses Feature kommen Messwerte per **CSV-Upload** (`MesswerteService.processCsvUpload`, Spalten `zeit,total,zev` je Einheit, inkl. KI-gestütztem Einheiten-Matching). `zev_calculated` wird separat durch die **Solarverteilung** (`SolarDistribution`) berechnet.
-  - Die Zähler werden physisch über einen **Raspberry Pi** ausgelesen (3× Wago via Modbus TCP, 1× BKW via gPlug) und heute per **SFTP** bereitgestellt (siehe `docs/Netzwerk-Topologie-Hene.md`).
+  - Die Zähler bei Hene werden über einen **Raspberry Pi** ausgelesen (15× Wago über das Kommunikationsmodul WAGO 879-9000, der BKW-Bilanzzähler über WhatWatt Go, die Batterie am Wechselrichter – alle per Modbus TCP); vor MQTT wurden die Daten per **SFTP** bereitgestellt. Topologie: `docs/Netzwerk-Topologie-Hene.md`.
   - Topologie: Der Pi ist MQTT-**Publisher**, der **Broker (Mosquitto) läuft auf dem NAS** (Variante B der Topologie-Doku), das ZEV-Backend ist **Subscriber**.
-  - **Nachbarhaus:** Das Nachbarhaus wird in den ZEV bei Hene integriert. Seine Smartmeter tragen je einen **gPlugK**, der selbst per MQTT publiziert. Die gPlugs werden **ohne Pi** direkt an den Broker auf dem NAS angebunden und senden ihr eigenes Meldungsformat auf ein **zweites Topic** (`gPlug/…`), das das Backend zusätzlich abonniert (FR-10).
+  - **Nachbarhaus:** Das Nachbarhaus wird in den ZEV bei Hene integriert. Seine Smartmeter tragen je einen **gPlugK**, der selbst per MQTT publiziert. Die gPlugs brauchen **keine Pi-Gateway-Software**: Sie publizieren im LAN an einen Mosquitto auf dem Pi, der `gPlug/#` per Bridge an den Broker auf dem NAS weiterleitet, und senden ihr eigenes Meldungsformat auf ein **zweites Topic** (`gPlug/…`), das das Backend zusätzlich abonniert (FR-10).
 
 > **Designentscheidung – absolute Zählerstände statt Deltas:** Der Pi überträgt die **absoluten (kumulativen) Zählerstände**, nicht berechnete Deltas. Die **Delta-/Intervall-Berechnung erfolgt im Backend**. Vorteil: **verlusttolerant** — geht eine MQTT-Nachricht verloren, bleibt die Gesamtsumme korrekt (die Differenz zweier empfangener Stände erfasst den Verbrauch dazwischen weiterhin vollständig); es sinkt nur kurz die zeitliche Auflösung. Dadurch entfallen strenge QoS-/Pufferungs-Anforderungen (kein zwingender Store-and-Forward-Bridge, Variante C).
 
@@ -42,7 +42,7 @@ zev/{orgId}/{messpunkt}/messwert
 | `messwert` | Message-Typ | `messwert` |
 
 * Backend abonniert `zev/+/+/messwert`.
-* Der Pi adressiert die Einheit über den **Messpunkt** (physisch bekannt), nicht über die interne `einheit.id`. Das Backend löst die Einheit über **(`org_id`, `messpunkt`)** auf; `messpunkt` ist pro `org_id` eindeutig (Anhang A.2).
+* Der Pi adressiert die Einheit über den **Messpunkt** (physisch bekannt), nicht über die interne `einheit.id`. Das Backend löst die Einheit über **(`org_id`, `messpunkt`)** auf. Ein Messpunkt kann **mehrere** Einheiten treffen: `BEZUG` und `RUECKLIEFERUNG` dürfen sich einen Bilanzmesspunkt teilen, die Meldung wird dann je Einheit auf ihr Register projiziert (`Specs/Bilanzmesspunkt.md`, FR-2.3/2.4). Eindeutig erzwungen ist der Messpunkt nur für Ladestationen (`V104`), die der Ingest ausschliesst (Anhang A.6).
 * `{orgId}` ist das interne `org_id` (`BIGINT`), konsistent mit `messwerte`, `zaehler_rohdaten` und der Pi-Config; kein UUID-Mapping (Anhang A.2).
 
 ### FR-3: Payload-Format (JSON, absolute Zählerstände)
@@ -120,6 +120,7 @@ CREATE TABLE zev.zaehler_rohdaten (
     empfangen_am              TIMESTAMP DEFAULT NOW(),
     verarbeitet               BOOLEAN DEFAULT FALSE,
     verarbeitet_am            TIMESTAMP,
+    seriennummer              VARCHAR(64),   -- ergänzt mit V92, Specs/Zaehlertausch-Erkennung.md
     CONSTRAINT uk_zaehler_rohdaten UNIQUE (einheit_id, zeit)
 );
 CREATE INDEX idx_zaehler_rohdaten_unverarbeitet
@@ -188,7 +189,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 > **Kante:** Ein *gemessener* Wert von genau `zev = 0` (z. B. Nachtstunde ohne ZEV-Bezug aus CSV) würde ebenfalls durch `zev_calculated` ersetzt. Da `zev_calculated` in solchen Fällen ohnehin ~0 ist, ist der Effekt vernachlässigbar; falls doch relevant, kann die Unterscheidung über `quelle = 'MQTT'` statt über `zev = 0` erfolgen (Umsetzungsdetail).
 
 ### FR-10: gPlug-Anbindung (zweites Topic)
-Die Smartmeter im Nachbarhaus tragen einen **gPlugK** (Auslesekopf für die Kundenschnittstelle des Smartmeters, Firmware auf Tasmota-Basis). Er publiziert die Zählerdaten selbst per MQTT. Das Backend liest diese Meldungen **direkt** – ohne Pi und ohne Umformatierung.
+Die Smartmeter im Nachbarhaus tragen einen **gPlugK** (Auslesekopf für die Kundenschnittstelle des Smartmeters, Firmware auf Tasmota-Basis). Er publiziert die Zählerdaten selbst per MQTT. Das Backend liest diese Meldungen **direkt** – ohne Pi-Gateway-Software und ohne Umformatierung. Weil der gPlug weder VPN noch TLS beherrscht, erreicht er den NAS-Broker über einen **Mosquitto auf dem Pi**, der nur `gPlug/#` per Bridge weiterleitet und die Meldungen nicht verändert (`docs/Netzwerk-Topologie-Hene.md`).
 
 > **Grundsatz:** Auf dem gPlug wird **nur die MQTT-Anbindung konfiguriert** (Host, Port, Benutzer, Passwort, Topic, FullTopic, Sendeintervall). An der Meldungsstruktur und am Ausleseskript ändert sich **nichts**. Die Übersetzung in das interne Format leistet das Backend.
 >
@@ -197,8 +198,8 @@ Die Smartmeter im Nachbarhaus tragen einen **gPlugK** (Auslesekopf für die Kund
 1. **Konfiguration am gPlug** (Tasmota-Konsole oder Web-Oberfläche „Configure MQTT“):
    | Einstellung | Wert | Bemerkung |
    |-------------|------|-----------|
-   | Host / Port | NAS-Broker, `1883` | Netzwerkweg siehe Offene Fragen |
-   | User / Password | eigener Broker-User je gPlug oder für alle gPlugs eines Hauses | nie der Backend- oder Pi-User (NFR-2) |
+   | Host / Port | Broker auf dem Pi (LAN-IP des Pi), `1883` | Bridge zum NAS, siehe oben |
+   | User / Password | eigener Broker-User auf dem Pi-Broker, je gPlug oder für alle gPlugs eines Hauses | nie der Backend- oder Pi-Gateway-User (NFR-2) |
    | Topic (`%topic%`) | **`messpunkt`** der Einheit, z. B. `ID742-Nachbar-1` | ohne `/`, `+`, `#` und Leerzeichen |
    | FullTopic | **`gPlug/{orgId}/%topic%/%prefix%/`**, z. B. `gPlug/42/%topic%/%prefix%/` | `{orgId}` ist hier ein fester Text |
    | TelePeriod | **`60`** (Sekunden) | Takt der `SENSOR`-Meldung, Begründung unten |
@@ -310,7 +311,7 @@ Die Smartmeter im Nachbarhaus tragen einen **gPlugK** (Auslesekopf für die Kund
 * **Kein Endbenutzer-UI / nicht rollenbasiert:** Der Ingest ist ein Backend-Hintergrunddienst (keine `zev_user`/`zev_admin`-Route, kein `@PreAuthorize`). Ein späteres Status-/Konfig-UI wäre über das Permission-Modell (`Specs/Composite-Roles.md`) zu schützen (Out of Scope).
 * **Broker-Auth:** Username/Passwort (nur via Env), **ACLs pro Mandant** (Pi darf nur in seine `org_id` publizieren); getrennte Broker-User für Publisher (Pi) und Backend-Subscriber.
 * **TLS (Port 8883)** empfohlen, zusätzlich zum VPN-Tunnel (Defense-in-Depth).
-* **gPlug (FR-10):** eigener Broker-User mit ACL nur auf seinen Mandanten, z. B. `topic write gPlug/42/+/tele/#` und `topic read gPlug/42/+/cmnd/#`. Der Backend-User darf `gPlug/+/+/tele/SENSOR` nur **lesen**; er publiziert nie auf `cmnd/…` (das wären Befehle an den gPlug). Die Standard-Firmware des gPlug spricht **kein TLS**: Der Weg zum Broker muss deshalb im lokalen Netz oder im VPN liegen, nie offen über das Internet.
+* **gPlug (FR-10):** eigener Broker-User auf dem Pi-Broker mit ACL nur auf seinen Mandanten, z. B. `topic write gPlug/42/+/tele/#` und `topic read gPlug/42/+/cmnd/#`; die Bridge meldet sich am NAS mit einem eigenen User an, der nur `gPlug/42/+/tele/#` schreiben darf. Der Backend-User darf `gPlug/+/+/tele/SENSOR` nur **lesen**; er publiziert nie auf `cmnd/…` (das wären Befehle an den gPlug). Die Standard-Firmware des gPlug spricht **kein TLS**: Er publiziert deshalb nur im lokalen Netz an den Pi-Broker; den Weg zum NAS übernimmt die Bridge über das VPN.
 * **Mandanten-Isolation:** `org_id` aus dem Topic wird gegen die Einheit geprüft; Rohdaten/Messwerte tragen `org_id` und unterliegen dem Hibernate-`orgFilter`. Da kein JWT vorliegt, wird der Filter explizit mit dem topic-abgeleiteten `org_id` versorgt.
 
 ### NFR-3: Zuverlässigkeit
@@ -357,13 +358,13 @@ Die Smartmeter im Nachbarhaus tragen einen **gPlugK** (Auslesekopf für die Kund
   - Mosquitto-Broker auf dem NAS betriebsbereit (siehe `docs/Netzwerk-Topologie-Hene.md`, Abschnitt „MQTT-Broker auf dem NAS betreiben").
   - VPN-Verbindung zwischen Pi und NAS; **separater Reader-/Publisher-Prozess** auf dem Pi (Out of Scope, `Specs/Pi-Gateway-Software.md`).
 * **Neue Dependencies (Backend):** `spring-integration-mqtt` + Eclipse Paho (`org.eclipse.paho.client.mqttv3`).
-* **Backend-Konfiguration (`application.yml`):** `mqtt.broker.url/username/password`, `mqtt.topics.messwerte=zev/+/+/messwert`, `mqtt.qos`, `mqtt.clean-session` (Secrets via Env). Der MQTT-Subscriber ist über das Spring-Profil **`mqtt`** zugeschaltet (`@Profile("mqtt")`, siehe FR-1); ohne aktives Profil wird keine Broker-Verbindung aufgebaut.
+* **Backend-Konfiguration (`application.yml`):** `mqtt.broker.url/username/password`, `mqtt.client-id`, `mqtt.topic=zev/+/+/messwert` (Env `MQTT_TOPIC`), `mqtt.qos`, `mqtt.clean-session` (Secrets via Env). Der MQTT-Subscriber ist über das Spring-Profil **`mqtt`** zugeschaltet (`@Profile("mqtt")`, siehe FR-1); ohne aktives Profil wird keine Broker-Verbindung aufgebaut.
 * **Neuer Code:** MQTT-Subscriber/Handler, Topic-/Payload-Parser, `ZaehlerRohdaten`-Entity + Repository, Aggregations-/Delta-Service (Scheduled), Health-Indicator, Prometheus-Metriken.
 * **Erweiterung:** `messwerte` um `quelle`.
 * **Wiederverwendet:** `Einheit`/`Messwerte`, `SolarDistribution` (unverändert), `MetricsService`, Grafana/Prometheus-Stack.
 * **Datenmigration:** Keine Bestandsmigration; nur neue Tabelle + `quelle`-Spalte.
 * **i18n:** Kein UI-Text in diesem Feature (reiner Backend-Ingest). Falls später Status-UI: Texte via `TranslationService`.
-* **gPlug (FR-10):** Konfiguration `mqtt.topic-gplug` (Env `MQTT_TOPIC_GPLUG`, Default `gPlug/+/+/tele/SENSOR`); Einheiten des Nachbarhauses mit `messpunkt` = Tasmota-Topic; je gPlug ein Broker-User mit ACL; `queue_qos0_messages true` und angepasstes `max_queued_messages` in der NAS-`mosquitto.conf`. `docs/Netzwerk-Topologie-Hene.md` ist um die gPlug-Anbindung zu ergänzen. Kein UI-Text, keine Migration.
+* **gPlug (FR-10):** Konfiguration `mqtt.topic-gplug` (Env `MQTT_TOPIC_GPLUG`, Default `gPlug/+/+/tele/SENSOR`); Einheiten des Nachbarhauses mit `messpunkt` = Tasmota-Topic; Mosquitto auf dem Pi mit Bridge `gPlug/# out` zum NAS, Broker-User und ACL für die gPlugs (Pi) und die Bridge (NAS); `queue_qos0_messages true` auf beiden Brokern und angepasstes `max_queued_messages` (Einrichtung: `docs/Netzwerk-Topologie-Hene.md`). Kein UI-Text, keine Migration.
 * **Abhängige Dokumente:** `docs/Netzwerk-Topologie-Hene.md` (Topologie/Broker-Setup/Varianten A/B/C), `Specs/Pi-Gateway-Software.md` (Publisher), `Specs/Metriken.md` (Prometheus-Infrastruktur).
 
 ## 7. Abgrenzung / Out of Scope
@@ -373,7 +374,7 @@ Die Smartmeter im Nachbarhaus tragen einen **gPlugK** (Auslesekopf für die Kund
 * Automatische Einheiten-/Geräteregistrierung; bidirektionale Befehle an Zähler.
 * TLS-Zertifikatsverwaltung (manuell, siehe Topologie-Doku).
 * Aufbewahrungs-/Cleanup-Strategie für Rohdaten (eigene Spec).
-* Beibehaltung des SFTP-Pfads als Fallback — nicht Gegenstand dieser Spec.
+* SFTP-Pfad als Fallback — abgelöst, nicht Gegenstand dieser Spec.
 * **gPlug:** Änderungen an Firmware, Ausleseskript oder Meldungsstruktur des gPlug; Auswertung der Momentanwerte (Leistung, Strom, Spannung) und der Tarifregister; die übrigen Tasmota-Meldungen (`STATE`, `LWT`, `INFO`); Befehle an den gPlug. Der `gplug_reader` der Pi-Software (`Specs/Pi-Gateway-Software.md`) ist ein anderer Weg und bleibt davon unberührt.
 * Änderung der `zev_calculated`-**Berechnungslogik** (Verteilalgorithmus) — bleibt wie bisher. **Ausnahme (FR-9):** ein kleiner Zusatz setzt `zev = zev_calculated`, wo `zev = 0` (MQTT-Sentinel) — die eigentliche Verteilung ändert sich nicht.
 
@@ -383,7 +384,6 @@ Die Smartmeter im Nachbarhaus tragen einen **gPlugK** (Auslesekopf für die Kund
 * [ ] **Prosumer im selben Intervall:** Verhalten, wenn `ΔBezug` **und** `ΔEinspeisung` > 0 (Netmetering)? Aktuelle Festlegung: Netto `total = ΔBezug − ΔEinspeisung` (FR-6.4) — genügt das fachlich?
 * [ ] **Rohdaten-Retention:** Cleanup-Job nötig, ab welchem Alter (absolute Stände wachsen unbegrenzt)? --> **aufgenommen in `Specs/Datenaufbewahrung.md`** (FR-1/FR-2, Default 24 Monate; der Referenzstand-Guard unten ist dort als Akzeptanzkriterium verankert). **Wichtig (Wechselwirkung mit der Wiederaufnahme nach Unterbruch):** Ein Cleanup darf den **letzten Stand vor einer noch unverarbeiteten Lücke** nicht löschen — dieser ist die Referenz für die überbrückende Delta-Bildung nach Wiederaufnahme; wird er gelöscht, ginge der Verbrauch des Unterbruchs verloren (`referenz == null` → kein Messwert). Sichere Regel: nur **verarbeitete** Rohdaten löschen und pro Einheit mindestens den jüngsten Stand behalten.
 * [ ] **gPlug-Meldung verifizieren (FR-10.3):** Stimmen Objektname `z`, die Feldnamen und die Einheit kWh bei den Smartmetern im Nachbarhaus? Liefert `SMid` eine stabile Zählerkennung? Vor der Umsetzung eine echte Meldung mitschneiden.
-* [ ] **Netzwerkweg gPlug → NAS:** Liegen die gPlugs im selben Netz wie der NAS-Broker, oder braucht das Nachbarhaus einen VPN-Zugang? Ohne TLS-Unterstützung der gPlug-Firmware darf der Weg nicht offen über das Internet führen (NFR-2).
 * [ ] **Uhr des gPlug:** Sind Zeitzone und Sommerzeit (Tasmota `Timezone 99` mit Regeln für Europe/Zurich) sowie NTP eingestellt? Sonst ist `Time` um eine Stunde verschoben.
 * [ ] **Einheiten des Nachbarhauses:** Welche Typen haben die neuen Zähler (Consumer, Bilanzzähler, Producer)? Gehören sie zum bestehenden Mandanten von Hene (gleiche `orgId` im FullTopic)?
 
@@ -411,4 +411,14 @@ Am 19.10.2026 lokal beobachtet. Eine Wartezeit von 30 s statt 5 s (Commit `4d891
 
 ### A.5 gPlug-Anbindung (FR-10, 20.10.2026)
 Am 20.10.2026 ergänzt (Commit `6d55231`): Das Nachbarhaus wird in den ZEV bei Hene integriert. Vorgabe des Users: Auf den gPlugs wird nur der MQTT-Broker konfiguriert, die Meldungsstruktur bleibt; ein zweites Topic (`gPlug`) nimmt die Meldungen auf, das Backend liest sie aus und speichert die Rohdaten.
+
+### A.6 Korrekturen nach der Konsolidierung (FR-2, FR-5, Abschnitt 6, 20.10.2026)
+Bei der Konsolidierung fielen drei Abweichungen zum Code auf; auf Wunsch des Users korrigiert:
+* **FR-2, Messpunkt-Eindeutigkeit:** Die beantwortete Frage (A.2) sagte „`messpunkt` ist pro `org_id` eindeutig (Unique-Constraint auf `einheit`)“. Das gilt seit dem Bilanzmesspunkt nicht mehr: `BEZUG` und `RUECKLIEFERUNG` teilen sich einen Messpunkt, der Ingest löst eine Liste auf (`EinheitRepository.findAllByOrgIdAndMesspunkt`). `V104` legt den Unique-Index bewusst nur partiell für Ladestationen an.
+* **FR-5:** Die SQL-Vorlage enthielt die Spalte `seriennummer` nicht, die `V92` mit der Zählertausch-Erkennung ergänzte.
+* **Abschnitt 6:** Die Konfiguration hiess dort `mqtt.topics.messwerte`; im Code (`application-mqtt.yml`, `MqttConfig`) heisst sie `mqtt.topic`. `mqtt.client-id` fehlte.
+
+### A.7 Topologie Hene bereinigt, Netzwerkweg der gPlugs (Abschnitt 1, FR-10, NFR-2, 20.10.2026)
+* Abschnitt 1 nannte „3× Wago via Modbus TCP, 1× BKW via gPlug“ und „heute per **SFTP** bereitgestellt“. Stand laut User: 15 Wago-Zähler, Bilanz vom BKW-Zähler über WhatWatt Go, Batterie per Modbus am Wechselrichter; SFTP ist durch MQTT abgelöst. Abschnitt 7 sagte „Beibehaltung des SFTP-Pfads als Fallback — nicht Gegenstand dieser Spec“.
+* Offene Frage beantwortet: „**Netzwerkweg gPlug → NAS:** Liegen die gPlugs im selben Netz wie der NAS-Broker, oder braucht das Nachbarhaus einen VPN-Zugang? Ohne TLS-Unterstützung der gPlug-Firmware darf der Weg nicht offen über das Internet führen (NFR-2).“ → Die ca. 5 gPlugs stehen im LAN bei Hene. Sie publizieren an einen Mosquitto auf dem Pi, der nur `gPlug/#` per Bridge über das VPN an den NAS weiterleitet (Entscheidung des Users, Alternativen waren ein Router-VPN oder ein NAS im selben LAN). Zuvor stand in FR-10: Host „NAS-Broker, `1883`“, „direkt an den Broker auf dem NAS“, „ohne Pi“; in NFR-2: „Der Weg zum Broker muss deshalb im lokalen Netz oder im VPN liegen“. „Ohne Pi“ meint jetzt: ohne Pi-Gateway-Software.
 

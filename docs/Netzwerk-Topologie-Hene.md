@@ -1,111 +1,79 @@
-# Netzwerk-Topologie ZEV
+# Netzwerk-Topologie ZEV (Hene)
 
 ```mermaid
 flowchart TB
-    subgraph Lokales_Netzwerk["Hausinfrastruktur (Zähler, Raspberry Pi)"]
-        W1["Stromzähler Wago 1"]
-        W2["Stromzähler Wago 2"]
-        W3["Stromzähler Wago 3"]
-        HUB["Modbus-TCP-Hub<br/>(RTU → TCP Gateway)"]
-        BKW["Stromzähler BKW<br/>(WhatWatt Go)"]
+    subgraph Hene["Standort Hene (LAN 192.168.10.0/24)"]
+        WAGO["15 Stromzähler Wago<br/>(Modbus RTU, RS485)"]
+        MOD["Kommunikationsmodul<br/>WAGO 879-9000"]
+        BKW["BKW-Zähler (Bilanz)<br/>mit WhatWatt Go"]
+        WR["Hybrid-Wechselrichter<br/>(Batterie)"]
+        GPLUG["ca. 5 Smartmeter Nachbarhaus<br/>je mit gPlugK"]
         ROUTER{{"Router"}}
-        RPI["Raspberry Pi<br/>VPN-Client<br/>Reader + MQTT-Publisher"]
+        RPI["Raspberry Pi<br/>Pi-Gateway (Reader + Publisher)<br/>Mosquitto (nur Bridge für gPlug)"]
     end
 
-    NAS["NAS<br/>ZEV-Verwaltung<br/>VPN-Server<br/>MQTT-Broker + Delta-Bildung"]
+    subgraph NASBOX["NAS"]
+        BROKER["Mosquitto-Broker"]
+        ZEV["ZEV-Backend<br/>(Subscriber, Delta-Bildung)"]
+    end
 
-    W1 -- "Modbus (RTU)" --> HUB
-    W2 -- "Modbus (RTU)" --> HUB
-    W3 -- "Modbus (RTU)" --> HUB
-    HUB -- "Modbus TCP" --> ROUTER
-    BKW -- "WhatWatt" --> ROUTER
+    WAGO -- "Modbus RTU" --> MOD
+    MOD -- "Modbus TCP" --> ROUTER
+    BKW -- "Modbus TCP" --> ROUTER
+    WR -- "Modbus TCP" --> ROUTER
+    GPLUG -- "LAN/WLAN" --> ROUTER
     ROUTER --- RPI
 
-    RPI -. "liest aus" .-> W1
-    RPI -. "liest aus" .-> W2
-    RPI -. "liest aus" .-> W3
+    RPI -. "liest aus" .-> MOD
     RPI -. "liest aus" .-> BKW
+    RPI -. "liest aus" .-> WR
+    GPLUG == "MQTT gPlug/… (im LAN)" ==> RPI
 
-    NAS -. "VPN über Internet" .-> ROUTER
-    RPI == "MQTT: publiziert absolute Zählerstände (über VPN)" ==> NAS
+    RPI == "MQTT zev/… (über VPN)" ==> BROKER
+    RPI == "Bridge gPlug/… (über VPN)" ==> BROKER
+    BROKER --> ZEV
 ```
 
-> **Zähler-Anbindung:** Die drei **Wago**-Zähler sind per **seriellem Modbus (RTU)** an einen
-> **Modbus-TCP-Hub** (RTU→TCP-Gateway) angeschlossen, der am Router hängt; der Pi liest sie per
-> **Modbus TCP** über den Hub (gemeinsame Hub-IP, je Zähler eine Unit-/Slave-ID). Der **BKW**-Zähler
-> ist separat über **WhatWatt** am Router und kann ebenfalls per **Modbus TCP** ausgelesen werden.
->
-> **Datenfluss (Ziel, MQTT):** Der Pi liest die Zähler (Modbus TCP über den Hub / WhatWatt) und
-> **publiziert die absoluten Zählerstände** über den VPN-Tunnel an den
-> Mosquitto-**Broker auf dem NAS** (Variante B). Das ZEV-Backend abonniert sie und
-> **bildet die Deltas/15-Min-Werte** selbst — verlusttolerant (siehe
-> `Specs/MQTT-Integration.md`). Der **SFTP-Pull** (NAS holt Dateien beim Pi) ist
-> der heutige Weg bzw. Fallback.
->
-> *Hinweis:* Das Diagramm zeigt den **Ziel-Pfad (MQTT)**. Der **SFTP-Pull** ist bewusst
-> **nicht eingezeichnet** (der Übersichtlichkeit halber), bleibt aber als heutiger Weg/Fallback
-> gültig — Details im Abschnitt „Setup-Notiz: Dateiübertragung via SFTP" unten.
+## Messquellen
 
-## Setup-Notiz: Dateiübertragung via SFTP
+| Quelle | Anzahl | Anbindung | Ausgelesen von | MQTT-Topic | Spec |
+|--------|--------|-----------|----------------|------------|------|
+| Wago-Zähler (Wohnungen, Allgemein, Produktion) | 15 | Modbus RTU → Kommunikationsmodul WAGO 879-9000 → Modbus TCP | Pi-Gateway | `zev/{orgId}/{messpunkt}/messwert` | `Specs/Pi-Gateway-Software.md` |
+| BKW-Zähler (Bilanz: Bezug und Rücklieferung) | 1 | WhatWatt Go, Modbus TCP | Pi-Gateway | `zev/{orgId}/{messpunkt}/messwert` | `Specs/Bilanzmesspunkt.md` |
+| Batterie (Hybrid-Wechselrichter) | 1 | Modbus TCP am Wechselrichter | Pi-Gateway | `zev/{orgId}/{messpunkt}/messwert` | `Specs/Batteriespeicher.md` |
+| Smartmeter Nachbarhaus | ca. 5 | gPlugK, publiziert selbst per MQTT | – (kein Reader) | `gPlug/{orgId}/{messpunkt}/tele/SENSOR` | `Specs/MQTT-Integration.md`, FR-10 |
 
-Das NAS holt die Zählerdaten-Dateien aktiv beim Raspberry Pi ab (Pull). Als
-Übertragungsweg wird **SFTP** (über SSH) verwendet — die sichere Variante
-gegenüber Samba/SMB: Verschlüsselung ist immer aktiv, schlüsselbasierte
-Authentisierung, nur ein offener Port (22), kleine Angriffsfläche. Zusätzlich
-zum VPN-Tunnel ergibt das Defense-in-Depth.
+## Datenfluss
 
-### Empfohlene Härtung
+* **Pi-Gateway:** Der Pi liest die 17 Zähler per Modbus TCP und **publiziert die absoluten
+  Zählerstände** über den VPN-Tunnel direkt an den Mosquitto-**Broker auf dem NAS**
+  (Variante B, unten).
+* **gPlugs:** Sie publizieren ihre Meldungen selbst – ohne Pi-Gateway-Software. Weil sie weder
+  VPN noch TLS beherrschen, erreichen sie den NAS nicht direkt: Sie publizieren an einen
+  **Mosquitto auf dem Pi** im LAN, der **nur** `gPlug/#` per **Bridge** über das VPN an den
+  NAS-Broker weiterleitet. Der Pi-Broker ist reiner Vermittler; er liest nichts aus und
+  verändert keine Meldung.
+* **ZEV-Backend:** abonniert beide Topics auf dem NAS-Broker und **bildet die
+  Deltas/15-Minuten-Werte** selbst — verlusttolerant (siehe `Specs/MQTT-Integration.md`).
 
-1. **SSH-Key-Auth statt Passwort**: Public Key des NAS auf den Pi hinterlegen,
-   Passwort-Login deaktivieren.
-   ```
-   # /etc/ssh/sshd_config auf dem Raspberry Pi
-   PasswordAuthentication no
-   PubkeyAuthentication yes
-   ```
-2. **Dedizierter, eingeschränkter User** auf dem Pi nur für den Datenabzug
-   (z. B. `zevdata`), nicht der Standard-User.
-3. **Auf SFTP einsperren** (Chroot, kein Shell-Zugriff aufs restliche System):
-   ```
-   # /etc/ssh/sshd_config auf dem Raspberry Pi
-   Match User zevdata
-       ForceCommand internal-sftp
-       ChrootDirectory /srv/zev-export
-       AllowTcpForwarding no
-       X11Forwarding no
-   ```
-4. **Read-only**: Das NAS holt nur ab und schreibt nicht zurück; das
-   Export-Verzeichnis für `zevdata` entsprechend berechtigen.
+> **Rollentrennung – ein Broker liest keine Zähler:** Mosquitto **verteilt nur Nachrichten** und
+> spricht kein Modbus. Das Auslesen der Wago-, BKW- und Batteriezähler übernimmt der
+> **Reader/Publisher-Prozess** auf dem Pi (`pi-gateway`). Die gPlugs sind Reader und Publisher
+> in einem.
 
-### Abholen vom NAS (Beispiel)
-
-Effizient inkrementell mit `rsync` über SSH (überträgt nur geänderte Dateien) —
-selbes Sicherheitsniveau wie SFTP, da derselbe SSH-Transport genutzt wird:
-
-```bash
-rsync -avz --remove-source-files \
-  -e "ssh -i /volume1/keys/zev_id_ed25519" \
-  zevdata@<raspberry-pi-vpn-ip>:/srv/zev-export/ \
-  /volume1/zev-import/
-```
-
-Alternativ rein mit SFTP:
-
-```bash
-sftp -i /volume1/keys/zev_id_ed25519 zevdata@<raspberry-pi-vpn-ip>
-```
-
-Der Abruf wird am NAS per Cronjob/geplanter Aufgabe periodisch ausgeführt.
+Der frühere SFTP-Weg ist abgelöst (Anhang).
 
 ## Verbesserungspotenzial der Architektur
 
-Die aktuelle Architektur (file-basiertes SFTP-Staging) ist bewusst entkoppelt,
-fehlertolerant und einfach zu debuggen. Folgende Punkte erhöhen Sicherheit,
-Reichbarkeit und Datenqualität — geordnet nach Wirkung.
+Folgende Punkte erhöhen Sicherheit, Erreichbarkeit und Datenqualität — geordnet nach Wirkung.
 
 ### 1. VPN-Richtung umdrehen: Pi als Client statt Server
 
-Aktuell ist der Pi der VPN-Server → der Router am Zählerstandort muss aus dem
+> **Offen – Stand klären:** Das frühere Diagramm dieser Doku zeigte den Pi bereits als
+> VPN-**Client** und den NAS als VPN-**Server**; dieser Abschnitt geht vom Gegenteil aus.
+> Ist der Pi schon Client, ist der Punkt erledigt und gehört in den Anhang.
+
+Ist der Pi der VPN-Server, muss der Router am Zählerstandort aus dem
 Internet erreichbar sein (Port-Forwarding + DynDNS). Das ist das größte Risiko:
 
 - **CGNAT-Problem**: Viele ISPs vergeben kein öffentlich erreichbares IPv4 mehr
@@ -115,70 +83,41 @@ Internet erreichbar sein (Port-Forwarding + DynDNS). Das ist das größte Risiko
 
 **Besser**: Der Pi wählt sich *ausgehend* beim NAS (oder einem kleinen
 Cloud-Endpoint) als VPN-**Client** ein. Der Tunnel ist danach bidirektional —
-das NAS kann weiterhin per SFTP *ziehen*. Vorteile: kein Port-Forwarding,
+der Pi erreicht den NAS-Broker, und für die Wartung bleibt der Pi per SSH erreichbar. Vorteile: kein Port-Forwarding,
 CGNAT-tauglich, keine Inbound-Exposition am Zählerstandort. WireGuard eignet
 sich dafür ideal (schlank, läuft gut auf dem Pi).
 
 ### 2. Netzwerk-Segmentierung für die Zähler
 
-Modbus TCP ist **unverschlüsselt und ohne Authentisierung**. Aktuell hängen
-Zähler, Pi und der VPN-Pfad im selben flachen LAN; ein kompromittiertes Gerät
-erreicht alles.
+Modbus TCP ist **unverschlüsselt und ohne Authentisierung**, und die gPlugs sprechen MQTT ohne
+TLS. Aktuell hängen Zähler, gPlugs, Pi und der VPN-Pfad im selben flachen LAN; ein
+kompromittiertes Gerät erreicht alles.
 
-→ Zähler in ein eigenes VLAN / separates Netzsegment legen; nur der Pi darf per
-Modbus dorthin. Trennt OT (Zähler) von IT (Pi/NAS-Pfad).
+→ Zähler und gPlugs in ein eigenes VLAN / separates Netzsegment legen; nur der Pi darf per
+Modbus dorthin, und nur die gPlugs dürfen den Broker auf dem Pi erreichen. Trennt OT (Zähler)
+von IT (Pi/NAS-Pfad).
 
 ### 3. Datenpipeline härten (Korrektheit)
 
-- **Atomare Dateiübergabe**: Pi schreibt in `*.tmp` und benennt erst nach
-  vollständigem Schreiben um (`rename`), sonst liest das NAS evtl. halbe
-  Dateien. `rsync --remove-source-files` löscht erst nach erfolgreicher
-  Übertragung.
-- **Pi-Speicher**: Nicht auf die SD-Karte schreiben (Wear-out → Datenverlust).
-  USB-SSD oder zumindest Log-Rotation + ausreichend Puffer, damit ein
-  NAS-Ausfall überbrückt wird.
-- **NTP auf dem Pi**: Zählerwerte brauchen korrekte Zeitstempel — eine driftende
-  Pi-Uhr verfälscht die ganze ZEV-Abrechnung.
+- **Pi-Speicher**: Nicht auf die SD-Karte schreiben (Wear-out → Datenverlust). Das gilt auch für
+  die `persistence` des Mosquitto auf dem Pi: USB-SSD oder zumindest Log-Rotation.
+- **NTP auf dem Pi und auf den gPlugs**: Zählerwerte brauchen korrekte Zeitstempel — eine
+  driftende Uhr verfälscht die ganze ZEV-Abrechnung. Die gPlugs stempeln ihre Meldungen selbst
+  (Zeitzone und Sommerzeit im Abschnitt „gPlugK“ unten).
 
 ### 4. Monitoring gegen stillen Ausfall
 
-Heute merkt niemand, wenn der Pi nicht mehr ausliest oder das NAS nicht mehr
-importiert → stiller Datenverlust, der erst bei der Quartalsabrechnung auffällt.
-ZEV hat bereits **Prometheus/Grafana** im Stack: Pi einen Heartbeat bzw.
-„letzter erfolgreicher Read"-Timestamp exponieren lassen und Alert bei Lücke.
-
-### Strategische Alternative: MQTT (Trade-off, kein Muss)
-
-Statt File-Batch + SFTP könnte der **Pi als MQTT-Gateway** die Messwerte an
-einen Broker beim NAS publizieren, ZEV abonniert sie (siehe Spec
-`MQTT-Integration.md`) → näher an Echtzeit, kein Datei-Handling. Alternativ
-direkter Push des Pi an die bestehende `/api/messwerte`-REST-Schnittstelle.
-
-> **Rollentrennung – der Broker liest keine Zähler:** Ein MQTT-Broker (Mosquitto)
-> **verteilt nur Nachrichten** und spricht kein Modbus. Das Auslesen der Zähler
-> (Modbus TCP / gPlug) übernimmt ein **separater Reader-/Publisher-Prozess** auf
-> dem Pi, der die Werte an den Broker *publiziert*. „Pi als MQTT-Gateway" meint
-> also zwei Komponenten:
-> 1. **Reader/Publisher** – liest die Zähler aus und publiziert (immer nötig, in
->    jeder Variante; **nicht** Teil der Broker-Installation, separat zu
->    implementieren/betreiben).
-> 2. **Broker** – nur bei Variante A/C lokal auf dem Pi; bei Variante B nur auf dem NAS.
->
-> Der Reader publiziert an den Broker auf `localhost` (diese Verbindung fällt
-> praktisch nie aus); das Verlustrisiko bei Ausfällen liegt allein auf der Strecke
-> **Broker → NAS** (siehe Pufferung/QoS in den Broker-Setup-Notizen unten).
-
-**Empfehlung**: Das jetzige File/SFTP-Modell vorerst behalten (entkoppelt,
-fehlertolerant, einfach zu debuggen) und Punkte 1–4 umsetzen. MQTT erst, wenn
-Echtzeit oder deutlich mehr Zähler tatsächlich gefordert sind — sonst
-zusätzliche Komplexität (Broker-Betrieb, Verfügbarkeit) ohne klaren Nutzen.
+Das Backend meldet Datenlücken eines Zählers als Systemmeldung (`MQTT_ZAEHLER_LUECKE` /
+`MQTT_ZAEHLER_AUSFALL`, `Specs/MQTT-Integration.md`, FR-8.3) – allerdings erst, **wenn wieder
+Daten eintreffen**. Ein laufender Totalausfall (Pi, VPN, Bridge oder Broker) bleibt bis dahin
+still. Abhilfe: in Grafana einen Alert auf `zev_mqtt_last_message_timestamp` (FR-8.1).
 
 ## Setup-Notiz: MQTT-Broker auf dem NAS betreiben
 
-Für die MQTT-Variante (s. o.) wird ein Broker auf dem NAS benötigt. Empfohlen:
-**Eclipse Mosquitto im Docker-Container** (auf Synology: Container Manager).
-Mosquitto ist der De-facto-Standard — schlank, stabil, NAS-tauglich. Docker gibt
-gegenüber einem NAS-Paket volle Versions- und Konfigurationskontrolle.
+Der Broker auf dem NAS nimmt die Meldungen des Pi-Gateways und – über die Bridge des Pi – die
+der gPlugs entgegen. Empfohlen: **Eclipse Mosquitto im Docker-Container** (auf Synology:
+Container Manager). Mosquitto ist der De-facto-Standard — schlank, stabil, NAS-tauglich. Docker
+gibt gegenüber einem NAS-Paket volle Versions- und Konfigurationskontrolle.
 
 https://github.com/sukesh-ak/setup-mosquitto-with-docker
 
@@ -186,7 +125,7 @@ https://github.com/sukesh-ak/setup-mosquitto-with-docker
 
 ```
 /volume1/docker/mosquitto/
-├── config/   → mosquitto.conf, passwordfile
+├── config/   → mosquitto.conf, passwordfile, acl
 ├── data/     → persistente Nachrichten (Retained Messages)
 └── log/
 ```
@@ -204,11 +143,16 @@ log_dest file /mosquitto/log/mosquitto.log
 # Keine anonymen Verbindungen!
 allow_anonymous false
 password_file /mosquitto/config/passwordfile
+acl_file /mosquitto/config/acl
 
 # Puffer fuer die dauerhafte Sitzung des Backends (mqtt.clean-session=false):
-# ~1050 Nachrichten pro Stunde (18 Zaehler, etwa jede Minute). Der Standard von
-# 1000 je Client reicht nur fuer rund eine Stunde Unterbruch; 100000 fuer ~4 Tage.
+# ~1300 Nachrichten pro Stunde (17 Zaehler ueber das Pi-Gateway + ca. 5 gPlugs, etwa
+# jede Minute). Der Standard von 1000 je Client reicht nicht einmal fuer eine Stunde
+# Unterbruch; 100000 fuer ~3 Tage.
 max_queued_messages 100000
+# Die gPlugs publizieren mit QoS 0. Ohne diese Zeile verwirft der Broker ihre Meldungen,
+# solange das Backend weg ist (Specs/MQTT-Integration.md, NFR-3).
+queue_qos0_messages true
 # Sitzung einer nicht mehr benutzten Client-ID nach 14 Tagen verwerfen
 persistent_client_expiration 14d
 ```
@@ -238,13 +182,34 @@ services:
 ### 4. Benutzer/Passwort anlegen
 
 ```bash
-# im laufenden Container
+# im laufenden Container (-c nur beim ersten User, sonst wird die Datei überschrieben)
 docker exec -it mosquitto mosquitto_passwd -c /mosquitto/config/passwordfile zevpi
+docker exec -it mosquitto mosquitto_passwd /mosquitto/config/passwordfile zevbridge
+docker exec -it mosquitto mosquitto_passwd /mosquitto/config/passwordfile zevbackend
 # danach Broker neu starten, damit die Datei geladen wird
 ```
 
-Getrennte User anlegen: einen für den **Pi (Publisher)** und einen für die
-**ZEV-Verwaltung (Subscriber)**.
+Getrennte User: **`zevpi`** für das Pi-Gateway (Publisher), **`zevbridge`** für die
+gPlug-Bridge des Pi und **`zevbackend`** für die ZEV-Verwaltung (Subscriber). Die Namen sind
+Beispiele.
+
+### 5. Zugriffsregeln (ACL)
+
+```conf
+# /volume1/docker/mosquitto/config/acl  –  42 = org_id des Mandanten (Beispiel)
+user zevpi
+topic write zev/42/+/messwert
+
+user zevbridge
+topic write gPlug/42/+/tele/#
+
+user zevbackend
+topic read zev/+/+/messwert
+topic read gPlug/+/+/tele/SENSOR
+```
+
+Jeder Publisher schreibt nur in seinen Mandanten; das Backend liest nur und publiziert nie auf
+`gPlug/…/cmnd/…` (das wären Befehle an die gPlugs).
 
 ### Sicherheit
 
@@ -253,23 +218,25 @@ Getrennte User anlegen: einen für den **Pi (Publisher)** und einen für die
 - **TLS (Port 8883)**: Auch über den VPN-Tunnel zusätzlich per TLS absichern
   (Defense-in-Depth). Zertifikate ins `config/`-Verzeichnis und in
   `mosquitto.conf` den `listener 8883` mit `cafile`/`certfile`/`keyfile`
-  ergänzen.
-- **ACLs**: Mit einer `acl_file` festlegen, dass der Pi nur in
-  `zev/messwerte/#` publizieren und ZEV nur dort lesen darf.
+  ergänzen. Pi-Gateway und Bridge können TLS; die gPlugs nicht – deshalb gehen sie über
+  die Bridge.
+- **ACLs**: siehe Abschnitt 5.
 - **Firewall**: Port 1883/8883 nur über den VPN-Pfad zugänglich machen, nicht
   im offenen LAN und nicht aus dem Internet erreichbar.
 
 ### Einordnung in die ZEV-Architektur
 
 ```
-Pi (MQTT-Publisher) ──VPN──> NAS:1883/8883 (Mosquitto) ──> ZEV-Backend (Subscriber)
+Pi-Gateway (Publisher) ───────────VPN──┐
+                                       ├──> NAS:1883/8883 (Mosquitto) ──> ZEV-Backend (Subscriber)
+gPlugs ──LAN──> Pi (Mosquitto, Bridge) ┘
 ```
 
 Das ZEV-Backend (Spring Boot) abonniert die Werte per MQTT-Client
 (`spring-integration-mqtt` / Eclipse Paho) — das ist der Implementierungsteil aus
 der Spec `MQTT-Integration.md`.
 
-**Verfügbarkeit / Verlusttoleranz**: Gemäss `MQTT-Integration.md` überträgt der Pi
+**Verfügbarkeit / Verlusttoleranz**: Pi-Gateway und gPlugs übertragen
 **absolute Zählerstände** (nicht Deltas), die Delta-Bildung macht das Backend.
 Dadurch ist ein Nachrichtenverlust **unkritisch**: Fällt Broker/VPN kurz aus,
 schliesst der nächste übertragene Stand die Lücke, die Gesamtsumme bleibt korrekt
@@ -278,7 +245,8 @@ begrenzt" → QoS 1/2 + `persistence` + `clean_session false` nötig) entfällt 
 weitgehend — **QoS 0/1 genügt**, ein Store-and-Forward-Puffer ist optional.
 Damit bei einem Update des Backends auch die 15-Minuten-Auflösung erhalten bleibt,
 verbindet es sich mit dauerhafter Sitzung (`mqtt.clean-session=false`, Standard)
-und QoS 1; der Broker puffert dann bis `max_queued_messages` (Abschnitt 2).
+und QoS 1; der Broker puffert dann bis `max_queued_messages` (Abschnitt 2), die
+QoS-0-Meldungen der gPlugs nur mit `queue_qos0_messages true`.
 
 ### Wo läuft der Broker? — Varianten A/B/C
 
@@ -325,44 +293,40 @@ Pi: Reader → lokaler Broker ──(Bridge/VPN)──> NAS-Broker → ZEV
 - **Contra**: Zwei Broker = mehr Konfiguration und Betrieb. Für einen Standort
   mit einem Pi tendenziell Overkill.
 
-#### Empfehlung
+#### Umsetzung bei Hene
 
-Für einen Standort mit einem Pi und einem NAS: **Variante B** — ZEV (Konsument)
-dockt lokal und stabil an, NAS hat die höhere Uptime, Pi bleibt reiner
-Publisher. Da absolute Zählerstände verlusttolerant sind (s. o.), genügt
-Variante B; **Variante C** (Bridge auf dem Pi) ist **kein Muss** und nur sinnvoll,
-wenn auch die *zeitliche Auflösung* während Ausfällen lückenlos bleiben soll —
-nicht zur Vermeidung von Datenverlust. Variante A nur wählen, wenn der
-Broker zusätzlich lokale Verbraucher *am Zählerstandort* bedienen soll.
+* **Pi-Gateway: Variante B.** ZEV (Konsument) dockt lokal und stabil an, der NAS hat die
+  höhere Uptime, das Pi-Gateway bleibt reiner Publisher. Da absolute Zählerstände
+  verlusttolerant sind, genügt Variante B; Variante C wäre nur nötig, wenn auch die
+  *zeitliche Auflösung* während Ausfällen lückenlos bleiben soll.
+* **gPlugs: schmale Variante C.** Ein Broker auf dem Pi mit Bridge zum NAS, aber **nur für
+  `gPlug/#`** – nicht, um Ausfälle zu überbrücken, sondern weil die gPlugs den NAS ohne VPN
+  und TLS nicht erreichen. Nebeneffekt: Der Pi-Broker puffert ihre Meldungen auch während
+  eines VPN-Ausfalls.
 
-## Setup-Notiz: MQTT-Broker auf dem Raspberry Pi betreiben (Variante A / C)
+## Setup-Notiz: MQTT-Broker auf dem Raspberry Pi (Bridge für die gPlugs)
 
-Wird nur für **Variante A** (Broker läuft am Zählerstandort) oder als lokale
-Hälfte von **Variante C** (Pi-Broker mit Bridge zum NAS) benötigt. Bei der
-Standard-Empfehlung (Variante B, Broker nur auf dem NAS) ist dies **nicht** nötig.
-
-Auf dem Pi ist die **native Installation via apt** am schlanksten (systemd,
-kein Docker-Overhead). Falls auf dem Pi ohnehin Docker läuft (vgl.
-`docs/NAS-Images.md`), geht auch `eclipse-mosquitto:2` analog zur NAS-Anleitung.
-
-### 1. Installation (nativ, empfohlen)
-
-```bash
-sudo apt update
-sudo apt install -y mosquitto mosquitto-clients
-sudo systemctl enable --now mosquitto     # Autostart nach Reboot/Stromausfall
-```
+Der Mosquitto auf dem Pi nimmt die Meldungen der gPlugs im LAN entgegen und leitet sie per
+Bridge an den NAS-Broker weiter. Das Pi-Gateway publiziert weiterhin **direkt** an den NAS
+(Variante B) und benutzt diesen Broker nicht.
 
 Pfade auf dem Pi (Raspberry Pi OS / Debian):
 - Konfig: `/etc/mosquitto/mosquitto.conf` + `/etc/mosquitto/conf.d/*.conf`
 - Daten (Persistence): `/var/lib/mosquitto/`
 - Logs: `/var/log/mosquitto/`
 
+### 1. Installation (nativ, empfohlen)
+
+```bash
+sudo apt update && sudo apt install -y mosquitto mosquitto-clients
+sudo systemctl enable --now mosquitto
+```
+
 ### 2. Konfiguration
 
 ```conf
 # /etc/mosquitto/conf.d/zev.conf
-listener 1883
+listener 1883                    # die gPlugs verbinden sich auf die LAN-IP des Pi
 persistence true
 persistence_location /var/lib/mosquitto/
 autosave_interval 300            # seltener auf Disk schreiben (SD-Karten schonen)
@@ -371,103 +335,97 @@ log_dest file /var/log/mosquitto/mosquitto.log
 # Keine anonymen Verbindungen!
 allow_anonymous false
 password_file /etc/mosquitto/passwd
+acl_file /etc/mosquitto/acl
+
+# Die gPlugs publizieren mit QoS 0: ohne diese Zeile puffert der Broker fuer die
+# Bridge nichts, solange das VPN weg ist. ~300 Meldungen pro Stunde (5 gPlugs).
+queue_qos0_messages true
+max_queued_messages 20000
 ```
 
 > **SD-Karten-Wear:** `persistence` schreibt nach `/var/lib/mosquitto/` — auf der
 > SD-Karte führt das zu Verschleiss. `persistence_location` besser auf eine
-> USB-SSD legen (vgl. Abschnitt „Datenpipeline härten → Pi-Speicher").
+> USB-SSD legen (vgl. Abschnitt „Datenpipeline härten").
 
-### 3. Benutzer/Passwort anlegen
+### 3. Benutzer und Zugriffsregeln
 
 ```bash
-sudo mosquitto_passwd -c /etc/mosquitto/passwd zevpi   # -c nur beim ersten User
+sudo mosquitto_passwd -c /etc/mosquitto/passwd gplug   # -c nur beim ersten User
 sudo systemctl restart mosquitto                       # Passwortdatei laden
 ```
 
-Getrennte User: einen für den **Zähler-Reader (Publisher, lokal)** und — bei
-Variante A — einen für die **NAS/ZEV-Verwaltung (Subscriber über VPN)**.
-
-### 4. Test (lokal auf dem Pi)
-
-```bash
-mosquitto_sub -h localhost -u zevpi -P '***' -t 'zev/messwerte/#' &
-mosquitto_pub -h localhost -u zevpi -P '***' -t 'zev/messwerte/test' -m 'hello'
+```conf
+# /etc/mosquitto/acl  –  42 = org_id des Mandanten (Beispiel)
+user gplug
+topic write gPlug/42/+/tele/#
+topic read gPlug/42/+/cmnd/#
 ```
 
-### 5. Variante A — NAS abonniert über VPN
+Die Bridge selbst braucht hier keinen Eintrag; sie meldet sich beim **NAS** mit `zevbridge` an.
 
-Der Broker muss für das NAS **nur über den VPN-Pfad** erreichbar sein, nicht im
-offenen LAN/Internet:
-
-```bash
-sudo ufw allow in on wg0 to any port 1883 proto tcp   # nur VPN-Interface (z.B. wg0)
-sudo ufw allow in on wg0 to any port 8883 proto tcp   # TLS
-sudo ufw deny 1883/tcp                                # sonst dicht
-```
-
-Für Pufferung an der Quelle: `persistence true` + QoS 1/2 + ggf. `retained`
-(spiegelt die Resilienz des SFTP-Pull-Modells).
-
-### 6. Variante C — Bridge zum NAS-Broker (store-and-forward)
-
-Der lokale Pi-Broker nimmt die Messwerte entgegen und leitet sie an den
-NAS-Broker weiter, sobald der Tunnel steht. Bei Ausfall wird lokal gepuffert und
-nachgesendet.
+### 4. Bridge zum NAS-Broker
 
 ```conf
 # /etc/mosquitto/conf.d/bridge.conf
 connection zev-nas-bridge
-address <nas-vpn-ip>:8883
-remote_username zevpi
+address <nas-vpn-ip>:1883        # bzw. :8883 mit TLS, siehe unten
+remote_username zevbridge
 remote_password ***
-# 'out' = vom Pi zum NAS; QoS 1
-topic zev/messwerte/# out 1
+# 'out' = vom Pi zum NAS, nur die gPlug-Meldungen
+topic gPlug/# out 1
 bridge_protocol_version mqttv311
 cleansession false               # + persistence -> puffert bei VPN-/NAS-Ausfall
 try_private true
 notifications false
 restart_timeout 30
-# TLS zum NAS-Broker (Defense-in-Depth über den VPN-Tunnel)
-bridge_cafile /etc/mosquitto/certs/ca.crt
+# Optional TLS zum NAS-Broker (Defense-in-Depth über den VPN-Tunnel)
+# bridge_cafile /etc/mosquitto/certs/ca.crt
 ```
 
-`cleansession false` zusammen mit `persistence true` (Abschnitt 2) sorgt dafür,
-dass keine Messwerte verloren gehen, während NAS oder VPN weg sind.
+> **QoS:** Die Bridge leitet mit der QoS der Meldung weiter, höchstens 1. Die gPlug-Meldungen
+> kommen deshalb auch auf dem NAS mit QoS 0 an – dort braucht es ebenfalls
+> `queue_qos0_messages true` (NAS-Abschnitt 2).
+
+### 5. Test (auf dem Pi)
+
+```bash
+mosquitto_sub -h localhost -u gplug -P '***' -t 'gPlug/#' -v     # kommen die gPlugs an?
+```
+
+Auf dem NAS mit dem Backend-User gegenprüfen, ob die Bridge weiterleitet:
+
+```bash
+docker exec -it mosquitto mosquitto_sub -u zevbackend -P '***' -t 'gPlug/+/+/tele/SENSOR' -v
+```
 
 ### Sicherheit / Pi-spezifisch
 
 - **`allow_anonymous false`** + Passwort ist Pflicht.
-- **Firewall**: Ports 1883/8883 nur über das VPN-Interface (siehe Schritt 5).
-- **TLS (8883)**: Zertifikate nach `/etc/mosquitto/certs/`, im `listener 8883`
-  mit `cafile`/`certfile`/`keyfile` bzw. für die Bridge mit `bridge_cafile`.
-- **ACLs**: `acl_file` einsetzen, damit der Reader nur in `zev/messwerte/#`
-  publizieren darf.
+- **Firewall**: Port 1883 auf dem Pi nur aus dem LAN (`192.168.10.0/24`), nicht über das
+  VPN-Interface und nicht aus dem Internet. Die gPlugs senden unverschlüsselt – Segmentierung
+  siehe „Verbesserungspotenzial“, Punkt 2.
 - **Persistence** nicht auf die SD-Karte (USB-SSD), `autosave_interval` erhöhen.
 - **Autostart**: `systemctl enable --now mosquitto` bringt den Broker nach einem
   Stromausfall selbstständig hoch.
-
-### Docker-Alternative (falls Docker auf dem Pi läuft)
-
-Analog zur NAS-Anleitung mit `eclipse-mosquitto:2`; Volumes dann z. B. unter
-`/home/pi/mosquitto/{config,data,log}`. Sonst ist die native apt-Installation
-für den schlanken Pi vorzuziehen.
 
 ## Zugriff & Diagnose
 
 Praxis-Notizen für den Zugriff auf die Anlage und die Fehlersuche an den Zählern.
 Unabhängig vom Broker-Setup oben.
 
-### Geräte-Inventar (Stand: August 2026)
+### Geräte-Inventar (Stand: Oktober 2026)
 
 | Gerät                                 | Adresse                                                            | Bemerkung                                                                                                                                                          |
 |---------------------------------------|--------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Raspberry Pi `rpi4sa`                 | `192.168.10.189` (eth0), `192.168.10.190` (wlan0), VPN `10.8.0.14` | **DHCP-Reservierung** im Router. **Beide** Interfaces liegen im selben Subnetz – bei Scans/Bindings beachten                                                       |
 | Router                                | `192.168.10.1`                                                     | `model=P5`, WebUI auf Port 80; dort die **DHCP-Lease-Liste** (zuverlässigste Geräteliste) und die Reservierungen                                                   |
-| Kommunikationsmodul **WAGO 879-9000** | `192.168.10.164:502`                                               | Gemeinsame IP für die drei Wago, je Zähler eine `unit_id` (1/2/3). Details/Grenzen s. u. **Reservierung prüfen** – die IP steht als `host` in der Pi-`config.yaml` |
+| Kommunikationsmodul **WAGO 879-9000** | `192.168.10.164:502`                                               | Gemeinsame IP für die 15 Wago, je Zähler eine eigene `unit_id`. Details/Grenzen s. u. **Reservierung prüfen** – die IP steht als `host` in der Pi-`config.yaml` |
 | WhatWatt Go (BKW-Zähler)              | `192.168.10.193:502`                                               | **Angeschlossen und auslesbar** (Stand 08/2026), **DHCP-Reservierung** im Router; Registerkarte s. u.                                                              |
-| **Wechselrichter** (`espressif.lan`)  | `192.168.10.220`                                                   | ESP32-basiert, Modbus TCP auf 502 offen, **kein** Port 80, **kein** mDNS. War zeitweise fälschlich als WhatWatt-Kandidat geführt                                   |
+| **Wechselrichter** (`espressif.lan`)  | `192.168.10.220`                                                   | **Batterie**, vom Pi-Gateway per Modbus TCP gelesen (`Specs/Batteriespeicher.md`). ESP32-basiert, Modbus TCP auf 502 offen, **kein** Port 80, **kein** mDNS. War zeitweise fälschlich als WhatWatt-Kandidat geführt                                   |
+| **gPlugK** (Nachbarhaus, ca. 5)        | DHCP, Adressen nachtragen                                          | Tasmota-Oberfläche auf Port 80. Publizieren an den Broker auf dem Pi (`192.168.10.189:1883`), siehe Abschnitt „gPlugK“ unten |
 
 > **Feste Adressen:** Pi und WhatWatt haben eine **DHCP-Reservierung** im Router (Stand 08/2026).
+> Die Pi-Adresse ist zusätzlich als `MqttHost` in allen gPlugs eingetragen.
 > Wichtig, weil die IP des WhatWatt (`192.168.10.193`) und die des WAGO-Moduls (`192.168.10.164`)
 > als `host` in der Pi-`config.yaml` stehen: ein Lease-Wechsel würde die betroffenen Zähler
 > **stillschweigend** ausfallen lassen (Read-Fehler, keine Rohdaten). Für das WAGO-Modul ist
@@ -566,10 +524,10 @@ avahi-browse -art                          # mDNS-Dienste (nur .local-Geräte!)
 ### Modbus-Diagnose mit `mbpoll`
 
 ```bash
-HUB=192.168.10.10
+HUB=192.168.10.164
 mbpoll -a 1 -t 4:float -r 0x600C -c 1 -1 $HUB -p 502    # Wago 1, Bezug (OBIS 1.8.0)
 mbpoll -a 2 -t 4:float -r 0x600C -c 1 -1 $HUB -p 502    # Wago 2
-mbpoll -a 3 -t 4:float -r 0x600C -c 1 -1 $HUB -p 502    # Wago 3
+mbpoll -a 3 -t 4:float -r 0x600C -c 1 -1 $HUB -p 502    # Wago 3 (… bis 15, unit_id gemäss config.yaml)
 mbpoll -t 4:hex -r 0x4000 -c 2 -1 $HUB -p 502 -a 1 -0   # Seriennummer auslesen
 ```
 
@@ -594,7 +552,7 @@ mbpoll -t 4:hex -r 0x4000 -c 2 -1 $HUB -p 502 -a 1 -0   # Seriennummer auslesen
 
 ### Das Kommunikationsmodul: WAGO 879-9000
 
-Der „Hub" auf `192.168.10.10` ist **kein** generisches RTU→TCP-Gateway, sondern das
+Der „Hub" auf `192.168.10.164` ist **kein** generisches RTU→TCP-Gateway, sondern das
 **Kommunikationsmodul der WAGO-MID-Zähler** ([Produktseite](https://www.wago.com/us/communication-module/p/879-9000),
 [Kurzanleitung PDF](https://www.tme.eu/Document/20b55b99db28c68f381d2192681b601b/879-9000-de.pdf)).
 
@@ -636,7 +594,7 @@ trifft es sporadisch alle (aktueller Stand), auf eine gemeinsame Ursache auf dem
 Zum Vergleich unabhängig von unserer Software gegenprüfen:
 
 ```bash
-for i in $(seq 1 50); do for a in 1 2 3; do
+for i in $(seq 1 50); do for a in $(seq 1 15); do   # unit_ids gemäss config.yaml
   mbpoll -a $a -t 4:float -r 0x600C -c 1 -1 -o 2 $HUB -p 502 >/dev/null 2>&1 || echo "fail a=$a lauf=$i"
 done; done
 ```
@@ -706,3 +664,278 @@ Spannungsprobe zuerst: zeigt sie ~230 V, sind Adressierung **und** Wortfolge bes
 > also nur ab **FW ≥ 2.0.2**; andernfalls braucht der Reader ein Config-Feld
 > (z. B. `funktion: input|holding`), das auf `read_input_registers` umschaltet.
 
+### gPlugK (Nachbarhaus)
+
+Der gPlugK sitzt an der Kundenschnittstelle des Smartmeters und publiziert selbst per MQTT
+(Firmware auf Tasmota-Basis). Konfiguriert wird **nur die MQTT-Anbindung** – Meldungsstruktur
+und Ausleseskript bleiben unverändert (`Specs/MQTT-Integration.md`, FR-10). Je gPlug in der
+Tasmota-Konsole (`Topic` = Messpunkt der Einheit im ZEV, `42` = org_id):
+
+```
+Backlog MqttHost 192.168.10.189; MqttPort 1883; MqttUser gplug; MqttPassword <passwort>; Topic ID742-Nachbar-1; FullTopic gPlug/42/%topic%/%prefix%/; TelePeriod 60
+Backlog Timezone 99; TimeStd 0,0,10,1,3,60; TimeDst 0,0,3,1,2,120
+```
+
+Die zweite Zeile stellt Mitteleuropäische Zeit mit Sommerzeit ein; ohne sie stempelt der gPlug
+um eine Stunde verschoben. Die Meldungen erscheinen danach auf
+`gPlug/42/ID742-Nachbar-1/tele/SENSOR` (Test: Abschnitt 5 der Pi-Broker-Notiz).
+
+> **Vor der Umsetzung im Backend** eine echte Meldung mitschneiden und die Feldnamen gegen
+> `Specs/MQTT-Integration.md`, FR-10.3, prüfen (dort offene Frage).
+
+
+## Anhang – Verlauf
+
+### SFTP-Pull (abgelöst durch MQTT, Oktober 2026)
+
+Bis zur MQTT-Anbindung holte das NAS die Zählerdaten per SFTP beim Pi ab. Die frühere
+Einleitung lautete:
+
+> **Zähler-Anbindung:** Die drei **Wago**-Zähler sind per **seriellem Modbus (RTU)** an einen
+> **Modbus-TCP-Hub** (RTU→TCP-Gateway) angeschlossen, der am Router hängt; der Pi liest sie per
+> **Modbus TCP** über den Hub (gemeinsame Hub-IP, je Zähler eine Unit-/Slave-ID). Der **BKW**-Zähler
+> ist separat über **WhatWatt** am Router und kann ebenfalls per **Modbus TCP** ausgelesen werden.
+>
+> **Datenfluss (Ziel, MQTT):** Der Pi liest die Zähler (Modbus TCP über den Hub / WhatWatt) und
+> **publiziert die absoluten Zählerstände** über den VPN-Tunnel an den
+> Mosquitto-**Broker auf dem NAS** (Variante B). Das ZEV-Backend abonniert sie und
+> **bildet die Deltas/15-Min-Werte** selbst — verlusttolerant (siehe
+> `Specs/MQTT-Integration.md`). Der **SFTP-Pull** (NAS holt Dateien beim Pi) ist
+> der heutige Weg bzw. Fallback.
+>
+> *Hinweis:* Das Diagramm zeigt den **Ziel-Pfad (MQTT)**. Der **SFTP-Pull** ist bewusst
+> **nicht eingezeichnet** (der Übersichtlichkeit halber), bleibt aber als heutiger Weg/Fallback
+> gültig — Details im Abschnitt „Setup-Notiz: Dateiübertragung via SFTP" unten.
+
+Die damalige Setup-Notiz „Dateiübertragung via SFTP“:
+
+Das NAS holt die Zählerdaten-Dateien aktiv beim Raspberry Pi ab (Pull). Als
+Übertragungsweg wird **SFTP** (über SSH) verwendet — die sichere Variante
+gegenüber Samba/SMB: Verschlüsselung ist immer aktiv, schlüsselbasierte
+Authentisierung, nur ein offener Port (22), kleine Angriffsfläche. Zusätzlich
+zum VPN-Tunnel ergibt das Defense-in-Depth.
+
+#### Empfohlene Härtung
+
+1. **SSH-Key-Auth statt Passwort**: Public Key des NAS auf den Pi hinterlegen,
+   Passwort-Login deaktivieren.
+   ```
+   # /etc/ssh/sshd_config auf dem Raspberry Pi
+   PasswordAuthentication no
+   PubkeyAuthentication yes
+   ```
+2. **Dedizierter, eingeschränkter User** auf dem Pi nur für den Datenabzug
+   (z. B. `zevdata`), nicht der Standard-User.
+3. **Auf SFTP einsperren** (Chroot, kein Shell-Zugriff aufs restliche System):
+   ```
+   # /etc/ssh/sshd_config auf dem Raspberry Pi
+   Match User zevdata
+       ForceCommand internal-sftp
+       ChrootDirectory /srv/zev-export
+       AllowTcpForwarding no
+       X11Forwarding no
+   ```
+4. **Read-only**: Das NAS holt nur ab und schreibt nicht zurück; das
+   Export-Verzeichnis für `zevdata` entsprechend berechtigen.
+
+#### Abholen vom NAS (Beispiel)
+
+Effizient inkrementell mit `rsync` über SSH (überträgt nur geänderte Dateien) —
+selbes Sicherheitsniveau wie SFTP, da derselbe SSH-Transport genutzt wird:
+
+```bash
+rsync -avz --remove-source-files \
+  -e "ssh -i /volume1/keys/zev_id_ed25519" \
+  zevdata@<raspberry-pi-vpn-ip>:/srv/zev-export/ \
+  /volume1/zev-import/
+```
+
+Alternativ rein mit SFTP:
+
+```bash
+sftp -i /volume1/keys/zev_id_ed25519 zevdata@<raspberry-pi-vpn-ip>
+```
+
+Der Abruf wird am NAS per Cronjob/geplanter Aufgabe periodisch ausgeführt.
+
+Aus „Datenpipeline härten“ (SFTP-spezifisch):
+
+- **Atomare Dateiübergabe**: Pi schreibt in `*.tmp` und benennt erst nach
+  vollständigem Schreiben um (`rename`), sonst liest das NAS evtl. halbe
+  Dateien. `rsync --remove-source-files` löscht erst nach erfolgreicher
+  Übertragung.
+
+Aus „Monitoring gegen stillen Ausfall“ (vor den Systemmeldungen des Backends):
+
+#### Monitoring gegen stillen Ausfall
+
+Heute merkt niemand, wenn der Pi nicht mehr ausliest oder das NAS nicht mehr
+importiert → stiller Datenverlust, der erst bei der Quartalsabrechnung auffällt.
+ZEV hat bereits **Prometheus/Grafana** im Stack: Pi einen Heartbeat bzw.
+„letzter erfolgreicher Read"-Timestamp exponieren lassen und Alert bei Lücke.
+
+### Frühere Empfehlung: SFTP behalten, MQTT nur bei Bedarf
+
+#### Strategische Alternative: MQTT (Trade-off, kein Muss)
+
+Statt File-Batch + SFTP könnte der **Pi als MQTT-Gateway** die Messwerte an
+einen Broker beim NAS publizieren, ZEV abonniert sie (siehe Spec
+`MQTT-Integration.md`) → näher an Echtzeit, kein Datei-Handling. Alternativ
+direkter Push des Pi an die bestehende `/api/messwerte`-REST-Schnittstelle.
+
+> **Rollentrennung – der Broker liest keine Zähler:** Ein MQTT-Broker (Mosquitto)
+> **verteilt nur Nachrichten** und spricht kein Modbus. Das Auslesen der Zähler
+> (Modbus TCP / gPlug) übernimmt ein **separater Reader-/Publisher-Prozess** auf
+> dem Pi, der die Werte an den Broker *publiziert*. „Pi als MQTT-Gateway" meint
+> also zwei Komponenten:
+> 1. **Reader/Publisher** – liest die Zähler aus und publiziert (immer nötig, in
+>    jeder Variante; **nicht** Teil der Broker-Installation, separat zu
+>    implementieren/betreiben).
+> 2. **Broker** – nur bei Variante A/C lokal auf dem Pi; bei Variante B nur auf dem NAS.
+>
+> Der Reader publiziert an den Broker auf `localhost` (diese Verbindung fällt
+> praktisch nie aus); das Verlustrisiko bei Ausfällen liegt allein auf der Strecke
+> **Broker → NAS** (siehe Pufferung/QoS in den Broker-Setup-Notizen unten).
+
+**Empfehlung**: Das jetzige File/SFTP-Modell vorerst behalten (entkoppelt,
+fehlertolerant, einfach zu debuggen) und Punkte 1–4 umsetzen. MQTT erst, wenn
+Echtzeit oder deutlich mehr Zähler tatsächlich gefordert sind — sonst
+zusätzliche Komplexität (Broker-Betrieb, Verfügbarkeit) ohne klaren Nutzen.
+
+Die frühere Empfehlung zur Broker-Variante:
+
+#### Empfehlung (Broker-Variante)
+
+Für einen Standort mit einem Pi und einem NAS: **Variante B** — ZEV (Konsument)
+dockt lokal und stabil an, NAS hat die höhere Uptime, Pi bleibt reiner
+Publisher. Da absolute Zählerstände verlusttolerant sind (s. o.), genügt
+Variante B; **Variante C** (Bridge auf dem Pi) ist **kein Muss** und nur sinnvoll,
+wenn auch die *zeitliche Auflösung* während Ausfällen lückenlos bleiben soll —
+nicht zur Vermeidung von Datenverlust. Variante A nur wählen, wenn der
+Broker zusätzlich lokale Verbraucher *am Zählerstandort* bedienen soll.
+
+### Frühere Zähler-Topologie
+
+Die Doku zeigte bis Oktober 2026 **drei** Wago-Zähler am „Modbus-TCP-Hub“ und den BKW-Zähler
+mit WhatWatt; Batterie und gPlugs fehlten. Die ACL-Empfehlung nannte das Topic
+`zev/messwerte/#`, das es nie gab (richtig: `zev/{orgId}/{messpunkt}/messwert`). Die
+Beispiele für `mbpoll` verwendeten `HUB=192.168.10.10`, das Geräte-Inventar
+`192.168.10.164`. Die Pi-Broker-Notiz beschrieb Variante A/C für die Zählerstände des Pi
+(`topic zev/messwerte/# out 1`) statt der Bridge für die gPlugs; ihr früherer Text:
+
+#### Setup-Notiz: MQTT-Broker auf dem Raspberry Pi betreiben (Variante A / C)
+
+Wird nur für **Variante A** (Broker läuft am Zählerstandort) oder als lokale
+Hälfte von **Variante C** (Pi-Broker mit Bridge zum NAS) benötigt. Bei der
+Standard-Empfehlung (Variante B, Broker nur auf dem NAS) ist dies **nicht** nötig.
+
+Auf dem Pi ist die **native Installation via apt** am schlanksten (systemd,
+kein Docker-Overhead). Falls auf dem Pi ohnehin Docker läuft (vgl.
+`docs/NAS-Images.md`), geht auch `eclipse-mosquitto:2` analog zur NAS-Anleitung.
+
+##### 1. Installation (nativ, empfohlen)
+
+```bash
+sudo apt update
+sudo apt install -y mosquitto mosquitto-clients
+sudo systemctl enable --now mosquitto     # Autostart nach Reboot/Stromausfall
+```
+
+Pfade auf dem Pi (Raspberry Pi OS / Debian):
+- Konfig: `/etc/mosquitto/mosquitto.conf` + `/etc/mosquitto/conf.d/*.conf`
+- Daten (Persistence): `/var/lib/mosquitto/`
+- Logs: `/var/log/mosquitto/`
+
+##### 2. Konfiguration
+
+```conf
+# /etc/mosquitto/conf.d/zev.conf
+listener 1883
+persistence true
+persistence_location /var/lib/mosquitto/
+autosave_interval 300            # seltener auf Disk schreiben (SD-Karten schonen)
+log_dest file /var/log/mosquitto/mosquitto.log
+
+# Keine anonymen Verbindungen!
+allow_anonymous false
+password_file /etc/mosquitto/passwd
+```
+
+> **SD-Karten-Wear:** `persistence` schreibt nach `/var/lib/mosquitto/` — auf der
+> SD-Karte führt das zu Verschleiss. `persistence_location` besser auf eine
+> USB-SSD legen (vgl. Abschnitt „Datenpipeline härten → Pi-Speicher").
+
+##### 3. Benutzer/Passwort anlegen
+
+```bash
+sudo mosquitto_passwd -c /etc/mosquitto/passwd zevpi   # -c nur beim ersten User
+sudo systemctl restart mosquitto                       # Passwortdatei laden
+```
+
+Getrennte User: einen für den **Zähler-Reader (Publisher, lokal)** und — bei
+Variante A — einen für die **NAS/ZEV-Verwaltung (Subscriber über VPN)**.
+
+##### 4. Test (lokal auf dem Pi)
+
+```bash
+mosquitto_sub -h localhost -u zevpi -P '***' -t 'zev/messwerte/#' &
+mosquitto_pub -h localhost -u zevpi -P '***' -t 'zev/messwerte/test' -m 'hello'
+```
+
+##### 5. Variante A — NAS abonniert über VPN
+
+Der Broker muss für das NAS **nur über den VPN-Pfad** erreichbar sein, nicht im
+offenen LAN/Internet:
+
+```bash
+sudo ufw allow in on wg0 to any port 1883 proto tcp   # nur VPN-Interface (z.B. wg0)
+sudo ufw allow in on wg0 to any port 8883 proto tcp   # TLS
+sudo ufw deny 1883/tcp                                # sonst dicht
+```
+
+Für Pufferung an der Quelle: `persistence true` + QoS 1/2 + ggf. `retained`
+(spiegelt die Resilienz des SFTP-Pull-Modells).
+
+##### 6. Variante C — Bridge zum NAS-Broker (store-and-forward)
+
+Der lokale Pi-Broker nimmt die Messwerte entgegen und leitet sie an den
+NAS-Broker weiter, sobald der Tunnel steht. Bei Ausfall wird lokal gepuffert und
+nachgesendet.
+
+```conf
+# /etc/mosquitto/conf.d/bridge.conf
+connection zev-nas-bridge
+address <nas-vpn-ip>:8883
+remote_username zevpi
+remote_password ***
+# 'out' = vom Pi zum NAS; QoS 1
+topic zev/messwerte/# out 1
+bridge_protocol_version mqttv311
+cleansession false               # + persistence -> puffert bei VPN-/NAS-Ausfall
+try_private true
+notifications false
+restart_timeout 30
+# TLS zum NAS-Broker (Defense-in-Depth über den VPN-Tunnel)
+bridge_cafile /etc/mosquitto/certs/ca.crt
+```
+
+`cleansession false` zusammen mit `persistence true` (Abschnitt 2) sorgt dafür,
+dass keine Messwerte verloren gehen, während NAS oder VPN weg sind.
+
+##### Sicherheit / Pi-spezifisch
+
+- **`allow_anonymous false`** + Passwort ist Pflicht.
+- **Firewall**: Ports 1883/8883 nur über das VPN-Interface (siehe Schritt 5).
+- **TLS (8883)**: Zertifikate nach `/etc/mosquitto/certs/`, im `listener 8883`
+  mit `cafile`/`certfile`/`keyfile` bzw. für die Bridge mit `bridge_cafile`.
+- **ACLs**: `acl_file` einsetzen, damit der Reader nur in `zev/messwerte/#`
+  publizieren darf.
+- **Persistence** nicht auf die SD-Karte (USB-SSD), `autosave_interval` erhöhen.
+- **Autostart**: `systemctl enable --now mosquitto` bringt den Broker nach einem
+  Stromausfall selbstständig hoch.
+
+##### Docker-Alternative (falls Docker auf dem Pi läuft)
+
+Analog zur NAS-Anleitung mit `eclipse-mosquitto:2`; Volumes dann z. B. unter
+`/home/pi/mosquitto/{config,data,log}`. Sonst ist die native apt-Installation
+für den schlanken Pi vorzuziehen.
