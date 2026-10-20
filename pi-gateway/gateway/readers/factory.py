@@ -9,14 +9,12 @@ from collections.abc import Callable
 
 from ..models import MeterConfig
 from .base import Reader
-from .gplug_reader import GplugReader
 from .modbus_reader import ModbusReader
 from .sim_reader import SimReader
 
 # Protokoll-Name (aus der Config) → Reader-Konstruktor.
 _READERS: dict[str, Callable[[MeterConfig], Reader]] = {
     "modbus-tcp": ModbusReader,
-    "gplug": GplugReader,  # spätere Erweiterung (wirft aktuell NotImplementedError)
     "sim": SimReader,      # Publisher-Simulator (synthetische Zählerstände)
 }
 

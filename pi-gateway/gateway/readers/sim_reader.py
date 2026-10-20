@@ -1,6 +1,6 @@
 """Publisher-Simulator: erzeugt synthetische, monoton steigende Zählerstände.
 
-Ersetzt den Modbus-/gPlug-Zugriff durch generierte Werte, damit der komplette
+Ersetzt den Modbus-Zugriff durch generierte Werte, damit der komplette
 MQTT-Pfad (Read-Loop → MqttPublisher → Topic/Payload → Backend-Ingest → Aggregation)
 ohne Hardware/Pi end-to-end getestet werden kann.
 

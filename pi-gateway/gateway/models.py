@@ -30,7 +30,7 @@ class MeterConfig:
     """Vollständige Beschreibung eines Zählers (ein Eintrag der Zähler-Liste)."""
 
     messpunkt: str
-    protokoll: str                # "modbus-tcp"; später "gplug"
+    protokoll: str                # "modbus-tcp" oder "sim"
     register_bezug: RegisterSpec
     # None = in der Config nicht angegeben (typisch bei Konsumenten): das Register wird
     # NICHT gelesen, publiziert wird 0 (Payload-Vertrag bleibt vollständig).

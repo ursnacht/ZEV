@@ -1,5 +1,5 @@
 # Beispiel-Konfiguration für den PUBLISHER-SIMULATOR (protokoll: sim).
-# Erzeugt synthetische, monoton steigende Zählerstände statt Modbus/gPlug zu lesen –
+# Erzeugt synthetische, monoton steigende Zählerstände statt Modbus zu lesen –
 # zum End-to-End-Test des MQTT-Workflows ohne Hardware/Pi.
 #
 # Nutzung:  python -m gateway.main --config config.sim.yaml

@@ -29,7 +29,6 @@ config.yaml ─► config.py ─► main.py (Read-Loop)
 - `gateway/readers/factory.py` – erzeugt je `protokoll` den passenden Reader (erweiterbar)
 - `gateway/readers/modbus_reader.py` – Modbus TCP; Registertypen **`float32`** (Wago-Zähler)
   und **`uint32`** (Wechselrichter mit kumulativer Ganzzahl-Energie, z. B. Solinteg MHT)
-- `gateway/readers/gplug_reader.py` – BKW/gPlug (**Platzhalter, folgt später**)
 - `gateway/publisher.py` – MQTT-Publish der absoluten Stände (Topic/Payload gemäss Vertrag)
 - `gateway/main.py` – Orchestrierung, Read-Loop, Signal-Handling, Heartbeat
 
@@ -302,8 +301,9 @@ journalctl -u pi-gateway.service -f
 
 - **Umgesetzt:** Projekt-Setup, Konfiguration, Modbus-Reader (Wago), MQTT-Publisher,
   Read-Loop mit Fehlerisolation je Zähler, Reconnect/Backoff, Heartbeat-Logging, systemd.
-- **Später:** gPlug-Reader (BKW), optionale Pufferung (aktuell nicht nötig – absolute
-  Stände sind verlusttolerant).
+- **Später:** optionale Pufferung (aktuell nicht nötig – absolute Stände sind verlusttolerant).
+- **Kein gPlug-Reader:** Der BKW-Zähler wird über WhatWatt Go per Modbus TCP gelesen; die gPlugK
+  im Nachbarhaus publizieren selbst (`Specs/MQTT-Integration.md`, FR-10).
 - **Tests:** `tests/` (unittest, keine Zusatzpakete), im Verzeichnis `pi-gateway` ausführen:
   `python -m unittest discover -s tests -t .` – bisher nur der Lese-Retry bei Fehlern der
   Modbus-Bibliothek (FR-1.6).

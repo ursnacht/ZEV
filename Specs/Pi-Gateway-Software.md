@@ -4,12 +4,13 @@
 
 * **Was soll erreicht werden:** Eine Software auf dem **Raspberry Pi** am Zählerstandort liest die Stromzähler aus und **publiziert deren absolute Zählerstände** per MQTT an den Broker. Sie ist das **Publisher-Gegenstück** zum Backend-Subscriber aus `Specs/MQTT-Integration.md`.
 * **Warum machen wir das:**
-  - Automatisierte, zeitnahe Datenerfassung statt manuellem CSV-Upload bzw. dem heutigen File/SFTP-Weg.
+  - Automatisierte, zeitnahe Datenerfassung statt manuellem CSV-Upload bzw. dem früheren File/SFTP-Weg.
   - Klar getrennte Verantwortung: der MQTT-Broker verteilt nur Nachrichten, das **Auslesen der Zähler ist Aufgabe dieses separaten Prozesses** (siehe Rollentrennung in `docs/Netzwerk-Topologie-Hene.md`).
-* **Aktueller Stand:**
-  - Der Pi liest die Zähler physisch bereits aus (**3× Wago via Modbus TCP**, **1× BKW via gPlug**) und stellt Daten heute per **SFTP** bereit (`docs/Netzwerk-Topologie-Hene.md`).
-  - Es existiert **noch keine** MQTT-Publisher-Software. In `Specs/MQTT-Integration.md` ist diese Pi-Software bewusst **Out of Scope** – dieses Dokument schliesst die Lücke.
-  - Ziel-Topologie: Broker auf dem NAS (Variante B). Ein lokaler Broker + Bridge (Variante C) ist **nicht erforderlich**, da absolute Zählerstände verlusttolerant sind (siehe unten).
+* **Ausgangslage:**
+  - Bei Hene liest der Pi **15 Wago-Zähler** (über das Kommunikationsmodul WAGO 879-9000), den **BKW-Bilanzzähler** (über WhatWatt Go) und die **Batterie** (am Hybrid-Wechselrichter) aus – alle per **Modbus TCP**. Vor MQTT stellte er die Daten per **SFTP** bereit; dieser Weg ist abgelöst (`docs/Netzwerk-Topologie-Hene.md`).
+  - In `Specs/MQTT-Integration.md` ist diese Pi-Software bewusst **Out of Scope** – dieses Dokument beschreibt sie.
+  - Topologie: Die Software publiziert direkt an den Broker auf dem NAS (Variante B). Ein lokaler Broker + Bridge (Variante C) ist für sie **nicht erforderlich**, da absolute Zählerstände verlusttolerant sind (siehe unten).
+  - Die **gPlugK im Nachbarhaus** liest diese Software **nicht**: Sie publizieren selbst (`Specs/MQTT-Integration.md`, FR-10). Der Mosquitto, der ihre Meldungen auf dem Pi per Bridge an den NAS weiterleitet, ist Betrieb, nicht Teil dieser Software.
 
 > **Designentscheidung – absolute Zählerstände statt Deltas:** Der Pi überträgt die **absoluten (kumulativen) Zählerstände**, **nicht** berechnete Deltas. Die Delta-/Intervall-Bildung erfolgt im **Backend** (`Specs/MQTT-Integration.md`, FR-6). Vorteil: **verlusttolerant** — geht eine Nachricht verloren, bleibt die Gesamtsumme korrekt (die Differenz zweier empfangener Stände deckt die Lücke), es sinkt nur kurz die Auflösung. Dadurch ist der Pi **weitgehend zustandslos** (keine „letzter Stand"-Persistenz nötig) und QoS/Pufferung entspannen sich deutlich.
 
@@ -18,8 +19,10 @@
 ## 2. Funktionale Anforderungen (FR)
 
 ### FR-1: Zähler auslesen
-1. **Wago via Modbus TCP (aktuell 3 Geräte, Liste beliebig erweiterbar — siehe FR-5):** periodisches Lesen der relevanten Register — die **Wirkenergie**-Zählerstände in **kWh** (Bezug/Einspeisung), **nicht** Leistung (kW) oder Blind-/Scheinenergie; pro Gerät Host/Port/Register/Unit-ID konfigurierbar. Die Wago hängen per seriellem Modbus (RTU) an einem **Modbus-TCP-Hub** (RTU→TCP-Gateway, siehe `docs/Netzwerk-Topologie-Hene.md`): gemeinsame Hub-IP (`host`/`port`), Unterscheidung über die **Unit-ID**.
-2. **BKW via gPlug:** Auslesen über die gPlug-Schnittstelle (Protokoll siehe Offene Fragen).
+1. **Wago via Modbus TCP (bei Hene 15 Geräte, Liste beliebig erweiterbar — siehe FR-5):** periodisches Lesen der relevanten Register — die **Wirkenergie**-Zählerstände in **kWh** (Bezug/Einspeisung), **nicht** Leistung (kW) oder Blind-/Scheinenergie; pro Gerät Host/Port/Register/Unit-ID konfigurierbar. Die Wago hängen per seriellem Modbus (RTU) am **Kommunikationsmodul WAGO 879-9000** (RTU→TCP, siehe `docs/Netzwerk-Topologie-Hene.md`): gemeinsame Modul-IP (`host`/`port`), Unterscheidung über die **Unit-ID**.
+2. **Weitere Modbus-TCP-Geräte**, je mit eigener `host`:
+   * **BKW-Bilanzzähler via WhatWatt Go:** Bezug (OBIS 1.8.0) und Rücklieferung (OBIS 2.8.0); Registerkarte und Firmware-Voraussetzung in `docs/Netzwerk-Topologie-Hene.md`, Abschnitt „WhatWatt Go“. Die Einheiten `BEZUG`/`RUECKLIEFERUNG` teilen sich den Messpunkt (`Specs/Bilanzmesspunkt.md`).
+   * **Batterie am Hybrid-Wechselrichter:** Lade- und Entladeenergie als `bezug`/`einspeisung` (`Specs/Batteriespeicher.md`), optional der Ladezustand als Zustandswert (`Specs/Gerätezustand.md`); Beispiel in `pi-gateway/config.example.yaml`.
 3. Jede physische Quelle ist einer **Einheit** über deren **`messpunkt`** zugeordnet (Konfiguration, kein Rückgriff auf interne DB-IDs).
 4. Lese-/Publish-Intervall konfigurierbar (Default z.B. 1–5 min).
 5. **Lese-Timeout konfigurierbar (Nachtrag):** Die Wartezeit auf die Antwort eines Zählers ist konfigurierbar, **global** über `read_timeout` (Default **5 s**) und je Zähler über `zaehler[].read_timeout` überschreibbar (gleicher Schlüsselname, nur enger gültig) (z.B. ein einzelner langsamer Slave am Hub). Angabe als Zahl (Sekunden) oder Kurzform (`"8s"`, `"1m"`); Werte ≤ 0 sowie ungültige Angaben führen zu einem `ConfigError` **beim Start** (kein stiller Fallback). Der **wirksame globale Wert** wird **beim Start** in der Start-Log-Zeile ausgegeben (neben `org_id`, Zähleranzahl, Intervall, Broker), damit im Betrieb ohne Blick in die `config.yaml` erkennbar ist, welcher Timeout gilt – auch der stillschweigende Default. Zähler mit eigenem `read_timeout` werden zusätzlich in einer eigenen Zeile genannt, damit der globale Wert nicht als für alle Zähler gültig missverstanden wird (die Reader selbst loggen ihren Wert nur auf `DEBUG`).
@@ -54,8 +57,8 @@
 > ```
 > `-a` Unit-ID, `-t 4`/`3` Holding/Input Register, `-r` Start, `-c` Anzahl,
 > `-1` One-Shot. Konkrete Register/Skalierung stammen aus der Zähler-Doku
-> (siehe Offene Frage „Register-Mapping Wago"). BKW/gPlug: falls HTTP-API,
-> Diagnose per `curl` statt `mbpoll`. Alternativen: `mbtget`, kurzes
+> (siehe Offene Frage „Register-Mapping Wago"). WhatWatt Go: zusätzlich per
+> REST-API (`curl`, siehe Topologie-Doku). Alternativen: `mbtget`, kurzes
 > `pymodbus`-Skript.
 
 ### FR-2: Zählerstände übertragen (keine Delta-Bildung auf dem Pi)
@@ -72,6 +75,7 @@
    ```
    `timestamp` in **lokaler Zeit mit UTC-Offset (ISO 8601)** (z. B. `+02:00`; eindeutig, kein DST-Problem), Stände in kWh (kumulativ, ≥ 0). Voraussetzung: korrekte lokale Zeitzone + NTP auf dem Pi (FR-6.3).
    `seriennummer` ist **optional** und wird nur publiziert, wenn im jeweiligen `zaehler`-Eintrag konfiguriert (Zählertausch-Erkennung, s. FR-3.5).
+   `zustand` ist ebenfalls **optional**: Momentanwerte wie der Ladezustand, gelesen aus den `zustand`-Registern des Eintrags (`Specs/Gerätezustand.md`); ohne solche Register fehlt das Feld, es wird **nie als leeres Objekt** gesendet (`MQTT-Integration.md`, FR-3).
 3. QoS **0 oder 1** genügt (Verlusttoleranz durch absolute Stände); stabile Client-ID.
 4. Die **Pflichtfelder** von Topic/Payload müssen exakt zum Backend-Vertrag passen; **additive optionale Felder** sind erlaubt (das Backend toleriert unbekannte Felder). Änderungen nur abgestimmt mit `MQTT-Integration.md`.
 5. **Seriennummer (Zählertausch-Erkennung):** Je `zaehler`-Eintrag optional `seriennummer` (String, max. 64 Zeichen), einmalig am Gerät abgelesen. Der Publisher übernimmt den Wert unverändert in den Payload. **Beim Zählertausch ist dieser Wert zu aktualisieren – er ist das Signal**, an dem das Backend den Tausch erkennt (`Specs/Zaehlertausch-Erkennung.md`, Betrieb: `docs/Zaehlertausch.md`). Überlänge → Startfehler (`ConfigError`), damit ein Konfigurationsfehler sofort auffällt.
@@ -87,7 +91,7 @@
 3. Weitere Parameter über Konfigurationsdatei/Env: `org_id`, Broker-URL/Credentials, Lese-/Publish-Intervall, optionale Puffer-Optionen.
 4. **Keine Secrets im Code/Repo** (Broker-Passwort etc. via Env/gesicherte Datei).
 
-> **Beispiel-Konfiguration (3 Wago-Zähler; ohne gPlug — folgt später):**
+> **Beispiel-Konfiguration (Ausschnitt: 3 der 15 Wago-Zähler):**
 > ```yaml
 > # config.yaml auf dem Pi (Secrets via Env)
 > org_id: 42
@@ -100,13 +104,13 @@
 >   password: ${MQTT_PASSWORD}
 >   qos: 1
 >
-> # Beliebig viele Zähler — hier 3 Wago hinter EINEM Modbus-TCP-Hub (RTU→TCP-Gateway):
-> # gleiche host/port (Hub-IP), unterschiedliche unit_id (Modbus-Slave-Adresse). Weitere anhängen.
+> # Beliebig viele Zähler — hier 3 Wago hinter EINEM Kommunikationsmodul WAGO 879-9000:
+> # gleiche host/port (Modul-IP), unterschiedliche unit_id (Modbus-Slave-Adresse). Weitere anhängen.
 > zaehler:
 >   - messpunkt: "ID742-Wohnung-1"
 >     seriennummer: "WAGO-8791234"    # optional; beim Zählertausch aktualisieren (FR-3.5)
 >     protokoll: modbus-tcp
->     host: 192.168.10.10             # IP des Modbus-TCP-Hubs (für alle Wago gleich)
+>     host: 192.168.10.164            # IP des Kommunikationsmoduls (für alle Wago gleich)
 >     port: 502
 >     unit_id: 1                      # Slave-Adresse dieses Zählers am Hub
 >     # read_timeout: 8s              # optional: überschreibt den globalen Wert nur für diesen Zähler
@@ -117,27 +121,27 @@
 >   # publiziert wird 0 (FR-1.7).
 >   - messpunkt: "ID742-Wohnung-2"
 >     protokoll: modbus-tcp
->     host: 192.168.10.10
+>     host: 192.168.10.164
 >     port: 502
 >     unit_id: 2
 >     register:
 >       bezug:       { addr: 600C, typ: float32, wortfolge: big, skalierung: 1.0 }
 >   - messpunkt: "ID742-Allgemein"
 >     protokoll: modbus-tcp
->     host: 192.168.10.10
+>     host: 192.168.10.164
 >     port: 502
 >     unit_id: 3
 >     register:
 >       bezug:       { addr: 600C, typ: float32, wortfolge: big, skalierung: 1.0 }
 >       einspeisung: { addr: 6018, typ: float32, wortfolge: big, skalierung: 1.0 }
 >
-> # Später (Erweiterung): BKW als weiterer Eintrag mit  protokoll: gplug  (siehe Offene Fragen).
+> # BKW (WhatWatt Go) und Batterie (Wechselrichter): weitere Einträge mit eigener host (FR-1.2).
 > ```
-> Die drei Wago hängen per seriellem Modbus (RTU) an einem **Modbus-TCP-Hub** (siehe `docs/Netzwerk-Topologie-Hene.md`); daher **gleiche `host`/`port` (Hub-IP), verschiedene `unit_id`**. Die Register-`addr`/`typ`/`skalierung` sind **beispielhaft** und müssen dem Wago-Datenblatt entsprechen (Diagnose per `mbpoll`, siehe FR-1). Der Skalierungs-/OBIS-Bezug ist unter „Register-Mapping Wago" (Offene Fragen) beschrieben.
+> Die Wago hängen per seriellem Modbus (RTU) am **Kommunikationsmodul WAGO 879-9000** (siehe `docs/Netzwerk-Topologie-Hene.md`); daher **gleiche `host`/`port` (Modul-IP), verschiedene `unit_id`**. Die Register-`addr`/`typ`/`skalierung` sind **beispielhaft** und müssen dem Wago-Datenblatt entsprechen (Diagnose per `mbpoll`, siehe FR-1). Der Skalierungs-/OBIS-Bezug ist unter „Register-Mapping Wago" (Offene Fragen) beschrieben.
 
 ### FR-6: Betrieb & Resilienz
 1. Läuft als **`systemd`-Service** mit Autostart nach Reboot/Stromausfall.
-2. Automatischer **Reconnect** (Broker/Modbus/gPlug) mit Backoff.
+2. Automatischer **Reconnect** (Broker/Modbus) mit Backoff.
 3. **NTP-Zeitsynchronisation** vorausgesetzt (korrekte Zeitstempel sind abrechnungskritisch).
 4. Strukturiertes Logging mit Rotation; ein lokaler Puffer (falls genutzt) **nicht** auf die SD-Karte (Wear) — USB-SSD.
 
@@ -146,7 +150,7 @@
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
-* [ ] Der Dienst liest **alle konfigurierten Zähler** (beliebige Anzahl; aktuell 3× Wago Modbus TCP, gPlug folgt später) im konfigurierten Intervall aus.
+* [ ] Der Dienst liest **alle konfigurierten Zähler** (beliebige Anzahl; bei Hene 15 Wago, BKW über WhatWatt und Batterie, alle Modbus TCP) im konfigurierten Intervall aus.
 * [ ] Ein zusätzlicher Zähler lässt sich **allein per Konfigurations-Eintrag** ergänzen (kein Code-Change/Rebuild).
 * [ ] Ohne `read_timeout` in der Config gilt der Default **5 s**; ein gesetzter Wert (Zahl oder `"8s"`/`"1m"`) wird für **alle** Zähler übernommen.
 * [ ] `zaehler[].read_timeout` überschreibt den globalen Wert **nur für diesen Zähler**; die übrigen behalten `read_timeout`.
@@ -165,7 +169,7 @@
 * [ ] Für jeden Zähler ohne `einspeisung`-Register erscheint beim Start eine `INFO`-Zeile.
 * [ ] Bleibt eine Antwort aus, nennt die Fehlermeldung den konfigurierten Timeout-Wert und den Hinweis, `timeout` zu erhöhen; bei einer **Modbus-Exception-Response** (z.B. `code 11`) erscheint dieser Hinweis **nicht** (dort hilft das Timeout nicht).
 * [ ] Der Dienst publiziert die **absoluten Zählerstände** unverändert (keine Delta-Berechnung, keine „letzter Stand"-Persistenz).
-* [ ] Publizierte Topic-/Payload-Struktur entspricht `MQTT-Integration.md`: Topic `zev/{orgId}/{messpunkt}/messwert`, Pflichtfelder `{timestamp,zaehlerstandBezug,zaehlerstandEinspeisung}` – plus das **optionale** `seriennummer`, sofern konfiguriert.
+* [ ] Publizierte Topic-/Payload-Struktur entspricht `MQTT-Integration.md`: Topic `zev/{orgId}/{messpunkt}/messwert`, Pflichtfelder `{timestamp,zaehlerstandBezug,zaehlerstandEinspeisung}` – plus die **optionalen** `seriennummer` und `zustand`, sofern konfiguriert.
 * [ ] Ist im `zaehler`-Eintrag eine `seriennummer` gesetzt, erscheint sie unverändert im Payload; fehlt sie, wird das Feld **weggelassen** (Payload identisch zum bisherigen Vertrag).
 * [ ] Bei Broker-/VPN-Ausfall entsteht **kein Datenverlust** in der Gesamtsumme (nächster übertragener Stand schliesst die Lücke); optionale Pufferung erhält zusätzlich die Auflösung.
 * [ ] Unvollständige/fehlgeschlagene Reads werden verworfen (nicht publiziert).
@@ -188,7 +192,7 @@
 ### NFR-3: Zuverlässigkeit
 * **Verlusttoleranz durch absolute Zählerstände** — eine verlorene Nachricht führt nicht zu Datenverlust; daher genügt QoS 0/1 und **keine** zwingende Pufferung.
 * Duplikate sind backend-seitig idempotent (Unique `einheit_id`+`zeit`).
-* Selbstheilung: Reconnect für Broker, Modbus und gPlug.
+* Selbstheilung: Reconnect für Broker und Modbus.
 
 ### NFR-4: Kompatibilität
 * Payload/Topic-Vertrag mit `MQTT-Integration.md` bleibt stabil; Änderungen nur koordiniert.
@@ -197,7 +201,7 @@
 ## 5. Edge Cases & Fehlerbehandlung
 | Szenario | Verhalten |
 |----------|-----------|
-| Zähler (Modbus/gPlug) nicht erreichbar | Loggen, diesen Zyklus überspringen, Retry (nächster Stand schliesst die Lücke) |
+| Zähler (Modbus) nicht erreichbar | Loggen, diesen Zyklus überspringen, Retry (nächster Stand schliesst die Lücke) |
 | Teilweiser/fehlgeschlagener Read | Messwert dieser Quelle verwerfen, nicht publizieren |
 | Abgeschnittene Antwort (`ModbusIOException` der Bibliothek) | Wie ein fehlgeschlagener Read: Retry gemäss `read_attempts`, danach überspringen (FR-1.6) |
 | Zählerüberlauf / Rücksprung / Zählerwechsel | Rohstand wird publiziert; Erkennung/Behandlung im **Backend** (Differenz < 0) |
@@ -212,7 +216,7 @@
 ## 6. Abhängigkeiten & betroffene Funktionalität
 * **Vertrag/Backend:** `Specs/MQTT-Integration.md` (Topic, Payload, QoS, Delta-Bildung/Aggregation) — **maßgeblich**.
 * **Topologie/Broker:** `docs/Netzwerk-Topologie-Hene.md` (Broker-Setup NAS/Pi, Varianten A/B/C, VPN, SD-Wear, Monitoring).
-* **Hardware/Protokolle:** Wago (Modbus TCP), BKW (gPlug), Mosquitto-Broker, VPN (WireGuard).
+* **Hardware/Protokolle:** Wago über Kommunikationsmodul WAGO 879-9000, BKW-Zähler über WhatWatt Go, Hybrid-Wechselrichter (alle Modbus TCP), Mosquitto-Broker, VPN (WireGuard).
 * **Voraussetzungen:** Einheiten inkl. `messpunkt` sind im ZEV-System angelegt; `org_id` bekannt; VPN eingerichtet.
 * **Kein** ZEV-App-Code betroffen (separates Pi-Artefakt); keine DB-/i18n-/Frontend-Änderung.
 
@@ -223,10 +227,11 @@
 * **VPN-Einrichtung**, Netzwerk-Segmentierung der Zähler.
 * **Bidirektionale Steuerung** (Befehle an Zähler), automatische Geräteregistrierung.
 * **Keine UI**; Konfiguration per Datei/Env.
+* **gPlugK im Nachbarhaus:** publizieren selbst (`Specs/MQTT-Integration.md`, FR-10); die Mosquitto-Bridge auf dem Pi, die ihre Meldungen weiterleitet, ist Betrieb (`docs/Netzwerk-Topologie-Hene.md`).
 
 ## 8. Offene Fragen
 * [ ] **Technologie/Sprache:** Empfehlung **Python** (`pymodbus`, `paho-mqtt`, HTTP-Client) für schnelle Umsetzung; **Go** als Alternative (ein statisches arm64-Binary, minimaler Footprint, einfachstes Deployment). Java auf dem Pi eher nicht (JVM-Overhead). → Python
-* [ ] **gPlug-Schnittstelle (BKW):** Modbus, HTTP/REST oder proprietär? Bestimmt Libs und Aufwand. → damit noch warten. Kommt später als Erweiterung.
+* [ ] **gPlug-Schnittstelle (BKW):** hinfällig – der BKW-Zähler wird über WhatWatt Go per Modbus TCP gelesen, die gPlugs im Nachbarhaus publizieren selbst (Anhang B.1).
 * [ ] **Optionale Pufferung:** überhaupt nötig (nur für Auflösungserhalt bei Ausfällen)? Falls ja: Variante C (lokaler Broker + Bridge) oder in-process Queue? → keine Pufferung
 * [ ] **Welche Register/Stände** werden publiziert (Bezug/Einspeisung, ggf. ZEV-Register) und wie im Backend auf `total`/`zev` gemappt? (Spiegelt Offene Frage in `MQTT-Integration.md`.) → **Wirkenergie** (Active Energy, kumulativ in kWh): **Bezug = OBIS 1.8.0** → `zaehlerstandBezug`, **Einspeisung = OBIS 2.8.0** → `zaehlerstandEinspeisung`. **Keine** Wirk-/Blind-/Scheinleistung (kW/kvar/kVA) und keine Blind-/Scheinenergie. Das Mapping der Stände auf `messwerte` ist entschieden (`MQTT-Integration.md` FR-6.4): `total = ΔBezug − ΔEinspeisung` (vorzeichenbehaftet), `zev = 0` (Sentinel), `zev_calculated` via Solarverteilung. Für den Pi ändert sich dadurch **nichts** — er publiziert weiterhin nur die absoluten Bezug-/Einspeisung-Stände.
 * [ ] **`org_id` im Topic:** internes `org_id` (BIGINT) vs. Keycloak-Alias/UUID — konsistent zu `MQTT-Integration.md` festlegen. → interne org_id
@@ -379,3 +384,15 @@ journalctl -u pi-gateway.service -f
 > (`timedatectl status` → „System clock synchronized: yes“ und korrekte „Time zone“;
 > ggf. `sudo timedatectl set-ntp true` bzw. `sudo timedatectl set-timezone Europe/Zurich`).
 > Der publizierte Zeitstempel trägt den lokalen UTC-Offset.
+
+## Anhang B – Verlauf
+
+### B.1 Topologie Hene bereinigt (Abschnitt 1, FR-1, FR-5, 20.10.2026)
+* Abschnitt 1 („Aktueller Stand“) lautete: „Der Pi liest die Zähler physisch bereits aus (**3× Wago via Modbus TCP**, **1× BKW via gPlug**) und stellt Daten heute per **SFTP** bereit“, „Es existiert **noch keine** MQTT-Publisher-Software“ und „Ziel-Topologie: Broker auf dem NAS (Variante B)“. Stand laut User: 15 Wago, BKW-Bilanz über WhatWatt Go, Batterie per Modbus am Wechselrichter; SFTP durch MQTT abgelöst.
+* FR-1.2 lautete: „**BKW via gPlug:** Auslesen über die gPlug-Schnittstelle (Protokoll siehe Offene Fragen).“ Die offene Frage dazu: „**gPlug-Schnittstelle (BKW):** Modbus, HTTP/REST oder proprietär? Bestimmt Libs und Aufwand. → damit noch warten. Kommt später als Erweiterung.“ Der BKW-Zähler hängt inzwischen an einem WhatWatt Go (Modbus TCP, ein gewöhnlicher `modbus-tcp`-Eintrag). Die gPlugK im Nachbarhaus publizieren selbst und brauchen keinen Reader (`Specs/MQTT-Integration.md`, FR-10). Ein gPlug-Reader in dieser Software entfällt damit.
+* Das Beispiel in FR-5 hiess „3 Wago-Zähler; ohne gPlug — folgt später“, nannte den „Modbus-TCP-Hub“ mit `host: 192.168.10.10` und endete mit „Später (Erweiterung): BKW als weiterer Eintrag mit `protokoll: gplug`“. Laut Geräte-Inventar der Topologie-Doku ist die Modul-IP `192.168.10.164`.
+* FR-6.2, NFR-3, das erste Akzeptanzkriterium, der Edge Case „Zähler nicht erreichbar“ und Abschnitt 6 nannten gPlug als Protokoll dieser Software.
+
+### B.2 Feld `zustand` im Payload nachgetragen (FR-3, 20.10.2026)
+FR-3.2 nannte nur `seriennummer` als optionales Feld, das Akzeptanzkriterium zur Topic-/Payload-Struktur lautete „… – plus das **optionale** `seriennummer`, sofern konfiguriert.“ Das Feld `zustand` kam mit `Specs/Gerätezustand.md` in Konfiguration und Publisher dazu (`gateway/config.py`, `gateway/publisher.py`) und im Vertrag `MQTT-Integration.md`, FR-3; diese Spec war nicht nachgeführt. Der Checkbox-Status des Kriteriums bleibt.
+

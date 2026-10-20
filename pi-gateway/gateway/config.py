@@ -26,7 +26,7 @@ _ENV_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 # Umrechnung von Intervall-Kurzschreibweisen (z. B. "5m", "30s", "1h") in Sekunden.
 _INTERVAL_UNITS = {"s": 1, "m": 60, "h": 3600}
 
-_SUPPORTED_PROTOCOLS = {"modbus-tcp", "sim"}  # "gplug" folgt später; "sim" = Publisher-Simulator
+_SUPPORTED_PROTOCOLS = {"modbus-tcp", "sim"}  # "sim" = Publisher-Simulator
 # float32: Wago-Zaehler (IEEE 754). uint32: Wechselrichter, die kumulative Energie als
 # vorzeichenlose Ganzzahl fuehren - der Solinteg MHT liefert kWh mal 10, also skalierung: 0.1.
 # uint16: Momentanwerte in EINEM Register - der Ladezustand desselben Geraets (Register 33000),

@@ -108,4 +108,6 @@ zaehler:
     register:
       bezug:       { addr: "600C", typ: float32, wortfolge: big, skalierung: 1.0 }
 
-# Später (Erweiterung): BKW als weiterer Eintrag mit  protokoll: gplug  (siehe Spec, Offene Fragen).
+# BKW-Bilanzzaehler (WhatWatt Go): weiterer modbus-tcp-Eintrag mit eigener host, Register in
+# docs/Netzwerk-Topologie-Hene.md (Abschnitt "WhatWatt Go"). Die gPlugK im Nachbarhaus brauchen
+# keinen Eintrag: Sie publizieren selbst (Specs/MQTT-Integration.md, FR-10).
