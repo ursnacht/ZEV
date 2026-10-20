@@ -12,6 +12,7 @@
   - Die Zähler werden physisch bereits über einen **Raspberry Pi** ausgelesen (3× Wago via Modbus TCP, 1× BKW via gPlug) und heute per **SFTP** bereitgestellt (siehe `docs/Netzwerk-Topologie-Hene.md`).
   - Ziel-Topologie: Der Pi ist MQTT-**Publisher**, der **Broker (Mosquitto) läuft auf dem NAS** (Variante B der Topologie-Doku), das ZEV-Backend ist **Subscriber**.
   - Es gibt **noch keinen** MQTT-Code / keine MQTT-Dependency im Backend.
+  - **Erweiterung Nachbarhaus (20.10.2026):** Das Nachbarhaus wird in den ZEV bei Hene integriert. Seine Smartmeter tragen je einen **gPlugK**, der selbst per MQTT publiziert. Die gPlugs werden **ohne Pi** direkt an den Broker auf dem NAS angebunden und senden ihr eigenes Meldungsformat auf ein **zweites Topic** (`gPlug/…`), das das Backend zusätzlich abonniert (FR-10).
 
 > **Designentscheidung – absolute Zählerstände statt Deltas:** Der Pi überträgt die **absoluten (kumulativen) Zählerstände**, nicht berechnete Deltas. Die **Delta-/Intervall-Berechnung erfolgt im Backend**. Vorteil: **verlusttolerant** — geht eine MQTT-Nachricht verloren, bleibt die Gesamtsumme korrekt (die Differenz zweier empfangener Stände erfasst den Verbrauch dazwischen weiterhin vollständig); es sinkt nur kurz die zeitliche Auflösung. Dadurch entfallen strenge QoS-/Pufferungs-Anforderungen (kein zwingender Store-and-Forward-Bridge, Variante C).
 
@@ -22,7 +23,7 @@
 ### FR-1: MQTT-Broker-Anbindung (Subscriber)
 1. Das ZEV-Backend verbindet sich beim Start automatisch zum konfigurierten Broker (Mosquitto auf dem NAS).
 2. Verbindungsparameter (URL, Username, Passwort, Client-ID, QoS) über `application.yml` / Environment — **keine Secrets im Code**.
-3. Subscribe mit Wildcard auf alle Messwert-Topics (FR-2).
+3. Subscribe mit Wildcard auf alle Messwert-Topics (FR-2) und auf die gPlug-Topics (FR-10) – über **dieselbe** Verbindung und Sitzung (eine Client-ID).
 4. Bei Verbindungsabbruch automatischer Reconnect mit Exponential Backoff.
 5. **Dauerhafte Sitzung** (`mqtt.clean-session`, Standard `false`, Env `MQTT_CLEAN_SESSION`): Der Broker behält das Abo des Backends über dessen Neustart hinweg und stellt die QoS-1-Nachrichten zu, die in der Zwischenzeit eintrafen. So bleibt bei einem Update auch die 15-Minuten-Auflösung erhalten, nicht nur die Energie. Voraussetzung: Die Client-ID wird je Broker von **genau einer** Backend-Instanz verwendet; der Broker begrenzt die Warteschlange (`max_queued_messages`, siehe `docs/Netzwerk-Topologie-Hene.md`).
 6. **Log-Meldung nach einem Neustart ist erwartet:** Hat der Broker Nachrichten gepuffert, erscheint beim Verbinden `Error subscribing to [zev/+/+/messwert] – Timed out waiting for a response from the server (32000)`. Sie ist harmlos: Spring wartet im Paho-Thread, der auch die eintreffenden Nachrichten verarbeitet, auf die Bestätigung des Abos (SUBACK); der Broker stellt aber zuerst die gepufferten Nachrichten zu, die Bestätigung kommt erst nach Ablauf der Wartezeit (`setCompletionTimeout(5000)`) durch. Das Abo besteht trotzdem, weil es in der Sitzung liegt – und gepufferte Nachrichten gibt es nur bei bestehender Sitzung. Ohne Sitzung (erster Start, abgelaufen, geleertes Broker-Volume) ist nichts gepuffert, und das Abo wird sofort bestätigt.
@@ -185,6 +186,71 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 
 > **Kante:** Ein *gemessener* Wert von genau `zev = 0` (z. B. Nachtstunde ohne ZEV-Bezug aus CSV) würde ebenfalls durch `zev_calculated` ersetzt. Da `zev_calculated` in solchen Fällen ohnehin ~0 ist, ist der Effekt vernachlässigbar; falls doch relevant, kann die Unterscheidung über `quelle = 'MQTT'` statt über `zev = 0` erfolgen (Umsetzungsdetail).
 
+### FR-10: gPlug-Anbindung (zweites Topic)
+Die Smartmeter im Nachbarhaus tragen einen **gPlugK** (Auslesekopf für die Kundenschnittstelle des Smartmeters, Firmware auf Tasmota-Basis). Er publiziert die Zählerdaten selbst per MQTT. Das Backend liest diese Meldungen **direkt** – ohne Pi und ohne Umformatierung.
+
+> **Grundsatz:** Auf dem gPlug wird **nur die MQTT-Anbindung konfiguriert** (Host, Port, Benutzer, Passwort, Topic, FullTopic, Sendeintervall). An der Meldungsstruktur und am Ausleseskript ändert sich **nichts**. Die Übersetzung in das interne Format leistet das Backend.
+>
+> Darum trägt der gPlug den Mandanten und den Messpunkt im **Topic** statt im Payload: Das Topic ist Konfiguration, der Payload wäre ein Eingriff ins Skript.
+
+1. **Konfiguration am gPlug** (Tasmota-Konsole oder Web-Oberfläche „Configure MQTT“):
+   | Einstellung | Wert | Bemerkung |
+   |-------------|------|-----------|
+   | Host / Port | NAS-Broker, `1883` | Netzwerkweg siehe Offene Fragen |
+   | User / Password | eigener Broker-User je gPlug oder für alle gPlugs eines Hauses | nie der Backend- oder Pi-User (NFR-2) |
+   | Topic (`%topic%`) | **`messpunkt`** der Einheit, z. B. `ID742-Nachbar-1` | ohne `/`, `+`, `#` und Leerzeichen |
+   | FullTopic | **`gPlug/{orgId}/%topic%/%prefix%/`**, z. B. `gPlug/42/%topic%/%prefix%/` | `{orgId}` ist hier ein fester Text |
+   | TelePeriod | **`60`** (Sekunden) | Takt der `SENSOR`-Meldung, Begründung unten |
+2. **Topic-Struktur:** Daraus entsteht für die Zählermeldung
+   ```
+   gPlug/{orgId}/{messpunkt}/tele/SENSOR
+   ```
+   | Segment | Beschreibung | Beispiel |
+   |---------|--------------|----------|
+   | `gPlug` | Root-Namespace der gPlug-Meldungen (Gross-/Kleinschreibung beachten) | `gPlug` |
+   | `{orgId}` | Mandanten-ID (`org_id`) wie in FR-2 | `42` |
+   | `{messpunkt}` | Messpunkt der Einheit (`einheit.messpunkt`) = Tasmota-Topic | `ID742-Nachbar-1` |
+   | `tele` | Tasmota-Präfix für periodische Meldungen | `tele` |
+   | `SENSOR` | Meldung mit den Zählerwerten | `SENSOR` |
+
+   * Das Backend abonniert `gPlug/+/+/tele/SENSOR` (Konfiguration `mqtt.topic-gplug`, Env `MQTT_TOPIC_GPLUG`; leer = kein gPlug-Abo).
+   * Die übrigen Tasmota-Meldungen (`tele/STATE`, `tele/LWT`, `tele/INFO…`, `stat/…`) werden **nicht** abonniert.
+3. **Meldungsstruktur des gPlug** (Tasmota-`SENSOR`-Meldung; das Objekt `z` liefert das Ausleseskript des gPlug):
+   ```json
+   {
+     "Time": "2026-10-20T14:30:00",
+     "z": {
+       "SMid": "12345678",
+       "Pi": 0.512, "Po": 0.000,
+       "Pi1": 0.170, "Pi2": 0.210, "Pi3": 0.132,
+       "I1": 0.80, "I2": 0.95, "I3": 0.61,
+       "U1": 231, "U2": 230, "U3": 232,
+       "Ei": 12345.678, "Eo": 4321.000,
+       "Ei1": 8000.123, "Ei2": 4345.555, "Eo1": 3000.000, "Eo2": 1321.000
+     }
+   }
+   ```
+   | Feld | Bedeutung | Einheit | Verwendung im Backend |
+   |------|-----------|---------|------------------------|
+   | `Time` | Zeitpunkt der Meldung, **lokale Zeit ohne Offset** (Uhr des gPlug, per NTP) | ISO 8601 | → `zeit` (verbatim, wie FR-3) |
+   | `z.Ei` | Wirkenergie Bezug kumulativ (OBIS 1.8.0) | kWh | → `zaehlerstand_bezug` |
+   | `z.Eo` | Wirkenergie Einspeisung kumulativ (OBIS 2.8.0) | kWh | → `zaehlerstand_einspeisung`; fehlt es, gilt `0` (Zähler ohne Einspeiseregister) |
+   | `z.SMid` | Kennung des Smartmeters | – | → `seriennummer` (Zählertausch-Erkennung, `Specs/Zaehlertausch-Erkennung.md`), gekürzt auf 64 Zeichen; fehlt es, gilt das bisherige Verhalten |
+   | `z.Ei1`/`z.Ei2`, `z.Eo1`/`z.Eo2` | Bezug/Einspeisung je Tarif (Hoch-/Niedertarif) | kWh | nicht verwendet (die Summe steht in `Ei`/`Eo`) |
+   | `z.Pi`/`z.Po`, `z.Pi1..3`/`z.Po1..3` | Momentanleistung Bezug/Einspeisung gesamt bzw. je Phase | kW | nicht verwendet |
+   | `z.I1..3`, `z.U1..3` | Strom bzw. Spannung je Phase | A bzw. V | nicht verwendet |
+
+   * Welche Felder ein gPlug liefert, hängt vom Smartmeter ab. Pflicht sind nur `Time` und `z.Ei`. Unbekannte und nicht verwendete Felder werden ignoriert (Vertrags-Regel wie FR-3).
+   * Die Feldnamen entsprechen der gPlug-Dokumentation. Vor der Umsetzung ist eine **echte Meldung** aus dem Nachbarhaus mitzuschneiden (`mosquitto_sub -v -t 'gPlug/#'`) und gegen die Tabelle zu prüfen (Offene Fragen).
+4. **Verarbeitung:** Das Backend übersetzt die gPlug-Meldung in die interne Form von FR-3 (`timestamp`, `zaehlerstandBezug`, `zaehlerstandEinspeisung`, `seriennummer`; kein `zustand`). Ab dort läuft **derselbe Weg** wie beim Pi: Einheiten über (`org_id`, `messpunkt`) auflösen, Ladestationen ausschliessen, Bilanz-Typen auf ihr Register projizieren, Upsert in `zaehler_rohdaten` (FR-4, FR-5), dieselben Metriken (FR-8.1).
+   * **Keine** neue Tabelle, **keine** Migration. Aggregation (FR-6), Ausfall- und Rücksprungmeldungen (FR-8.3, FR-8.4) und Solarverteilung (FR-9) sehen keinen Unterschied zwischen Pi- und gPlug-Rohdaten. Die aggregierten Messwerte tragen `quelle = 'MQTT'`.
+   * Die Zeit hat keinen Offset: Sie wird als lokale Wanduhrzeit **verbatim** übernommen, genau wie der Pi-Zeitstempel nach `toLocalDateTime()`.
+5. **Plausibilität** zusätzlich zu FR-4.2:
+   * `Time` vor dem **01.01.2020** → WARN, verwerfen. Tasmota sendet vor der ersten NTP-Synchronisation eine Zeit ab 1970.
+   * `z.Ei` **und** `z.Eo` beide `0` → WARN, verwerfen. Nach einem Neustart meldet der gPlug Nullwerte, bis das erste Telegramm des Smartmeters gelesen ist.
+     > **Warum verwerfen statt speichern:** Ein solcher Nullstand zwischen zwei echten Ständen löste zuerst einen Rücksprung aus (Delta 0, FR-6.3) und im nächsten Intervall einen Sprung um den **ganzen Zählerstand**, der als Verbrauch verbucht würde.
+6. **Sendetakt:** `TelePeriod 60` liefert etwa eine Meldung pro Minute, wie der Pi. Häufigere Meldungen verbessern nichts, weil das Backend auf 15 Minuten aggregiert. Sie vervielfachen aber `zaehler_rohdaten` und die Broker-Warteschlange (NFR-3). Seltenere Meldungen (bis 300 s) sind zulässig. Ab etwa 900 s fallen einzelne Intervalle leer aus und lösen `MQTT_ZAEHLER_LUECKE` aus (FR-8.3).
+
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
 **MQTT-Empfang:**
@@ -215,6 +281,17 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 **Verbindung:**
 * [ ] Ohne `MQTT_CLEAN_SESSION` verbindet sich das Backend mit dauerhafter Sitzung (`cleanSession = false`); mit `MQTT_CLEAN_SESSION=true` ohne (Test: MqttConfigTest#applicationMqttYml_OhneUmgebungsvariable_DauerhafteSitzung, MqttConfigTest#mqttClientFactory_CleanSessionFalse_DauerhafteSitzung, MqttConfigTest#mqttClientFactory_CleanSessionTrue_SitzungOhnePuffer)
 
+**gPlug (FR-10):**
+* [ ] Mit gesetztem `mqtt.topic-gplug` abonniert das Backend zusätzlich `gPlug/+/+/tele/SENSOR` über dieselbe Verbindung; ist es leer, entsteht kein gPlug-Abo.
+* [ ] Gültige gPlug-Meldung auf `gPlug/{orgId}/{messpunkt}/tele/SENSOR` → Zeile in `zaehler_rohdaten` mit `org_id` und `einheit_id` (über `messpunkt` aufgelöst), `zeit` = `Time` verbatim, `zaehlerstand_bezug` = `z.Ei`, `zaehlerstand_einspeisung` = `z.Eo`, `seriennummer` = `z.SMid`.
+* [ ] Fehlt `z.Eo`, wird die Einspeisung als `0` gespeichert; fehlt `z.SMid`, bleibt `seriennummer` leer.
+* [ ] Fehlt `Time` oder `z.Ei`, oder ist die Meldung kein JSON → WARN, kein Insert, Zähler `..._failed_total` steigt.
+* [ ] `Time` vor dem 01.01.2020 → WARN, kein Insert.
+* [ ] `z.Ei = 0` und `z.Eo = 0` → WARN, kein Insert.
+* [ ] Unbekannter Messpunkt, fremde `orgId` und Ladestation werden wie bei der Pi-Meldung verworfen; ein geteilter Bilanzmesspunkt wird je Einheit auf ihr Register projiziert.
+* [ ] Nicht verwendete Felder (Leistung, Strom, Spannung, Tarifregister, unbekannte Felder) verhindern das Speichern nicht.
+* [ ] Aus gPlug-Rohdaten aggregierte Messwerte unterscheiden sich nicht von denen des Pi (`quelle = 'MQTT'`, gleiche Delta-, Lücken- und Rücksprunglogik).
+
 **Monitoring & Kompatibilität:**
 * [ ] MQTT-Metriken unter `/actuator/prometheus`; `/actuator/health/mqtt` zeigt Status.
 * [ ] **Genau ein** Intervall ohne Zählerdaten → Systemmeldung `MQTT_ZAEHLER_LUECKE` mit Level **INFO**, Kategorie `SYSTEMMELDUNG_KATEGORIE_MQTT`, Parameter mit Einheiten-Name und Zeitraum; der Messwert des Folgeintervalls enthält den gesamten Lückenverbrauch.
@@ -232,11 +309,13 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 * **Kein Endbenutzer-UI / nicht rollenbasiert:** Der Ingest ist ein Backend-Hintergrunddienst (keine `zev_user`/`zev_admin`-Route, kein `@PreAuthorize`). Ein späteres Status-/Konfig-UI wäre über das Permission-Modell (`Specs/Composite-Roles.md`) zu schützen (Out of Scope).
 * **Broker-Auth:** Username/Passwort (nur via Env), **ACLs pro Mandant** (Pi darf nur in seine `org_id` publizieren); getrennte Broker-User für Publisher (Pi) und Backend-Subscriber.
 * **TLS (Port 8883)** empfohlen, zusätzlich zum VPN-Tunnel (Defense-in-Depth).
+* **gPlug (FR-10):** eigener Broker-User mit ACL nur auf seinen Mandanten, z. B. `topic write gPlug/42/+/tele/#` und `topic read gPlug/42/+/cmnd/#`. Der Backend-User darf `gPlug/+/+/tele/SENSOR` nur **lesen**; er publiziert nie auf `cmnd/…` (das wären Befehle an den gPlug). Die Standard-Firmware des gPlug spricht **kein TLS**: Der Weg zum Broker muss deshalb im lokalen Netz oder im VPN liegen, nie offen über das Internet.
 * **Mandanten-Isolation:** `org_id` aus dem Topic wird gegen die Einheit geprüft; Rohdaten/Messwerte tragen `org_id` und unterliegen dem Hibernate-`orgFilter`. Da kein JWT vorliegt, wird der Filter explizit mit dem topic-abgeleiteten `org_id` versorgt.
 
 ### NFR-3: Zuverlässigkeit
 * **Verlusttoleranz durch absolute Zählerstände:** Eine verlorene Nachricht führt **nicht** zu Datenverlust (die Differenzbildung ist selbstheilend). Daher genügt **QoS 0/1**; ein aufwändiger Store-and-Forward-Puffer/Bridge (Variante C) ist **nicht erforderlich** (Broker auf dem NAS = Variante B genügt).
 * **Neustart des Backends:** Die dauerhafte Sitzung (FR-1.5) lässt den Broker die Nachrichten puffern, solange das Backend fehlt. Nach dem Wiederverbinden kann eine Nachricht doppelt ankommen (QoS 1 = mindestens einmal); das ist unkritisch, siehe nächster Punkt.
+* **gPlug publiziert mit QoS 0.** Mosquitto puffert QoS-0-Nachrichten für eine dauerhafte Sitzung nur mit `queue_qos0_messages true`. Ohne diese Einstellung gehen die gPlug-Meldungen während eines Backend-Neustarts verloren: Die Energie bleibt dank absoluter Stände erhalten, die 15-Minuten-Auflösung nicht (wie vor FR-1.5). Die Einstellung gehört in die `mosquitto.conf` auf dem NAS. `max_queued_messages` ist um die gPlug-Meldungen zu erhöhen (etwa 60 pro gPlug und Stunde).
 * Duplikate idempotent über Unique-Constraint (`einheit_id`, `zeit`).
 * Bei DB-Fehler: Rohdaten nicht als verarbeitet markieren, erneuter Versuch.
 
@@ -264,6 +343,12 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 | Job-Ausfall/Neustart | nächster Lauf verarbeitet alle unverarbeiteten Rohdaten |
 | Bereits aggregierter `messwerte`-Eintrag | Upsert statt Doppel-Insert |
 | Leere Zähler-/Einheitenliste | kein Fehler; nichts zu verarbeiten |
+| gPlug: Uhr noch nicht synchronisiert (`Time` vor 2020) | WARN, verwerfen (FR-10.5) |
+| gPlug: Nullwerte nach Neustart (`Ei = 0` und `Eo = 0`) | WARN, verwerfen (FR-10.5) |
+| gPlug: `Time` ohne Offset in der doppelten Stunde der Umstellung auf Winterzeit | Upsert überschreibt den ersten Stand derselben Wanduhrzeit; die Energie bleibt dank absoluter Stände erhalten, die Auflösung dieser Stunde nicht (wie beim CSV-Import) |
+| gPlug: falsches Tasmota-Topic (Messpunkt nicht angelegt) | wie „Unbekannter Messpunkt“: WARN, verwerfen |
+| gPlug: Smartmeter getauscht | neue `SMid` → neue Baseline (`Specs/Zaehlertausch-Erkennung.md`) |
+| gPlug: Backend-Neustart ohne `queue_qos0_messages` | Meldungen verloren, Fall „Verlorene Nachricht(en)“ (NFR-3) |
 
 ## 6. Abhängigkeiten & betroffene Funktionalität
 * **Voraussetzungen:**
@@ -277,6 +362,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 * **Wiederverwendet:** `Einheit`/`Messwerte`, `SolarDistribution` (unverändert), `MetricsService`, Grafana/Prometheus-Stack.
 * **Datenmigration:** Keine Bestandsmigration; nur neue Tabelle + `quelle`-Spalte.
 * **i18n:** Kein UI-Text in diesem Feature (reiner Backend-Ingest). Falls später Status-UI: Texte via `TranslationService`.
+* **gPlug (FR-10):** Konfiguration `mqtt.topic-gplug` (Env `MQTT_TOPIC_GPLUG`, Default `gPlug/+/+/tele/SENSOR`); Einheiten des Nachbarhauses mit `messpunkt` = Tasmota-Topic; je gPlug ein Broker-User mit ACL; `queue_qos0_messages true` und angepasstes `max_queued_messages` in der NAS-`mosquitto.conf`. `docs/Netzwerk-Topologie-Hene.md` ist um die gPlug-Anbindung zu ergänzen. Kein UI-Text, keine Migration.
 * **Abhängige Dokumente:** `docs/Netzwerk-Topologie-Hene.md` (Topologie/Broker-Setup/Varianten A/B/C), `Specs/Pi-Gateway-Software.md` (Publisher), `Specs/Metriken.md` (Prometheus-Infrastruktur).
 
 ## 7. Abgrenzung / Out of Scope
@@ -287,6 +373,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 * TLS-Zertifikatsverwaltung (manuell, siehe Topologie-Doku).
 * Aufbewahrungs-/Cleanup-Strategie für Rohdaten (eigene Spec).
 * Beibehaltung des SFTP-Pfads als Fallback — nicht Gegenstand dieser Spec.
+* **gPlug:** Änderungen an Firmware, Ausleseskript oder Meldungsstruktur des gPlug; Auswertung der Momentanwerte (Leistung, Strom, Spannung) und der Tarifregister; die übrigen Tasmota-Meldungen (`STATE`, `LWT`, `INFO`); Befehle an den gPlug. Der `gplug_reader` der Pi-Software (`Specs/Pi-Gateway-Software.md`) ist ein anderer Weg und bleibt davon unberührt.
 * Änderung der `zev_calculated`-**Berechnungslogik** (Verteilalgorithmus) — bleibt wie bisher. **Ausnahme (FR-9):** ein kleiner Zusatz setzt `zev = zev_calculated`, wo `zev = 0` (MQTT-Sentinel) — die eigentliche Verteilung ändert sich nicht.
 
 ## 8. Offene Fragen
@@ -299,4 +386,8 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 * [ ] **Prosumer im selben Intervall:** Verhalten, wenn `ΔBezug` **und** `ΔEinspeisung` > 0 (Netmetering)? Aktuelle Festlegung: Netto `total = ΔBezug − ΔEinspeisung` (FR-6.4) — genügt das fachlich?
 * [x] **`zev`-Behandlung / Verträglichkeit:** → **`zev = 0` beim Ingest** (kein NULL, kein Schema-Eingriff); die Solarverteilung ersetzt `0` durch `zev_calculated` (FR-9). Bestehende `zev`-Konsumenten bleiben kompatibel. Rest-Kante (gemessenes echtes `0`) siehe FR-9-Hinweis.
 * [ ] **Rohdaten-Retention:** Cleanup-Job nötig, ab welchem Alter (absolute Stände wachsen unbegrenzt)? --> **aufgenommen in `Specs/Datenaufbewahrung.md`** (FR-1/FR-2, Default 24 Monate; der Referenzstand-Guard unten ist dort als Akzeptanzkriterium verankert). **Wichtig (Wechselwirkung mit der Wiederaufnahme nach Unterbruch):** Ein Cleanup darf den **letzten Stand vor einer noch unverarbeiteten Lücke** nicht löschen — dieser ist die Referenz für die überbrückende Delta-Bildung nach Wiederaufnahme; wird er gelöscht, ginge der Verbrauch des Unterbruchs verloren (`referenz == null` → kein Messwert). Sichere Regel: nur **verarbeitete** Rohdaten löschen und pro Einheit mindestens den jüngsten Stand behalten.
+* [ ] **gPlug-Meldung verifizieren (FR-10.3):** Stimmen Objektname `z`, die Feldnamen und die Einheit kWh bei den Smartmetern im Nachbarhaus? Liefert `SMid` eine stabile Zählerkennung? Vor der Umsetzung eine echte Meldung mitschneiden.
+* [ ] **Netzwerkweg gPlug → NAS:** Liegen die gPlugs im selben Netz wie der NAS-Broker, oder braucht das Nachbarhaus einen VPN-Zugang? Ohne TLS-Unterstützung der gPlug-Firmware darf der Weg nicht offen über das Internet führen (NFR-2).
+* [ ] **Uhr des gPlug:** Sind Zeitzone und Sommerzeit (Tasmota `Timezone 99` mit Regeln für Europe/Zurich) sowie NTP eingestellt? Sonst ist `Time` um eine Stunde verschoben.
+* [ ] **Einheiten des Nachbarhauses:** Welche Typen haben die neuen Zähler (Consumer, Bilanzzähler, Producer)? Gehören sie zum bestehenden Mandanten von Hene (gleiche `orgId` im FullTopic)?
 * [x] **Mehrfach-Quelle pro Einheit:** Verhalten, wenn für dieselbe Einheit + Zeitpunkt sowohl CSV- als auch MQTT-Daten vorliegen? → **Warnung loggen, MQTT hat Vorrang.**
