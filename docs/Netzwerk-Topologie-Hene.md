@@ -115,101 +115,85 @@ still. Abhilfe: in Grafana einen Alert auf `zev_mqtt_last_message_timestamp` (FR
 ## Setup-Notiz: MQTT-Broker auf dem NAS betreiben
 
 Der Broker auf dem NAS nimmt die Meldungen des Pi-Gateways und – über die Bridge des Pi – die
-der gPlugs entgegen. Empfohlen: **Eclipse Mosquitto im Docker-Container** (auf Synology:
-Container Manager). Mosquitto ist der De-facto-Standard — schlank, stabil, NAS-tauglich. Docker
-gibt gegenüber einem NAS-Paket volle Versions- und Konfigurationskontrolle.
+der gPlugs entgegen. Er läuft als Service `mosquitto` im ZEV-Stack
+(`docker-compose-mqtt-hene.yml`, lokal `docker-compose-mqtt.yml`) und wird aus
+`pi-gateway/deploy/mosquitto/` gebaut:
 
-https://github.com/sukesh-ak/setup-mosquitto-with-docker
-
-### 1. Verzeichnisstruktur auf dem NAS
-
-```
-/volume1/docker/mosquitto/
-├── config/   → mosquitto.conf, passwordfile, acl
-├── data/     → persistente Nachrichten (Retained Messages)
-└── log/
-```
-
-### 2. mosquitto.conf
-
-```conf
-# /volume1/docker/mosquitto/config/mosquitto.conf
-listener 1883
-persistence true
-persistence_location /mosquitto/data/
-autosave_interval 300          # alle 5 Min. speichern (Standard 30)
-log_dest file /mosquitto/log/mosquitto.log
-
-# Keine anonymen Verbindungen!
-allow_anonymous false
-password_file /mosquitto/config/passwordfile
-acl_file /mosquitto/config/acl
-
-# Puffer fuer die dauerhafte Sitzung des Backends (mqtt.clean-session=false):
-# ~1300 Nachrichten pro Stunde (17 Zaehler ueber das Pi-Gateway + ca. 5 gPlugs, etwa
-# jede Minute). Der Standard von 1000 je Client reicht nicht einmal fuer eine Stunde
-# Unterbruch; 100000 fuer ~3 Tage.
-max_queued_messages 100000
-# Die gPlugs publizieren mit QoS 0. Ohne diese Zeile verwirft der Broker ihre Meldungen,
-# solange das Backend weg ist (Specs/MQTT-Integration.md, NFR-3).
-queue_qos0_messages true
-# Sitzung einer nicht mehr benutzten Client-ID nach 14 Tagen verwerfen
-persistent_client_expiration 14d
-```
+| Datei | Inhalt |
+|-------|--------|
+| `Dockerfile` | `eclipse-mosquitto:2` mit eingebackener `mosquitto.conf` und eigenem Entrypoint |
+| `mosquitto.conf` | Listener, Persistenz, Puffer der dauerhaften Backend-Sitzung, `queue_qos0_messages` |
+| `docker-entrypoint.sh` | erzeugt beim Start die `passwd` aus `MOSQUITTO_USERS` – keine Passwörter im Image oder im Repo |
 
 > **Wozu `persistence`:** Die dauerhafte Sitzung des Backends hält der Broker im
 > Speicher. Für einen **Neustart des Backends** (Update) genügt das. Damit die
 > gepufferten Nachrichten auch einen **Neustart des Brokers** überstehen, braucht es
 > `persistence true` mit einem Volume für `/mosquitto/data/`.
 
-### 3. docker-compose (Container Manager → Projekt)
+### 1. Benutzer (`MOSQUITTO_USERS`)
 
-```yaml
-services:
-  mosquitto:
-    image: eclipse-mosquitto:2
-    container_name: mosquitto
-    restart: unless-stopped
-    ports:
-      - "1883:1883"     # MQTT (intern / über VPN)
-      - "8883:8883"     # MQTT über TLS (empfohlen)
-    volumes:
-      - /volume1/docker/mosquitto/config:/mosquitto/config
-      - /volume1/docker/mosquitto/data:/mosquitto/data
-      - /volume1/docker/mosquitto/log:/mosquitto/log
+In der `.env` des Stacks, Paare `user:passwort` durch Leerzeichen getrennt. Passwörter dürfen
+kein Leerzeichen enthalten; ein Doppelpunkt im Passwort ist erlaubt (nur der erste trennt).
+
+```
+MOSQUITTO_USERS=zev-backend:<passwort> pi-org42:<passwort> zevbridge:<passwort>
 ```
 
-### 4. Benutzer/Passwort anlegen
+| User (Beispiel) | Wer | Gegenstück |
+|-----------------|-----|------------|
+| `zev-backend` | ZEV-Backend (Subscriber) | `MQTT_BROKER_USERNAME` / `MQTT_BROKER_PASSWORD` in derselben `.env` |
+| `pi-org42` | Pi-Gateway (Publisher) | `MQTT_USERNAME` / `MQTT_PASSWORD` in `/etc/pi-gateway.env` auf dem Pi |
+| `zevbridge` | Bridge des Pi für die gPlugs | `remote_username` / `remote_password` in `/etc/mosquitto/conf.d/bridge.conf` auf dem Pi |
+
+Die `passwd` entsteht beim Start des Containers. Ein neuer oder geänderter User wirkt deshalb
+erst nach dem Neuerzeugen des Containers:
 
 ```bash
-# im laufenden Container (-c nur beim ersten User, sonst wird die Datei überschrieben)
-docker exec -it mosquitto mosquitto_passwd -c /mosquitto/config/passwordfile zevpi
-docker exec -it mosquitto mosquitto_passwd /mosquitto/config/passwordfile zevbridge
-docker exec -it mosquitto mosquitto_passwd /mosquitto/config/passwordfile zevbackend
-# danach Broker neu starten, damit die Datei geladen wird
+docker compose -f docker-compose-mqtt-hene.yml up -d mosquitto
 ```
 
-Getrennte User: **`zevpi`** für das Pi-Gateway (Publisher), **`zevbridge`** für die
-gPlug-Bridge des Pi und **`zevbackend`** für die ZEV-Verwaltung (Subscriber). Die Namen sind
-Beispiele.
+Backend und Pi-Gateway verbinden sich danach selbst neu.
 
-### 5. Zugriffsregeln (ACL)
+### 2. Konfiguration ändern
+
+Die `mosquitto.conf` ist ins Image gebacken. Nach einer Änderung im Repo die Dateien aus
+`pi-gateway/deploy/mosquitto/` in das Build-Verzeichnis des Stacks auf dem NAS bringen (die
+Hene-Compose baut aus `./mosquitto` neben der Compose-Datei) und neu bauen:
+
+```bash
+docker compose -f docker-compose-mqtt-hene.yml up -d --build mosquitto
+```
+
+Dass die neue Konfiguration greift, zeigt der Container selbst:
+
+```bash
+docker exec mosquitto grep queue_qos0 /mosquitto/config/mosquitto.conf
+```
+
+### 3. Zugriffsregeln (ACL) – noch nicht aktiv
+
+Der NAS-Broker hat heute **keine** `acl_file`: Jeder angemeldete User darf jedes Topic lesen und
+schreiben. Sobald eine `acl_file` aktiv ist, verliert **jeder User den Zugriff, der nicht darin
+steht** – also zuerst die echten Usernamen aus `MOSQUITTO_USERS` zusammentragen. Vorschlag
+(`42` = org_id des Mandanten):
 
 ```conf
-# /volume1/docker/mosquitto/config/acl  –  42 = org_id des Mandanten (Beispiel)
-user zevpi
+user pi-org42
 topic write zev/42/+/messwert
 
 user zevbridge
 topic write gPlug/42/+/tele/#
 
-user zevbackend
+user zev-backend
 topic read zev/+/+/messwert
 topic read gPlug/+/+/tele/SENSOR
+# der Healthcheck des Containers publiziert als Backend-User
+topic write healthcheck
 ```
 
-Jeder Publisher schreibt nur in seinen Mandanten; das Backend liest nur und publiziert nie auf
-`gPlug/…/cmnd/…` (das wären Befehle an die gPlugs).
+Einbau: Datei als `pi-gateway/deploy/mosquitto/acl` anlegen, im `Dockerfile` nach
+`/mosquitto/config/acl` kopieren, in der `mosquitto.conf` `acl_file /mosquitto/config/acl`
+ergänzen, neu bauen (Abschnitt 2).
 
 ### Sicherheit
 
@@ -220,7 +204,7 @@ Jeder Publisher schreibt nur in seinen Mandanten; das Backend liest nur und publ
   `mosquitto.conf` den `listener 8883` mit `cafile`/`certfile`/`keyfile`
   ergänzen. Pi-Gateway und Bridge können TLS; die gPlugs nicht – deshalb gehen sie über
   die Bridge.
-- **ACLs**: siehe Abschnitt 5.
+- **ACLs**: siehe Abschnitt 3 (noch nicht aktiv).
 - **Firewall**: Port 1883/8883 nur über den VPN-Pfad zugänglich machen, nicht
   im offenen LAN und nicht aus dem Internet erreichbar.
 
@@ -306,105 +290,97 @@ Pi: Reader → lokaler Broker ──(Bridge/VPN)──> NAS-Broker → ZEV
 
 ## Setup-Notiz: MQTT-Broker auf dem Raspberry Pi (Bridge für die gPlugs)
 
-Der Mosquitto auf dem Pi nimmt die Meldungen der gPlugs im LAN entgegen und leitet sie per
-Bridge an den NAS-Broker weiter. Das Pi-Gateway publiziert weiterhin **direkt** an den NAS
-(Variante B) und benutzt diesen Broker nicht.
+Der Mosquitto auf dem Pi nimmt die Meldungen der gPlugs im LAN entgegen und leitet **nur**
+`gPlug/#` per Bridge an den NAS-Broker weiter. Das Pi-Gateway publiziert weiterhin **direkt**
+an den NAS (Variante B) und benutzt diesen Broker nicht.
 
-Pfade auf dem Pi (Raspberry Pi OS / Debian):
-- Konfig: `/etc/mosquitto/mosquitto.conf` + `/etc/mosquitto/conf.d/*.conf`
-- Daten (Persistence): `/var/lib/mosquitto/`
-- Logs: `/var/log/mosquitto/`
+Vorlagen liegen in `pi-gateway/deploy/mosquitto-bridge/` und kommen mit dem Pi-Gateway-Paket
+nach `/opt/pi-gateway/deploy/mosquitto-bridge/`:
 
-### 1. Installation (nativ, empfohlen)
+| Vorlage | Ziel auf dem Pi | Anpassen |
+|---------|-----------------|----------|
+| `zev.conf` | `/etc/mosquitto/conf.d/zev.conf` | nichts |
+| `acl.example` | `/etc/mosquitto/acl` | org_id (`42`) |
+| `bridge.conf.example` | `/etc/mosquitto/conf.d/bridge.conf` | NAS-Adresse, Passwort des Users `zevbridge` |
 
-```bash
-sudo apt update && sudo apt install -y mosquitto mosquitto-clients
-sudo systemctl enable --now mosquitto
-```
-
-### 2. Konfiguration
-
-```conf
-# /etc/mosquitto/conf.d/zev.conf
-# persistence, persistence_location und log_dest setzt schon /etc/mosquitto/mosquitto.conf
-# (Debian) - doppelt eingetragen bricht Mosquitto beim Start ab.
-#
-# Die gPlugs verbinden sich auf die LAN-IP des Pi
-listener 1883
-# Seltener auf Disk schreiben (SD-Karten schonen)
-autosave_interval 300
-
-# Keine anonymen Verbindungen!
-allow_anonymous false
-password_file /etc/mosquitto/passwd
-acl_file /etc/mosquitto/acl
-
-# Die gPlugs publizieren mit QoS 0: ohne diese Zeile puffert der Broker fuer die
-# Bridge nichts, solange das VPN weg ist. ~300 Meldungen pro Stunde (5 gPlugs).
-queue_qos0_messages true
-max_queued_messages 20000
-```
-
-> **Keine Kommentare am Zeilenende:** Mosquitto kennt nur ganze Kommentarzeilen. In
+> **Zwei Fallen in Mosquitto-Konfigurationen:** `persistence`, `persistence_location` und
+> `log_dest` setzt schon die Debian-Datei `/etc/mosquitto/mosquitto.conf` – doppelt eingetragen
+> bricht Mosquitto beim Start ab. Und Mosquitto kennt nur ganze Kommentarzeilen: In
 > `listener 1883 # …` würde `#` als Bind-Adresse gelesen, in `address … # …` als weitere
 > Broker-Adresse.
 
-> **SD-Karten-Wear:** `persistence` schreibt nach `/var/lib/mosquitto/` — auf der
-> SD-Karte führt das zu Verschleiss. `persistence_location` besser auf eine
-> USB-SSD legen (vgl. Abschnitt „Datenpipeline härten").
+### 1. Voraussetzung auf dem NAS
 
-### 3. Benutzer und Zugriffsregeln
+User `zevbridge` in `MOSQUITTO_USERS` ergänzen und den Broker-Container neu erzeugen
+(NAS-Abschnitt 1). Ohne ihn lehnt der NAS die Bridge ab (`not authorised` im Log des Pi).
+
+### 2. Installation
+
+```bash
+sudo apt update && sudo apt install -y mosquitto mosquitto-clients
+```
+
+### 3. Konfiguration aus den Vorlagen
+
+```bash
+V=/opt/pi-gateway/deploy/mosquitto-bridge
+sudo cp $V/zev.conf /etc/mosquitto/conf.d/zev.conf
+sudo cp $V/acl.example /etc/mosquitto/acl
+sudo cp $V/bridge.conf.example /etc/mosquitto/conf.d/bridge.conf
+sudo nano /etc/mosquitto/acl                    # org_id eintragen
+sudo nano /etc/mosquitto/conf.d/bridge.conf     # NAS-Adresse und Passwort eintragen
+```
+
+Die NAS-Adresse ist dieselbe wie `broker.url` in `/opt/pi-gateway/config.yaml` (ohne `tcp://`).
+
+### 4. User für die gPlugs und Rechte
 
 ```bash
 sudo mosquitto_passwd -c /etc/mosquitto/passwd gplug   # -c nur beim ersten User
-sudo systemctl restart mosquitto                       # Passwortdatei laden
+sudo chown mosquitto:mosquitto /etc/mosquitto/passwd /etc/mosquitto/acl /etc/mosquitto/conf.d/bridge.conf
+sudo chmod 600 /etc/mosquitto/passwd /etc/mosquitto/conf.d/bridge.conf
 ```
 
-```conf
-# /etc/mosquitto/acl  –  42 = org_id des Mandanten (Beispiel)
-user gplug
-topic write gPlug/42/+/tele/#
-topic read gPlug/42/+/cmnd/#
-```
+`bridge.conf` enthält das Passwort des Users `zevbridge` und darf nur für `mosquitto` lesbar sein.
 
-Die Bridge selbst braucht hier keinen Eintrag; sie meldet sich beim **NAS** mit `zevbridge` an.
-
-### 4. Bridge zum NAS-Broker
-
-```conf
-# /etc/mosquitto/conf.d/bridge.conf
-connection zev-nas-bridge
-# Dieselbe Adresse wie broker.url in der config.yaml des Pi-Gateways (bzw. :8883 mit TLS)
-address <nas-vpn-ip>:1883
-remote_username zevbridge
-remote_password ***
-# 'out' = vom Pi zum NAS, nur die gPlug-Meldungen
-topic gPlug/# out 1
-bridge_protocol_version mqttv311
-# Zusammen mit persistence: puffert bei VPN-/NAS-Ausfall
-cleansession false
-try_private true
-notifications false
-restart_timeout 30
-# Optional TLS zum NAS-Broker (Defense-in-Depth über den VPN-Tunnel)
-# bridge_cafile /etc/mosquitto/certs/ca.crt
-```
-
-> **QoS:** Die Bridge leitet mit der QoS der Meldung weiter, höchstens 1. Die gPlug-Meldungen
-> kommen deshalb auch auf dem NAS mit QoS 0 an – dort braucht es ebenfalls
-> `queue_qos0_messages true` (NAS-Abschnitt 2).
-
-### 5. Test (auf dem Pi)
+### 5. Starten und prüfen
 
 ```bash
-mosquitto_sub -h localhost -u gplug -P '***' -t 'gPlug/#' -v     # kommen die gPlugs an?
+sudo systemctl enable --now mosquitto
+sudo systemctl restart mosquitto
+journalctl -u mosquitto -n 30 --no-pager
 ```
 
-Auf dem NAS mit dem Backend-User gegenprüfen, ob die Bridge weiterleitet:
+Im Log steht `Connecting bridge zev-nas-bridge (<nas-adresse>:1883)` und kein `Error`.
+
+### 6. Ende-zu-Ende-Test
+
+Auf dem NAS mitlesen (mit dem Backend-User):
 
 ```bash
-docker exec -it mosquitto mosquitto_sub -u zevbackend -P '***' -t 'gPlug/+/+/tele/SENSOR' -v
+docker exec -it mosquitto mosquitto_sub -u zev-backend -P '<passwort>' -t 'gPlug/#' -v
 ```
+
+Auf dem Pi eine Testmeldung senden:
+
+```bash
+mosquitto_pub -h localhost -u gplug -P '<passwort>' -t 'gPlug/42/TEST/tele/SENSOR' -m '{"Time":"test"}'
+```
+
+Erscheint sie auf dem NAS, steht die Bridge. Solange das Backend `gPlug/…` noch nicht
+abonniert (`Specs/MQTT-Integration.md`, FR-10), bleiben solche Meldungen folgenlos. Danach die
+gPlugs konfigurieren (Abschnitt „gPlugK“ unten) und mit `mosquitto_sub` auf dem Pi prüfen, ob
+ihre Meldungen ankommen.
+
+### Fehlerbilder
+
+| Im Log des Pi (`journalctl -u mosquitto`) | Ursache |
+|-------------------------------------------|---------|
+| `Duplicate persistence_location value` o. ä. | `persistence…`/`log_dest` doppelt – aus `zev.conf` entfernen |
+| `Error: Unable to open pwfile` / `Unable to open acl_file` | Pfad falsch oder Datei nicht für `mosquitto` lesbar (Schritt 4) |
+| `Connection Refused: not authorised` bei der Bridge | `zevbridge` fehlt in `MOSQUITTO_USERS` oder Passwort falsch (Schritt 1) |
+| Bridge verbindet sich nicht, kein Refused | NAS-Adresse falsch oder VPN weg – `mosquitto_sub -h <nas-adresse> -u zevbridge …` vom Pi aus testen |
+| gPlug-Meldung kommt auf dem Pi nicht an | `MqttHost`/`MqttUser` im gPlug falsch, Firewall, oder org_id in `acl` und FullTopic verschieden |
 
 ### Sicherheit / Pi-spezifisch
 
@@ -686,7 +662,7 @@ Backlog Timezone 99; TimeStd 0,0,10,1,3,60; TimeDst 0,0,3,1,2,120
 
 Die zweite Zeile stellt Mitteleuropäische Zeit mit Sommerzeit ein; ohne sie stempelt der gPlug
 um eine Stunde verschoben. Die Meldungen erscheinen danach auf
-`gPlug/42/ID742-Nachbar-1/tele/SENSOR` (Test: Abschnitt 5 der Pi-Broker-Notiz).
+`gPlug/42/ID742-Nachbar-1/tele/SENSOR` (Test: Abschnitt 6 der Pi-Broker-Notiz).
 
 > **Vor der Umsetzung im Backend** eine echte Meldung mitschneiden und die Feldnamen gegen
 > `Specs/MQTT-Integration.md`, FR-10.3, prüfen (dort offene Frage).
@@ -947,3 +923,112 @@ dass keine Messwerte verloren gehen, während NAS oder VPN weg sind.
 Analog zur NAS-Anleitung mit `eclipse-mosquitto:2`; Volumes dann z. B. unter
 `/home/pi/mosquitto/{config,data,log}`. Sonst ist die native apt-Installation
 für den schlanken Pi vorzuziehen.
+
+### Frühere Broker-Anleitungen (bis 21.10.2026)
+
+Die NAS-Anleitung beschrieb eine manuelle Einrichtung (`/volume1/docker/mosquitto/`, User per
+`mosquitto_passwd` im Container), die nicht dem Betrieb entsprach: Der Broker wird aus
+`pi-gateway/deploy/mosquitto/` gebaut, die User kommen aus `MOSQUITTO_USERS`. Die
+Pi-Anleitung vom 20.10.2026 hätte Mosquitto nicht starten lassen (doppelte
+`persistence`-Einträge, Kommentare am Zeilenende). Der frühere Text der NAS-Anleitung:
+
+#### Setup-Notiz: MQTT-Broker auf dem NAS betreiben
+
+Der Broker auf dem NAS nimmt die Meldungen des Pi-Gateways und – über die Bridge des Pi – die
+der gPlugs entgegen. Empfohlen: **Eclipse Mosquitto im Docker-Container** (auf Synology:
+Container Manager). Mosquitto ist der De-facto-Standard — schlank, stabil, NAS-tauglich. Docker
+gibt gegenüber einem NAS-Paket volle Versions- und Konfigurationskontrolle.
+
+https://github.com/sukesh-ak/setup-mosquitto-with-docker
+
+##### 1. Verzeichnisstruktur auf dem NAS
+
+```
+/volume1/docker/mosquitto/
+├── config/   → mosquitto.conf, passwordfile, acl
+├── data/     → persistente Nachrichten (Retained Messages)
+└── log/
+```
+
+##### 2. mosquitto.conf
+
+```conf
+# /volume1/docker/mosquitto/config/mosquitto.conf
+listener 1883
+persistence true
+persistence_location /mosquitto/data/
+autosave_interval 300          # alle 5 Min. speichern (Standard 30)
+log_dest file /mosquitto/log/mosquitto.log
+
+# Keine anonymen Verbindungen!
+allow_anonymous false
+password_file /mosquitto/config/passwordfile
+acl_file /mosquitto/config/acl
+
+# Puffer fuer die dauerhafte Sitzung des Backends (mqtt.clean-session=false):
+# ~1300 Nachrichten pro Stunde (17 Zaehler ueber das Pi-Gateway + ca. 5 gPlugs, etwa
+# jede Minute). Der Standard von 1000 je Client reicht nicht einmal fuer eine Stunde
+# Unterbruch; 100000 fuer ~3 Tage.
+max_queued_messages 100000
+# Die gPlugs publizieren mit QoS 0. Ohne diese Zeile verwirft der Broker ihre Meldungen,
+# solange das Backend weg ist (Specs/MQTT-Integration.md, NFR-3).
+queue_qos0_messages true
+# Sitzung einer nicht mehr benutzten Client-ID nach 14 Tagen verwerfen
+persistent_client_expiration 14d
+```
+
+> **Wozu `persistence`:** Die dauerhafte Sitzung des Backends hält der Broker im
+> Speicher. Für einen **Neustart des Backends** (Update) genügt das. Damit die
+> gepufferten Nachrichten auch einen **Neustart des Brokers** überstehen, braucht es
+> `persistence true` mit einem Volume für `/mosquitto/data/`.
+
+##### 3. docker-compose (Container Manager → Projekt)
+
+```yaml
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"     # MQTT (intern / über VPN)
+      - "8883:8883"     # MQTT über TLS (empfohlen)
+    volumes:
+      - /volume1/docker/mosquitto/config:/mosquitto/config
+      - /volume1/docker/mosquitto/data:/mosquitto/data
+      - /volume1/docker/mosquitto/log:/mosquitto/log
+```
+
+##### 4. Benutzer/Passwort anlegen
+
+```bash
+# im laufenden Container (-c nur beim ersten User, sonst wird die Datei überschrieben)
+docker exec -it mosquitto mosquitto_passwd -c /mosquitto/config/passwordfile zevpi
+docker exec -it mosquitto mosquitto_passwd /mosquitto/config/passwordfile zevbridge
+docker exec -it mosquitto mosquitto_passwd /mosquitto/config/passwordfile zevbackend
+# danach Broker neu starten, damit die Datei geladen wird
+```
+
+Getrennte User: **`zevpi`** für das Pi-Gateway (Publisher), **`zevbridge`** für die
+gPlug-Bridge des Pi und **`zevbackend`** für die ZEV-Verwaltung (Subscriber). Die Namen sind
+Beispiele.
+
+##### 5. Zugriffsregeln (ACL)
+
+```conf
+# /volume1/docker/mosquitto/config/acl  –  42 = org_id des Mandanten (Beispiel)
+user zevpi
+topic write zev/42/+/messwert
+
+user zevbridge
+topic write gPlug/42/+/tele/#
+
+user zevbackend
+topic read zev/+/+/messwert
+topic read gPlug/+/+/tele/SENSOR
+```
+
+Jeder Publisher schreibt nur in seinen Mandanten; das Backend liest nur und publiziert nie auf
+`gPlug/…/cmnd/…` (das wären Befehle an die gPlugs).
+
+

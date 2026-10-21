@@ -1,0 +1,20 @@
+# Bridge zum Broker auf dem NAS.
+# Ziel: /etc/mosquitto/conf.d/bridge.conf, Eigentuemer mosquitto, Rechte 600 - die Datei enthaelt
+# das Passwort und gehoert deshalb nie ins Repository. Platzhalter <...> ersetzen.
+
+connection zev-nas-bridge
+# Dieselbe Adresse wie broker.url in /opt/pi-gateway/config.yaml, ohne "tcp://"
+address <nas-adresse>:1883
+# Muss als user:passwort in MOSQUITTO_USERS (.env auf dem NAS) stehen
+remote_username zevbridge
+remote_password <passwort>
+# Nur die gPlug-Meldungen, nur vom Pi zum NAS
+topic gPlug/# out 1
+bridge_protocol_version mqttv311
+# Zusammen mit persistence: puffert bei VPN-/NAS-Ausfall
+cleansession false
+try_private true
+notifications false
+restart_timeout 30
+# Optional TLS zum NAS-Broker (dann address <nas-adresse>:8883):
+# bridge_cafile /etc/mosquitto/certs/ca.crt

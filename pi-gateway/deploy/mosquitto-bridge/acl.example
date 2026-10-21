@@ -1,0 +1,9 @@
+# Zugriffsregeln des Brokers auf dem Pi.
+# Ziel: /etc/mosquitto/acl
+#
+# 42 durch die org_id des Mandanten ersetzen - dieselbe Zahl wie im FullTopic der gPlugs
+# (gPlug/<org_id>/%topic%/%prefix%/). Ein gPlug darf nur in seinen Mandanten schreiben und
+# nur seine eigenen Befehle (cmnd) lesen.
+user gplug
+topic write gPlug/42/+/tele/#
+topic read gPlug/42/+/cmnd/#

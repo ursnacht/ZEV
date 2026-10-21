@@ -42,7 +42,8 @@ services:
     environment:
       # Broker-User (user:passwort, whitespace-getrennt); daraus generiert der
       # Entrypoint die gehashte passwd. Muss MQTT_BROKER_USERNAME (Backend) und –
-      # fuer den Pi – den Publisher-User enthalten.
+      # fuer den Pi – den Publisher-User sowie den Bridge-User der gPlugs (zevbridge)
+      # enthalten (docs/Netzwerk-Topologie-Hene.md).
       - MOSQUITTO_USERS=${MOSQUITTO_USERS}
     volumes:
       # Persistenz (persistence true in mosquitto.conf): Die gepufferten Nachrichten der

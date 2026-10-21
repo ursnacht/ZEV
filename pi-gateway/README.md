@@ -297,6 +297,14 @@ sudo systemctl start pi-gateway.service
 journalctl -u pi-gateway.service -f
 ```
 
+### Mosquitto-Bridge für die gPlugK (Nachbarhaus)
+
+Die gPlugK publizieren selbst an einen Mosquitto auf dem Pi, der `gPlug/#` per Bridge an den
+NAS weiterleitet; das Pi-Gateway ist daran nicht beteiligt. Vorlagen: `deploy/mosquitto-bridge/`
+(`zev.conf`, `acl.example`, `bridge.conf.example`, ohne Passwörter). Einrichtung Schritt für
+Schritt: [`docs/Netzwerk-Topologie-Hene.md`](../docs/Netzwerk-Topologie-Hene.md), Abschnitt
+„Setup-Notiz: MQTT-Broker auf dem Raspberry Pi“.
+
 ## Stand / Abgrenzung
 
 - **Umgesetzt:** Projekt-Setup, Konfiguration, Modbus-Reader (Wago), MQTT-Publisher,
