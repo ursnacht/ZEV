@@ -22,9 +22,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -302,6 +305,110 @@ public class ZaehlerAggregationServiceTest {
         Messwerte m = captureSavedMesswert();
         // total = 0 (Bezug geguardet) − 10 (Einspeisung) = -10
         assertEquals(-10.0, m.getTotal(), 1e-9);
+    }
+
+    /**
+     * FR-8.4: Der Rücksprung eines Registers erzeugt eine WARN-Systemmeldung mit Einheit,
+     * Register, Intervall(ende) und der verworfenen Menge - nicht nur eine Logzeile.
+     */
+    @Test
+    void aggregiere_RegisterRuecksprungBezug_ErfasstWarnSystemmeldungMitVerworfenerMenge() {
+        // Arrange - Bezug sinkt um 70 kWh, Einspeisung steigt normal
+        stubCatchUpEinInterval();
+        stubStaende(rohdaten("100.0", "50.0"), rohdaten("30.0", "60.0"));
+        when(messwerteRepository.findByEinheitAndZeit(eq(einheit), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act
+        service.aggregiere();
+
+        // Assert
+        String intervallEnde = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").format(intervall[1]);
+        verify(systemmeldungService).erfasse(eq(ORG_ID), eq(MeldungLevel.WARN),
+                eq(SystemmeldungService.KATEGORIE_MQTT), eq(SystemmeldungService.KEY_ZAEHLER_RUECKSPRUNG),
+                eq("Wohnung 1 (Bezug): " + intervallEnde + ", 70.0 kWh verworfen"));
+        // Nur das betroffene Register meldet - die Einspeisung ist gestiegen
+        verify(systemmeldungService, times(1)).erfasse(any(), any(), any(),
+                eq(SystemmeldungService.KEY_ZAEHLER_RUECKSPRUNG), any());
+        assertTrue(loggedContaining(Level.WARN, "Rücksprung bei Bezug"));
+    }
+
+    @Test
+    void aggregiere_RegisterRuecksprungEinspeisung_MeldetRegisterEinspeisung() {
+        // Arrange - Einspeisung sinkt um 12.5 kWh, Bezug normal (ΔBezug = 10)
+        stubCatchUpEinInterval();
+        stubStaende(rohdaten("100.0", "50.0"), rohdaten("110.0", "37.5"));
+        when(messwerteRepository.findByEinheitAndZeit(eq(einheit), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act
+        service.aggregiere();
+
+        // Assert - ΔEinspeisung geguardet auf 0 → total = 10
+        assertEquals(10.0, captureSavedMesswert().getTotal(), 1e-9);
+        ArgumentCaptor<String> parameter = ArgumentCaptor.forClass(String.class);
+        verify(systemmeldungService).erfasse(eq(ORG_ID), eq(MeldungLevel.WARN),
+                eq(SystemmeldungService.KATEGORIE_MQTT), eq(SystemmeldungService.KEY_ZAEHLER_RUECKSPRUNG),
+                parameter.capture());
+        assertTrue(parameter.getValue().startsWith("Wohnung 1 (Einspeisung): "), parameter.getValue());
+        assertTrue(parameter.getValue().endsWith(", 12.5 kWh verworfen"), parameter.getValue());
+    }
+
+    @Test
+    void aggregiere_RuecksprungBeiderRegister_ZweiMeldungenTotalNull() {
+        // Arrange - beide Register sinken: je Register eine eigene Meldung
+        stubCatchUpEinInterval();
+        stubStaende(rohdaten("100.0", "50.0"), rohdaten("90.0", "45.0"));
+        when(messwerteRepository.findByEinheitAndZeit(eq(einheit), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act
+        service.aggregiere();
+
+        // Assert
+        assertEquals(0.0, captureSavedMesswert().getTotal(), 1e-9);
+        verify(systemmeldungService).erfasse(any(), any(), any(),
+                eq(SystemmeldungService.KEY_ZAEHLER_RUECKSPRUNG), contains("(Bezug)"));
+        verify(systemmeldungService).erfasse(any(), any(), any(),
+                eq(SystemmeldungService.KEY_ZAEHLER_RUECKSPRUNG), contains("(Einspeisung)"));
+    }
+
+    @Test
+    void aggregiere_KeinRuecksprung_KeineRuecksprungMeldung() {
+        // Arrange - beide Register steigen
+        stubCatchUpEinInterval();
+        stubStaende(rohdaten("100.0", "50.0"), rohdaten("110.0", "52.0"));
+        when(messwerteRepository.findByEinheitAndZeit(eq(einheit), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act
+        service.aggregiere();
+
+        // Assert
+        verify(systemmeldungService, never()).erfasse(any(), any(), any(),
+                eq(SystemmeldungService.KEY_ZAEHLER_RUECKSPRUNG), any());
+    }
+
+    @Test
+    void aggregiere_RuecksprungMeldungSchlaegtFehl_MesswertWirdTrotzdemGespeichert() {
+        // Arrange - das Erfassen der Meldung wirft; die Aggregation darf nicht abbrechen
+        stubCatchUpEinInterval();
+        stubStaende(rohdaten("100.0", "50.0"), rohdaten("30.0", "60.0"));
+        when(messwerteRepository.findByEinheitAndZeit(eq(einheit), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+        doThrow(new RuntimeException("DB weg")).when(systemmeldungService)
+                .erfasse(any(), any(), any(), eq(SystemmeldungService.KEY_ZAEHLER_RUECKSPRUNG), any());
+
+        // Act - keine Exception nach aussen
+        assertDoesNotThrow(() -> service.aggregiere());
+
+        // Assert - Messwert gespeichert (ΔBezug = 0, ΔEinspeisung = 10), Rohdaten markiert,
+        // Verteilung läuft
+        assertEquals(-10.0, captureSavedMesswert().getTotal(), 1e-9);
+        verify(rohdatenRepository).markVerarbeitet(eq(EINHEIT_ID), eq(intervall[1]), any());
+        verify(messwerteService).calculateSolarDistributionForOrg(
+                eq(ORG_ID), eq(intervall[0]), eq(intervall[0]), eq("PROPORTIONAL"), eq(false));
+        assertTrue(loggedContaining(Level.WARN, "Systemmeldung zum Rücksprung konnte nicht erfasst werden"));
     }
 
     // --- Fehlende Referenz / leeres Intervall ------------------------------
@@ -829,5 +936,164 @@ public class ZaehlerAggregationServiceTest {
                 eq(SystemmeldungService.KATEGORIE_MQTT), eq(SystemmeldungService.KEY_ZAEHLER_AUSFALL),
                 contains("3 Intervalle"));
         verify(systemmeldungService, never()).erfasse(any(), eq(MeldungLevel.INFO), any(), any(), any());
+    }
+
+    /**
+     * FR-8.3: Liegt der Referenz-Stand <b>mitten</b> im unmittelbar vorangehenden Intervall (die
+     * Messung an der Quartalsgrenze fehlt), ist das keine Lücke - absolute Zählerstände machen den
+     * Ausfall folgenlos, es darf keine Meldung entstehen.
+     */
+    @Test
+    void aggregiere_ReferenzMittenImVorangehendenIntervall_KeineSystemmeldung() {
+        // Arrange - 5-Minuten-Takt, die Messung bei q-15 fällt aus; Referenz für (q-15, q] ist q-20
+        LocalDateTime q = floorAufQuartal(Ortszeit.jetzt());
+        stubCatchUpZeitreihe(
+                rohdaten(q.minusMinutes(30), "100.0", "0.0", null),
+                rohdaten(q.minusMinutes(25), "102.0", "0.0", null),
+                rohdaten(q.minusMinutes(20), "104.0", "0.0", null),
+                // q-15 fehlt
+                rohdaten(q.minusMinutes(10), "108.0", "0.0", null),
+                rohdaten(q.minusMinutes(5), "110.0", "0.0", null),
+                rohdaten(q, "112.0", "0.0", null));
+        when(messwerteRepository.findByEinheitAndZeit(eq(einheit), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act
+        service.aggregiere();
+
+        // Assert - keine Meldung; die Energie verteilt sich verlustfrei auf die beiden Intervalle
+        verify(systemmeldungService, never()).erfasse(any(), any(), any(), any(), any());
+        ArgumentCaptor<Messwerte> captor = ArgumentCaptor.forClass(Messwerte.class);
+        verify(messwerteRepository, times(2)).save(captor.capture());
+        assertEquals(4.0, captor.getAllValues().get(0).getTotal(), 1e-9);  // (q-30, q-15]: 104 - 100
+        assertEquals(8.0, captor.getAllValues().get(1).getTotal(), 1e-9);  // (q-15, q]:    112 - 104
+    }
+
+    @Test
+    void aggregiere_ReferenzKurzVorIntervallstart_KeineSystemmeldung() {
+        // Arrange - Referenz 1 Minute vor dem Intervallstart (nicht exakt an der Grenze)
+        LocalDateTime q = floorAufQuartal(Ortszeit.jetzt());
+        stubCatchUpZeitreihe(
+                rohdaten(q.minusMinutes(16), "100.0", "0.0", null),
+                rohdaten(q, "110.0", "0.0", null));
+        when(messwerteRepository.findByEinheitAndZeit(eq(einheit), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act
+        service.aggregiere();
+
+        // Assert
+        verify(systemmeldungService, never()).erfasse(any(), any(), any(), any(), any());
+        assertEquals(10.0, captureSavedMesswert().getTotal(), 1e-9);
+    }
+
+    // --- Fehler-Isolation je Mandant bei der Solarverteilung (FR-6.7) -------
+
+    private static final long ORG_B = 200L;
+    private static final long EINHEIT_B = 2L;
+
+    /**
+     * Zwei Einheiten in zwei Mandanten mit je einem verarbeiteten Intervall (q-15, q]; Referenz
+     * exakt an der Quartalsgrenze (keine Lückenmeldung).
+     */
+    private void stubZweiMandanten() {
+        LocalDateTime q = floorAufQuartal(Ortszeit.jetzt());
+        Einheit einheitB = new Einheit("Wohnung B", EinheitTyp.CONSUMER);
+        einheitB.setId(EINHEIT_B);
+        einheitB.setOrgId(ORG_B);
+
+        when(rohdatenRepository.findEinheitIdsWithUnverarbeitet()).thenReturn(List.of(EINHEIT_ID, EINHEIT_B));
+        when(einheitRepository.findById(EINHEIT_ID)).thenReturn(Optional.of(einheit));
+        when(einheitRepository.findById(EINHEIT_B)).thenReturn(Optional.of(einheitB));
+        when(rohdatenRepository.findFirstByEinheitIdAndVerarbeitetFalseOrderByZeitAsc(anyLong()))
+                .thenAnswer(inv -> Optional.of(new ZaehlerRohdaten(ORG_ID, inv.getArgument(0), q,
+                        new BigDecimal("110.0"), BigDecimal.ZERO)));
+        when(rohdatenRepository.existsByEinheitIdAndZeitGreaterThanAndZeitLessThanEqual(anyLong(), any(), any()))
+                .thenReturn(true);
+        when(rohdatenRepository.findFirstByEinheitIdAndZeitLessThanEqualOrderByZeitDesc(anyLong(), any()))
+                .thenAnswer(inv -> {
+                    LocalDateTime bis = inv.getArgument(1);
+                    if (!bis.isBefore(q)) {
+                        return Optional.of(new ZaehlerRohdaten(ORG_ID, inv.getArgument(0), q,
+                                new BigDecimal("110.0"), BigDecimal.ZERO));
+                    }
+                    return Optional.of(new ZaehlerRohdaten(ORG_ID, inv.getArgument(0), q.minusMinutes(INTERVALL),
+                            new BigDecimal("100.0"), BigDecimal.ZERO));
+                });
+        when(messwerteRepository.findByEinheitAndZeit(any(), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    /**
+     * Die Reihenfolge der Mandanten ist nicht festgelegt (HashMap). Deshalb werfen <b>beide</b>
+     * Aufrufe: Wird trotzdem für beide Mandanten verteilt, hat der Fehler des zuerst behandelten
+     * den zweiten nicht abgebrochen.
+     */
+    @Test
+    void aggregiere_VerteilungWirftIllegalState_UebrigeMandantenLaufenWeiter() {
+        // Arrange - Konfigurationsfehler im Bilanzmodus (z.B. fehlende BEZUG-Einheit)
+        stubZweiMandanten();
+        when(messwerteService.calculateSolarDistributionForOrg(anyLong(), any(), any(), anyString(), anyBoolean()))
+                .thenThrow(new IllegalStateException("BILANZMODELL_KEINE_BILANZDATEN"));
+
+        // Act
+        assertDoesNotThrow(() -> service.aggregiere());
+
+        // Assert
+        verify(messwerteService).calculateSolarDistributionForOrg(eq(ORG_ID), any(), any(), eq("PROPORTIONAL"), eq(false));
+        verify(messwerteService).calculateSolarDistributionForOrg(eq(ORG_B), any(), any(), eq("PROPORTIONAL"), eq(false));
+        verify(messwerteRepository, times(2)).save(any(Messwerte.class));
+        assertTrue(loggedContaining(Level.ERROR, "Solarverteilung nach Aggregation abgebrochen",
+                "org=" + ORG_ID, "BILANZMODELL_KEINE_BILANZDATEN"));
+        assertTrue(loggedContaining(Level.ERROR, "Solarverteilung nach Aggregation abgebrochen", "org=" + ORG_B));
+    }
+
+    @Test
+    void aggregiere_VerteilungWirftRuntimeException_UebrigeMandantenLaufenWeiter() {
+        // Arrange - sonstiger Laufzeitfehler (generischer catch-Zweig)
+        stubZweiMandanten();
+        when(messwerteService.calculateSolarDistributionForOrg(anyLong(), any(), any(), anyString(), anyBoolean()))
+                .thenThrow(new RuntimeException("DB weg"));
+
+        // Act
+        assertDoesNotThrow(() -> service.aggregiere());
+
+        // Assert
+        verify(messwerteService).calculateSolarDistributionForOrg(eq(ORG_ID), any(), any(), eq("PROPORTIONAL"), eq(false));
+        verify(messwerteService).calculateSolarDistributionForOrg(eq(ORG_B), any(), any(), eq("PROPORTIONAL"), eq(false));
+        assertTrue(loggedContaining(Level.WARN, "Solarverteilung nach Aggregation fehlgeschlagen",
+                "org=" + ORG_ID, "DB weg"));
+        assertTrue(loggedContaining(Level.WARN, "Solarverteilung nach Aggregation fehlgeschlagen", "org=" + ORG_B));
+    }
+
+    @Test
+    void aggregiere_FehlerNurBeiEinemMandant_AndererWirdVerteilt() {
+        // Arrange - nur Mandant A scheitert; B läuft regulär
+        stubZweiMandanten();
+        when(messwerteService.calculateSolarDistributionForOrg(eq(ORG_ID), any(), any(), anyString(), anyBoolean()))
+                .thenThrow(new IllegalStateException("kaputt"));
+
+        // Act
+        assertDoesNotThrow(() -> service.aggregiere());
+
+        // Assert
+        verify(messwerteService).calculateSolarDistributionForOrg(eq(ORG_B), any(), any(), eq("PROPORTIONAL"), eq(false));
+        assertTrue(loggedContaining(Level.INFO, "Solarverteilung nach Aggregation ausgeführt", "org=" + ORG_B));
+        assertFalse(loggedContaining(Level.INFO, "Solarverteilung nach Aggregation ausgeführt", "org=" + ORG_ID));
+    }
+
+    // --- Zeitplan (FR-6) ----------------------------------------------------
+
+    @Test
+    void aggregiere_Zeitplan_FuenfMinutenNachJederViertelstunde() throws NoSuchMethodException {
+        // Arrange
+        Method methode = ZaehlerAggregationService.class.getMethod("aggregiere");
+
+        // Act
+        Scheduled scheduled = methode.getAnnotation(Scheduled.class);
+
+        // Assert - :05/:20/:35/:50, sekundengenau zur vollen Minute
+        assertNotNull(scheduled);
+        assertEquals("0 5,20,35,50 * * * *", scheduled.cron());
     }
 }

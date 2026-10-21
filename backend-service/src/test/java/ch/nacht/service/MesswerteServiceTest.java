@@ -1208,6 +1208,93 @@ public class MesswerteServiceTest {
         assertEquals(4.0, consumer.getZev(), 1e-9);
     }
 
+    // ==================== FR-9: zev-Fallback nur für MQTT-Consumer ====================
+
+    @Test
+    void calculateSolarDistribution_CsvConsumer_ZevBleibtGemessenZevCalculatedGesetzt() {
+        LocalDateTime dateFrom = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime dateTo = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
+        LocalDateTime zeit = LocalDateTime.of(2024, 1, 15, 12, 0);
+
+        Einheit consumerEinheit2 = new Einheit("Wohnung B", EinheitTyp.CONSUMER);
+        consumerEinheit2.setId(3L);
+        consumerEinheit2.setOrgId(testOrgId);
+
+        // Produktion 10, zwei Consumer à 5 → EQUAL_SHARE je 5.
+        // CSV-Consumer trägt den gemessenen zev 3 (≠ 0), MQTT-Consumer den Sentinel 0.
+        Messwerte producer = new Messwerte(zeit, -10.0, -10.0, producerEinheit);
+        Messwerte csvConsumer = new Messwerte(zeit, 5.0, 3.0, consumerEinheit);
+        Messwerte mqttConsumer = new Messwerte(zeit, 5.0, 0.0, consumerEinheit2);
+        mqttConsumer.setQuelle(Quelle.MQTT);
+
+        when(messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo))
+            .thenReturn(List.of(zeit));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.PRODUCER))
+            .thenReturn(List.of(producer));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER))
+            .thenReturn(List.of(csvConsumer, mqttConsumer));
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        messwerteService.calculateSolarDistribution(dateFrom, dateTo, "EQUAL_SHARE");
+
+        // CSV: gemessener zev bleibt, zev_calculated wird trotzdem gesetzt
+        assertEquals(3.0, csvConsumer.getZev(), 1e-9);
+        assertEquals(5.0, csvConsumer.getZevCalculated(), 1e-9);
+        // MQTT: zev = zev_calculated
+        assertEquals(5.0, mqttConsumer.getZev(), 1e-9);
+        assertEquals(5.0, mqttConsumer.getZevCalculated(), 1e-9);
+        verify(messwerteRepository).save(csvConsumer);
+        verify(messwerteRepository).save(mqttConsumer);
+    }
+
+    @Test
+    void calculateSolarDistribution_Bilanz_CsvConsumer_ZevBleibtGemessenZevCalculatedGesetzt() {
+        LocalDateTime dateFrom = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime dateTo = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
+        LocalDateTime zeit = LocalDateTime.of(2024, 1, 15, 12, 0);
+
+        when(einstellungenService.getVerteilmodus(any())).thenReturn(Verteilmodus.BILANZ);
+        when(einheitRepository.existsByTyp(EinheitTyp.BEZUG)).thenReturn(true);
+        when(messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo)).thenReturn(List.of(zeit));
+
+        // ConsumerTotal 10, Bezug 6 → S = 4; der CSV-Consumer hat zev 6.5 gemessen
+        Messwerte consumer = new Messwerte(zeit, 10.0, 6.5, consumerEinheit);
+        Messwerte bezug = new Messwerte(zeit, 6.0, 0.0, bezugEinheit);
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.PRODUCER)).thenReturn(Collections.emptyList());
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.CONSUMER)).thenReturn(List.of(consumer));
+        when(messwerteRepository.findByZeitAndEinheitTyp(zeit, EinheitTyp.BEZUG)).thenReturn(List.of(bezug));
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        messwerteService.calculateSolarDistribution(dateFrom, dateTo, "EQUAL_SHARE");
+
+        assertEquals(6.5, consumer.getZev(), 1e-9);
+        assertEquals(4.0, consumer.getZevCalculated(), 1e-9);
+    }
+
+    // ==================== calculateSolarDistributionForOrg (Aggregations-Job) ====================
+
+    @Test
+    void calculateSolarDistributionForOrg_AktiviertOrgFilterFuerExpliziteOrg() {
+        LocalDateTime dateFrom = LocalDateTime.of(2024, 1, 15, 12, 0);
+        LocalDateTime dateTo = LocalDateTime.of(2024, 1, 15, 12, 0);
+        Long jobOrgId = 42L;
+
+        when(messwerteRepository.findDistinctZeitBetween(dateFrom, dateTo))
+            .thenReturn(Collections.emptyList());
+
+        MesswerteService.CalculationResult result = messwerteService.calculateSolarDistributionForOrg(
+            jobOrgId, dateFrom, dateTo, "PROPORTIONAL", false);
+
+        // Kein Request-Scope: Filter mit der übergebenen org_id, nicht über den Request-Kontext
+        verify(hibernateFilterService).enableOrgFilter(jobOrgId);
+        verify(hibernateFilterService, never()).enableOrgFilter();
+        verify(organizationContextService, never()).getCurrentOrgId();
+        verify(einstellungenService).getVerteilmodus(jobOrgId);
+        // showProgress = false → kein Fortschritts-Tracking
+        verify(calculationProgressService, never()).startCalculation(any(), anyInt());
+        assertEquals(0, result.getProcessedTimestamps());
+    }
+
     // ==================== CalculationResult Tests ====================
 
     @Test
