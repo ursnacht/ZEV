@@ -326,11 +326,13 @@ sudo systemctl enable --now mosquitto
 
 ```conf
 # /etc/mosquitto/conf.d/zev.conf
-listener 1883                    # die gPlugs verbinden sich auf die LAN-IP des Pi
-persistence true
-persistence_location /var/lib/mosquitto/
-autosave_interval 300            # seltener auf Disk schreiben (SD-Karten schonen)
-log_dest file /var/log/mosquitto/mosquitto.log
+# persistence, persistence_location und log_dest setzt schon /etc/mosquitto/mosquitto.conf
+# (Debian) - doppelt eingetragen bricht Mosquitto beim Start ab.
+#
+# Die gPlugs verbinden sich auf die LAN-IP des Pi
+listener 1883
+# Seltener auf Disk schreiben (SD-Karten schonen)
+autosave_interval 300
 
 # Keine anonymen Verbindungen!
 allow_anonymous false
@@ -342,6 +344,10 @@ acl_file /etc/mosquitto/acl
 queue_qos0_messages true
 max_queued_messages 20000
 ```
+
+> **Keine Kommentare am Zeilenende:** Mosquitto kennt nur ganze Kommentarzeilen. In
+> `listener 1883 # …` würde `#` als Bind-Adresse gelesen, in `address … # …` als weitere
+> Broker-Adresse.
 
 > **SD-Karten-Wear:** `persistence` schreibt nach `/var/lib/mosquitto/` — auf der
 > SD-Karte führt das zu Verschleiss. `persistence_location` besser auf eine
@@ -368,13 +374,15 @@ Die Bridge selbst braucht hier keinen Eintrag; sie meldet sich beim **NAS** mit 
 ```conf
 # /etc/mosquitto/conf.d/bridge.conf
 connection zev-nas-bridge
-address <nas-vpn-ip>:1883        # bzw. :8883 mit TLS, siehe unten
+# Dieselbe Adresse wie broker.url in der config.yaml des Pi-Gateways (bzw. :8883 mit TLS)
+address <nas-vpn-ip>:1883
 remote_username zevbridge
 remote_password ***
 # 'out' = vom Pi zum NAS, nur die gPlug-Meldungen
 topic gPlug/# out 1
 bridge_protocol_version mqttv311
-cleansession false               # + persistence -> puffert bei VPN-/NAS-Ausfall
+# Zusammen mit persistence: puffert bei VPN-/NAS-Ausfall
+cleansession false
 try_private true
 notifications false
 restart_timeout 30
