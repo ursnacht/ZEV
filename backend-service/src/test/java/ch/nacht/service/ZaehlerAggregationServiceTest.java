@@ -333,6 +333,34 @@ public class ZaehlerAggregationServiceTest {
         assertTrue(loggedContaining(Level.WARN, "Rücksprung bei Bezug"));
     }
 
+    /**
+     * Nach dem Rücksprung rechnet das Folgeintervall vom <b>gesunkenen</b> Stand aus („Referenz
+     * neu gesetzt“): Sonst verbuchte es den Sprung zurück auf den alten Stand als Verbrauch oder
+     * meldete den Rücksprung erneut.
+     */
+    @Test
+    void aggregiere_RuecksprungUeberZweiIntervalle_FolgeintervallRechnetVomGesunkenenStand() {
+        // Arrange - Bezug 100 → 30 (Rücksprung) → 40
+        LocalDateTime q = floorAufQuartal(Ortszeit.jetzt());
+        stubCatchUpZeitreihe(
+                rohdaten(q.minusMinutes(30), "100.0", "0.0", null),
+                rohdaten(q.minusMinutes(15), "30.0", "0.0", null),
+                rohdaten(q, "40.0", "0.0", null));
+        when(messwerteRepository.findByEinheitAndZeit(eq(einheit), any())).thenReturn(Optional.empty());
+        when(messwerteRepository.save(any(Messwerte.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act
+        service.aggregiere();
+
+        // Assert - erstes Intervall 0 (geguardet), zweites 10 ab dem gesunkenen Stand
+        ArgumentCaptor<Messwerte> captor = ArgumentCaptor.forClass(Messwerte.class);
+        verify(messwerteRepository, times(2)).save(captor.capture());
+        assertEquals(List.of(0.0, 10.0),
+                captor.getAllValues().stream().map(Messwerte::getTotal).toList());
+        verify(systemmeldungService, times(1)).erfasse(any(), any(), any(),
+                eq(SystemmeldungService.KEY_ZAEHLER_RUECKSPRUNG), any());
+    }
+
     @Test
     void aggregiere_RegisterRuecksprungEinspeisung_MeldetRegisterEinspeisung() {
         // Arrange - Einspeisung sinkt um 12.5 kWh, Bezug normal (ΔBezug = 10)

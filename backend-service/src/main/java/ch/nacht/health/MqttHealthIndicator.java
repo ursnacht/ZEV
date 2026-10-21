@@ -7,24 +7,31 @@ import org.springframework.integration.mqtt.inbound.MqttPahoMessageDrivenChannel
 import org.springframework.stereotype.Component;
 
 /**
- * Health-Indicator für den MQTT-Subscriber (FR-8): {@code /actuator/health/mqtt}.
+ * Health-Indicator für den MQTT-Subscriber (FR-8.2): {@code /actuator/health/mqtt}.
  * NUR aktiv mit Spring-Profil {@code mqtt}. Meldet UP, solange der Inbound-Adapter läuft
- * (Broker-Reconnect erfolgt automatisch), sonst DOWN.
+ * <b>und</b> mit dem Broker verbunden ist, sonst DOWN.
+ *
+ * <p>{@code isRunning()} allein genügt nicht: Der Adapter läuft auch weiter, während Paho nach
+ * einem Verbindungsabbruch im Hintergrund neu verbindet.
  */
 @Component
 @Profile("mqtt")
 public class MqttHealthIndicator implements HealthIndicator {
 
     private final MqttPahoMessageDrivenChannelAdapter mqttInbound;
+    private final BeobachteteMqttClientFactory clientFactory;
 
-    public MqttHealthIndicator(MqttPahoMessageDrivenChannelAdapter mqttInbound) {
+    public MqttHealthIndicator(MqttPahoMessageDrivenChannelAdapter mqttInbound,
+                               BeobachteteMqttClientFactory clientFactory) {
         this.mqttInbound = mqttInbound;
+        this.clientFactory = clientFactory;
     }
 
     @Override
     public Health health() {
         boolean running = mqttInbound.isRunning();
-        Health.Builder builder = running ? Health.up() : Health.down();
-        return builder.withDetail("running", running).build();
+        boolean verbunden = clientFactory.istVerbunden();
+        Health.Builder builder = running && verbunden ? Health.up() : Health.down();
+        return builder.withDetail("running", running).withDetail("verbunden", verbunden).build();
     }
 }

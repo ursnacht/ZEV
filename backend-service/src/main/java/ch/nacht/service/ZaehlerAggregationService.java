@@ -85,7 +85,7 @@ public class ZaehlerAggregationService {
         // Ortszeit.jetzt() statt LocalDateTime.now(): unabhaengig von der Zone der JVM - frueher
         // war TZ=Europe/Zurich im Container die Voraussetzung.
         LocalDateTime jetzt = Ortszeit.jetzt();
-        log.info("Aggregation start}");
+        log.info("Aggregation start");
         LocalDateTime letzteGrenze = floorAufQuartal(jetzt); // letztes abgeschlossenes Intervallende
         int erzeugt = 0;
         // Behandelter Zeitraum je Mandant für die anschliessende Verteilung:
