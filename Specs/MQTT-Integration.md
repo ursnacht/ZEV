@@ -141,7 +141,7 @@ CREATE INDEX idx_zaehler_rohdaten_unverarbeitet
    * `total` = **vorzeichenbehafteter Netto-Wert**: `total = ΔBezug − ΔEinspeisung`. Bezug überwiegt → **positiv** (Verbrauch/Consumer); Einspeisung überwiegt → **negativ** (Produktion/Producer). Producer vs. Consumer wird also **über das Vorzeichen** unterschieden, ohne `einheit.typ`-Verzweigung.
    * `zev`:
      * **Consumer** (`einheit.typ = CONSUMER`): **0** (Sentinel „nicht gemessen"; wird nicht aus MQTT befüllt). Die Solarverteilung ersetzt `0` später durch `zev_calculated` (FR-9).
-     * **Producer** (`einheit.typ = PRODUCER`): **`zev = total`** — die gesamte Produktion des Intervalls wird als ZEV-relevanter Wert übernommen, damit die **Statistik die Produktion korrekt ausweist**. Dieser Wert ist ≠ 0 (ausser bei `total = 0`) und wird daher von der Solarverteilung **nicht** überschrieben (FR-9 greift nur bei `zev = 0`).
+     * **Producer** (`einheit.typ = PRODUCER`): **`zev = total`** beim Ingest — vorläufig die gesamte Produktion des Intervalls. Die Solarverteilung ersetzt ihn danach durch die **im ZEV verbrauchte** Produktion (FR-9.4); die Statistik weist so die Produktion korrekt aus (Hintergrund: Anhang A.8).
      * **Keine** Tabellen-/Constraint-Änderung nötig – `messwerte.zev` bleibt `NOT NULL`.
      * Dies ist die **einzige** typ-abhängige Verzweigung im Ingest; die `total`-Bildung bleibt vorzeichenbasiert ohne `einheit.typ`-Verzweigung.
    * `zev_calculated` = **NULL** beim Ingest; wird erst durch die **Solarverteilung** (`SolarDistribution`) berechnet. Diese setzt anschliessend `zev = zev_calculated`, sofern `zev = 0` (FR-9).
@@ -183,8 +183,9 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 
 ### FR-9: Anpassung Solarverteilung (`zev`-Fallback)
 1. Die Solarverteilung (`SolarDistribution`) berechnet wie bisher `zev_calculated` pro Consumer/Intervall.
-2. **Neu:** Nach der Berechnung wird `zev = zev_calculated` gesetzt, **sofern `zev = 0`** (Sentinel für „nicht gemessen", von MQTT-importierten Consumer-Werten). Bereits gesetzte `zev`-Werte (z. B. aus CSV oder MQTT-**Producer**-Werte mit `zev = total`, `zev ≠ 0`) bleiben unverändert.
+2. **Neu:** Nach der Berechnung wird bei Consumern `zev = zev_calculated` gesetzt, **sofern `zev = 0`** (Sentinel für „nicht gemessen", von MQTT-importierten Consumer-Werten). Bereits gesetzte `zev`-Werte von Consumern (z. B. aus CSV) bleiben unverändert.
 3. Dadurch tragen MQTT-Werte nach der Verteilung denselben `zev`-Wert wie `zev_calculated`; CSV-Werte behalten ihren gemessenen Anteil.
+4. **Producer:** Bei MQTT-Producern (`quelle = 'MQTT'`) setzt die Verteilung `zev` auf die **tatsächlich verteilte Menge** des Zeitpunkts (negativ; bei mehreren Producern anteilig nach Produktion). Die Algorithmen kappen die Zuteilung am Verbrauch, der Rest ist Rücklieferung. CSV-Producer behalten ihren gemessenen `zev`.
 
 > **Kante:** Ein *gemessener* Wert von genau `zev = 0` (z. B. Nachtstunde ohne ZEV-Bezug aus CSV) würde ebenfalls durch `zev_calculated` ersetzt. Da `zev_calculated` in solchen Fällen ohnehin ~0 ist, ist der Effekt vernachlässigbar; falls doch relevant, kann die Unterscheidung über `quelle = 'MQTT'` statt über `zev = 0` erfolgen (Umsetzungsdetail).
 
@@ -260,7 +261,7 @@ Die Smartmeter im Nachbarhaus tragen einen **gPlugK** (Auslesekopf für die Kund
 * [x] Gültige Nachricht → Zeile in `zaehler_rohdaten` mit korrektem `org_id` + `einheit_id` (aufgelöst über `messpunkt`) und den absoluten Ständen. (Test: MqttIngestServiceTest#handle_ValidMessage_SavesRohdaten)
 * [x] Ungültiges JSON / fehlende Pflichtfelder → WARN, kein Insert. (Test: MqttIngestServiceTest#handle_InvalidJson_Discarded, #handle_EmptyPayload_Discarded, #handle_MissingTimestamp_Discarded, #handle_MissingBezug_Discarded, #handle_MissingEinspeisung_Discarded)
 * [x] Unbekannter Messpunkt → abgelehnt (WARN, kein Insert). (Test: MqttIngestServiceTest#handle_UnknownMesspunkt_Discarded)
-* [ ] `orgId` passt nicht zur Einheit → verworfen (Security-Log) — Mandanten-Isolation gewährleistet.
+* [x] `orgId` passt nicht zur Einheit → verworfen wie ein unbekannter Messpunkt (WARN, kein Insert) — Mandanten-Isolation gewährleistet. (Test: ZaehlerRohdatenRepositoryIT#findAllByOrgIdAndMesspunkt_WrongOrg_ReturnsEmpty; Test: MqttIngestServiceTest#handle_UnknownMesspunkt_Discarded)
 * [x] Negativer Zählerstand → verworfen. (Test: MqttIngestServiceTest#handle_NegativeBezug_Discarded, #handle_NegativeEinspeisung_Discarded)
 * [x] Duplikat (Einheit + `zeit`) → Upsert. (Test: MqttIngestServiceTest#handle_DuplicateEinheitAndZeit_UpdatesInsteadOfInsert)
 * [ ] Nach Broker-Abbruch automatischer Reconnect.
@@ -269,7 +270,7 @@ Die Smartmeter im Nachbarhaus tragen einen **gPlugK** (Auslesekopf für die Kund
 * [ ] Job läuft um :05, :20, :35, :50; verarbeitet werden die quartalsgenauen Intervalle (:00–:15, :15–:30, …); `ΔBezug`/`ΔEinspeisung` je Register korrekt als **Differenz** gebildet.
 * [x] `total = ΔBezug − ΔEinspeisung` korrekt vorzeichenbehaftet (Bezug → positiv, Einspeisung → negativ). (Test: ZaehlerAggregationServiceTest#aggregiere_BezugUeberwiegt_TotalPositiv, #aggregiere_EinspeisungUeberwiegt_TotalNegativ)
 * [x] `zev` wird beim MQTT-Ingest für **Consumer** auf `0` gesetzt (Sentinel), für **Producer** auf `total`; `messwerte.zev` bleibt `NOT NULL`. (Test: ZaehlerAggregationServiceTest#aggregiere_BezugUeberwiegt_TotalPositiv, #aggregiere_Producer_ZevGleichTotal)
-* [ ] Für eine **Producer**-Einheit gilt nach der Aggregation `zev = total` (und wird von der Solarverteilung nicht überschrieben, da `zev ≠ 0`).
+* [x] Für eine **Producer**-Einheit gilt nach der Aggregation `zev = total`; die Solarverteilung ersetzt ihn bei MQTT-Werten durch die im ZEV verbrauchte Menge, CSV-Producer bleiben unverändert. (Test: ZaehlerAggregationServiceTest#aggregiere_Producer_ZevGleichTotal; Test: MesswerteServiceTest#calculateSolarDistribution_MqttProducer_ZevIstVerteilteMenge, #calculateSolarDistribution_CsvProducer_ZevBleibtGemessenerWert)
 * [x] Aggregierte Werte in `messwerte` mit `quelle = 'MQTT'`. (Test: ZaehlerAggregationServiceTest#aggregiere_BezugUeberwiegt_TotalPositiv)
 * [x] Verarbeitete Rohdaten `verarbeitet = TRUE`; bereits verarbeitete werden nicht erneut aggregiert. (Test: ZaehlerAggregationServiceTest#aggregiere_ProcessedInterval_MarkiertRohdatenVerarbeitet, ZaehlerRohdatenRepositoryIT#markVerarbeitet_MarksRowsUpToBoundary, ZaehlerRohdatenRepositoryIT#findEinheitIdsWithUnverarbeitet_ReturnsOnlyUnprocessed)
 * [x] Leeres Intervall (keine neue Meldung) → kein `messwerte`-Eintrag (kein Nullwert). (Test: ZaehlerAggregationServiceTest#aggregiere_LeeresIntervall_KeinEintrag)
@@ -331,7 +332,7 @@ Die Smartmeter im Nachbarhaus tragen einen **gPlugK** (Auslesekopf für die Kund
 |----------|-----------|
 | Ungültiges/leeres JSON, fehlende Pflichtfelder | WARN, verwerfen |
 | Unbekannter Messpunkt | WARN, verwerfen |
-| `orgId` passt nicht zur Einheit | Security-WARN, verwerfen (kein Cross-Tenant-Write) |
+| `orgId` passt nicht zur Einheit | WARN wie „Unbekannter Messpunkt“, verwerfen (kein Cross-Tenant-Write) |
 | Negativer Zählerstand | WARN, verwerfen |
 | Timestamp in der Zukunft | WARN, trotzdem speichern |
 | Duplikat (Einheit + `zeit`) | Upsert |
@@ -421,4 +422,9 @@ Bei der Konsolidierung fielen drei Abweichungen zum Code auf; auf Wunsch des Use
 ### A.7 Topologie Hene bereinigt, Netzwerkweg der gPlugs (Abschnitt 1, FR-10, NFR-2, 20.10.2026)
 * Abschnitt 1 nannte „3× Wago via Modbus TCP, 1× BKW via gPlug“ und „heute per **SFTP** bereitgestellt“. Stand laut User: 15 Wago-Zähler, Bilanz vom BKW-Zähler über WhatWatt Go, Batterie per Modbus am Wechselrichter; SFTP ist durch MQTT abgelöst. Abschnitt 7 sagte „Beibehaltung des SFTP-Pfads als Fallback — nicht Gegenstand dieser Spec“.
 * Offene Frage beantwortet: „**Netzwerkweg gPlug → NAS:** Liegen die gPlugs im selben Netz wie der NAS-Broker, oder braucht das Nachbarhaus einen VPN-Zugang? Ohne TLS-Unterstützung der gPlug-Firmware darf der Weg nicht offen über das Internet führen (NFR-2).“ → Die ca. 5 gPlugs stehen im LAN bei Hene. Sie publizieren an einen Mosquitto auf dem Pi, der nur `gPlug/#` per Bridge über das VPN an den NAS weiterleitet (Entscheidung des Users, Alternativen waren ein Router-VPN oder ein NAS im selben LAN). Zuvor stand in FR-10: Host „NAS-Broker, `1883`“, „direkt an den Broker auf dem NAS“, „ohne Pi“; in NFR-2: „Der Weg zum Broker muss deshalb im lokalen Netz oder im VPN liegen“. „Ohne Pi“ meint jetzt: ohne Pi-Gateway-Software.
+
+### A.8 Producer-`zev` und „Security-Log“ (FR-6.4, FR-9, Abschnitte 3 und 5, 21.10.2026)
+Beim Akzeptanzkriterien-Check vom 20.10.2026 wichen zwei Stellen vom Code ab; auf Wunsch des Users an den Code angepasst:
+* **Producer-`zev`:** FR-6.4 sagte „die gesamte Produktion des Intervalls wird als ZEV-relevanter Wert übernommen … Dieser Wert ist ≠ 0 (ausser bei `total = 0`) und wird daher von der Solarverteilung **nicht** überschrieben (FR-9 greift nur bei `zev = 0`)“, FR-9.2 „Bereits gesetzte `zev`-Werte (z. B. aus CSV oder MQTT-**Producer**-Werte mit `zev = total`, `zev ≠ 0`) bleiben unverändert“, das Kriterium „Für eine **Producer**-Einheit gilt nach der Aggregation `zev = total` (und wird von der Solarverteilung nicht überschrieben, da `zev ≠ 0`)“. Seit Commit `ea2d1de` (16.07.2026, „Producer-zev = im ZEV konsumierte Produktion (statt Gesamtproduktion)“) setzt `MesswerteService.aktualisiereProducerZev` bei MQTT-Producern die verteilte Menge; die Spec war nicht nachgeführt. Neu FR-9.4.
+* **Fremde `orgId`:** Das Kriterium verlangte „verworfen (Security-Log)“, der Edge Case „Security-WARN“. Weil die Einheit über (`org_id`, `messpunkt`) gesucht wird, ist eine fremde `orgId` ohne mandantenübergreifende Abfrage nicht von einem unbekannten Messpunkt zu unterscheiden; der Ingest meldet beides gleich. Die Isolation selbst ist gewährleistet.
 
