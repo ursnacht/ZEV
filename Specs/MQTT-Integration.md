@@ -257,31 +257,31 @@ Die Smartmeter im Nachbarhaus tragen einen **gPlugK** (Auslesekopf für die Kund
 
 **MQTT-Empfang:**
 * [ ] Backend verbindet sich beim Start automatisch zum Broker und abonniert `zev/+/+/messwert`.
-* [ ] Gültige Nachricht → Zeile in `zaehler_rohdaten` mit korrektem `org_id` + `einheit_id` (aufgelöst über `messpunkt`) und den absoluten Ständen.
-* [ ] Ungültiges JSON / fehlende Pflichtfelder → WARN, kein Insert.
-* [ ] Unbekannter Messpunkt → abgelehnt (WARN, kein Insert).
+* [x] Gültige Nachricht → Zeile in `zaehler_rohdaten` mit korrektem `org_id` + `einheit_id` (aufgelöst über `messpunkt`) und den absoluten Ständen. (Test: MqttIngestServiceTest#handle_ValidMessage_SavesRohdaten)
+* [x] Ungültiges JSON / fehlende Pflichtfelder → WARN, kein Insert. (Test: MqttIngestServiceTest#handle_InvalidJson_Discarded, #handle_EmptyPayload_Discarded, #handle_MissingTimestamp_Discarded, #handle_MissingBezug_Discarded, #handle_MissingEinspeisung_Discarded)
+* [x] Unbekannter Messpunkt → abgelehnt (WARN, kein Insert). (Test: MqttIngestServiceTest#handle_UnknownMesspunkt_Discarded)
 * [ ] `orgId` passt nicht zur Einheit → verworfen (Security-Log) — Mandanten-Isolation gewährleistet.
-* [ ] Negativer Zählerstand → verworfen.
-* [ ] Duplikat (Einheit + `zeit`) → Upsert.
+* [x] Negativer Zählerstand → verworfen. (Test: MqttIngestServiceTest#handle_NegativeBezug_Discarded, #handle_NegativeEinspeisung_Discarded)
+* [x] Duplikat (Einheit + `zeit`) → Upsert. (Test: MqttIngestServiceTest#handle_DuplicateEinheitAndZeit_UpdatesInsteadOfInsert)
 * [ ] Nach Broker-Abbruch automatischer Reconnect.
 
 **15-Minuten-Aggregation:**
 * [ ] Job läuft um :05, :20, :35, :50; verarbeitet werden die quartalsgenauen Intervalle (:00–:15, :15–:30, …); `ΔBezug`/`ΔEinspeisung` je Register korrekt als **Differenz** gebildet.
-* [ ] `total = ΔBezug − ΔEinspeisung` korrekt vorzeichenbehaftet (Bezug → positiv, Einspeisung → negativ).
-* [ ] `zev` wird beim MQTT-Ingest für **Consumer** auf `0` gesetzt (Sentinel), für **Producer** auf `total`; `messwerte.zev` bleibt `NOT NULL`.
+* [x] `total = ΔBezug − ΔEinspeisung` korrekt vorzeichenbehaftet (Bezug → positiv, Einspeisung → negativ). (Test: ZaehlerAggregationServiceTest#aggregiere_BezugUeberwiegt_TotalPositiv, #aggregiere_EinspeisungUeberwiegt_TotalNegativ)
+* [x] `zev` wird beim MQTT-Ingest für **Consumer** auf `0` gesetzt (Sentinel), für **Producer** auf `total`; `messwerte.zev` bleibt `NOT NULL`. (Test: ZaehlerAggregationServiceTest#aggregiere_BezugUeberwiegt_TotalPositiv, #aggregiere_Producer_ZevGleichTotal)
 * [ ] Für eine **Producer**-Einheit gilt nach der Aggregation `zev = total` (und wird von der Solarverteilung nicht überschrieben, da `zev ≠ 0`).
-* [ ] Aggregierte Werte in `messwerte` mit `quelle = 'MQTT'`.
-* [ ] Verarbeitete Rohdaten `verarbeitet = TRUE`; bereits verarbeitete werden nicht erneut aggregiert.
-* [ ] Leeres Intervall (keine neue Meldung) → kein `messwerte`-Eintrag (kein Nullwert).
-* [ ] Verlorene Zwischen-Nachricht → Gesamtsumme über die betroffenen Intervalle bleibt korrekt (verlusttolerant).
-* [ ] **Wiederaufnahme nach mehrtägigem Unterbruch** → die Differenz zum letzten Vor-Unterbruch-Stand deckt den gesamten Zeitraum; **keine kWh gehen verloren**, der Gesamtbetrag erscheint gebündelt im ersten Intervall mit Meldung nach Wiederaufnahme (Referenz wird unabhängig vom `verarbeitet`-Flag über den Zeitstempel aufgelöst).
+* [x] Aggregierte Werte in `messwerte` mit `quelle = 'MQTT'`. (Test: ZaehlerAggregationServiceTest#aggregiere_BezugUeberwiegt_TotalPositiv)
+* [x] Verarbeitete Rohdaten `verarbeitet = TRUE`; bereits verarbeitete werden nicht erneut aggregiert. (Test: ZaehlerAggregationServiceTest#aggregiere_ProcessedInterval_MarkiertRohdatenVerarbeitet, ZaehlerRohdatenRepositoryIT#markVerarbeitet_MarksRowsUpToBoundary, ZaehlerRohdatenRepositoryIT#findEinheitIdsWithUnverarbeitet_ReturnsOnlyUnprocessed)
+* [x] Leeres Intervall (keine neue Meldung) → kein `messwerte`-Eintrag (kein Nullwert). (Test: ZaehlerAggregationServiceTest#aggregiere_LeeresIntervall_KeinEintrag)
+* [x] Verlorene Zwischen-Nachricht → Gesamtsumme über die betroffenen Intervalle bleibt korrekt (verlusttolerant). (Test: ZaehlerAggregationServiceTest#aggregiere_EinIntervallOhneDaten_ErfasstInfoMeldung)
+* [x] **Wiederaufnahme nach mehrtägigem Unterbruch** → die Differenz zum letzten Vor-Unterbruch-Stand deckt den gesamten Zeitraum; **keine kWh gehen verloren**, der Gesamtbetrag erscheint gebündelt im ersten Intervall mit Meldung nach Wiederaufnahme (Referenz wird unabhängig vom `verarbeitet`-Flag über den Zeitstempel aufgelöst). (Test: ZaehlerAggregationServiceTest#aggregiere_WiederaufnahmeNachUnterbruch_GesamterVerbrauchImErstenIntervall, ZaehlerRohdatenRepositoryIT#findFirstByZeitLessThanEqual_ReturnsLatestAtOrBefore)
 * [ ] Zähler-Reset/Rücksprung **pro Register** (`ΔBezug` bzw. `ΔEinspeisung` < 0) → betroffenes Delta auf 0, Referenz neu gesetzt, WARN **und Systemmeldung `MQTT_ZAEHLER_RUECKSPRUNG` mit der verworfenen Menge**. (Ein negatives `total` aus Einspeisung ist dagegen legitim und wird übernommen.)
-* [ ] `zev_calculated` wird durch den Ingest nicht verändert; Solarverteilung funktioniert unverändert.
+* [x] `zev_calculated` wird durch den Ingest nicht verändert; Solarverteilung funktioniert unverändert. (Test: ZaehlerAggregationServiceTest#aggregiere_BezugUeberwiegt_TotalPositiv, #aggregiere_Producer_ZevGleichTotal)
 * [ ] Nach der Solarverteilung gilt `zev = zev_calculated`, wo `zev = 0` war (MQTT-Werte); gemessene CSV-Werte (`zev ≠ 0`) bleiben unverändert (FR-9).
 * [ ] Nach jedem Aggregationslauf wird je betroffenem Mandant die Solarverteilung für den behandelten Zeitraum automatisch ausgeführt (`calculateSolarDistributionForOrg`, `orgFilter` explizit gesetzt); ohne verarbeitetes Intervall erfolgt kein Verteilungsaufruf. Ein Fehler bei einem Mandanten bricht die übrigen nicht ab.
 
 **Verbindung:**
-* [ ] Ohne `MQTT_CLEAN_SESSION` verbindet sich das Backend mit dauerhafter Sitzung (`cleanSession = false`); mit `MQTT_CLEAN_SESSION=true` ohne (Test: MqttConfigTest#applicationMqttYml_OhneUmgebungsvariable_DauerhafteSitzung, MqttConfigTest#mqttClientFactory_CleanSessionFalse_DauerhafteSitzung, MqttConfigTest#mqttClientFactory_CleanSessionTrue_SitzungOhnePuffer)
+* [x] Ohne `MQTT_CLEAN_SESSION` verbindet sich das Backend mit dauerhafter Sitzung (`cleanSession = false`); mit `MQTT_CLEAN_SESSION=true` ohne (Test: MqttConfigTest#applicationMqttYml_OhneUmgebungsvariable_DauerhafteSitzung, MqttConfigTest#mqttClientFactory_CleanSessionFalse_DauerhafteSitzung, MqttConfigTest#mqttClientFactory_CleanSessionTrue_SitzungOhnePuffer)
 
 **gPlug (FR-10):**
 * [ ] Mit gesetztem `mqtt.topic-gplug` abonniert das Backend zusätzlich `gPlug/+/+/tele/SENSOR` über dieselbe Verbindung; ist es leer, entsteht kein gPlug-Abo.
@@ -296,11 +296,11 @@ Die Smartmeter im Nachbarhaus tragen einen **gPlugK** (Auslesekopf für die Kund
 
 **Monitoring & Kompatibilität:**
 * [ ] MQTT-Metriken unter `/actuator/prometheus`; `/actuator/health/mqtt` zeigt Status.
-* [ ] **Genau ein** Intervall ohne Zählerdaten → Systemmeldung `MQTT_ZAEHLER_LUECKE` mit Level **INFO**, Kategorie `SYSTEMMELDUNG_KATEGORIE_MQTT`, Parameter mit Einheiten-Name und Zeitraum; der Messwert des Folgeintervalls enthält den gesamten Lückenverbrauch.
-* [ ] **Mehrere** aufeinanderfolgende Intervalle ohne Zählerdaten → Systemmeldung `MQTT_ZAEHLER_AUSFALL` mit Level **WARN**; der Parameter nennt die Anzahl fehlender Intervalle.
+* [x] **Genau ein** Intervall ohne Zählerdaten → Systemmeldung `MQTT_ZAEHLER_LUECKE` mit Level **INFO**, Kategorie `SYSTEMMELDUNG_KATEGORIE_MQTT`, Parameter mit Einheiten-Name und Zeitraum; der Messwert des Folgeintervalls enthält den gesamten Lückenverbrauch. (Test: ZaehlerAggregationServiceTest#aggregiere_EinIntervallOhneDaten_ErfasstInfoMeldung)
+* [x] **Mehrere** aufeinanderfolgende Intervalle ohne Zählerdaten → Systemmeldung `MQTT_ZAEHLER_AUSFALL` mit Level **WARN**; der Parameter nennt die Anzahl fehlender Intervalle. (Test: ZaehlerAggregationServiceTest#aggregiere_MehrereIntervalleOhneDaten_ErfasstWarnMeldung)
 * [ ] **Keine** Systemmeldung, wenn der Referenz-Stand im unmittelbar vorangehenden Intervall liegt (lückenloser Betrieb) — insbesondere **nicht** bei einzelnen ausgefallenen Messungen innerhalb eines Intervalls.
-* [ ] Meldungen sind mandantenbezogen (`org_id` aus der Einheit) und werden je Meldungs-Key dedupliziert (Zähler + „zuletzt aufgetreten"); Texte via `TranslationService` (DE/EN).
-* [ ] Bestehender CSV-Upload unverändert nutzbar; Werte beider Quellen gleichwertig.
+* [x] Meldungen sind mandantenbezogen (`org_id` aus der Einheit) und werden je Meldungs-Key dedupliziert (Zähler + „zuletzt aufgetreten"); Texte via `TranslationService` (DE/EN). (Test: ZaehlerAggregationServiceTest#aggregiere_EinIntervallOhneDaten_ErfasstInfoMeldung, SystemmeldungServiceTest#erfasse_OffenerEintragVorhanden_ErhoehtZaehlerStattNeuemEintrag; Nachweis: V93__Add_Zaehler_Ausfall_Translations.sql, V151__Add_Zaehler_Ruecksprung_Translation.sql)
+* [x] Bestehender CSV-Upload unverändert nutzbar; Werte beider Quellen gleichwertig. (Test: MesswerteServiceTest#processCsvUpload_ValidCsv_ReturnsSuccess, #processBilanzCsvUpload_ValidCsv_SavesBezugAndRuecklieferung, #calculateSolarDistribution_Bilanz_CsvProducer_ZevBleibtGemessen)
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
