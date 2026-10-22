@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import re
 from pathlib import Path
@@ -145,7 +146,8 @@ def _parse_timeout(value, ctx: str, default: float) -> float:
     else:
         raise ConfigError(f"{ctx} muss eine Zahl oder Kurzform wie '5s' sein.")
 
-    if seconds <= 0:
+    # nan und inf sind float, aber keine Zeitangabe: nan <= 0 ist False und kaeme sonst durch.
+    if not math.isfinite(seconds) or seconds <= 0:
         raise ConfigError(f"{ctx} muss > 0 sein (war: {value}).")
     return seconds
 
@@ -210,8 +212,8 @@ def _parse_meters(data, read_timeout: float) -> list[MeterConfig]:
                 messpunkt=messpunkt,
                 protokoll=protokoll,
                 host=host,
-                port=int(entry.get("port", 502)),
-                unit_id=int(entry.get("unit_id", 1)),
+                port=_parse_ganzzahl(entry.get("port"), f"zaehler '{messpunkt}' port", 502, 1, 65535),
+                unit_id=_parse_ganzzahl(entry.get("unit_id"), f"zaehler '{messpunkt}' unit_id", 1, 0, 255),
                 register_bezug=register_bezug,
                 register_einspeisung=register_einspeisung,
                 register_zustand=register_zustand,
@@ -314,7 +316,7 @@ def _parse_register(data, messpunkt: str, rolle: str) -> RegisterSpec:
         addr=addr,
         typ=typ,
         wortfolge=wortfolge,
-        skalierung=float(data.get("skalierung", 1.0)),
+        skalierung=_parse_skalierung(data.get("skalierung"), ctx),
     )
 
 
@@ -365,6 +367,53 @@ def _require(data: dict, key: str, expected_type, ctx: str | None = None):
     if key not in data or data[key] is None:
         raise ConfigError(f"Pflichtfeld '{where}{key}' fehlt.")
     value = data[key]
-    if not isinstance(value, expected_type):
+    # bool ist ein int-Subtyp: ohne diese Pruefung gaelte "org_id: true" als 1.
+    if not isinstance(value, expected_type) or (isinstance(value, bool) and not _erlaubt_bool(expected_type)):
         raise ConfigError(f"Feld '{where}{key}' hat falschen Typ (war: {type(value).__name__}).")
     return value
+
+
+def _erlaubt_bool(expected_type) -> bool:
+    typen = expected_type if isinstance(expected_type, tuple) else (expected_type,)
+    return bool in typen
+
+
+def _parse_ganzzahl(value, ctx: str, default: int, minimum: int, maximum: int) -> int:
+    """Ganze Zahl im Bereich [minimum, maximum]; ``None`` → ``default``.
+
+    Auch als Text erlaubt (``"502"``) - so kommt eine Zahl nach ``${VAR}``-Aufloesung an.
+    Alles andere bricht den Start mit ``ConfigError`` ab statt mit einem ``ValueError``, den
+    ``main()`` nicht als Konfigurationsfehler erkennt.
+    """
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        raise ConfigError(f"{ctx} muss eine ganze Zahl sein (war: {value!r}).")
+    if isinstance(value, int):
+        zahl = value
+    elif isinstance(value, str) and value.strip().lstrip("-").isdigit():
+        zahl = int(value.strip())
+    else:
+        raise ConfigError(f"{ctx} muss eine ganze Zahl sein (war: {value!r}).")
+    if not minimum <= zahl <= maximum:
+        raise ConfigError(f"{ctx} muss zwischen {minimum} und {maximum} liegen (war: {zahl}).")
+    return zahl
+
+
+def _parse_skalierung(value, ctx: str) -> float:
+    """Faktor Rohwert → kWh; ``None`` → 1.0. Muss eine endliche Zahl > 0 sein.
+
+    0 machte jeden Stand zu 0, ein negativer Faktor jeden Stand negativ (der Reader verwirft
+    ihn dann bei jedem Lesen) - beides ist ein Tippfehler, kein Zaehler.
+    """
+    if value is None:
+        return 1.0
+    if isinstance(value, bool):
+        raise ConfigError(f"{ctx}: skalierung muss eine Zahl sein (war: {value!r}).")
+    try:
+        faktor = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(f"{ctx}: skalierung muss eine Zahl sein (war: {value!r}).") from exc
+    if not math.isfinite(faktor) or faktor <= 0:
+        raise ConfigError(f"{ctx}: skalierung muss eine Zahl > 0 sein (war: {value!r}).")
+    return faktor

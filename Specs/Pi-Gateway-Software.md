@@ -90,6 +90,7 @@
 2. **Neuer Zähler = nur ein Konfigurations-Eintrag** (kein Code-Change, kein Rebuild).
 3. Weitere Parameter über Konfigurationsdatei/Env: `org_id`, Broker-URL/Credentials, Lese-/Publish-Intervall, optionale Puffer-Optionen.
 4. **Keine Secrets im Code/Repo** (Broker-Passwort etc. via Env/gesicherte Datei).
+5. **Ungültige Angaben brechen den Start ab** – mit `ConfigError` und klarer Meldung, nie mit einem unerwarteten Fehler oder einem still übernommenen Unsinnswert: `port` (1–65535) und `unit_id` (0–255) als ganze Zahl, auch als Text (`"502"`, wie nach `${VAR}`-Auflösung); `skalierung` als endliche Zahl > 0; `org_id` als ganze Zahl, nicht als Boolean; Zeitangaben endlich (kein `nan`/`inf`). Hintergrund: Anhang B.6.
 
 > **Beispiel-Konfiguration (Ausschnitt: 3 der 15 Wago-Zähler):**
 > ```yaml
@@ -166,6 +167,7 @@
 * [ ] Ohne `read_timeout` in der Config gilt der Default **5 s**; ein gesetzter Wert (Zahl oder `"8s"`/`"1m"`) wird für **alle** Zähler übernommen. (Test: test_config.py › ReadTimeoutConfigTest › test_loadConfig_OhneReadTimeout_Default5sFuerAlle, test_loadConfig_ReadTimeoutGesetzt_GiltFuerAlle)
 * [ ] `zaehler[].read_timeout` überschreibt den globalen Wert **nur für diesen Zähler**; die übrigen behalten `read_timeout`. (Test: test_config.py › ReadTimeoutConfigTest › test_loadConfig_ZaehlerReadTimeout_NurFuerDiesenZaehler)
 * [ ] Ungültige Timeout-Angaben (`0`, negativ, nicht-numerisch, Boolean) führen zu einem `ConfigError` **beim Start** — kein stiller Fallback auf den Default. (Test: test_config.py › ReadTimeoutConfigTest › test_loadConfig_UngueltigesReadTimeout_ConfigError, test_loadConfig_UngueltigesZaehlerReadTimeout_ConfigError)
+* [ ] Ungültige Werte für `port`, `unit_id`, `skalierung` und `org_id` sowie `nan`/`inf` als Zeitangabe führen zu `ConfigError` **beim Start**; `port`/`unit_id` als Zahlentext werden übernommen (FR-5.5). (Test: test_config.py › UngueltigeWerteConfigTest › test_loadConfig_PortOderUnitIdKeineZahl_ConfigError, test_loadConfig_PortUndUnitIdAlsText_Uebernommen, test_loadConfig_OhnePortUndUnitId_Defaults, test_loadConfig_SkalierungUngueltig_ConfigError, test_loadConfig_SkalierungGueltig_Uebernommen, test_loadConfig_OrgIdBoolean_ConfigError, test_loadConfig_ReadTimeoutNanOderInf_ConfigError)
 * [ ] Die **Start-Log-Zeile** nennt neben `org_id`, Zähleranzahl, Intervall und Broker auch das **wirksame globale `read_timeout`** (auch wenn es der Default ist). (Test: test_main.py › StartLogTest › test_main_Default_StartzeileNenntTimeoutUndVersuche, test_main_GesetzteWerte_StartzeileNenntWirksameWerte)
 * [ ] Sind für einzelne Zähler eigene `read_timeout`-Werte konfiguriert, werden **genau diese** Zähler beim Start zusätzlich mit ihrem Wert genannt; ohne Abweichung erscheint **keine** solche Zeile. (Test: test_main.py › StartLogTest › test_logAbweichendeTimeouts_NenntGenauDieAbweichenden, test_main_OhneAbweichung_KeineZeileEigenesTimeout)
 * [ ] Ein fehlgeschlagener Read wird gemäss `read_attempts` **wiederholt**; gelingt der zweite Versuch, wird der Messwert publiziert und der Zyklus zählt als Erfolg. (Test: test_main.py › ReadAndPublishTest › test_readAndPublish_ZweiterVersuchGelingt_PubliziertUndTrue)
@@ -424,4 +426,7 @@ Beim Nachcheck von B.4 gegen einen lokalen TCP-Server ohne Antwort gemessen: Die
 Zugleich nennt eine Exception-Response ihren Code ausdrücklich („Exception-Response code 11 (…)“): `str()` der `ExceptionResponse` enthält ihn in pymodbus 3.8 nicht. Die bisherige Darstellung bleibt dahinter stehen, weil die Diagnose in `docs/Netzwerk-Topologie-Hene.md` die Ausfälle je Zähler über `dev_id=` zählt.
 
 Die Untergrenze in `requirements.txt` und `pyproject.toml` ist von `pymodbus>=3.6` auf `>=3.8` angehoben: Der Reader erkennt eine ausbleibende Antwort am Text der `ModbusIOException` („No response received …“), geprüft ist das nur mit 3.8.6.
+
+### B.6 Ungültige Konfigurationswerte (FR-5.5, 22.10.2026)
+Die Testabdeckung vom 22.10.2026 fand drei Lücken: Ein nicht-numerischer `port`, `unit_id` oder `skalierung` endete in einem `ValueError` (`int(...)`/`float(...)` ohne Prüfung). `main()` fängt nur `ConfigError`, der Dienst brach also mit einem Traceback ab statt mit „Konfigurationsfehler“ und Exit-Code 2. `read_timeout: nan`/`inf` wurde angenommen (`nan <= 0` ist falsch), `org_id: true` galt als 1 (bool ist in Python ein int-Subtyp). Ebenso still angenommen wurden `port` ausserhalb 1–65535, `unit_id` ausserhalb 0–255 und eine `skalierung` von 0 oder negativ. Seither gilt FR-5.5.
 

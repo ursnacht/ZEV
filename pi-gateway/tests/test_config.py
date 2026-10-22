@@ -226,3 +226,56 @@ class ZaehlerListeTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UngueltigeWerteConfigTest(unittest.TestCase):
+    """Ungueltige Angaben brechen den Start mit ConfigError ab - nicht mit einem ValueError, den
+    main() nicht als Konfigurationsfehler erkennt, und nicht still mit einem unsinnigen Wert."""
+
+    def test_loadConfig_ReadTimeoutNanOderInf_ConfigError(self) -> None:
+        for angabe in (".nan", ".inf", "\"nan\"", "\"inf\"", "\"infs\""):
+            with self.subTest(angabe=angabe):
+                with self.assertRaises(ConfigError):
+                    _lade(_yaml(f"read_timeout: {angabe}\n"))
+
+    def test_loadConfig_PortOderUnitIdKeineZahl_ConfigError(self) -> None:
+        for zusatz in ("port: abc", "port: 2.5", "port: true", "port: 0", "port: 70000",
+                       "unit_id: abc", "unit_id: true", "unit_id: 256", "unit_id: -1"):
+            with self.subTest(zusatz=zusatz):
+                with self.assertRaises(ConfigError):
+                    _lade(_yaml(zaehler=_zaehler("MP-1", zusatz)))
+
+    def test_loadConfig_PortUndUnitIdAlsText_Uebernommen(self) -> None:
+        # So kommen Zahlen nach ${VAR}-Aufloesung an
+        config = _lade(_yaml(zaehler=_zaehler("MP-1", "port: \"1502\"") .replace(
+            "    protokoll: modbus-tcp\n", "    protokoll: modbus-tcp\n    unit_id: \"7\"\n")))
+
+        self.assertEqual(1502, config.meters[0].port)
+        self.assertEqual(7, config.meters[0].unit_id)
+
+    def test_loadConfig_OhnePortUndUnitId_Defaults(self) -> None:
+        config = _lade(_yaml())
+
+        self.assertEqual(502, config.meters[0].port)
+        self.assertEqual(1, config.meters[0].unit_id)
+
+    def test_loadConfig_SkalierungUngueltig_ConfigError(self) -> None:
+        for skalierung in ("abc", "0", "-0.1", ".nan", ".inf", "true"):
+            with self.subTest(skalierung=skalierung):
+                zaehler = _zaehler("MP-1").replace(
+                    "bezug: { addr: \"600C\" }", f"bezug: {{ addr: \"600C\", skalierung: {skalierung} }}")
+                with self.assertRaises(ConfigError):
+                    _lade(_yaml(zaehler=zaehler))
+
+    def test_loadConfig_SkalierungGueltig_Uebernommen(self) -> None:
+        zaehler = _zaehler("MP-1").replace(
+            "bezug: { addr: \"600C\" }", "bezug: { addr: \"600C\", skalierung: 0.1 }")
+
+        config = _lade(_yaml(zaehler=zaehler))
+
+        self.assertEqual(0.1, config.meters[0].register_bezug.skalierung)
+
+    def test_loadConfig_OrgIdBoolean_ConfigError(self) -> None:
+        with self.assertRaises(ConfigError):
+            _lade(_yaml().replace("org_id: 42", "org_id: true"))
+
