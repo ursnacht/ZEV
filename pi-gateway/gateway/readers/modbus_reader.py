@@ -20,8 +20,8 @@ from .base import Reader
 
 log = logging.getLogger(__name__)
 
-# So meldet pymodbus (3.7+) eine ausbleibende Antwort: als ModbusIOException mit diesem Text,
-# nicht als Fehler-Response ("No response received after 3 retries ..." bzw. "... of the last
+# So meldet pymodbus (3.8, siehe requirements.txt) eine ausbleibende Antwort: als ModbusIOException mit diesem Text,
+# nicht als Fehler-Response ("No response received after 0 retries ..." bzw. "... of the last
 # requests ..., CLOSING CONNECTION").
 _KEINE_ANTWORT = "No response received"
 
@@ -55,6 +55,12 @@ class ModbusReader(Reader):
             host=config.host,
             port=config.port,
             timeout=config.read_timeout_seconds,
+            # Keine internen Wiederholungen: pymodbus wartete sonst bei ausbleibender Antwort
+            # (retries + 1) x read_timeout, mit dem Default 3 also das Vierfache - die Meldung
+            # "keine Antwort innerhalb 5.0s" stimmte nicht, und das Zeitbudget je Zyklus
+            # vervielfachte sich. Wiederholt wird in _read_with_retry (read_attempts, FR-1.6),
+            # dort mit neu aufgebauter Verbindung und Pause.
+            retries=0,
         )
 
     def read(self) -> MeterReading:
@@ -121,7 +127,7 @@ class ModbusReader(Reader):
             # exception_code=11 - als ReadError greift der Retry (FR-1.6).
             #
             # Auch eine AUSBLEIBENDE Antwort kommt so (pymodbus 3.8: "No response received
-            # after 3 retries ..."). Nur dann hilft ein hoeheres read_timeout (FR-1.5).
+            # after 0 retries ..."). Nur dann hilft ein hoeheres read_timeout (FR-1.5).
             hinweis = self._timeout_hinweis() if _KEINE_ANTWORT in str(exc) else ""
             raise ReadError(
                 f"'{self.messpunkt}' {rolle}: Modbus-Fehler bei Register "
@@ -135,10 +141,19 @@ class ModbusReader(Reader):
             #
             # Am Typ erkennen, nicht an str(response): Die Textform ist ein Detail der Bibliothek
             # und kann sich mit einem Update aendern.
-            hinweis = "" if isinstance(response, ExceptionResponse) else self._timeout_hinweis()
+            if isinstance(response, ExceptionResponse):
+                # Den Code ausdruecklich nennen: str(response) enthaelt ihn nicht, und code 11
+                # (Ziel am Hub antwortet nicht) ist von anderen Codes zu unterscheiden (FR-1.5).
+                # str(response) bleibt dahinter stehen - es traegt dev_id, nach dem die
+                # Diagnose in docs/Netzwerk-Topologie-Hene.md die Ausfaelle je Zaehler zaehlt.
+                ursache = f"Exception-Response code {response.exception_code} ({response})"
+                hinweis = ""
+            else:
+                ursache = str(response)
+                hinweis = self._timeout_hinweis()
             raise ReadError(
                 f"'{self.messpunkt}' {rolle}: Modbus-Fehler bei Register "
-                f"0x{register.addr:04X} – {response}{hinweis}"
+                f"0x{register.addr:04X} – {ursache}{hinweis}"
             )
 
         registers = response.registers

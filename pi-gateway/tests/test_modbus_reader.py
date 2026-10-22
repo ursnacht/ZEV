@@ -100,11 +100,34 @@ class TimeoutHinweisTest(unittest.TestCase):
         self.assertIn("Batterie-Test", meldung)
         self.assertNotIn("read_timeout", meldung)
 
+    def test_read_ExceptionResponse_NenntCodeUndDevId(self) -> None:
+        # Den Code liest man sonst nirgends; dev_id braucht die Diagnose (grep "dev_id=")
+        meldung = self._fehlermeldung(return_value=ExceptionResponse(3, 11))
+
+        self.assertIn("Exception-Response code 11", meldung)
+        self.assertIn("dev_id=", meldung)
+
+
     def test_read_AbgeschnitteneAntwort_OhneHinweis(self) -> None:
         # Auch das ist eine Antwort - nur eine kaputte. Ein hoeheres Timeout aendert nichts.
         meldung = self._fehlermeldung(side_effect=_abgeschnitten())
 
         self.assertNotIn("read_timeout", meldung)
+
+
+class ClientKonfigurationTest(unittest.TestCase):
+
+    def test_init_KeineInternenWiederholungen(self) -> None:
+        """FR-1.5/1.6: pymodbus soll nicht selbst wiederholen - sonst dauert ein Timeout
+        (retries + 1) x read_timeout, und die Meldung nennt die falsche Zeit."""
+        with mock.patch("gateway.readers.modbus_reader.ModbusTcpClient") as client_klasse:
+            ModbusReader(MeterConfig(
+                messpunkt="Wago-1", protokoll="modbus-tcp", register_bezug=RegisterSpec(addr=0x600C),
+                register_einspeisung=None, host="192.168.10.164", read_timeout_seconds=5.0))
+
+        kwargs = client_klasse.call_args.kwargs
+        self.assertEqual(0, kwargs["retries"])
+        self.assertEqual(5.0, kwargs["timeout"])
 
 
 class ReadWithRetryTest(unittest.TestCase):

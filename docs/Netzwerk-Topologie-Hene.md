@@ -527,7 +527,10 @@ mbpoll -t 4:hex -r 0x4000 -c 2 -1 $HUB -p 502 -a 1 -0   # Seriennummer auslesen
 
 > **Client-Timeout des Pi-Gateways:** konfigurierbar über `read_timeout` (global, Default 5 s)
 > bzw. `zaehler[].read_timeout` je Zähler (s. `Specs/Pi-Gateway-Software.md`, FR-1.5). Wirkt nur bei
-> **ausbleibender** Antwort – nicht bei Exception-Responses wie `code 11` (s. Tabelle).
+> **ausbleibender** Antwort – nicht bei Exception-Responses wie `code 11` (s. Tabelle). pymodbus
+> wiederholt selbst nicht (`retries=0`): Eine ausbleibende Antwort kostet einmal `read_timeout`,
+> und die Fehlermeldung nennt dann diesen Wert samt Hinweis. Eine Exception-Response erscheint im Log
+> als `Exception-Response code 11 (ExceptionResponse(dev_id=…, …))`.
 >
 > **Retry des Pi-Gateways:** `read_attempts` (global, Default **2** = ein Wiederholversuch,
 > 0,5 s Pause, Verbindung wird neu aufgebaut). Das ist die Kompensation für sporadische
