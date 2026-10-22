@@ -178,7 +178,7 @@
 * [ ] Ist `register.einspeisung` konfiguriert, verhält sich der Reader unverändert (zwei Zugriffe, echter Wert).
 * [ ] Ein **vorhandener, aber fehlerhafter** `einspeisung`-Block (z.B. `addr` fehlt) führt zu `ConfigError` **beim Start**; ein fehlendes `register.bezug` ebenso.
 * [ ] Für jeden Zähler ohne `einspeisung`-Register erscheint beim Start eine `INFO`-Zeile.
-* [ ] Bleibt eine Antwort aus, nennt die Fehlermeldung den konfigurierten Timeout-Wert und den Hinweis, `timeout` zu erhöhen; bei einer **Modbus-Exception-Response** (z.B. `code 11`) erscheint dieser Hinweis **nicht** (dort hilft das Timeout nicht).
+* [x] Bleibt eine Antwort aus, nennt die Fehlermeldung den konfigurierten Timeout-Wert und den Hinweis, `timeout` zu erhöhen; bei einer **Modbus-Exception-Response** (z.B. `code 11`) erscheint dieser Hinweis **nicht** (dort hilft das Timeout nicht). (Test: test_modbus_reader.py › TimeoutHinweisTest › test_read_KeineAntwort_NenntTimeoutUndHinweis, test_read_KeineAntwortVerbindungGeschlossen_NenntHinweis, test_read_ExceptionResponseCode11_OhneHinweis, test_read_AbgeschnitteneAntwort_OhneHinweis)
 * [ ] Der Dienst publiziert die **absoluten Zählerstände** unverändert (keine Delta-Berechnung, keine „letzter Stand"-Persistenz).
 * [ ] Publizierte Topic-/Payload-Struktur entspricht `MQTT-Integration.md`: Topic `zev/{orgId}/{messpunkt}/messwert`, Pflichtfelder `{timestamp,zaehlerstandBezug,zaehlerstandEinspeisung}` – plus die **optionalen** `seriennummer` und `zustand`, sofern konfiguriert.
 * [ ] Ist im `zaehler`-Eintrag eine `seriennummer` gesetzt, erscheint sie unverändert im Payload; fehlt sie, wird das Feld **weggelassen** (Payload identisch zum bisherigen Vertrag).
@@ -413,4 +413,7 @@ FR-3.2 nannte nur `seriennummer` als optionales Feld, das Akzeptanzkriterium zur
 
 ### B.3 Simulator in die Spec aufgenommen, gPlug-Modus (FR-8, 22.10.2026)
 Der Publisher-Simulator (`protokoll: sim`) war bisher nur in `pi-gateway/README.md` beschrieben. Mit dem gPlug-Modus (`protokoll: sim-gplug`) ist er als FR-8 in die Spec aufgenommen: Der User wollte das Auslesen und Speichern von gPlug-Meldungen testen können, bevor ein echter gPlug angeschlossen und eine echte Meldung mitgeschnitten ist (`Specs/MQTT-Integration.md`, FR-10, Anhang A.9). FR-8.1 und FR-8.2 beschreiben das bestehende Verhalten.
+
+### B.4 Timeout-Hinweis bei ausbleibender Antwort (FR-1.5, 22.10.2026)
+Beim Akzeptanzkriterien-Check vom 22.10.2026 fiel auf: Der Hinweis „keine Antwort innerhalb … – ggf. `read_timeout` erhöhen“ stand nur im Zweig für eine **Fehler-Response** (`response.isError()`). pymodbus 3.8 meldet eine ausbleibende Antwort aber nicht mehr als Response, sondern **wirft** eine `ModbusIOException` („No response received after 3 retries …“). Sie landete im Zweig für Exceptions der Bibliothek (FR-1.6) – ohne Hinweis. Bei einem echten Timeout erschien er so nie. Seither nennt auch dieser Zweig den Hinweis, wenn die Exception eine ausbleibende Antwort meldet; eine abgeschnittene Antwort und eine Exception-Response (code 11) bleiben ohne Hinweis. Die Exception-Response wird am Typ (`ExceptionResponse`) erkannt statt am Text von `str(response)`.
 

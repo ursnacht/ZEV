@@ -9,6 +9,7 @@ import unittest
 from unittest import mock
 
 from pymodbus.exceptions import ModbusIOException
+from pymodbus.pdu import ExceptionResponse
 
 from gateway.main import _read_with_retry
 from gateway.models import MeterConfig, ReadError, RegisterSpec
@@ -62,6 +63,48 @@ class ModbusReaderTest(unittest.TestCase):
         self.assertIn("Batterie-Test", str(kontext.exception))
         self.assertIs(kontext.exception.__cause__, ursache)
         reader._client.close.assert_called_once()
+
+
+class TimeoutHinweisTest(unittest.TestCase):
+    """Specs/Pi-Gateway-Software.md, FR-1.5: Der Hinweis auf read_timeout erscheint nur, wenn
+    keine Antwort kam - bei einer Exception-Response (code 11) hilft ein hoeheres Timeout nicht."""
+
+    def _fehlermeldung(self, side_effect=None, return_value=None) -> str:
+        reader = _reader()
+        if side_effect is not None:
+            reader._client.read_holding_registers.side_effect = side_effect
+        else:
+            reader._client.read_holding_registers.return_value = return_value
+        with self.assertRaises(ReadError) as kontext:
+            reader.read()
+        return str(kontext.exception)
+
+    def test_read_KeineAntwort_NenntTimeoutUndHinweis(self) -> None:
+        # So meldet pymodbus 3.8 eine ausbleibende Antwort
+        meldung = self._fehlermeldung(side_effect=ModbusIOException(
+            "No response received after 3 retries, continue with next request"))
+
+        self.assertIn("keine Antwort innerhalb 5.0s", meldung)
+        self.assertIn("'read_timeout'", meldung)
+
+    def test_read_KeineAntwortVerbindungGeschlossen_NenntHinweis(self) -> None:
+        meldung = self._fehlermeldung(side_effect=ModbusIOException(
+            "ERROR: No response received of the last requests (default: retries+3), CLOSING CONNECTION."))
+
+        self.assertIn("'read_timeout'", meldung)
+
+    def test_read_ExceptionResponseCode11_OhneHinweis(self) -> None:
+        # Der Hub hat geantwortet: "Gateway target device failed to respond"
+        meldung = self._fehlermeldung(return_value=ExceptionResponse(3, 11))
+
+        self.assertIn("Batterie-Test", meldung)
+        self.assertNotIn("read_timeout", meldung)
+
+    def test_read_AbgeschnitteneAntwort_OhneHinweis(self) -> None:
+        # Auch das ist eine Antwort - nur eine kaputte. Ein hoeheres Timeout aendert nichts.
+        meldung = self._fehlermeldung(side_effect=_abgeschnitten())
+
+        self.assertNotIn("read_timeout", meldung)
 
 
 class ReadWithRetryTest(unittest.TestCase):

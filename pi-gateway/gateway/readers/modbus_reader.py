@@ -13,11 +13,17 @@ from datetime import datetime, timezone
 
 from pymodbus.client import ModbusTcpClient
 from pymodbus.exceptions import ModbusException
+from pymodbus.pdu import ExceptionResponse
 
 from ..models import MeterConfig, MeterReading, ReadError, RegisterSpec
 from .base import Reader
 
 log = logging.getLogger(__name__)
+
+# So meldet pymodbus (3.7+) eine ausbleibende Antwort: als ModbusIOException mit diesem Text,
+# nicht als Fehler-Response ("No response received after 3 retries ..." bzw. "... of the last
+# requests ..., CLOSING CONNECTION").
+_KEINE_ANTWORT = "No response received"
 
 # float32 belegt zwei aufeinanderfolgende 16-bit-Register.
 # Wie viele Modbus-Register ein Typ belegt. Frueher eine Konstante 2 - der Ladezustand des
@@ -95,6 +101,11 @@ class ModbusReader(Reader):
             zustand=zustand or None,
         )
 
+    def _timeout_hinweis(self) -> str:
+        """Hinweis fuer eine ausbleibende Antwort: Nur dort hilft ein hoeheres read_timeout."""
+        return (f" (keine Antwort innerhalb {self.config.read_timeout_seconds:.1f}s – "
+                f"ggf. 'read_timeout' für diesen Zähler erhöhen)")
+
     def _read_float(self, register: RegisterSpec, rolle: str) -> float:
         anzahl = _REGISTERS_PER_TYP[register.typ]
         try:
@@ -108,22 +119,26 @@ class ModbusReader(Reader):
             # Antwort ("Unable to decode frame ... byte_count 4 > length of packet 3") kommt
             # als ModbusIOException. Das ist derselbe sporadische Fehler der RTU-Strecke wie
             # exception_code=11 - als ReadError greift der Retry (FR-1.6).
+            #
+            # Auch eine AUSBLEIBENDE Antwort kommt so (pymodbus 3.8: "No response received
+            # after 3 retries ..."). Nur dann hilft ein hoeheres read_timeout (FR-1.5).
+            hinweis = self._timeout_hinweis() if _KEINE_ANTWORT in str(exc) else ""
             raise ReadError(
                 f"'{self.messpunkt}' {rolle}: Modbus-Fehler bei Register "
-                f"0x{register.addr:04X} – {exc}"
+                f"0x{register.addr:04X} – {exc}{hinweis}"
             ) from exc
         if response.isError():
             # Timeout und Exception-Response unterscheiden: bei einer Exception-Response hat
             # das Gerät/der Hub GEANTWORTET (z. B. code 11 = Gateway target device failed to
             # respond) – dann hilft ein höheres Client-Timeout nicht, die Ursache liegt auf
             # der RTU-Strecke bzw. am Hub. Timeout-Hinweis daher nur, wenn keine Antwort kam.
-            hinweis = ""
-            if "ExceptionResponse" not in str(response):
-                hinweis = (f" (keine Antwort innerhalb {self.config.read_timeout_seconds:.1f}s – "
-                           f"ggf. 'read_timeout' für diesen Zähler erhöhen)")
+            #
+            # Am Typ erkennen, nicht an str(response): Die Textform ist ein Detail der Bibliothek
+            # und kann sich mit einem Update aendern.
+            hinweis = "" if isinstance(response, ExceptionResponse) else self._timeout_hinweis()
             raise ReadError(
                 f"'{self.messpunkt}' {rolle}: Modbus-Fehler bei Register "
-                f"0x{register.addr:04X} – {response}.{hinweis}"
+                f"0x{register.addr:04X} – {response}{hinweis}"
             )
 
         registers = response.registers
