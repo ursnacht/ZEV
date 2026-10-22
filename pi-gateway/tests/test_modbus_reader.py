@@ -130,6 +130,38 @@ class ClientKonfigurationTest(unittest.TestCase):
         self.assertEqual(5.0, kwargs["timeout"])
 
 
+class EinspeisungRegisterTest(unittest.TestCase):
+    """FR-1.4: Ohne register.einspeisung ein Modbus-Zugriff weniger, publiziert wird 0."""
+
+    def test_read_OhneEinspeisung_EinZugriffUndNull(self) -> None:
+        reader = _reader()
+        reader._client.read_holding_registers.return_value = _antwort(_HUNDERT)
+
+        stand = reader.read()
+
+        self.assertEqual(1, reader._client.read_holding_registers.call_count)
+        self.assertEqual(0x5000, reader._client.read_holding_registers.call_args.kwargs["address"])
+        self.assertEqual(100.0, stand.zaehlerstand_bezug)
+        self.assertEqual(0.0, stand.zaehlerstand_einspeisung)
+
+    def test_read_MitEinspeisung_ZweiZugriffeUndEchterWert(self) -> None:
+        reader = _reader()
+        reader.config = MeterConfig(
+            messpunkt="Wago-1", protokoll="modbus-tcp", register_bezug=RegisterSpec(addr=0x600C),
+            register_einspeisung=RegisterSpec(addr=0x6018), host="127.0.0.1")
+        # float32 big-endian 0x41200000 = 10.0
+        reader._client.read_holding_registers.side_effect = [_antwort(_HUNDERT),
+                                                             _antwort([0x4120, 0x0000])]
+
+        stand = reader.read()
+
+        adressen = [aufruf.kwargs["address"]
+                    for aufruf in reader._client.read_holding_registers.call_args_list]
+        self.assertEqual([0x600C, 0x6018], adressen)
+        self.assertEqual(100.0, stand.zaehlerstand_bezug)
+        self.assertEqual(10.0, stand.zaehlerstand_einspeisung)
+
+
 class ReadWithRetryTest(unittest.TestCase):
 
     @mock.patch("gateway.main.time.sleep")
