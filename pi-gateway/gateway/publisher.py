@@ -3,6 +3,10 @@
 Topic:   zev/{orgId}/{messpunkt}/messwert
 Payload: {"timestamp": "...Z", "zaehlerstandBezug": ..., "zaehlerstandEinspeisung": ...}
 
+Nur der Simulator (protokoll: sim-gplug) erzeugt zusaetzlich die Meldung eines gPlugK:
+Topic gPlug/{orgId}/{messpunkt}/tele/SENSOR, Tasmota-Payload, QoS 0
+(Specs/Pi-Gateway-Software.md, FR-8.3; Specs/MQTT-Integration.md, FR-10).
+
 Der Pi publiziert die gelesenen Stände unverändert (keine Delta-Bildung); die
 Aggregation erfolgt im Backend (Specs/MQTT-Integration.md).
 """
@@ -21,6 +25,12 @@ log = logging.getLogger(__name__)
 
 # kWh mit 4 Nachkommastellen entspricht der Backend-Spalte DECIMAL(14,4).
 _KWH_DECIMALS = 4
+
+# Ein gPlug liefert die Zaehlerstaende in Wh-Aufloesung, also kWh mit 3 Nachkommastellen.
+_GPLUG_KWH_DECIMALS = 3
+# Tasmota publiziert mit QoS 0 - der Simulator ebenso, damit er auch den Puffer des Brokers
+# (queue_qos0_messages) so beansprucht wie ein echter gPlug.
+_GPLUG_QOS = 0
 
 _DEFAULT_PORTS = {"tcp": 1883, "mqtt": 1883, "tls": 8883, "mqtts": 8883, "ssl": 8883}
 _TLS_SCHEMES = {"tls", "mqtts", "ssl"}
@@ -61,10 +71,16 @@ class MqttPublisher:
 
     def publish(self, reading: MeterReading) -> bool:
         """Publiziert einen Zählerstand. Gibt True bei erfolgreichem Enqueue zurück."""
-        topic = f"zev/{self._org_id}/{reading.messpunkt}/messwert"
-        payload = json.dumps(_to_payload(reading), separators=(",", ":"))
+        if reading.meldung == "gplug":
+            topic = f"gPlug/{self._org_id}/{reading.messpunkt}/tele/SENSOR"
+            payload = json.dumps(_to_gplug_payload(reading), separators=(",", ":"))
+            qos = _GPLUG_QOS
+        else:
+            topic = f"zev/{self._org_id}/{reading.messpunkt}/messwert"
+            payload = json.dumps(_to_payload(reading), separators=(",", ":"))
+            qos = self._broker.qos
 
-        info = self._client.publish(topic, payload, qos=self._broker.qos)
+        info = self._client.publish(topic, payload, qos=qos)
         if info.rc != mqtt.MQTT_ERR_SUCCESS:
             log.warning(
                 "Publish für '%s' fehlgeschlagen (rc=%s) – Broker vermutlich offline.",
@@ -124,6 +140,32 @@ def _to_payload(reading: MeterReading) -> dict:
     if reading.zustand:
         payload["zustand"] = reading.zustand
     return payload
+
+
+def _to_gplug_payload(reading: MeterReading) -> dict:
+    """Baut die Tasmota-SENSOR-Meldung eines gPlugK (Specs/MQTT-Integration.md, FR-10.3).
+
+    ``Time`` ist die lokale Zeit **ohne** Offset - so sendet Tasmota sie. Im Objekt ``z`` stehen
+    die Zaehlerstaende (``Ei``/``Eo``, kWh), die Tarifregister (hier alles im Hochtarif), die
+    Momentanleistung (``Pi``/``Po``, kW) und - falls konfiguriert - die Zaehlerkennung ``SMid``.
+    Das Backend verwendet nur ``Time``, ``Ei``, ``Eo`` und ``SMid``; die uebrigen Felder sind
+    dabei, damit der Simulator auch prueft, dass sie das Speichern nicht verhindern.
+    """
+    zeit = reading.timestamp.astimezone().replace(microsecond=0, tzinfo=None)
+    ei = round(reading.zaehlerstand_bezug, _GPLUG_KWH_DECIMALS)
+    eo = round(reading.zaehlerstand_einspeisung, _GPLUG_KWH_DECIMALS)
+    z: dict = {}
+    if reading.seriennummer:
+        z["SMid"] = reading.seriennummer
+    z["Pi"] = reading.leistung_bezug_kw if reading.leistung_bezug_kw is not None else 0.0
+    z["Po"] = reading.leistung_einspeisung_kw if reading.leistung_einspeisung_kw is not None else 0.0
+    z["Ei"] = ei
+    z["Eo"] = eo
+    z["Ei1"] = ei
+    z["Ei2"] = 0.0
+    z["Eo1"] = eo
+    z["Eo2"] = 0.0
+    return {"Time": zeit.isoformat(), "z": z}
 
 
 def _parse_broker_url(url: str) -> tuple[str, str, int]:

@@ -12,6 +12,7 @@ import ch.nacht.repository.GeraetezustandRepository;
 import ch.nacht.repository.ZaehlerRohdatenRepository;
 import ch.nacht.util.Ortszeit;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +42,9 @@ import java.util.Optional;
  * (kein {@code OrganizationContextService}, kein {@code orgFilter}). Fehler werden geloggt und
  * die Nachricht verworfen – niemals nach aussen geworfen (der Adapter gilt als konsumiert).
  *
+ * <p>Zwei Quellen, ein Weg: Meldungen des Pi-Gateways ({@code zev/…}) und Tasmota-Meldungen der
+ * gPlugK ({@code gPlug/…}, FR-10) werden beim Lesen in dieselbe interne Form übersetzt.
+ *
  * <p>Neben den Zählerständen trägt eine Nachricht optional <b>Zustandswerte</b> (Ladezustand u.a.,
  * {@code Specs/Gerätezustand.md}). Sie sind <b>Beiwerk</b>: Ein ungültiger Wert verwirft weder die
  * Nachricht noch die Zählerstände und berührt {@link MqttMetrics} nicht.
@@ -51,6 +57,12 @@ public class MqttIngestService {
 
     /** Spaltenlänge von {@code zaehler_rohdaten.seriennummer} – längere Werte werden gekürzt. */
     private static final int MAX_SERIENNUMMER_LAENGE = 64;
+
+    /** Root-Namespace der gPlug-Meldungen (FR-10.2). */
+    private static final String GPLUG_ROOT = "gPlug";
+
+    /** Frühere Zeiten stammen von einer noch nicht synchronisierten gPlug-Uhr (FR-10.5). */
+    private static final LocalDateTime GPLUG_FRUEHESTE_ZEIT = LocalDateTime.of(2020, 1, 1, 0, 0);
 
     private final EinheitRepository einheitRepository;
     private final ZaehlerRohdatenRepository rohdatenRepository;
@@ -81,36 +93,25 @@ public class MqttIngestService {
         log.info("MQTT data received. Topic: {}, payload: {}", topic, payload);
         metrics.recordReceived();
         try {
-            // 1) Topic parsen: zev/{orgId}/{messpunkt}/messwert
             if (topic == null) {
                 log.warn("MQTT: Nachricht ohne Topic verworfen");
                 metrics.recordFailed();
                 return;
             }
-            String[] parts = topic.split("/");
-            if (parts.length != 4 || !"zev".equals(parts[0]) || !"messwert".equals(parts[3])) {
-                log.warn("MQTT: ungültiges Topic '{}' verworfen", topic);
-                metrics.recordFailed();
-                return;
-            }
-            long orgId;
-            try {
-                orgId = Long.parseLong(parts[1]);
-            } catch (NumberFormatException e) {
-                log.warn("MQTT: ungültige orgId im Topic '{}' verworfen", topic);
-                metrics.recordFailed();
-                return;
-            }
-            String messpunkt = parts[2];
 
-            // 2) Payload parsen + validieren
-            ZaehlerMesswertPayloadDTO p = objectMapper.readValue(payload, ZaehlerMesswertPayloadDTO.class);
-            if (p.getTimestamp() == null || p.getZaehlerstandBezug() == null
-                    || p.getZaehlerstandEinspeisung() == null) {
-                log.warn("MQTT: Pflichtfeld fehlt (Topic {}) – verworfen", topic);
+            // 1) + 2) Topic und Payload lesen: Pi-Gateway (zev/{orgId}/{messpunkt}/messwert) oder
+            //    gPlugK (gPlug/{orgId}/{messpunkt}/tele/SENSOR, FR-10). Beide ergeben dieselbe
+            //    interne Form; ab hier gibt es keinen Unterschied mehr.
+            Meldung meldung = topic.startsWith(GPLUG_ROOT + "/")
+                    ? leseGplugMeldung(topic, payload)
+                    : leseZevMeldung(topic, payload);
+            if (meldung == null) {
                 metrics.recordFailed();
                 return;
             }
+            long orgId = meldung.orgId();
+            String messpunkt = meldung.messpunkt();
+            ZaehlerMesswertPayloadDTO p = meldung.werte();
             if (p.getZaehlerstandBezug().signum() < 0 || p.getZaehlerstandEinspeisung().signum() < 0) {
                 log.warn("MQTT: negativer Zählerstand (Topic {}) – verworfen", topic);
                 metrics.recordFailed();
@@ -134,10 +135,7 @@ public class MqttIngestService {
             }
 
             // 4) Rohdaten upsert je Einheit (org_id explizit)
-            // Der Pi sendet die lokale Zeit mit Offset (ISO 8601); die lokale Wanduhrzeit
-            // wird verbatim übernommen – konsistent mit dem CSV-Upload und der messwerte-Tabelle
-            // (naive lokale Zeit). Unabhängig von der Backend-Zeitzone.
-            LocalDateTime zeit = p.getTimestamp().toLocalDateTime();
+            LocalDateTime zeit = meldung.zeit();
             for (Einheit einheit : einheiten) {
                 upsertRohdaten(orgId, einheit, zeit, p);
             }
@@ -152,6 +150,117 @@ public class MqttIngestService {
         } catch (Exception e) {
             metrics.recordFailed();
             log.warn("MQTT: Nachricht verworfen (Topic {}): {}", topic, e.getMessage());
+        }
+    }
+
+    /**
+     * Eine gelesene Meldung in interner Form: Mandant und Messpunkt aus dem Topic, die lokale
+     * Wanduhrzeit und die Werte nach dem Vertrag von FR-3.
+     */
+    private record Meldung(long orgId, String messpunkt, LocalDateTime zeit, ZaehlerMesswertPayloadDTO werte) {
+    }
+
+    /**
+     * Liest eine Meldung des Pi-Gateways (FR-2, FR-3). {@code null} = verworfen, der Grund ist
+     * geloggt.
+     */
+    private Meldung leseZevMeldung(String topic, String payload) throws Exception {
+        String[] parts = topic.split("/");
+        if (parts.length != 4 || !"zev".equals(parts[0]) || !"messwert".equals(parts[3])) {
+            log.warn("MQTT: ungültiges Topic '{}' verworfen", topic);
+            return null;
+        }
+        Long orgId = parseOrgId(parts[1], topic);
+        if (orgId == null) {
+            return null;
+        }
+
+        ZaehlerMesswertPayloadDTO p = objectMapper.readValue(payload, ZaehlerMesswertPayloadDTO.class);
+        if (p.getTimestamp() == null || p.getZaehlerstandBezug() == null
+                || p.getZaehlerstandEinspeisung() == null) {
+            log.warn("MQTT: Pflichtfeld fehlt (Topic {}) – verworfen", topic);
+            return null;
+        }
+        // Der Pi sendet die lokale Zeit mit Offset (ISO 8601); die lokale Wanduhrzeit
+        // wird verbatim übernommen – konsistent mit dem CSV-Upload und der messwerte-Tabelle
+        // (naive lokale Zeit). Unabhängig von der Backend-Zeitzone.
+        return new Meldung(orgId, parts[2], p.getTimestamp().toLocalDateTime(), p);
+    }
+
+    /**
+     * Liest die Tasmota-{@code SENSOR}-Meldung eines gPlugK (Specs/MQTT-Integration.md, FR-10) und
+     * übersetzt sie in die interne Form: {@code Time} → Zeit, {@code z.Ei} → Bezug, {@code z.Eo} →
+     * Einspeisung (fehlt es: 0), {@code z.SMid} → Seriennummer. Alle übrigen Felder (Leistung,
+     * Strom, Spannung, Tarifregister) werden ignoriert. {@code null} = verworfen, der Grund ist
+     * geloggt.
+     */
+    private Meldung leseGplugMeldung(String topic, String payload) throws Exception {
+        String[] parts = topic.split("/");
+        if (parts.length != 5 || !GPLUG_ROOT.equals(parts[0]) || !"tele".equals(parts[3])
+                || !"SENSOR".equals(parts[4])) {
+            log.warn("MQTT: ungültiges gPlug-Topic '{}' verworfen", topic);
+            return null;
+        }
+        Long orgId = parseOrgId(parts[1], topic);
+        if (orgId == null) {
+            return null;
+        }
+
+        JsonNode wurzel = objectMapper.readTree(payload);
+        JsonNode zeitKnoten = wurzel.path("Time");
+        JsonNode z = wurzel.path("z");
+        JsonNode ei = z.path("Ei");
+        if (!zeitKnoten.isTextual() || !ei.isNumber()) {
+            log.warn("MQTT: gPlug-Pflichtfeld Time oder z.Ei fehlt (Topic {}) – verworfen", topic);
+            return null;
+        }
+        LocalDateTime zeit = parseGplugZeit(zeitKnoten.asText());
+        if (zeit.isBefore(GPLUG_FRUEHESTE_ZEIT)) {
+            // Vor der ersten NTP-Synchronisation zaehlt Tasmota ab 1970.
+            log.warn("MQTT: gPlug-Uhr nicht synchronisiert (Time {}, Topic {}) – verworfen", zeit, topic);
+            return null;
+        }
+        JsonNode eo = z.path("Eo");
+        BigDecimal bezug = ei.decimalValue();
+        BigDecimal einspeisung = eo.isNumber() ? eo.decimalValue() : BigDecimal.ZERO;
+        if (bezug.signum() == 0 && einspeisung.signum() == 0) {
+            // Nach einem Neustart meldet der gPlug Nullen, bis er das erste Telegramm des
+            // Smartmeters gelesen hat. Gespeichert loeste so ein Stand erst einen Ruecksprung
+            // aus und im Folgeintervall einen Sprung um den ganzen Zaehlerstand (FR-10.5).
+            log.warn("MQTT: gPlug meldet Ei = Eo = 0 (Topic {}) – verworfen", topic);
+            return null;
+        }
+
+        ZaehlerMesswertPayloadDTO werte = new ZaehlerMesswertPayloadDTO();
+        werte.setZaehlerstandBezug(bezug);
+        werte.setZaehlerstandEinspeisung(einspeisung);
+        JsonNode smid = z.path("SMid");
+        if (smid.isValueNode() && !smid.isNull()) {
+            werte.setSeriennummer(smid.asText());
+        }
+        return new Meldung(orgId, parts[2], zeit, werte);
+    }
+
+    /**
+     * Tasmota sendet die lokale Zeit ohne Offset ({@code 2026-10-20T14:30:00}); sie wird verbatim
+     * übernommen. Trägt sie doch einen Offset, gilt ebenfalls die lokale Wanduhrzeit - wie beim
+     * Pi-Gateway.
+     */
+    private static LocalDateTime parseGplugZeit(String text) {
+        try {
+            return LocalDateTime.parse(text);
+        } catch (DateTimeParseException e) {
+            return OffsetDateTime.parse(text).toLocalDateTime();
+        }
+    }
+
+    /** {@code null}, wenn die orgId im Topic keine Zahl ist (geloggt). */
+    private static Long parseOrgId(String text, String topic) {
+        try {
+            return Long.parseLong(text);
+        } catch (NumberFormatException e) {
+            log.warn("MQTT: ungültige orgId im Topic '{}' verworfen", topic);
+            return null;
         }
     }
 

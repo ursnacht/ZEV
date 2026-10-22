@@ -16,6 +16,7 @@ from .sim_reader import SimReader
 _READERS: dict[str, Callable[[MeterConfig], Reader]] = {
     "modbus-tcp": ModbusReader,
     "sim": SimReader,      # Publisher-Simulator (synthetische Zählerstände)
+    "sim-gplug": SimReader,  # dito, publiziert als gPlugK-Meldung (FR-8.3)
 }
 
 

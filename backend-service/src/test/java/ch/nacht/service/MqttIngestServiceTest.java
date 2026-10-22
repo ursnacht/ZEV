@@ -610,4 +610,240 @@ public class MqttIngestServiceTest {
         verify(metrics).recordProcessed();
         verify(metrics, never()).recordFailed();
     }
+
+    // --- gPlugK (FR-10): Tasmota-SENSOR-Meldung ------------------------------
+
+    private static final String GPLUG_TOPIC = "gPlug/100/MP-001/tele/SENSOR";
+
+    /** Eine gPlug-Meldung wie in FR-10.3; {@code zFelder} ist der Inhalt des Objekts {@code z}. */
+    private String gplug(String time, String zFelder) {
+        String zeit = time == null ? "" : "\"Time\":\"" + time + "\",";
+        return "{" + zeit + "\"z\":{" + zFelder + "}}";
+    }
+
+    /** Vollständige Meldung mit allen Feldern, die ein gPlugK typischerweise liefert. */
+    private static final String GPLUG_Z_VOLL = "\"SMid\":\"12345678\","
+            + "\"Pi\":0.512,\"Po\":0.000,\"Pi1\":0.170,\"Pi2\":0.210,\"Pi3\":0.132,"
+            + "\"I1\":0.80,\"I2\":0.95,\"I3\":0.61,\"U1\":231,\"U2\":230,\"U3\":232,"
+            + "\"Ei\":12345.678,\"Eo\":4321.000,"
+            + "\"Ei1\":8000.123,\"Ei2\":4345.555,\"Eo1\":3000.000,\"Eo2\":1321.000";
+
+    @Test
+    void handle_GplugMeldung_SpeichertRohdaten() {
+        // Arrange
+        stubEinheitOhneBestand();
+
+        // Act - Tasmota-Zeit ohne Offset, alle typischen Felder
+        service.handle(GPLUG_TOPIC, gplug("2026-10-20T14:30:00", GPLUG_Z_VOLL));
+
+        // Assert - Time verbatim, Ei -> Bezug, Eo -> Einspeisung, SMid -> Seriennummer
+        ZaehlerRohdaten saved = captureSavedRohdaten();
+        assertEquals(ORG_ID, saved.getOrgId());
+        assertEquals(EINHEIT_ID, saved.getEinheitId());
+        assertEquals(LocalDateTime.of(2026, 10, 20, 14, 30), saved.getZeit());
+        assertEquals(0, new BigDecimal("12345.678").compareTo(saved.getZaehlerstandBezug()));
+        assertEquals(0, new BigDecimal("4321.000").compareTo(saved.getZaehlerstandEinspeisung()));
+        assertEquals("12345678", saved.getSeriennummer());
+        assertFalse(saved.isVerarbeitet());
+        verify(metrics).recordReceived();
+        verify(metrics).recordProcessed();
+        verify(metrics, never()).recordFailed();
+    }
+
+    /** Dieselbe Messung als Pi- und als gPlug-Meldung ergibt denselben Rohdatensatz (FR-10.4). */
+    @Test
+    void handle_GplugUndPiMeldung_GleicherRohdatensatz() {
+        // Arrange
+        stubEinheitOhneBestand();
+
+        // Act
+        service.handle(TOPIC, payload("2026-10-20T14:30:00+02:00", "12345.678", "4321.000",
+                seriennummerJson("12345678")));
+        service.handle(GPLUG_TOPIC, gplug("2026-10-20T14:30:00",
+                "\"SMid\":\"12345678\",\"Ei\":12345.678,\"Eo\":4321.000"));
+
+        // Assert
+        ArgumentCaptor<ZaehlerRohdaten> captor = ArgumentCaptor.forClass(ZaehlerRohdaten.class);
+        verify(rohdatenRepository, times(2)).save(captor.capture());
+        ZaehlerRohdaten pi = captor.getAllValues().get(0);
+        ZaehlerRohdaten gplug = captor.getAllValues().get(1);
+        assertEquals(pi.getOrgId(), gplug.getOrgId());
+        assertEquals(pi.getEinheitId(), gplug.getEinheitId());
+        assertEquals(pi.getZeit(), gplug.getZeit());
+        assertEquals(0, pi.getZaehlerstandBezug().compareTo(gplug.getZaehlerstandBezug()));
+        assertEquals(0, pi.getZaehlerstandEinspeisung().compareTo(gplug.getZaehlerstandEinspeisung()));
+        assertEquals(pi.getSeriennummer(), gplug.getSeriennummer());
+        verify(metrics, times(2)).recordProcessed();
+    }
+
+    @Test
+    void handle_GplugOhneEoUndSMid_EinspeisungNullSeriennummerLeer() {
+        // Arrange - Zaehler ohne Einspeiseregister und ohne Kennung
+        stubEinheitOhneBestand();
+
+        // Act
+        service.handle(GPLUG_TOPIC, gplug("2026-10-20T14:30:00", "\"Ei\":12345.678"));
+
+        // Assert
+        ZaehlerRohdaten saved = captureSavedRohdaten();
+        assertEquals(0, BigDecimal.ZERO.compareTo(saved.getZaehlerstandEinspeisung()));
+        assertNull(saved.getSeriennummer());
+        verify(metrics).recordProcessed();
+    }
+
+    @Test
+    void handle_GplugZeitMitOffset_LokaleWanduhrzeitVerbatim() {
+        // Arrange
+        stubEinheitOhneBestand();
+
+        // Act
+        service.handle(GPLUG_TOPIC, gplug("2026-10-20T14:30:00+02:00", "\"Ei\":1.5"));
+
+        // Assert
+        assertEquals(LocalDateTime.of(2026, 10, 20, 14, 30), captureSavedRohdaten().getZeit());
+    }
+
+    /**
+     * Unbekannte Felder - in {@code z} wie auf oberster Ebene - verhindern das Speichern nicht
+     * (Vertrags-Regel wie FR-3). Schützt vor einer späteren Umstellung auf ein DTO, das bei
+     * unbekannten Feldern abbricht.
+     */
+    @Test
+    void handle_GplugUnbekannteFelder_WirdVerarbeitet() {
+        // Arrange
+        stubEinheitOhneBestand();
+
+        // Act
+        service.handle(GPLUG_TOPIC, "{\"Time\":\"2026-10-20T14:30:00\",\"ENERGY\":{\"Total\":1.0},"
+                + "\"z\":{\"Q5\":1.0,\"Neu\":\"x\",\"Ei\":12345.678,\"Eo\":4321.0}}");
+
+        // Assert
+        assertEquals(0, new BigDecimal("12345.678").compareTo(captureSavedRohdaten().getZaehlerstandBezug()));
+        verify(metrics).recordProcessed();
+        verify(metrics, never()).recordFailed();
+    }
+
+    @Test
+    void handle_GplugUngueltigeZeit_Discarded() {
+        service.handle(GPLUG_TOPIC, gplug("abc", "\"Ei\":12345.678"));
+
+        verify(metrics).recordFailed();
+        verify(rohdatenRepository, never()).save(any());
+    }
+
+    @Test
+    void handle_GplugOhneTime_Discarded() {
+        service.handle(GPLUG_TOPIC, gplug(null, "\"Ei\":12345.678"));
+
+        verify(metrics).recordFailed();
+        verify(rohdatenRepository, never()).save(any());
+    }
+
+    @Test
+    void handle_GplugOhneEi_Discarded() {
+        service.handle(GPLUG_TOPIC, gplug("2026-10-20T14:30:00", "\"Eo\":4321.0"));
+
+        verify(metrics).recordFailed();
+        verify(rohdatenRepository, never()).save(any());
+    }
+
+    @Test
+    void handle_GplugKeinJson_Discarded() {
+        service.handle(GPLUG_TOPIC, "kein-json");
+
+        verify(metrics).recordFailed();
+        verify(rohdatenRepository, never()).save(any());
+    }
+
+    /** Vor der ersten NTP-Synchronisation zählt Tasmota ab 1970 (FR-10.5). */
+    @Test
+    void handle_GplugZeitVor2020_Discarded() {
+        service.handle(GPLUG_TOPIC, gplug("1970-01-01T00:05:12", "\"Ei\":12345.678"));
+
+        verify(metrics).recordFailed();
+        verify(rohdatenRepository, never()).save(any());
+    }
+
+    /** Nullwerte nach einem Neustart des gPlug lösten sonst einen Sprung um den ganzen Stand aus. */
+    @Test
+    void handle_GplugEiUndEoNull_Discarded() {
+        service.handle(GPLUG_TOPIC, gplug("2026-10-20T14:30:00", "\"Ei\":0,\"Eo\":0"));
+
+        verify(metrics).recordFailed();
+        verify(rohdatenRepository, never()).save(any());
+    }
+
+    @Test
+    void handle_GplugUnbekannterMesspunkt_Discarded() {
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, "Fremd")).thenReturn(List.of());
+
+        service.handle("gPlug/100/Fremd/tele/SENSOR", gplug("2026-10-20T14:30:00", "\"Ei\":1.0"));
+
+        verify(metrics).recordFailed();
+        verify(rohdatenRepository, never()).save(any());
+    }
+
+    @Test
+    void handle_GplugUngueltigesTopic_Discarded() {
+        service.handle("gPlug/100/MP-001/tele/STATE", gplug("2026-10-20T14:30:00", "\"Ei\":1.0"));
+        service.handle("gPlug/abc/MP-001/tele/SENSOR", gplug("2026-10-20T14:30:00", "\"Ei\":1.0"));
+
+        verify(metrics, times(2)).recordFailed();
+        verify(einheitRepository, never()).findAllByOrgIdAndMesspunkt(anyLong(), any());
+        verify(rohdatenRepository, never()).save(any());
+    }
+
+    @Test
+    void handle_GplugAnLadestation_Discarded() {
+        Einheit ladestation = new Einheit("Ladestation", EinheitTyp.LADESTATION);
+        ladestation.setId(30L);
+        ladestation.setOrgId(ORG_ID);
+        ladestation.setMesspunkt(MESSPUNKT);
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT)).thenReturn(List.of(ladestation));
+
+        service.handle(GPLUG_TOPIC, gplug("2026-10-20T14:30:00", "\"Ei\":1.0"));
+
+        verify(metrics).recordFailed();
+        verify(rohdatenRepository, never()).save(any());
+    }
+
+    @Test
+    void handle_GplugGeteilterBilanzMesspunkt_ProjiziertJeRegister() {
+        // Arrange
+        Einheit bezugEinheit = new Einheit("Bezug", EinheitTyp.BEZUG);
+        bezugEinheit.setId(20L);
+        bezugEinheit.setOrgId(ORG_ID);
+        bezugEinheit.setMesspunkt(MESSPUNKT);
+        Einheit ruecklieferungEinheit = new Einheit("Rücklieferung", EinheitTyp.RUECKLIEFERUNG);
+        ruecklieferungEinheit.setId(21L);
+        ruecklieferungEinheit.setOrgId(ORG_ID);
+        ruecklieferungEinheit.setMesspunkt(MESSPUNKT);
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT))
+                .thenReturn(List.of(bezugEinheit, ruecklieferungEinheit));
+        when(rohdatenRepository.findByEinheitIdAndZeit(anyLong(), any())).thenReturn(Optional.empty());
+        when(rohdatenRepository.save(any(ZaehlerRohdaten.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act
+        service.handle(GPLUG_TOPIC, gplug("2026-10-20T14:30:00", GPLUG_Z_VOLL));
+
+        // Assert - BEZUG nur Ei, RUECKLIEFERUNG nur Eo
+        ArgumentCaptor<ZaehlerRohdaten> captor = ArgumentCaptor.forClass(ZaehlerRohdaten.class);
+        verify(rohdatenRepository, times(2)).save(captor.capture());
+        assertEquals(0, new BigDecimal("12345.678").compareTo(captor.getAllValues().get(0).getZaehlerstandBezug()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(captor.getAllValues().get(0).getZaehlerstandEinspeisung()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(captor.getAllValues().get(1).getZaehlerstandBezug()));
+        assertEquals(0, new BigDecimal("4321.000").compareTo(captor.getAllValues().get(1).getZaehlerstandEinspeisung()));
+    }
+
+    /** Ein fremder Mandant im Topic findet die Einheit nicht (Mandanten-Isolation wie FR-4). */
+    @Test
+    void handle_GplugFremdeOrgId_Discarded() {
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(999L, MESSPUNKT)).thenReturn(List.of());
+
+        service.handle("gPlug/999/MP-001/tele/SENSOR", gplug("2026-10-20T14:30:00", "\"Ei\":1.0"));
+
+        verify(einheitRepository).findAllByOrgIdAndMesspunkt(999L, MESSPUNKT);
+        verify(metrics).recordFailed();
+        verify(rohdatenRepository, never()).save(any());
+    }
 }

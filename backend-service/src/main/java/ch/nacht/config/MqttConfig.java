@@ -39,6 +39,10 @@ public class MqttConfig {
     @Value("${mqtt.topic:zev/+/+/messwert}")
     private String topic;
 
+    /** Zweites Abo fuer die gPlugK (MQTT-Integration.md, FR-10); leer = kein gPlug-Abo. */
+    @Value("${mqtt.topic-gplug:gPlug/+/+/tele/SENSOR}")
+    private String topicGplug;
+
     @Value("${mqtt.qos:1}")
     private int qos;
 
@@ -77,8 +81,12 @@ public class MqttConfig {
     @Bean
     public MqttPahoMessageDrivenChannelAdapter mqttInbound(MqttPahoClientFactory mqttClientFactory,
                                                            MessageChannel mqttInputChannel) {
+        // Beide Abos ueber dieselbe Verbindung und Sitzung (eine Client-ID, FR-1.3).
+        String[] topics = topicGplug == null || topicGplug.isBlank()
+                ? new String[]{topic}
+                : new String[]{topic, topicGplug};
         MqttPahoMessageDrivenChannelAdapter adapter =
-                new MqttPahoMessageDrivenChannelAdapter(clientId, mqttClientFactory, topic);
+                new MqttPahoMessageDrivenChannelAdapter(clientId, mqttClientFactory, topics);
         // Nach einem Neustart mit gepufferten Nachrichten meldet das Abo "Timed out (32000)" - erwartet und
         // harmlos, eine laengere Wartezeit hilft nicht (MQTT-Integration.md, FR-1.6).
         adapter.setCompletionTimeout(5000);

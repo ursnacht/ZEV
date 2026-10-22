@@ -16,11 +16,17 @@ Verhalten je Zähler wird über den `messpunkt` gesteuert:
                                                        (`total` mal positiv, mal negativ); dazu ein
                                                        Ladezustand (`soc`), der der Phase folgt
 - sonst (Consumer)                                   → Bezug wächst, kaum Einspeisung (positives `total`)
+
+Mit ``protokoll: sim-gplug`` erzeugt derselbe Reader die Messung eines **gPlugK**: Der Publisher
+sendet sie als Tasmota-SENSOR-Meldung auf ``gPlug/{orgId}/{messpunkt}/tele/SENSOR`` statt im
+Format des Pi-Gateways (Specs/Pi-Gateway-Software.md, FR-8.3). Dazu kommt die Momentanleistung
+(``Pi``/``Po``), die ein echter gPlug mitliefert; einen Ladezustand hat ein gPlug nicht.
 """
 
 from __future__ import annotations
 
 import random
+import time
 from datetime import datetime, timezone
 
 from ..models import MeterConfig, MeterReading
@@ -65,8 +71,13 @@ class SimReader(Reader):
         self._phase_rest = random.randint(_PHASE_MIN, _PHASE_MAX)
         # Ladezustand in Prozent. Startet halbvoll, damit beide Richtungen sofort sichtbar sind.
         self._soc = 50.0
+        # gPlug-Modus: Momentanleistung aus dem Zuwachs seit dem letzten Lesen. None = noch kein
+        # Lesen - die erste Meldung traegt Leistung 0, sonst teilte sie durch Millisekunden.
+        self._gplug = config.protokoll == "sim-gplug"
+        self._letzter_read: float | None = None
 
     def read(self) -> MeterReading:
+        bezug_vorher, einspeisung_vorher = self._bezug, self._einspeisung
         if self._mode == "producer":
             self._bezug += random.uniform(0.0, 0.05)
             self._einspeisung += random.uniform(0.30, 0.80)
@@ -110,7 +121,21 @@ class SimReader(Reader):
         # Er wird aus der LAUFENDEN PHASE abgeleitet, nicht unabhaengig gewuerfelt: Ein SOC, der
         # faellt waehrend die Ladung steigt, widerspraeche den Zaehlerstaenden derselben Nachricht -
         # und genau diese Art Widerspruch soll der Simulator aufdecken, nicht erzeugen.
-        zustand = {"soc": round(self._soc, 1)} if self._mode == "speicher" else None
+        zustand = {"soc": round(self._soc, 1)} if self._mode == "speicher" and not self._gplug else None
+
+        leistung_bezug = leistung_einspeisung = None
+        if self._gplug:
+            # Mittlere Leistung seit dem letzten Lesen: kWh / h = kW. So passen Leistung und
+            # Zaehlerstaende derselben Meldung zusammen, wie bei einem echten Zaehler. Weil der
+            # Simulator beschleunigt (je Lesen statt je Stunde) zaehlt, ist sie entsprechend hoch.
+            jetzt = time.monotonic()
+            if self._letzter_read is None:
+                leistung_bezug = leistung_einspeisung = 0.0
+            else:
+                stunden = max(jetzt - self._letzter_read, 1.0) / 3600.0
+                leistung_bezug = round((self._bezug - bezug_vorher) / stunden, 3)
+                leistung_einspeisung = round((self._einspeisung - einspeisung_vorher) / stunden, 3)
+            self._letzter_read = jetzt
 
         return MeterReading(
             messpunkt=self.messpunkt,
@@ -119,4 +144,7 @@ class SimReader(Reader):
             zaehlerstand_einspeisung=round(self._einspeisung, 4),
             seriennummer=self.config.seriennummer,
             zustand=zustand,
+            meldung="gplug" if self._gplug else "zev",
+            leistung_bezug_kw=leistung_bezug,
+            leistung_einspeisung_kw=leistung_einspeisung,
         )

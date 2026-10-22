@@ -148,6 +148,17 @@
 ### FR-7: Monitoring / Heartbeat
 1. „Letzter erfolgreicher Read"- und „letzter erfolgreicher Publish"-Zeitstempel exponieren (z.B. Logfile, lokaler Statusendpunkt oder eigenes MQTT-Status-Topic), damit stiller Ausfall erkennbar ist (vgl. `docs/Netzwerk-Topologie-Hene.md`, Punkt „Monitoring gegen stillen Ausfall").
 
+### FR-8: Publisher-Simulator (Test ohne Hardware)
+1. **`protokoll: sim`** erzeugt synthetische, monoton steigende **absolute** Zählerstände, statt einen Zähler zu lesen, und publiziert sie über den echten Publish-Pfad (FR-3). Damit lässt sich der ganze Weg `Simulator → Broker → Backend-Ingest → zaehler_rohdaten → Aggregation` ohne Pi und Hardware prüfen. Vorlage: `pi-gateway/config.sim.example.yaml`.
+2. Der **Messpunkt-Name** bestimmt das Verhalten: `producer` (Einspeisung überwiegt), `bilanz` (beide Register), `bezug` bzw. `rücklieferung` (nur ein Register), `speicher`/`batterie` (wechselnde Lade- und Entladephasen samt Ladezustand `soc`), sonst Consumer. Einzelheiten: `pi-gateway/README.md`, Abschnitt „Publisher-Simulator“.
+3. **gPlugK simulieren (`protokoll: sim-gplug`):** dieselben Modi, aber als Meldung eines gPlugK nach `Specs/MQTT-Integration.md`, FR-10:
+   * Topic `gPlug/{org_id}/{messpunkt}/tele/SENSOR`, **QoS 0** (wie Tasmota).
+   * Payload `{"Time": "<lokale Zeit ohne Offset, ohne Sekundenbruchteile>", "z": {...}}`. In `z`: `SMid` (nur mit konfigurierter `seriennummer`), `Pi`/`Po` (kW), `Ei`/`Eo` (kWh, 3 Nachkommastellen) und die Tarifregister `Ei1`/`Ei2`/`Eo1`/`Eo2` (alles im Hochtarif: `Ei1 = Ei`, `Ei2 = 0`).
+   * `Pi`/`Po` sind die mittlere Leistung seit dem letzten Lesen; die erste Meldung trägt 0.
+   * Kein `zustand` – ein gPlug kennt keinen Ladezustand, auch nicht bei einem Speicher-Namen.
+   > Damit lässt sich der gPlug-Ingest des Backends prüfen, bevor ein echter gPlug angeschlossen ist, und später jederzeit ohne Gerät wieder. Echte gPlugs publizieren selbst (Abschnitt 7); `sim-gplug` ist nur im Simulator sinnvoll.
+4. Simulator-Zähler (`sim`, `sim-gplug`) brauchen weder `host` noch `register`.
+
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
 * [ ] Der Dienst liest **alle konfigurierten Zähler** (beliebige Anzahl; bei Hene 15 Wago, BKW über WhatWatt und Batterie, alle Modbus TCP) im konfigurierten Intervall aus.
@@ -177,6 +188,10 @@
 * [ ] Zeitstempel sind lokale Zeit mit korrektem UTC-Offset (NTP + Zeitzone); driftende Uhr wird als Problem erkennbar.
 * [ ] Keine Secrets im Code/Repo; Broker-Zugangsdaten via Env/Config.
 * [ ] „Letzter erfolgreicher Read/Publish" ist auslesbar (Heartbeat).
+* [x] `protokoll: sim-gplug` wird ohne `host` und `register` akzeptiert und erzeugt einen Simulator-Reader (FR-8.3, FR-8.4). (Test: test_sim_gplug.py › SimGplugConfigTest › test_loadConfig_SimGplugOhneHostUndRegister_Gueltig; test_sim_gplug.py › SimGplugReaderTest › test_factory_SimGplug_ErzeugtSimReader)
+* [x] Eine `sim-gplug`-Messung wird auf `gPlug/{org_id}/{messpunkt}/tele/SENSOR` mit QoS 0 publiziert; `sim`- und Modbus-Zähler publizieren unverändert auf `zev/…/messwert` mit der QoS des Brokers. (Test: test_sim_gplug.py › GplugPublishTest › test_publish_Gplug_TopicSensorUndQos0, test_publish_Zev_UnveraendertTopicMesswertUndBrokerQos; test_sim_gplug.py › SimGplugReaderTest › test_read_Sim_MeldungBleibtZev)
+* [x] Die gPlug-Meldung trägt `Time` als lokale Zeit ohne Offset und ohne Sekundenbruchteile, `z.Ei`/`z.Eo` in kWh mit 3 Nachkommastellen, `z.SMid` nur mit konfigurierter Seriennummer, dazu `Pi`/`Po` und Tarifregister, deren Summe `Ei` bzw. `Eo` ergibt. (Test: test_sim_gplug.py › GplugPayloadTest › test_payload_TimeLokalOhneOffsetOhneMikrosekunden, test_payload_ZaehlerstaendeInKwhMitDreiStellen, test_payload_TarifregisterSummierenSich, test_payload_OhneSeriennummer_KeinSMid)
+* [x] `Pi`/`Po` sind die mittlere Leistung seit dem letzten Lesen, die erste Meldung trägt 0; ein `sim-gplug`-Zähler meldet keinen Ladezustand. (Test: test_sim_gplug.py › SimGplugReaderTest › test_read_ErsteMeldung_LeistungNull, test_read_FolgeMeldung_LeistungAusZuwachs, test_read_SimGplug_MeldungGplugOhneZustand)
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
@@ -395,4 +410,7 @@ journalctl -u pi-gateway.service -f
 
 ### B.2 Feld `zustand` im Payload nachgetragen (FR-3, 20.10.2026)
 FR-3.2 nannte nur `seriennummer` als optionales Feld, das Akzeptanzkriterium zur Topic-/Payload-Struktur lautete „… – plus das **optionale** `seriennummer`, sofern konfiguriert.“ Das Feld `zustand` kam mit `Specs/Gerätezustand.md` in Konfiguration und Publisher dazu (`gateway/config.py`, `gateway/publisher.py`) und im Vertrag `MQTT-Integration.md`, FR-3; diese Spec war nicht nachgeführt. Der Checkbox-Status des Kriteriums bleibt.
+
+### B.3 Simulator in die Spec aufgenommen, gPlug-Modus (FR-8, 22.10.2026)
+Der Publisher-Simulator (`protokoll: sim`) war bisher nur in `pi-gateway/README.md` beschrieben. Mit dem gPlug-Modus (`protokoll: sim-gplug`) ist er als FR-8 in die Spec aufgenommen: Der User wollte das Auslesen und Speichern von gPlug-Meldungen testen können, bevor ein echter gPlug angeschlossen und eine echte Meldung mitgeschnitten ist (`Specs/MQTT-Integration.md`, FR-10, Anhang A.9). FR-8.1 und FR-8.2 beschreiben das bestehende Verhalten.
 

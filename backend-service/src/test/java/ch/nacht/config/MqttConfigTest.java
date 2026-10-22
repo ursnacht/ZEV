@@ -87,4 +87,47 @@ class MqttConfigTest {
         assertArrayEquals(new String[]{"zev/+/+/messwert"}, adapter.getTopic());
         assertArrayEquals(new int[]{1}, adapter.getQos());
     }
+
+    /** FR-10.2: das zweite Abo fuer die gPlugK laeuft ueber denselben Adapter und dieselbe QoS. */
+    @Test
+    void mqttInbound_MitGplugTopic_AbonniertBeideTopics() {
+        MqttConfig config = new MqttConfig();
+        ReflectionTestUtils.setField(config, "clientId", "zev-backend-subscriber");
+        ReflectionTestUtils.setField(config, "topic", "zev/+/+/messwert");
+        ReflectionTestUtils.setField(config, "topicGplug", "gPlug/+/+/tele/SENSOR");
+        ReflectionTestUtils.setField(config, "qos", 1);
+
+        MqttPahoMessageDrivenChannelAdapter adapter =
+                config.mqttInbound(factoryMit(false), config.mqttInputChannel());
+
+        assertArrayEquals(new String[]{"zev/+/+/messwert", "gPlug/+/+/tele/SENSOR"}, adapter.getTopic());
+        assertArrayEquals(new int[]{1, 1}, adapter.getQos());
+    }
+
+    /** Leeres {@code MQTT_TOPIC_GPLUG} schaltet das gPlug-Abo ab. */
+    @Test
+    void mqttInbound_GplugTopicLeer_NurPiTopic() {
+        MqttConfig config = new MqttConfig();
+        ReflectionTestUtils.setField(config, "clientId", "zev-backend-subscriber");
+        ReflectionTestUtils.setField(config, "topic", "zev/+/+/messwert");
+        ReflectionTestUtils.setField(config, "topicGplug", " ");
+        ReflectionTestUtils.setField(config, "qos", 1);
+
+        MqttPahoMessageDrivenChannelAdapter adapter =
+                config.mqttInbound(factoryMit(false), config.mqttInputChannel());
+
+        assertArrayEquals(new String[]{"zev/+/+/messwert"}, adapter.getTopic());
+    }
+
+    /** Ohne {@code MQTT_TOPIC_GPLUG} abonniert das Backend die SENSOR-Meldungen der gPlugK. */
+    @Test
+    void applicationMqttYml_OhneUmgebungsvariable_GplugTopicDefault() throws IOException {
+        StandardEnvironment env = new StandardEnvironment();
+        env.getPropertySources().remove(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME);
+        new YamlPropertySourceLoader()
+                .load("application-mqtt", new ClassPathResource("application-mqtt.yml"))
+                .forEach(env.getPropertySources()::addLast);
+
+        assertEquals("gPlug/+/+/tele/SENSOR", env.getProperty("mqtt.topic-gplug"));
+    }
 }

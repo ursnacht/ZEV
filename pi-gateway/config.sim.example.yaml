@@ -34,3 +34,8 @@ zaehler:
   # Im Backend braucht es dazu eine Einheit vom Typ SPEICHER mit GENAU diesem messpunkt,
   # sonst verwirft der Ingest die Meldungen als "unbekannter Messpunkt".
   - { messpunkt: "Batterie",       protokoll: sim, seriennummer: "SIM-0005" }
+  # gPlugK im Nachbarhaus (protokoll: sim-gplug): gleiche Modi wie oben, aber als Tasmota-Meldung
+  # auf gPlug/{org_id}/{messpunkt}/tele/SENSOR mit QoS 0 - so, wie ein echter gPlug sie sendet
+  # (Specs/MQTT-Integration.md, FR-10). seriennummer erscheint als z.SMid. Das Backend braucht
+  # dazu eine Einheit mit GENAU diesem messpunkt und ein aktives gPlug-Abo (mqtt.topic-gplug).
+  - { messpunkt: "MP-Nachbar-1",   protokoll: sim-gplug, seriennummer: "GPLUG-0001" }

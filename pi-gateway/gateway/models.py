@@ -30,7 +30,7 @@ class MeterConfig:
     """Vollständige Beschreibung eines Zählers (ein Eintrag der Zähler-Liste)."""
 
     messpunkt: str
-    protokoll: str                # "modbus-tcp" oder "sim"
+    protokoll: str                # "modbus-tcp", "sim" oder "sim-gplug" (Simulator)
     register_bezug: RegisterSpec
     # None = in der Config nicht angegeben (typisch bei Konsumenten): das Register wird
     # NICHT gelesen, publiziert wird 0 (Payload-Vertrag bleibt vollständig).
@@ -94,3 +94,10 @@ class MeterReading:
     # unveraendert. Anders als die Zaehlerstaende sind das KEINE kumulativen Groessen: Das Backend
     # legt sie getrennt ab und aggregiert sie nie (Specs/Geraetezustand.md).
     zustand: dict[str, float] | None = None
+    # Meldungsformat: "zev" = Vertrag des Pi-Gateways (Specs/MQTT-Integration.md, FR-3), "gplug" =
+    # Tasmota-SENSOR-Meldung eines gPlugK (FR-10). "gplug" erzeugt nur der Simulator
+    # (protokoll: sim-gplug) - echte gPlugs publizieren selbst, ohne dieses Gateway.
+    meldung: str = "zev"
+    # Momentanleistung in kW (nur die gPlug-Meldung traegt sie, das Backend ignoriert sie).
+    leistung_bezug_kw: float | None = None
+    leistung_einspeisung_kw: float | None = None

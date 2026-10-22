@@ -26,7 +26,9 @@ _ENV_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 # Umrechnung von Intervall-Kurzschreibweisen (z. B. "5m", "30s", "1h") in Sekunden.
 _INTERVAL_UNITS = {"s": 1, "m": 60, "h": 3600}
 
-_SUPPORTED_PROTOCOLS = {"modbus-tcp", "sim"}  # "sim" = Publisher-Simulator
+# "sim" = Publisher-Simulator, "sim-gplug" = Simulator mit gPlug-Meldungen (Specs/Pi-Gateway-Software.md, FR-8)
+_SIM_PROTOCOLS = {"sim", "sim-gplug"}
+_SUPPORTED_PROTOCOLS = {"modbus-tcp"} | _SIM_PROTOCOLS
 # float32: Wago-Zaehler (IEEE 754). uint32: Wechselrichter, die kumulative Energie als
 # vorzeichenlose Ganzzahl fuehren - der Solinteg MHT liefert kWh mal 10, also skalierung: 0.1.
 # uint16: Momentanwerte in EINEM Register - der Ladezustand desselben Geraets (Register 33000),
@@ -189,7 +191,7 @@ def _parse_meters(data, read_timeout: float) -> list[MeterConfig]:
                 f"nicht unterstützt (verfügbar: {sorted(_SUPPORTED_PROTOCOLS)})."
             )
 
-        if protokoll == "sim":
+        if protokoll in _SIM_PROTOCOLS:
             # Der Simulator liest weder Host noch echte Register – Felder optional.
             host = entry.get("host")
             register_bezug = _DUMMY_REGISTER

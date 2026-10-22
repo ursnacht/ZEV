@@ -7,6 +7,9 @@ mqtt:
     password: ${MQTT_BROKER_PASSWORD:}
   client-id: ${MQTT_CLIENT_ID:zev-backend-subscriber}
   topic: ${MQTT_TOPIC:zev/+/+/messwert}
+  # Zweites Abo fuer die gPlugK im Nachbarhaus (Tasmota-SENSOR-Meldung, Specs/MQTT-Integration.md
+  # FR-10). Leer = kein gPlug-Abo.
+  topic-gplug: ${MQTT_TOPIC_GPLUG:gPlug/+/+/tele/SENSOR}
   qos: ${MQTT_QOS:1}
   # false = dauerhafte Sitzung: der Broker puffert die Nachrichten, solange das Backend fehlt
   # (z. B. beim Update). Client-ID darf je Broker nur von einer Instanz benutzt werden.

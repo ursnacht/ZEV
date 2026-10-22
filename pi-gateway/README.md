@@ -143,6 +143,12 @@ Einheiten Typ Bezug **und** Typ Rücklieferung mit demselben `messpunkt` anlegen
 splittet die Meldung je Typ); `"bezug"` bzw. `"rücklieferung"` → nur ein Register wächst;
 sonst Consumer (positives `total`).
 
+**gPlugK simulieren:** Mit `protokoll: sim-gplug` sendet derselbe Simulator die Meldung eines
+gPlugK im Nachbarhaus – Topic `gPlug/{org_id}/{messpunkt}/tele/SENSOR`, Tasmota-Payload
+(`Time` ohne Offset, `z.Ei`/`z.Eo`/`z.SMid`, dazu Leistung und Tarifregister), QoS 0. So lässt
+sich der gPlug-Ingest des Backends (`Specs/MQTT-Integration.md`, FR-10) ohne Gerät prüfen: Die
+Werte müssen in `zaehler_rohdaten` genauso ankommen wie die einer Pi-Meldung.
+
 Der Broker erzwingt Auth (Username/Passwort). Dev-Credentials: `zev-backend` / `zev-mqtt-dev`
 (Default in `.env.mqtt.example` → `MOSQUITTO_USERS`).
 
@@ -203,7 +209,7 @@ beenden mit `Ctrl+C`.
 Viertelstunde (`:00/:15/:30/:45`, Job-Läufe `:05/:20/:35/:50`) schreibt der Job `zev.messwerte`
 (`total` vorzeichenbehaftet, `quelle = 'MQTT'`); die unmittelbar anschliessende Solarverteilung
 setzt `zev`/`zev_calculated` (Producer: im ZEV konsumierter Anteil). Mitlesen der Nachrichten optional:
-`mosquitto_sub -h localhost -t 'zev/#' -v -u zev-backend -P zev-mqtt-dev`.
+`mosquitto_sub -h localhost -t 'zev/#' -t 'gPlug/#' -v -u zev-backend -P zev-mqtt-dev`.
 
 ## Broker-Zugangsdaten (`MOSQUITTO_USERS`)
 
