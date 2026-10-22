@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import struct
+import time
 from datetime import datetime, timezone
 
 from pymodbus.client import ModbusTcpClient
@@ -19,6 +20,10 @@ from ..models import MeterConfig, MeterReading, ReadError, RegisterSpec
 from .base import Reader
 
 log = logging.getLogger(__name__)
+
+# Pause zwischen zwei Versuchen an einem Zustandsregister - dieselbe wie beim Retry der ganzen
+# Messung (main._RETRY_DELAY_SECONDS, FR-1.6).
+_ZUSTAND_RETRY_DELAY_SECONDS = 0.5
 
 # So meldet pymodbus (3.8, siehe requirements.txt) eine ausbleibende Antwort: als ModbusIOException mit diesem Text,
 # nicht als Fehler-Response ("No response received after 0 retries ..." bzw. "... of the last
@@ -80,10 +85,7 @@ class ModbusReader(Reader):
             )
             # Momentanwerte (Ladezustand u.a.). Je konfigurierter Groesse ein Zugriff - wer
             # keine konfiguriert, zahlt nichts dafuer.
-            zustand = {
-                name: round(self._read_float(spec, rolle=name), 3)
-                for name, spec in self.config.register_zustand.items()
-            }
+            zustand = self._read_zustand()
         finally:
             # An einem RTU->TCP-Hub mit wenigen erlaubten Sockets darf immer nur EINE
             # Verbindung offen sein. Da die Zähler sequenziell gelesen werden, hält das
@@ -106,6 +108,38 @@ class ModbusReader(Reader):
             seriennummer=self.config.seriennummer,
             zustand=zustand or None,
         )
+
+    def _read_zustand(self) -> dict[str, float]:
+        """Liest die Zustandsregister (FR-1.8). Sie sind **Beiwerk**: Ein Register wird bis zu
+        ``read_attempts``-mal gelesen; scheitern alle Versuche, fehlt nur diese Groesse - die
+        Zaehlerstaende derselben Messung werden trotzdem publiziert und nicht neu gelesen.
+
+        Vorher kostete ein ausbleibender Ladezustand die ganze Messung: Der Read galt als
+        gescheitert, nach dem letzten Versuch fehlten auch Lade- und Entladeenergie des Zyklus.
+        Beobachtet am 22.10.2026 am Wechselrichter von Hene (Register 0x80E8, keine Antwort).
+        """
+        zustand: dict[str, float] = {}
+        for name, spec in self.config.register_zustand.items():
+            wert = self._read_zustandswert(name, spec)
+            if wert is not None:
+                zustand[name] = wert
+        return zustand
+
+    def _read_zustandswert(self, name: str, spec: RegisterSpec) -> float | None:
+        """Ein Zustandsregister mit Wiederholung; ``None``, wenn alle Versuche scheitern."""
+        versuche = max(1, self.config.read_attempts)
+        for versuch in range(1, versuche + 1):
+            try:
+                return round(self._read_float(spec, rolle=name), 3)
+            except ReadError as exc:
+                if versuch < versuche:
+                    log.info("Zustandswert '%s' nicht gelesen, Versuch %d/%d – neuer Versuch in "
+                             "%.1fs: %s", name, versuch, versuche, _ZUSTAND_RETRY_DELAY_SECONDS, exc)
+                    time.sleep(_ZUSTAND_RETRY_DELAY_SECONDS)
+                else:
+                    log.warning("Zustandswert '%s' nach %d Versuch(en) nicht gelesen – "
+                                "Zählerstände werden ohne ihn publiziert: %s", name, versuche, exc)
+        return None
 
     def _timeout_hinweis(self) -> str:
         """Hinweis fuer eine ausbleibende Antwort: Nur dort hilft ein hoeheres read_timeout."""

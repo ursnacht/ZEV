@@ -113,6 +113,20 @@ class ReadAttemptsConfigTest(unittest.TestCase):
                 _lade(_yaml(f"read_attempts: {angabe}\n"))
 
 
+class ZaehlerReadAttemptsTest(unittest.TestCase):
+    """FR-1.8: Das globale read_attempts gilt auch fuer die Zustandsregister jedes Zaehlers."""
+
+    def test_loadConfig_ReadAttempts_AnJedemZaehler(self) -> None:
+        config = _lade(_yaml("read_attempts: 3\n"))
+
+        self.assertEqual([3, 3], [m.read_attempts for m in config.meters])
+
+    def test_loadConfig_OhneReadAttempts_ZaehlerDefault2(self) -> None:
+        config = _lade(_yaml())
+
+        self.assertEqual([2, 2], [m.read_attempts for m in config.meters])
+
+
 class RegisterConfigTest(unittest.TestCase):
     """FR-1.4: ``register.einspeisung`` optional, ``register.bezug`` Pflicht."""
 

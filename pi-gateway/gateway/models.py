@@ -45,6 +45,10 @@ class MeterConfig:
     # Lese-Timeout in Sekunden für diesen Zähler. Wird von der Konfiguration aufgelöst:
     # zaehler[].read_timeout, sonst der globale read_timeout (Default s. config.py).
     read_timeout_seconds: float = 5.0
+    # Lese-Versuche fuer ein Zustandsregister (inkl. Erstversuch), aufgeloest aus dem globalen
+    # read_attempts. Die Zaehlerstaende wiederholt _read_with_retry; ein Zustandsregister ist
+    # Beiwerk und wird im Reader selbst wiederholt, ohne die Staende neu zu lesen (FR-1.8).
+    read_attempts: int = 2
     # Zustandsregister: Groessenname (klein, z. B. "soc") -> Register. Leer = das Geraet meldet
     # keine Momentanwerte, der Payload traegt dann kein 'zustand'-Objekt.
     #

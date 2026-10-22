@@ -162,6 +162,130 @@ class EinspeisungRegisterTest(unittest.TestCase):
         self.assertEqual(10.0, stand.zaehlerstand_einspeisung)
 
 
+def _speicher_reader(read_attempts: int = 2) -> ModbusReader:
+    """Speicher mit Lade-/Entladeregister und Ladezustand (uint16), wie der Wechselrichter von Hene."""
+    config = MeterConfig(
+        read_attempts=read_attempts,
+        messpunkt="Batterie-Test",
+        protokoll="modbus-tcp",
+        register_bezug=RegisterSpec(addr=0x7984, typ="uint32", skalierung=0.1),
+        register_einspeisung=RegisterSpec(addr=0x7986, typ="uint32", skalierung=0.1),
+        register_zustand={"soc": RegisterSpec(addr=0x80E8, typ="uint16", skalierung=0.01)},
+        host="127.0.0.1",
+    )
+    reader = ModbusReader(config)
+    reader._client = mock.Mock()
+    reader._client.connect.return_value = True
+    return reader
+
+
+def _keine_antwort() -> ModbusIOException:
+    return ModbusIOException("No response received after 0 retries, continue with next request")
+
+
+@mock.patch("gateway.readers.modbus_reader.time.sleep")
+class ZustandAlsBeiwerkTest(unittest.TestCase):
+    """FR-1.8: Ein Zustandsregister wird bis zu read_attempts-mal gelesen; scheitern alle
+    Versuche, kostet es die Zählerstände nicht."""
+
+    # uint32 1000 -> 100.0 kWh, 500 -> 50.0 kWh; uint16 8750 -> 87.5 %
+    _LADUNG = [0x0000, 0x03E8]
+    _ENTLADUNG = [0x0000, 0x01F4]
+    _SOC = [0x222E]
+
+    def test_read_ZustandImmerOhneAntwort_StaendeOhneZustandNachAllenVersuchen(self, sleep) -> None:
+        reader = _speicher_reader(read_attempts=2)
+        reader._client.read_holding_registers.side_effect = [
+            _antwort(self._LADUNG), _antwort(self._ENTLADUNG), _keine_antwort(), _keine_antwort(),
+        ]
+
+        with self.assertLogs("gateway", level="INFO") as logs:
+            stand = reader.read()
+
+        self.assertEqual(100.0, stand.zaehlerstand_bezug)
+        self.assertEqual(50.0, stand.zaehlerstand_einspeisung)
+        self.assertIsNone(stand.zustand)  # nicht {} - der Payload bleibt ohne 'zustand'
+        # Zwei Versuche am Ladezustand, die Zaehlerstaende je nur einmal gelesen
+        adressen = [a.kwargs["address"] for a in reader._client.read_holding_registers.call_args_list]
+        self.assertEqual([0x7984, 0x7986, 0x80E8, 0x80E8], adressen)
+        sleep.assert_called_once_with(0.5)
+        self.assertTrue(any("Versuch 1/2" in zeile for zeile in logs.output))
+        self.assertTrue(any("WARNING" in zeile and "nach 2 Versuch(en)" in zeile and "ohne ihn" in zeile
+                            for zeile in logs.output))
+
+    def test_read_ZustandZweiterVersuchGelingt_ZustandImReading(self, sleep) -> None:
+        reader = _speicher_reader(read_attempts=2)
+        reader._client.read_holding_registers.side_effect = [
+            _antwort(self._LADUNG), _antwort(self._ENTLADUNG), _keine_antwort(), _antwort(self._SOC),
+        ]
+
+        stand = reader.read()
+
+        self.assertEqual({"soc": 87.5}, stand.zustand)
+        self.assertEqual(100.0, stand.zaehlerstand_bezug)
+        sleep.assert_called_once_with(0.5)
+
+    def test_read_ReadAttemptsEins_ZustandNurEinmalGelesen(self, sleep) -> None:
+        reader = _speicher_reader(read_attempts=1)
+        reader._client.read_holding_registers.side_effect = [
+            _antwort(self._LADUNG), _antwort(self._ENTLADUNG), _keine_antwort(),
+        ]
+
+        with self.assertLogs("gateway", level="WARNING"):
+            stand = reader.read()
+
+        self.assertIsNone(stand.zustand)
+        self.assertEqual(3, reader._client.read_holding_registers.call_count)
+        sleep.assert_not_called()
+
+    def test_read_ZustandExceptionResponse_StaendeOhneZustand(self, sleep) -> None:
+        reader = _speicher_reader(read_attempts=2)
+        reader._client.read_holding_registers.side_effect = [
+            _antwort(self._LADUNG), _antwort(self._ENTLADUNG),
+            ExceptionResponse(3, 2), ExceptionResponse(3, 2),
+        ]
+
+        with self.assertLogs("gateway", level="WARNING"):
+            stand = reader.read()
+
+        self.assertEqual(100.0, stand.zaehlerstand_bezug)
+        self.assertIsNone(stand.zustand)
+
+    def test_read_ZustandGelesen_ImReading(self, sleep) -> None:
+        reader = _speicher_reader()
+        reader._client.read_holding_registers.side_effect = [
+            _antwort(self._LADUNG), _antwort(self._ENTLADUNG), _antwort(self._SOC),
+        ]
+
+        stand = reader.read()
+
+        self.assertEqual({"soc": 87.5}, stand.zustand)
+
+    def test_read_ZaehlerstandKeineAntwort_WeiterhinReadError(self, sleep) -> None:
+        # Nur der Zustand ist Beiwerk - fehlt ein Zaehlerstand, gilt der Read als gescheitert.
+        reader = _speicher_reader()
+        reader._client.read_holding_registers.side_effect = ModbusIOException(
+            "No response received after 0 retries, continue with next request")
+
+        with self.assertRaises(ReadError):
+            reader.read()
+
+    @mock.patch("gateway.main.time.sleep")
+    def test_readWithRetry_ZustandKeineAntwort_MessungNichtWiederholt(self, main_sleep, sleep) -> None:
+        # Der Zustand wird im Reader wiederholt - die ganze Messung (Zaehlerstaende) nicht.
+        reader = _speicher_reader(read_attempts=2)
+        reader._client.read_holding_registers.side_effect = [
+            _antwort(self._LADUNG), _antwort(self._ENTLADUNG), _keine_antwort(), _keine_antwort(),
+        ]
+
+        with self.assertLogs("gateway", level="WARNING"):
+            stand = _read_with_retry(reader, attempts=2)
+
+        self.assertIsNotNone(stand)
+        self.assertEqual(4, reader._client.read_holding_registers.call_count)
+        main_sleep.assert_not_called()
+
+
 class ReadWithRetryTest(unittest.TestCase):
 
     @mock.patch("gateway.main.time.sleep")

@@ -81,7 +81,7 @@ def load_config(path: str | Path) -> GatewayConfig:
     broker = _parse_broker(_require(raw, "broker", dict))
     read_timeout = _parse_timeout(raw.get("read_timeout"), "read_timeout", _DEFAULT_READ_TIMEOUT)
     read_attempts = _parse_attempts(raw.get("read_attempts"))
-    meters = _parse_meters(raw.get("zaehler"), read_timeout)
+    meters = _parse_meters(raw.get("zaehler"), read_timeout, read_attempts)
 
     return GatewayConfig(
         org_id=org_id,
@@ -167,7 +167,7 @@ def _parse_attempts(value) -> int:
     return value
 
 
-def _parse_meters(data, read_timeout: float) -> list[MeterConfig]:
+def _parse_meters(data, read_timeout: float, read_attempts: int = _DEFAULT_READ_ATTEMPTS) -> list[MeterConfig]:
     if not isinstance(data, list) or not data:
         raise ConfigError("'zaehler' muss eine nicht-leere Liste sein.")
 
@@ -222,6 +222,7 @@ def _parse_meters(data, read_timeout: float) -> list[MeterConfig]:
                 # je Zähler überschreibbar (z. B. ein langsamer Slave am Hub).
                 read_timeout_seconds=_parse_timeout(
                     entry.get("read_timeout"), f"zaehler '{messpunkt}' read_timeout", read_timeout),
+                read_attempts=read_attempts,
             )
         )
 
