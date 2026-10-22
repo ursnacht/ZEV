@@ -147,6 +147,27 @@ class RunLoopTest(unittest.TestCase):
         self.assertEqual(["MP-2"], [a.args[0].messpunkt for a in publisher.publish.call_args_list])
         self.log_cycle.assert_called_once_with(1, 2, True)
 
+    def test_runLoop_NachZyklus_WartetPublishInterval(self, _sleep) -> None:
+        """FR-1.4: Zwischen zwei Zyklen wartet die Schleife das konfigurierte Intervall."""
+        gewartet: list[float] = []
+
+        class _EinZyklusEvent(threading.Event):
+            def wait(self, timeout=None):
+                gewartet.append(timeout)
+                self.set()
+                return True
+
+        erster = _StubReader("MP-1", _reading("MP-1"))
+        zweiter = _StubReader("MP-2", _reading("MP-2"))
+        publisher = _publisher()
+
+        _run_loop(_config([erster.config, zweiter.config]), [erster, zweiter], publisher,
+                  Heartbeat(), _EinZyklusEvent())
+
+        self.assertEqual([300], gewartet)  # publish_interval_seconds aus _config
+        self.assertEqual(1, erster.aufrufe)
+        self.assertEqual(1, zweiter.aufrufe)
+
 
 @mock.patch("gateway.main.time.sleep")
 class ReadAndPublishTest(unittest.TestCase):

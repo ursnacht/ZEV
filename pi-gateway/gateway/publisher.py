@@ -1,7 +1,8 @@
 """MQTT-Publisher: publiziert absolute Zählerstände gemäss Vertrag.
 
 Topic:   zev/{orgId}/{messpunkt}/messwert
-Payload: {"timestamp": "...Z", "zaehlerstandBezug": ..., "zaehlerstandEinspeisung": ...}
+Payload: {"timestamp": "2026-07-10T14:30:00+02:00", "zaehlerstandBezug": ..., "zaehlerstandEinspeisung": ...}
+         (lokale Zeit mit Offset; optional "seriennummer" und "zustand")
 
 Nur der Simulator (protokoll: sim-gplug) erzeugt zusaetzlich die Meldung eines gPlugK:
 Topic gPlug/{orgId}/{messpunkt}/tele/SENSOR, Tasmota-Payload, QoS 0

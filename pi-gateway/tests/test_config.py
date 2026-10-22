@@ -224,9 +224,6 @@ class ZaehlerListeTest(unittest.TestCase):
             _lade(_yaml(zaehler=_zaehler("MP-1") + _zaehler("MP-1")))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class UngueltigeWerteConfigTest(unittest.TestCase):
     """Ungueltige Angaben brechen den Start mit ConfigError ab - nicht mit einem ValueError, den
@@ -279,3 +276,6 @@ class UngueltigeWerteConfigTest(unittest.TestCase):
         with self.assertRaises(ConfigError):
             _lade(_yaml().replace("org_id: 42", "org_id: true"))
 
+
+if __name__ == "__main__":
+    unittest.main()
