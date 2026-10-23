@@ -42,12 +42,12 @@
               <button type="button" id="zeitraumZurueck" class="zev-button zev-button--secondary" (click)="onBlaettern(-1)"
                 [disabled]="!kannBlaettern" [attr.aria-label]="'ZEITRAUM_ZURUECK' | translate"
                 [title]="'ZEITRAUM_ZURUECK' | translate">
-                <app-icon name="chevron-left"></app-icon>
+                <app-icon name="chevron-left" size="xl"></app-icon>
               </button>
               <button type="button" id="zeitraumVor" class="zev-button zev-button--secondary" (click)="onBlaettern(1)"
                 [disabled]="!kannBlaettern" [attr.aria-label]="'ZEITRAUM_VOR' | translate"
                 [title]="'ZEITRAUM_VOR' | translate">
-                <app-icon name="chevron-right"></app-icon>
+                <app-icon name="chevron-right" size="xl"></app-icon>
               </button>
               <button type="button" class="zev-button zev-button--secondary" (click)="onHeute()"
                 [disabled]="loading">

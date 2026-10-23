@@ -274,3 +274,16 @@ tragen `chevron-left` vor „Vorherige“ und `chevron-right` nach „Nächste�
 Regel in `Specs/Icons.md`, FR-1 (Anhang A.1). Annahme 6 („nur links vom Text“) gilt für „Nächste“
 nicht. Kein CSS, keine Migration, keine Tests (reine Darstellung, Nachweis per Sichtprüfung).
 
+## Nachtrag: Grössere Chevrons auf Blätter-Schaltflächen (23.10.2026)
+
+Neue Icon-Grösse `xl` (2em) in `design-system/src/components/icon/icon.css`, in `.zev-button` und
+`.zev-toggle-button` mit `margin-top/-bottom: -0.5em`, damit die Schaltfläche nicht höher wird,
+und ohne den rechten Rand von `.zev-button .zev-icon` (Abstand zum Text gibt das `gap`; mit Rand
+sass das Icon in Schaltflächen ohne Text links von der Mitte – Sichtprüfung des Users)), und als Block
+(`display: block`; inline sass es 1.2px tiefer als der Text, gemessen im Showcase).
+`IconComponent.size` kennt `'xl'`. Eingesetzt bei allen Blätter-Schaltflächen: Einspeisesteuerung,
+Statistik, Systemmeldungen, Datenbank-Ansicht, Preiszeitreihe und Showcase (dort auch bei den
+Grössen und der Klassenliste). Nicht bei „Zurück zur Übersicht“ (Nebenkostenabrechnung, blättert
+nicht). Spec: `Specs/Icons.md`, FR-1, Anhang A.2. Keine Tests (reine Darstellung, Nachweis per
+Sichtprüfung).
+

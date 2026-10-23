@@ -14,10 +14,12 @@
   * Das Icon soll auf der entsprechenden Seite ebenfalls eingeblendet werden
 * Im Titel soll ein geeignetes Icon eingeblendet werden.
 * **Blätter-Schaltflächen** (Tag, Zeitraum oder Seite zurück/vor) tragen die Feather-Icons
-  `chevron-left` und `chevron-right` – auch im Design-System-Showcase. Mit Text steht `chevron-left`
+  `chevron-left` und `chevron-right` in doppelter Grösse (`size="xl"`, 2em) – auch im
+  Design-System-Showcase. Die Schaltfläche wird dadurch nicht höher. Mit Text steht `chevron-left`
   vor „Vorherige“ und `chevron-right` nach „Nächste“; ohne Text (z. B. Steuerzeile der
   Einspeisesteuerung) trägt die Schaltfläche nur das Icon.
   > Das Icon zeigt die Richtung. Am Ende von „Nächste“ zeigt der Pfeil dorthin, wohin geblättert wird.
+  > Der Strich eines Chevrons füllt nur die Mitte des Icon-Rasters – in normaler Grösse war er kaum zu treffen.
   > (Hintergrund: Anhang A.1)
 
 ### FR-2: Icon-Registry
@@ -60,4 +62,7 @@ FR-1 nannte Blätter-Schaltflächen nicht eigens. Die Anwendung verwendete `chev
 Die Annahme 6 im Umsetzungsplan („Icons nur links vom Text, nie rechts“) gilt für Blätter-Schaltflächen nicht: „Nächste“ trägt den Pfeil rechts, wie schon in der Datenbank-Ansicht.
 
 Eine eigene Spec „Design-System“ wurde nicht angelegt: Die Regeln für das Design System stehen in `Specs/generell.md` (Abschnitt „Design System“), Icon-Regeln hier. Eine dritte Stelle hätte dieselben Regeln doppelt geführt.
+
+### A.2 Grössere Chevrons auf Blätter-Schaltflächen (FR-1, 23.10.2026)
+Bis dahin trugen die Blätter-Schaltflächen ihre Chevrons in Standardgrösse (`md`, 1em). Auf Wunsch des Users sind sie mindestens doppelt so gross. Dafür gibt es die neue Icon-Grösse `xl` (2em, `design-system/src/components/icon/icon.css`). In Schaltflächen gleicht ein negativer Rand oben und unten die zusätzliche Höhe aus, damit sie in ihrer Zeile nicht höher werden als die Nachbarn. „Zurück zur Übersicht“ in der Nebenkostenabrechnung trägt ebenfalls `chevron-left`, blättert aber nicht und bleibt in Standardgrösse.
 

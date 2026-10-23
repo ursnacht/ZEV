@@ -9,7 +9,7 @@ import { ICONS } from './icons';
 })
 export class IconComponent {
   @Input() name!: string;
-  @Input() size: 'sm' | 'md' | 'lg' = 'md';
+  @Input() size: 'sm' | 'md' | 'lg' | 'xl' = 'md';
 
   constructor(private sanitizer: DomSanitizer) {}
 

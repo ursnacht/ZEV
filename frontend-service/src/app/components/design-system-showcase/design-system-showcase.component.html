@@ -284,6 +284,10 @@
         <app-icon name="sun" size="lg"></app-icon>
         <span>Large (lg)</span>
       </div>
+      <div class="icon-size-item">
+        <app-icon name="chevron-right" size="xl"></app-icon>
+        <span>Extra Large (xl) - Blättern</span>
+      </div>
     </div>
   </div>
 
@@ -305,7 +309,7 @@
 &lt;app-icon name="upload" size="lg"&gt;&lt;/app-icon&gt;</code></pre>
     <ul class="zev-list">
       <li><code>name</code> - Name des Icons (siehe Übersicht oben)</li>
-      <li><code>size</code> - Größe: "sm", "md" (Standard), "lg"</li>
+      <li><code>size</code> - Größe: "sm", "md" (Standard), "lg", "xl" (Chevrons der Blätter-Schaltflächen)</li>
     </ul>
   </div>
 
@@ -316,6 +320,7 @@
       <li><code>.zev-icon--sm</code> - Kleine Größe (0.875em)</li>
       <li><code>.zev-icon--md</code> - Mittlere Größe (1em)</li>
       <li><code>.zev-icon--lg</code> - Große Größe (1.25em)</li>
+      <li><code>.zev-icon--xl</code> - Doppelte Größe (2em), in Buttons ohne zusätzliche Höhe</li>
     </ul>
   </div>
 </section>
@@ -856,13 +861,13 @@
       <h3>Paginierung</h3>
       <div class="zev-pagination">
         <button type="button" class="zev-button zev-button--secondary zev-button--compact" disabled>
-          <app-icon name="chevron-left"></app-icon>
+          <app-icon name="chevron-left" size="xl"></app-icon>
           Vorherige
         </button>
         <span class="zev-text--muted">Seite 1</span>
         <button type="button" class="zev-button zev-button--secondary zev-button--compact">
           Nächste
-          <app-icon name="chevron-right"></app-icon>
+          <app-icon name="chevron-right" size="xl"></app-icon>
         </button>
       </div>
     </div>
@@ -872,13 +877,13 @@
       <p class="zev-text--muted"><code>.zev-pagination--start</code> – statt der zentrierten Standard-Variante.</p>
       <div class="zev-pagination zev-pagination--start">
         <button type="button" class="zev-button zev-button--secondary zev-button--compact" disabled>
-          <app-icon name="chevron-left"></app-icon>
+          <app-icon name="chevron-left" size="xl"></app-icon>
           Vorherige
         </button>
         <span class="zev-text--muted">Seite 1</span>
         <button type="button" class="zev-button zev-button--secondary zev-button--compact">
           Nächste
-          <app-icon name="chevron-right"></app-icon>
+          <app-icon name="chevron-right" size="xl"></app-icon>
         </button>
       </div>
     </div>
@@ -891,13 +896,13 @@
         <button type="button" class="zev-button zev-button--primary">Anzeigen</button>
         <div class="zev-pagination zev-pagination--inline">
           <button type="button" class="zev-button zev-button--secondary zev-button--compact" disabled>
-          <app-icon name="chevron-left"></app-icon>
+          <app-icon name="chevron-left" size="xl"></app-icon>
           Vorherige
         </button>
           <span class="zev-text--muted">Seite 1</span>
           <button type="button" class="zev-button zev-button--secondary zev-button--compact">
           Nächste
-          <app-icon name="chevron-right"></app-icon>
+          <app-icon name="chevron-right" size="xl"></app-icon>
         </button>
         </div>
       </div>

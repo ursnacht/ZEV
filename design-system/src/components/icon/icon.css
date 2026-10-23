@@ -35,6 +35,14 @@
   height: 1.25em;
 }
 
+/* Doppelte Grösse, für die Chevrons der Blätter-Schaltflächen: Ihr Strich füllt nur die Mitte
+   des Icon-Rasters und wirkt in 1em zu klein. */
+.zev-icon--xl {
+  width: 2em;
+  height: 2em;
+}
+
+
 /* Button integration */
 .zev-button .zev-icon {
   margin-right: var(--spacing-xs);
@@ -53,4 +61,20 @@
 /* Kebab menu integration */
 .zev-kebab-menu__item .zev-icon {
   margin-right: var(--spacing-xs);
+}
+
+/* In Schaltflächen nimmt das grosse Icon keinen zusätzlichen Platz in der Höhe ein – sonst
+   würde eine Blätter-Schaltfläche höher als ihre Nachbarn in derselben Zeile. Ohne den rechten
+   Rand: Den Abstand zum Text gibt das `gap` der Schaltfläche, und eine Schaltfläche nur mit
+   Icon hätte es sonst nach links verschoben. Steht nach dem Button-Abschnitt, damit die Regel
+   `.zev-button .zev-icon` (gleiche Spezifität) sie nicht überschreibt.
+   `display: block`: Als Inline-Element sässe das Icon auf der Textgrundlinie (`vertical-align:
+   middle`) gut 1px tiefer als der Text und machte die Schaltfläche um Bruchteile eines Pixels
+   höher; als Block zentriert es die Schaltfläche (`align-items: center`) exakt. */
+.zev-button .zev-icon--xl,
+.zev-toggle-button .zev-icon--xl {
+  display: block;
+  margin-top: -0.5em;
+  margin-bottom: -0.5em;
+  margin-right: 0;
 }

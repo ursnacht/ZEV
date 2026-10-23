@@ -132,14 +132,14 @@
     <div class="zev-pagination">
       <button type="button" class="zev-button zev-button--secondary zev-button--compact"
         [disabled]="page === 0 || loading" (click)="onVorherigeSeite()">
-        <app-icon name="chevron-left"></app-icon>
+        <app-icon name="chevron-left" size="xl"></app-icon>
         {{ 'PAGINATION_VORHERIGE' | translate }}
       </button>
       <span class="zev-text--muted">{{ 'PAGINATION_SEITE' | translate }} {{ page + 1 }}</span>
       <button type="button" class="zev-button zev-button--secondary zev-button--compact"
         [disabled]="!hatMehr || loading" (click)="onNaechsteSeite()">
         {{ 'PAGINATION_NAECHSTE' | translate }}
-        <app-icon name="chevron-right"></app-icon>
+        <app-icon name="chevron-right" size="xl"></app-icon>
       </button>
     </div>
   }
