@@ -33,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * {@code ch.nacht}, weil es den Container aus {@link AbstractIntegrationTest} direkt braucht.
  *
  * <p>Specs/Einheitenverwaltung.md, Abschnitt 5 (Loeschen referenzierter Daten).
+ * Specs/Gerätezustand.md, Abschnitt 3 (CHECK, Unique-Schluessel und Index von {@code geraetezustand}).
  */
 class FlywaySchemaIT extends AbstractIntegrationTest {
 
@@ -123,6 +124,106 @@ class FlywaySchemaIT extends AbstractIntegrationTest {
                 .hasMessageContaining("fk_mieter_einheit_einheit");
     }
 
+    /**
+     * Der CHECK {@code ck_geraetezustand_prozent} weist einen Ladezustand ueber 100 % ab — auch an
+     * der Anwendung vorbei (Specs/Gerätezustand.md, FR-2). Die Registry im Code prueft das zwar
+     * schon; der CHECK ist die Sicherung fuer SQL-Importe und einen kuenftigen zweiten Schreibpfad.
+     */
+    @Test
+    void geraetezustand_DirektesInsertSocUeber100_WirdVonDerDatenbankAbgewiesen() throws SQLException {
+        long speicher = einheit("Batterie", "SPEICHER");
+
+        assertThatThrownBy(() -> aendern("INSERT INTO zev.geraetezustand (org_id, einheit_id, zeit, groesse, wert) "
+                + "VALUES (" + orgId + ", ?, TIMESTAMP '2026-10-18 12:00', 'SOC', 101)", speicher))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("ck_geraetezustand_prozent");
+        assertThatThrownBy(() -> aendern("INSERT INTO zev.geraetezustand (org_id, einheit_id, zeit, groesse, wert) "
+                + "VALUES (" + orgId + ", ?, TIMESTAMP '2026-10-18 12:00', 'SOC', -1)", speicher))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("ck_geraetezustand_prozent");
+        assertThat(zaehle("zev.geraetezustand", speicher)).isZero();
+    }
+
+    /**
+     * Gegenprobe zum CHECK: Die Grenzen 0 und 100 sind erlaubt, und eine Grad-Celsius-Groesse
+     * faellt nicht unter die Prozent-Regel.
+     */
+    @Test
+    void geraetezustand_SocAufGrenzenUndAndereGroesse_WerdenAngenommen() throws SQLException {
+        long speicher = einheit("Batterie", "SPEICHER");
+
+        aendern("INSERT INTO zev.geraetezustand (org_id, einheit_id, zeit, groesse, wert) "
+                + "VALUES (" + orgId + ", ?, TIMESTAMP '2026-10-18 12:00', 'SOC', 0)", speicher);
+        aendern("INSERT INTO zev.geraetezustand (org_id, einheit_id, zeit, groesse, wert) "
+                + "VALUES (" + orgId + ", ?, TIMESTAMP '2026-10-18 12:01', 'SOC', 100)", speicher);
+        aendern("INSERT INTO zev.geraetezustand (org_id, einheit_id, zeit, groesse, wert) "
+                + "VALUES (" + orgId + ", ?, TIMESTAMP '2026-10-18 12:00', 'TEMPERATUR', 120)", speicher);
+
+        assertThat(zaehle("zev.geraetezustand", speicher)).isEqualTo(3);
+    }
+
+    /**
+     * Der Upsert des Ingest stuetzt sich auf {@code uk_geraetezustand (einheit_id, zeit, groesse)}:
+     * Ein zweiter Datensatz zu demselben Schluessel wird abgewiesen. Im Hibernate-Testschema der
+     * uebrigen ITs fehlt der Constraint.
+     */
+    @Test
+    void geraetezustand_DoppelterSchluessel_WirdVonDerDatenbankAbgewiesen() throws SQLException {
+        long speicher = einheit("Batterie", "SPEICHER");
+        geraetezustand(speicher);
+
+        assertThatThrownBy(() -> geraetezustand(speicher))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("uk_geraetezustand");
+    }
+
+    /**
+     * „Letzter Wert vor Zeitpunkt" (FR-5.1) ist ein Index-Scan ohne Sortierung — kein Seq-Scan
+     * durch die Zeitreihe. Heutiger Betrieb: nur {@code SOC}.
+     *
+     * <p><b>Welcher Index</b>, ist mit nur einer Groesse offen: Der Unique-Index
+     * {@code uk_geraetezustand (einheit_id, zeit, groesse)} bedient die Abfrage dann genauso gut
+     * (rueckwaerts), und PostgreSQL waehlt ihn auch. Erst mit einer zweiten Groesse traegt
+     * {@code idx_geraetezustand_letzter}, siehe naechster Test.
+     *
+     * <p>Die Abfrage entspricht der, die Spring Data aus
+     * {@code findFirstByEinheitIdAndGroesseAndZeitLessThanOrderByZeitDesc} erzeugt.
+     * {@code enable_seqscan = off} nimmt dem Planer die Ausrede einer kleinen Testtabelle; geprueft
+     * wird so, dass ein Index fuer diese Abfrage <b>taugt</b> und gewaehlt wird.
+     */
+    @Test
+    void geraetezustand_LetzterWertVorZeitpunkt_NurSoc_IndexScanOhneSort() throws SQLException {
+        long speicher = einheit("Batterie", "SPEICHER");
+        zeitreihe(speicher, "SOC");
+
+        String plan = planLetzterWertVor(speicher);
+
+        assertThat(plan)
+                .contains("Index Scan")
+                .doesNotContain("Seq Scan")
+                .doesNotContain("Sort");
+    }
+
+    /**
+     * Mit einer zweiten Groesse an derselben Einheit nutzt die Abfrage
+     * {@code idx_geraetezustand_letzter (einheit_id, groesse, zeit DESC)}: Der Unique-Index fuehrt
+     * {@code groesse} erst an dritter Stelle und muesste die fremden Zeilen ueberspringen.
+     */
+    @Test
+    void geraetezustand_LetzterWertVorZeitpunkt_MehrereGroessen_NutztIdxGeraetezustandLetzter() throws SQLException {
+        long speicher = einheit("Batterie", "SPEICHER");
+        zeitreihe(speicher, "SOC");
+        zeitreihe(speicher, "TEMPERATUR");
+        zeitreihe(speicher, "SOH");
+
+        String plan = planLetzterWertVor(speicher);
+
+        assertThat(plan)
+                .contains("idx_geraetezustand_letzter")
+                .doesNotContain("Seq Scan")
+                .doesNotContain("Sort");
+    }
+
     // ==================== Hilfsmethoden ====================
 
     private long einheit(String name, String typ) throws SQLException {
@@ -138,6 +239,35 @@ class FlywaySchemaIT extends AbstractIntegrationTest {
     private void geraetezustand(long einheit) throws SQLException {
         aendern("INSERT INTO zev.geraetezustand (org_id, einheit_id, zeit, groesse, wert) "
                 + "VALUES (" + orgId + ", ?, TIMESTAMP '2026-10-18 12:00', 'SOC', 50)", einheit);
+    }
+
+    /** 2000 Werte im Minutentakt ab dem 01.10.2026 fuer eine Groesse (Wert 0-99, also CHECK-konform). */
+    private void zeitreihe(long einheit, String groesse) throws SQLException {
+        try (PreparedStatement ps = verbindung.prepareStatement(
+                "INSERT INTO zev.geraetezustand (org_id, einheit_id, zeit, groesse, wert) "
+                        + "SELECT " + orgId + ", ?, TIMESTAMP '2026-10-01 00:00' + n * INTERVAL '1 minute', '"
+                        + groesse + "', n % 100 FROM generate_series(0, 1999) AS n")) {
+            ps.setLong(1, einheit);
+            ps.executeUpdate();
+        }
+    }
+
+    /** {@code EXPLAIN} der Abfrage „letzter SOC vor 01.10.2026 12:00", mit {@code enable_seqscan = off}. */
+    private String planLetzterWertVor(long einheit) throws SQLException {
+        StringBuilder plan = new StringBuilder();
+        try (Statement stmt = verbindung.createStatement()) {
+            stmt.execute("ANALYZE zev.geraetezustand");
+            stmt.execute("SET enable_seqscan = off");
+            try (ResultSet rs = stmt.executeQuery("EXPLAIN SELECT * FROM zev.geraetezustand "
+                    + "WHERE einheit_id = " + einheit + " AND groesse = 'SOC' "
+                    + "AND zeit < TIMESTAMP '2026-10-01 12:00' ORDER BY zeit DESC LIMIT 1")) {
+                while (rs.next()) {
+                    plan.append(rs.getString(1)).append(System.lineSeparator());
+                }
+            }
+            stmt.execute("RESET enable_seqscan");
+        }
+        return plan.toString();
     }
 
     private long zaehle(String tabelle, long einheit) throws SQLException {

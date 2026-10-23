@@ -286,25 +286,32 @@ public class MqttIngestService {
      */
     private void schreibeZustandswerte(long orgId, List<Einheit> einheiten, LocalDateTime zeit,
                                        ZaehlerMesswertPayloadDTO p) {
-        Map<String, Object> zustand = p.getZustand();
-        if (zustand == null || zustand.isEmpty()) {
+        Object roh = p.getZustand();
+        if (roh == null) {
             return;
         }
-        for (Map.Entry<String, Object> eintrag : zustand.entrySet()) {
+        // Kein JSON-Objekt (Zahl, Text, Liste): nur der Zustand geht verloren, die Zaehlerstaende
+        // sind schon gespeichert (FR-1.2) - der DTO-Typ ist dafuer bewusst Object.
+        if (!(roh instanceof Map<?, ?> zustand)) {
+            meldeZustandsfehler(orgId, SystemmeldungService.KEY_GERAETEZUSTAND_WERT_UNGUELTIG,
+                    String.format("zustand: '%s' ist kein Objekt", roh));
+            return;
+        }
+        for (Map.Entry<?, ?> eintrag : zustand.entrySet()) {
+            String schluessel = String.valueOf(eintrag.getKey());
             if (eintrag.getValue() == null) {
                 continue;   // nicht gemeldet - kein Stoerfall
             }
             BigDecimal wert = alsZahl(eintrag.getValue());
             if (wert == null) {
                 meldeZustandsfehler(orgId, SystemmeldungService.KEY_GERAETEZUSTAND_WERT_UNGUELTIG,
-                        String.format("%s: '%s' ist keine Zahl", eintrag.getKey(),
-                                eintrag.getValue()));
+                        String.format("%s: '%s' ist keine Zahl", schluessel, eintrag.getValue()));
                 continue;
             }
-            Optional<Zustandsgroesse> groesseOpt = Zustandsgroesse.fromKey(eintrag.getKey());
+            Optional<Zustandsgroesse> groesseOpt = Zustandsgroesse.fromKey(schluessel);
             if (groesseOpt.isEmpty()) {
                 log.debug("MQTT: unbekannte Zustandsgroesse '{}' (org={}) - ignoriert",
-                        eintrag.getKey(), orgId);
+                        schluessel, orgId);
                 continue;
             }
             Zustandsgroesse groesse = groesseOpt.get();

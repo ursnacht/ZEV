@@ -255,6 +255,35 @@ class ArchitectureTest {
             rule.check(importedClasses);
         }
 
+        /**
+         * Zustandswerte werden nie aggregiert und nie verrechnet (Specs/Gerätezustand.md,
+         * Abschnitt 3 „Abgrenzung zu den Messwerten"). Ein Ladestand ist keine Energiemenge; wer
+         * ihn durch die Delta-Aggregation, eine Statistik oder eine Abrechnung schickt, erhaelt
+         * „Δ SOC". Deshalb greifen nur der Ingest (schreibt) und die Steuerung (liest) auf die
+         * Tabelle zu — jede weitere Abhaengigkeit ist eine bewusste Entscheidung und muss hier
+         * eingetragen werden.
+         */
+        @Test
+        @DisplayName("Nur Ingest und Steuerung greifen auf die Geraetezustaende zu")
+        void nurIngestUndSteuerungGreifenAufGeraetezustandZu() {
+            Set<String> erlaubt = Set.of(
+                "MqttIngestService", "SteuerungService",
+                "GeraetezustandRepository", "Geraetezustand");
+
+            ArchRule rule = classes()
+                .that().haveSimpleName("GeraetezustandRepository")
+                .or().haveSimpleName("Geraetezustand")
+                .should().onlyHaveDependentClassesThat(new DescribedPredicate<JavaClass>(
+                    "MqttIngestService oder SteuerungService sind") {
+                    @Override
+                    public boolean test(JavaClass abhaengige) {
+                        return erlaubt.contains(abhaengige.getSimpleName());
+                    }
+                });
+
+            rule.check(importedClasses);
+        }
+
         @Test
         @DisplayName("Entities sollten keine anderen Schichten importieren")
         void entitiesShouldNotImportOtherLayers() {

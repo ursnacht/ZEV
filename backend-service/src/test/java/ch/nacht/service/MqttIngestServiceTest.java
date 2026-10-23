@@ -2,7 +2,10 @@ package ch.nacht.service;
 
 import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
+import ch.nacht.entity.Geraetezustand;
+import ch.nacht.entity.MeldungLevel;
 import ch.nacht.entity.ZaehlerRohdaten;
+import ch.nacht.entity.Zustandsgroesse;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.GeraetezustandRepository;
 import ch.nacht.repository.ZaehlerRohdatenRepository;
@@ -13,13 +16,19 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -566,6 +575,453 @@ public class MqttIngestServiceTest {
         assertEquals("SN-1", captureSavedRohdaten().getSeriennummer());
         verify(metrics).recordProcessed();
         verify(metrics, never()).recordFailed();
+    }
+
+    // --- Gerätezustand: zustand ist kein Objekt (Specs/Gerätezustand.md, FR-1.2) -
+    // Ist `zustand` eine Zahl, ein Text oder eine Liste, darf nur der Zustandswert verloren gehen.
+    // Mit `Map<String, Object>` als Feldtyp scheiterte Jackson schon beim Parsen, und der
+    // generische catch verwarf die ganze Nachricht samt Zaehlerstaenden.
+
+    @ParameterizedTest
+    @ValueSource(strings = {"5", "\"x\"", "[1]"})
+    void handle_ZustandKeinObjekt_SpeichertZaehlerstaendeUndMeldet(String zustandJson) {
+        // Arrange
+        stubEinheitOhneBestand();
+
+        // Act
+        service.handle(TOPIC, payload("2026-01-01T10:07:00+01:00", "123.4500", "10.0000",
+                "\"zustand\":" + zustandJson));
+
+        // Assert - Zaehlerstaende gespeichert, Nachricht gilt als verarbeitet
+        assertEquals(0, new BigDecimal("123.4500").compareTo(captureSavedRohdaten().getZaehlerstandBezug()));
+        verify(metrics).recordProcessed();
+        verify(metrics, never()).recordFailed();
+        // Kein Zustandswert, aber eine Meldung - ein solcher Payload ist ein Konfigurationsfehler
+        verifyNoInteractions(geraetezustandRepository);
+        verify(systemmeldungService).erfasse(eq(ORG_ID), eq(MeldungLevel.WARN),
+                eq(SystemmeldungService.KATEGORIE_MQTT),
+                eq(SystemmeldungService.KEY_GERAETEZUSTAND_WERT_UNGUELTIG), any());
+    }
+
+    // --- Gerätezustand: Zustandswerte (Specs/Gerätezustand.md, Abschnitt 3) --
+    // Zustandswerte sind Beiwerk: Ein verworfener Wert kostet weder die Zaehlerstaende noch die
+    // Metriken, und eine Meldung dazu wird nie automatisch erledigt.
+
+    private static final long SPEICHER_ID = 30L;
+
+    /** Zeitstempel mit Offset +02:00 (Sommerzeit) - gespeichert wird die Wanduhrzeit verbatim. */
+    private static final String SOMMER_ZEIT = "2026-07-10T14:30:00+02:00";
+
+    private Einheit speicher(Long id, String name) {
+        Einheit speicher = new Einheit(name, EinheitTyp.SPEICHER);
+        speicher.setId(id);
+        speicher.setOrgId(ORG_ID);
+        speicher.setMesspunkt(MESSPUNKT);
+        return speicher;
+    }
+
+    /** Payload mit Zaehlerstaenden und dem rohen {@code zustand}-JSON. */
+    private String payloadMitZustand(String timestamp, String zustandJson) {
+        return payload(timestamp, "123.4500", "10.0000", "\"zustand\":" + zustandJson);
+    }
+
+    /** Verdrahtet die uebergebenen Einheiten am Messpunkt + leere Rohdaten-Upserts. */
+    private void stubEinheitenOhneRohdaten(Einheit... einheiten) {
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT)).thenReturn(List.of(einheiten));
+        when(rohdatenRepository.findByEinheitIdAndZeit(anyLong(), any())).thenReturn(Optional.empty());
+        when(rohdatenRepository.save(any(ZaehlerRohdaten.class))).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    /** Ein SPEICHER am Messpunkt, ohne vorhandene Rohdaten und ohne vorhandenen Zustandswert. */
+    private void stubSpeicherOhneBestand() {
+        stubEinheitenOhneRohdaten(speicher(SPEICHER_ID, "Batterie"));
+        when(geraetezustandRepository.findByEinheitIdAndZeitAndGroesse(anyLong(), any(), any()))
+                .thenReturn(Optional.empty());
+    }
+
+    /** Faengt den einzigen gespeicherten Zustandswert ab. */
+    private Geraetezustand captureSavedZustand() {
+        ArgumentCaptor<Geraetezustand> captor = ArgumentCaptor.forClass(Geraetezustand.class);
+        verify(geraetezustandRepository).save(captor.capture());
+        return captor.getValue();
+    }
+
+    /** Die Zaehlerstaende der Nachricht sind gespeichert, und sie gilt als verarbeitet. */
+    private void assertZaehlerstaendeGespeichert() {
+        ArgumentCaptor<ZaehlerRohdaten> captor = ArgumentCaptor.forClass(ZaehlerRohdaten.class);
+        verify(rohdatenRepository, atLeastOnce()).save(captor.capture());
+        assertEquals(0, new BigDecimal("123.4500").compareTo(captor.getValue().getZaehlerstandBezug()));
+        verify(metrics).recordProcessed();
+        verify(metrics, never()).recordFailed();
+    }
+
+    /** Faengt den Parameter der einzigen Systemmeldung mit diesem Key ab (WARN, Kategorie MQTT). */
+    private String captureMeldungsParameter(String key) {
+        ArgumentCaptor<String> parameter = ArgumentCaptor.forClass(String.class);
+        verify(systemmeldungService).erfasse(eq(ORG_ID), eq(MeldungLevel.WARN),
+                eq(SystemmeldungService.KATEGORIE_MQTT), eq(key), parameter.capture());
+        return parameter.getValue();
+    }
+
+    @Test
+    void handle_ZustandSocAnSpeicher_SpeichertZustandswertUndZaehlerstaende() {
+        // Arrange
+        stubSpeicherOhneBestand();
+
+        // Act
+        service.handle(TOPIC, payloadMitZustand(SOMMER_ZEIT, "{\"soc\": 87.5}"));
+
+        // Assert
+        Geraetezustand saved = captureSavedZustand();
+        assertEquals(ORG_ID, saved.getOrgId());
+        assertEquals(SPEICHER_ID, saved.getEinheitId());
+        assertEquals(Zustandsgroesse.SOC, saved.getGroesse());
+        assertEquals(0, new BigDecimal("87.5").compareTo(saved.getWert()));
+        assertNotNull(saved.getEmpfangenAm());
+        assertZaehlerstaendeGespeichert();
+        verifyNoInteractions(systemmeldungService);
+    }
+
+    @Test
+    void handle_ZustandZeitMitOffsetPlus2_OrtszeitVerbatim() {
+        // Arrange
+        stubSpeicherOhneBestand();
+
+        // Act - 14:30+02:00 ist 12:30 UTC; gespeichert wird die Wanduhrzeit 14:30
+        service.handle(TOPIC, payloadMitZustand(SOMMER_ZEIT, "{\"soc\": 87.5}"));
+
+        // Assert - unabhaengig von der Zeitzone der Test-JVM
+        LocalDateTime erwartet = LocalDateTime.of(2026, 7, 10, 14, 30);
+        assertEquals(erwartet, captureSavedZustand().getZeit());
+        verify(geraetezustandRepository).findByEinheitIdAndZeitAndGroesse(SPEICHER_ID, erwartet,
+                Zustandsgroesse.SOC);
+    }
+
+    @Test
+    void handle_ZustandMitOrgIdImPayload_OrgIdStammtAusTopic() {
+        // Arrange - toleranter Mapper wie im Betrieb, damit die fremden Felder nicht verwerfen
+        MqttIngestService toleranterService = new MqttIngestService(einheitRepository, rohdatenRepository,
+                geraetezustandRepository, systemmeldungService,
+                new ObjectMapper().registerModule(new JavaTimeModule())
+                        .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES),
+                metrics);
+        stubSpeicherOhneBestand();
+
+        // Act - der Payload behauptet einen anderen Mandanten
+        toleranterService.handle(TOPIC, payload(SOMMER_ZEIT, "123.4500", "10.0000",
+                "\"orgId\":999,\"org_id\":999,\"zustand\":{\"soc\":50}"));
+
+        // Assert
+        assertEquals(ORG_ID, captureSavedZustand().getOrgId());
+        verify(einheitRepository).findAllByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT);
+    }
+
+    @Test
+    void handle_OhneZustand_KeinZustandswert() {
+        // Arrange
+        stubEinheitenOhneRohdaten(speicher(SPEICHER_ID, "Batterie"));
+
+        // Act
+        service.handle(TOPIC, payload(SOMMER_ZEIT, "123.4500", "10.0000"));
+
+        // Assert
+        assertZaehlerstaendeGespeichert();
+        verifyNoInteractions(geraetezustandRepository);
+        verifyNoInteractions(systemmeldungService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "null"})
+    void handle_ZustandLeerOderNull_KeinZustandswert(String zustandJson) {
+        // Arrange
+        stubEinheitenOhneRohdaten(speicher(SPEICHER_ID, "Batterie"));
+
+        // Act
+        service.handle(TOPIC, payloadMitZustand(SOMMER_ZEIT, zustandJson));
+
+        // Assert
+        assertZaehlerstaendeGespeichert();
+        verifyNoInteractions(geraetezustandRepository);
+        verifyNoInteractions(systemmeldungService);
+    }
+
+    @Test
+    void handle_ZustandSocUndUnbekannterSchluessel_GenauEineZeile() {
+        // Arrange
+        stubSpeicherOhneBestand();
+
+        // Act
+        service.handle(TOPIC, payloadMitZustand(SOMMER_ZEIT, "{\"soc\": 87.5, \"temperatur\": 21.5}"));
+
+        // Assert - nur SOC; die unbekannte Groesse wird ohne Meldung verworfen
+        Geraetezustand saved = captureSavedZustand();
+        assertEquals(Zustandsgroesse.SOC, saved.getGroesse());
+        assertEquals(0, new BigDecimal("87.5").compareTo(saved.getWert()));
+        assertZaehlerstaendeGespeichert();
+        verifyNoInteractions(systemmeldungService);
+    }
+
+    @Test
+    void handle_ZustandUnbekannteGroesse_VerworfenOhneMeldung() {
+        // Arrange
+        stubEinheitenOhneRohdaten(speicher(SPEICHER_ID, "Batterie"));
+
+        // Act
+        service.handle(TOPIC, payloadMitZustand(SOMMER_ZEIT, "{\"temperatur\": 21.5}"));
+
+        // Assert - die Nachricht bleibt gueltig
+        assertZaehlerstaendeGespeichert();
+        verifyNoInteractions(geraetezustandRepository);
+        verifyNoInteractions(systemmeldungService);
+    }
+
+    @Test
+    void handle_ZustandSocKeineZahl_VerwirftNurZustandswert() {
+        // Arrange
+        stubEinheitenOhneRohdaten(speicher(SPEICHER_ID, "Batterie"));
+
+        // Act
+        service.handle(TOPIC, payloadMitZustand(SOMMER_ZEIT, "{\"soc\": \"abc\"}"));
+
+        // Assert - Zaehlerstaende gespeichert, Zustandswert verworfen und gemeldet
+        assertZaehlerstaendeGespeichert();
+        verify(geraetezustandRepository, never()).save(any());
+        assertTrue(captureMeldungsParameter(SystemmeldungService.KEY_GERAETEZUSTAND_WERT_UNGUELTIG)
+                .contains("abc"));
+        verify(systemmeldungService, never()).autoResolve(anyLong(), any());
+    }
+
+    @Test
+    void handle_ZustandSocNull_KeineZeileKeineMeldung() {
+        // Arrange
+        stubEinheitenOhneRohdaten(speicher(SPEICHER_ID, "Batterie"));
+
+        // Act
+        service.handle(TOPIC, payloadMitZustand(SOMMER_ZEIT, "{\"soc\": null}"));
+
+        // Assert - "nicht gemeldet" ist kein Stoerfall
+        assertZaehlerstaendeGespeichert();
+        verifyNoInteractions(geraetezustandRepository);
+        verifyNoInteractions(systemmeldungService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"soc", "SOC", "Soc"})
+    void handle_ZustandSchluesselSchreibweise_WirdAufSocAbgebildet(String schluessel) {
+        // Arrange
+        stubSpeicherOhneBestand();
+
+        // Act
+        service.handle(TOPIC, payloadMitZustand(SOMMER_ZEIT, "{\"" + schluessel + "\": 42}"));
+
+        // Assert - in der Tabelle steht der Enum-Name SOC
+        assertEquals(Zustandsgroesse.SOC, captureSavedZustand().getGroesse());
+    }
+
+    @Test
+    void handle_ZustandBestehenderDatensatz_AktualisiertStattNeu() {
+        // Arrange - dieselbe Nachricht wurde schon einmal empfangen
+        Geraetezustand vorhanden = new Geraetezustand(ORG_ID, SPEICHER_ID,
+                LocalDateTime.of(2026, 7, 10, 14, 30), Zustandsgroesse.SOC, new BigDecimal("80.0"));
+        vorhanden.setId(77L);
+        stubEinheitenOhneRohdaten(speicher(SPEICHER_ID, "Batterie"));
+        when(geraetezustandRepository.findByEinheitIdAndZeitAndGroesse(SPEICHER_ID,
+                LocalDateTime.of(2026, 7, 10, 14, 30), Zustandsgroesse.SOC))
+                .thenReturn(Optional.of(vorhanden));
+
+        // Act
+        service.handle(TOPIC, payloadMitZustand(SOMMER_ZEIT, "{\"soc\": 87.5}"));
+
+        // Assert - dieselbe Instanz (Upsert), keine zweite Zeile
+        Geraetezustand saved = captureSavedZustand();
+        assertSame(vorhanden, saved);
+        assertEquals(77L, saved.getId());
+        assertEquals(0, new BigDecimal("87.5").compareTo(saved.getWert()));
+    }
+
+    @Test
+    void handle_ZustandHerbstZeitumstellung_ZweiterDurchgangUeberschreibtErsten() {
+        // Arrange - 02:30 tritt am 25.10.2026 zweimal auf: erst mit +02:00, dann mit +01:00.
+        // Der Upsert-Schluessel ist die Ortszeit; der zweite Durchgang trifft den ersten Datensatz.
+        LocalDateTime ortszeit = LocalDateTime.of(2026, 10, 25, 2, 30);
+        stubEinheitenOhneRohdaten(speicher(SPEICHER_ID, "Batterie"));
+        Geraetezustand[] gespeichert = new Geraetezustand[1];
+        when(geraetezustandRepository.findByEinheitIdAndZeitAndGroesse(SPEICHER_ID, ortszeit,
+                Zustandsgroesse.SOC))
+                .thenAnswer(inv -> Optional.ofNullable(gespeichert[0]));
+        when(geraetezustandRepository.save(any(Geraetezustand.class))).thenAnswer(inv -> {
+            gespeichert[0] = inv.getArgument(0);
+            return gespeichert[0];
+        });
+
+        // Act
+        service.handle(TOPIC, payloadMitZustand("2026-10-25T02:30:00+02:00", "{\"soc\": 40}"));
+        Geraetezustand ersterDurchgang = gespeichert[0];
+        service.handle(TOPIC, payloadMitZustand("2026-10-25T02:30:00+01:00", "{\"soc\": 45}"));
+
+        // Assert - beide Male dieselbe Zeile, der Wert des zweiten Durchgangs gilt
+        ArgumentCaptor<Geraetezustand> captor = ArgumentCaptor.forClass(Geraetezustand.class);
+        verify(geraetezustandRepository, times(2)).save(captor.capture());
+        assertNotNull(ersterDurchgang);
+        assertSame(ersterDurchgang, captor.getAllValues().get(1));
+        assertEquals(ortszeit, captor.getAllValues().get(1).getZeit());
+        assertEquals(0, new BigDecimal("45").compareTo(captor.getAllValues().get(1).getWert()));
+    }
+
+    @Test
+    void handle_ZustandHerbstZeitumstellung_GanzerTagErgibt96ViertelstundenMitWerten() {
+        // Arrange - der 25.10.2026 hat 25 Stunden, also 100 Viertelstunden. Ein Wert je
+        // Viertelstunde, wie ihn der Pi mit Offset sendet. Der Speicher im Test haelt die Zeilen
+        // nach dem Upsert-Schluessel (Ortszeit) - wie der UNIQUE-Index in V153.
+        stubEinheitenOhneRohdaten(speicher(SPEICHER_ID, "Batterie"));
+        Map<LocalDateTime, Geraetezustand> zeilen = new HashMap<>();
+        when(geraetezustandRepository.findByEinheitIdAndZeitAndGroesse(eq(SPEICHER_ID), any(),
+                eq(Zustandsgroesse.SOC)))
+                .thenAnswer(inv -> Optional.ofNullable(zeilen.get(inv.<LocalDateTime>getArgument(1))));
+        when(geraetezustandRepository.save(any(Geraetezustand.class))).thenAnswer(inv -> {
+            Geraetezustand z = inv.getArgument(0);
+            zeilen.put(z.getZeit(), z);
+            return z;
+        });
+        ZoneId zuerich = ZoneId.of("Europe/Zurich");
+        ZonedDateTime zeitpunkt = ZonedDateTime.of(2026, 10, 25, 0, 0, 0, 0, zuerich);
+        ZonedDateTime tagesende = zeitpunkt.plusDays(1);
+
+        // Act - der SOC steigt je Viertelstunde, damit erkennbar ist, welcher Durchgang gilt
+        int nachrichten = 0;
+        while (zeitpunkt.isBefore(tagesende)) {
+            service.handle(TOPIC, payloadMitZustand(zeitpunkt.toOffsetDateTime().toString(),
+                    "{\"soc\": " + (nachrichten / 2.0) + "}"));
+            nachrichten++;
+            zeitpunkt = zeitpunkt.plusMinutes(15);   // Instant-Addition: 02:00-03:00 kommt zweimal
+        }
+
+        // Assert - 100 Nachrichten, aber nur 96 Viertelstunden mit Werten; in der doppelten
+        // Stunde gilt der zweite Durchgang (02:30 ist Nachricht 10 bzw. 14)
+        assertEquals(100, nachrichten);
+        assertEquals(96, zeilen.size());
+        assertEquals(0, new BigDecimal("7").compareTo(
+                zeilen.get(LocalDateTime.of(2026, 10, 25, 2, 30)).getWert()));
+        verify(metrics, times(100)).recordProcessed();
+        verify(metrics, never()).recordFailed();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "100", "0.0", "100.000"})
+    void handle_ZustandSocAufBereichsgrenze_WirdGespeichert(String wert) {
+        // Arrange
+        stubSpeicherOhneBestand();
+
+        // Act
+        service.handle(TOPIC, payloadMitZustand(SOMMER_ZEIT, "{\"soc\": " + wert + "}"));
+
+        // Assert - Grenzen eingeschlossen
+        assertEquals(0, new BigDecimal(wert).compareTo(captureSavedZustand().getWert()));
+        verifyNoInteractions(systemmeldungService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"101", "-1", "100.001"})
+    void handle_ZustandSocAusserhalbBereich_VerworfenMitMeldungZaehlerstaendeBleiben(String wert) {
+        // Arrange
+        stubEinheitenOhneRohdaten(speicher(SPEICHER_ID, "Batterie"));
+
+        // Act
+        service.handle(TOPIC, payloadMitZustand(SOMMER_ZEIT, "{\"soc\": " + wert + "}"));
+
+        // Assert - Zustandswert verworfen, Zaehlerstaende gespeichert, Metriken unberuehrt
+        verify(geraetezustandRepository, never()).save(any());
+        assertZaehlerstaendeGespeichert();
+        String parameter = captureMeldungsParameter(SystemmeldungService.KEY_GERAETEZUSTAND_WERT_UNGUELTIG);
+        assertTrue(parameter.contains("Batterie"), parameter);      // Einheit
+        assertTrue(parameter.contains("SOC"), parameter);           // Groesse
+        assertTrue(parameter.contains(wert), parameter);            // Wert
+        assertTrue(parameter.contains("0–100 %"), parameter);       // erlaubter Bereich
+        // Nie automatisch erledigt - der Betreiber hakt sie ab
+        verify(systemmeldungService, never()).autoResolve(anyLong(), any());
+        verify(systemmeldungService, never()).erfasse(anyLong(), any(), any(),
+                eq(SystemmeldungService.KEY_GERAETEZUSTAND_TYP_UNGUELTIG), any());
+    }
+
+    @Test
+    void handle_ZustandSocAnConsumer_VerworfenMitTypMeldung() {
+        // Arrange - Standard-Einheit ist CONSUMER
+        stubEinheitOhneBestand();
+
+        // Act
+        service.handle(TOPIC, payloadMitZustand(SOMMER_ZEIT, "{\"soc\": 87.5}"));
+
+        // Assert - eigener Key, nicht der der Bereichsverletzung
+        verify(geraetezustandRepository, never()).save(any());
+        assertZaehlerstaendeGespeichert();
+        String parameter = captureMeldungsParameter(SystemmeldungService.KEY_GERAETEZUSTAND_TYP_UNGUELTIG);
+        assertTrue(parameter.contains("Wohnung 1"), parameter);
+        assertTrue(parameter.contains("CONSUMER"), parameter);
+        assertTrue(parameter.contains("SOC"), parameter);
+        verify(systemmeldungService, never()).erfasse(anyLong(), any(), any(),
+                eq(SystemmeldungService.KEY_GERAETEZUSTAND_WERT_UNGUELTIG), any());
+        verify(systemmeldungService, never()).autoResolve(anyLong(), any());
+    }
+
+    @Test
+    void handle_ZustandMehrereZulaessigeEinheiten_GenauEineZeileAnKleinsterId() {
+        // Arrange - konstruiert: zwei SPEICHER am selben Messpunkt, die groessere id zuerst
+        stubEinheitenOhneRohdaten(speicher(31L, "Batterie B"), speicher(SPEICHER_ID, "Batterie A"));
+        when(geraetezustandRepository.findByEinheitIdAndZeitAndGroesse(anyLong(), any(), any()))
+                .thenReturn(Optional.empty());
+
+        // Act
+        service.handle(TOPIC, payloadMitZustand(SOMMER_ZEIT, "{\"soc\": 87.5}"));
+
+        // Assert - genau eine Zeile, an der kleinsten id; Rohdaten fuer beide Einheiten
+        assertEquals(SPEICHER_ID, captureSavedZustand().getEinheitId());
+        verify(rohdatenRepository, times(2)).save(any(ZaehlerRohdaten.class));
+        verifyNoInteractions(systemmeldungService);
+    }
+
+    @Test
+    void handle_ZustandSpeicherUndConsumerAmMesspunkt_ZeileAmSpeicherOhneMeldung() {
+        // Arrange - nur der SPEICHER fuehrt SOC; der CONSUMER daneben ist kein Fehler
+        stubEinheitenOhneRohdaten(einheit, speicher(SPEICHER_ID, "Batterie"));
+        when(geraetezustandRepository.findByEinheitIdAndZeitAndGroesse(anyLong(), any(), any()))
+                .thenReturn(Optional.empty());
+
+        // Act
+        service.handle(TOPIC, payloadMitZustand(SOMMER_ZEIT, "{\"soc\": 87.5}"));
+
+        // Assert
+        assertEquals(SPEICHER_ID, captureSavedZustand().getEinheitId());
+        verifyNoInteractions(systemmeldungService);
+    }
+
+    @Test
+    void handle_ZustandUnbekannterMesspunkt_VerwirftAuchZustandswert() {
+        // Arrange
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT)).thenReturn(List.of());
+
+        // Act
+        service.handle(TOPIC, payloadMitZustand(SOMMER_ZEIT, "{\"soc\": 87.5}"));
+
+        // Assert - die ganze Nachricht ist verworfen, wie bisher
+        verify(metrics).recordFailed();
+        verify(rohdatenRepository, never()).save(any());
+        verifyNoInteractions(geraetezustandRepository);
+        verifyNoInteractions(systemmeldungService);
+    }
+
+    @Test
+    void handle_ZustandMeldungScheitert_ZaehlerstaendeBleiben() {
+        // Arrange - die Systemmeldung selbst wirft; das darf die Nachricht nicht kosten
+        stubEinheitenOhneRohdaten(speicher(SPEICHER_ID, "Batterie"));
+        doThrow(new RuntimeException("DB down")).when(systemmeldungService)
+                .erfasse(anyLong(), any(), any(), any(), any());
+
+        // Act
+        service.handle(TOPIC, payloadMitZustand(SOMMER_ZEIT, "{\"soc\": 101}"));
+
+        // Assert
+        assertZaehlerstaendeGespeichert();
+        verify(geraetezustandRepository, never()).save(any());
     }
 
     // --- Ladestationen bleiben aussen vor (Specs/Ladestationen.md) ------------

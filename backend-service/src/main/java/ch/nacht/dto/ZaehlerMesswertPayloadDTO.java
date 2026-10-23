@@ -2,7 +2,6 @@ package ch.nacht.dto;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.util.Map;
 
 /**
  * JSON-Payload einer MQTT-Messwert-Nachricht (absolute Zählerstände, Wirkenergie kWh).
@@ -29,17 +28,19 @@ public class ZaehlerMesswertPayloadDTO {
      * Momentanwerte des Geräts: Grössenname auf Zahlenwert. Optional; fehlt das Objekt, entsteht
      * kein Zustandswert.
      *
-     * <p><b>{@code Object} als Werttyp, nicht {@code BigDecimal}</b> — und das ist keine
-     * Nachlässigkeit: Beim engeren Typ scheitert Jackson schon beim Deserialisieren an
-     * {@code {"soc": "abc"}}, an {@code "zustand": 5} oder an einem verschachtelten Objekt. Der
-     * Fehler landet im generischen {@code catch} von {@code MqttIngestService.handle} und verwirft
-     * die <b>ganze</b> Nachricht — samt der Zählerstände, die in Ordnung waren. Ein Tippfehler in
-     * der Pi-Konfiguration kostete dann die Energiemengen.
+     * <p><b>{@code Object} als Typ — weder {@code Map<String, BigDecimal>} noch
+     * {@code Map<String, Object>}</b>, und das ist keine Nachlässigkeit: Bei einem engeren Typ
+     * scheitert Jackson schon beim Deserialisieren — mit {@code BigDecimal} als Werttyp an
+     * {@code {"soc": "abc"}}, mit jeder {@code Map} an {@code "zustand": 5}, {@code "x"} oder
+     * {@code [1]}. Der Fehler landet im generischen {@code catch} von
+     * {@code MqttIngestService.handle} und verwirft die <b>ganze</b> Nachricht — samt der
+     * Zählerstände, die in Ordnung waren. Ein Tippfehler in der Pi-Konfiguration kostete dann die
+     * Energiemengen.
      *
-     * <p>Die Umwandlung in eine Zahl passiert deshalb <b>je Eintrag</b> im Ingest, wo ein einzelner
-     * ungültiger Wert nur sich selbst verliert.
+     * <p>Ein JSON-Objekt kommt als {@code Map} an. Ob es eines ist und ob seine Werte Zahlen sind,
+     * prüft deshalb der Ingest <b>je Eintrag</b>, wo ein ungültiger Wert nur sich selbst verliert.
      */
-    private Map<String, Object> zustand;
+    private Object zustand;
 
     public OffsetDateTime getTimestamp() {
         return timestamp;
@@ -73,11 +74,11 @@ public class ZaehlerMesswertPayloadDTO {
         this.seriennummer = seriennummer;
     }
 
-    public Map<String, Object> getZustand() {
+    public Object getZustand() {
         return zustand;
     }
 
-    public void setZustand(Map<String, Object> zustand) {
+    public void setZustand(Object zustand) {
         this.zustand = zustand;
     }
 }

@@ -50,11 +50,13 @@
    }
    ```
 
-2. **Generisch und tolerant:** Im DTO ist das eine `Map<String, Object>`, kein Feld je Grösse —
-   und bewusst **nicht** `Map<String, BigDecimal>`.
+2. **Generisch und tolerant:** Im DTO ist das Feld vom Typ `Object`, kein Feld je Grösse — und
+   bewusst **weder** `Map<String, BigDecimal>` **noch** `Map<String, Object>`. Ein JSON-Objekt kommt
+   als `Map` an; ob es eines ist, prüft der Ingest. (Hintergrund: Anhang A.7)
 
-   > **Warum nicht der engere Typ:** Jackson scheitert dann schon beim Deserialisieren an
-   > `{"soc": "abc"}`, an `"zustand": 5` oder an einem verschachtelten Objekt. Der Fehler landet im
+   > **Warum nicht ein engerer Typ:** Jackson scheitert dann schon beim Deserialisieren — mit
+   > `BigDecimal` als Werttyp an `{"soc": "abc"}` oder einem verschachtelten Objekt, mit jeder `Map`
+   > an `"zustand": 5`, `"x"` oder `[1]`. Der Fehler landet im
    > generischen `catch` von `MqttIngestService.handle` — und verwirft die **ganze** Nachricht samt
    > Zählerständen. Das widerspricht der Zusage, dass Zustandswerte Beiwerk sind (FR-1.5, FR-4.4):
    > Ein Tippfehler in der Pi-Konfiguration kostete dann die Energiemengen.
@@ -209,7 +211,8 @@ verfügbar.
    Geprüft wird in dieser Reihenfolge: Ist der Wert **in eine Zahl umwandelbar**, ist der Schlüssel
    eine **bekannte Grösse**, passt der **Einheiten-Typ**, liegt der Wert **im Bereich**.
 3. **Ein nicht umwandelbarer Wert wird verworfen** wie ein Wert ausserhalb des Bereichs — mit
-   `GERAETEZUSTAND_WERT_UNGUELTIG`. `null` gilt als **nicht gemeldet**: keine Zeile, keine Meldung,
+   `GERAETEZUSTAND_WERT_UNGUELTIG`. Ebenso ein `zustand`, das **kein Objekt** ist (Zahl, Text,
+   Liste): kein Zustandswert, eine Meldung, die Zählerstände bleiben. `null` gilt als **nicht gemeldet**: keine Zeile, keine Meldung,
    kein Fehler. Ein Gerät, das eine Grösse gerade nicht liefern kann, ist kein Störfall.
 4. **Fehlt `zustand` oder ist das Objekt leer, entsteht keine Zeile** — kein `null`, keine `0`.
    Sonst liesse sich später nicht unterscheiden, ob der Speicher leer war oder nichts gemeldet hat.
@@ -248,75 +251,109 @@ verfügbar.
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
 **Transport**
-* [ ] Eine Nachricht mit `"zustand": {"soc": 87.5}` erzeugt einen Zustandswert und die
+* [x] Eine Nachricht mit `"zustand": {"soc": 87.5}` erzeugt einen Zustandswert und die
   Zählerstände wie bisher.
-* [ ] Eine Nachricht **ohne** `zustand` — und eine mit leerem Objekt — erzeugt **keine** Zeile in
+  (Test: MqttIngestServiceTest#handle_ZustandSocAnSpeicher_SpeichertZustandswertUndZaehlerstaende)
+* [x] Eine Nachricht **ohne** `zustand` — und eine mit leerem Objekt — erzeugt **keine** Zeile in
   `geraetezustand`; die Zählerstände bleiben unverändert.
-* [ ] Ein unbekanntes Feld im Payload führt **nicht** zum Verwerfen der Nachricht.
-* [ ] Eine Nachricht mit **`soc` und einem unbekannten Schlüssel** erzeugt **eine** Zeile — die
+  (Test: MqttIngestServiceTest#handle_OhneZustand_KeinZustandswert, MqttIngestServiceTest#handle_ZustandLeerOderNull_KeinZustandswert)
+* [x] Ein unbekanntes Feld im Payload führt **nicht** zum Verwerfen der Nachricht.
+  (Test: MqttIngestServiceTest#handle_UnbekanntesZusatzfeldImPayload_WirdVerarbeitet)
+* [x] Eine Nachricht mit **`soc` und einem unbekannten Schlüssel** erzeugt **eine** Zeile — die
   unbekannte Grösse wird verworfen, `soc` entsteht trotzdem.
-* [ ] `"zustand": {"soc": "abc"}` und `"zustand": 5` verwerfen **nur den Zustandswert**; die
+  (Test: MqttIngestServiceTest#handle_ZustandSocUndUnbekannterSchluessel_GenauEineZeile)
+* [x] `"zustand": {"soc": "abc"}` und `"zustand": 5` verwerfen **nur den Zustandswert**; die
   Zählerstände derselben Nachricht werden gespeichert (kein Verlust durch fehlerhaftes JSON).
-* [ ] `"zustand": {"soc": null}` erzeugt **keine** Zeile und **keine** Systemmeldung — „nicht
+  (Test: MqttIngestServiceTest#handle_ZustandKeinObjekt_SpeichertZaehlerstaendeUndMeldet, MqttIngestServiceTest#handle_ZustandSocKeineZahl_VerwirftNurZustandswert)
+* [x] `"zustand": {"soc": null}` erzeugt **keine** Zeile und **keine** Systemmeldung — „nicht
   gemeldet" ist kein Störfall.
-* [ ] Der Schlüssel wird unabhängig von der Schreibweise abgebildet (`soc`, `SOC`, `Soc`); in der
+  (Test: MqttIngestServiceTest#handle_ZustandSocNull_KeineZeileKeineMeldung)
+* [x] Der Schlüssel wird unabhängig von der Schreibweise abgebildet (`soc`, `SOC`, `Soc`); in der
   Tabelle steht `SOC`.
+  (Test: MqttIngestServiceTest#handle_ZustandSchluesselSchreibweise_WirdAufSocAbgebildet)
 
 **Persistierung**
-* [ ] Dieselbe Nachricht zweimal empfangen ergibt **eine** Zeile (Upsert auf
+* [x] Dieselbe Nachricht zweimal empfangen ergibt **eine** Zeile (Upsert auf
   `(einheit_id, zeit, groesse)`), nicht zwei.
-* [ ] `zeit` trägt die **Ortszeit** aus dem Payload, verbatim — geprüft an einem Zeitstempel mit
+  (Test: MqttIngestServiceTest#handle_ZustandBestehenderDatensatz_AktualisiertStattNeu, FlywaySchemaIT#geraetezustand_DoppelterSchluessel_WirdVonDerDatenbankAbgewiesen)
+* [x] `zeit` trägt die **Ortszeit** aus dem Payload, verbatim — geprüft an einem Zeitstempel mit
   Offset `+02:00`.
-* [ ] `org_id` stammt aus dem Topic, nicht aus dem Payload.
-* [ ] Am Umstellungstag im Herbst überschreibt der zweite Durchgang der Stunde 02:00–03:00 die
+  (Test: MqttIngestServiceTest#handle_ZustandZeitMitOffsetPlus2_OrtszeitVerbatim)
+* [x] `org_id` stammt aus dem Topic, nicht aus dem Payload.
+  (Test: MqttIngestServiceTest#handle_ZustandMitOrgIdImPayload_OrgIdStammtAusTopic)
+* [x] Am Umstellungstag im Herbst überschreibt der zweite Durchgang der Stunde 02:00–03:00 die
   Werte des ersten; der Tag hat 96 statt 100 Viertelstunden mit Werten.
-* [ ] **Eine gelöschte Einheit nimmt ihre Zustandswerte mit** (`ON DELETE CASCADE`) — geprüft am
+  (Test: MqttIngestServiceTest#handle_ZustandHerbstZeitumstellung_ZweiterDurchgangUeberschreibtErsten, MqttIngestServiceTest#handle_ZustandHerbstZeitumstellung_GanzerTagErgibt96ViertelstundenMitWerten)
+* [x] **Eine gelöschte Einheit nimmt ihre Zustandswerte mit** (`ON DELETE CASCADE`) — geprüft am
   konstruierten Fall „Zustandswert ohne Rohdaten", weil das Löschen sonst an `zaehler_rohdaten`
-  scheitert (FR-2).
-* [ ] Ein **direktes `INSERT`** mit `wert = 101` und `groesse = 'SOC'` wird von der Datenbank
+  scheitert (FR-2). (Test: FlywaySchemaIT#einheitLoeschen_LoeschtTarifpositionenUndGeraetezustaendeMit)
+* [x] Ein **direktes `INSERT`** mit `wert = 101` und `groesse = 'SOC'` wird von der Datenbank
   abgewiesen — der CHECK greift auch an der Anwendung vorbei.
-* [ ] Die Abfrage „letzter Wert vor Zeitpunkt" nutzt den Index `(einheit_id, groesse, zeit DESC)`
-  (`EXPLAIN` zeigt einen Index-Scan, keinen Seq-Scan).
+  (Test: FlywaySchemaIT#geraetezustand_DirektesInsertSocUeber100_WirdVonDerDatenbankAbgewiesen)
+* [x] Die Abfrage „letzter Wert vor Zeitpunkt" läuft über einen Index (`EXPLAIN` zeigt einen
+  Index-Scan, keinen Seq-Scan und keine Sortierung). Mit mehreren Grössen je Einheit ist es
+  `(einheit_id, groesse, zeit DESC)`. (Hintergrund: Anhang A.8)
+  (Test: FlywaySchemaIT#geraetezustand_LetzterWertVorZeitpunkt_NurSoc_IndexScanOhneSort, FlywaySchemaIT#geraetezustand_LetzterWertVorZeitpunkt_MehrereGroessen_NutztIdxGeraetezustandLetzter)
 
 **Validierung**
-* [ ] `soc = 87.5` an einer `SPEICHER`-Einheit wird gespeichert.
-* [ ] `soc = 101` wird **verworfen** und erzeugt eine Systemmeldung mit Key
+* [x] `soc = 87.5` an einer `SPEICHER`-Einheit wird gespeichert.
+  (Test: MqttIngestServiceTest#handle_ZustandSocAnSpeicher_SpeichertZustandswertUndZaehlerstaende)
+* [x] `soc = 101` wird **verworfen** und erzeugt eine Systemmeldung mit Key
   `GERAETEZUSTAND_WERT_UNGUELTIG`, Level `WARN`, Kategorie `SYSTEMMELDUNG_KATEGORIE_MQTT`; der
   Parameter nennt Einheit, Grösse, Wert und erlaubten Bereich. Die Zählerstände derselben Nachricht
   werden **trotzdem** gespeichert.
-* [ ] `soc = -1` wird verworfen.
-* [ ] `soc` an einer `CONSUMER`-Einheit wird verworfen und erzeugt eine Meldung mit dem **eigenen**
+  (Test: MqttIngestServiceTest#handle_ZustandSocAusserhalbBereich_VerworfenMitMeldungZaehlerstaendeBleiben)
+* [x] `soc = -1` wird verworfen.
+  (Test: MqttIngestServiceTest#handle_ZustandSocAusserhalbBereich_VerworfenMitMeldungZaehlerstaendeBleiben)
+* [x] `soc` an einer `CONSUMER`-Einheit wird verworfen und erzeugt eine Meldung mit dem **eigenen**
   Key `GERAETEZUSTAND_TYP_UNGUELTIG` — nicht mit dem der Bereichsverletzung.
-* [ ] Keine der beiden Meldungen wird automatisch erledigt; sie bleibt offen, bis der Betreiber sie
+  (Test: MqttIngestServiceTest#handle_ZustandSocAnConsumer_VerworfenMitTypMeldung)
+* [x] Keine der beiden Meldungen wird automatisch erledigt; sie bleibt offen, bis der Betreiber sie
   abhakt.
-* [ ] Ein unbekannter Grössenname wird verworfen, ohne die Nachricht zu verlieren.
-* [ ] Lassen **mehrere** aufgelöste Einheiten dieselbe Grösse zu, entsteht **genau eine** Zeile —
+  (Test: MqttIngestServiceTest#handle_ZustandSocAusserhalbBereich_VerworfenMitMeldungZaehlerstaendeBleiben, MqttIngestServiceTest#handle_ZustandSocAnConsumer_VerworfenMitTypMeldung)
+* [x] Ein unbekannter Grössenname wird verworfen, ohne die Nachricht zu verlieren.
+  (Test: MqttIngestServiceTest#handle_ZustandUnbekannteGroesse_VerworfenOhneMeldung)
+* [x] Lassen **mehrere** aufgelöste Einheiten dieselbe Grösse zu, entsteht **genau eine** Zeile —
   an der Einheit mit der kleinsten `id` (FR-4.6). Mit `SOC` allein ist der Fall konstruiert; das
   Kriterium sichert die Regel für die erste Grösse, die an mehreren Typen gilt.
-* [ ] Ein **unbekannter Messpunkt** verwirft die ganze Nachricht wie bisher — auch den
+  (Test: MqttIngestServiceTest#handle_ZustandMehrereZulaessigeEinheiten_GenauEineZeileAnKleinsterId)
+* [x] Ein **unbekannter Messpunkt** verwirft die ganze Nachricht wie bisher — auch den
   Zustandswert.
+  (Test: MqttIngestServiceTest#handle_ZustandUnbekannterMesspunkt_VerwirftAuchZustandswert)
 
 **Lesen**
-* [ ] „Letzter Wert vor Zeitpunkt" liefert bei mehreren Werten desselben Intervalls den
+* [x] „Letzter Wert vor Zeitpunkt" liefert bei mehreren Werten desselben Intervalls den
   **jüngsten** davor, nicht den ersten.
-* [ ] Liegt kein Wert vor dem Zeitpunkt, ist das Ergebnis leer — kein Fehler.
-* [ ] Die Zeitspannen-Abfrage liefert **aufsteigend** nach `zeit`, Beginn **einschliesslich**, Ende
+  (Test: GeraetezustandRepositoryIT#findFirstVor_MehrereWerte_LiefertJuengstenDavor)
+* [x] Liegt kein Wert vor dem Zeitpunkt, ist das Ergebnis leer — kein Fehler.
+  (Test: GeraetezustandRepositoryIT#findFirstVor_KeinWertDavor_LiefertLeer)
+* [x] Die Zeitspannen-Abfrage liefert **aufsteigend** nach `zeit`, Beginn **einschliesslich**, Ende
   **ausschliesslich** — dieselben Grenzen wie `findByZeitVonBetween` der Steuerentscheide.
-* [ ] Zustandswerte eines Mandanten sind für einen anderen **nicht** abrufbar.
+  (Test: GeraetezustandRepositoryIT#findZeitspanne_LiefertAufsteigendVonEinschliesslichBisAusschliesslich)
+* [x] Zustandswerte eines Mandanten sind für einen anderen **nicht** abrufbar.
+  (Test: GeraetezustandRepositoryIT#abgeleiteteAbfragen_MitOrgFilter_SehenKeineFremdenWerte, GeraetezustandRepositoryIT#letzterWertJeIntervall_FremderMandantGleicheEinheit_WirdNichtGelesen)
 
 **Abgrenzung zu den Messwerten**
-* [ ] Die Aggregation (`ZaehlerAggregationService`) liest `geraetezustand` **nicht** und schreibt
+* [x] Die Aggregation (`ZaehlerAggregationService`) liest `geraetezustand` **nicht** und schreibt
   nicht hinein; `messwerte` bleibt unverändert.
+  (Test: ArchitectureTest#nurIngestUndSteuerungGreifenAufGeraetezustandZu)
 * [ ] Ein Zustandswert taucht in **keiner** Statistik-Summe und in **keiner** Abrechnung auf.
+  (Test: ArchitectureTest#nurIngestUndSteuerungGreifenAufGeraetezustandZu)
+
+  > **Bemerkung:** Die ArchUnit-Regel belegt nur, dass Statistik und Abrechnung `geraetezustand`
+  > nicht direkt lesen. Nicht abgedeckt ist der Umweg über `steuerentscheid.soc` (V155,
+  > `Specs/Einspeisesteuerung.md`): Die Steuerung schreibt den SOC dort zu jedem Entscheid mit. Ob
+  > Statistik oder Abrechnung diese Spalte lesen, prüft die Regel nicht.
 
 **Pi-Gateway** (§6)
 * [ ] Ein Register vom Typ `uint16` wird über **ein** Register gelesen; `float32` und `uint32`
   bleiben unverändert bei zwei.
-* [ ] Rohwert `8750` mit `skalierung: 0.01` ergibt `87.5` — nicht `875000`.
+* [x] Rohwert `8750` mit `skalierung: 0.01` ergibt `87.5` — nicht `875000`.
+  (Test: pi-gateway/tests/test_modbus_reader.py › ZustandAlsBeiwerkTest.test_read_ZustandGelesen_ImReading)
 * [ ] Der Simulator liefert einen SOC, der in der **Ladephase steigt** und in der Entladephase
   fällt, 0–100 nicht verlässt und zu den Zählerständen derselben Nachricht passt.
-* [ ] Ohne konfigurierte Zustandsregister enthält der Payload **kein** `zustand`-Objekt — auch kein
-  leeres.
+* [x] Ohne konfigurierte Zustandsregister enthält der Payload **kein** `zustand`-Objekt — auch kein
+  leeres. (Test: pi-gateway/tests/test_publisher.py › PayloadTest.test_payload_ZustandLeerOderNone_FeldFehlt)
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
@@ -395,7 +432,7 @@ verfügbar.
       gekoppelt** — steigt in der Ladephase, fällt in der Entladephase, bleibt in 0–100 und kehrt an
       den Grenzen um. Der Speicher-Modus führt die Phase (`_laedt`, `_phase_rest`); ein unabhängig
       gewürfelter SOC widerspräche den Zählerständen derselben Nachricht.
-  - `ZaehlerMesswertPayloadDTO`: Objekt `zustand` als `Map<String, Object>` (FR-1.2).
+  - `ZaehlerMesswertPayloadDTO`: Feld `zustand` vom Typ `Object` (FR-1.2).
   - `MqttIngestService`: Validierung und Schreiben (FR-3, FR-4), mit einer Abhängigkeit auf
     `SystemmeldungService` für die beiden Meldungen.
   - **`MqttMetrics` bleibt unberührt:** Ein verworfener Zustandswert ruft **kein** `recordFailed()`
@@ -517,3 +554,23 @@ FR-3 und der beantworteten Frage „Enthält die Registry alle drei Grössen ode
   gleiche Meldungen je Mandant und Key zusammen. An dieser Frequenz war der Mechanismus nie erprobt;
   der Beobachtungspunkt für die erste Betriebswoche ist auf Wunsch des Users am 23.10.2026
   gestrichen.
+
+### A.7 `zustand` als `Object` statt `Map<String, Object>` (FR-1.2, FR-4.3, 23.10.2026)
+FR-1.2 lautete: „Im DTO ist das eine `Map<String, Object>`, kein Feld je Grösse — und bewusst
+**nicht** `Map<String, BigDecimal>`." Die Begründung nannte `"zustand": 5` bereits als Fall, den der
+engere Typ nicht übersteht — die `Map` überstand ihn aber auch nicht: Jackson scheiterte mit
+`MismatchedInputException` (`LinkedHashMap` aus einer Zahl), und der generische `catch` in
+`MqttIngestService.handle` verwarf die ganze Nachricht samt Zählerständen. `Map<String, Object>`
+machte nur die **Werte** tolerant, nicht das Feld selbst. Gefunden beim Akzeptanzkriterien-Check vom
+23.10.2026 (Kriterium zu `"zustand": 5`). Seither ist das Feld `Object`; ist es kein Objekt, meldet
+der Ingest `GERAETEZUSTAND_WERT_UNGUELTIG` und behält die Zählerstände.
+
+### A.8 Index-Kriterium gelockert (§3, 23.10.2026)
+Das Kriterium lautete: „Die Abfrage „letzter Wert vor Zeitpunkt" nutzt den Index
+`(einheit_id, groesse, zeit DESC)` (`EXPLAIN` zeigt einen Index-Scan, keinen Seq-Scan)." Beim
+Schreiben der Tests (23.10.2026) zeigte `EXPLAIN`: Solange eine Einheit nur `SOC` führt, wählt
+PostgreSQL den Unique-Index `uk_geraetezustand (einheit_id, zeit, groesse)` und liest ihn
+rückwärts — ebenfalls ein Index-Scan ohne Sortierung. Erst mit einer zweiten Grösse an derselben
+Einheit nimmt der Planer `idx_geraetezustand_letzter`. Auf Wunsch des Users verlangt das Kriterium
+seither einen Index-Scan ohne Seq-Scan und Sortierung, nicht einen bestimmten Index.
+

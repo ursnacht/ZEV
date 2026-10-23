@@ -16,13 +16,19 @@ import org.springframework.test.context.ActiveProfiles;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Integrationstests fuer {@link GeraetezustandRepository#letzterWertJeIntervall} — die
- * <b>native</b> Abfrage der Einspeisesteuerung (Specs/Einspeisesteuerung.md, FR-2a/FR-5b).
+ * Integrationstests fuer {@link GeraetezustandRepository} — vor allem fuer
+ * {@link GeraetezustandRepository#letzterWertJeIntervall}, die <b>native</b> Abfrage der
+ * Einspeisesteuerung (Specs/Einspeisesteuerung.md, FR-2a/FR-5b), dazu die abgeleiteten Abfragen
+ * „letzter Wert vor Zeitpunkt" und „Zeitspanne" samt Mandantenfilter (Specs/Gerätezustand.md, FR-5).
+ *
+ * <p><b>Schema aus dem Mapping:</b> Hier fehlen UNIQUE, Index und CHECK der Migration V153 — die
+ * prueft {@code FlywaySchemaIT}.
  *
  * <p><b>Warum ausgerechnet diese Abfrage einen Integrationstest braucht.</b> Sie ist natives SQL:
  * {@code DISTINCT ON} kennt JPQL nicht. Damit faellt gleich dreierlei weg, worauf sich die uebrigen
@@ -339,11 +345,132 @@ class GeraetezustandRepositoryIT extends AbstractIntegrationTest {
         assertThat((BigDecimal) ergebnis.get(95)[1]).isEqualByComparingTo("95");
     }
 
+    // ==================== Letzter Wert vor Zeitpunkt (FR-5.1) ====================
+
+    /**
+     * Mehrere Werte im selben Intervall: geliefert wird der <b>juengste</b> davor, nicht der erste.
+     * Eingefuegt in verdrehter Reihenfolge, damit die Id nicht zufaellig mitsortiert.
+     */
+    @Test
+    void findFirstVor_MehrereWerte_LiefertJuengstenDavor() {
+        speichere(orgId, SPEICHER_ID, LocalDateTime.of(2026, 3, 1, 10, 14), "55.0");
+        speichere(orgId, SPEICHER_ID, LocalDateTime.of(2026, 3, 1, 10, 1), "45.0");
+        speichere(orgId, SPEICHER_ID, LocalDateTime.of(2026, 3, 1, 10, 8), "50.0");
+        flushUndLeere();
+
+        assertThat(letzterVor(SPEICHER_ID, LocalDateTime.of(2026, 3, 1, 10, 15)))
+                .get().satisfies(z -> assertThat(z.getWert()).isEqualByComparingTo("55.0"));
+    }
+
+    /**
+     * <b>Echt kleiner</b>: Ein Wert genau auf dem Zeitpunkt gehoert zum folgenden Intervall und
+     * zaehlt nicht mit.
+     */
+    @Test
+    void findFirstVor_WertGenauAufZeitpunkt_ZaehltNicht() {
+        speichere(orgId, SPEICHER_ID, LocalDateTime.of(2026, 3, 1, 10, 10), "50.0");
+        speichere(orgId, SPEICHER_ID, LocalDateTime.of(2026, 3, 1, 10, 15), "60.0");
+        flushUndLeere();
+
+        assertThat(letzterVor(SPEICHER_ID, LocalDateTime.of(2026, 3, 1, 10, 15)))
+                .get().extracting(Geraetezustand::getZeit)
+                .isEqualTo(LocalDateTime.of(2026, 3, 1, 10, 10));
+    }
+
+    /** Kein Wert vor dem Zeitpunkt: leeres Ergebnis, kein Fehler. */
+    @Test
+    void findFirstVor_KeinWertDavor_LiefertLeer() {
+        speichere(orgId, SPEICHER_ID, LocalDateTime.of(2026, 3, 1, 10, 15), "60.0");
+        flushUndLeere();
+
+        assertThat(letzterVor(SPEICHER_ID, LocalDateTime.of(2026, 3, 1, 10, 15))).isEmpty();
+        assertThat(letzterVor(ANDERE_EINHEIT_ID, LocalDateTime.of(2026, 3, 2, 0, 0))).isEmpty();
+    }
+
+    // ==================== Zeitspanne (FR-5.2) ====================
+
+    /**
+     * Aufsteigend nach {@code zeit}, Beginn einschliesslich, Ende ausschliesslich — dieselben
+     * Grenzen wie {@code SteuerentscheidRepository.findByZeitVonBetween}.
+     */
+    @Test
+    void findZeitspanne_LiefertAufsteigendVonEinschliesslichBisAusschliesslich() {
+        speichere(orgId, SPEICHER_ID, LocalDateTime.of(2026, 3, 1, 11, 0), "40.0");
+        speichere(orgId, SPEICHER_ID, LocalDateTime.of(2026, 3, 1, 10, 30), "30.0");
+        speichere(orgId, SPEICHER_ID, LocalDateTime.of(2026, 3, 1, 9, 59, 59), "10.0");
+        speichere(orgId, SPEICHER_ID, LocalDateTime.of(2026, 3, 1, 10, 0), "20.0");
+        speichere(orgId, ANDERE_EINHEIT_ID, LocalDateTime.of(2026, 3, 1, 10, 15), "77.0");
+        flushUndLeere();
+
+        List<Geraetezustand> ergebnis = geraetezustandRepository
+                .findByEinheitIdAndGroesseAndZeitGreaterThanEqualAndZeitLessThanOrderByZeitAsc(
+                        SPEICHER_ID, Zustandsgroesse.SOC,
+                        LocalDateTime.of(2026, 3, 1, 10, 0), LocalDateTime.of(2026, 3, 1, 11, 0));
+
+        assertThat(ergebnis).extracting(Geraetezustand::getZeit).containsExactly(
+                LocalDateTime.of(2026, 3, 1, 10, 0),
+                LocalDateTime.of(2026, 3, 1, 10, 30));
+    }
+
+    /** Zeitspanne ohne Werte: leere Liste, wie ein Tag ohne Entscheide. */
+    @Test
+    void findZeitspanne_KeineWerte_LiefertLeereListe() {
+        assertThat(geraetezustandRepository
+                .findByEinheitIdAndGroesseAndZeitGreaterThanEqualAndZeitLessThanOrderByZeitAsc(
+                        SPEICHER_ID, Zustandsgroesse.SOC,
+                        LocalDateTime.of(2026, 3, 1, 0, 0), LocalDateTime.of(2026, 3, 2, 0, 0)))
+                .isEmpty();
+    }
+
+    // ==================== Mandanten-Isolation der abgeleiteten Abfragen ====================
+
+    /**
+     * Die abgeleiteten Abfragen haengen am Hibernate-{@code orgFilter}, den der Aufrufer
+     * org-explizit aktiviert (FR-5.3). Dieselbe {@code einheit_id} bei zwei Mandanten — sonst
+     * trennte schon die Einheit. Der fremde Wert liegt <b>spaeter</b>, damit er ohne Filter
+     * gewaenne.
+     */
+    @Test
+    void abgeleiteteAbfragen_MitOrgFilter_SehenKeineFremdenWerte() {
+        speichere(orgId, SPEICHER_ID, LocalDateTime.of(2026, 3, 1, 10, 5), "40.0");
+        speichere(fremdOrgId, SPEICHER_ID, LocalDateTime.of(2026, 3, 1, 10, 10), "99.0");
+        flushUndLeere();
+
+        aktiviereOrgFilter(entityManager, orgId);
+
+        assertThat(letzterVor(SPEICHER_ID, LocalDateTime.of(2026, 3, 1, 11, 0)))
+                .get().extracting(Geraetezustand::getOrgId).isEqualTo(orgId);
+        assertThat(geraetezustandRepository
+                .findByEinheitIdAndGroesseAndZeitGreaterThanEqualAndZeitLessThanOrderByZeitAsc(
+                        SPEICHER_ID, Zustandsgroesse.SOC,
+                        LocalDateTime.of(2026, 3, 1, 10, 0), LocalDateTime.of(2026, 3, 1, 11, 0)))
+                .extracting(Geraetezustand::getOrgId).containsExactly(orgId);
+        assertThat(geraetezustandRepository.findAll()).hasSize(1);
+    }
+
+    /** Gegenprobe: Der fremde Mandant sieht unter seinem Filter nur seinen Wert. */
+    @Test
+    void abgeleiteteAbfragen_FremderOrgFilter_SiehtNurEigeneWerte() {
+        speichere(fremdOrgId, SPEICHER_ID, LocalDateTime.of(2026, 3, 1, 10, 5), "99.0");
+        speichere(orgId, SPEICHER_ID, LocalDateTime.of(2026, 3, 1, 10, 10), "40.0");
+        flushUndLeere();
+
+        aktiviereOrgFilter(entityManager, fremdOrgId);
+
+        assertThat(letzterVor(SPEICHER_ID, LocalDateTime.of(2026, 3, 1, 11, 0)))
+                .get().extracting(Geraetezustand::getOrgId).isEqualTo(fremdOrgId);
+    }
+
     // ==================== Hilfsmittel ====================
 
     private List<Object[]> abfrage(Long orgId, Long einheitId, String groesse,
                                    LocalDateTime von, LocalDateTime bis) {
         return geraetezustandRepository.letzterWertJeIntervall(orgId, einheitId, groesse, von, bis);
+    }
+
+    private Optional<Geraetezustand> letzterVor(Long einheitId, LocalDateTime vor) {
+        return geraetezustandRepository.findFirstByEinheitIdAndGroesseAndZeitLessThanOrderByZeitDesc(
+                einheitId, Zustandsgroesse.SOC, vor);
     }
 
     private List<LocalDateTime> buckets(List<Object[]> zeilen) {
