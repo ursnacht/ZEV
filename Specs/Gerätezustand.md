@@ -338,20 +338,23 @@ verfügbar.
   nicht hinein; `messwerte` bleibt unverändert.
   (Test: ArchitectureTest#nurIngestUndSteuerungGreifenAufGeraetezustandZu)
 * [ ] Ein Zustandswert taucht in **keiner** Statistik-Summe und in **keiner** Abrechnung auf.
-  (Test: ArchitectureTest#nurIngestUndSteuerungGreifenAufGeraetezustandZu)
+  (Test: ArchitectureTest#nurIngestUndSteuerungGreifenAufGeraetezustandZu, ArchitectureTest#statistikUndAbrechnungKennenKeineZustandswerte)
 
-  > **Bemerkung:** Die ArchUnit-Regel belegt nur, dass Statistik und Abrechnung `geraetezustand`
-  > nicht direkt lesen. Nicht abgedeckt ist der Umweg über `steuerentscheid.soc` (V155,
-  > `Specs/Einspeisesteuerung.md`): Die Steuerung schreibt den SOC dort zu jedem Entscheid mit. Ob
-  > Statistik oder Abrechnung diese Spalte lesen, prüft die Regel nicht.
+  > **Bemerkung:** Die erste ArchUnit-Regel belegt nur, dass Statistik und Abrechnung
+  > `geraetezustand` nicht direkt lesen. Die zweite schliesst den Umweg über `steuerentscheid.soc`
+  > (V155, `Specs/Einspeisesteuerung.md`), in den die Steuerung den SOC zu jedem Entscheid
+  > mitschreibt: Statistik-, Rechnungs-, Nebenkosten-, Messwerte- (Solarverteilung in
+  > `MesswerteService`) und Verteilungsklassen dürfen weder von `Geraetezustand` noch von
+  > `Steuerentscheid` abhängen — auch nicht über `SteuerungService`, der beides liest und herausgibt.
+  > Beide prüfen Klassen-Abhängigkeiten, kein SQL in Zeichenketten.
 
 **Pi-Gateway** (§6)
-* [ ] Ein Register vom Typ `uint16` wird über **ein** Register gelesen; `float32` und `uint32`
-  bleiben unverändert bei zwei.
+* [x] Ein Register vom Typ `uint16` wird über **ein** Register gelesen; `float32` und `uint32`
+  bleiben unverändert bei zwei. (Test: test_modbus_reader.py › ZustandAlsBeiwerkTest.test_read_RegisteranzahlJeTyp_Uint16EinsUint32Zwei, test_modbus_reader.py › ModbusReaderTest.test_read_Float32_LiestZweiRegister)
 * [x] Rohwert `8750` mit `skalierung: 0.01` ergibt `87.5` — nicht `875000`.
   (Test: pi-gateway/tests/test_modbus_reader.py › ZustandAlsBeiwerkTest.test_read_ZustandGelesen_ImReading)
-* [ ] Der Simulator liefert einen SOC, der in der **Ladephase steigt** und in der Entladephase
-  fällt, 0–100 nicht verlässt und zu den Zählerständen derselben Nachricht passt.
+* [x] Der Simulator liefert einen SOC, der in der **Ladephase steigt** und in der Entladephase
+  fällt, 0–100 nicht verlässt und zu den Zählerständen derselben Nachricht passt. (Test: test_sim_speicher.py › SimSpeicherSocTest.test_read_VieleLesevorgaenge_SocFolgtDerPhaseUndBleibtImBereich)
 * [x] Ohne konfigurierte Zustandsregister enthält der Payload **kein** `zustand`-Objekt — auch kein
   leeres. (Test: pi-gateway/tests/test_publisher.py › PayloadTest.test_payload_ZustandLeerOderNone_FeldFehlt)
 

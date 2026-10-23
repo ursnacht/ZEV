@@ -284,6 +284,42 @@ class ArchitectureTest {
             rule.check(importedClasses);
         }
 
+        /**
+         * Specs/Gerätezustand.md, §3 „Abgrenzung zu den Messwerten": Ein Zustandswert taucht in
+         * keiner Statistik-Summe und in keiner Abrechnung auf. Die Regel oben deckt den direkten
+         * Zugriff auf {@code geraetezustand} ab; diese schliesst den Umweg über den
+         * Steuerentscheid, der den SOC zu jedem Entscheid mitschreibt ({@code steuerentscheid.soc},
+         * V155). Statistik, Rechnungen, Nebenkostenabrechnung, Messwerte (dort rechnet
+         * {@code MesswerteService} die Solarverteilung, auf der die Rechnungen aufbauen) und die
+         * Verteilungsklassen dürfen weder Zustandswerte noch Steuerentscheide kennen — auch nicht
+         * über {@code SteuerungService}, der beides liest und herausgibt.
+         */
+        @Test
+        @DisplayName("Statistik und Abrechnung kennen weder Zustandswerte noch Steuerentscheide")
+        void statistikUndAbrechnungKennenKeineZustandswerte() {
+            Set<String> verboten = Set.of(
+                "Geraetezustand", "GeraetezustandRepository", "Zustandsgroesse",
+                "Steuerentscheid", "SteuerentscheidRepository", "SteuerentscheidDTO",
+                "SteuerungService");
+
+            ArchRule rule = noClasses()
+                .that().haveSimpleNameStartingWith("Statistik")
+                .or().haveSimpleNameStartingWith("Messwerte")
+                .or().haveSimpleNameStartingWith("Rechnung")
+                .or().haveSimpleNameStartingWith("Nk")
+                .or().haveSimpleName("SolarDistribution")
+                .or().haveSimpleName("ProportionalConsumptionDistribution")
+                .should().dependOnClassesThat(new DescribedPredicate<JavaClass>(
+                    "Zustandswerte oder Steuerentscheide sind") {
+                    @Override
+                    public boolean test(JavaClass ziel) {
+                        return verboten.contains(ziel.getSimpleName());
+                    }
+                });
+
+            rule.check(importedClasses);
+        }
+
         @Test
         @DisplayName("Entities sollten keine anderen Schichten importieren")
         void entitiesShouldNotImportOtherLayers() {

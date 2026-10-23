@@ -64,6 +64,17 @@ class ModbusReaderTest(unittest.TestCase):
         self.assertIs(kontext.exception.__cause__, ursache)
         reader._client.close.assert_called_once()
 
+    def test_read_Float32_LiestZweiRegister(self) -> None:
+        """float32 bleibt bei zwei Registern (Specs/Gerätezustand.md, §3 Pi-Gateway)."""
+        reader = _reader()
+        reader._client.read_holding_registers.return_value = _antwort(_HUNDERT)
+
+        stand = reader.read()
+
+        self.assertEqual(100.0, stand.zaehlerstand_bezug)
+        reader._client.read_holding_registers.assert_called_once_with(
+            address=0x5000, count=2, slave=reader.config.unit_id)
+
 
 class TimeoutHinweisTest(unittest.TestCase):
     """Specs/Pi-Gateway-Software.md, FR-1.5: Der Hinweis auf read_timeout erscheint nur, wenn
@@ -224,6 +235,22 @@ class ZustandAlsBeiwerkTest(unittest.TestCase):
         self.assertEqual({"soc": 87.5}, stand.zustand)
         self.assertEqual(100.0, stand.zaehlerstand_bezug)
         sleep.assert_called_once_with(0.5)
+
+    def test_read_RegisteranzahlJeTyp_Uint16EinsUint32Zwei(self, sleep) -> None:
+        """Specs/Gerätezustand.md, §3 Pi-Gateway: Der Ladezustand (uint16) belegt EIN Register.
+        Mit zwei gelesenen Registern hiesse der Wert 0x222E_xxxx statt 8750 - und die beiden
+        uint32-Zaehlerstaende muessen dabei unveraendert zwei lesen."""
+        reader = _speicher_reader()
+        reader._client.read_holding_registers.side_effect = [
+            _antwort(self._LADUNG), _antwort(self._ENTLADUNG), _antwort(self._SOC),
+        ]
+
+        reader.read()
+
+        aufrufe = reader._client.read_holding_registers.call_args_list
+        self.assertEqual([(0x7984, 2), (0x7986, 2), (0x80E8, 1)],
+                         [(a.kwargs["address"], a.kwargs["count"]) for a in aufrufe])
+        sleep.assert_not_called()
 
     def test_read_ReadAttemptsEins_ZustandNurEinmalGelesen(self, sleep) -> None:
         reader = _speicher_reader(read_attempts=1)
