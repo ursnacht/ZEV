@@ -67,6 +67,12 @@
   padding: var(--spacing-xs) var(--spacing-md);
 }
 
+/* `.zev-button:disabled` setzt das Padding zurück - ohne diese Regel würde eine kompakte
+   Schaltfläche beim Sperren breiter und schöbe ihre Nachbarn weg. */
+.zev-button--compact:disabled {
+  padding: var(--spacing-xs) var(--spacing-md);
+}
+
 /**
  * Nur-Icon-Schaltflaeche fuer Aktionen innerhalb einer Tabellenzeile (Zeile entfernen).
  *

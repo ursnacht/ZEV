@@ -1,7 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { blaettereZeitraum, toIsoDate, vorquartal, monatsende } from '../../utils/date-utils';
+import { ActivatedRoute } from '@angular/router';
+import { blaettereZeitraum, isoZuDatum, toIsoDate, vorquartal, monatsende } from '../../utils/date-utils';
 import { LoadingIndicatorComponent } from '../loading-indicator/loading-indicator.component';
 import { WithMessage } from '../../utils/with-message';
 import { StatistikService } from '../../services/statistik.service';
@@ -67,11 +68,28 @@ export class StatistikComponent extends WithMessage implements OnInit {
 
   constructor(
     private statistikService: StatistikService,
-    private translationService: TranslationService
+    private translationService: TranslationService,
+    private route: ActivatedRoute
   ) { super(); }
 
   ngOnInit(): void {
+    // Aufruf mit Zeitraum (?von=…&bis=…, z.B. aus der Einspeisesteuerung): übernehmen und sofort
+    // anzeigen (Specs/Statistik.md, FR-1.4). Sonst das Vorquartal - ohne Laden, wie bisher.
+    const von = this.route.snapshot.queryParamMap.get('von');
+    const bis = this.route.snapshot.queryParamMap.get('bis');
+    if (von && bis && this.istGueltigesDatum(von) && this.istGueltigesDatum(bis) && von <= bis) {
+      this.dateFrom = von;
+      this.dateTo = bis;
+      this.onSubmit();
+      return;
+    }
     this.setDefaultDateRange();
+  }
+
+  /** `yyyy-MM-dd` und ein echter Kalendertag - `2026-02-30` rollte sonst still in den März. */
+  private istGueltigesDatum(iso: string): boolean {
+    const datum = isoZuDatum(iso);
+    return datum !== null && toIsoDate(datum) === iso;
   }
 
   /**

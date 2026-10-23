@@ -1,6 +1,7 @@
 import { createSpyObj, SpyObj } from '../../../testing/spy';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
+import { ActivatedRoute } from '@angular/router';
 import { fakeAsync, tick } from '../../../testing/fake-async';
 import { StatistikComponent } from './statistik.component';
 import { IconComponent } from '../icon/icon.component';
@@ -14,6 +15,9 @@ describe('StatistikComponent', () => {
   let fixture: ComponentFixture<StatistikComponent>;
   let statistikServiceSpy: SpyObj<StatistikService>;
   let translationServiceSpy: SpyObj<TranslationService>;
+  // Query-Parameter der URL (FR-1.4); leer = normaler Aufruf über das Menü.
+  let queryParams: Record<string, string> = {};
+  const routeStub = { snapshot: { queryParamMap: { get: (key: string) => queryParams[key] ?? null } } };
 
   const mockMonat: MonatsStatistik = {
     jahr: 2024,
@@ -74,6 +78,7 @@ describe('StatistikComponent', () => {
   };
 
   beforeEach(async () => {
+    queryParams = {};
     statistikServiceSpy = createSpyObj<StatistikService>('StatistikService', ['getStatistik', 'exportPdf', 'exportCsv']);
     statistikServiceSpy.getStatistik.mockReturnValue(of(mockStatistik));
     statistikServiceSpy.exportPdf.mockReturnValue(of(new Blob(['pdf'], { type: 'application/pdf' })));
@@ -87,7 +92,8 @@ describe('StatistikComponent', () => {
       imports: [StatistikComponent],
       providers: [
         { provide: StatistikService, useValue: statistikServiceSpy },
-        { provide: TranslationService, useValue: translationServiceSpy }
+        { provide: TranslationService, useValue: translationServiceSpy },
+        { provide: ActivatedRoute, useValue: routeStub }
       ]
     }).compileComponents();
 
@@ -116,6 +122,47 @@ describe('StatistikComponent', () => {
     expect(heute).toBeTruthy();
     return heute as HTMLButtonElement;
   }
+
+  describe('Aufruf mit Zeitraum in der URL (FR-1.4)', () => {
+    /** Erzeugt die Komponente neu - ngOnInit liest die Query-Parameter nur beim Start. */
+    function oeffneMit(params: Record<string, string>): StatistikComponent {
+      queryParams = params;
+      statistikServiceSpy.getStatistik.mockClear();
+      const neu = TestBed.createComponent(StatistikComponent);
+      neu.detectChanges();
+      return neu.componentInstance;
+    }
+
+    it('should take von and bis from the URL and load immediately', () => {
+      const statistik = oeffneMit({ von: '2026-10-22', bis: '2026-10-22' });
+
+      expect(statistik.dateFrom).toBe('2026-10-22');
+      expect(statistik.dateTo).toBe('2026-10-22');
+      expect(statistikServiceSpy.getStatistik).toHaveBeenCalledWith('2026-10-22', '2026-10-22');
+    });
+
+    it('should fall back to the previous quarter without loading when the dates are invalid', () => {
+      const faelle: Record<string, string>[] = [
+        { von: '2026-02-30', bis: '2026-02-30' },
+        { von: '22.10.2026', bis: '22.10.2026' },
+        { von: '2026-10-23', bis: '2026-10-22' },
+        { von: '2026-10-22' }
+      ];
+      for (const params of faelle) {
+        const statistik = oeffneMit(params);
+
+        expect(statistik.dateFrom).toBe(component.dateFrom);
+        expect(statistik.dateTo).toBe(component.dateTo);
+        expect(statistikServiceSpy.getStatistik).not.toHaveBeenCalled();
+      }
+    });
+
+    it('should not load on a normal call without parameters', () => {
+      oeffneMit({});
+
+      expect(statistikServiceSpy.getStatistik).not.toHaveBeenCalled();
+    });
+  });
 
   describe('initialization', () => {
     it('should set default date range on init', () => {

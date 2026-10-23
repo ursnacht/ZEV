@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { createSpyObj, SpyObj } from '../../../testing/spy';
 import { NEVER, of, throwError } from 'rxjs';
+import { Router } from '@angular/router';
 import { EinspeisesteuerungComponent } from './einspeisesteuerung.component';
 import { EinspeisesteuerungService } from '../../services/einspeisesteuerung.service';
 import { PreiszeitreiheService } from '../../services/preiszeitreihe.service';
@@ -28,6 +29,7 @@ describe('EinspeisesteuerungComponent', () => {
   let steuerungServiceSpy: SpyObj<EinspeisesteuerungService>;
   let preiszeitreiheServiceSpy: SpyObj<PreiszeitreiheService>;
   let translationServiceSpy: SpyObj<TranslationService>;
+  let routerSpy: SpyObj<Router>;
 
   /** Ein Entscheid mit allen Pflichtfeldern; einzelne werden je Test überschrieben. */
   function entscheid(zeit: string, ueberschreibungen: Partial<Steuerentscheid> = {}): Steuerentscheid {
@@ -112,12 +114,15 @@ describe('EinspeisesteuerungComponent', () => {
     translationServiceSpy = createSpyObj<TranslationService>('TranslationService', ['translate']);
     translationServiceSpy.translate.mockImplementation((key: string) => key);
 
+    routerSpy = createSpyObj<Router>('Router', ['navigate']);
+
     await TestBed.configureTestingModule({
       imports: [EinspeisesteuerungComponent],
       providers: [
         { provide: EinspeisesteuerungService, useValue: steuerungServiceSpy },
         { provide: PreiszeitreiheService, useValue: preiszeitreiheServiceSpy },
-        { provide: TranslationService, useValue: translationServiceSpy }
+        { provide: TranslationService, useValue: translationServiceSpy },
+        { provide: Router, useValue: routerSpy }
       ]
     }).compileComponents();
 
@@ -130,6 +135,33 @@ describe('EinspeisesteuerungComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  // ==================== Sprung in die Statistik (FR-5) ====================
+
+  describe('zurStatistik', () => {
+    it('should open the statistics for the displayed day', () => {
+      component.datum = '2026-10-21';
+
+      component.zurStatistik();
+
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/statistik'],
+        { queryParams: { von: '2026-10-21', bis: '2026-10-21' } });
+    });
+
+    it('should place the button directly to the right of "Nachrechnen"', () => {
+      const knoepfe = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('.zev-date-range-row > button'));
+      const nachrechnen = knoepfe.findIndex(b => b.textContent?.includes('STEUERUNG_NACHRECHNEN'));
+      const statistik = knoepfe.findIndex(b => b.id === 'zur-statistik');
+
+      expect(nachrechnen).toBeGreaterThanOrEqual(0);
+      expect(statistik).toBe(nachrechnen + 1);
+
+      (knoepfe[statistik] as HTMLButtonElement).click();
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/statistik'],
+        { queryParams: { von: component.datum, bis: component.datum } });
+    });
   });
 
   // ==================== Laden ====================

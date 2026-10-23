@@ -1,6 +1,7 @@
 import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { EinspeisesteuerungService } from '../../services/einspeisesteuerung.service';
 import {
   STEUERREGELN,
@@ -70,6 +71,7 @@ export class EinspeisesteuerungComponent extends WithMessage
   private readonly steuerungService = inject(EinspeisesteuerungService);
   private readonly preiszeitreiheService = inject(PreiszeitreiheService);
   protected readonly translationService = inject(TranslationService);
+  private readonly router = inject(Router);
 
   @ViewChild('diagramm') private diagrammRef?: ElementRef<HTMLDivElement>;
 
@@ -468,6 +470,16 @@ export class EinspeisesteuerungComponent extends WithMessage
         this.showMessage(error.error?.error || error.error || 'STEUERUNG_FEHLER_SIMULATION', 'error');
       }
     });
+  }
+
+  /**
+   * Öffnet die Statistik für den angezeigten Tag (Specs/Einspeisesteuerung.md, FR-5).
+   *
+   * <p>Die Statistik übernimmt `von`/`bis` aus der URL und lädt sofort (Specs/Statistik.md, FR-1.4) —
+   * ein Tag ist dort von = bis.
+   */
+  zurStatistik(): void {
+    this.router.navigate(['/statistik'], { queryParams: { von: this.datum, bis: this.datum } });
   }
 
   /** Übersetzungs-Key einer Regel — die Tabelle zeigt Klartext, nicht den Schlüssel. */

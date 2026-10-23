@@ -32,6 +32,12 @@ input[type="date"].zev-input {
   cursor: not-allowed;
 }
 
+/* Schmales Eingabefeld für kurze Werte (Zahl mit wenigen Stellen, z. B. ein Preis in CHF/kWh) in
+   einer Steuerzeile – ohne den Modifier nimmt .zev-input die ganze Breite seiner Gruppe ein. */
+.zev-input--schmal {
+  width: 6.5rem;
+}
+
 /* Clearable Input – Textfeld mit Löschen-Button (×) am rechten Rand */
 .zev-input-wrapper {
   position: relative;

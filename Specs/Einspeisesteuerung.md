@@ -496,8 +496,18 @@ wie der NK-Eintrag).
 **Aufbau von oben nach unten:**
 1. Titel **Einspeisesteuerung** mit Icon.
 2. **Eine Steuerzeile** (`zev-date-range-row`, wie bei der Preiszeitreihe): Datumswahl,
-   **‹ / ›** zum Blättern um je einen Tag, **Heute**, **Aktualisieren**, Feld **Schwellwert**
-   und Schaltfläche **Nachrechnen**.
+   **‹ / ›** zum Blättern um je einen Tag, **Heute**, **Aktualisieren**, die Felder **Schwellwert**
+   und **Mindest-Preisabstand**, Schaltfläche **Nachrechnen** und rechts davon **Statistik**.
+   * **Schwellwert** und **Mindest-Preisabstand** sind schmale Felder (`zev-input--schmal`, Design
+     System): Sie nehmen einen Preis mit wenigen Stellen auf, die volle Breite verschob nur die
+     Schaltflächen dahinter. Alle Schaltflächen der Steuerzeile sind kompakt (`zev-button--compact`),
+     damit die Zeile samt **Statistik** ab rund 1200px Fensterbreite auf einer Zeile Platz hat.
+   * **Statistik** (Icon `pie-chart`, wie der Menüeintrag) öffnet die Statistik für den **angezeigten
+     Tag** – Zeitraum von = bis = dieser Tag, sofort geladen (`/statistik?von=…&bis=…`,
+     `Specs/Statistik.md`, FR-1.4).
+     > Die Einspeisesteuerung zeigt, wie gesteuert wurde; ob sich der Tag gelohnt hat, zeigt die
+     > Statistik mit Eigenverbrauch und Netzbezug. Ohne die Schaltfläche führte der Weg über das Menü
+     > und zwei Datumsfelder.
    * **Heute** (Icon `calendar`) springt auf den heutigen Tag. Deaktiviert, solange dieser schon
      angezeigt wird — sonst wäre der Klick folgenlos, ohne dass man es vorher sähe.
      > Ohne sie führte der Weg zurück nur über wiederholtes Blättern oder über das Datumsfeld.
@@ -511,6 +521,7 @@ wie der NK-Eintrag).
      > nicht.
    * Beide stehen **vor** dem Schwellwert-Block. Am Zeilenende sitzt *Aufzeichnung zeigen*, das nur
      zeitweise erscheint — dort würden die Nachbarn bei jedem Nachrechnen ihre Position wechseln.
+     Aus demselben Grund steht **Statistik** vor *Aufzeichnung zeigen*.
    * *Aufzeichnung zeigen* trägt das Icon `database`, nicht mehr `refresh-cw`: Zwei gleiche Icons in
      derselben Zeile wären nicht auseinanderzuhalten, und die Schaltfläche holt die **gespeicherten**
      Entscheide zurück, statt neu zu laden.
@@ -1030,6 +1041,7 @@ Der Text ist an kein Feature gebunden.
   demselben Schwellwert erneut, statt auf die Aufzeichnung zurückzufallen.
 * [ ] Beide Schaltflächen sind während eines laufenden Ladevorgangs deaktiviert.
 * [ ] Keine zwei Schaltflächen der Steuerzeile tragen dasselbe Icon.
+* [x] Rechts direkt neben „Nachrechnen“ steht „Statistik“; ein Klick öffnet die Statistik mit von = bis = angezeigter Tag (`/statistik?von=…&bis=…`). (Test: einspeisesteuerung.component.spec.ts › EinspeisesteuerungComponent › zurStatistik › should open the statistics for the displayed day, should place the button directly to the right of "Nachrechnen")
 * [ ] Beträge erscheinen im Schweizer Format (`0.05`, `1'234.50`), unabhängig von der Browser-Locale.
 
 **Nachrechnen**
@@ -1249,3 +1261,9 @@ Lücke nicht**, es rechnet nur und speichert nichts.
 * **Soll die `SPEICHER`-Einheit gleich angelegt werden?** Sie ist in
   `Specs/Batteriespeicher.md` fertig spezifiziert und wäre die Voraussetzung dafür, die Wirkung zu
   sehen. Ausserhalb des Scopes dieser Spec, aber sinnvollerweise davor oder parallel.
+
+## Anhang A – Entscheidungen und Verlauf
+
+### A.1 Schaltfläche „Statistik“ und schmale Eingabefelder (FR-5, 23.10.2026)
+FR-5.2 lautete: „**Eine Steuerzeile** (`zev-date-range-row`, wie bei der Preiszeitreihe): Datumswahl, **‹ / ›** zum Blättern um je einen Tag, **Heute**, **Aktualisieren**, Feld **Schwellwert** und Schaltfläche **Nachrechnen**.“ Das Feld Mindest-Preisabstand (FR-2b) fehlte in der Aufzählung. Auf Wunsch des Users kam rechts von „Nachrechnen“ die Schaltfläche „Statistik“ dazu, und die beiden Eingabefelder wurden schmaler. Dafür braucht die Statistik einen Aufruf mit Zeitraum in der URL (`Specs/Statistik.md`, FR-1.4).
+

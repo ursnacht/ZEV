@@ -947,3 +947,12 @@ Spaltenbreiten (gesamt 555):
 1. `mvn test -pl backend-service -Dtest=JasperTemplateCompileTest` - Templates kompilieren
 2. `mvn compile -pl backend-service` - Build inkl. Jasper-Kompilierung
 3. Manuell: PDF-Export über `/api/statistik/export/pdf` testen
+
+## Nachtrag: Aufruf mit Zeitraum in der URL (FR-1.4, 23.10.2026)
+
+`StatistikComponent.ngOnInit` liest `von`/`bis` aus `ActivatedRoute.snapshot.queryParamMap`. Sind
+beide echte Kalendertage (`isoZuDatum` + Rückformatierung, damit `2026-02-30` nicht in den März
+rollt) und `von <= bis`, werden sie übernommen und `onSubmit()` lädt sofort; sonst gilt das
+Vorquartal ohne Laden. Aufrufer: Schaltfläche „Statistik“ der Einspeisesteuerung. Tests: 3 in
+`statistik.component.spec.ts` (Describe „Aufruf mit Zeitraum in der URL (FR-1.4)“).
+

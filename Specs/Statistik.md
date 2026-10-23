@@ -15,6 +15,7 @@
    * Jahreswechsel: im Q1 wird Q4 des Vorjahres vorselektiert;
    * der Zeitraum bleibt manuell änderbar.
 3. Der Quartal-Selektor setzt nur den Zeitraum; geladen wird mit „Anzeigen“ (FR-2). „Heute“ (FR-3) und das Blättern (FR-4) laden selbst.
+4. **Aufruf mit Zeitraum:** Trägt die URL `?von=YYYY-MM-DD&bis=YYYY-MM-DD` (z. B. aus der Einspeisesteuerung, `Specs/Einspeisesteuerung.md`, FR-5), übernimmt die Seite diesen Zeitraum statt des Vorquartals und **zeigt die Statistik sofort an**. Ungültige Angaben – kein echtes Datum, falsches Format, `von` nach `bis`, ein Wert fehlt – fallen auf das Vorquartal zurück, ohne zu laden (wie FR-1.2).
 
 ### FR-2: Schaltfläche „Anzeigen“
 1. „Anzeigen“ steht **rechts neben den Quartalsknöpfen**: Wer ein Quartal wählt, findet den Auslöser gleich daneben (Hintergrund: Anhang A.2).
@@ -197,6 +198,10 @@ Beim Speicher gilt `total = ΔLadung − ΔEntladung`; über den Zeitraum getren
 * [x] In der Zeile der Datumsfelder steht kein „Anzeigen“ mehr; dort bleiben ◀ / ▶, „Heute“ und „PDF exportieren“. (E2E: statistik.spec.ts › Statistik Page - Heute › should set both dates to today and load immediately; E2E: statistik.spec.ts › Statistik Page › should display the statistics page with date selection form)
 * [x] Klick auf „Anzeigen“ lädt die Statistik des eingestellten Zeitraums. (Test: statistik.component.spec.ts › StatistikComponent › onSubmit › should call getStatistik with correct params; E2E: statistik.spec.ts › Statistik Page › should load and display statistics when date range is submitted)
 * [ ] Andere Seiten mit Quartal-Selektor sehen unverändert aus.
+
+### Aufruf mit Zeitraum (FR-1.4)
+* [x] Mit `?von=…&bis=…` in der URL übernimmt die Seite den Zeitraum und lädt die Statistik sofort. (Test: statistik.component.spec.ts › StatistikComponent › Aufruf mit Zeitraum in der URL (FR-1.4) › should take von and bis from the URL and load immediately)
+* [x] Ungültige Angaben (kein echtes Datum, falsches Format, `von` nach `bis`, ein Wert fehlt) fallen auf das Vorquartal zurück, ohne zu laden; ohne Parameter bleibt es beim Vorquartal ohne Laden. (Test: statistik.component.spec.ts › StatistikComponent › Aufruf mit Zeitraum in der URL (FR-1.4) › should fall back to the previous quarter without loading when the dates are invalid, should not load on a normal call without parameters)
 
 ### „Heute“ (FR-3)
 * [x] Die Schaltfläche „Heute“ steht nach ◀ / ▶ („Anzeigen“ steht neben den Quartalen). (E2E: statistik.spec.ts › Statistik Page - Heute › should set both dates to today and load immediately)
@@ -430,4 +435,7 @@ Beim Akzeptanzkriterien-Check vom 19.10.2026 als ❌ gefunden: Das PDF druckte u
 
 ### A.14 Abgeschnittene Texte im Statistik-PDF (FR-8, FR-15, 20.10.2026)
 Bei der Sichtprüfung des Quartals-PDFs am 19.10.2026 aufgefallen: „B = C: Ungleich (+2.544“ ohne „ kWh)“ (Wertfeld 105 pt) und der ZEV-Eigenverbrauch über ein Quartal („2'175.069“) ohne Einheit (Wertfeld 75 pt). Behoben durch neue Spaltenbreiten in `statistik.jrxml`: Summen-Vergleich drei gleich breite Spalten (45 + 140 pt), Kennzahlen links Bezeichnung 205 / Wert 85 pt, rechte Spalte ab 310 pt. Am PDF vom 20.10.2026 sichtgeprüft. Ein automatischer Test fehlt: Jasper meldet das Abschneiden in der Testumgebung nicht (`getTextTruncateIndex()` blieb auch beim alten Template leer).
+
+### A.15 Aufruf mit Zeitraum in der URL (FR-1.4, 23.10.2026)
+Bisher öffnete die Seite immer mit dem Vorquartal (FR-1.2). Für die neue Schaltfläche „Statistik“ in der Einspeisesteuerung (`Specs/Einspeisesteuerung.md`, FR-5, Anhang A.1) übernimmt sie einen Zeitraum aus `?von=…&bis=…` und lädt sofort – wie „Heute“ (FR-3), weil der Umweg über „Anzeigen“ beim Sprung auf einen Tag nur lästig wäre.
 

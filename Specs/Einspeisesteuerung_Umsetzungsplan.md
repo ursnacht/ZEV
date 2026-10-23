@@ -1122,3 +1122,16 @@ knapp unter dem damaligen Preis. Ohne Wirkung, weil nachts kein Überschuss anf�
 
 Backend unverändert: `/api/steuerung/prognose` und `/api/preiszeitreihe` liefern auch für künftige
 Tage, sobald Daten vorliegen. Keine Migration, keine neuen Übersetzungen.
+
+## Nachtrag 25 — Schaltfläche „Statistik“, schmale Eingabefelder (23.10.2026)
+
+Rechts von „Nachrechnen“ öffnet **Statistik** (Icon `pie-chart`, Übersetzung `STATISTIK` vorhanden)
+die Statistik für den angezeigten Tag: `zurStatistik()` navigiert auf
+`/statistik?von=<datum>&bis=<datum>`. Die Statistik übernimmt den Zeitraum und lädt sofort
+(`Specs/Statistik.md`, FR-1.4). Die Felder Schwellwert und Mindest-Preisabstand tragen die neue
+Design-System-Klasse `zev-input--schmal` (`design-system/src/components/form/form.css`, 6.5rem, im
+Showcase ergänzt); alle Schaltflächen der Steuerzeile tragen `zev-button--compact`, damit „Statistik“ bei
+rund 1200px noch in die Zeile passt (gemessen: 1134px Bedarf gegen 1112px Platz ohne)
+(dazu `.zev-button--compact:disabled` im Design System: Gesperrt wurde die Schaltfläche sonst breiter). Tests: `zurStatistik` (2) in `einspeisesteuerung.component.spec.ts`. Keine
+Migration, keine neuen Übersetzungen, kein Backend.
+
