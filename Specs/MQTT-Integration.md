@@ -178,7 +178,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 4. **Rücksprung eines Zählerstands als Systemmeldung** (`MQTT_ZAEHLER_RUECKSPRUNG`, **`WARN`**): Ein Zählerstand kann nicht sinken. Sinkt er doch — Zählertausch ohne Seriennummernwechsel, Überlauf, fehlerhafte Übertragung —, wird das Delta des betroffenen Registers auf `0` gesetzt.
    * **Die Energie dieses Intervalls geht dabei verloren**, anders als bei einer Datenlücke: Dort fällt der Verbrauch gebündelt ins Folgeintervall, hier fehlt er dauerhaft.
    * Bei einem `PRODUCER` sinkt damit die **ausgewiesene Produktion**, ohne dass der Anlage etwas fehlt. Genau das ist der Grund für die Meldung: Bis dahin stand der Fall nur in einer Logzeile und war im Betrieb unsichtbar — eine zu tief erscheinende Produktion liess sich nicht davon unterscheiden, dass die Anlage wirklich weniger lieferte.
-   * Der Parameter nennt Einheit, Register, Intervall und die **verworfene Menge**. Ohne den Betrag liesse sich nicht abschätzen, ob es um Rundung oder um Kilowattstunden geht.
+   * Der Parameter nennt Einheit, Register, das Intervall mit seinem **Beginn** – unter diesem Zeitpunkt steht sein Messwert (`Specs/Messwerte-Zeitkonvention.md`) – und die **verworfene Menge**. Ohne den Betrag liesse sich nicht abschätzen, ob es um Rundung oder um Kilowattstunden geht.
    * Eine fehlgeschlagene Meldung bricht die Aggregation **nicht** ab — dieselbe Abwägung wie beim Zählerwechsel.
 
 ### FR-9: Anpassung Solarverteilung (`zev`-Fallback)
@@ -439,4 +439,7 @@ FR-10.3 verlangte: „Vor der Umsetzung ist eine **echte Meldung** aus dem Nachb
 * **FR-5:** lautete „Neue Flyway-Migration (`V[n]__create_zaehler_rohdaten.sql`)“ – die Migration ist `V72`, die Spalte `seriennummer` kam mit `V92`.
 * **FR-9.2:** trug den Marker „**Neu:**“.
 * **FR-8.1:** lautete „Prometheus-Metriken (bestehende Infrastruktur, siehe `Specs/Metriken.md` / `MetricsService`)“. Umgesetzt ist eine eigene Komponente `MqttMetrics` (Umsetzungsplan, Phase 10); auf Wunsch des Users an den Code angepasst.
+
+### A.11 Rücksprung-Meldung nennt den Intervall-Beginn (FR-8.4, 23.10.2026)
+FR-8.4 nannte nur „Intervall“; der Code schrieb das Intervall-**Ende** in den Parameter (`Wohnung 1 (Bezug): <Ende>, 70.0 kWh verworfen`). Messwerte stehen unter dem Intervall-**Beginn** – wer zur Meldung den Messwert suchte, landete ein Intervall daneben. Gleich wie bei der Zählertausch-Meldung (`Specs/Zaehlertausch-Erkennung.md`, Anhang A.2) nennt die Meldung jetzt auf Wunsch des Users den Beginn; die Logzeile ebenso (`intervall=` statt `ende=`). Bestehende Meldungen behalten den alten Zeitpunkt.
 

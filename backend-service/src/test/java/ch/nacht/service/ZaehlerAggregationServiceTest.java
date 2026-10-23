@@ -323,10 +323,11 @@ public class ZaehlerAggregationServiceTest {
         service.aggregiere();
 
         // Assert
-        String intervallEnde = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").format(intervall[1]);
+        // Das Intervall mit seinem Beginn - dort steht sein Messwert (Messwerte-Zeitkonvention)
+        String intervallBeginn = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").format(intervall[0]);
         verify(systemmeldungService).erfasse(eq(ORG_ID), eq(MeldungLevel.WARN),
                 eq(SystemmeldungService.KATEGORIE_MQTT), eq(SystemmeldungService.KEY_ZAEHLER_RUECKSPRUNG),
-                eq("Wohnung 1 (Bezug): " + intervallEnde + ", 70.0 kWh verworfen"));
+                eq("Wohnung 1 (Bezug): " + intervallBeginn + ", 70.0 kWh verworfen"));
         // Nur das betroffene Register meldet - die Einspeisung ist gestiegen
         verify(systemmeldungService, times(1)).erfasse(any(), any(), any(),
                 eq(SystemmeldungService.KEY_ZAEHLER_RUECKSPRUNG), any());
@@ -707,6 +708,10 @@ public class ZaehlerAggregationServiceTest {
         assertTrue(parameter.getValue().contains("Wohnung 1"), parameter.getValue());
         assertTrue(parameter.getValue().contains("SN-ALT"), parameter.getValue());
         assertTrue(parameter.getValue().contains("SN-NEU"), parameter.getValue());
+        // Das Uebergangsintervall steht mit seinem BEGINN im Parameter - unter diesem Zeitpunkt
+        // stuende sein Messwert (Messwerte-Zeitkonvention); mit dem Ende suchte man daneben.
+        String intervallBeginn = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").format(intervall[0]);
+        assertTrue(parameter.getValue().contains("(Intervall " + intervallBeginn + ")"), parameter.getValue());
         // Nicht deduplizierend erfassen – sonst überschreibt ein zweiter Tausch den ersten.
         verify(systemmeldungService, never()).erfasse(any(), any(),
                 eq(SystemmeldungService.KATEGORIE_MQTT), eq(SystemmeldungService.KEY_ZAEHLERTAUSCH),
@@ -827,6 +832,9 @@ public class ZaehlerAggregationServiceTest {
         assertTrue(loggedContaining(Level.INFO, "Seriennummer erstmals vorhanden",
                         String.valueOf(EINHEIT_ID), intervall[0].toString(), intervall[1].toString(), "SN-NEU"),
                 "INFO-Rollout-Marker erwartet, war: " + logAppender.list);
+        // Der Rollout-Marker bleibt eine Logzeile, keine Systemmeldung (FR-5.5)
+        verify(systemmeldungService, never()).erfasseAudit(any(), any(), any(),
+                eq(SystemmeldungService.KEY_ZAEHLERTAUSCH), any());
     }
 
     @Test
@@ -844,6 +852,8 @@ public class ZaehlerAggregationServiceTest {
         assertEquals(8.0, captureSavedMesswert().getTotal(), 1e-9);
         assertFalse(loggedContaining(Level.WARN, "Zählerwechsel erkannt"));
         assertFalse(loggedContaining(Level.INFO, "Seriennummer erstmals vorhanden"));
+        verify(systemmeldungService, never()).erfasseAudit(any(), any(), any(),
+                eq(SystemmeldungService.KEY_ZAEHLERTAUSCH), any());
     }
 
     @Test
@@ -860,6 +870,8 @@ public class ZaehlerAggregationServiceTest {
         // Assert
         assertEquals(8.0, captureSavedMesswert().getTotal(), 1e-9);
         assertFalse(loggedContaining(Level.WARN, "Zählerwechsel erkannt"));
+        verify(systemmeldungService, never()).erfasseAudit(any(), any(), any(),
+                eq(SystemmeldungService.KEY_ZAEHLERTAUSCH), any());
     }
 
     @Test

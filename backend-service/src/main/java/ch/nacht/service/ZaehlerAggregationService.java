@@ -194,7 +194,7 @@ public class ZaehlerAggregationService {
             log.warn("Zählerwechsel erkannt (einheit={}, intervall={} - {}): Seriennummer {} -> {}"
                     + " – kein Messwert für das Übergangsintervall",
                     einheitId, start, ende, serieReferenz, serieLetzter);
-            meldeZaehlerwechsel(einheit, serieReferenz, serieLetzter, ende);
+            meldeZaehlerwechsel(einheit, serieReferenz, serieLetzter, start);
             return false;
         }
         if (serieReferenz == null && serieLetzter != null) {
@@ -205,10 +205,10 @@ public class ZaehlerAggregationService {
 
         BigDecimal deltaBezug = nichtNegativ(
                 letzter.getZaehlerstandBezug().subtract(referenz.getZaehlerstandBezug()),
-                einheit, "Bezug", ende);
+                einheit, "Bezug", start);
         BigDecimal deltaEinspeisung = nichtNegativ(
                 letzter.getZaehlerstandEinspeisung().subtract(referenz.getZaehlerstandEinspeisung()),
-                einheit, "Einspeisung", ende);
+                einheit, "Einspeisung", start);
 
         double total = deltaBezug.subtract(deltaEinspeisung).doubleValue();
         upsertMesswert(einheit, start, total);
@@ -297,10 +297,12 @@ public class ZaehlerAggregationService {
      * <p>Fehler beim Erfassen dürfen die Aggregation nicht beeinträchtigen.
      */
     private void meldeZaehlerwechsel(Einheit einheit, String serieAlt, String serieNeu,
-                                     LocalDateTime ende) {
+                                     LocalDateTime beginn) {
         try {
+            // Das Uebergangsintervall mit seinem BEGINN nennen - unter diesem Zeitpunkt stuende sein
+            // Messwert (Messwerte-Zeitkonvention). Mit dem Ende suchte man ein Intervall daneben.
             String parameter = String.format("%s: %s → %s (Intervall %s)",
-                    einheit.getName(), serieAlt, serieNeu, ZEIT_FORMAT.format(ende));
+                    einheit.getName(), serieAlt, serieNeu, ZEIT_FORMAT.format(beginn));
             systemmeldungService.erfasseAudit(einheit.getOrgId(), MeldungLevel.INFO,
                     SystemmeldungService.KATEGORIE_MQTT, SystemmeldungService.KEY_ZAEHLERTAUSCH,
                     parameter);
@@ -323,17 +325,19 @@ public class ZaehlerAggregationService {
      * ob es um Rundung oder um Kilowattstunden geht.
      */
     private BigDecimal nichtNegativ(BigDecimal delta, Einheit einheit, String register,
-                                    LocalDateTime ende) {
+                                    LocalDateTime beginn) {
         if (delta.signum() < 0) {
-            log.warn("Aggregation: Rücksprung bei {} (einheit={}, ende={}, delta={}) –"
+            log.warn("Aggregation: Rücksprung bei {} (einheit={}, intervall={}, delta={}) –"
                             + " Delta auf 0 gesetzt, Energie geht verloren",
-                    register, einheit.getId(), ende, delta);
+                    register, einheit.getId(), beginn, delta);
             try {
                 systemmeldungService.erfasse(einheit.getOrgId(), MeldungLevel.WARN,
                         SystemmeldungService.KATEGORIE_MQTT,
                         SystemmeldungService.KEY_ZAEHLER_RUECKSPRUNG,
+                        // Das Intervall mit seinem BEGINN nennen - unter diesem Zeitpunkt steht
+                        // sein Messwert (Messwerte-Zeitkonvention), wie bei der Zaehlertausch-Meldung.
                         String.format("%s (%s): %s, %s kWh verworfen", einheit.getName(), register,
-                                ZEIT_FORMAT.format(ende), delta.abs().toPlainString()));
+                                ZEIT_FORMAT.format(beginn), delta.abs().toPlainString()));
             } catch (RuntimeException e) {
                 // Eine fehlgeschlagene Meldung darf die Aggregation nicht abbrechen - dieselbe
                 // Abwaegung wie beim Zaehlerwechsel.
