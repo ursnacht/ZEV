@@ -264,3 +264,13 @@ Neuer Abschnitt "Icons" mit:
 5. **Entscheidung:** Feather Icons werden verwendet (MIT-Lizenz, ca. 280 Icons, minimalistischer Stil)
 6. **Annahme:** Icons werden nur links vom Text platziert (nie rechts)
 7. **Annahme:** Der Sprachschalter (DE/EN) erhält kein Icon (zu kurzer Text)
+
+---
+
+## Nachtrag: Blätter-Schaltflächen im Showcase (23.10.2026)
+
+Die drei Paginierungsbeispiele im Design-System-Showcase (`.zev-pagination`, `--start`, `--inline`)
+tragen `chevron-left` vor „Vorherige“ und `chevron-right` nach „Nächste“, wie die Datenbank-Ansicht.
+Regel in `Specs/Icons.md`, FR-1 (Anhang A.1). Annahme 6 („nur links vom Text“) gilt für „Nächste“
+nicht. Kein CSS, keine Migration, keine Tests (reine Darstellung, Nachweis per Sichtprüfung).
+

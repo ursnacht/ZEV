@@ -13,10 +13,16 @@
   * Das Icon soll links vom Text angezeigt werden
   * Das Icon soll auf der entsprechenden Seite ebenfalls eingeblendet werden
 * Im Titel soll ein geeignetes Icon eingeblendet werden.
+* **Blätter-Schaltflächen** (Tag, Zeitraum oder Seite zurück/vor) tragen die Feather-Icons
+  `chevron-left` und `chevron-right` – auch im Design-System-Showcase. Mit Text steht `chevron-left`
+  vor „Vorherige“ und `chevron-right` nach „Nächste“; ohne Text (z. B. Steuerzeile der
+  Einspeisesteuerung) trägt die Schaltfläche nur das Icon.
+  > Das Icon zeigt die Richtung. Am Ende von „Nächste“ zeigt der Pfeil dorthin, wohin geblättert wird.
+  > (Hintergrund: Anhang A.1)
 
 ### FR-2: Icon-Registry
 * Neue Icons werden in `frontend-service/src/app/components/icon/icons.ts` registriert.
-* Verwendete Icons: sun, moon, upload, home, zap, bar-chart-2, pie-chart, file-text, tag, globe, log-out, plus, check, x, edit-2, trash-2, copy, download, search, calculator, save, refresh-cw, eye, settings, user, users, calendar, filter, plus-circle, alert-circle, info, check-circle, grid, shield, layout, **credit-card** (Debitorkontrolle).
+* Verwendete Icons: sun, moon, upload, home, zap, bar-chart-2, pie-chart, file-text, tag, globe, log-out, plus, check, x, edit-2, trash-2, copy, download, search, calculator, save, refresh-cw, eye, settings, user, users, calendar, filter, plus-circle, alert-circle, info, check-circle, grid, shield, layout, **credit-card** (Debitorkontrolle), **chevron-left**, **chevron-right** (Blättern, FR-1).
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 * [ ] Die Anwendung hat in der Titelzeile ein tolles Icon, das das Thema der Anwendung widerspiegelt. 
@@ -45,3 +51,13 @@
 
 ## 7. Offene Fragen
 * Werden die Icon generiert oder im Internet gesucht?
+
+## Anhang A – Entscheidungen und Verlauf
+
+### A.1 Blätter-Schaltflächen mit Chevron-Icons (FR-1, 23.10.2026)
+FR-1 nannte Blätter-Schaltflächen nicht eigens. Die Anwendung verwendete `chevron-left`/`chevron-right` bereits (Statistik, Einspeisesteuerung, Preiszeitreihe, Systemmeldungen, Datenbank-Ansicht), die Paginierungsbeispiele im Design-System-Showcase zeigten aber nur „Vorherige“/„Nächste“ als Text. Auf Wunsch des Users tragen sie jetzt dieselben Icons, und die Regel steht in FR-1.
+
+Die Annahme 6 im Umsetzungsplan („Icons nur links vom Text, nie rechts“) gilt für Blätter-Schaltflächen nicht: „Nächste“ trägt den Pfeil rechts, wie schon in der Datenbank-Ansicht.
+
+Eine eigene Spec „Design-System“ wurde nicht angelegt: Die Regeln für das Design System stehen in `Specs/generell.md` (Abschnitt „Design System“), Icon-Regeln hier. Eine dritte Stelle hätte dieselben Regeln doppelt geführt.
+
