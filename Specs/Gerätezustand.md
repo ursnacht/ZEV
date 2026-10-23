@@ -337,7 +337,7 @@ verfügbar.
 * [x] Die Aggregation (`ZaehlerAggregationService`) liest `geraetezustand` **nicht** und schreibt
   nicht hinein; `messwerte` bleibt unverändert.
   (Test: ArchitectureTest#nurIngestUndSteuerungGreifenAufGeraetezustandZu)
-* [ ] Ein Zustandswert taucht in **keiner** Statistik-Summe und in **keiner** Abrechnung auf.
+* [x] Ein Zustandswert taucht in **keiner** Statistik-Summe und in **keiner** Abrechnung auf.
   (Test: ArchitectureTest#nurIngestUndSteuerungGreifenAufGeraetezustandZu, ArchitectureTest#statistikUndAbrechnungKennenKeineZustandswerte)
 
   > **Bemerkung:** Die erste ArchUnit-Regel belegt nur, dass Statistik und Abrechnung
@@ -432,9 +432,10 @@ verfügbar.
     - `gateway/publisher.py`: `_to_payload` ergänzt `zustand` — **nur wenn Werte vorliegen**, sonst
       erhielte jede Nachricht ein leeres Objekt.
     - `gateway/readers/sim_reader.py`: SOC-Verlauf, **an die bestehende Lade-/Entladephase
-      gekoppelt** — steigt in der Ladephase, fällt in der Entladephase, bleibt in 0–100 und kehrt an
-      den Grenzen um. Der Speicher-Modus führt die Phase (`_laedt`, `_phase_rest`); ein unabhängig
-      gewürfelter SOC widerspräche den Zählerständen derselben Nachricht.
+      gekoppelt** — steigt in der Ladephase, fällt in der Entladephase, bleibt in 0–100 und steht an
+      den Grenzen still, bis die Phase wechselt (Hintergrund: Anhang A.9). Der Speicher-Modus führt
+      die Phase (`_laedt`, `_phase_rest`); ein unabhängig gewürfelter SOC widerspräche den
+      Zählerständen derselben Nachricht.
   - `ZaehlerMesswertPayloadDTO`: Feld `zustand` vom Typ `Object` (FR-1.2).
   - `MqttIngestService`: Validierung und Schreiben (FR-3, FR-4), mit einer Abhängigkeit auf
     `SystemmeldungService` für die beiden Meldungen.
@@ -576,4 +577,10 @@ PostgreSQL den Unique-Index `uk_geraetezustand (einheit_id, zeit, groesse)` und 
 rückwärts — ebenfalls ein Index-Scan ohne Sortierung. Erst mit einer zweiten Grösse an derselben
 Einheit nimmt der Planer `idx_geraetezustand_letzter`. Auf Wunsch des Users verlangt das Kriterium
 seither einen Index-Scan ohne Seq-Scan und Sortierung, nicht einen bestimmten Index.
+
+### A.9 Simulator-SOC an den Grenzen (§6, 23.10.2026)
+§6 sagte, der Simulator-SOC „kehrt an den Grenzen um“. Der Simulator begrenzt ihn aber nur
+(`min`/`max` auf 0 bzw. 100): Er bleibt dort stehen, bis die Lade- oder Entladephase von selbst
+wechselt. Beim Schreiben des Simulator-Tests aufgefallen; auf Wunsch des Users wurde der Satz an den
+Code angepasst, nicht der Simulator an den Satz. Das Kriterium in §3 verlangte kein Umkehren.
 
