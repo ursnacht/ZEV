@@ -19,28 +19,28 @@
 ## 2. Funktionale Anforderungen (FR)
 
 ### FR-1: Zähler auslesen
-1. **Wago via Modbus TCP (bei Hene 15 Geräte, Liste beliebig erweiterbar — siehe FR-5):** periodisches Lesen der relevanten Register — die **Wirkenergie**-Zählerstände in **kWh** (Bezug/Einspeisung), **nicht** Leistung (kW) oder Blind-/Scheinenergie; pro Gerät Host/Port/Register/Unit-ID konfigurierbar. Die Wago hängen per seriellem Modbus (RTU) am **Kommunikationsmodul WAGO 879-9000** (RTU→TCP, siehe `docs/Netzwerk-Topologie-Hene.md`): gemeinsame Modul-IP (`host`/`port`), Unterscheidung über die **Unit-ID**.
+1. **Wago via Modbus TCP (bei Hene 15 Geräte, Liste beliebig erweiterbar — siehe FR-5):** periodisches Lesen der relevanten Register — die **Wirkenergie**-Zählerstände in **kWh**, Bezug = **OBIS 1.8.0** (`zaehlerstandBezug`), Einspeisung = **OBIS 2.8.0** (`zaehlerstandEinspeisung`); **nicht** Leistung (kW/kvar/kVA) oder Blind-/Scheinenergie. Pro Gerät Host/Port/Register/Unit-ID konfigurierbar; die konkreten Registeradressen und die Skalierung je Wago-Typ stammen aus dem Gerätedatenblatt (Diagnose per `mbpoll`), die Zuordnung `messpunkt` ↔ Gerät aus der Konfiguration. Die Wago hängen per seriellem Modbus (RTU) am **Kommunikationsmodul WAGO 879-9000** (RTU→TCP, siehe `docs/Netzwerk-Topologie-Hene.md`): gemeinsame Modul-IP (`host`/`port`), Unterscheidung über die **Unit-ID**.
 2. **Weitere Modbus-TCP-Geräte**, je mit eigener `host`:
    * **BKW-Bilanzzähler via WhatWatt Go:** Bezug (OBIS 1.8.0) und Rücklieferung (OBIS 2.8.0); Registerkarte und Firmware-Voraussetzung in `docs/Netzwerk-Topologie-Hene.md`, Abschnitt „WhatWatt Go“. Die Einheiten `BEZUG`/`RUECKLIEFERUNG` teilen sich den Messpunkt (`Specs/Bilanzmesspunkt.md`).
    * **Batterie am Hybrid-Wechselrichter:** Lade- und Entladeenergie als `bezug`/`einspeisung` (`Specs/Batteriespeicher.md`), optional der Ladezustand als Zustandswert (`Specs/Gerätezustand.md`); Beispiel in `pi-gateway/config.example.yaml`.
 3. Jede physische Quelle ist einer **Einheit** über deren **`messpunkt`** zugeordnet (Konfiguration, kein Rückgriff auf interne DB-IDs).
-4. Lese-/Publish-Intervall konfigurierbar (Default z.B. 1–5 min).
-5. **Lese-Timeout konfigurierbar (Nachtrag):** Die Wartezeit auf die Antwort eines Zählers ist konfigurierbar, **global** über `read_timeout` (Default **5 s**) und je Zähler über `zaehler[].read_timeout` überschreibbar (gleicher Schlüsselname, nur enger gültig) (z.B. ein einzelner langsamer Slave am Hub). Angabe als Zahl (Sekunden) oder Kurzform (`"8s"`, `"1m"`); Werte ≤ 0 sowie ungültige Angaben führen zu einem `ConfigError` **beim Start** (kein stiller Fallback). Der **wirksame globale Wert** wird **beim Start** in der Start-Log-Zeile ausgegeben (neben `org_id`, Zähleranzahl, Intervall, Broker), damit im Betrieb ohne Blick in die `config.yaml` erkennbar ist, welcher Timeout gilt – auch der stillschweigende Default. Zähler mit eigenem `read_timeout` werden zusätzlich in einer eigenen Zeile genannt, damit der globale Wert nicht als für alle Zähler gültig missverstanden wird (die Reader selbst loggen ihren Wert nur auf `DEBUG`).
-6. **Lese-Versuche / Retry (Nachtrag):** Ein fehlgeschlagener Read wird **wiederholt**, bevor der Zähler im Zyklus übersprungen wird. Anzahl über `read_attempts` konfigurierbar (**inklusive** Erstversuch, Default **2** = ein Wiederholversuch; `1` = kein Retry). Gilt **global**, nicht je Zähler — die beobachteten Fehler treffen wechselnde Zähler.
+4. Lese-/Publish-Intervall über **`publish_interval`** – ein **Pflichtfeld ohne Default**: als Kurzform (`"30s"`, `"1m"`, `"1h"`) oder als ganze Zahl Sekunden, > 0; fehlt es oder ist es ungültig, bricht der Start mit `ConfigError` ab. Das Intervall bestimmt die erreichbare zeitliche Auflösung. Bei Hene läuft der Pi im **Minutentakt** (`1m`).
+5. **Lese-Timeout konfigurierbar:** Die Wartezeit auf die Antwort eines Zählers ist konfigurierbar, **global** über `read_timeout` (Default **5 s**) und je Zähler über `zaehler[].read_timeout` überschreibbar (gleicher Schlüsselname, nur enger gültig) (z.B. ein einzelner langsamer Slave am Hub). Angabe als Zahl (Sekunden) oder Kurzform (`"8s"`, `"1m"`); Werte ≤ 0 sowie ungültige Angaben führen zu einem `ConfigError` **beim Start** (kein stiller Fallback). Der **wirksame globale Wert** wird **beim Start** in der Start-Log-Zeile ausgegeben (neben `org_id`, Zähleranzahl, Intervall, Broker), damit im Betrieb ohne Blick in die `config.yaml` erkennbar ist, welcher Timeout gilt – auch der stillschweigende Default. Zähler mit eigenem `read_timeout` werden zusätzlich in einer eigenen Zeile genannt, damit der globale Wert nicht als für alle Zähler gültig missverstanden wird (die Reader selbst loggen ihren Wert nur auf `DEBUG`).
+   * Grund für den grosszügigen Default: An einem **RTU→TCP-Hub** wird die Anfrage seriell bis zum Slave durchgereicht und erst danach beantwortet — das dauert deutlich länger als bei direkt angebundenen TCP-Geräten.
+   * **Abgrenzung:** Das Timeout wirkt nur, wenn der Hub **gar nicht** antwortet. Antwortet er mit einer **Modbus-Exception** (z.B. `code 11` = *Gateway target device failed to respond*), ist die Anfrage bereits beantwortet — ein höheres Client-Timeout ändert daran **nichts**; Ursache und Abhilfe liegen dann auf der RTU-Strecke bzw. in der Hub-Konfiguration (siehe `docs/Netzwerk-Topologie-Hene.md`, Abschnitt „Modbus-Diagnose"). Die Fehlermeldung des Readers unterscheidet beide Fälle und nennt den Timeout-Hinweis nur bei ausbleibender Antwort.
+6. **Lese-Versuche / Retry:** Ein fehlgeschlagener Read wird **wiederholt**, bevor der Zähler im Zyklus übersprungen wird. Anzahl über `read_attempts` konfigurierbar (**inklusive** Erstversuch, Default **2** = ein Wiederholversuch; `1` = kein Retry). Gilt **global**, nicht je Zähler — die beobachteten Fehler treffen wechselnde Zähler.
    * **Begründung:** Am eingesetzten Kommunikationsmodul **WAGO 879-9000** ist **kein RTU-Response-Timeout einstellbar** (nur Baudrate/Parität der RS485-Seite, s. `docs/Netzwerk-Topologie-Hene.md`). Sporadische `exception_code=11` lassen sich daher nur client-seitig kompensieren.
    * **Unschädlich:** Es werden **absolute** Zählerstände publiziert – ein doppelt gelesener Stand kann nichts verfälschen (keine Delta-Bildung auf dem Pi, FR-2).
    * **Ablauf:** zwischen zwei Versuchen **0,5 s** Pause; jeder Versuch baut die Verbindung neu auf. Fehlgeschlagene Zwischenversuche werden auf `INFO` geloggt (mit Versuchszähler), der endgültige Fehlschlag auf `WARN`. Die Modbus-Bibliothek selbst wiederholt **nicht** (`retries=0`): Sonst wartete sie bei ausbleibender Antwort `(retries + 1) × read_timeout`, und Zeitbudget und Fehlermeldung stimmten nicht (Hintergrund: Anhang B.5).
    * **Als fehlgeschlagener Read gelten auch Exceptions der Modbus-Bibliothek** (`ModbusException`, z. B. `ModbusIOException` bei einer abgeschnittenen Antwort: „Unable to decode frame … byte_count 4 > length of packet 3“). Der Reader übersetzt sie in einen `ReadError`; der Retry greift wie bei einer Fehler-Response.
      > Es ist derselbe sporadische Fehler der RTU-Strecke, nur meldet ihn pymodbus als Exception statt als Fehler-Response. Beobachtet am Speicher („Batterie-Hene“).
    * **Kein Retry** bei unerwarteten Exceptions (Programmierfehler) – dort ist ein zweiter Versuch aussichtslos.
-   * **Zeitbudget:** `read_timeout × read_attempts` (+ Pausen) je Zähler muss deutlich unter dem `publish_interval` bleiben; ungültige Angaben (`0`, negativ, nicht-ganzzahlig, Boolean) führen zu `ConfigError` **beim Start**. Der wirksame Wert steht in der Start-Log-Zeile.
-7. **`register.einspeisung` optional (Nachtrag):** **Konsumenten** speisen nicht ein – dort ist der Block `register.einspeisung` **weglassbar**. Fehlt er, wird das Register **nicht gelesen** und im Payload **`zaehlerstandEinspeisung: 0`** publiziert.
+   * **Zeitbudget je Zyklus:** Ein Zyklus liest alle Zähler **nacheinander**. Im schlimmsten Fall – kein Zähler antwortet – dauert er die **Summe** über alle Zähler von `read_timeout × read_attempts` plus `(read_attempts − 1) × 0,5 s` Pause; Zustandsregister (FR-1.8) kommen je Register mit demselben Betrag dazu. Nach jedem Zyklus wartet die Schleife `publish_interval` (FR-1.4); der Abstand zweier Messungen desselben Zählers ist also **Zyklusdauer + `publish_interval`**. Im **Normalbetrieb** soll die Zyklusdauer klein gegen das Intervall bleiben, sonst verschiebt sich der Takt. Im schlimmsten Fall wird der Abstand entsprechend länger: Es geht keine Energie verloren (absolute Stände, FR-2.1), nur die zeitliche Auflösung sinkt, solange der Ausfall dauert. Beispiel Hene, 17 Modbus-Zähler mit Defaults und `publish_interval` 1 Minute: Zyklus im schlimmsten Fall rund 17 × 10,5 s ≈ 3 Minuten, Abstand also rund 4 statt 1 Minute. Ungültige `read_attempts` (`0`, negativ, nicht-ganzzahlig, Boolean) führen zu `ConfigError` **beim Start**. Der wirksame Wert steht in der Start-Log-Zeile.
+7. **`register.einspeisung` optional:** **Konsumenten** speisen nicht ein – dort ist der Block `register.einspeisung` **weglassbar**. Fehlt er, wird das Register **nicht gelesen** und im Payload **`zaehlerstandEinspeisung: 0`** publiziert.
    * **Nutzen:** ein Modbus-Zugriff weniger je Zyklus und Zähler – halbiert die Anfragen für reine Konsumenten und entlastet damit die RS485-Strecke (relevant angesichts der sporadischen `exception_code=11`, s. FR-1.6).
    * **Payload-Vertrag unverändert:** `zaehlerstandEinspeisung` bleibt ein **Pflichtfeld** (`MQTT-Integration.md`, FR-3) und wird mit `0` gefüllt – das Feld wird **nicht** weggelassen. Das Backend bleibt unberührt.
    * **`register.bezug` bleibt Pflicht**; ein **vorhandener, aber fehlerhafter** `einspeisung`-Block führt weiterhin zu `ConfigError` **beim Start** – ein Tippfehler (z.B. `adr` statt `addr`) darf nicht stillschweigend zu 0 werden.
    * **Sichtbarkeit:** Beim Start wird je betroffenem Zähler eine `INFO`-Zeile geloggt, damit ein *versehentlich* fehlender Block nicht unbemerkt 0 liefert.
-   * Grund für den grosszügigen Default: An einem **RTU→TCP-Hub** wird die Anfrage seriell bis zum Slave durchgereicht und erst danach beantwortet — das dauert deutlich länger als bei direkt angebundenen TCP-Geräten.
-   * **Abgrenzung:** Das Timeout wirkt nur, wenn der Hub **gar nicht** antwortet. Antwortet er mit einer **Modbus-Exception** (z.B. `code 11` = *Gateway target device failed to respond*), ist die Anfrage bereits beantwortet — ein höheres Client-Timeout ändert daran **nichts**; Ursache und Abhilfe liegen dann auf der RTU-Strecke bzw. in der Hub-Konfiguration (siehe `docs/Netzwerk-Topologie-Hene.md`, Abschnitt „Modbus-Diagnose"). Die Fehlermeldung des Readers unterscheidet beide Fälle und nennt den Timeout-Hinweis nur bei ausbleibender Antwort.
 8. **Zustandsregister sind Beiwerk:** Ein Zustandsregister (z. B. der Ladezustand `soc`) wird bis zu `read_attempts`-mal gelesen, mit **0,5 s** Pause; Zwischenversuche loggen `INFO`. Scheitern alle Versuche, werden die Zählerstände derselben Messung trotzdem publiziert – ohne diese Grösse, mit einer `WARN`-Zeile. Die Zählerstände werden dafür **nicht** neu gelesen, und die Messung gilt nicht als gescheitert. Fehlt dagegen ein Zählerstand (`bezug`, `einspeisung`), gilt der Read wie bisher als gescheitert (FR-1.6).
    > Dasselbe Prinzip wie im Backend (`Specs/Gerätezustand.md`): Ein Momentanwert darf die Energiemengen nicht kosten. Hintergrund: Anhang B.8.
 
@@ -59,7 +59,7 @@
 > ```
 > `-a` Unit-ID, `-t 4`/`3` Holding/Input Register, `-r` Start, `-c` Anzahl,
 > `-1` One-Shot. Konkrete Register/Skalierung stammen aus der Zähler-Doku
-> (siehe Offene Frage „Register-Mapping Wago"). WhatWatt Go: zusätzlich per
+> (FR-1.1). WhatWatt Go: zusätzlich per
 > REST-API (`curl`, siehe Topologie-Doku). Alternativen: `mbtget`, kurzes
 > `pymodbus`-Skript.
 
@@ -69,7 +69,7 @@
 3. Nur **unvollständige/fehlgeschlagene Reads** werden verworfen (nicht publiziert), damit keine Scheinwerte entstehen.
 
 ### FR-3: MQTT-Publish (Vertrag gemäss `MQTT-Integration.md`)
-1. **Topic:** `zev/{orgId}/{messpunkt}/messwert` (exakt wie Backend-Subscription `zev/+/+/messwert`).
+1. **Topic:** `zev/{orgId}/{messpunkt}/messwert` (exakt wie Backend-Subscription `zev/+/+/messwert`); `{orgId}` ist das **interne `org_id`** (BIGINT) des Mandanten, wie in `MQTT-Integration.md`, FR-2.
 2. **Payload (JSON, absolute Stände):**
    ```json
    { "timestamp": "2026-06-19T14:30:00+02:00", "zaehlerstandBezug": 12345.678, "zaehlerstandEinspeisung": 4321.000,
@@ -82,15 +82,15 @@
 4. Die **Pflichtfelder** von Topic/Payload müssen exakt zum Backend-Vertrag passen; **additive optionale Felder** sind erlaubt (das Backend toleriert unbekannte Felder). Änderungen nur abgestimmt mit `MQTT-Integration.md`.
 5. **Seriennummer (Zählertausch-Erkennung):** Je `zaehler`-Eintrag optional `seriennummer` (String, max. 64 Zeichen), einmalig am Gerät abgelesen. Der Publisher übernimmt den Wert unverändert in den Payload. **Beim Zählertausch ist dieser Wert zu aktualisieren – er ist das Signal**, an dem das Backend den Tausch erkennt (`Specs/Zaehlertausch-Erkennung.md`, Betrieb: `docs/Zaehlertausch.md`). Überlänge → Startfehler (`ConfigError`), damit ein Konfigurationsfehler sofort auffällt.
 
-### FR-4: Übertragung & (optionale) Pufferung
+### FR-4: Übertragung & Pufferung
 1. Bei nicht erreichbarem Broker/VPN ist ein **Nachrichtenverlust unkritisch** — der nächste erfolgreich übertragene Stand schliesst die Lücke (Backend bildet die Differenz).
-2. **Pufferung ist optional** (nur falls auch die *zeitliche Auflösung* während Ausfällen erhalten bleiben soll): entweder ein lokaler Mosquitto + Bridge (Variante C) oder eine einfache in-process/Disk-Queue. **Kein** zwingender Store-and-Forward.
+2. **Keine Pufferung** – eine Pufferung brächte nur die *zeitliche Auflösung* während Ausfällen zurück, nicht die Energie. Wäre sie je nötig: ein lokaler Mosquitto + Bridge (Variante C) oder eine einfache in-process/Disk-Queue. **Kein** zwingender Store-and-Forward.
 3. Ohne Pufferung reicht ein direkter Publish an den NAS-Broker (Variante B).
 
 ### FR-5: Konfiguration
 1. **Flexible Zähler-Liste:** Die Zähler werden als **Liste beliebiger Länge** konfiguriert — typisch **10–20 oder mehr**, keine feste Anzahl im Code. Jeder Eintrag beschreibt einen Zähler vollständig (Protokoll, Host/IP, Port, Unit-ID, Register-Mapping, `messpunkt`).
 2. **Neuer Zähler = nur ein Konfigurations-Eintrag** (kein Code-Change, kein Rebuild).
-3. Weitere Parameter über Konfigurationsdatei/Env: `org_id`, Broker-URL/Credentials, Lese-/Publish-Intervall, optionale Puffer-Optionen.
+3. Weitere Parameter über Konfigurationsdatei/Env: `org_id`, Broker-URL/Credentials, Lese-/Publish-Intervall.
 4. **Keine Secrets im Code/Repo** (Broker-Passwort etc. via Env/gesicherte Datei).
 5. **Ungültige Angaben brechen den Start ab** – mit `ConfigError` und klarer Meldung, nie mit einem unerwarteten Fehler oder einem still übernommenen Unsinnswert: `port` (1–65535) und `unit_id` (0–255) als ganze Zahl, auch als Text (`"502"`, wie nach `${VAR}`-Auflösung); `skalierung` als endliche Zahl > 0; `org_id` als ganze Zahl, nicht als Boolean; Zeitangaben endlich (kein `nan`/`inf`). Hintergrund: Anhang B.6.
 
@@ -98,7 +98,7 @@
 > ```yaml
 > # config.yaml auf dem Pi (Secrets via Env)
 > org_id: 42
-> publish_interval: 5m
+> publish_interval: 1m              # Pflicht, kein Default; bei Hene jede Minute
 > read_timeout: 5s                  # Lese-Timeout je Zähler (Default 5s), unten überschreibbar
 > read_attempts: 2                  # Lese-Versuche inkl. Erstversuch (Default 2, 1 = kein Retry)
 > broker:
@@ -140,7 +140,7 @@
 >
 > # BKW (WhatWatt Go) und Batterie (Wechselrichter): weitere Einträge mit eigener host (FR-1.2).
 > ```
-> Die Wago hängen per seriellem Modbus (RTU) am **Kommunikationsmodul WAGO 879-9000** (siehe `docs/Netzwerk-Topologie-Hene.md`); daher **gleiche `host`/`port` (Modul-IP), verschiedene `unit_id`**. Die Register-`addr`/`typ`/`skalierung` sind **beispielhaft** und müssen dem Wago-Datenblatt entsprechen (Diagnose per `mbpoll`, siehe FR-1). Der Skalierungs-/OBIS-Bezug ist unter „Register-Mapping Wago" (Offene Fragen) beschrieben.
+> Die Wago hängen per seriellem Modbus (RTU) am **Kommunikationsmodul WAGO 879-9000** (siehe `docs/Netzwerk-Topologie-Hene.md`); daher **gleiche `host`/`port` (Modul-IP), verschiedene `unit_id`**. Die Register-`addr`/`typ`/`skalierung` sind **beispielhaft** und müssen dem Wago-Datenblatt entsprechen (Diagnose per `mbpoll`, siehe FR-1). Der Skalierungs-/OBIS-Bezug steht in FR-1.1.
 
 ### FR-6: Betrieb & Resilienz
 1. Läuft als **`systemd`-Service** mit Autostart nach Reboot/Stromausfall.
@@ -215,7 +215,7 @@
 
 ### NFR-4: Kompatibilität
 * Payload/Topic-Vertrag mit `MQTT-Integration.md` bleibt stabil; Änderungen nur koordiniert.
-* Läuft auf Raspberry Pi OS (arm64); Deployment ohne Build auf dem Pi bevorzugt (siehe Sprachwahl, Offene Fragen).
+* Läuft auf Raspberry Pi OS (arm64); Deployment ohne Build auf dem Pi. Umgesetzt in **Python** (`pymodbus`, `paho-mqtt`, `PyYAML`) in einem venv.
 
 ## 5. Edge Cases & Fehlerbehandlung
 | Szenario | Verhalten |
@@ -224,8 +224,8 @@
 | Teilweiser/fehlgeschlagener Read | Messwert dieser Quelle verwerfen, nicht publizieren |
 | Abgeschnittene Antwort (`ModbusIOException` der Bibliothek) | Wie ein fehlgeschlagener Read: Retry gemäss `read_attempts`, danach überspringen (FR-1.6) |
 | Zählerüberlauf / Rücksprung / Zählerwechsel | Rohstand wird publiziert; Erkennung/Behandlung im **Backend** (Differenz < 0) |
-| Broker/VPN nicht erreichbar | Verlust unkritisch; optional puffern (Variante C / Queue) für Auflösung |
-| Puffer voll (falls Pufferung aktiv) | Definiertes Verhalten (z.B. älteste verwerfen + WARN) |
+| Broker/VPN nicht erreichbar | Verlust unkritisch – der nächste Stand schliesst die Lücke; keine Pufferung (FR-4.2) |
+| Puffer voll (nur falls je eine Pufferung eingeführt wird, FR-4.2) | Definiertes Verhalten (z.B. älteste verwerfen + WARN) |
 | Uhr driftet / kein NTP | Nicht erkannt: NTP und Zeitzone sind Betriebsvoraussetzung (FR-6.3), Prüfung per `timedatectl status` (Anhang A). Zeitstempel bleiben lokale Zeit mit Offset |
 | Doppelter Publish (nach Reconnect) | Backend behandelt idempotent (Unique-Constraint) |
 | Prozessabsturz/Neustart | `systemd` startet neu; kein „letzter Stand" nötig (zustandslos) |
@@ -249,13 +249,7 @@
 * **gPlugK im Nachbarhaus:** publizieren selbst (`Specs/MQTT-Integration.md`, FR-10); die Mosquitto-Bridge auf dem Pi, die ihre Meldungen weiterleitet, ist Betrieb (`docs/Netzwerk-Topologie-Hene.md`).
 
 ## 8. Offene Fragen
-* [ ] **Technologie/Sprache:** Empfehlung **Python** (`pymodbus`, `paho-mqtt`, HTTP-Client) für schnelle Umsetzung; **Go** als Alternative (ein statisches arm64-Binary, minimaler Footprint, einfachstes Deployment). Java auf dem Pi eher nicht (JVM-Overhead). → Python
-* [ ] **gPlug-Schnittstelle (BKW):** hinfällig – der BKW-Zähler wird über WhatWatt Go per Modbus TCP gelesen, die gPlugs im Nachbarhaus publizieren selbst (Anhang B.1).
-* [ ] **Optionale Pufferung:** überhaupt nötig (nur für Auflösungserhalt bei Ausfällen)? Falls ja: Variante C (lokaler Broker + Bridge) oder in-process Queue? → keine Pufferung
-* [ ] **Welche Register/Stände** werden publiziert (Bezug/Einspeisung, ggf. ZEV-Register) und wie im Backend auf `total`/`zev` gemappt? (Spiegelt Offene Frage in `MQTT-Integration.md`.) → **Wirkenergie** (Active Energy, kumulativ in kWh): **Bezug = OBIS 1.8.0** → `zaehlerstandBezug`, **Einspeisung = OBIS 2.8.0** → `zaehlerstandEinspeisung`. **Keine** Wirk-/Blind-/Scheinleistung (kW/kvar/kVA) und keine Blind-/Scheinenergie. Das Mapping der Stände auf `messwerte` ist entschieden (`MQTT-Integration.md` FR-6.4): `total = ΔBezug − ΔEinspeisung` (vorzeichenbehaftet), `zev = 0` (Sentinel), `zev_calculated` via Solarverteilung. Für den Pi ändert sich dadurch **nichts** — er publiziert weiterhin nur die absoluten Bezug-/Einspeisung-Stände.
-* [ ] **`org_id` im Topic:** internes `org_id` (BIGINT) vs. Keycloak-Alias/UUID — konsistent zu `MQTT-Integration.md` festlegen. → interne org_id
-* [ ] **Register-Mapping Wago:** konkrete Modbus-Register/Skalierung je Zählertyp; `messpunkt`↔Gerät-Zuordnung. → Semantik geklärt: **Wirkenergie kWh** (OBIS 1.8.0 Bezug / 2.8.0 Einspeisung, s. o.). Die **konkreten Modbus-Registeradressen + Skalierung** je Wago-Typ stammen aus dem Gerätedatenblatt (Diagnose per `mbpoll`); `messpunkt`↔Gerät-Zuordnung per Config.
-* [ ] **Publish-Intervall:** wie oft absolute Stände senden (bestimmt die erreichbare zeitliche Auflösung)? → konfigurierbar. Wir beginnen mit 5 Minuten.
+Keine. Die beantworteten Fragen samt Antworten stehen in Anhang B.9.
 
 ## Anhang A: systemd-Registrierung (Raspberry Pi OS)
 
@@ -388,8 +382,8 @@ sudo cp -r /tmp/pi-gw-update/pi-gateway/. /opt/pi-gateway/
 # 3) Eigentümer korrigieren (cp hat als root kopiert)
 sudo chown -R pigw:pigw /opt/pi-gateway
 
-# 4) Abhängigkeiten im venv aktualisieren  <-- WICHTIG bei pymodbus-Fix!
-#    requirements.txt ist jetzt <3.10 -> pip stellt die kompatible Version sicher.
+# 4) Abhängigkeiten im venv aktualisieren - nötig, wenn sich requirements.txt geändert hat
+#    (z.B. die pymodbus-Grenzen); pip stellt die kompatible Version sicher.
 sudo -u pigw /opt/pi-gateway/.venv/bin/pip install -r /opt/pi-gateway/requirements.txt
 
 # 5) Starten + Logs prüfen
@@ -442,3 +436,23 @@ Beim Akzeptanzkriterien-Check vom 22.10.2026 vorgeschlagen, vom User übernommen
 ### B.8 Zustandsregister als Beiwerk (FR-1.8, 22.10.2026)
 Nach dem Update vom 22.10.2026 im Log von Hene: „Read fehlgeschlagen (Batterie-Hene), Versuch 1/2 – … 'Batterie-Hene' soc: Modbus-Fehler bei Register 0x80E8 – … No response received after 0 retries … (keine Antwort innerhalb 5.0s …)“. Der Reader las den Ladezustand im selben Durchgang wie die Zählerstände; scheiterte nur er, galt die **ganze** Messung als gescheitert. Nach dem letzten Versuch fehlten so auch Lade- und Entladeenergie des Zyklus – die Gesamtsumme blieb dank absoluter Stände korrekt, die 15-Minuten-Auflösung nicht. Die Spec regelte den Fall auf dem Pi nicht; das Backend behandelt Zustandswerte schon als Beiwerk (`Specs/Gerätezustand.md`). Auf Wunsch des Users gilt das jetzt auch auf dem Pi (FR-1.8). Die erste Fassung las das Zustandsregister nur einmal – weniger Versuche als vorher, als `read_attempts` die ganze Messung wiederholte. Auf Rückfrage des Users wird es jetzt selbst bis zu `read_attempts`-mal gelesen, ohne die Zählerstände zu wiederholen.
 
+### B.9 Konsolidierung: beantwortete offene Fragen und Nachträge (Abschnitt 8, FR-1, FR-3, FR-4, NFR-4, 23.10.2026)
+Die Fragen aus Abschnitt 8 waren alle beantwortet, standen aber noch als offen da. Die Antworten stehen jetzt in den Anforderungen; Wortlaut der Fragen samt Antworten (Checkboxen standen auf `[ ]`):
+
+* [ ] **Technologie/Sprache:** Empfehlung **Python** (`pymodbus`, `paho-mqtt`, HTTP-Client) für schnelle Umsetzung; **Go** als Alternative (ein statisches arm64-Binary, minimaler Footprint, einfachstes Deployment). Java auf dem Pi eher nicht (JVM-Overhead). → Python
+* [ ] **gPlug-Schnittstelle (BKW):** hinfällig – der BKW-Zähler wird über WhatWatt Go per Modbus TCP gelesen, die gPlugs im Nachbarhaus publizieren selbst (Anhang B.1).
+* [ ] **Optionale Pufferung:** überhaupt nötig (nur für Auflösungserhalt bei Ausfällen)? Falls ja: Variante C (lokaler Broker + Bridge) oder in-process Queue? → keine Pufferung
+* [ ] **Welche Register/Stände** werden publiziert (Bezug/Einspeisung, ggf. ZEV-Register) und wie im Backend auf `total`/`zev` gemappt? (Spiegelt Offene Frage in `MQTT-Integration.md`.) → **Wirkenergie** (Active Energy, kumulativ in kWh): **Bezug = OBIS 1.8.0** → `zaehlerstandBezug`, **Einspeisung = OBIS 2.8.0** → `zaehlerstandEinspeisung`. **Keine** Wirk-/Blind-/Scheinleistung (kW/kvar/kVA) und keine Blind-/Scheinenergie. Das Mapping der Stände auf `messwerte` ist entschieden (`MQTT-Integration.md` FR-6.4): `total = ΔBezug − ΔEinspeisung` (vorzeichenbehaftet), `zev = 0` (Sentinel), `zev_calculated` via Solarverteilung. Für den Pi ändert sich dadurch **nichts** — er publiziert weiterhin nur die absoluten Bezug-/Einspeisung-Stände.
+* [ ] **`org_id` im Topic:** internes `org_id` (BIGINT) vs. Keycloak-Alias/UUID — konsistent zu `MQTT-Integration.md` festlegen. → interne org_id
+* [ ] **Register-Mapping Wago:** konkrete Modbus-Register/Skalierung je Zählertyp; `messpunkt`↔Gerät-Zuordnung. → Semantik geklärt: **Wirkenergie kWh** (OBIS 1.8.0 Bezug / 2.8.0 Einspeisung, s. o.). Die **konkreten Modbus-Registeradressen + Skalierung** je Wago-Typ stammen aus dem Gerätedatenblatt (Diagnose per `mbpoll`); `messpunkt`↔Gerät-Zuordnung per Config.
+* [ ] **Publish-Intervall:** wie oft absolute Stände senden (bestimmt die erreichbare zeitliche Auflösung)? → konfigurierbar. Wir beginnen mit 5 Minuten.
+
+Verbleib der Antworten: Python → NFR-4; gPlug-Schnittstelle → hinfällig (B.1); Pufferung → FR-4.2 („Keine Pufferung“, dazu die Edge Cases „Broker/VPN nicht erreichbar“ und „Puffer voll“, die zuvor „optional puffern (Variante C / Queue) für Auflösung“ bzw. „(falls Pufferung aktiv)“ lauteten; FR-4.2 lautete „**Pufferung ist optional** (nur falls auch die *zeitliche Auflösung* während Ausfällen erhalten bleiben soll) …“); Register/Stände → FR-1.1 (OBIS), Mapping im Backend → `MQTT-Integration.md`, FR-6.4; `org_id` → FR-3.1; Register-Mapping Wago → FR-1.1 (die Verweise „siehe Offene Frage ‚Register-Mapping Wago‘“ zeigen jetzt auf FR-1.1); Publish-Intervall → FR-1.4. FR-1.4 lautete „Lese-/Publish-Intervall konfigurierbar (Default z.B. 1–5 min)“, die Antwort „Wir beginnen mit 5 Minuten“ war ein Startwert, kein Soll.
+
+Ausserdem: FR-1.5, FR-1.6 und FR-1.7 trugen den Zusatz „(Nachtrag)“. Die Punkte „Grund für den grosszügigen Default …“ und „**Abgrenzung:** Das Timeout wirkt nur, wenn der Hub **gar nicht** antwortet …“ standen unter FR-1.7 (`register.einspeisung`), gehören aber zum Timeout und stehen jetzt unter FR-1.5. NFR-4 verwies auf „Sprachwahl, Offene Fragen“, FR-4 hiess „Übertragung & (optionale) Pufferung“, FR-5.3 nannte unter den Parametern noch „optionale Puffer-Optionen“. In Anhang A, „Updaten“, hiess Schritt 4: „Abhängigkeiten im venv aktualisieren  <-- WICHTIG bei pymodbus-Fix! requirements.txt ist jetzt <3.10 -> pip stellt die kompatible Version sicher.“
+
+### B.10 Publish-Intervall präzisiert (FR-1.4, FR-5, 23.10.2026)
+Bei der Konsolidierung fiel auf: FR-1.4 sagte nicht, dass `publish_interval` Pflicht ist – der Code verlangt den Wert und kennt keinen Default (`gateway/config.py`, `_require`). Und das Konfig-Beispiel nannte `publish_interval: 5m` (wie die frühere Antwort „Wir beginnen mit 5 Minuten“, B.9), während Hene laut Datenbank im Minutentakt liefert: Am 22.10.2026 kamen in 30 Minuten je Einheit 30 Rohdaten-Zeilen an, bei allen 18 Einheiten. Auf Wunsch des Users nennt FR-1.4 jetzt Pflichtfeld und Format, und Beispiel wie FR-1.4 nennen den Minutentakt.
+
+### B.11 Zeitbudget je Zyklus statt je Zähler (FR-1.6, 23.10.2026)
+FR-1.6 lautete: „**Zeitbudget:** `read_timeout × read_attempts` (+ Pausen) je Zähler muss deutlich unter dem `publish_interval` bleiben“. Ein Zyklus liest aber alle Zähler nacheinander; das Budget je Zähler sagte nichts über die Dauer des Zyklus. Bei Hene (17 Modbus-Zähler, Defaults, 1-Minuten-Takt seit B.10) dauerte ein Zyklus im schlimmsten Fall rund 3 Minuten. Auf Wunsch des Users ist das Budget jetzt je Zyklus formuliert, samt dem, was beim Überschreiten passiert. Dabei präzisiert: Die Schleife wartet `publish_interval` nach jedem Zyklus, der Abstand zweier Messungen ist Zyklusdauer + Intervall.

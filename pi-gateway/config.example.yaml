@@ -7,7 +7,7 @@
 # Ein zusätzlicher Zähler = nur ein weiterer Listeneintrag, kein Code-Change.
 
 org_id: 42                       # internes org_id (BIGINT) des Mandanten
-publish_interval: 5m             # z. B. "30s", "5m", "1h" oder reine Sekunden-Zahl
+publish_interval: 1m             # Pflicht; z. B. "30s", "1m", "5m", "1h" oder reine Sekunden-Zahl (Hene: 1m)
 
 # Lese-Timeout je Zähler (Default 5s). Hochsetzen, wenn Reads mit "keine Antwort"
 # fehlschlagen – an einem RTU->TCP-Hub reicht die Anfrage seriell bis zum Slave durch.

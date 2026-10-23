@@ -87,7 +87,7 @@ Die Nummer wird einmalig am Gerät abgelesen (z. B. per `mbpoll`, siehe
   dazu eine `INFO`-Zeile je betroffenem Zähler. `register.bezug` bleibt **Pflicht**, und ein
   **vorhandener, aber fehlerhafter** `einspeisung`-Block bleibt ein Startfehler — ein Tippfehler
   soll nicht stillschweigend zu 0 werden.
-- **Intervall:** `publish_interval` z. B. `5m`, `30s`, `1h` oder reine Sekunden-Zahl.
+- **Intervall:** `publish_interval` (Pflicht, kein Default) z. B. `1m`, `30s`, `1h` oder reine Sekunden-Zahl; bei Hene `1m`.
 - **Lese-Timeout:** `read_timeout` (Default `5s`) gilt für alle Zähler; je Zähler mit
   `zaehler[].read_timeout` überschreibbar. Zahl (Sekunden) oder Kurzform (`8s`, `1m`);
   `0`/negativ/ungültig → Fehler beim Start.
@@ -104,7 +104,11 @@ Die Nummer wird einmalig am Gerät abgelesen (z. B. per `mbpoll`, siehe
   hier kompensiert. Zwischen den Versuchen liegen 0,5 s; die Verbindung wird neu aufgebaut.
   Unschädlich, weil **absolute** Zählerstände publiziert werden — ein doppelt gelesener Stand
   kann nichts verfälschen. Worst Case je Zähler: `read_timeout × read_attempts` (+ Pausen),
-  bei Defaults ~10,5 s — muss deutlich unter `publish_interval` bleiben.
+  bei Defaults ~10,5 s. Ein Zyklus liest alle Zähler nacheinander und dauert im schlimmsten Fall
+  die Summe davon (Hene: 17 Zähler ≈ 3 Minuten). Danach wartet die Schleife `publish_interval`;
+  der Abstand zweier Messungen ist also Zyklusdauer + Intervall. Im Normalbetrieb soll der Zyklus
+  klein gegen das Intervall bleiben; im schlimmsten Fall geht keine Energie verloren, nur
+  Auflösung (`Specs/Pi-Gateway-Software.md`, FR-1.6).
 
 ## Lokale Installation (Entwicklung)
 
