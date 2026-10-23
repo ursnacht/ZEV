@@ -81,8 +81,14 @@ def _run_loop(
     heartbeat: Heartbeat,
     stop_event: threading.Event,
 ) -> None:
-    """Liest und publiziert alle Zähler bis zum Stop-Signal."""
+    """Liest und publiziert alle Zähler bis zum Stop-Signal.
+
+    Ein Zyklus beginnt alle ``publish_interval`` Sekunden: Gewartet wird nur die Zeit, die nach
+    dem Lesen vom Intervall übrig ist. Dauert ein Zyklus länger, beginnt der nächste sofort
+    (Specs/Pi-Gateway-Software.md, FR-1.4). Sonst verschöbe jede Zyklusdauer den Takt.
+    """
     while not stop_event.is_set():
+        zyklus_start = time.monotonic()
         success = 0
         for reader in readers:
             if stop_event.is_set():
@@ -91,8 +97,10 @@ def _run_loop(
                 success += 1
 
         heartbeat.log_cycle(success, len(readers), publisher.is_connected())
-        # Unterbrechbares Warten bis zum nächsten Zyklus (reagiert sofort auf Stop).
-        stop_event.wait(config.publish_interval_seconds)
+        # Unterbrechbares Warten bis zum nächsten Zyklus (reagiert sofort auf Stop). Die Dauer des
+        # Zyklus geht vom Intervall ab; ist nichts mehr übrig, wird sofort wieder gelesen.
+        wartezeit = config.publish_interval_seconds - (time.monotonic() - zyklus_start)
+        stop_event.wait(max(0.0, wartezeit))
 
 
 def _read_and_publish(

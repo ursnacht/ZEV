@@ -105,10 +105,10 @@ Die Nummer wird einmalig am Gerät abgelesen (z. B. per `mbpoll`, siehe
   Unschädlich, weil **absolute** Zählerstände publiziert werden — ein doppelt gelesener Stand
   kann nichts verfälschen. Worst Case je Zähler: `read_timeout × read_attempts` (+ Pausen),
   bei Defaults ~10,5 s. Ein Zyklus liest alle Zähler nacheinander und dauert im schlimmsten Fall
-  die Summe davon (Hene: 17 Zähler ≈ 3 Minuten). Danach wartet die Schleife `publish_interval`;
-  der Abstand zweier Messungen ist also Zyklusdauer + Intervall. Im Normalbetrieb soll der Zyklus
-  klein gegen das Intervall bleiben; im schlimmsten Fall geht keine Energie verloren, nur
-  Auflösung (`Specs/Pi-Gateway-Software.md`, FR-1.6).
+  die Summe davon (Hene: 17 Zähler ≈ 3 Minuten). Der Takt läuft ab Zyklusbeginn: Gewartet wird
+  `publish_interval` minus Zyklusdauer, dauert der Zyklus länger, wird sofort wieder gelesen. Im
+  Normalbetrieb soll der Zyklus unter dem Intervall bleiben; im schlimmsten Fall geht keine
+  Energie verloren, nur Auflösung (`Specs/Pi-Gateway-Software.md`, FR-1.4, FR-1.6).
 
 ## Lokale Installation (Entwicklung)
 

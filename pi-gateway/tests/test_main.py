@@ -147,8 +147,8 @@ class RunLoopTest(unittest.TestCase):
         self.assertEqual(["MP-2"], [a.args[0].messpunkt for a in publisher.publish.call_args_list])
         self.log_cycle.assert_called_once_with(1, 2, True)
 
-    def test_runLoop_NachZyklus_WartetPublishInterval(self, _sleep) -> None:
-        """FR-1.4: Zwischen zwei Zyklen wartet die Schleife das konfigurierte Intervall."""
+    def _wartezeit_nach_zyklus(self, zyklus_start: float, zyklus_ende: float) -> list[float]:
+        """Lässt genau einen Zyklus laufen und liefert die Wartezeit danach (Uhr gestellt)."""
         gewartet: list[float] = []
 
         class _EinZyklusEvent(threading.Event):
@@ -157,16 +157,32 @@ class RunLoopTest(unittest.TestCase):
                 self.set()
                 return True
 
-        erster = _StubReader("MP-1", _reading("MP-1"))
-        zweiter = _StubReader("MP-2", _reading("MP-2"))
-        publisher = _publisher()
+        self.erster = _StubReader("MP-1", _reading("MP-1"))
+        self.zweiter = _StubReader("MP-2", _reading("MP-2"))
+        with mock.patch("gateway.main.time.monotonic", side_effect=[zyklus_start, zyklus_ende]):
+            readers = [self.erster, self.zweiter]
+            _run_loop(_config([r.config for r in readers]), readers, _publisher(), Heartbeat(),
+                      _EinZyklusEvent())
+        return gewartet
 
-        _run_loop(_config([erster.config, zweiter.config]), [erster, zweiter], publisher,
-                  Heartbeat(), _EinZyklusEvent())
+    def test_runLoop_KurzerZyklus_WartetIntervallMinusZyklusdauer(self, _sleep) -> None:
+        """FR-1.4: Der Takt ist publish_interval ab Zyklusbeginn - die Zyklusdauer geht ab."""
+        gewartet = self._wartezeit_nach_zyklus(1000.0, 1012.5)  # Zyklus 12.5 s
 
-        self.assertEqual([300], gewartet)  # publish_interval_seconds aus _config
-        self.assertEqual(1, erster.aufrufe)
-        self.assertEqual(1, zweiter.aufrufe)
+        self.assertEqual([287.5], gewartet)  # publish_interval_seconds 300 aus _config
+        self.assertEqual(1, self.erster.aufrufe)
+        self.assertEqual(1, self.zweiter.aufrufe)
+
+    def test_runLoop_ZyklusLaengerAlsIntervall_LiestSofortWieder(self, _sleep) -> None:
+        """FR-1.4: Bleibt vom Intervall nichts übrig, beginnt der nächste Zyklus sofort."""
+        gewartet = self._wartezeit_nach_zyklus(1000.0, 1360.0)  # Zyklus 360 s > 300 s
+
+        self.assertEqual([0.0], gewartet)
+
+    def test_runLoop_ZyklusGenauIntervall_WartetNicht(self, _sleep) -> None:
+        gewartet = self._wartezeit_nach_zyklus(1000.0, 1300.0)
+
+        self.assertEqual([0.0], gewartet)
 
 
 @mock.patch("gateway.main.time.sleep")
