@@ -15,7 +15,7 @@
 
 > **Designentscheidung – absolute Zählerstände statt Deltas:** Der Pi überträgt die **absoluten (kumulativen) Zählerstände**, nicht berechnete Deltas. Die **Delta-/Intervall-Berechnung erfolgt im Backend**. Vorteil: **verlusttolerant** — geht eine MQTT-Nachricht verloren, bleibt die Gesamtsumme korrekt (die Differenz zweier empfangener Stände erfasst den Verbrauch dazwischen weiterhin vollständig); es sinkt nur kurz die zeitliche Auflösung. Dadurch entfallen strenge QoS-/Pufferungs-Anforderungen (kein zwingender Store-and-Forward-Bridge, Variante C).
 
-> **Rollentrennung (siehe Topologie-Doku):** Ein MQTT-Broker verteilt nur Nachrichten und liest selbst keine Zähler. Das Auslesen (Modbus/gPlug) + Publish der Zählerstände macht ein **separater Reader-/Publisher-Prozess auf dem Pi** (`Specs/Pi-Gateway-Software.md`) — nicht Teil dieses Backend-Features (Out of Scope).
+> **Rollentrennung (siehe Topologie-Doku):** Ein MQTT-Broker verteilt nur Nachrichten und liest selbst keine Zähler. Das Auslesen (Modbus TCP) + Publish der Zählerstände macht ein **separater Reader-/Publisher-Prozess auf dem Pi** (`Specs/Pi-Gateway-Software.md`) — nicht Teil dieses Backend-Features (Out of Scope). Die gPlugK im Nachbarhaus lesen und publizieren selbst (FR-10).
 
 ## 2. Funktionale Anforderungen (FR)
 
@@ -108,7 +108,7 @@ Pro eingehender Nachricht:
 > **Kein JWT im Ingest-Pfad:** MQTT-Nachrichten laufen ohne User-Request/JWT. Der Mandantenkontext (`org_id`) darf **nicht** aus `OrganizationContextService` (JWT) stammen, sondern wird aus dem Topic abgeleitet, gegen die Einheit geprüft und beim Persistieren explizit gesetzt (Hibernate-`orgFilter` entsprechend versorgen).
 
 ### FR-5: Rohdaten-Persistierung (absolute Zählerstände)
-Neue Flyway-Migration (`V[n]__create_zaehler_rohdaten.sql`):
+Flyway-Migration `V72__create_zaehler_rohdaten.sql` (Spalte `seriennummer`: `V92`):
 ```sql
 CREATE TABLE zev.zaehler_rohdaten (
     id                        BIGSERIAL PRIMARY KEY,
@@ -164,7 +164,7 @@ ALTER TABLE zev.messwerte ADD COLUMN IF NOT EXISTS quelle VARCHAR(20) DEFAULT 'C
 Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine** Änderung an `messwerte.zev` nötig (`zev`-Werte: FR-6.4, Fallback: FR-9); alle bestehenden Konsumenten von `messwerte.zev` (Statistik/Rechnung) bleiben unverändert kompatibel.
 
 ### FR-8: Monitoring & Status
-1. Prometheus-Metriken (bestehende Infrastruktur, siehe `Specs/Metriken.md` / `MetricsService`):
+1. Prometheus-Metriken (Prometheus-Infrastruktur wie in `Specs/Metriken.md`) über die eigene Komponente `MqttMetrics`, direkt an der `MeterRegistry` – **nicht** über `MetricsService`, weil dieser den Organisationskontext eines Requests braucht, den Ingest und Aggregations-Job nicht haben:
    - `zev_mqtt_messages_received_total`, `..._processed_total`, `..._failed_total` (Counter)
    - `zev_mqtt_last_message_timestamp` (Gauge)
    - `zev_aggregation_runs_total` (Counter), `zev_aggregation_last_run_timestamp` (Gauge)
@@ -183,7 +183,7 @@ Bestehende Zeilen erhalten per Default `'CSV'` (rückwärtskompatibel). **Keine*
 
 ### FR-9: Anpassung Solarverteilung (`zev`-Fallback)
 1. Die Solarverteilung (`SolarDistribution`) berechnet wie bisher `zev_calculated` pro Consumer/Intervall.
-2. **Neu:** Nach der Berechnung wird bei Consumern `zev = zev_calculated` gesetzt, **sofern `zev = 0`** (Sentinel für „nicht gemessen", von MQTT-importierten Consumer-Werten). Bereits gesetzte `zev`-Werte von Consumern (z. B. aus CSV) bleiben unverändert.
+2. Nach der Berechnung wird bei Consumern `zev = zev_calculated` gesetzt, **sofern `zev = 0`** (Sentinel für „nicht gemessen", von MQTT-importierten Consumer-Werten). Bereits gesetzte `zev`-Werte von Consumern (z. B. aus CSV) bleiben unverändert.
 3. Dadurch tragen MQTT-Werte nach der Verteilung denselben `zev`-Wert wie `zev_calculated`; CSV-Werte behalten ihren gemessenen Anteil.
 4. **Producer:** Bei MQTT-Producern (`quelle = 'MQTT'`) setzt die Verteilung `zev` auf die **tatsächlich verteilte Menge** des Zeitpunkts (negativ; bei mehreren Producern anteilig nach Produktion). Die Algorithmen kappen die Zuteilung am Verbrauch, der Rest ist Rücklieferung. CSV-Producer behalten ihren gemessenen `zev`.
 
@@ -370,19 +370,19 @@ Die Smartmeter im Nachbarhaus tragen einen **gPlugK** (Auslesekopf für die Kund
 * **Abhängige Dokumente:** `docs/Netzwerk-Topologie-Hene.md` (Topologie/Broker-Setup/Varianten A/B/C), `Specs/Pi-Gateway-Software.md` (Publisher), `Specs/Metriken.md` (Prometheus-Infrastruktur).
 
 ## 7. Abgrenzung / Out of Scope
-* **Pi-Gateway-Software** (Auslesen Wago/Modbus TCP + BKW/gPlug, Publish der Zählerstände) — separat auf dem Pi implementiert/konfiguriert (`Specs/Pi-Gateway-Software.md`). Die **Delta-Bildung** liegt hingegen im Backend (FR-6).
+* **Pi-Gateway-Software** (Auslesen der Wago, des BKW-Zählers über WhatWatt und der Batterie per Modbus TCP, Publish der Zählerstände) — separat auf dem Pi implementiert/konfiguriert (`Specs/Pi-Gateway-Software.md`). Die **Delta-Bildung** liegt hingegen im Backend (FR-6).
 * Frontend-Live-Anzeige / WebSocket-Bridge.
 * Admin-UI für MQTT-Konfiguration / Broker-/ACL-Verwaltung.
 * Automatische Einheiten-/Geräteregistrierung; bidirektionale Befehle an Zähler.
 * TLS-Zertifikatsverwaltung (manuell, siehe Topologie-Doku).
 * Aufbewahrungs-/Cleanup-Strategie für Rohdaten (eigene Spec).
 * SFTP-Pfad als Fallback — abgelöst, nicht Gegenstand dieser Spec.
-* **gPlug:** Änderungen an Firmware, Ausleseskript oder Meldungsstruktur des gPlug; Auswertung der Momentanwerte (Leistung, Strom, Spannung) und der Tarifregister; die übrigen Tasmota-Meldungen (`STATE`, `LWT`, `INFO`); Befehle an den gPlug. Der `gplug_reader` der Pi-Software (`Specs/Pi-Gateway-Software.md`) ist ein anderer Weg und bleibt davon unberührt.
+* **gPlug:** Änderungen an Firmware, Ausleseskript oder Meldungsstruktur des gPlug; Auswertung der Momentanwerte (Leistung, Strom, Spannung) und der Tarifregister; die übrigen Tasmota-Meldungen (`STATE`, `LWT`, `INFO`); Befehle an den gPlug. Die Pi-Gateway-Software liest die gPlugs nicht; ihr Simulator (`protokoll: sim-gplug`) erzeugt nur Testmeldungen (`Specs/Pi-Gateway-Software.md`, FR-8.3).
 * Änderung der `zev_calculated`-**Berechnungslogik** (Verteilalgorithmus) — bleibt wie bisher. **Ausnahme (FR-9):** ein kleiner Zusatz setzt `zev = zev_calculated`, wo `zev = 0` (MQTT-Sentinel) — die eigentliche Verteilung ändert sich nicht.
 
 ## 8. Offene Fragen
 * [ ] **Reset/Überlauf-Policy:** Genaue Erkennung (Schwellwert für „Rücksprung") **pro Register** (Bezug/Einspeisung) und Umgang (Referenz neu setzen, Delta = 0)? (Grundsatz in FR-6.3 festgelegt; Schwellwert-Details offen.) — **Betrieblicher Sonderfall Zählertausch:** siehe `docs/Zaehlertausch.md` (Einheit behalten, `messpunkt` anpassen, Offline-Zeit kurz halten, Zählerstände protokollieren; der Reset-Guard nullt **genau ein** Übergangsintervall — unabhängig von der Uhrzeit).
-* [ ] **Zählertausch-Erkennung (Blindspot):** Der Reset-Guard erkennt einen Tausch nur am **negativen** Delta. Startet der neue Zähler **höher** als der alte endete, ist das Delta positiv → der Sprung wird als echter Verbrauch verbucht (Bogus-Wert, keine Warnung). Aus den Werten allein nicht zuverlässig erkennbar → **explizites Signal nötig.** **Lösung spezifiziert in `Specs/Zaehlertausch-Erkennung.md`:** optionales Payload-Feld **`seriennummer`** (aus der Pi-Config je `messpunkt`) + neue Spalte `seriennummer` auf `zaehler_rohdaten`; die Aggregation setzt bei Serien-Wechsel eine neue Baseline (kein Delta über die Grenze, robust in beide Richtungen), bei fehlender Serie greift das heutige Verhalten. (Interim-Vorgehen: Anhang A.2.)
+* **Zählertausch-Erkennung (Blindspot):** gelöst durch `Specs/Zaehlertausch-Erkennung.md` – Feld `seriennummer` (FR-3, FR-5), neue Baseline bei Serien-Wechsel. Frage und Antwort: Anhang A.10.
 * [ ] **Prosumer im selben Intervall:** Verhalten, wenn `ΔBezug` **und** `ΔEinspeisung` > 0 (Netmetering)? Aktuelle Festlegung: Netto `total = ΔBezug − ΔEinspeisung` (FR-6.4) — genügt das fachlich?
 * [ ] **Rohdaten-Retention:** Cleanup-Job nötig, ab welchem Alter (absolute Stände wachsen unbegrenzt)? --> **aufgenommen in `Specs/Datenaufbewahrung.md`** (FR-1/FR-2, Default 24 Monate; der Referenzstand-Guard unten ist dort als Akzeptanzkriterium verankert). **Wichtig (Wechselwirkung mit der Wiederaufnahme nach Unterbruch):** Ein Cleanup darf den **letzten Stand vor einer noch unverarbeiteten Lücke** nicht löschen — dieser ist die Referenz für die überbrückende Delta-Bildung nach Wiederaufnahme; wird er gelöscht, ginge der Verbrauch des Unterbruchs verloren (`referenz == null` → kein Messwert). Sichere Regel: nur **verarbeitete** Rohdaten löschen und pro Einheit mindestens den jüngsten Stand behalten.
 * [ ] **gPlug-Meldung verifizieren (FR-10.3):** Stimmen Objektname `z`, die Feldnamen und die Einheit kWh bei den Smartmetern im Nachbarhaus? Liefert `SMid` eine stabile Zählerkennung? Vor dem Produktivbetrieb eine echte Meldung mitschneiden.
@@ -431,4 +431,12 @@ Beim Akzeptanzkriterien-Check vom 20.10.2026 wichen zwei Stellen vom Code ab; au
 
 ### A.9 gPlug-Ingest vor dem Mitschnitt einer echten Meldung (FR-10, 22.10.2026)
 FR-10.3 verlangte: „Vor der Umsetzung ist eine **echte Meldung** aus dem Nachbarhaus mitzuschneiden … und gegen die Tabelle zu prüfen“, die offene Frage ebenso („Vor der Umsetzung eine echte Meldung mitschneiden“). Auf Wunsch des Users ist der Ingest zusammen mit dem Simulator (`Specs/Pi-Gateway-Software.md`, FR-8.3) schon vorher umgesetzt, damit sich Auslesen und Speichern ohne Gerät testen lassen. Der Mitschnitt bleibt vor dem Produktivbetrieb nötig: Weichen Feldnamen oder Einheit ab, ist der Parser anzupassen. Zugleich festgelegt: Trägt `Time` wider Erwarten einen Offset, gilt die lokale Wanduhrzeit.
+
+### A.10 Zweite Konsolidierung (Abschnitte 1, 7, 8, FR-5, FR-9, 23.10.2026)
+* **Abschnitt 8, beantwortete Frage** (Checkbox stand auf `[ ]`): „**Zählertausch-Erkennung (Blindspot):** Der Reset-Guard erkennt einen Tausch nur am **negativen** Delta. Startet der neue Zähler **höher** als der alte endete, ist das Delta positiv → der Sprung wird als echter Verbrauch verbucht (Bogus-Wert, keine Warnung). Aus den Werten allein nicht zuverlässig erkennbar → **explizites Signal nötig.** **Lösung spezifiziert in `Specs/Zaehlertausch-Erkennung.md`:** optionales Payload-Feld **`seriennummer`** (aus der Pi-Config je `messpunkt`) + neue Spalte `seriennummer` auf `zaehler_rohdaten`; die Aggregation setzt bei Serien-Wechsel eine neue Baseline (kein Delta über die Grenze, robust in beide Richtungen), bei fehlender Serie greift das heutige Verhalten. (Interim-Vorgehen: Anhang A.2.)“ Die Lösung steht in `Specs/Zaehlertausch-Erkennung.md`, im Code ist sie vorhanden (`seriennummer` in FR-3 und FR-5, Baseline in `ZaehlerAggregationService`); deren Akzeptanzkriterien sind am 23.10.2026 erst zum Teil geprüft (4 von 28); in Abschnitt 8 steht nur noch der Verweis, weil jene Spec diese Frage beim Namen nennt.
+* **Abschnitt 1:** Die Rollentrennung lautete „**Rollentrennung (siehe Topologie-Doku):** Ein MQTT-Broker verteilt nur Nachrichten und liest selbst keine Zähler. Das Auslesen (Modbus/gPlug) + Publish der Zählerstände macht ein **separater Reader-/Publisher-Prozess auf dem Pi** (`Specs/Pi-Gateway-Software.md`) — nicht Teil dieses Backend-Features (Out of Scope).“ – die gPlugs liest der Pi nicht (FR-10).
+* **Abschnitt 7:** lautete „**Pi-Gateway-Software** (Auslesen Wago/Modbus TCP + BKW/gPlug, Publish der Zählerstände) — separat auf dem Pi implementiert/konfiguriert (`Specs/Pi-Gateway-Software.md`). Die **Delta-Bildung** liegt hingegen im Backend (FR-6).“ und „Der `gplug_reader` der Pi-Software (`Specs/Pi-Gateway-Software.md`) ist ein anderer Weg und bleibt davon unberührt.“ Der gPlug-Platzhalter der Pi-Software ist seit dem 20.10.2026 entfernt (`Specs/Pi-Gateway-Software.md`, Anhang B.1), der BKW-Zähler hängt an einem WhatWatt Go.
+* **FR-5:** lautete „Neue Flyway-Migration (`V[n]__create_zaehler_rohdaten.sql`)“ – die Migration ist `V72`, die Spalte `seriennummer` kam mit `V92`.
+* **FR-9.2:** trug den Marker „**Neu:**“.
+* **FR-8.1:** lautete „Prometheus-Metriken (bestehende Infrastruktur, siehe `Specs/Metriken.md` / `MetricsService`)“. Umgesetzt ist eine eigene Komponente `MqttMetrics` (Umsetzungsplan, Phase 10); auf Wunsch des Users an den Code angepasst.
 
