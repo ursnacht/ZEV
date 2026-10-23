@@ -5,7 +5,7 @@
 # entstehen zur Laufzeit im Container).
 #
 # MOSQUITTO_USERS: durch Whitespace getrennte "user:passwort"-Paare, z.B.
-#   MOSQUITTO_USERS="zev-backend:geheim1 pi-org42:geheim2"
+#   MOSQUITTO_USERS="zev-backend:geheim1 pi-org1:geheim2"
 # Einschraenkung: Passwoerter duerfen keinen Whitespace enthalten (Wort-Splitting).
 # Ein Doppelpunkt im Passwort ist erlaubt (nur der erste trennt user/passwort).
 set -eu

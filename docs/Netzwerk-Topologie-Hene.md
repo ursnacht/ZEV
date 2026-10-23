@@ -136,13 +136,13 @@ In der `.env` des Stacks, Paare `user:passwort` durch Leerzeichen getrennt. Pass
 kein Leerzeichen enthalten; ein Doppelpunkt im Passwort ist erlaubt (nur der erste trennt).
 
 ```
-MOSQUITTO_USERS=zev-backend:<passwort> pi-org42:<passwort> zevbridge:<passwort>
+MOSQUITTO_USERS=zev-backend:<passwort> pi-org1:<passwort> zevbridge:<passwort>
 ```
 
 | User (Beispiel) | Wer | Gegenstück |
 |-----------------|-----|------------|
 | `zev-backend` | ZEV-Backend (Subscriber) | `MQTT_BROKER_USERNAME` / `MQTT_BROKER_PASSWORD` in derselben `.env` |
-| `pi-org42` | Pi-Gateway (Publisher) | `MQTT_USERNAME` / `MQTT_PASSWORD` in `/etc/pi-gateway.env` auf dem Pi |
+| `pi-org1` | Pi-Gateway (Publisher) | `MQTT_USERNAME` / `MQTT_PASSWORD` in `/etc/pi-gateway.env` auf dem Pi |
 | `zevbridge` | Bridge des Pi für die gPlugs | `remote_username` / `remote_password` in `/etc/mosquitto/conf.d/bridge.conf` auf dem Pi |
 
 Die `passwd` entsteht beim Start des Containers. Ein neuer oder geänderter User wirkt deshalb
@@ -175,14 +175,14 @@ docker exec mosquitto grep queue_qos0 /mosquitto/config/mosquitto.conf
 Der NAS-Broker hat heute **keine** `acl_file`: Jeder angemeldete User darf jedes Topic lesen und
 schreiben. Sobald eine `acl_file` aktiv ist, verliert **jeder User den Zugriff, der nicht darin
 steht** – also zuerst die echten Usernamen aus `MOSQUITTO_USERS` zusammentragen. Vorschlag
-(`42` = org_id des Mandanten):
+(`1` = org_id des Mandanten bei Hene):
 
 ```conf
-user pi-org42
-topic write zev/42/+/messwert
+user pi-org1
+topic write zev/1/+/messwert
 
 user zevbridge
-topic write gPlug/42/+/tele/#
+topic write gPlug/1/+/tele/#
 
 user zev-backend
 topic read zev/+/+/messwert
@@ -294,6 +294,21 @@ Der Mosquitto auf dem Pi nimmt die Meldungen der gPlugs im LAN entgegen und leit
 `gPlug/#` per Bridge an den NAS-Broker weiter. Das Pi-Gateway publiziert weiterhin **direkt**
 an den NAS (Variante B) und benutzt diesen Broker nicht.
 
+```
+gPlug ──(User gplug)──► Mosquitto Pi ──(Bridge, User zevbridge)──► Mosquitto NAS ──(User zev-backend)──► Backend
+Pi-Gateway ──(User pi-org1, direkt)──────────────────────────────► Mosquitto NAS
+```
+
+| User | Wer meldet sich an | Bei welchem Broker | Angelegt in |
+|------|--------------------|--------------------|-------------|
+| `gplug` | die gPlugs | Pi | `/etc/mosquitto/passwd` auf dem Pi (Schritt 4) |
+| `zevbridge` | der Pi-Broker selbst (Bridge) | NAS | `MOSQUITTO_USERS` in der `.env` auf dem NAS, Passwort zusätzlich in `bridge.conf` auf dem Pi |
+| `zev-backend` | das Backend (liest `gPlug/…` und `zev/…`) | NAS | `MOSQUITTO_USERS` |
+| `pi-org1` | das Pi-Gateway (schreibt `zev/1/…`), **nicht** über den Pi-Broker | NAS | `MOSQUITTO_USERS`, Passwort zusätzlich als `MQTT_USERNAME`/`MQTT_PASSWORD` in `/etc/pi-gateway.env` auf dem Pi |
+
+Der System-Benutzer `mosquitto` (Eigentümer der Konfigurationsdateien) ist kein MQTT-Login; ihn
+legt `apt install mosquitto` selbst an.
+
 Vorlagen liegen in `pi-gateway/deploy/mosquitto-bridge/` und kommen mit dem Pi-Gateway-Paket
 nach `/opt/pi-gateway/deploy/mosquitto-bridge/`:
 
@@ -319,6 +334,7 @@ User `zevbridge` in `MOSQUITTO_USERS` ergänzen und den Broker-Container neu erz
 ```bash
 sudo apt update && sudo apt install -y mosquitto mosquitto-clients
 ```
+Legt den Unix-User `mosquitto` an.
 
 ### 3. Konfiguration aus den Vorlagen
 
@@ -333,7 +349,7 @@ sudo nano /etc/mosquitto/conf.d/bridge.conf     # NAS-Adresse und Passwort eintr
 
 Die NAS-Adresse ist dieselbe wie `broker.url` in `/opt/pi-gateway/config.yaml` (ohne `tcp://`).
 
-### 4. User für die gPlugs und Rechte
+### 4. Mosquitto-User für die gPlugs und Rechte
 
 ```bash
 sudo mosquitto_passwd -c /etc/mosquitto/passwd gplug   # -c nur beim ersten User
@@ -341,7 +357,8 @@ sudo chown mosquitto:mosquitto /etc/mosquitto/passwd /etc/mosquitto/acl /etc/mos
 sudo chmod 600 /etc/mosquitto/passwd /etc/mosquitto/conf.d/bridge.conf
 ```
 
-`bridge.conf` enthält das Passwort des Users `zevbridge` und darf nur für `mosquitto` lesbar sein.
+`bridge.conf` enthält das Passwort des Mosquitto-Users `zevbridge` für den Zugriff auf den
+MQTT-Broker auf dem NAS und darf nur für `mosquitto` lesbar sein.
 
 ### 5. Starten und prüfen
 
@@ -364,7 +381,7 @@ docker exec -it mosquitto mosquitto_sub -u zev-backend -P '<passwort>' -t 'gPlug
 Auf dem Pi eine Testmeldung senden:
 
 ```bash
-mosquitto_pub -h localhost -u gplug -P '<passwort>' -t 'gPlug/42/TEST/tele/SENSOR' -m '{"Time":"test"}'
+mosquitto_pub -h localhost -u gplug -P '<passwort>' -t 'gPlug/1/TEST/tele/SENSOR' -m '{"Time":"test"}'
 ```
 
 Erscheint sie auf dem NAS, steht die Bridge. Solange das Backend `gPlug/…` noch nicht
@@ -656,16 +673,16 @@ Spannungsprobe zuerst: zeigt sie ~230 V, sind Adressierung **und** Wortfolge bes
 Der gPlugK sitzt an der Kundenschnittstelle des Smartmeters und publiziert selbst per MQTT
 (Firmware auf Tasmota-Basis). Konfiguriert wird **nur die MQTT-Anbindung** – Meldungsstruktur
 und Ausleseskript bleiben unverändert (`Specs/MQTT-Integration.md`, FR-10). Je gPlug in der
-Tasmota-Konsole (`Topic` = Messpunkt der Einheit im ZEV, `42` = org_id):
+Tasmota-Konsole (`Topic` = Messpunkt der Einheit im ZEV, `1` = org_id bei Hene):
 
 ```
-Backlog MqttHost 192.168.10.189; MqttPort 1883; MqttUser gplug; MqttPassword <passwort>; Topic ID742-Nachbar-1; FullTopic gPlug/42/%topic%/%prefix%/; TelePeriod 60
+Backlog MqttHost 192.168.10.189; MqttPort 1883; MqttUser gplug; MqttPassword <passwort>; Topic ID742-Nachbar-1; FullTopic gPlug/1/%topic%/%prefix%/; TelePeriod 60
 Backlog Timezone 99; TimeStd 0,0,10,1,3,60; TimeDst 0,0,3,1,2,120
 ```
 
 Die zweite Zeile stellt Mitteleuropäische Zeit mit Sommerzeit ein; ohne sie stempelt der gPlug
 um eine Stunde verschoben. Die Meldungen erscheinen danach auf
-`gPlug/42/ID742-Nachbar-1/tele/SENSOR` (Test: Abschnitt 6 der Pi-Broker-Notiz).
+`gPlug/1/ID742-Nachbar-1/tele/SENSOR` (Test: Abschnitt 6 der Pi-Broker-Notiz).
 
 > **Vor der Umsetzung im Backend** eine echte Meldung mitschneiden und die Feldnamen gegen
 > `Specs/MQTT-Integration.md`, FR-10.3, prüfen (dort offene Frage).

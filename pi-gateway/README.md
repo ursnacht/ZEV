@@ -119,7 +119,7 @@ python -m venv .venv
 pip install -e .            # bzw. pip install -r requirements.txt
 
 cp config.example.yaml config.yaml   # anpassen
-export MQTT_USERNAME=pi-org42 MQTT_PASSWORD=...
+export MQTT_USERNAME=pi-org1 MQTT_PASSWORD=...
 python -m gateway.main --config config.yaml
 ```
 
@@ -228,7 +228,7 @@ Format (whitespace-getrennte Paare; Passwörter ohne Whitespace, Doppelpunkt im 
 
 ```dotenv
 # in .env.mqtt (bzw. der NAS-.env)
-MOSQUITTO_USERS=zev-backend:zev-mqtt-dev pi-org42:change-me
+MOSQUITTO_USERS=zev-backend:zev-mqtt-dev pi-org1:change-me
 ```
 
 - **Backend-Subscriber:** einer der Einträge muss zu `MQTT_BROKER_USERNAME` /

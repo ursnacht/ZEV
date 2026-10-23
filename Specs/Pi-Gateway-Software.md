@@ -290,7 +290,7 @@ sudo install -o pigw -g pigw -m 640 config.yaml /opt/pi-gateway/config.yaml
 
 # Broker-Zugangsdaten als root-only Env-Datei (NICHT ins Unit-File!)
 sudo tee /etc/pi-gateway.env >/dev/null <<'EOF'
-MQTT_USERNAME=pi-org42
+MQTT_USERNAME=pi-org1
 MQTT_PASSWORD=<broker-passwort>
 EOF
 sudo chmod 600 /etc/pi-gateway.env
