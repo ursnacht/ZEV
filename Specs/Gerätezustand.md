@@ -22,17 +22,16 @@
   die Batterie voll. Das ist ein Schluss über zwei Intervalle statt einer Messung.
 
 * **Aktueller Stand:**
-  - **Der Wechselrichter liefert den Wert bereits.** Register `33000` des Solinteg MHT
+  - **Der Wechselrichter liefert den Wert.** Register `33000` des Solinteg MHT
     (`SOC`, `U16`, `%`, Faktor 100), gelesen über dasselbe Modbus-TCP, über das seit dem 16.09.2026
     Ladung und Entladung kommen.
-  - **Es gibt keine Ablage dafür.** `zev.messwerte` führt kumulative Energie je 15-Minuten-Intervall
-    (`total = ΔBezug − ΔEinspeisung`), `zev.zaehler_rohdaten` absolute Zählerstände. Beide sind auf
-    **Deltas** ausgelegt; ein Momentanwert passt in keine von beiden.
-  - **Der MQTT-Vertrag kennt zwei Register.** `ZaehlerMesswertPayloadDTO` trägt `timestamp`,
-    `zaehlerstandBezug`, `zaehlerstandEinspeisung` und optional `seriennummer`
-    (`Specs/MQTT-Integration.md`, FR-3).
+  - **`zev.messwerte` und `zev.zaehler_rohdaten` passen nicht.** `zev.messwerte` führt kumulative
+    Energie je 15-Minuten-Intervall (`total = ΔBezug − ΔEinspeisung`), `zev.zaehler_rohdaten`
+    absolute Zählerstände. Beide sind auf **Deltas** ausgelegt; ein Momentanwert passt in keine von
+    beiden — darum die eigene Tabelle (FR-2).
   - **Der Einheiten-Typ `SPEICHER` existiert** seit V152 (`Specs/Batteriespeicher.md`), mit Ladung
     und Entladung auf den beiden Registern.
+  - Die Ausgangslage vor der Umsetzung steht im Anhang A.1.
 
 ## 2. Funktionale Anforderungen (FR) - Was soll das System tun?
 
@@ -141,8 +140,8 @@ Prüfungen, die eine typisierte Spalte mitbrächte; FR-3 holt sie zurück.
 `steuerentscheid.zeit_von` (seit V147). Eine vierte Zeitkonvention im selben System wäre der
 nächste stille Fehler; die Einspeisesteuerung hat drei davon teuer bezahlt.
 
-> Der Spaltenkommentar von `zaehler_rohdaten.zeit` sagt es seit V74 ebenso: „Messzeitpunkt als
-> lokale Wanduhrzeit". V72 hatte dort ursprünglich „UTC" stehen.
+> Der Spaltenkommentar von `zaehler_rohdaten.zeit` sagt es ebenso: „Messzeitpunkt als lokale
+> Wanduhrzeit" (Hintergrund: Anhang A.3).
 
 ### FR-3: Registry der Grössen
 
@@ -269,6 +268,15 @@ verfügbar.
 * [ ] `zeit` trägt die **Ortszeit** aus dem Payload, verbatim — geprüft an einem Zeitstempel mit
   Offset `+02:00`.
 * [ ] `org_id` stammt aus dem Topic, nicht aus dem Payload.
+* [ ] Am Umstellungstag im Herbst überschreibt der zweite Durchgang der Stunde 02:00–03:00 die
+  Werte des ersten; der Tag hat 96 statt 100 Viertelstunden mit Werten.
+* [ ] **Eine gelöschte Einheit nimmt ihre Zustandswerte mit** (`ON DELETE CASCADE`) — geprüft am
+  konstruierten Fall „Zustandswert ohne Rohdaten", weil das Löschen sonst an `zaehler_rohdaten`
+  scheitert (FR-2).
+* [ ] Ein **direktes `INSERT`** mit `wert = 101` und `groesse = 'SOC'` wird von der Datenbank
+  abgewiesen — der CHECK greift auch an der Anwendung vorbei.
+* [ ] Die Abfrage „letzter Wert vor Zeitpunkt" nutzt den Index `(einheit_id, groesse, zeit DESC)`
+  (`EXPLAIN` zeigt einen Index-Scan, keinen Seq-Scan).
 
 **Validierung**
 * [ ] `soc = 87.5` an einer `SPEICHER`-Einheit wird gespeichert.
@@ -287,8 +295,6 @@ verfügbar.
   Kriterium sichert die Regel für die erste Grösse, die an mehreren Typen gilt.
 * [ ] Ein **unbekannter Messpunkt** verwirft die ganze Nachricht wie bisher — auch den
   Zustandswert.
-* [ ] Am Umstellungstag im Herbst überschreibt der zweite Durchgang der Stunde 02:00–03:00 die
-  Werte des ersten; der Tag hat 96 statt 100 Viertelstunden mit Werten.
 
 **Lesen**
 * [ ] „Letzter Wert vor Zeitpunkt" liefert bei mehreren Werten desselben Intervalls den
@@ -303,7 +309,7 @@ verfügbar.
   nicht hinein; `messwerte` bleibt unverändert.
 * [ ] Ein Zustandswert taucht in **keiner** Statistik-Summe und in **keiner** Abrechnung auf.
 
-**Pi-Gateway** (die Vorarbeit aus §6)
+**Pi-Gateway** (§6)
 * [ ] Ein Register vom Typ `uint16` wird über **ein** Register gelesen; `float32` und `uint32`
   bleiben unverändert bei zwei.
 * [ ] Rohwert `8750` mit `skalierung: 0.01` ergibt `87.5` — nicht `875000`.
@@ -311,13 +317,6 @@ verfügbar.
   fällt, 0–100 nicht verlässt und zu den Zählerständen derselben Nachricht passt.
 * [ ] Ohne konfigurierte Zustandsregister enthält der Payload **kein** `zustand`-Objekt — auch kein
   leeres.
-* [ ] **Eine gelöschte Einheit nimmt ihre Zustandswerte mit** (`ON DELETE CASCADE`) — geprüft am
-  konstruierten Fall „Zustandswert ohne Rohdaten", weil das Löschen sonst an `zaehler_rohdaten`
-  scheitert (FR-2).
-* [ ] Ein **direktes `INSERT`** mit `wert = 101` und `groesse = 'SOC'` wird von der Datenbank
-  abgewiesen — der CHECK greift auch an der Anwendung vorbei.
-* [ ] Die Abfrage „letzter Wert vor Zeitpunkt" nutzt den Index `(einheit_id, groesse, zeit DESC)`
-  (`EXPLAIN` zeigt einen Index-Scan, keinen Seq-Scan).
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
@@ -377,39 +376,35 @@ verfügbar.
 ## 6. Abhängigkeiten & betroffene Funktionalität
 
 * **Voraussetzungen:**
-  - Einheiten-Typ `SPEICHER` (V152, `Specs/Batteriespeicher.md`) — vorhanden.
-  - MQTT-Integration und laufender Ingest (`Specs/MQTT-Integration.md`) — vorhanden.
-  - **`uint16` im Pi-Gateway — fehlt.** `SOC` steht in **einem** Register (`U16`), der Reader liest
-    fest zwei (`_REGISTERS_PER_WERT = 2`) und kennt nur `float32` und `uint32`. Ohne diese
-    Erweiterung kann der Pi den Wert nicht lesen. **Das ist die einzige echte Vorarbeit.**
+  - Einheiten-Typ `SPEICHER` (V152, `Specs/Batteriespeicher.md`).
+  - MQTT-Integration und laufender Ingest (`Specs/MQTT-Integration.md`).
+  - **`uint16` im Pi-Gateway.** `SOC` steht in **einem** Register (`U16`); der Reader liest je nach
+    Typ ein Register (`uint16`) oder zwei (`float32`, `uint32`). (Hintergrund: Anhang A.2)
 
 * **Betroffener Code:**
-  - **`pi-gateway`, vier Dateien** — der Wert erreicht den Broker sonst nicht:
-    - `gateway/config.py`: `uint16` in `_SUPPORTED_REGISTER_TYPES` (heute `{"float32", "uint32"}`,
-      ein unbekannter Typ bricht beim Start ab) und ein Konfigurationsformat für Zustandsregister.
-    - `gateway/readers/modbus_reader.py`: `uint16` und **variable Registeranzahl** —
-      `_REGISTERS_PER_WERT` ist heute fest `2`, `SOC` belegt eines.
-    - `gateway/models.py`: `MeterReading` ist ein `@dataclass(frozen=True)` mit festen Feldern; ohne
-      ein Feld für die Zustandswerte kommen sie nicht bis zum Publisher.
-    - `gateway/publisher.py`: `_to_payload` baut das JSON aus genau diesen Feldern; `zustand` ist
-      dort zu ergänzen — **nur wenn Werte vorliegen**, sonst erhielte jede Nachricht ein leeres
-      Objekt.
+  - **`pi-gateway`** — ohne diese Teile erreicht der Wert den Broker nicht:
+    - `gateway/config.py`: `uint16` in `_SUPPORTED_REGISTER_TYPES` (ein unbekannter Typ bricht beim
+      Start ab) und ein Konfigurationsformat für Zustandsregister.
+    - `gateway/readers/modbus_reader.py`: `uint16` und **variable Registeranzahl** — `SOC` belegt
+      ein Register, `float32` und `uint32` zwei.
+    - `gateway/models.py`: `MeterReading` (`@dataclass(frozen=True)`) trägt die Zustandswerte bis
+      zum Publisher.
+    - `gateway/publisher.py`: `_to_payload` ergänzt `zustand` — **nur wenn Werte vorliegen**, sonst
+      erhielte jede Nachricht ein leeres Objekt.
     - `gateway/readers/sim_reader.py`: SOC-Verlauf, **an die bestehende Lade-/Entladephase
       gekoppelt** — steigt in der Ladephase, fällt in der Entladephase, bleibt in 0–100 und kehrt an
-      den Grenzen um. Der Speicher-Modus führt die Phase bereits (`_laedt`, `_phase_rest`); ein
-      unabhängig gewürfelter SOC widerspräche den Zählerständen derselben Nachricht.
+      den Grenzen um. Der Speicher-Modus führt die Phase (`_laedt`, `_phase_rest`); ein unabhängig
+      gewürfelter SOC widerspräche den Zählerständen derselben Nachricht.
   - `ZaehlerMesswertPayloadDTO`: Objekt `zustand` als `Map<String, Object>` (FR-1.2).
-  - `MqttIngestService`: Validierung und Schreiben (FR-3, FR-4). **Neue Abhängigkeit** auf
-    `SystemmeldungService` — der Konstruktor kennt heute nur `EinheitRepository`,
-    `ZaehlerRohdatenRepository`, `ObjectMapper` und `MqttMetrics`.
+  - `MqttIngestService`: Validierung und Schreiben (FR-3, FR-4), mit einer Abhängigkeit auf
+    `SystemmeldungService` für die beiden Meldungen.
   - **`MqttMetrics` bleibt unberührt:** Ein verworfener Zustandswert ruft **kein** `recordFailed()`
     auf. Die Zähler messen die Verarbeitung von Nachrichten; die Nachricht war gültig, nur ein
     Beiwerk nicht. Sonst sänke die Erfolgsquote wegen eines falsch skalierten Registers.
-  - **`Specs/MQTT-Integration.md`, FR-3** ist nachzuführen: Dort steht der Payload-Vertrag als
-    verbindliche Tabelle. Ohne die Ergänzung gäbe es zwei Beschreibungen desselben Vertrags, eine
-    davon unvollständig.
-  - Neu: Entity, Repository, `Zustandsgroesse`-Enum, **zwei** Flyway-Migrationen — eine für die
-    Tabelle samt Index, eine für die Übersetzungen `GERAETEZUSTAND_WERT_UNGUELTIG` und
+  - **`Specs/MQTT-Integration.md`, FR-3** führt `zustand` im Payload-Vertrag (verbindliche Tabelle) —
+    eine Beschreibung des Vertrags, nicht zwei.
+  - Entity, Repository, `Zustandsgroesse`-Enum, **zwei** Flyway-Migrationen — eine für die Tabelle
+    samt Index, eine für die Übersetzungen `GERAETEZUSTAND_WERT_UNGUELTIG` und
     `GERAETEZUSTAND_TYP_UNGUELTIG` (DE/EN, mit `ON CONFLICT (key) DO NOTHING`, deutscher Text mit
     Umlauten und `ss` statt `ß`).
   - **Nicht betroffen:** `ZaehlerAggregationService`, `MesswerteService`, Statistik, Abrechnung.
@@ -419,33 +414,19 @@ verfügbar.
 
 ## 7. Abgrenzung / Out of Scope
 
-* **Keine Nutzung durch die Einspeisesteuerung.** Dieses Feature schafft die Datengrundlage; ob und
-  wie die Regel den Ladestand auswertet, ist eine Änderung an `Specs/Einspeisesteuerung.md` und
-  gehört dorthin. Erst die Messung, dann die Entscheidung darüber.
+* **Keine Nutzung durch die Einspeisesteuerung in dieser Spec.** Dieses Feature schafft die
+  Datengrundlage; ob und wie die Steuerung den Ladestand auswertet und zum Entscheid mitschreibt,
+  steht in `Specs/Einspeisesteuerung.md` und gehört dorthin. Erst die Messung, dann die
+  Entscheidung darüber. (Hintergrund: Anhang A.4)
 * **Keine Anzeige.** Kein Diagramm, keine Tabelle, keine Seite. Der Wert liegt in der Datenbank und
   wird über das Repository gelesen.
-* **Keine weiteren Grössen** ausser `SOC`. `SOH` und `TEMPERATUR` stehen in der Registry, damit
-  sichtbar ist, dass die Struktur trägt — umgesetzt wird nur der Ladestand.
+* **Keine weiteren Grössen** ausser `SOC`. `SOH` und `TEMPERATUR` stehen nur als Kandidaten in
+  FR-3, nicht in der Registry — umgesetzt wird nur der Ladestand. (Hintergrund: Anhang A.5)
 * **Keine Retention.** Wie `zaehler_rohdaten` wird nichts gelöscht. Sollte das Volumen je stören,
   ist es eine eigene Entscheidung für **beide** Tabellen.
 * **Keine Aggregation, keine Statistik, keine Abrechnung.** Siehe den Kasten am Anfang.
 
 ## 8. Offene Fragen
-
-* ~~**Welche Auflösung braucht der SOC?**~~ **Geklärt:** Der Pi publiziert im **Minutentakt**, die
-  Steuerung entscheidet alle 15. Gespeichert wird trotzdem jeder Wert (NFR-1). --> Annahme: Alles speichern, was ankommt — das Volumen ist
-  unkritisch, und ein Verlauf ist mehr wert als eine Sparsamkeit, die niemand spürt. --> Annahme OK, der Pi puliziert sogar jede Minute
-* ~~**Wird der SOC zum Entscheid mitgeschrieben?**~~ **Geklärt: als nächster Schritt, nicht hier.**
-  Eine Spalte in `steuerentscheid` würde erklären, *warum* gesperrt wurde — „bei 95 % Ladestand" ist
-  eine andere Aussage als „bei 40 %". Das ist eine Änderung an `Specs/Einspeisesteuerung.md` und
-  folgt, sobald die Werte fliessen.
-* ~~**Enthält die Registry alle drei Grössen oder nur `SOC`?**~~ **Geklärt: nur `SOC`** (FR-3). Was
-  nicht umgesetzt wird, steht auch nicht in der Registry.
-* ~~**Welche Einheit gewinnt bei mehreren Treffern je Messpunkt?**~~ **Geklärt: die mit der kleinsten
-  `id`** (FR-4.6) — willkürlich, aber deterministisch.
-* ~~**Eigener Meldungs-Key für die Typverletzung?**~~ **Geklärt: ja**, `GERAETEZUSTAND_TYP_UNGUELTIG`
-  (FR-3.3). Ein gemeinsamer Key zeigte abwechselnd zwei Ursachen, die verschiedene Gegenmassnahmen
-  verlangen.
 
 * **Soll `TEMPERATUR` mehrere Sensoren je Gerät unterscheiden?** *(offen — betrifft erst die zweite
   Grösse)* Der Solinteg liefert vier (`11032`–`11035`). Der Schlüssel `(einheit_id, zeit, groesse)`
@@ -454,9 +435,85 @@ verfügbar.
   mit der Anforderung, die Temperatur wirklich braucht. **Durch den generischen Wire-Contract (FR-1)
   ist die erste Variante inzwischen billig:** vier Einträge in der Registry, kein DTO-Feld, kein
   Pi-Rollout.
-* ~~**Sollen Zustandswerte über die REST-API lesbar sein?**~~ **Geklärt: bei Bedarf.** Vorerst nur
-  Repository-Zugriff; ein Controller kommt mit der Ansicht, die ihn braucht.
-* ~~**Deduplizierung der Systemmeldung bei dauerhaft falschem Wert:**~~ **Geklärt: so übernommen.**
-  Ein falsch skalierter SOC erzeugt **jede Minute** einen Verstoss; der `SystemmeldungService` zählt
-  gleiche Meldungen je Mandant und Key zusammen. An dieser Frequenz ist der Mechanismus nie erprobt
-  worden — bleibt als Beobachtungspunkt für die erste Betriebswoche.
+
+Die beantworteten Fragen (Auflösung, SOC im Entscheid, Umfang der Registry, Einheit bei mehreren
+Treffern, eigener Meldungs-Key, REST-API, Deduplizierung) stehen mit ihren Antworten im Anhang A.6.
+
+## Anhang A – Entscheidungen und Verlauf
+
+### A.1 Ausgangslage vor der Umsetzung (§1, 17.09.2026)
+Bevor das Feature umgesetzt war, lautete „Aktueller Stand":
+* **Der Wechselrichter liefert den Wert bereits.** Register `33000` des Solinteg MHT (`SOC`, `U16`,
+  `%`, Faktor 100), gelesen über dasselbe Modbus-TCP, über das seit dem 16.09.2026 Ladung und
+  Entladung kommen.
+* **Es gibt keine Ablage dafür.** `zev.messwerte` führt kumulative Energie je 15-Minuten-Intervall
+  (`total = ΔBezug − ΔEinspeisung`), `zev.zaehler_rohdaten` absolute Zählerstände. Beide sind auf
+  **Deltas** ausgelegt; ein Momentanwert passt in keine von beiden.
+* **Der MQTT-Vertrag kennt zwei Register.** `ZaehlerMesswertPayloadDTO` trägt `timestamp`,
+  `zaehlerstandBezug`, `zaehlerstandEinspeisung` und optional `seriennummer`
+  (`Specs/MQTT-Integration.md`, FR-3).
+* **Der Einheiten-Typ `SPEICHER` existiert** seit V152 (`Specs/Batteriespeicher.md`), mit Ladung und
+  Entladung auf den beiden Registern.
+
+### A.2 Vorarbeit im Pi-Gateway und im Ingest (§6, 17.09.2026)
+Abschnitt 6 beschrieb den Stand vor der Umsetzung:
+* **`uint16` im Pi-Gateway — fehlt.** `SOC` steht in **einem** Register (`U16`), der Reader liest
+  fest zwei (`_REGISTERS_PER_WERT = 2`) und kennt nur `float32` und `uint32`. Ohne diese Erweiterung
+  kann der Pi den Wert nicht lesen. **Das ist die einzige echte Vorarbeit.**
+* `gateway/config.py`: `_SUPPORTED_REGISTER_TYPES` ist heute `{"float32", "uint32"}`, ein unbekannter
+  Typ bricht beim Start ab.
+* `gateway/readers/modbus_reader.py`: `_REGISTERS_PER_WERT` ist heute fest `2`, `SOC` belegt eines.
+* `gateway/models.py`: `MeterReading` ist ein `@dataclass(frozen=True)` mit festen Feldern; ohne ein
+  Feld für die Zustandswerte kommen sie nicht bis zum Publisher.
+* `gateway/publisher.py`: `_to_payload` baut das JSON aus genau diesen Feldern; `zustand` ist dort zu
+  ergänzen.
+* `MqttIngestService`: **Neue Abhängigkeit** auf `SystemmeldungService` — der Konstruktor kennt heute
+  nur `EinheitRepository`, `ZaehlerRohdatenRepository`, `ObjectMapper` und `MqttMetrics`.
+* **`Specs/MQTT-Integration.md`, FR-3** ist nachzuführen: Dort steht der Payload-Vertrag als
+  verbindliche Tabelle. Ohne die Ergänzung gäbe es zwei Beschreibungen desselben Vertrags, eine davon
+  unvollständig.
+* Die Voraussetzungen `SPEICHER` und MQTT-Integration waren als „vorhanden" vermerkt; die Migrationen
+  als „Neu".
+
+Den Umsetzungsstand protokolliert `Specs/Gerätezustand_Umsetzungsplan.md`.
+
+### A.3 Spaltenkommentar von `zaehler_rohdaten.zeit` (FR-2)
+Der Kommentar lautet seit V74 „Messzeitpunkt als lokale Wanduhrzeit". V72 hatte dort ursprünglich
+„UTC" stehen.
+
+### A.4 SOC im Steuerentscheid (§7, §8)
+Die offene Frage lautete: „**Wird der SOC zum Entscheid mitgeschrieben?** Geklärt: als nächster
+Schritt, nicht hier. Eine Spalte in `steuerentscheid` würde erklären, *warum* gesperrt wurde — „bei
+95 % Ladestand" ist eine andere Aussage als „bei 40 %". Das ist eine Änderung an
+`Specs/Einspeisesteuerung.md` und folgt, sobald die Werte fliessen." Der erste Punkt in §7 lautete
+„**Keine Nutzung durch die Einspeisesteuerung.**" Die Auswertung und das Mitschreiben sind
+inzwischen in `Specs/Einspeisesteuerung.md` spezifiziert (Regel `SOC_TIEF`, Migration
+`V155__Steuerentscheid_Soc.sql`, die auf diese Frage verweist).
+
+### A.5 Registry nur mit `SOC` (FR-3, §7)
+§7 sagte: „**Keine weiteren Grössen** ausser `SOC`. `SOH` und `TEMPERATUR` stehen in der Registry,
+damit sichtbar ist, dass die Struktur trägt — umgesetzt wird nur der Ladestand." Das widersprach
+FR-3 und der beantworteten Frage „Enthält die Registry alle drei Grössen oder nur `SOC`? Geklärt: nur
+`SOC`. Was nicht umgesetzt wird, steht auch nicht in der Registry." Bei der Konsolidierung vom
+23.10.2026 an FR-3 angeglichen: `SOH` und `TEMPERATUR` stehen nur als Kandidaten im Text von FR-3.
+
+### A.6 Beantwortete offene Fragen (§8)
+* **Welche Auflösung braucht der SOC?** Geklärt: Der Pi publiziert im **Minutentakt**, die Steuerung
+  entscheidet alle 15. Gespeichert wird trotzdem jeder Wert (NFR-1). --> Annahme: Alles speichern,
+  was ankommt — das Volumen ist unkritisch, und ein Verlauf ist mehr wert als eine Sparsamkeit, die
+  niemand spürt. --> Annahme OK, der Pi publiziert sogar jede Minute.
+* **Wird der SOC zum Entscheid mitgeschrieben?** Geklärt: als nächster Schritt, nicht hier (A.4).
+* **Enthält die Registry alle drei Grössen oder nur `SOC`?** Geklärt: nur `SOC` (FR-3). Was nicht
+  umgesetzt wird, steht auch nicht in der Registry.
+* **Welche Einheit gewinnt bei mehreren Treffern je Messpunkt?** Geklärt: die mit der kleinsten `id`
+  (FR-4.6) — willkürlich, aber deterministisch.
+* **Eigener Meldungs-Key für die Typverletzung?** Geklärt: ja, `GERAETEZUSTAND_TYP_UNGUELTIG`
+  (FR-3.3). Ein gemeinsamer Key zeigte abwechselnd zwei Ursachen, die verschiedene Gegenmassnahmen
+  verlangen.
+* **Sollen Zustandswerte über die REST-API lesbar sein?** Geklärt: bei Bedarf. Vorerst nur
+  Repository-Zugriff; ein Controller kommt mit der Ansicht, die ihn braucht (NFR-2).
+* **Deduplizierung der Systemmeldung bei dauerhaft falschem Wert:** Geklärt: so übernommen. Ein
+  falsch skalierter SOC erzeugt **jede Minute** einen Verstoss; der `SystemmeldungService` zählt
+  gleiche Meldungen je Mandant und Key zusammen. An dieser Frequenz war der Mechanismus nie erprobt;
+  der Beobachtungspunkt für die erste Betriebswoche ist auf Wunsch des Users am 23.10.2026
+  gestrichen.
