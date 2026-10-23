@@ -197,6 +197,7 @@ Die Smartmeter im Nachbarhaus tragen einen **gPlugK** (Auslesekopf für die Kund
 > Darum trägt der gPlug den Mandanten und den Messpunkt im **Topic** statt im Payload: Das Topic ist Konfiguration, der Payload wäre ein Eingriff ins Skript.
 
 1. **Konfiguration am gPlug** (Tasmota-Konsole oder Web-Oberfläche „Configure MQTT“):
+
    | Einstellung | Wert | Bemerkung |
    |-------------|------|-----------|
    | Host / Port | Broker auf dem Pi (LAN-IP des Pi), `1883` | Bridge zum NAS, siehe oben |

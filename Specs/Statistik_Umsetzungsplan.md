@@ -153,6 +153,7 @@ export class StatistikService {
    - Header: "Monat Jahr (von - bis)"
    - Ampel-Status für Datenvollständigkeit
    - Summen-Tabelle:
+
      | Beschreibung | Wert |
      |--------------|------|
      | Produktion (Producer total) | X kWh |

@@ -53,6 +53,7 @@
 
 ### FR-3: Backend-Endpunkte
 Neuer Controller unter `/api/datenbank`, klassenweit `@PreAuthorize("hasAuthority('datenbank:read')")`:
+
 | Methode | Pfad | Zweck |
 |---------|------|-------|
 | `GET` | `/api/datenbank/tabellen` | Liste der auswählbaren Tabellennamen (Schema `zev`) |

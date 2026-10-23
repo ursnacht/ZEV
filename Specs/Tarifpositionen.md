@@ -82,6 +82,7 @@
   `ZEV`/`VNB`/`LADESTROM` (`KWH`). Für `ZUSATZ` und `GRUNDGEBUEHR` gilt der Wert aus der Spalte.
 * **`MANUELL_ERFASST`** ist `{ LADESTROM, ZUSATZ }`.
 * **Eindeutigkeit einer Position — typabhängig:**
+
   | Tariftyp | Regel |
   |----------|-------|
   | `LADESTROM` | höchstens **eine** Position je Einheit, Quartal und **Tariftyp** |
