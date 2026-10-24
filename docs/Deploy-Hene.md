@@ -83,10 +83,12 @@ Reihenfolge zusammen und ergänzt die Kontrollschritte:
 
 ## 2b. Client-Zugriff einrichten (einmalig je Gerät)
 
-Die Anwendung läuft hinter dem Reverse-Proxy unter **`http://nafam.zev:8000`**
-(s. `Specs/NAS-Einheitlicher-Hostname_Umsetzungsplan.md`). Auf den Endgeräten ist deshalb
-nur **eines** nötig: `nafam.zev` muss auf `192.168.7.240` auflösen. Kein Proxy, keine
-Zertifikate, keine Portfreigaben auf dem Client.
+Die Anwendung läuft hinter dem Reverse-Proxy unter **`https://nafam.zev:8443`**
+(s. `Specs/NAS-Einheitlicher-Hostname_Umsetzungsplan.md`, HTTPS seit 24.10.2026:
+`Specs/HTTPS.md`); `http://nafam.zev:8000` leitet dorthin weiter. Auf den Endgeräten ist
+deshalb **zweierlei** nötig: `nafam.zev` muss auf `192.168.7.240` auflösen, und das
+Root-Zertifikat von Caddys interner CA muss importiert sein. Kein Proxy, keine Portfreigaben
+auf dem Client.
 
 > **Warum ausgerechnet die LAN-Adresse?** `192.168.7.240` ist die **universelle** Adresse:
 > Im NAS-LAN direkt erreichbar, und von aussen über den VPN-Tunnel, weil das VPN die Route
@@ -119,12 +121,22 @@ Zertifikate, keine Portfreigaben auf dem Client.
 >    die Anwendung wäre sporadisch nicht erreichbar. Ausfallsicherheit gäbe es nur über
 >    einen zweiten internen DNS mit derselben Zone.
 
+- [ ] **Root-Zertifikat importieren** (jedes Gerät, einmalig). Auf dem NAS exportieren:
+      ```bash
+      docker cp caddy:/data/caddy/pki/authorities/local/root.crt caddy-root.crt
+      ```
+      Windows (als Administrator): `certutil -addstore -f ROOT caddy-root.crt`. Firefox:
+      `security.enterprise_roots.enabled` auf `true` oder das Zertifikat selbst importieren.
+      Smartphones/Tablets: als vertrauenswürdige CA installieren (iOS zusätzlich unter
+      *Info → Zertifikatsvertrauen* aktivieren). Das Volume `caddy-data` nie löschen
+      (`down -v`) — sonst entsteht eine neue CA, und alle Geräte müssen neu importieren.
 - [ ] Prüfen (vom jeweiligen Gerät):
       ```bash
       nslookup nafam.zev
-      curl -s http://nafam.zev:8000/assets/config.json
+      curl -s https://nafam.zev:8443/assets/config.json
       ```
-      Erwartet: `{"apiBaseUrl":"","keycloak":{"url":"http://nafam.zev:8000/auth",…}}`
+      Erwartet: `{"apiBaseUrl":"","keycloak":{"url":"https://nafam.zev:8443/auth",…}}`.
+      Meldet `curl` einen Zertifikatsfehler, fehlt der Import (Gegenprobe mit `curl -k`).
 
 ## 3. Pi: Code aktualisieren
 
@@ -237,6 +249,8 @@ Konfigurations-Optionen wirken daher erst, wenn sie **manuell** eingetragen werd
 | Reads schlagen mit „keine Antwort" fehl | `read_timeout` erhöhen (Schritt 4) |
 | `ExceptionResponse … exception_code=11` | **Kein** Timeout-Problem: der Hub hat geantwortet. Ursache auf der RTU-Strecke bzw. am Hub — s. `docs/Netzwerk-Topologie-Hene.md`, „Modbus-Diagnose" |
 | Keine Rohdaten trotz laufendem Pi | Broker-Verbindung (`/actuator/health/mqtt`), Topic/`org_id`, Einheit mit passendem `messpunkt` vorhanden? |
-| `nafam.zev` wird nicht gefunden | Namensauflösung auf dem Client fehlt → Schritt 2b (hosts-Eintrag bzw. DNS). Gegenprobe: `curl http://192.168.7.240:8000/` funktioniert, `nafam.zev` nicht |
-| Anwendung lädt, aber Login-Redirect bleibt hängen | Zugriff über eine **andere** Adresse als `nafam.zev:8000` (z.B. direkt über IP/Port 4200): Die Redirect-URI passt dann nicht zur Client-Konfiguration im Realm. Immer über den Proxy-Hostnamen zugreifen |
+| `nafam.zev` wird nicht gefunden | Namensauflösung auf dem Client fehlt → Schritt 2b (hosts-Eintrag bzw. DNS). Gegenprobe: `curl http://192.168.7.240:8000/` antwortet (Weiterleitung), `nafam.zev` nicht |
+| Browser meldet „Verbindung nicht sicher“ | Root-Zertifikat auf dem Gerät nicht importiert → Schritt 2b. Über die reine IP antwortet Caddy unter HTTPS gar nicht, nur unter `nafam.zev` |
+| Anwendung lädt, aber Login-Redirect bleibt hängen | Zugriff über eine **andere** Adresse als `https://nafam.zev:8443` (z.B. direkt über IP/Port 4200): Die Redirect-URI passt dann nicht zur Client-Konfiguration im Realm. Immer über den Proxy-Hostnamen zugreifen |
+| `401` auf alle API-Aufrufe nach Änderungen an der `.env` | Token-`iss` und `BACKEND_JWT_ISSUER_URI` unterscheiden sich in Schema oder Port → `Specs/HTTPS.md`, Abschnitte 4 und 7 |
 | Nach Standortwechsel plötzlich gar kein DNS mehr | Fest eingetragener DNS-Server im Adapter statt hosts-Eintrag → Schritt 2b, Falle 1 |

@@ -1,11 +1,12 @@
 # HTTPS für die ZEV-Anwendung
 
 Analyse des Ist-Zustands und der Schritte, die für den Wechsel von HTTP auf HTTPS nötig sind —
-**lokal umgesetzt** (Abschnitt 5), auf dem **NAS offen** (Abschnitt 6).
-Zertifikatsweg **A** (Caddys interne CA). Stand: 21.08.2026.
+**lokal umgesetzt** (Abschnitt 5) und **auf dem NAS (Hene) umgesetzt** (Abschnitt 6, seit
+24.10.2026: `https://nafam.zev:8443`, `http://nafam.zev:8000` leitet weiter).
+Zertifikatsweg **A** (Caddys interne CA).
 
-Die Abschnitte 1 bis 4 beschreiben weiterhin den Weg für das NAS; die dort beschriebene
-Ausgangslage (`:80`, HTTP-Defaults) gilt für die NAS-Installation, nicht mehr für die lokale.
+Die Abschnitte 1 bis 4 beschreiben den Weg, wie er für das NAS gegangen wurde; die Ausgangslage
+in Abschnitt 1 (`:80`, HTTP-Defaults) ist der Stand **vor** der Umstellung.
 
 > **Kein Feature, sondern eine Betriebsänderung.** Dieses Dokument folgt deshalb nicht dem
 > Template `Specs/SPEC.md`, sondern der Struktur der Deployment-Pläne
@@ -14,6 +15,8 @@ Ausgangslage (`:80`, HTTP-Defaults) gilt für die NAS-Installation, nicht mehr f
 ---
 
 ## 1. Ausgangslage
+
+> Stand vor der Umstellung — lokal bis 20.08.2026, auf dem NAS bis 24.10.2026.
 
 Die Anwendung läuft hinter einem Caddy-Reverse-Proxy als **eine Origin**
 (`http://nafam.zev:8000` auf dem NAS, `http://localhost:8000` lokal). Pfad-Routing:
@@ -319,18 +322,23 @@ funktionsfähig bleibt.
 
 | Status | Phase | Beschreibung |
 |--------|-------|--------------|
-| [ ] | 1. Zertifikatsweg entscheiden | Abschnitt 2. Bestimmt den Hostnamen und damit alle weiteren Werte. |
-| [ ] | 2. Zertifikat bereitstellen | Weg A: nichts (Caddy erzeugt es beim Start). Weg B: DSM-Zertifikat anfordern und den PEM-Pfad festlegen. Weg C: eigenes Caddy-Image bauen. |
-| [ ] | 3. Caddy **additiv** auf HTTPS | Site-Adresse + `tls`-Direktive, Port `8443:443` ergänzen, `8000:80` **behalten**. Danach ist die App über beide Wege erreichbar — kein Aussperren möglich. |
-| [ ] | 4. Erreichbarkeit prüfen | `https://nafam.zev:8443/` liefert die index.html; das Zertifikat wird als vertrauenswürdig angezeigt (bei Weg A erst nach Import der Root-CA). |
-| [ ] | 5. Keycloak-Client ergänzen | **Noch im laufenden HTTP-Betrieb:** beim Client `zev-frontend` die neuen `https://…:8443`-Adressen zu *Valid redirect URIs* und *Web origins* hinzufügen, die alten `http://`-Einträge stehen lassen. Kein Realm-Reimport — der wirkt bei bestehendem Realm nicht und würde Benutzer/Organisationen überschreiben (Abschnitt 4). |
-| [ ] | 6. Root-CA verteilen (nur Weg A) | Caddys Root-Zertifikat aus dem Volume `caddy-data` holen und auf allen Clients importieren. |
-| [ ] | 7. `.env` umstellen | Alle Werte aus Abschnitt 4 **gemeinsam** — eine halbe Umstellung bricht die Anmeldung. |
-| [ ] | 8. Neustart und Verifikation | Abschnitt 6. |
+| [x] | 1. Zertifikatsweg entscheiden | Abschnitt 2. Bestimmt den Hostnamen und damit alle weiteren Werte. |
+| [x] | 2. Zertifikat bereitstellen | Weg A: nichts (Caddy erzeugt es beim Start). Weg B: DSM-Zertifikat anfordern und den PEM-Pfad festlegen. Weg C: eigenes Caddy-Image bauen. |
+| [x] | 3. Caddy **additiv** auf HTTPS | Site-Adresse + `tls`-Direktive, Port `8443:443` ergänzen, `8000:80` **behalten**. Danach ist die App über beide Wege erreichbar — kein Aussperren möglich. |
+| [x] | 4. Erreichbarkeit prüfen | `https://nafam.zev:8443/` liefert die index.html; das Zertifikat wird als vertrauenswürdig angezeigt (bei Weg A erst nach Import der Root-CA). |
+| [x] | 5. Keycloak-Client ergänzen | **Noch im laufenden HTTP-Betrieb:** beim Client `zev-frontend` die neuen `https://…:8443`-Adressen zu *Valid redirect URIs* und *Web origins* hinzufügen, die alten `http://`-Einträge stehen lassen. Kein Realm-Reimport — der wirkt bei bestehendem Realm nicht und würde Benutzer/Organisationen überschreiben (Abschnitt 4). |
+| [x] | 6. Root-CA verteilen (nur Weg A) | Caddys Root-Zertifikat aus dem Volume `caddy-data` holen und auf allen Clients importieren. |
+| [x] | 7. `.env` umstellen | Alle Werte aus Abschnitt 4 **gemeinsam** — eine halbe Umstellung bricht die Anmeldung. |
+| [x] | 8. Neustart und Verifikation | Abschnitt 7. Auf Hene am 24.10.2026 alle Punkte geprüft (Login, Weiterleitung von `:8000`, POST ohne CORS-Fehler, LAN und VPN). |
 | [ ] | 9. HTTP abklemmen (optional) | Erst wenn alles läuft: Weiterleitung behalten, aber sicherstellen, dass kein Client mehr direkt auf `:8000` konfiguriert ist. |
 
 Die Schritte 2–9 greifen in die Umgebung ein (Container, Keycloak, Zertifikate) und werden
 **vom Betreiber ausgeführt**, nicht von einem Agenten.
+
+**Umgesetzt auf Hene am 24.10.2026** (Phasen 1–8). Caddy wurde dabei nicht additiv, sondern in
+einem Zug über `CADDY_CONFIG=./caddy/Caddyfile.https` umgeschaltet; der Rückweg bleibt offen, weil
+die `http://`-Einträge im Keycloak-Client stehen geblieben sind. Phase 9 ist offen: Die
+Weiterleitung von `:8000` bleibt vorerst aktiv.
 
 ---
 
@@ -365,10 +373,8 @@ Häufigster Fehler beim Wechsel: `401` auf alle API-Calls, weil Token-`iss` und
 
 ## 9. Offene Punkte
 
-* Welcher Zertifikatsweg (A, B oder C)? → bestimmt den Hostnamen.
-* Bei Weg B: Soll der Hostname dauerhaft auf die Synology-DDNS wechseln, oder bleibt
-  `nafam.zev` als zusätzlicher interner Name bestehen (dann zwei Namen im Zertifikat bzw.
-  zwei Site-Blöcke in Caddy)?
+* ~~Welcher Zertifikatsweg (A, B oder C)?~~ **Entschieden: A** (20.08.2026, Abschnitt 2);
+  damit entfällt auch die Frage nach dem DDNS-Hostnamen von Weg B.
 * Externer Port: `8443` gesetzt, weil DSM 443 belegt. Alternativ liesse sich DSM umkonfigurieren
   — das ist aber ein Eingriff ins NAS ausserhalb dieser Anwendung.
 

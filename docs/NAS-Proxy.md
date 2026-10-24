@@ -234,6 +234,9 @@ docker logs keycloak
 
 ## Schritt 6 — HTTPS (empfohlen)
 
+> **Hene:** umgesetzt am 24.10.2026 mit Caddys interner CA (`https://nafam.zev:8443`), nicht
+> über das DSM-Zertifikat. Ablauf und Werte: `Specs/HTTPS.md`.
+
 HTTP genügt für einen rein vertrauenswürdigen VPN/LAN-Betrieb; für sichere Cookies/Token und
 zur Vermeidung von Mixed-Content ist HTTPS empfohlen.
 
