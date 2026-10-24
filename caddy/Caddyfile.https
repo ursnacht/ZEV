@@ -47,3 +47,15 @@ https://{$ZEV_PUBLIC_HOST:localhost} {
 		reverse_proxy frontend-service:8080
 	}
 }
+
+# Spring Boot Admin (admin-service) ueber HTTPS auf eigenem Port 8444. Grund: HSTS. Keycloak und
+# das Backend senden unter HTTPS "Strict-Transport-Security"; der Browser merkt sich damit fuer
+# den GANZEN Hostnamen - unabhaengig vom Port -, dass nur noch HTTPS gilt. Danach wird auch
+# http://<host>:8081 auf https umgeschrieben, und dort spricht der admin-service kein TLS.
+# Eigener Port statt Pfad (/admin): SBA laeuft im Root-Kontext, ein Pfad-Prefix verlangte
+# Anpassungen an SBA selbst. Port 8081 bleibt veroeffentlicht (Zugriff ueber die IP, die HSTS
+# nicht betrifft, und als Rueckweg). Specs/HTTPS.md, Abschnitt 10.
+https://{$ZEV_PUBLIC_HOST:localhost}:8444 {
+	tls internal
+	reverse_proxy admin-service:8081
+}

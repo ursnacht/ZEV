@@ -230,6 +230,9 @@ services:
       # von DSM belegt ist; lokal halten wir denselben Port. Im HTTP-Betrieb lauscht in Caddy
       # niemand auf 443 - die Veroeffentlichung ist dann wirkungslos, aber harmlos.
       - "8443:443"
+      # Spring Boot Admin ueber HTTPS (caddy/Caddyfile.https, Specs/HTTPS.md Abschnitt 10). Im
+      # HTTP-Betrieb lauscht dort niemand - wie bei 8443 wirkungslos, aber harmlos.
+      - "8444:8444"
     environment:
       # Site-Adresse fuer caddy/Caddyfile.https. Ohne diesen Wert beantwortet Caddy im
       # HTTPS-Betrieb nur "localhost" - unter dem eigenen Hostnamen waere die Anwendung

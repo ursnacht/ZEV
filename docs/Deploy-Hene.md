@@ -88,7 +88,9 @@ Die Anwendung läuft hinter dem Reverse-Proxy unter **`https://nafam.zev:8443`**
 `Specs/HTTPS.md`); `http://nafam.zev:8000` leitet dorthin weiter. Auf den Endgeräten ist
 deshalb **zweierlei** nötig: `nafam.zev` muss auf `192.168.7.240` auflösen, und das
 Root-Zertifikat von Caddys interner CA muss importiert sein. Kein Proxy, keine Portfreigaben
-auf dem Client.
+auf dem Client. Spring Boot Admin liegt unter **`https://nafam.zev:8444`** (Specs/HTTPS.md,
+Abschnitt 10); `http://nafam.zev:8081` funktioniert im Browser wegen HSTS nicht mehr, über die
+IP (`http://192.168.7.240:8081`) schon.
 
 > **Warum ausgerechnet die LAN-Adresse?** `192.168.7.240` ist die **universelle** Adresse:
 > Im NAS-LAN direkt erreichbar, und von aussen über den VPN-Tunnel, weil das VPN die Route

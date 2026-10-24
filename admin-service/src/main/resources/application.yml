@@ -1,5 +1,10 @@
 server:
   port: 8081
+  # Hinter Caddy (https://<host>:8444, Specs/HTTPS.md Abschnitt 10): X-Forwarded-Proto/-Host
+  # auswerten, damit die SBA-Oberflaeche ihre Adressen mit https und dem externen Port baut -
+  # sonst laedt sie Skripte ueber http (Mixed Content). Ohne Proxy (Port 8081 direkt) fehlen
+  # die Header, und alles bleibt wie bisher.
+  forward-headers-strategy: framework
 
 spring:
   application:

@@ -380,6 +380,43 @@ Häufigster Fehler beim Wechsel: `401` auf alle API-Calls, weil Token-`iss` und
 
 ---
 
+## 10. Spring Boot Admin hinter HTTPS (24.10.2026)
+
+**Befund nach der Umstellung auf Hene:** `http://nafam.zev:8081` (Spring Boot Admin, direkt am
+`admin-service`) war nicht mehr erreichbar — der Browser schrieb die Adresse selbst auf `https`
+um. Ursache ist **HSTS**: Keycloak (Realm-Standard: `Strict-Transport-Security: max-age=31536000;
+includeSubDomains`) und das Backend (Spring Security setzt den Header bei jeder Anfrage, die es
+dank `forward-headers-strategy: framework` als HTTPS erkennt) senden den Header unter
+`https://nafam.zev:8443`. Der Browser merkt sich damit ein Jahr lang, dass für den **ganzen
+Hostnamen** nur HTTPS gilt — HSTS kennt keine Ports. Port 8081 spricht aber kein TLS.
+
+**Lösung:** SBA läuft ebenfalls hinter Caddy, als eigene HTTPS-Site auf Port **8444**:
+
+| Baustein | Änderung |
+|---|---|
+| `caddy/Caddyfile.https` | Site `https://{$ZEV_PUBLIC_HOST}:8444` mit `tls internal`, `reverse_proxy admin-service:8081` |
+| Compose-Dateien (`caddy`) | Port `8444:8444` (`docker-compose.yml`, `docker-compose-mqtt.yml`, lokale `docker-compose-mqtt-hene.yml`) |
+| `admin-service/…/application.yml` | `server.forward-headers-strategy: framework` — die SBA-Oberfläche baut ihre Adressen sonst mit `http` und Port 8081 (Mixed Content) |
+
+* **Eigener Port statt Pfad** (`/admin`): SBA läuft im Root-Kontext; ein Pfad-Prefix verlangte
+  Anpassungen an SBA selbst (Context-Path, öffentliche URL) und an den Client-Registrierungen.
+* **Dasselbe Root-Zertifikat:** Caddys interne CA stellt auch für `:8444` aus — auf den Clients
+  ist nichts zusätzlich zu importieren.
+* **Port 8081 bleibt veröffentlicht:** über die IP (`http://192.168.7.240:8081`, HSTS gilt nicht
+  für IP-Adressen) und als Rückweg. Die Dienste registrieren sich weiter intern über
+  `http://admin-service:8081` — daran ändert sich nichts.
+* **HSTS abschalten** (Keycloak-Realm und Backend) wurde verworfen: Es schwächte die Absicherung
+  und verlangte, den gespeicherten HSTS-Eintrag in jedem Browser einzeln zu löschen.
+
+**Einführen auf dem NAS** (vom Betreiber):
+1. `caddy/Caddyfile.https` und die Hene-Compose-Datei (Port `8444:8444`) aufs NAS bringen.
+2. Neues Image `zev-admin-service:amd64` bauen und laden (`docs/NAS-Images.md`).
+3. `docker compose -f docker-compose-mqtt-hene.yml up -d admin-service caddy`
+4. Prüfen: `https://nafam.zev:8444` öffnet SBA mit Anmeldedialog, ohne Zertifikatswarnung und
+   ohne Mixed-Content-Meldung in der Browser-Konsole; die Instanzen erscheinen wie bisher.
+
+---
+
 ## Siehe auch
 * `docs/NAS-Proxy.md` — Reverse-Proxy-Setup, Schritt 6 (HTTPS) als Kurzfassung
 * `Specs/NAS-Einheitlicher-Hostname_Umsetzungsplan.md` — schuf die Voraussetzung (ein Hostname)
