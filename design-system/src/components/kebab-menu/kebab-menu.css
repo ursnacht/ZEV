@@ -91,6 +91,15 @@
   transform: translateY(0);
 }
 
+/* Fest im Fenster statt absolut im Container: Kein Vorfahre mit overflow (Panel, scrollende
+   Tabelle) kann das Menue abschneiden. top/left setzt die Angular-Komponente aus der Lage des
+   Knopfs und berechnet sie beim Scrollen neu, damit es am Knopf bleibt. */
+.zev-kebab-menu.zev-kebab-menu--fixed {
+  position: fixed;
+  right: auto;
+  bottom: auto;
+}
+
 /* Menu Items */
 .zev-kebab-menu__item {
   /* Flex layout so a wrapping label hangs under its first word (next to the

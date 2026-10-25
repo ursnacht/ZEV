@@ -320,13 +320,15 @@ describe('KebabMenuComponent', () => {
   });
 
   describe('nach oben aufklappen', () => {
-    /** Knopf an Position top..bottom, Menue mit Hoehe `hoehe`, Fenster `fenster` hoch. */
-    function lage(top: number, bottom: number, hoehe: number, fenster: number): void {
+    /** Knopf an Position top..bottom (rechter Rand `right`), Menue `hoehe` x `breite`, Fenster `fenster` hoch. */
+    function lage(top: number, bottom: number, hoehe: number, fenster: number,
+                  right = 500, breite = 160): void {
       const host: HTMLElement = fixture.nativeElement;
       const knopf = host.querySelector('.zev-kebab-button') as HTMLElement;
       const menue = host.querySelector('.zev-kebab-menu') as HTMLElement;
-      vi.spyOn(knopf, 'getBoundingClientRect').mockReturnValue({ top, bottom } as DOMRect);
+      vi.spyOn(knopf, 'getBoundingClientRect').mockReturnValue({ top, bottom, right } as DOMRect);
       Object.defineProperty(menue, 'offsetHeight', { configurable: true, value: hoehe });
+      Object.defineProperty(menue, 'offsetWidth', { configurable: true, value: breite });
       Object.defineProperty(window, 'innerHeight', { configurable: true, value: fenster });
     }
 
@@ -348,20 +350,113 @@ describe('KebabMenuComponent', () => {
       expect(menu().classList.contains('zev-kebab-menu--up')).toBe(false);
     });
 
-    it('should open upwards at the bottom of a clipping container', () => {
-      // Panel mit overflow: hidden endet bei 300 - unten nur 30 px, oben 250 px
+    /**
+     * Specs/Messpunkt-Empfang.md, Anhang A.2: In einer kurzen Tabelle in `.zev-table-scroll`
+     * passte das absolut positionierte Menue weder nach unten noch nach oben, der oberste Eintrag
+     * war abgeschnitten. Fest positioniert zaehlt nur noch das Fenster - ein abschneidender
+     * Container aendert die Richtung nicht.
+     */
+    it('should ignore a clipping container and open downwards when the window has room', () => {
       lage(250, 270, 150, 800);
       const panel = document.createElement('div');
-      panel.style.overflow = 'hidden';
+      panel.style.overflow = 'auto';
       const host: HTMLElement = fixture.nativeElement;
       host.parentElement!.insertBefore(panel, host);
       panel.appendChild(host);
-      vi.spyOn(panel, 'getBoundingClientRect').mockReturnValue({ top: 0, bottom: 300 } as DOMRect);
+      vi.spyOn(panel, 'getBoundingClientRect').mockReturnValue({ top: 200, bottom: 300 } as DOMRect);
 
       oeffne();
 
-      expect(menu().classList.contains('zev-kebab-menu--up')).toBe(true);
+      expect(menu().classList.contains('zev-kebab-menu--up')).toBe(false);
+      expect(menu().style.top).toBe('270px');
       panel.remove();
+    });
+  });
+
+  describe('feste Lage im Fenster', () => {
+    function lage(top: number, bottom: number, right: number, hoehe: number, breite: number): void {
+      const host: HTMLElement = fixture.nativeElement;
+      const knopf = host.querySelector('.zev-kebab-button') as HTMLElement;
+      const menue = host.querySelector('.zev-kebab-menu') as HTMLElement;
+      vi.spyOn(knopf, 'getBoundingClientRect').mockReturnValue({ top, bottom, right } as DOMRect);
+      Object.defineProperty(menue, 'offsetHeight', { configurable: true, value: hoehe });
+      Object.defineProperty(menue, 'offsetWidth', { configurable: true, value: breite });
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
+    }
+
+    it('should be positioned fixed', () => {
+      expect(menu().classList.contains('zev-kebab-menu--fixed')).toBe(true);
+    });
+
+    it('should place the menu right-aligned below the button', () => {
+      lage(100, 132, 600, 150, 160);
+      oeffne();
+      expect(menu().style.top).toBe('132px');
+      expect(menu().style.left).toBe('440px');
+    });
+
+    it('should place the menu above the button when opening upwards', () => {
+      lage(700, 732, 600, 150, 160);
+      oeffne();
+      expect(menu().style.top).toBe('550px');
+    });
+
+    it('should never leave the window on the left', () => {
+      lage(100, 132, 50, 150, 160);
+      oeffne();
+      expect(menu().style.left).toBe('0px');
+    });
+
+    /**
+     * Ein Scroll-Ereignis kommt oft erst nach dem Klick an (der Browser holt den Knopf ins Bild).
+     * Schloss sich das Menue dabei, war es gleich nach dem Oeffnen wieder zu - es muss offen
+     * bleiben und mit dem Knopf mitwandern.
+     */
+    it('should stay open on scroll and follow the button', () => {
+      lage(100, 132, 600, 150, 160);
+      oeffne();
+      const knopf = kebabButton();
+      vi.spyOn(knopf, 'getBoundingClientRect').mockReturnValue({ top: 40, bottom: 72, right: 600 } as DOMRect);
+
+      window.dispatchEvent(new Event('scroll'));
+      fixture.detectChanges();
+
+      expect(istOffen()).toBe(true);
+      expect(menu().style.top).toBe('72px');
+    });
+
+    it('should follow the button when a table inside the page scrolls', () => {
+      lage(100, 132, 600, 150, 160);
+      oeffne();
+      vi.spyOn(kebabButton(), 'getBoundingClientRect').mockReturnValue({ top: 200, bottom: 232, right: 600 } as DOMRect);
+      const ausserhalb = fixture.nativeElement.querySelector('.ausserhalb') as HTMLElement;
+
+      ausserhalb.dispatchEvent(new Event('scroll'));
+      fixture.detectChanges();
+
+      expect(istOffen()).toBe(true);
+      expect(menu().style.top).toBe('232px');
+    });
+
+    it('should follow the button on resize', () => {
+      lage(100, 132, 600, 150, 160);
+      oeffne();
+      vi.spyOn(kebabButton(), 'getBoundingClientRect').mockReturnValue({ top: 100, bottom: 132, right: 400 } as DOMRect);
+
+      window.dispatchEvent(new Event('resize'));
+      fixture.detectChanges();
+
+      expect(istOffen()).toBe(true);
+      expect(menu().style.left).toBe('240px');
+    });
+
+    it('should remove the scroll listener on close', () => {
+      const entfernt = vi.spyOn(window, 'removeEventListener');
+      oeffne();
+      kebabButton().click();
+      fixture.detectChanges();
+      expect(entfernt).toHaveBeenCalledWith('scroll', expect.any(Function), true);
+      expect(entfernt).toHaveBeenCalledWith('resize', expect.any(Function));
     });
   });
 });

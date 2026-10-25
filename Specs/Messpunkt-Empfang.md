@@ -402,7 +402,8 @@
 * [x] Die Seite ist über Admin › Messpunkt-Empfang erreichbar und zeigt nur Zeilen des eigenen
       Mandanten. (Test Backend: MesspunktEmpfangRepositoryIT#findAllByOrderByLetzterEmpfangDesc_UnterOrgFilter_NurEigenerMandant;
       MesspunktEmpfangServiceTest#getAllMesspunktEmpfang_EmpfangUndEinheiten_ErgibtVereinigung;
-      Test Frontend: navigation.component.spec.ts › Admin-Untermenü › should list the seven admin entries in order inside the submenu)
+      Test Frontend: navigation.component.spec.ts › Admin-Untermenü › should list the seven admin entries in order inside the submenu;
+      E2E: messpunkt-empfang.spec.ts › Messpunkt-Empfang - Navigation › should open the view via Admin menu with title and columns in order)
 * [x] Eine Einheit mit Messpunkt ohne Empfangszeile erscheint als **Kein Empfang** (rotes
       Ergebnis-Badge, leere Empfangsspalten, kein Alters-Badge); eine Einheit ohne Messpunkt und eine
       Ladestation erscheinen nicht.
@@ -411,7 +412,8 @@
       MesspunktEmpfangServiceTest#getAllMesspunktEmpfang_NurLadestationAmMesspunkt_KeineKeinEmpfangZeile;
       Test Frontend: messpunkt-empfang.component.spec.ts › ergebnisFarbe (FR-2.4) › should render text and colour of the result badge;
       Formatierung (FR-2.3) › should show a dash for missing source, times, readings, count and units;
-      Alters-Badge im Template (FR-2.5) › should render no age badge for a row without reception)
+      Alters-Badge im Template (FR-2.5) › should render no age badge for a row without reception;
+      E2E: messpunkt-empfang.spec.ts › Messpunkt-Empfang - Kein Empfang › should show a newly created unit with meter point as Kein Empfang)
 * [x] Ein Messpunkt mit mehreren Einheiten (Bilanzmesspunkt) erscheint einmal, mit allen Einheiten.
       (Test: MesspunktEmpfangServiceTest#getAllMesspunktEmpfang_EmpfangUndEinheiten_ErgibtVereinigung)
 * [x] Die Spalte Einheiten zeigt die aktuelle Zuordnung, auch wenn die Einheit erst nach der letzten
@@ -437,7 +439,8 @@
       translated text; Alters-Badge im Template (FR-2.5) › should render the age badge with its colour
       for a row with reception)
 * [x] Die Spalte Erster Empfang steht direkt vor Letzter Empfang. (Test: messpunkt-empfang.component.spec.ts ›
-      Spaltenreihenfolge (FR-2.3) › should place first reception before last reception)
+      Spaltenreihenfolge (FR-2.3) › should place first reception before last reception;
+      E2E: messpunkt-empfang.spec.ts › Messpunkt-Empfang - Navigation › should open the view via Admin menu with title and columns in order)
 * [x] Letzter Empfang erscheint als `dd.MM.yyyy HH:mm:ss` in Ortszeit (`formatSwissDateTime` mit
       Sekunden, eigener Unit-Test), Zählerstände mit drei Nachkommastellen im Schweizer Format, die
       Quelle als übersetzter Text; fehlende Quelle und `NULL`-Stände als „–“.
@@ -484,14 +487,17 @@
 * [x] Die Meldung erscheint in einer Zeile unter der gewählten; gültiges JSON eingerückt, anderer
       Text unverändert, ohne Payload `MESSPUNKT_EMPFANG_KEINE_MELDUNG`. (Test: messpunkt-empfang.component.spec.ts ›
       onLetzteMeldung (FR-2.9) › should show the payload as indented JSON below the row; should
-      show text that is not JSON unchanged; should show a hint when no payload is stored)
+      show text that is not JSON unchanged; should show a hint when no payload is stored;
+      E2E: messpunkt-empfang.spec.ts › Messpunkt-Empfang - Letzte Meldung › should show the last message below the row, replace it and close it)
 * [x] Es ist höchstens eine Meldung offen; **Schliessen** und **Aktualisieren** schliessen sie.
       (Test: messpunkt-empfang.component.spec.ts › onLetzteMeldung (FR-2.9) › should keep at most one message open; should close
-      the message with Schliessen; should close the message on Aktualisieren)
+      the message with Schliessen; should close the message on Aktualisieren;
+      E2E: messpunkt-empfang.spec.ts › Messpunkt-Empfang - Letzte Meldung › should show the last message below the row, replace it and close it)
 * [x] Scheitert das Laden der Meldung, erscheint `FEHLER_BEIM_LADEN_DER_DATEN`.
       (Test: messpunkt-empfang.component.spec.ts › onLetzteMeldung (FR-2.9) › should show an error message when loading fails)
 * [x] Ein Payload mit Markup (z.B. `<b>x</b>`) erscheint als Text, nicht als HTML.
-      (Test: messpunkt-empfang.component.spec.ts › onLetzteMeldung (FR-2.9) › should render markup in the payload as text, not as HTML)
+      (Test: messpunkt-empfang.component.spec.ts › onLetzteMeldung (FR-2.9) › should render markup in the payload as text, not as HTML;
+      E2E: messpunkt-empfang.spec.ts › Messpunkt-Empfang - Letzte Meldung › should show the last message below the row, replace it and close it)
 
 ### Einheit anlegen
 * [x] **Einheit anlegen** erscheint nur bei Zeilen ohne Einheit mit Messpunkt bis 50 Zeichen und nur
@@ -503,7 +509,8 @@
       should open the unit management with prefilled meter point; einheit-list.component.spec.ts ›
       neue Einheit per URL (FR-8) › should open the form with the meter point from the URL and clear the
       parameters; einheit-form.component.spec.ts › should prefill the meter point of a new unit and keep
-      the other defaults (FR-8))
+      the other defaults (FR-8);
+      E2E: messpunkt-empfang.spec.ts › Messpunkt-Empfang - Einheit anlegen › should open the unit form with the meter point prefilled from a row without unit)
 
 ### Aufräumen
 * [x] Löschen entfernt die Zeile nach Bestätigung und zeigt `MESSPUNKT_EMPFANG_GELOESCHT`;
@@ -684,3 +691,17 @@ braucht nur `einheit:read`.
 Die Spalte **Erster Empfang** stand vorher nach **Meldungen** (Reihenfolge: Messpunkt, Einheiten,
 Quelle, Letzter Empfang, Zählerstände, Meldungen, Erster Empfang, Ergebnis). Sie steht jetzt vor
 **Letzter Empfang**, damit sich die Zeitspanne von links nach rechts liest.
+
+### A.2 Kebab-Menü in kurzen Tabellen abgeschnitten (FR-2.8, 25.10.2026)
+Die E2E-Tests fanden: Mit nur ein bis zwei Zeilen war das Kebab-Menü der obersten Zeile nicht
+bedienbar. Die Tabelle steht in `.zev-table-scroll` (`overflow-x: auto`, damit auch `overflow-y`
+nicht `visible`); das absolut positionierte Menü passte darin weder nach unten noch nach oben, es
+klappte nach oben auf und wurde vom Rahmen abgeschnitten – „Letzte Meldung anzeigen“ war nicht
+anklickbar. Gerade bei der Inbetriebnahme, wenn erst ein, zwei Messpunkte ohne Einheit dastehen.
+Behoben im gemeinsamen Kebab-Menü: Es liegt fest im Fenster (`.zev-kebab-menu--fixed`,
+`position: fixed`); beim Scrollen und bei Grössenänderung wird seine Lage neu berechnet, damit es
+am Knopf bleibt. Das gilt für alle Listen, auch für Datenbank-Ansicht und Einspeisesteuerung, die
+denselben Rahmen nutzen. Ein erster Ansatz schloss das Menü beim Scrollen; das scheiterte, weil
+der Browser den Knopf vor dem Klick ins Bild holt und das Scroll-Ereignis erst nach dem Öffnen
+ankommt – das Menü war sofort wieder zu, und die E2E-Suiten konnten ihre Testdaten nicht löschen.
+

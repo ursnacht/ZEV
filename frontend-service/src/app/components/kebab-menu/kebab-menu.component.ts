@@ -22,15 +22,29 @@ export class KebabMenuComponent implements OnDestroy {
 
   isOpen = false;
 
-  /**
-   * Klappt nach oben auf, wenn unter dem Knopf zu wenig Platz ist - sonst schnitte ein Panel mit
-   * `overflow: hidden` oder eine scrollende Tabelle (Spaltenbreiten-Direktive) das Menue der unteren
-   * Zeilen ab, oder es ragte unter den Fensterrand.
-   */
+  /** Klappt nach oben auf, wenn bis zum Fensterrand unter dem Knopf zu wenig Platz ist. */
   nachOben = false;
+
+  /**
+   * Lage des Menues im **Fenster** (`position: fixed`, `.zev-kebab-menu--fixed`).
+   *
+   * Fest statt absolut: Ein absolut positioniertes Menue schnitt jeder Vorfahre mit `overflow`
+   * ab - ein Panel, eine scrollende Tabelle (`.zev-table-scroll`, Spaltenbreiten-Direktive). In
+   * einer kurzen Tabelle passte es dort weder nach unten noch nach oben, und der oberste Eintrag
+   * war nicht anklickbar (Specs/Messpunkt-Empfang.md, Anhang A.2). Fest positioniert liegt es
+   * ueber der Seite; beim Scrollen und bei Groessenaenderung wird die Lage neu berechnet, damit es
+   * am Knopf bleibt.
+   *
+   * <p><b>Nicht schliessen beim Scrollen:</b> Das war der erste Ansatz. Ein Scroll-Ereignis kommt
+   * aber oft erst nach dem Klick an - wenn der Browser den Knopf eben ins Bild geholt hat
+   * (Playwright tut das vor jedem Klick, ein Touchpad mit Traegheit ebenso). Das Menue schloss sich
+   * dann gleich nach dem Oeffnen, und die E2E-Suiten konnten ihre Testdaten nicht mehr loeschen.
+   */
+  position = { top: 0, left: 0 };
 
   private documentClickListener: ((e: MouseEvent) => void) | null = null;
   private escapeKeyListener: ((e: KeyboardEvent) => void) | null = null;
+  private scrollListener: (() => void) | null = null;
 
   constructor(
     private elementRef: ElementRef,
@@ -41,7 +55,7 @@ export class KebabMenuComponent implements OnDestroy {
   toggle(): void {
     this.isOpen = !this.isOpen;
     if (this.isOpen) {
-      this.nachOben = this.mussNachObenAufklappen();
+      this.lege();
       this.addListeners();
     } else {
       this.removeListeners();
@@ -61,32 +75,27 @@ export class KebabMenuComponent implements OnDestroy {
   }
 
   /**
-   * Vergleicht den Platz unter und ueber dem Knopf - jeweils bis zum naechsten Vorfahren, der
-   * abschneidet (`overflow` nicht `visible`), hoechstens bis zum Fensterrand. Nach oben nur, wenn
-   * das Menue unten nicht passt und oben mehr Platz ist.
+   * Setzt Richtung und Lage im Fenster: rechtsbuendig unter dem Knopf, oder darueber, wenn bis
+   * zum Fensterrand unten zu wenig Platz ist und oben mehr. Abschneidende Vorfahren zaehlen nicht
+   * mehr - das feste Menue liegt ueber ihnen.
    */
-  private mussNachObenAufklappen(): boolean {
+  private lege(): void {
     const host: HTMLElement = this.elementRef.nativeElement;
     const knopf = host.querySelector('.zev-kebab-button') as HTMLElement | null;
     const menue = host.querySelector('.zev-kebab-menu') as HTMLElement | null;
     if (!knopf || !menue) {
-      return false;
+      return;
     }
     const rechteck = knopf.getBoundingClientRect();
     const hoehe = menue.offsetHeight;
-    let unten = window.innerHeight;
-    let oben = 0;
-    for (let el = host.parentElement; el; el = el.parentElement) {
-      const stil = getComputedStyle(el);
-      if ([stil.overflow, stil.overflowX, stil.overflowY].some(w => !!w && w !== 'visible')) {
-        const rand = el.getBoundingClientRect();
-        unten = Math.min(unten, rand.bottom);
-        oben = Math.max(oben, rand.top);
-      }
-    }
-    const platzUnten = unten - rechteck.bottom;
-    const platzOben = rechteck.top - oben;
-    return platzUnten < hoehe && platzOben > platzUnten;
+    const platzUnten = window.innerHeight - rechteck.bottom;
+    const platzOben = rechteck.top;
+    this.nachOben = platzUnten < hoehe && platzOben > platzUnten;
+    this.position = {
+      top: this.nachOben ? rechteck.top - hoehe : rechteck.bottom,
+      // Rechtsbuendig zum Knopf, aber nie links aus dem Fenster
+      left: Math.max(0, (rechteck.right ?? 0) - menue.offsetWidth)
+    };
   }
 
   private addListeners(): void {
@@ -101,8 +110,16 @@ export class KebabMenuComponent implements OnDestroy {
           this.ngZone.run(() => this.close());
         }
       };
+      // Fest positioniert wandert das Menue nicht von selbst mit - also neu legen. Capture, damit
+      // auch das Scrollen einer Tabelle oder eines Panels zaehlt.
+      this.scrollListener = () => this.ngZone.run(() => {
+        this.lege();
+        this.cdr.markForCheck();
+      });
       document.addEventListener('click', this.documentClickListener, true);
       document.addEventListener('keydown', this.escapeKeyListener);
+      window.addEventListener('scroll', this.scrollListener, true);
+      window.addEventListener('resize', this.scrollListener);
     });
   }
 
@@ -114,6 +131,11 @@ export class KebabMenuComponent implements OnDestroy {
     if (this.escapeKeyListener) {
       document.removeEventListener('keydown', this.escapeKeyListener);
       this.escapeKeyListener = null;
+    }
+    if (this.scrollListener) {
+      window.removeEventListener('scroll', this.scrollListener, true);
+      window.removeEventListener('resize', this.scrollListener);
+      this.scrollListener = null;
     }
   }
 
