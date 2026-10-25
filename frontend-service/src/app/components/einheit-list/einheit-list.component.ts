@@ -2,9 +2,9 @@ import { Component, OnInit, inject } from '@angular/core';
 import Keycloak from 'keycloak-js';
 import { WithMessage } from '../../utils/with-message';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { EinheitService } from '../../services/einheit.service';
-import { Einheit } from '../../models/einheit.model';
+import { Einheit, MAX_MESSPUNKT_LAENGE } from '../../models/einheit.model';
 import { EinheitTypPipe } from '../../pipes/einheit-typ.pipe';
 import { EinheitFormComponent } from '../einheit-form/einheit-form.component';
 import { TranslatePipe } from '../../pipes/translate.pipe';
@@ -24,6 +24,8 @@ export class EinheitListComponent extends WithMessage implements OnInit {
   einheiten: Einheit[] = [];
   selectedEinheit: Einheit | null = null;
   showForm = false;
+  /** Messpunkt für eine neue Einheit aus der URL (FR-8); die übrigen Vorgaben setzt das Formular. */
+  messpunktVorgabe: string | null = null;
 
   sortColumn: 'id' | 'name' | 'typ' | 'messpunkt' | null = 'name';
   sortDirection: 'asc' | 'desc' = 'asc';
@@ -44,11 +46,34 @@ export class EinheitListComponent extends WithMessage implements OnInit {
   constructor(
     private einheitService: EinheitService,
     private translationService: TranslationService,
-    private router: Router
+    private router: Router,
+    private route: ActivatedRoute
   ) { super(); }
 
   ngOnInit(): void {
     this.loadEinheiten();
+    this.oeffneNeueEinheitAusUrl();
+  }
+
+  /**
+   * `/einheiten?neu=1&messpunkt=…` öffnet das Formular für eine neue Einheit mit vorausgefülltem
+   * Messpunkt – aufgerufen aus der Ansicht Messpunkt-Empfang (Specs/Einheitenverwaltung.md, FR-8).
+   *
+   * Ohne `einheit:write` bleibt es bei der Liste. Ein Messpunkt über 50 Zeichen wird nicht
+   * übernommen: Das Feld schnitte ihn still ab (`maxlength`), und die Einheit passte wieder nicht.
+   * Danach verschwinden die Parameter aus der URL, damit Neuladen oder Zurück das Formular nicht
+   * erneut öffnet.
+   */
+  private oeffneNeueEinheitAusUrl(): void {
+    const params = this.route.snapshot.queryParamMap;
+    if (params.get('neu') !== '1' || !this.canWrite) {
+      return;
+    }
+    const messpunkt = params.get('messpunkt')?.trim() ?? '';
+    this.selectedEinheit = null;
+    this.messpunktVorgabe = messpunkt.length > 0 && messpunkt.length <= MAX_MESSPUNKT_LAENGE ? messpunkt : null;
+    this.showForm = true;
+    this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
   }
 
   loadEinheiten(): void {
@@ -66,10 +91,12 @@ export class EinheitListComponent extends WithMessage implements OnInit {
 
   onCreateNew(): void {
     this.selectedEinheit = null;
+    this.messpunktVorgabe = null;
     this.showForm = true;
   }
 
   onEdit(einheit: Einheit): void {
+    this.messpunktVorgabe = null;
     this.selectedEinheit = { ...einheit };
     this.showForm = true;
   }

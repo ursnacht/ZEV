@@ -124,6 +124,11 @@ systemmeldung:
     tage: 90                 # erledigte Meldungen älter als N Tage werden gelöscht
     cron: "0 0 3 * * *"      # täglich 03:00 (Cleanup-Job, ohne mqtt-Profil)
 
+# Messpunkt-Empfang: Zeilen ohne Einheit nach 30 Tagen ohne Empfang loeschen (Specs/Messpunkt-Empfang.md, FR-3.2)
+messpunkt-empfang:
+  retention:
+    cron: "0 30 3 * * *"     # täglich 03:30 Europe/Zurich (Cleanup-Job, ohne mqtt-Profil)
+
 # Preiszeitreihe: dynamische Einspeisepreise (Specs/Preiszeitreihe.md)
 preiszeitreihe:
   url: "https://api.bkw.ch/api/dyntariffs/v1/Tariffs"   # Quelle der Einspeisepreise (oeffentlich)

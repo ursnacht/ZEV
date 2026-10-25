@@ -113,6 +113,8 @@ Die Spalten `zev_user` / `zev_admin` / `org_admin` sind gleich dargestellt wie i
 |--------------------------|-----------------------------------------------------------------------------|------------------------------------------|:---:|:---------:|:---------:|
 | EinheitController        | `GET /api/einheit` (Liste)                                                  | `hasAuthority('einheit:read')`           | ✅  | ✅        | ✅        |
 | EinheitController        | übrige (`POST`, `PUT`, `DELETE`, `POST /match`)                              | `hasAuthority('einheit:write')`          | ❌  | ✅        | ✅        |
+| MesspunktEmpfangController | `GET /api/messpunkt-empfang` (Liste), `GET /{id}/letzte-meldung`          | `hasAuthority('einheit:read')`           | ✅  | ✅        | ✅        |
+| MesspunktEmpfangController | `DELETE /api/messpunkt-empfang/{id}`                                      | `hasAuthority('einheit:write')`          | ❌  | ✅        | ✅        |
 | MesswerteController      | `GET /by-einheit`                                                           | `hasAuthority('messwerte:read')`         | ✅  | ✅        | ✅        |
 | MesswerteController      | `POST /upload`, `POST /calculate-distribution`, `GET /calculation-progress` | `hasAuthority('messwerte:write')`        | ❌  | ✅        | ✅        |
 | StatistikController      | alle                                                                        | `hasAuthority('statistik:read')`         | ✅  | ✅        | ✅        |

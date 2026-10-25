@@ -114,14 +114,17 @@ export function toIsoDate(date: Date): string {
  *
  * @param date - Date object or ISO string
  * @param fallback - Value to return if date is null/undefined (default: '-')
- * @returns Formatted string (dd.MM.yyyy HH:mm) or fallback value
+ * @param mitSekunden - `true` haengt `:ss` an (Specs/Messpunkt-Empfang.md, FR-2.3)
+ * @returns Formatted string (dd.MM.yyyy HH:mm bzw. dd.MM.yyyy HH:mm:ss) or fallback value
  *
  * @example
  * formatSwissDateTime('2026-08-27T15:50:00') // '27.08.2026 15:50'
+ * formatSwissDateTime('2026-08-27T15:50:07', '-', true) // '27.08.2026 15:50:07'
  * formatSwissDateTime(null) // '-'
  */
 export function formatSwissDateTime(date: Date | string | null | undefined,
-                                    fallback: string = '-'): string {
+                                    fallback: string = '-',
+                                    mitSekunden: boolean = false): string {
   if (date === null || date === undefined || date === '') {
     return fallback;
   }
@@ -131,7 +134,8 @@ export function formatSwissDateTime(date: Date | string | null | undefined,
   }
   const zwei = (teil: number) => String(teil).padStart(2, '0');
   return `${zwei(wert.getDate())}.${zwei(wert.getMonth() + 1)}.${wert.getFullYear()} `
-    + `${zwei(wert.getHours())}:${zwei(wert.getMinutes())}`;
+    + `${zwei(wert.getHours())}:${zwei(wert.getMinutes())}`
+    + (mitSekunden ? `:${zwei(wert.getSeconds())}` : '');
 }
 
 /**

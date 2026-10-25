@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { StartseiteComponent } from './components/startseite/startseite.component';
 import { EinheitListComponent } from './components/einheit-list/einheit-list.component';
+import { MesspunktEmpfangComponent } from './components/messpunkt-empfang/messpunkt-empfang.component';
 import { MesswerteUploadComponent } from './components/messwerte-upload/messwerte-upload.component';
 import { SolarCalculationComponent } from './components/solar-calculation/solar-calculation.component';
 import { MesswerteChartComponent } from './components/messwerte-chart/messwerte-chart.component';
@@ -27,6 +28,7 @@ export const routes: Routes = [
   { path: 'startseite', component: StartseiteComponent, canActivate: [AuthGuard] },
   { path: 'upload', component: MesswerteUploadComponent, canActivate: [AuthGuard, FeatureFlagGuard], data: { permissions: ['messwerte:write'], featureFlag: 'MESSWERTE_UPLOAD' } },
   { path: 'einheiten', component: EinheitListComponent, canActivate: [AuthGuard], data: { permissions: ['einheit:read'] } },
+  { path: 'messpunkt-empfang', component: MesspunktEmpfangComponent, canActivate: [AuthGuard], data: { permissions: ['einheit:read'] } },
   { path: 'solar-calculation', component: SolarCalculationComponent, canActivate: [AuthGuard], data: { permissions: ['messwerte:write'] } },
   { path: 'chart', component: MesswerteChartComponent, canActivate: [AuthGuard], data: { permissions: ['messwerte:read'] } },
   { path: 'statistik', component: StatistikComponent, canActivate: [AuthGuard], data: { permissions: ['statistik:read'] } },

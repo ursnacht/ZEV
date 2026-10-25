@@ -75,6 +75,7 @@ export class NavigationComponent implements OnInit, OnDestroy {
    */
   readonly adminEintraege: MenueEintrag[] = [
     eintrag('/einheiten', 'EINHEITEN_VERWALTUNG', 'home'),
+    eintrag('/messpunkt-empfang', 'MESSPUNKT_EMPFANG', 'radio'),
     eintrag('/solar-calculation', 'SOLAR_DISTRIBUTION', 'zap'),
     eintrag('/systemmeldungen', 'SYSTEMMELDUNGEN', 'file-text'),
     eintrag('/einstellungen', 'EINSTELLUNGEN', 'settings'),

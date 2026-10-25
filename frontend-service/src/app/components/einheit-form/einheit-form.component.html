@@ -30,7 +30,7 @@
 
     <div class="zev-form-group">
       <label for="messpunkt">{{ 'MESSPUNKT' | translate }}:</label>
-      <input type="text" id="messpunkt" class="zev-input" [(ngModel)]="formData.messpunkt" name="messpunkt" maxlength="50"
+      <input type="text" id="messpunkt" class="zev-input" [(ngModel)]="formData.messpunkt" name="messpunkt" [maxlength]="MAX_MESSPUNKT_LAENGE"
         [placeholder]="'MESSPUNKT_PLACEHOLDER' | translate" />
       <div class="zev-form-hint">
         {{ (formData.typ === EinheitTyp.LADESTATION ? 'MESSPUNKT_HINT_LADESTATION' : 'MESSPUNKT_HINT') | translate }}

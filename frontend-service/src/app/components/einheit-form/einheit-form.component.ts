@@ -1,6 +1,6 @@
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Einheit, EinheitTyp } from '../../models/einheit.model';
+import { Einheit, EinheitTyp, MAX_MESSPUNKT_LAENGE } from '../../models/einheit.model';
 
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
@@ -13,6 +13,11 @@ import { IconComponent } from '../icon/icon.component';
 })
 export class EinheitFormComponent implements OnInit {
   @Input() einheit: Einheit | null = null;
+  /**
+   * Vorbelegter Messpunkt einer **neuen** Einheit (Specs/Einheitenverwaltung.md, FR-8); die
+   * übrigen Vorgaben bleiben die des Formulars. Wird ignoriert, wenn `einheit` gesetzt ist.
+   */
+  @Input() messpunktVorgabe: string | null = null;
   @Output() save = new EventEmitter<Einheit>();
   @Output() cancel = new EventEmitter<void>();
 
@@ -33,8 +38,12 @@ export class EinheitFormComponent implements OnInit {
   ];
 
   readonly EinheitTyp = EinheitTyp;
+  readonly MAX_MESSPUNKT_LAENGE = MAX_MESSPUNKT_LAENGE;
 
   ngOnInit(): void {
+    if (!this.einheit && this.messpunktVorgabe) {
+      this.formData.messpunkt = this.messpunktVorgabe;
+    }
     if (this.einheit) {
       this.formData = { ...this.einheit };
       // Bestandsdaten vor V123 tragen das Feld nicht - dann gilt der Standard "ist eine Wohnung".

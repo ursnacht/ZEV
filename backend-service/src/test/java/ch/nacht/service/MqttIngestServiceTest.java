@@ -4,6 +4,8 @@ import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Geraetezustand;
 import ch.nacht.entity.MeldungLevel;
+import ch.nacht.entity.MesspunktEmpfangErgebnis;
+import ch.nacht.entity.MesspunktEmpfangQuelle;
 import ch.nacht.entity.ZaehlerRohdaten;
 import ch.nacht.entity.Zustandsgroesse;
 import ch.nacht.repository.EinheitRepository;
@@ -21,6 +23,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -68,6 +72,9 @@ public class MqttIngestServiceTest {
     @Mock
     private MqttMetrics metrics;
 
+    @Mock
+    private MesspunktEmpfangService messpunktEmpfangService;
+
     private ObjectMapper objectMapper;
     private MqttIngestService service;
 
@@ -77,7 +84,8 @@ public class MqttIngestServiceTest {
     void setUp() {
         objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
         service = new MqttIngestService(einheitRepository, rohdatenRepository,
-                geraetezustandRepository, systemmeldungService, objectMapper, metrics);
+                geraetezustandRepository, systemmeldungService, objectMapper, metrics,
+                messpunktEmpfangService);
 
         einheit = new Einheit("Wohnung 1", EinheitTyp.CONSUMER);
         einheit.setId(EINHEIT_ID);
@@ -564,7 +572,7 @@ public class MqttIngestServiceTest {
                 geraetezustandRepository, systemmeldungService,
                 new ObjectMapper().registerModule(new JavaTimeModule())
                         .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES),
-                metrics);
+                metrics, messpunktEmpfangService);
         stubEinheitOhneBestand();
 
         // Act
@@ -704,7 +712,7 @@ public class MqttIngestServiceTest {
                 geraetezustandRepository, systemmeldungService,
                 new ObjectMapper().registerModule(new JavaTimeModule())
                         .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES),
-                metrics);
+                metrics, messpunktEmpfangService);
         stubSpeicherOhneBestand();
 
         // Act - der Payload behauptet einen anderen Mandanten
@@ -1301,5 +1309,452 @@ public class MqttIngestServiceTest {
         verify(einheitRepository).findAllByOrgIdAndMesspunkt(999L, MESSPUNKT);
         verify(metrics).recordFailed();
         verify(rohdatenRepository, never()).save(any());
+    }
+
+    // ==================== Messpunkt-Empfang: letzte Meldung (Specs/Messpunkt-Empfang.md, FR-1.9) ====================
+
+    /** Fängt den einzigen festgehaltenen Empfangsvermerk ab (ohne Transaktion: direkt festgehalten). */
+    private MesspunktEmpfangService.Meldung captureEmpfang() {
+        ArgumentCaptor<MesspunktEmpfangService.Meldung> captor =
+                ArgumentCaptor.forClass(MesspunktEmpfangService.Meldung.class);
+        verify(messpunktEmpfangService).halteFest(captor.capture());
+        return captor.getValue();
+    }
+
+    @Test
+    void handle_GueltigeMeldung_HaeltPayloadFest() {
+        stubEinheitOhneBestand();
+        String payload = payload("2026-01-01T10:07:00+01:00", "123.4500", "10.0000");
+
+        service.handle(TOPIC, payload);
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertEquals(MesspunktEmpfangErgebnis.GESPEICHERT, meldung.ergebnis());
+        assertEquals(payload, meldung.payload());
+    }
+
+    @Test
+    void handle_UnlesbarerPayload_HaeltPayloadTrotzdemFest() {
+        // Gerade der unlesbare Payload ist der, den man sehen will
+        service.handle(TOPIC, "kein-json");
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertEquals(MesspunktEmpfangErgebnis.UNGUELTIG, meldung.ergebnis());
+        assertEquals(MqttIngestService.GRUND_PAYLOAD_NICHT_LESBAR, meldung.grund());
+        assertEquals("kein-json", meldung.payload());
+    }
+
+    // ==================== Messpunkt-Empfang: Ergebnis und Grund (Specs/Messpunkt-Empfang.md, FR-1.3 bis FR-1.6) ====================
+
+    private static void assertStand(String erwartet, BigDecimal ist) {
+        assertNotNull(ist, "Stand erwartet: " + erwartet);
+        assertEquals(0, new BigDecimal(erwartet).compareTo(ist), "Stand " + ist + " statt " + erwartet);
+    }
+
+    private static void assertVerworfen(MesspunktEmpfangService.Meldung meldung, String grund) {
+        assertEquals(MesspunktEmpfangErgebnis.UNGUELTIG, meldung.ergebnis());
+        assertEquals(grund, meldung.grund());
+    }
+
+    // --- Pi-Gateway ---
+
+    @Test
+    void handle_GueltigeMeldung_VermerkGespeichertMitQuelleUndStaenden() {
+        stubEinheitOhneBestand();
+
+        service.handle(TOPIC, payload("2026-01-01T10:07:00+01:00", "123.4500", "10.0000"));
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertEquals(ORG_ID, meldung.orgId());
+        assertEquals(MESSPUNKT, meldung.messpunkt());
+        assertEquals(MesspunktEmpfangQuelle.PI_GATEWAY, meldung.quelle());
+        assertEquals(MesspunktEmpfangErgebnis.GESPEICHERT, meldung.ergebnis());
+        assertNull(meldung.grund());
+        assertStand("123.4500", meldung.bezug());
+        assertStand("10.0000", meldung.einspeisung());
+    }
+
+    @Test
+    void handle_KeinJson_VermerkPayloadNichtLesbarOhneStaende() {
+        service.handle(TOPIC, "{kein json");
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertVerworfen(meldung, MqttIngestService.GRUND_PAYLOAD_NICHT_LESBAR);
+        assertNull(meldung.bezug());
+        assertNull(meldung.einspeisung());
+        verify(einheitRepository, never()).findAllByOrgIdAndMesspunkt(anyLong(), any());
+    }
+
+    @Test
+    void handle_LeererPayload_VermerkPayloadNichtLesbar() {
+        service.handle(TOPIC, "");
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertVerworfen(meldung, MqttIngestService.GRUND_PAYLOAD_NICHT_LESBAR);
+        assertEquals("", meldung.payload());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "{\"timestamp\":\"abc\",\"zaehlerstandBezug\":1.0,\"zaehlerstandEinspeisung\":0.0}",
+            "{\"timestamp\":\"2026-01-01T10:07:00+01:00\",\"zaehlerstandBezug\":\"abc\",\"zaehlerstandEinspeisung\":0.0}",
+            "{\"timestamp\":\"2026-01-01T10:07:00+01:00\",\"zaehlerstandBezug\":{\"x\":1},\"zaehlerstandEinspeisung\":0.0}"
+    })
+    void handle_FeldVomFalschenTyp_VermerkPayloadNichtLesbar(String payload) {
+        service.handle(TOPIC, payload);
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertVerworfen(meldung, MqttIngestService.GRUND_PAYLOAD_NICHT_LESBAR);
+        assertNull(meldung.bezug());
+        assertNull(meldung.einspeisung());
+    }
+
+    @Test
+    void handle_FalscherTypUndPflichtfeldFehlt_LesbarkeitZuerst() {
+        // Pruefreihenfolge #1 vor #2: Die unlesbare Zeit entscheidet, nicht die fehlenden Staende
+        service.handle(TOPIC, "{\"timestamp\":\"abc\"}");
+
+        assertVerworfen(captureEmpfang(), MqttIngestService.GRUND_PAYLOAD_NICHT_LESBAR);
+    }
+
+    @Test
+    void handle_OhneTimestamp_VermerkPflichtfeldFehltMitLesbarenStaenden() {
+        service.handle(TOPIC, payload(null, "1.5", "2.0"));
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertVerworfen(meldung, MqttIngestService.GRUND_PFLICHTFELD_FEHLT);
+        assertStand("1.5", meldung.bezug());
+        assertStand("2.0", meldung.einspeisung());
+    }
+
+    @Test
+    void handle_OhneEinspeisung_VermerkPflichtfeldFehltEinspeisungNull() {
+        service.handle(TOPIC, payload("2026-01-01T10:07:00Z", "1.5", null));
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertVerworfen(meldung, MqttIngestService.GRUND_PFLICHTFELD_FEHLT);
+        assertStand("1.5", meldung.bezug());
+        assertNull(meldung.einspeisung());
+    }
+
+    @Test
+    void handle_PflichtfeldFehltUndNegativ_PflichtfeldZuerst() {
+        // Pruefreihenfolge #2 vor #5
+        service.handle(TOPIC, payload(null, "-1.0", "2.0"));
+
+        assertVerworfen(captureEmpfang(), MqttIngestService.GRUND_PFLICHTFELD_FEHLT);
+    }
+
+    @Test
+    void handle_NegativerStand_VermerkNegativMitNegativemStand() {
+        service.handle(TOPIC, payload("2026-01-01T10:07:00Z", "-5.0", "0"));
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertVerworfen(meldung, MqttIngestService.GRUND_NEGATIV);
+        assertStand("-5.0", meldung.bezug());
+        assertStand("0", meldung.einspeisung());
+        verify(einheitRepository, never()).findAllByOrgIdAndMesspunkt(anyLong(), any());
+    }
+
+    @Test
+    void handle_UnbekannterMesspunkt_VermerkUnbekanntMitStaendenOhneRohdaten() {
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT)).thenReturn(List.of());
+
+        service.handle(TOPIC, payload("2026-01-01T10:07:00Z", "1.0", "0.5"));
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertEquals(MesspunktEmpfangErgebnis.UNBEKANNTER_MESSPUNKT, meldung.ergebnis());
+        assertNull(meldung.grund());
+        assertStand("1.0", meldung.bezug());
+        assertStand("0.5", meldung.einspeisung());
+        verify(rohdatenRepository, never()).save(any());
+    }
+
+    @Test
+    void handle_UngueltigerPayloadUnbekannterMesspunkt_VermerkUngueltig() {
+        // Erst eine gueltige Meldung sagt, ob der Messpunkt passt (Pruefreihenfolge #1 vor #6)
+        service.handle("zev/100/Fremd/messwert", "kein-json");
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertEquals("Fremd", meldung.messpunkt());
+        assertVerworfen(meldung, MqttIngestService.GRUND_PAYLOAD_NICHT_LESBAR);
+        verify(einheitRepository, never()).findAllByOrgIdAndMesspunkt(anyLong(), any());
+    }
+
+    @Test
+    void handle_NurLadestationAmMesspunkt_VermerkUnbekannterMesspunkt() {
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT))
+                .thenReturn(List.of(ladestation(900L)));
+
+        service.handle(TOPIC, payload("2026-01-01T10:07:00Z", "1.0", "0.0"));
+
+        assertEquals(MesspunktEmpfangErgebnis.UNBEKANNTER_MESSPUNKT, captureEmpfang().ergebnis());
+    }
+
+    @Test
+    void handle_AllgemeinesCatch_VermerkVerarbeitungFehlgeschlagenNichtGespeichert() {
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, MESSPUNKT)).thenReturn(List.of(einheit));
+        when(rohdatenRepository.findByEinheitIdAndZeit(eq(EINHEIT_ID), any())).thenReturn(Optional.empty());
+        when(rohdatenRepository.save(any(ZaehlerRohdaten.class))).thenThrow(new RuntimeException("DB down"));
+
+        service.handle(TOPIC, payload("2026-01-01T10:07:00Z", "7.0", "3.0"));
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertVerworfen(meldung, MqttIngestService.GRUND_VERARBEITUNG);
+        assertStand("7.0", meldung.bezug());
+        assertStand("3.0", meldung.einspeisung());
+    }
+
+    // --- Topic nicht lesbar: kein Vermerk (FR-1.5) ---
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "zev/100/MP-001",               // zu wenige Segmente
+            "zev/abc/MP-001/messwert",      // Mandant keine Zahl
+            "zev/100//messwert",            // leerer Messpunkt
+            "gPlug/100//tele/SENSOR",       // leerer Messpunkt (gPlug)
+            "gPlug/abc/MP-001/tele/SENSOR"  // Mandant keine Zahl (gPlug)
+    })
+    void handle_TopicNichtLesbar_KeinVermerk(String topic) {
+        service.handle(topic, payload("2026-01-01T10:07:00Z", "1.0", "0.0"));
+
+        verify(messpunktEmpfangService, never()).halteFest(any());
+    }
+
+    @Test
+    void handle_OhneTopic_KeinVermerk() {
+        service.handle(null, payload("2026-01-01T10:07:00Z", "1.0", "0.0"));
+
+        verify(messpunktEmpfangService, never()).halteFest(any());
+    }
+
+    @Test
+    void handle_MesspunktUeber255Zeichen_KeinVermerk() {
+        String messpunkt = "m".repeat(256);
+
+        service.handle("zev/100/" + messpunkt + "/messwert", payload("2026-01-01T10:07:00Z", "1.0", "0.0"));
+
+        verify(messpunktEmpfangService, never()).halteFest(any());
+    }
+
+    @Test
+    void handle_MesspunktGenau255Zeichen_Vermerk() {
+        String messpunkt = "m".repeat(255);
+
+        service.handle("zev/100/" + messpunkt + "/messwert", payload("2026-01-01T10:07:00Z", "1.0", "0.0"));
+
+        assertEquals(messpunkt, captureEmpfang().messpunkt());
+    }
+
+    // --- Festhalten nach dem Ende der Transaktion (FR-1.6) ---
+
+    @Test
+    void handle_FesthaltenWirft_RohdatenGespeichertKeineException() {
+        stubEinheitOhneBestand();
+        doThrow(new RuntimeException("Upsert kaputt")).when(messpunktEmpfangService).halteFest(any());
+
+        assertDoesNotThrow(() ->
+                service.handle(TOPIC, payload("2026-01-01T10:07:00Z", "1.0", "0.0")));
+
+        verify(rohdatenRepository).save(any(ZaehlerRohdaten.class));
+        verify(metrics).recordProcessed();
+    }
+
+    @Test
+    void handle_MitTransaktion_HaeltErstNachAbschlussFest() {
+        stubEinheitOhneBestand();
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.handle(TOPIC, payload("2026-01-01T10:07:00Z", "1.0", "0.0"));
+
+            verify(messpunktEmpfangService, never()).halteFest(any());
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(s -> s.afterCompletion(TransactionSynchronization.STATUS_COMMITTED));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        assertEquals(MesspunktEmpfangErgebnis.GESPEICHERT, captureEmpfang().ergebnis());
+    }
+
+    @Test
+    void handle_MitTransaktionRollback_VermerkSpeichernFehlgeschlagen() {
+        stubEinheitOhneBestand();
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.handle(TOPIC, payload("2026-01-01T10:07:00Z", "1.0", "0.0"));
+
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(s -> s.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertVerworfen(meldung, MqttIngestService.GRUND_SPEICHERN);
+        assertStand("1.0", meldung.bezug());
+    }
+
+    // --- gPlug ---
+
+    @Test
+    void handle_GplugGueltig_VermerkGespeichertQuelleGplug() {
+        stubEinheitOhneBestand();
+
+        service.handle(GPLUG_TOPIC, gplug("2026-10-20T14:30:00", GPLUG_Z_VOLL));
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertEquals(MesspunktEmpfangQuelle.GPLUG, meldung.quelle());
+        assertEquals(MesspunktEmpfangErgebnis.GESPEICHERT, meldung.ergebnis());
+        assertStand("12345.678", meldung.bezug());
+        assertStand("4321.000", meldung.einspeisung());
+    }
+
+    @Test
+    void handle_GplugOhneEo_VermerkEinspeisungNullRohdatenNull() {
+        stubEinheitOhneBestand();
+
+        service.handle(GPLUG_TOPIC, gplug("2026-10-20T14:30:00", "\"Ei\":12345.678"));
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertEquals(MesspunktEmpfangErgebnis.GESPEICHERT, meldung.ergebnis());
+        // So wie gemeldet: NULL im Vermerk, 0 in den Rohdaten (FR-1.4)
+        assertNull(meldung.einspeisung());
+        assertEquals(0, BigDecimal.ZERO.compareTo(captureSavedRohdaten().getZaehlerstandEinspeisung()));
+    }
+
+    @Test
+    void handle_GplugKeinJson_VermerkPayloadNichtLesbar() {
+        service.handle(GPLUG_TOPIC, "kein-json");
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertEquals(MesspunktEmpfangQuelle.GPLUG, meldung.quelle());
+        assertVerworfen(meldung, MqttIngestService.GRUND_PAYLOAD_NICHT_LESBAR);
+        assertNull(meldung.bezug());
+        assertNull(meldung.einspeisung());
+    }
+
+    @Test
+    void handle_GplugUnlesbareTime_VermerkPayloadNichtLesbarMitStaenden() {
+        service.handle(GPLUG_TOPIC, gplug("abc", "\"Ei\":1.5,\"Eo\":2.5"));
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertVerworfen(meldung, MqttIngestService.GRUND_PAYLOAD_NICHT_LESBAR);
+        // Die Staende liessen sich lesen und stehen im Vermerk (FR-1.4)
+        assertStand("1.5", meldung.bezug());
+        assertStand("2.5", meldung.einspeisung());
+    }
+
+    @Test
+    void handle_GplugUnlesbareTimeOhneEi_LesbarkeitVorVollstaendigkeit() {
+        service.handle(GPLUG_TOPIC, gplug("abc", "\"Eo\":2.5"));
+
+        assertVerworfen(captureEmpfang(), MqttIngestService.GRUND_PAYLOAD_NICHT_LESBAR);
+    }
+
+    @Test
+    void handle_GplugOhneTime_VermerkPflichtfeldFehlt() {
+        service.handle(GPLUG_TOPIC, gplug(null, "\"Ei\":1.5"));
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertVerworfen(meldung, MqttIngestService.GRUND_PFLICHTFELD_FEHLT);
+        assertStand("1.5", meldung.bezug());
+    }
+
+    @Test
+    void handle_GplugOhneEi_VermerkPflichtfeldFehltBezugNull() {
+        service.handle(GPLUG_TOPIC, gplug("2026-10-20T14:30:00", "\"Eo\":4321.0"));
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertVerworfen(meldung, MqttIngestService.GRUND_PFLICHTFELD_FEHLT);
+        assertNull(meldung.bezug());
+        assertStand("4321.0", meldung.einspeisung());
+    }
+
+    @Test
+    void handle_GplugUhrNichtSynchronisiert_VermerkGplugUhr() {
+        service.handle(GPLUG_TOPIC, gplug("1970-01-01T00:05:12", "\"Ei\":12345.678"));
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertVerworfen(meldung, MqttIngestService.GRUND_GPLUG_UHR);
+        assertStand("12345.678", meldung.bezug());
+    }
+
+    @Test
+    void handle_GplugUhrNichtSynchronisiertUndNullen_UhrZuerst() {
+        // Pruefreihenfolge #3 vor #4
+        service.handle(GPLUG_TOPIC, gplug("1970-01-01T00:05:12", "\"Ei\":0,\"Eo\":0"));
+
+        assertVerworfen(captureEmpfang(), MqttIngestService.GRUND_GPLUG_UHR);
+    }
+
+    @Test
+    void handle_GplugEiUndEoNull_VermerkEiEoNullMitNullStaenden() {
+        service.handle(GPLUG_TOPIC, gplug("2026-10-20T14:30:00", "\"Ei\":0,\"Eo\":0"));
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertVerworfen(meldung, MqttIngestService.GRUND_EI_EO_NULL);
+        assertStand("0", meldung.bezug());
+        assertStand("0", meldung.einspeisung());
+    }
+
+    @Test
+    void handle_GplugEiNullOhneEo_VermerkEiEoNullEinspeisungNull() {
+        service.handle(GPLUG_TOPIC, gplug("2026-10-20T14:30:00", "\"Ei\":0"));
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertVerworfen(meldung, MqttIngestService.GRUND_EI_EO_NULL);
+        assertNull(meldung.einspeisung());
+    }
+
+    @Test
+    void handle_GplugNegativerStand_VermerkNegativ() {
+        // Einspeisung 0, aber Bezug nicht: kein "Ei = Eo = 0", sondern negativ
+        service.handle(GPLUG_TOPIC, gplug("2026-10-20T14:30:00", "\"Ei\":-3.0,\"Eo\":0"));
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertVerworfen(meldung, MqttIngestService.GRUND_NEGATIV);
+        assertStand("-3.0", meldung.bezug());
+    }
+
+    @Test
+    void handle_GplugUnbekannterMesspunkt_VermerkUnbekannt() {
+        when(einheitRepository.findAllByOrgIdAndMesspunkt(ORG_ID, "Fremd")).thenReturn(List.of());
+
+        service.handle("gPlug/100/Fremd/tele/SENSOR", gplug("2026-10-20T14:30:00", "\"Ei\":1.0"));
+
+        MesspunktEmpfangService.Meldung meldung = captureEmpfang();
+        assertEquals(MesspunktEmpfangQuelle.GPLUG, meldung.quelle());
+        assertEquals(MesspunktEmpfangErgebnis.UNBEKANNTER_MESSPUNKT, meldung.ergebnis());
+    }
+
+    // --- FR-1.3 #1: Lesbarkeit vor Vollstaendigkeit (Befunde aus /3 vom 25.10.2026, behoben) ---
+
+    /**
+     * FR-1.3 #1 verlangt fuer ein Feld vom falschen Typ {@code Payload nicht lesbar}. Zuvor lieferte
+     * der gPlug-Ingest {@code Pflichtfeld fehlt}: Er pruefte nur {@code isTextual()} bzw.
+     * {@code isNumber()} und behandelte einen Knoten vom falschen Typ wie einen fehlenden.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "{\"Time\":\"2026-10-20T14:30:00\",\"z\":{\"Ei\":\"abc\"}}",
+            "{\"Time\":12345,\"z\":{\"Ei\":1.5}}"
+    })
+    void handle_GplugFeldVomFalschenTyp_VermerkPayloadNichtLesbar(String payload) {
+        service.handle(GPLUG_TOPIC, payload);
+
+        assertVerworfen(captureEmpfang(), MqttIngestService.GRUND_PAYLOAD_NICHT_LESBAR);
+    }
+
+    /**
+     * Gueltiges JSON, aber kein Objekt: {@code readValue("null")} liefert {@code null}. Zuvor warf der
+     * Zugriff auf die Staende eine NullPointerException, die erst das allgemeine catch fing
+     * ({@code Verarbeitung fehlgeschlagen}). Nach FR-1.3 #1 ist der Payload nicht lesbar.
+     */
+    @Test
+    void handle_PayloadJsonNull_VermerkPayloadNichtLesbar() {
+        service.handle(TOPIC, "null");
+
+        assertVerworfen(captureEmpfang(), MqttIngestService.GRUND_PAYLOAD_NICHT_LESBAR);
     }
 }

@@ -256,6 +256,23 @@ class ArchitectureTest {
         }
 
         /**
+         * Specs/Messpunkt-Empfang.md, NFR-2: Die Tabelle wird nur per Upsert geschrieben und
+         * mandantenübergreifend aufgeräumt — beides steckt im Service. Ingest und Cleanup-Job
+         * gehen über ihn; ein direkter {@code save} am Repository vorbei zählte nicht hoch und
+         * liefe am Unique-Schlüssel auf.
+         */
+        @Test
+        @DisplayName("Nur MesspunktEmpfangService greift auf MesspunktEmpfangRepository zu")
+        void nurServiceGreiftAufMesspunktEmpfangRepositoryZu() {
+            ArchRule rule = classes()
+                .that().haveSimpleName("MesspunktEmpfangRepository")
+                .should().onlyHaveDependentClassesThat()
+                .haveSimpleNameStartingWith("MesspunktEmpfangService");
+
+            rule.check(importedClasses);
+        }
+
+        /**
          * Zustandswerte werden nie aggregiert und nie verrechnet (Specs/Gerätezustand.md,
          * Abschnitt 3 „Abgrenzung zu den Messwerten"). Ein Ladestand ist keine Energiemenge; wer
          * ihn durch die Delta-Aggregation, eine Statistik oder eine Abrechnung schickt, erhaelt

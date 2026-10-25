@@ -1,0 +1,134 @@
+<div class="zev-container">
+  <h1><app-icon name="radio" size="lg"></app-icon> {{ 'MESSPUNKT_EMPFANG' | translate }}</h1>
+
+  @if (message) {
+    <div class="zev-message" [ngClass]="'zev-message--' + messageType"
+      [class.zev-message--dismissible]="messageType === 'error'" (click)="messageType === 'error' && dismissMessage()">
+      <span>{{ message | translate }}</span>
+      @if (messageType === 'error') {
+        <span class="zev-message__dismiss">&times;</span>
+      }
+    </div>
+  }
+
+  <div class="zev-button-row">
+    <button class="zev-button zev-button--secondary zev-button--compact" (click)="loadMesspunktEmpfang()">
+      <app-icon name="refresh-cw"></app-icon>
+      {{ 'AKTUALISIEREN' | translate }}
+    </button>
+  </div>
+
+  @if (zeilen.length > 0) {
+    <!-- Zehn Spalten: bei schmaler Breite scrollt die Tabelle in ihrem Rahmen, nicht die Seite -->
+    <div class="zev-table-scroll">
+    <table class="zev-table" appColumnResize>
+      <thead>
+        <tr>
+          <th class="zev-table__header--sortable" (click)="onSort('messpunkt')">
+            {{ 'MESSPUNKT' | translate }}
+            @if (sortColumn === 'messpunkt') {
+              <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+            }
+          </th>
+          <th class="zev-table__header--sortable" (click)="onSort('einheiten')">
+            {{ 'EINHEITEN' | translate }}
+            @if (sortColumn === 'einheiten') {
+              <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+            }
+          </th>
+          <th class="zev-table__header--sortable" (click)="onSort('quelle')">
+            {{ 'MESSPUNKT_EMPFANG_QUELLE' | translate }}
+            @if (sortColumn === 'quelle') {
+              <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+            }
+          </th>
+          <th class="zev-table__header--sortable" (click)="onSort('ersterEmpfang')">
+            {{ 'MESSPUNKT_EMPFANG_ERSTER' | translate }}
+            @if (sortColumn === 'ersterEmpfang') {
+              <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+            }
+          </th>
+          <th class="zev-table__header--sortable" (click)="onSort('letzterEmpfang')">
+            {{ 'MESSPUNKT_EMPFANG_LETZTER' | translate }}
+            @if (sortColumn === 'letzterEmpfang') {
+              <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+            }
+          </th>
+          <th>{{ 'MESSPUNKT_EMPFANG_STAND_BEZUG' | translate }}</th>
+          <th>{{ 'MESSPUNKT_EMPFANG_STAND_EINSPEISUNG' | translate }}</th>
+          <th class="zev-table__header--sortable" (click)="onSort('anzahlMeldungen')">
+            {{ 'MESSPUNKT_EMPFANG_ANZAHL' | translate }}
+            @if (sortColumn === 'anzahlMeldungen') {
+              <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+            }
+          </th>
+          <th class="zev-table__header--sortable" (click)="onSort('ergebnis')">
+            {{ 'MESSPUNKT_EMPFANG_ERGEBNIS' | translate }}
+            @if (sortColumn === 'ergebnis') {
+              <span class="zev-table__sort-indicator">{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+            }
+          </th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (z of zeilen; track z.messpunkt) {
+          <tr>
+            <td>{{ z.messpunkt }}</td>
+            <td>{{ einheitenText(z) }}</td>
+            <td>{{ quelleText(z) }}</td>
+            <td>{{ zeitpunkt(z.ersterEmpfang, false) }}</td>
+            <td>
+              {{ zeitpunkt(z.letzterEmpfang, true) }}
+              @if (!z.keinEmpfang) {
+                <br>
+                <span class="zev-status" [ngClass]="'zev-status--' + altersFarbe(z)">{{ alter(z) }}</span>
+              }
+            </td>
+            <td class="zev-table__number">{{ stand(z.zaehlerstandBezug) }}</td>
+            <td class="zev-table__number">{{ stand(z.zaehlerstandEinspeisung) }}</td>
+            <td class="zev-table__number">{{ z.anzahlMeldungen ?? '–' }}</td>
+            <td>
+              <span class="zev-status" [ngClass]="'zev-status--' + ergebnisFarbe(z)">{{ ergebnisKey(z) | translate }}</span>
+              <!-- Der Grund bleibt technischer Klartext wie in den Logzeilen, unuebersetzt: Er richtet sich
+                   an den, der den Zaehler konfiguriert (Specs/Messpunkt-Empfang.md, Abschnitt 7) -->
+              @if (z.grund) {
+                {{ z.grund }}
+              }
+            </td>
+            <td>
+              @if (menuItemsFuer(z).length > 0) {
+                <app-kebab-menu
+                  [items]="menuItemsFuer(z)"
+                  (itemClick)="onMenuAction($event, z)">
+                </app-kebab-menu>
+              }
+            </td>
+          </tr>
+          @if (offeneMeldung?.messpunkt === z.messpunkt) {
+            <tr>
+              <td colspan="10">
+                <button class="zev-button zev-button--secondary zev-button--compact" (click)="onMeldungSchliessen()">
+                  <app-icon name="x"></app-icon>
+                  {{ 'SCHLIESSEN' | translate }}
+                </button>
+                @if (offeneMeldung?.geladen) {
+                  @if (offeneMeldung?.text != null) {
+                    <!-- Payload vom Geraet: nur als Text interpolieren, nie als HTML (FR-2.9) -->
+                    <pre class="zev-code-block">{{ offeneMeldung?.text }}</pre>
+                  } @else {
+                    <p class="zev-text--muted">{{ 'MESSPUNKT_EMPFANG_KEINE_MELDUNG' | translate }}</p>
+                  }
+                }
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+    </div>
+  }
+  @if (geladen && zeilen.length === 0) {
+    <p>{{ 'MESSPUNKT_EMPFANG_KEINE_DATEN' | translate }}</p>
+  }
+</div>

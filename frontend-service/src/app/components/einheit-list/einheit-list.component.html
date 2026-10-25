@@ -83,7 +83,7 @@
   }
 
   @if (showForm) {
-    <app-einheit-form [einheit]="selectedEinheit" (save)="onFormSubmit($event)"
+    <app-einheit-form [einheit]="selectedEinheit" [messpunktVorgabe]="messpunktVorgabe" (save)="onFormSubmit($event)"
     (cancel)="onFormCancel()"></app-einheit-form>
   }
 </div>

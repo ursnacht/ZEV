@@ -1,6 +1,7 @@
 package ch.nacht.controller;
 
 import ch.nacht.config.SecurityConfig;
+import ch.nacht.dto.MesspunktEmpfangMeldungDTO;
 import ch.nacht.dto.NkRechnungLaufDTO;
 import ch.nacht.dto.StatistikDTO;
 import ch.nacht.entity.Einheit;
@@ -9,6 +10,7 @@ import ch.nacht.service.EinheitMatchingService;
 import ch.nacht.service.EinheitService;
 import ch.nacht.service.EinstellungenService;
 import ch.nacht.service.FeatureFlagService;
+import ch.nacht.service.MesspunktEmpfangService;
 import ch.nacht.service.MieterService;
 import ch.nacht.service.NkAbrechnungService;
 import ch.nacht.service.NkRechnungService;
@@ -70,7 +72,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         TarifpositionController.class,
         EinheitController.class, MieterController.class, NkAbrechnungController.class,
         NkRechnungController.class, SystemmeldungController.class, PreiszeitreiheController.class,
-        SteuerungController.class, TranslationController.class, StatistikController.class})
+        SteuerungController.class, TranslationController.class, StatistikController.class,
+        MesspunktEmpfangController.class})
 @Import(SecurityConfig.class)
 @TestPropertySource(properties = "app.cors.allowed-origins=http://localhost:4200")
 class ControllerAuthorizationTest {
@@ -98,6 +101,9 @@ class ControllerAuthorizationTest {
 
     @MockitoBean
     private EinheitMatchingService einheitMatchingService;
+
+    @MockitoBean
+    private MesspunktEmpfangService messpunktEmpfangService;
 
     @MockitoBean
     private MieterService mieterService;
@@ -402,6 +408,67 @@ class ControllerAuthorizationTest {
                 .andExpect(status().isForbidden());
 
         verify(einheitService, never()).getAllEinheiten();
+    }
+
+    // ==================== Messpunkt-Empfang (Specs/Messpunkt-Empfang.md, FR-2.9) ====================
+    // Die letzte Meldung ansehen ist ein Lesezugriff: einheit:read genuegt, ohne einheit:write.
+
+    @Test
+    void getLetzteMeldung_withEinheitRead_ok() throws Exception {
+        when(messpunktEmpfangService.getLetzteMeldung(1L))
+                .thenReturn(Optional.of(new MesspunktEmpfangMeldungDTO("{}")));
+
+        mockMvc.perform(get("/api/messpunkt-empfang/1/letzte-meldung")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("einheit:read"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getLetzteMeldung_withoutEinheitRead_forbidden() throws Exception {
+        mockMvc.perform(get("/api/messpunkt-empfang/1/letzte-meldung")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("mieter:read"))))
+                .andExpect(status().isForbidden());
+
+        verify(messpunktEmpfangService, never()).getLetzteMeldung(any());
+    }
+
+    @Test
+    void getAllMesspunktEmpfang_withEinheitRead_ok() throws Exception {
+        when(messpunktEmpfangService.getAllMesspunktEmpfang()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/messpunkt-empfang")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("einheit:read"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getAllMesspunktEmpfang_withoutEinheitRead_forbidden() throws Exception {
+        mockMvc.perform(get("/api/messpunkt-empfang")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("mieter:read"))))
+                .andExpect(status().isForbidden());
+
+        verify(messpunktEmpfangService, never()).getAllMesspunktEmpfang();
+    }
+
+    @Test
+    void deleteMesspunktEmpfang_withReadPermissionOnly_forbidden() throws Exception {
+        // zev_user hat einheit:read, aber nicht einheit:write
+        mockMvc.perform(delete("/api/messpunkt-empfang/1")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("einheit:read")))
+                        .with(csrf()))
+                .andExpect(status().isForbidden());
+
+        verify(messpunktEmpfangService, never()).deleteMesspunktEmpfang(any());
+    }
+
+    @Test
+    void deleteMesspunktEmpfang_withEinheitWrite_noContent() throws Exception {
+        when(messpunktEmpfangService.deleteMesspunktEmpfang(1L)).thenReturn(true);
+
+        mockMvc.perform(delete("/api/messpunkt-empfang/1")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("einheit:write")))
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
     }
 
     @Test

@@ -5,12 +5,15 @@ import ch.nacht.entity.Einheit;
 import ch.nacht.entity.EinheitTyp;
 import ch.nacht.entity.Geraetezustand;
 import ch.nacht.entity.MeldungLevel;
+import ch.nacht.entity.MesspunktEmpfangErgebnis;
+import ch.nacht.entity.MesspunktEmpfangQuelle;
 import ch.nacht.entity.ZaehlerRohdaten;
 import ch.nacht.entity.Zustandsgroesse;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.GeraetezustandRepository;
 import ch.nacht.repository.ZaehlerRohdatenRepository;
 import ch.nacht.util.Ortszeit;
+import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,6 +22,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -28,6 +33,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * Verarbeitet eingehende MQTT-Messwert-Nachrichten (FR-4): Topic/Payload parsen, validieren,
@@ -48,6 +54,10 @@ import java.util.Optional;
  * <p>Neben den Zählerständen trägt eine Nachricht optional <b>Zustandswerte</b> (Ladezustand u.a.,
  * {@code Specs/Gerätezustand.md}). Sie sind <b>Beiwerk</b>: Ein ungültiger Wert verwirft weder die
  * Nachricht noch die Zählerstände und berührt {@link MqttMetrics} nicht.
+ *
+ * <p>Jede Meldung mit lesbarem Topic hinterlässt ausserdem einen <b>Empfangsvermerk</b>
+ * (Specs/Messpunkt-Empfang.md, FR-1): Ergebnis, Grund und Stände, festgehalten erst nach dem
+ * Ende der Transaktion ({@link #halteEmpfangFest}).
  */
 @Service
 @Profile("mqtt")
@@ -64,23 +74,39 @@ public class MqttIngestService {
     /** Frühere Zeiten stammen von einer noch nicht synchronisierten gPlug-Uhr (FR-10.5). */
     private static final LocalDateTime GPLUG_FRUEHESTE_ZEIT = LocalDateTime.of(2020, 1, 1, 0, 0);
 
+    /** Spaltenlänge von {@code messpunkt_empfang.messpunkt}; längere Messpunkte: kein Vermerk. */
+    private static final int MAX_MESSPUNKT_LAENGE_EMPFANG = 255;
+
+    // Gruende verworfener Meldungen (Specs/Messpunkt-Empfang.md, FR-1.3) - feste Texte, nie
+    // Exception-Meldungen: Sie passen so immer in die Spalte und lassen sich vergleichen.
+    static final String GRUND_PAYLOAD_NICHT_LESBAR = "Payload nicht lesbar";
+    static final String GRUND_PFLICHTFELD_FEHLT = "Pflichtfeld fehlt";
+    static final String GRUND_GPLUG_UHR = "gPlug-Uhr nicht synchronisiert";
+    static final String GRUND_EI_EO_NULL = "Ei = Eo = 0";
+    static final String GRUND_NEGATIV = "negativer Zählerstand";
+    static final String GRUND_VERARBEITUNG = "Verarbeitung fehlgeschlagen";
+    static final String GRUND_SPEICHERN = "Speichern fehlgeschlagen";
+
     private final EinheitRepository einheitRepository;
     private final ZaehlerRohdatenRepository rohdatenRepository;
     private final GeraetezustandRepository geraetezustandRepository;
     private final SystemmeldungService systemmeldungService;
     private final ObjectMapper objectMapper;
     private final MqttMetrics metrics;
+    private final MesspunktEmpfangService messpunktEmpfangService;
 
     public MqttIngestService(EinheitRepository einheitRepository,
                              ZaehlerRohdatenRepository rohdatenRepository,
                              GeraetezustandRepository geraetezustandRepository,
                              SystemmeldungService systemmeldungService,
                              ObjectMapper objectMapper,
-                             MqttMetrics metrics) {
+                             MqttMetrics metrics,
+                             MesspunktEmpfangService messpunktEmpfangService) {
         this.einheitRepository = einheitRepository;
         this.rohdatenRepository = rohdatenRepository;
         this.geraetezustandRepository = geraetezustandRepository;
         this.systemmeldungService = systemmeldungService;
+        this.messpunktEmpfangService = messpunktEmpfangService;
         // Offset-behaftete Zeit NICHT auf die Kontext-Zeitzone normalisieren, damit die vom Pi
         // gesendete lokale Wanduhrzeit verbatim erhalten bleibt (OffsetDateTime.toLocalDateTime()).
         this.objectMapper = objectMapper.copy()
@@ -92,6 +118,8 @@ public class MqttIngestService {
     public void handle(String topic, String payload) {
         log.info("MQTT data received. Topic: {}, payload: {}", topic, payload);
         metrics.recordReceived();
+        Empfangsvermerk vermerk = new Empfangsvermerk();
+        vermerk.payload = payload;
         try {
             if (topic == null) {
                 log.warn("MQTT: Nachricht ohne Topic verworfen");
@@ -103,8 +131,8 @@ public class MqttIngestService {
             //    gPlugK (gPlug/{orgId}/{messpunkt}/tele/SENSOR, FR-10). Beide ergeben dieselbe
             //    interne Form; ab hier gibt es keinen Unterschied mehr.
             Meldung meldung = topic.startsWith(GPLUG_ROOT + "/")
-                    ? leseGplugMeldung(topic, payload)
-                    : leseZevMeldung(topic, payload);
+                    ? leseGplugMeldung(topic, payload, vermerk)
+                    : leseZevMeldung(topic, payload, vermerk);
             if (meldung == null) {
                 metrics.recordFailed();
                 return;
@@ -114,6 +142,7 @@ public class MqttIngestService {
             ZaehlerMesswertPayloadDTO p = meldung.werte();
             if (p.getZaehlerstandBezug().signum() < 0 || p.getZaehlerstandEinspeisung().signum() < 0) {
                 log.warn("MQTT: negativer Zählerstand (Topic {}) – verworfen", topic);
+                vermerk.verwirf(GRUND_NEGATIV);
                 metrics.recordFailed();
                 return;
             }
@@ -130,6 +159,7 @@ public class MqttIngestService {
                     .toList();
             if (einheiten.isEmpty()) {
                 log.warn("MQTT: unbekannter Messpunkt (org={}, messpunkt={}) – verworfen", orgId, messpunkt);
+                vermerk.ergebnis = MesspunktEmpfangErgebnis.UNBEKANNTER_MESSPUNKT;
                 metrics.recordFailed();
                 return;
             }
@@ -139,6 +169,9 @@ public class MqttIngestService {
             for (Einheit einheit : einheiten) {
                 upsertRohdaten(orgId, einheit, zeit, p);
             }
+            // GESPEICHERT erst hier, nicht aus dem Commit abgeleitet: Das allgemeine catch beendet
+            // die Transaktion normal, auch fuer verworfene Meldungen (FR-1.3).
+            vermerk.ergebnis = MesspunktEmpfangErgebnis.GESPEICHERT;
 
             // 5) Zustandswerte (Specs/Gerätezustand.md). Beiwerk: Ein ungueltiger Wert darf weder
             //    die Zaehlerstaende noch die Metriken beruehren - die Nachricht war gueltig.
@@ -150,6 +183,9 @@ public class MqttIngestService {
         } catch (Exception e) {
             metrics.recordFailed();
             log.warn("MQTT: Nachricht verworfen (Topic {}): {}", topic, e.getMessage());
+            vermerk.verwirf(GRUND_VERARBEITUNG);
+        } finally {
+            halteEmpfangFest(vermerk);
         }
     }
 
@@ -161,10 +197,103 @@ public class MqttIngestService {
     }
 
     /**
+     * Was über den Ausgang einer Meldung bekannt ist (Specs/Messpunkt-Empfang.md, FR-1.3).
+     *
+     * <p>Wächst mit der Verarbeitung: Mandant, Messpunkt und Quelle kennt er, sobald das Topic
+     * gelesen ist; die Stände, sobald sie lesbar sind; das Ergebnis am Ende. <b>Die erste
+     * gescheiterte Prüfung bestimmt das Ergebnis</b> — die Reihenfolge der Aufrufe im Ingest ist
+     * die Prüfreihenfolge der Spec.
+     */
+    private static final class Empfangsvermerk {
+        Long orgId;
+        String messpunkt;
+        MesspunktEmpfangQuelle quelle;
+        BigDecimal bezug;
+        BigDecimal einspeisung;
+        MesspunktEmpfangErgebnis ergebnis;
+        String grund;
+        /** Die Meldung, wie sie ankam — bei jedem Ergebnis (FR-1.9). */
+        String payload;
+
+        /** Ohne lesbares Topic gibt es keine Zeile, der man die Meldung zuordnen könnte (FR-1.5). */
+        boolean hatZiel() {
+            return orgId != null;
+        }
+
+        void verwirf(String grund) {
+            this.ergebnis = MesspunktEmpfangErgebnis.UNGUELTIG;
+            this.grund = grund;
+        }
+
+        MesspunktEmpfangService.Meldung alsMeldung() {
+            return new MesspunktEmpfangService.Meldung(orgId, messpunkt, quelle, bezug, einspeisung,
+                    ergebnis, grund, payload);
+        }
+    }
+
+    /**
+     * Setzt Mandant, Messpunkt und Quelle des Vermerks — ausser der Messpunkt ist leer oder länger
+     * als die Spalte (FR-1.5): Dann bleibt der Vermerk ohne Ziel und wird nicht festgehalten.
+     */
+    private static void setzeZiel(Empfangsvermerk vermerk, long orgId, String messpunkt,
+                                  MesspunktEmpfangQuelle quelle) {
+        if (messpunkt.isEmpty()) {
+            return;
+        }
+        if (messpunkt.length() > MAX_MESSPUNKT_LAENGE_EMPFANG) {
+            // Kuerzen hiesse, zwei verschiedene Messpunkte koennten auf dieselbe Zeile fallen.
+            log.warn("MQTT: Messpunkt länger als {} Zeichen – kein Empfangsvermerk (org={})",
+                    MAX_MESSPUNKT_LAENGE_EMPFANG, orgId);
+            return;
+        }
+        vermerk.orgId = orgId;
+        vermerk.messpunkt = messpunkt;
+        vermerk.quelle = quelle;
+    }
+
+    /**
+     * Hält den Empfang fest — <b>nach dem Ende der Ingest-Transaktion</b>, in einer eigenen
+     * (Specs/Messpunkt-Empfang.md, FR-1.6).
+     *
+     * <p>Erst danach steht fest, ob die Rohdaten wirklich gespeichert sind: Scheitert der Commit,
+     * wird aus {@code GESPEICHERT} ein {@code Speichern fehlgeschlagen}. Und ein Fehler beim
+     * Festhalten kann die Rohdaten nicht mehr kosten — im selben Transaktionsschritt setzte ein
+     * werfender Upsert die ganze Transaktion auf rollback-only.
+     */
+    private void halteEmpfangFest(Empfangsvermerk vermerk) {
+        if (!vermerk.hatZiel() || vermerk.ergebnis == null) {
+            return;
+        }
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            halteFestOhneFolgen(vermerk);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_COMMITTED) {
+                    vermerk.verwirf(GRUND_SPEICHERN);
+                }
+                halteFestOhneFolgen(vermerk);
+            }
+        });
+    }
+
+    /** Ein Fehler beim Festhalten wird nur protokolliert — die Anzeige darf die Messung nie kosten. */
+    private void halteFestOhneFolgen(Empfangsvermerk vermerk) {
+        try {
+            messpunktEmpfangService.halteFest(vermerk.alsMeldung());
+        } catch (RuntimeException e) {
+            log.warn("MQTT: Empfang konnte nicht festgehalten werden (org={}, messpunkt={}): {}",
+                    vermerk.orgId, vermerk.messpunkt, e.getMessage());
+        }
+    }
+
+    /**
      * Liest eine Meldung des Pi-Gateways (FR-2, FR-3). {@code null} = verworfen, der Grund ist
      * geloggt.
      */
-    private Meldung leseZevMeldung(String topic, String payload) throws Exception {
+    private Meldung leseZevMeldung(String topic, String payload, Empfangsvermerk vermerk) {
         String[] parts = topic.split("/");
         if (parts.length != 4 || !"zev".equals(parts[0]) || !"messwert".equals(parts[3])) {
             log.warn("MQTT: ungültiges Topic '{}' verworfen", topic);
@@ -174,11 +303,29 @@ public class MqttIngestService {
         if (orgId == null) {
             return null;
         }
+        setzeZiel(vermerk, orgId, parts[2], MesspunktEmpfangQuelle.PI_GATEWAY);
 
-        ZaehlerMesswertPayloadDTO p = objectMapper.readValue(payload, ZaehlerMesswertPayloadDTO.class);
+        ZaehlerMesswertPayloadDTO p;
+        try {
+            p = objectMapper.readValue(payload, ZaehlerMesswertPayloadDTO.class);
+        } catch (JacksonException e) {
+            // Kein JSON oder ein Feld vom falschen Typ ("timestamp": "abc")
+            log.warn("MQTT: Payload nicht lesbar (Topic {}) – verworfen: {}", topic, e.getOriginalMessage());
+            vermerk.verwirf(GRUND_PAYLOAD_NICHT_LESBAR);
+            return null;
+        }
+        if (p == null) {
+            // Das JSON-Literal null: lesbar fuer Jackson, aber keine Meldung
+            log.warn("MQTT: Payload ist null (Topic {}) – verworfen", topic);
+            vermerk.verwirf(GRUND_PAYLOAD_NICHT_LESBAR);
+            return null;
+        }
+        vermerk.bezug = p.getZaehlerstandBezug();
+        vermerk.einspeisung = p.getZaehlerstandEinspeisung();
         if (p.getTimestamp() == null || p.getZaehlerstandBezug() == null
                 || p.getZaehlerstandEinspeisung() == null) {
             log.warn("MQTT: Pflichtfeld fehlt (Topic {}) – verworfen", topic);
+            vermerk.verwirf(GRUND_PFLICHTFELD_FEHLT);
             return null;
         }
         // Der Pi sendet die lokale Zeit mit Offset (ISO 8601); die lokale Wanduhrzeit
@@ -194,7 +341,7 @@ public class MqttIngestService {
      * Strom, Spannung, Tarifregister) werden ignoriert. {@code null} = verworfen, der Grund ist
      * geloggt.
      */
-    private Meldung leseGplugMeldung(String topic, String payload) throws Exception {
+    private Meldung leseGplugMeldung(String topic, String payload, Empfangsvermerk vermerk) {
         String[] parts = topic.split("/");
         if (parts.length != 5 || !GPLUG_ROOT.equals(parts[0]) || !"tele".equals(parts[3])
                 || !"SENSOR".equals(parts[4])) {
@@ -205,22 +352,55 @@ public class MqttIngestService {
         if (orgId == null) {
             return null;
         }
+        setzeZiel(vermerk, orgId, parts[2], MesspunktEmpfangQuelle.GPLUG);
 
-        JsonNode wurzel = objectMapper.readTree(payload);
+        JsonNode wurzel;
+        try {
+            wurzel = objectMapper.readTree(payload);
+        } catch (JacksonException e) {
+            log.warn("MQTT: gPlug-Payload nicht lesbar (Topic {}) – verworfen: {}", topic, e.getOriginalMessage());
+            vermerk.verwirf(GRUND_PAYLOAD_NICHT_LESBAR);
+            return null;
+        }
         JsonNode zeitKnoten = wurzel.path("Time");
         JsonNode z = wurzel.path("z");
         JsonNode ei = z.path("Ei");
-        if (!zeitKnoten.isTextual() || !ei.isNumber()) {
-            log.warn("MQTT: gPlug-Pflichtfeld Time oder z.Ei fehlt (Topic {}) – verworfen", topic);
+        JsonNode eo = z.path("Eo");
+        // Fuer den Vermerk so, wie gemeldet: ein fehlendes Eo bleibt NULL, auch wenn die Rohdaten
+        // dafuer 0 speichern (Specs/Messpunkt-Empfang.md, FR-1.4)
+        vermerk.bezug = ei.isNumber() ? ei.decimalValue() : null;
+        vermerk.einspeisung = eo.isNumber() ? eo.decimalValue() : null;
+        // Lesbarkeit vor Vollstaendigkeit (FR-1.3): Ein vorhandenes Feld vom falschen Typ
+        // ("Ei":"abc", "Time":12345) oder eine Time, die keine Zeit ist, macht den Payload
+        // unlesbar - auch wenn zugleich ein anderes Pflichtfeld fehlt. Nur ein FEHLENDES Feld ist
+        // "Pflichtfeld fehlt".
+        if (falscherTyp(zeitKnoten, JsonNode::isTextual) || falscherTyp(ei, JsonNode::isNumber)
+                || falscherTyp(eo, JsonNode::isNumber)) {
+            log.warn("MQTT: gPlug-Feld vom falschen Typ (Topic {}) – verworfen", topic);
+            vermerk.verwirf(GRUND_PAYLOAD_NICHT_LESBAR);
             return null;
         }
-        LocalDateTime zeit = parseGplugZeit(zeitKnoten.asText());
+        LocalDateTime zeit = null;
+        if (zeitKnoten.isTextual()) {
+            try {
+                zeit = parseGplugZeit(zeitKnoten.asText());
+            } catch (DateTimeParseException e) {
+                log.warn("MQTT: gPlug-Time '{}' nicht lesbar (Topic {}) – verworfen", zeitKnoten.asText(), topic);
+                vermerk.verwirf(GRUND_PAYLOAD_NICHT_LESBAR);
+                return null;
+            }
+        }
+        if (zeit == null || !ei.isNumber()) {
+            log.warn("MQTT: gPlug-Pflichtfeld Time oder z.Ei fehlt (Topic {}) – verworfen", topic);
+            vermerk.verwirf(GRUND_PFLICHTFELD_FEHLT);
+            return null;
+        }
         if (zeit.isBefore(GPLUG_FRUEHESTE_ZEIT)) {
             // Vor der ersten NTP-Synchronisation zaehlt Tasmota ab 1970.
             log.warn("MQTT: gPlug-Uhr nicht synchronisiert (Time {}, Topic {}) – verworfen", zeit, topic);
+            vermerk.verwirf(GRUND_GPLUG_UHR);
             return null;
         }
-        JsonNode eo = z.path("Eo");
         BigDecimal bezug = ei.decimalValue();
         BigDecimal einspeisung = eo.isNumber() ? eo.decimalValue() : BigDecimal.ZERO;
         if (bezug.signum() == 0 && einspeisung.signum() == 0) {
@@ -228,6 +408,7 @@ public class MqttIngestService {
             // Smartmeters gelesen hat. Gespeichert loeste so ein Stand erst einen Ruecksprung
             // aus und im Folgeintervall einen Sprung um den ganzen Zaehlerstand (FR-10.5).
             log.warn("MQTT: gPlug meldet Ei = Eo = 0 (Topic {}) – verworfen", topic);
+            vermerk.verwirf(GRUND_EI_EO_NULL);
             return null;
         }
 
@@ -239,6 +420,11 @@ public class MqttIngestService {
             werte.setSeriennummer(smid.asText());
         }
         return new Meldung(orgId, parts[2], zeit, werte);
+    }
+
+    /** Ein Feld ist vorhanden (auch {@code null}), hat aber nicht den erwarteten Typ. */
+    private static boolean falscherTyp(JsonNode knoten, Predicate<JsonNode> erwartet) {
+        return !knoten.isMissingNode() && !knoten.isNull() && !erwartet.test(knoten);
     }
 
     /**

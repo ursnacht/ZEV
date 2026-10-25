@@ -24,7 +24,7 @@
 
 ### FR-2: Icon-Registry
 * Neue Icons werden in `frontend-service/src/app/components/icon/icons.ts` registriert.
-* Verwendete Icons: sun, moon, upload, home, zap, bar-chart-2, pie-chart, file-text, tag, globe, log-out, plus, check, x, edit-2, trash-2, copy, download, search, calculator, save, refresh-cw, eye, settings, user, users, calendar, filter, plus-circle, alert-circle, info, check-circle, grid, shield, layout, **credit-card** (Debitorkontrolle), **chevron-left**, **chevron-right** (Blättern, FR-1).
+* Verwendete Icons: sun, moon, upload, home, zap, bar-chart-2, pie-chart, file-text, tag, globe, log-out, plus, check, x, edit-2, trash-2, copy, download, search, calculator, save, refresh-cw, eye, settings, user, users, calendar, filter, plus-circle, alert-circle, info, check-circle, grid, shield, layout, **credit-card** (Debitorkontrolle), **chevron-left**, **chevron-right** (Blättern, FR-1), **radio** (Messpunkt-Empfang).
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 * [ ] Die Anwendung hat in der Titelzeile ein tolles Icon, das das Thema der Anwendung widerspiegelt. 

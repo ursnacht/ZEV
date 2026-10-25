@@ -71,12 +71,13 @@ describe('NavigationComponent', () => {
     Array.from(wurzel?.querySelectorAll('a') ?? []).map(a => a.getAttribute('href') ?? '');
 
   describe('Admin-Untermenü', () => {
-    it('should list the six admin entries in order inside the submenu', async () => {
+    it('should list the seven admin entries in order inside the submenu', async () => {
       await baue(ALLE_ADMIN_PERMISSIONS);
 
       expect(adminToggle()?.textContent).toContain('ADMIN');
       expect(hrefs(submenu())).toEqual([
-        '/einheiten', '/solar-calculation', '/systemmeldungen', '/einstellungen', '/translations', '/lizenzen'
+        '/einheiten', '/messpunkt-empfang', '/solar-calculation', '/systemmeldungen', '/einstellungen',
+        '/translations', '/lizenzen'
       ]);
       // In der ersten Ebene steht keiner davon mehr
       const ersteEbene = Array.from(el().querySelectorAll('.zev-navbar__menu > li > a'))
@@ -84,6 +85,17 @@ describe('NavigationComponent', () => {
       for (const href of hrefs(submenu())) {
         expect(ersteEbene).not.toContain(href);
       }
+    });
+
+    it('should place Messpunkt-Empfang directly after Einheiten with icon radio', async () => {
+      // Specs/Messpunkt-Empfang.md, FR-2.1
+      await baue(ALLE_ADMIN_PERMISSIONS);
+
+      const index = component.adminEintraege.findIndex(e => e.route === '/messpunkt-empfang');
+      expect(component.adminEintraege[index - 1].route).toBe('/einheiten');
+      expect(component.adminEintraege[index]).toEqual(expect.objectContaining({
+        key: 'MESSPUNKT_EMPFANG', icon: 'radio', permissions: ['einheit:read']
+      }));
     });
 
     it('should show only the entries the user is permitted to open', async () => {
@@ -167,8 +179,9 @@ describe('NavigationComponent', () => {
     it('should take the permissions of the entries from the routes', async () => {
       await baue(ALLE_ADMIN_PERMISSIONS);
 
+      // Einheiten und Messpunkt-Empfang teilen sich einheit:read (Specs/Messpunkt-Empfang.md)
       expect(component.adminEintraege.map(e => e.permissions)).toEqual(
-        ALLE_ADMIN_PERMISSIONS.map(p => [p]));
+        [ALLE_ADMIN_PERMISSIONS[0], ...ALLE_ADMIN_PERMISSIONS].map(p => [p]));
       expect(component.adminPermissions).toEqual(ALLE_ADMIN_PERMISSIONS);
     });
   });

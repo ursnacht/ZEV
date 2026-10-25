@@ -35,6 +35,16 @@ describe('EinheitFormComponent', () => {
       expect(component.formData.typ).toBe(EinheitTyp.CONSUMER);
     });
 
+    it('should prefill the meter point of a new unit and keep the other defaults (FR-8)', () => {
+      component.einheit = null;
+      component.messpunktVorgabe = 'MP-NEU';
+      component.ngOnInit();
+
+      expect(component.formData.messpunkt).toBe('MP-NEU');
+      expect(component.formData.typ).toBe(EinheitTyp.CONSUMER);
+      expect(component.formData.nebenkostenRelevant).toBe(true);
+    });
+
     it('should populate form with einheit data when input is provided', () => {
       const inputEinheit: Einheit = {
         id: 1,

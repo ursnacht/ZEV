@@ -58,7 +58,7 @@ Die folgende Tabelle ist ein **Überblick, nicht vollständig**. Massgeblich (Qu
 | Quarter-Selector | `.zev-quarter-selector` |
 | Checkbox | `.zev-checkbox` |
 | Icon | `.zev-icon` |
-| Typographie | `.zev-text--primary`, `.zev-text--secondary`, `.zev-text--danger`, `.zev-text--muted` |
+| Typographie | `.zev-text--primary`, `.zev-text--secondary`, `.zev-text--danger`, `.zev-text--muted`, `.zev-code-block` (Festbreitenschrift, z.B. Meldungs-Payload) |
 | Statistik | `.zev-info-row`, `.zev-bar-container`, `.zev-empty-state` |
 
 **Regeln:**

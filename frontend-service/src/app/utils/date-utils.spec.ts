@@ -164,6 +164,20 @@ describe('Date Utils', () => {
     it('should return the fallback for an unreadable value', () => {
       expect(formatSwissDateTime('kein Datum')).toBe('-');
     });
+
+    it('should append padded seconds when mitSekunden is true', () => {
+      // Specs/Messpunkt-Empfang.md, FR-2.3: Letzter Empfang als dd.MM.yyyy HH:mm:ss
+      expect(formatSwissDateTime('2026-10-25T09:59:30', '-', true)).toBe('25.10.2026 09:59:30');
+      expect(formatSwissDateTime(new Date(2026, 8, 1, 0, 0, 5), '-', true)).toBe('01.09.2026 00:00:05');
+    });
+
+    it('should omit the seconds by default', () => {
+      expect(formatSwissDateTime('2026-10-25T09:59:30')).toBe('25.10.2026 09:59');
+    });
+
+    it('should return the fallback with mitSekunden as well', () => {
+      expect(formatSwissDateTime(null, '–', true)).toBe('–');
+    });
   });
 
   describe('blaettereZeitraum', () => {

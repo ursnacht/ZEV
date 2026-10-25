@@ -1,11 +1,11 @@
 import { createSpyObj, SpyObj } from '../../../testing/spy';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { fakeAsync, tick } from '../../../testing/fake-async';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { EinheitListComponent } from './einheit-list.component';
 import { EinheitService } from '../../services/einheit.service';
 import { TranslationService } from '../../services/translation.service';
-import { Einheit, EinheitTyp } from '../../models/einheit.model';
+import { Einheit, EinheitTyp, MAX_MESSPUNKT_LAENGE } from '../../models/einheit.model';
 import { of, throwError } from 'rxjs';
 import Keycloak from 'keycloak-js';
 
@@ -15,6 +15,9 @@ describe('EinheitListComponent', () => {
   let einheitServiceSpy: SpyObj<EinheitService>;
   let translationServiceSpy: SpyObj<TranslationService>;
   let routerSpy: SpyObj<Router>;
+
+  /** Query-Parameter der Route; die Komponente liest sie in ngOnInit (FR-8). */
+  let queryParams: Record<string, string>;
 
   /** Realm-Rollen des Test-Benutzers; die Komponente liest sie beim Erzeugen. */
   let rollen: string[];
@@ -31,6 +34,7 @@ describe('EinheitListComponent', () => {
 
   beforeEach(async () => {
     rollen = ['einheit:read', 'einheit:write'];
+    queryParams = {};
     einheitServiceSpy = createSpyObj<EinheitService>('EinheitService', [
       'getAllEinheiten', 'createEinheit', 'updateEinheit', 'deleteEinheit'
     ]);
@@ -47,6 +51,7 @@ describe('EinheitListComponent', () => {
         { provide: EinheitService, useValue: einheitServiceSpy },
         { provide: TranslationService, useValue: translationServiceSpy },
         { provide: Router, useValue: routerSpy },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: (key: string) => queryParams[key] ?? null } } } },
         { provide: Keycloak, useValue: keycloakMock }
       ]
     }).compileComponents();
@@ -618,6 +623,44 @@ describe('EinheitListComponent', () => {
       component.loadEinheiten();
 
       expect(component.einheiten.map(e => e.name)).toEqual(['Zora', 'Anna']);
+    });
+  });
+
+  // Specs/Einheitenverwaltung.md, FR-8: Aufruf aus der Ansicht Messpunkt-Empfang
+  describe('neue Einheit per URL (FR-8)', () => {
+    /** Die Komponente neu erzeugen, nachdem Rollen und Query-Parameter gesetzt sind. */
+    function neuErzeugen(): void {
+      fixture = TestBed.createComponent(EinheitListComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+    }
+
+    it('should open the form with the meter point from the URL and clear the parameters', () => {
+      queryParams = { neu: '1', messpunkt: 'MP-NEU' };
+      routerSpy.navigate.mockClear();
+      neuErzeugen();
+
+      expect(component.showForm).toBe(true);
+      expect(component.selectedEinheit).toBeNull();
+      expect(component.messpunktVorgabe).toBe('MP-NEU');
+      expect(routerSpy.navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: {}, replaceUrl: true }));
+    });
+
+    it('should not take over a meter point longer than 50 characters', () => {
+      queryParams = { neu: '1', messpunkt: 'x'.repeat(MAX_MESSPUNKT_LAENGE + 1) };
+      neuErzeugen();
+
+      expect(component.showForm).toBe(true);
+      expect(component.messpunktVorgabe).toBeNull();
+    });
+
+    it('should ignore the parameters without einheit:write', () => {
+      rollen = ['einheit:read'];
+      queryParams = { neu: '1', messpunkt: 'MP-NEU' };
+      neuErzeugen();
+
+      expect(component.showForm).toBe(false);
+      expect(component.messpunktVorgabe).toBeNull();
     });
   });
 });

@@ -14,6 +14,9 @@ export enum EinheitTyp {
   SPEICHER = 'SPEICHER'
 }
 
+/** Länge von `zev.einheit.messpunkt` – Formularfeld, Backend-`@Size` und Messpunkt-Empfang. */
+export const MAX_MESSPUNKT_LAENGE = 50;
+
 export interface Einheit {
   id?: number;
   name: string;

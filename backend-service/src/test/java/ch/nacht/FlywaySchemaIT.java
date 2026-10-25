@@ -34,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * <p>Specs/Einheitenverwaltung.md, Abschnitt 5 (Loeschen referenzierter Daten).
  * Specs/Gerätezustand.md, Abschnitt 3 (CHECK, Unique-Schluessel und Index von {@code geraetezustand}).
+ * Specs/Messpunkt-Empfang.md, Datenmodell (CHECKs und Unique-Constraint von {@code messpunkt_empfang}).
  */
 class FlywaySchemaIT extends AbstractIntegrationTest {
 
@@ -222,6 +223,105 @@ class FlywaySchemaIT extends AbstractIntegrationTest {
                 .contains("idx_geraetezustand_letzter")
                 .doesNotContain("Seq Scan")
                 .doesNotContain("Sort");
+    }
+
+    // ==================== Messpunkt-Empfang (Specs/Messpunkt-Empfang.md, Datenmodell, V186) ====================
+
+    /** Eine Empfangszeile direkt per SQL - an der Anwendung vorbei, damit die CHECKs greifen müssen. */
+    private void empfang(String messpunkt, String quelle, long anzahl, String ergebnis, String grund)
+            throws SQLException {
+        try (PreparedStatement ps = verbindung.prepareStatement(
+                "INSERT INTO zev.messpunkt_empfang (org_id, messpunkt, quelle, erster_empfang, letzter_empfang, "
+                        + "anzahl_meldungen, ergebnis, grund) VALUES (?, ?, ?, now(), now(), ?, ?, ?)")) {
+            ps.setLong(1, orgId);
+            ps.setString(2, messpunkt);
+            ps.setString(3, quelle);
+            ps.setLong(4, anzahl);
+            ps.setString(5, ergebnis);
+            ps.setString(6, grund);
+            ps.executeUpdate();
+        }
+    }
+
+    private long zaehleEmpfang(String messpunkt) throws SQLException {
+        try (PreparedStatement ps = verbindung.prepareStatement(
+                "SELECT COUNT(*) FROM zev.messpunkt_empfang WHERE org_id = ? AND messpunkt = ?")) {
+            ps.setLong(1, orgId);
+            ps.setString(2, messpunkt);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getLong(1);
+            }
+        }
+    }
+
+    /** Gegenprobe zu den CHECKs: gültige Zeilen beider Quellen und aller Ergebnisse gehen durch. */
+    @Test
+    void messpunktEmpfang_GueltigeZeilen_WerdenAngenommen() throws SQLException {
+        empfang("MP-1", "PI_GATEWAY", 1, "GESPEICHERT", null);
+        empfang("MP-2", "GPLUG", 2, "UNBEKANNTER_MESSPUNKT", null);
+        empfang("MP-3", "GPLUG", 1, "UNGUELTIG", "Payload nicht lesbar");
+
+        assertThat(zaehleEmpfang("MP-1") + zaehleEmpfang("MP-2") + zaehleEmpfang("MP-3")).isEqualTo(3);
+    }
+
+    @Test
+    void messpunktEmpfang_UnbekannteQuelle_WirdAbgewiesen() {
+        assertThatThrownBy(() -> empfang("MP-1", "TASMOTA", 1, "GESPEICHERT", null))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("ck_messpunkt_empfang_quelle");
+    }
+
+    @Test
+    void messpunktEmpfang_UnbekanntesErgebnis_WirdAbgewiesen() {
+        assertThatThrownBy(() -> empfang("MP-1", "PI_GATEWAY", 1, "VERWORFEN", null))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("ck_messpunkt_empfang_ergebnis");
+    }
+
+    @Test
+    void messpunktEmpfang_AnzahlNull_WirdAbgewiesen() {
+        assertThatThrownBy(() -> empfang("MP-1", "PI_GATEWAY", 0, "GESPEICHERT", null))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("ck_messpunkt_empfang_anzahl");
+    }
+
+    /** Ein Grund genau dann, wenn die Meldung verworfen wurde - in beide Richtungen. */
+    @Test
+    void messpunktEmpfang_GrundNichtGenauBeiUngueltig_WirdAbgewiesen() {
+        assertThatThrownBy(() -> empfang("MP-1", "PI_GATEWAY", 1, "UNGUELTIG", null))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("ck_messpunkt_empfang_grund");
+        assertThatThrownBy(() -> empfang("MP-2", "PI_GATEWAY", 1, "GESPEICHERT", "Pflichtfeld fehlt"))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("ck_messpunkt_empfang_grund");
+    }
+
+    /** Der Upsert stützt sich auf {@code (org_id, messpunkt)}; ein zweiter Datensatz wird abgewiesen. */
+    @Test
+    void messpunktEmpfang_DoppelterMesspunkt_WirdAbgewiesen() throws SQLException {
+        empfang("MP-1", "PI_GATEWAY", 1, "GESPEICHERT", null);
+
+        assertThatThrownBy(() -> empfang("MP-1", "GPLUG", 1, "GESPEICHERT", null))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("uq_messpunkt_empfang_org_messpunkt");
+    }
+
+    /**
+     * Kein FK auf {@code zev.einheit} (FR-1.7): Ändern des Messpunkts und Löschen der Einheit lassen
+     * die Empfangszeile stehen.
+     */
+    @Test
+    void messpunktEmpfang_EinheitGeaendertUndGeloescht_ZeileBleibt() throws SQLException {
+        long einheit = einheit("Wohnung", "CONSUMER");
+        aendern("UPDATE zev.einheit SET messpunkt = 'MP-1' WHERE id = ?", einheit);
+        empfang("MP-1", "PI_GATEWAY", 1, "GESPEICHERT", null);
+
+        aendern("UPDATE zev.einheit SET messpunkt = 'MP-ANDERS' WHERE id = ?", einheit);
+        assertThat(zaehleEmpfang("MP-1")).isEqualTo(1);
+
+        aendern("DELETE FROM zev.einheit WHERE id = ?", einheit);
+        assertThat(zaehleEmpfang("MP-1")).isEqualTo(1);
     }
 
     // ==================== Hilfsmethoden ====================

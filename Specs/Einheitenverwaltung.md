@@ -68,6 +68,18 @@ Die Regeln gehören den Features, die die Typen eingeführt haben; hier nur der 
 1. User wählt im Kebab-Menü einer Zeile „Tarifpositionen“.
 2. System navigiert auf `/tarifpositionen?einheitId=<id>` (Seite und Vorauswahl: `Specs/Ladestationen.md`, FR-3, und `Specs/Tarifpositionen.md`). Der Eintrag erscheint bei jeder Einheit, unabhängig vom Typ und auch ohne `einheit:write`.
 
+### FR-8: Neue Einheit mit vorausgefülltem Messpunkt (Aufruf per URL)
+1. Die Liste wird mit `/einheiten?neu=1&messpunkt=<messpunkt>` aufgerufen – aus der Ansicht
+   Messpunkt-Empfang (`Specs/Messpunkt-Empfang.md`, FR-2.8).
+2. Hat der User `einheit:write`, öffnet sich nach dem Laden das Formular für eine **neue** Einheit
+   wie bei FR-3, mit dem Messpunkt aus der URL vorausgefüllt (URL-dekodiert). Alle übrigen
+   Vorbelegungen bleiben wie in FR-3.2.
+3. Ist der Messpunkt länger als 50 Zeichen oder leer, öffnet sich das Formular **ohne** Messpunkt.
+   > Das Feld schnitte ihn sonst still ab (`maxlength`), und die neue Einheit passte wieder nicht.
+4. Ohne `einheit:write` werden die Parameter ignoriert; die Liste erscheint wie gewohnt.
+5. Nach der Übernahme werden die Parameter aus der URL entfernt (`replaceUrl`), damit ein Neuladen
+   oder Zurück das Formular nicht erneut öffnet.
+
 ### Datenmodell & Persistierung
 * **Tabelle:** `zev.einheit` (Ist-Schema per `information_schema`/`pg_constraint`; Entity `backend-service/src/main/java/ch/nacht/entity/Einheit.java`)
 * **Spalten:**
@@ -248,6 +260,11 @@ Neu mit `V185__Add_Einheitenverwaltung_Fehler_Translations.sql` (Anhang A.6):
 * [x] Der Kebab-Eintrag „Tarifpositionen“ navigiert auf `/tarifpositionen?einheitId=<id>`. (Test: einheit-list.component.spec.ts › onTarifpositionen › should navigate to the tarifpositionen page with the einheitId)
 * [x] Das Kebab-Menü enthält Bearbeiten, Tarifpositionen und Löschen in dieser Reihenfolge. (Test: einheit-list.component.spec.ts › initialization › should have menu items for edit, tarifpositionen and delete)
 
+### Neue Einheit per URL
+* [x] `/einheiten?neu=1&messpunkt=<m>` öffnet mit `einheit:write` das Formular für eine neue Einheit mit vorausgefülltem Messpunkt; die Parameter verschwinden danach aus der URL. (Test: einheit-list.component.spec.ts › neue Einheit per URL (FR-8) › should open the form with the meter point from the URL and clear the parameters; einheit-form.component.spec.ts › initialization › should prefill the meter point of a new unit and keep the other defaults (FR-8))
+* [x] Ein Messpunkt über 50 Zeichen wird nicht übernommen; das Formular öffnet ohne Messpunkt. (Test: einheit-list.component.spec.ts › neue Einheit per URL (FR-8) › should not take over a meter point longer than 50 characters)
+* [x] Ohne `einheit:write` werden die Parameter ignoriert. (Test: einheit-list.component.spec.ts › neue Einheit per URL (FR-8) › should ignore the parameters without einheit:write)
+
 ### Sicherheit & API
 * [x] `POST /api/einheit` mit `einheit:write` erreicht den Controller (`201`). (Test: ControllerAuthorizationTest#createEinheit_withEinheitWrite_reachesController)
 * [x] `POST /api/einheit` nur mit `einheit:read` (Rolle `zev_user`) → `403`, der Service wird nicht aufgerufen. (Test: ControllerAuthorizationTest#createEinheit_withReadPermissionOnly_forbidden)
@@ -302,6 +319,7 @@ Neu mit `V185__Add_Einheitenverwaltung_Fehler_Translations.sql` (Anhang A.6):
   * Nenner der Nebenkostenumlage (`countByTypAndNebenkostenRelevantTrue`) – `Specs/Nebenkosten/Abrechnung.md`, FR-2 und FR-9
   * Einheiten-Auswahllisten (`EinheitSelectorComponent`, Rechnungen, Debitorkontrolle, Messwerte-Grafik)
   * Menü – `Specs/Hamburgermenü.md`, FR-2
+  * Ansicht Messpunkt-Empfang, Eintrag „Einheit anlegen“ (FR-8) – `Specs/Messpunkt-Empfang.md`, FR-2.8
 * **Datenmigration:** n/a – keine.
 
 ## 7. Abgrenzung / Out of Scope

@@ -1,0 +1,25 @@
+-- Messpunkt-Empfang: Texte der Ansicht (Specs/Messpunkt-Empfang.md, Übersetzungen)
+INSERT INTO zev.translation (key, deutsch, englisch) VALUES
+('MESSPUNKT_EMPFANG', 'Messpunkt-Empfang', 'Meter point reception'),
+('MESSPUNKT_EMPFANG_KEINE_DATEN', 'Keine Messpunkte vorhanden.', 'No meter points available.'),
+('MESSPUNKT_EMPFANG_LETZTER', 'Letzter Empfang', 'Last received'),
+('MESSPUNKT_EMPFANG_ERSTER', 'Erster Empfang', 'First received'),
+('MESSPUNKT_EMPFANG_ANZAHL', 'Meldungen', 'Messages'),
+('MESSPUNKT_EMPFANG_QUELLE', 'Quelle', 'Source'),
+('MESSPUNKT_EMPFANG_QUELLE_PI_GATEWAY', 'Pi-Gateway', 'Pi gateway'),
+('MESSPUNKT_EMPFANG_QUELLE_GPLUG', 'gPlug', 'gPlug'),
+('MESSPUNKT_EMPFANG_STAND_BEZUG', 'Zählerstand Bezug (kWh)', 'Meter reading consumption (kWh)'),
+('MESSPUNKT_EMPFANG_STAND_EINSPEISUNG', 'Zählerstand Einspeisung (kWh)', 'Meter reading feed-in (kWh)'),
+('MESSPUNKT_EMPFANG_ERGEBNIS', 'Ergebnis', 'Result'),
+('MESSPUNKT_EMPFANG_GESPEICHERT', 'Gespeichert', 'Stored'),
+('MESSPUNKT_EMPFANG_UNBEKANNTER_MESSPUNKT', 'Keine Einheit zugeordnet', 'No unit assigned'),
+('MESSPUNKT_EMPFANG_UNGUELTIG', 'Verworfen', 'Rejected'),
+('MESSPUNKT_EMPFANG_KEIN_EMPFANG', 'Kein Empfang', 'Nothing received'),
+('MESSPUNKT_EMPFANG_VOR_MINUTEN', 'vor {0} Min.', '{0} min ago'),
+('MESSPUNKT_EMPFANG_VOR_STUNDEN', 'vor {0} Std.', '{0} h ago'),
+('MESSPUNKT_EMPFANG_VOR_TAGEN', 'vor {0} Tagen', '{0} days ago'),
+('MESSPUNKT_EMPFANG_EINHEIT_ANLEGEN', 'Einheit anlegen', 'Create unit'),
+('MESSPUNKT_EMPFANG_LOESCHEN_BESTAETIGEN', 'Eintrag löschen? Sendet der Messpunkt weiter, erscheint er wieder.', 'Delete entry? It reappears if the meter point keeps sending.'),
+('MESSPUNKT_EMPFANG_GELOESCHT', 'Eintrag gelöscht', 'Entry deleted'),
+('MESSPUNKT_EMPFANG_FEHLER_LOESCHEN', 'Eintrag konnte nicht gelöscht werden', 'Entry could not be deleted')
+ON CONFLICT (key) DO NOTHING;
