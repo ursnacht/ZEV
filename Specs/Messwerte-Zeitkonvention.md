@@ -400,9 +400,20 @@ es dort braucht):
   Winterzeit (25.10.2026) gibt es die Stunde 02:00–03:00 zweimal.
   * **MQTT:** Vorbestehend, das Verhalten ist nicht spezifiziert. Auch die Rohdaten tragen
     Ortszeit ohne Zone; die Stände beider Durchgänge mischen sich in der Delta-Bildung, und
-    `upsertMesswert` schreibt pro Einheit und Stempel höchstens eine Zeile. Die Werte dieser
-    Stunde sind unzuverlässig — heute wie nach der Umstellung. Die Kollisionsprüfung des Skripts
-    vergleicht MQTT nur mit anderen Quellen und ist davon nicht berührt.
+    `upsertMesswert` schreibt pro Einheit und Stempel höchstens eine Zeile. Die
+    **Viertelstundenwerte dieser Stunde sind unzuverlässig, die Energie bleibt erhalten**
+    (beobachtet auf Hene am 25.10.2026, Hintergrund: Anhang A.1):
+    * Der Tag hat 96 Intervalle, keines fehlt; die **Energie der doppelten Stunde landet im
+      Intervall 02:00**, das als Spitze erscheint (Statistik, Einspeisesteuerung) — kein echter
+      Mehrverbrauch.
+    * Summen über die Nacht, den Tag und das Quartal stimmen, weil die Zählerstände absolut sind:
+      Die Summe der Messwerte entspricht der Differenz der Zählerstände.
+    * In `zaehler_rohdaten` liegen Lesungen beider Durchgänge gemischt in der Stunde 02:00;
+      überschrieben wird nur, wo der Zeitstempel auf die Sekunde gleich ist.
+    * Es entsteht keine Systemmeldung (kein Rücksprung, keine Lücke).
+
+    Die Kollisionsprüfung des Skripts vergleicht MQTT nur mit anderen Quellen und ist davon
+    nicht berührt.
   * **CSV:** Doppelzeilen möglich (siehe Abschnitt 7).
 * **Ungültige Eingaben, Netzwerkfehler:** nicht berührt — es gibt keine neue Eingabe und keinen
   neuen Aufruf.
@@ -474,3 +485,23 @@ Keine. Geklärt am 09.10.2026:
 * Die Datenumstellung ist ein einmaliges Skript ausserhalb von Flyway, ohne Schutz gegen einen
   Lauf nach dem Start der neuen Version — der User hält die Reihenfolge aus NFR-3 ein.
 * Datenlücke und Sammel-Intervall während der Ausfallzeit sind hinnehmbar.
+
+## Anhang A – Entscheidungen und Verlauf
+
+### A.1 Erste Umstellung auf Winterzeit mit MQTT-Daten (§5, 25.10.2026)
+§5 sagte zur doppelten Stunde bei MQTT nur: „Die Werte dieser Stunde sind unzuverlässig — heute
+wie nach der Umstellung." Am 25.10.2026 auf Hene nachgesehen (Datenbank `zev-db-hene`):
+* `zaehler_rohdaten`: Jede Stunde der Nacht hat 1080 Zeilen (18 Zähler × 60), die Stunde 02:00
+  dagegen 1530 — beide Durchgänge kamen an, gleiche Zeitstempel wurden überschrieben, die übrigen
+  liegen nebeneinander.
+* `messwerte`: alle Intervalle vorhanden. Bezug aller Einheiten im Intervall 02:00: 1.909 kWh,
+  in den Nachbarintervallen 0.23–0.57 kWh — die wiederholte Stunde steckt in diesem einen
+  Intervall.
+* Gegenprobe 00:00–06:00 für die 14 Verbraucher: Summe der Messwerte gleich der Differenz der
+  Zählerstände, Abweichung höchstens 0.002 kWh (Wahl der Grenzzeitpunkte), z. B. „1. OG links"
+  2.099 gegen 2.100 kWh.
+* Keine Systemmeldung seit dem Vortag.
+
+Auf Wunsch des Users als beobachtetes Verhalten festgehalten; spezifiziert ist es weiterhin
+nicht.
+
