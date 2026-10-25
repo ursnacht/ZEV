@@ -974,6 +974,10 @@ Der Text ist an kein Feature gebunden.
 * [ ] Der Tooltip zeigt für ein Intervall **ohne** Entscheid Zeit, Preis und **Noch nicht
       ausgewertet** — und für jedes Intervall **mit** Entscheid dessen eigene Werte, unabhängig
       davon, wie viele Preispunkte davor liegen.
+* [x] Am Tag der Umstellung auf Winterzeit zeigt der Tooltip auch in der doppelten Stunde Werte:
+      Die Prognosekurve setzt dort keine eigenen Punkte, auf die er ohne Entscheid und Preis
+      einrasten könnte (Test: `einspeisesteuerung.component.spec.ts` › prognoseReihe › an der
+      Umstellung auf Winterzeit). (Hintergrund: Anhang A.2)
 * [x] Liegt für einen Tag (z.B. morgen) **nur** die Prognose vor, zeichnet das Diagramm die
       erwartete Erzeugung; liegen nur Preise vor, die Preiskurve. Ohne jede Kurve bleibt es leer.
 * [x] Der Tooltip zeigt für ein Intervall ohne Entscheid neben dem Preis auch Einstrahlung und
@@ -1165,7 +1169,7 @@ Der Job protokolliert auf `INFO` nach demselben Muster wie `ZaehlerAggregationSe
 | **`von` nach `bis`** beim Nachrechnen | `400` mit lesbarem Klartext. |
 | **Zeitraum über 366 Tage** | `400`. |
 | **Zeitumstellung Frühling** | Die Stunde 02:00–03:00 entfällt; der Ortstag hat 92 Intervalle. Es entsteht eine Lücke, sonst nichts. |
-| **Zeitumstellung Herbst** | Die Stunde 02:00–03:00 tritt zweimal auf. Beide Durchgänge tragen denselben `zeit_von`, der zweite überschreibt den ersten per Upsert: **96 statt 100 Entscheide**. Bewusst hingenommen — nachts gibt es keinen Überschuss, und `zev.messwerte` verliert dieselben vier Intervalle (nachgeprüft am 26.10.2025). Siehe FR-3. |
+| **Zeitumstellung Herbst** | Die Stunde 02:00–03:00 tritt zweimal auf. Beide Durchgänge tragen denselben `zeit_von`, der zweite überschreibt den ersten per Upsert: **96 statt 100 Entscheide**. Bewusst hingenommen — nachts gibt es keinen Überschuss, und `zev.messwerte` verliert dieselben vier Intervalle (nachgeprüft am 26.10.2025). Siehe FR-3. Im Diagramm bekommt die doppelte Stunde keine eigenen Punkte; das Raster der Prognosekurve läuft in Ortszeit (Anhang A.2). |
 | **Job-Lauf überschneidet sich** | Der Job ist nicht reentrant; ein zweiter Lauf desselben Intervalls ist durch das Upsert folgenlos. |
 | **Datenbank nicht erreichbar** | Der Job protokolliert den Fehler und endet; der nächste Lauf versucht es erneut. Keine Systemmeldung je Lauf — bei 96 Läufen am Tag wäre das eine Flut. |
 | **Flag mitten am Tag eingeschaltet** | Die Entscheide beginnen ab dem nächsten Lauf; der Tag ist unvollständig, und die Ansicht zeigt das, ohne zu behaupten, es sei nichts passiert. |
@@ -1267,3 +1271,7 @@ Lücke nicht**, es rechnet nur und speichert nichts.
 ### A.1 Schaltfläche „Statistik“ und schmale Eingabefelder (FR-5, 23.10.2026)
 FR-5.2 lautete: „**Eine Steuerzeile** (`zev-date-range-row`, wie bei der Preiszeitreihe): Datumswahl, **‹ / ›** zum Blättern um je einen Tag, **Heute**, **Aktualisieren**, Feld **Schwellwert** und Schaltfläche **Nachrechnen**.“ Das Feld Mindest-Preisabstand (FR-2b) fehlte in der Aufzählung. Auf Wunsch des Users kam rechts von „Nachrechnen“ die Schaltfläche „Statistik“ dazu, und die beiden Eingabefelder wurden schmaler. Dafür braucht die Statistik einen Aufruf mit Zeitraum in der URL (`Specs/Statistik.md`, FR-1.4).
 
+### A.2 Leerer Tooltip in der doppelten Stunde der Winterzeit (FR-5, 25.10.2026)
+Am 25.10.2026 blieb auf Hene der Tooltip zwischen 02:00 und 03:00 Winterzeit leer. Es sah aus, als fehle dort die Meteoprognose. In der Datenbank war sie aber vollständig (96 Punkte). Ursache: Die Prognosekurve füllte Lücken mit einem Raster in 15-Minuten-Schritten **absoluter** Zeit. Die zonenlosen Zeitstempel kennen „02:00“ bis „02:45“ nur einmal, darum lagen in der zweiten, wiederholten Stunde vier `null`-Punkte ohne Entscheid und ohne Preis. Der Tooltip (`trigger: 'axis'`) rastete auf sie ein und fand nichts. Seither läuft das Raster in Ortszeit. Wer in diese Stunde zeigt, landet auf dem nächsten echten Intervall (02:45 oder 03:00).
+
+Die Zeitachse bleibt **physikalisch**: Der Tag hat 25 Stunden, und zwischen 02:45 Sommerzeit und 03:00 Winterzeit stehen 75 Minuten Leerraum ohne Daten. Erwogen wurde eine Achse in Ortszeit, die immer 96 Viertelstunden ohne Lücke zeigt. Der User hat sich dagegen entschieden: Der Leerraum zeigt ehrlich, dass für diese Stunde keine eigenen Werte vorliegen, und die Umstellung betrifft einen Tag im Jahr.

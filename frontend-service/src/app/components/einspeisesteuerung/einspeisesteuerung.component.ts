@@ -25,7 +25,8 @@ import { formatSwissNumber } from '../../utils/number-utils';
 type EChartsCore = Awaited<ReturnType<typeof ladeECharts>>;
 
 /** Länge eines Messintervalls in Millisekunden — dasselbe 15-Minuten-Raster wie im Backend. */
-const INTERVALL_MS = 15 * 60 * 1000;
+const INTERVALL_MINUTEN = 15;
+const INTERVALL_MS = INTERVALL_MINUTEN * 60 * 1000;
 
 /**
  * Höhe **eines** Zustandsbandes als Anteil der höchsten dargestellten Menge.
@@ -308,6 +309,12 @@ export class EinspeisesteuerungComponent extends WithMessage
    *
    * <p>Deshalb wird das 15-Minuten-Raster zwischen erstem und letztem bekannten Punkt aufgespannt
    * und jedes fehlende Intervall ausdrücklich mit `null` belegt.
+   *
+   * <p><b>Das Raster läuft in Ortszeit, nicht in Millisekunden.</b> Die Zeitstempel sind zonenlose
+   * Ortszeit; die doppelte Stunde der Umstellung auf Winterzeit trägt keinen eigenen Wert. Ein
+   * Raster in 15-Minuten-Schritten absoluter Zeit setzte dort vier `null`-Punkte, an denen weder
+   * Entscheid noch Preis liegt — der Tooltip rastete darauf ein und blieb leer
+   * (Specs/Einspeisesteuerung.md, Edge Case „Zeitumstellung Herbst“).
    */
   private prognoseReihe(): (number | null)[][] {
     if (this.prognose.length === 0) {
@@ -318,8 +325,10 @@ export class EinspeisesteuerungComponent extends WithMessage
     const zeiten = [...werte.keys()].sort((a, b) => a - b);
 
     const reihe: (number | null)[][] = [];
-    for (let t = zeiten[0]; t <= zeiten[zeiten.length - 1]; t += INTERVALL_MS) {
-      reihe.push([t, werte.get(t) ?? null]);
+    const t = new Date(zeiten[0]);
+    while (t.getTime() <= zeiten[zeiten.length - 1]) {
+      reihe.push([t.getTime(), werte.get(t.getTime()) ?? null]);
+      t.setMinutes(t.getMinutes() + INTERVALL_MINUTEN);
     }
     return reihe;
   }

@@ -1135,3 +1135,13 @@ rund 1200px noch in die Zeile passt (gemessen: 1134px Bedarf gegen 1112px Platz 
 (dazu `.zev-button--compact:disabled` im Design System: Gesperrt wurde die Schaltfläche sonst breiter). Tests: `zurStatistik` (2) in `einspeisesteuerung.component.spec.ts`. Keine
 Migration, keine neuen Übersetzungen, kein Backend.
 
+## Nachtrag 26 — Tooltip in der doppelten Stunde der Winterzeit (25.10.2026)
+
+Auf Hene blieb am 25.10.2026 der Tooltip zwischen 02:00 und 03:00 Winterzeit leer. `prognoseReihe()`
+spannte das Lückenraster in absoluten 15 Minuten auf und setzte so in die wiederholte Stunde vier
+`null`-Punkte ohne Entscheid und Preis. Jetzt läuft das Raster in Ortszeit (`setMinutes(+15)`).
+Tests: `prognoseReihe › an der Umstellung auf Winterzeit` (2, Zone per `vi.stubEnv('TZ', …)`
+fest auf `Europe/Zurich`). Gegenprobe: Beide schlagen mit dem alten Code fehl. Keine Migration, kein
+Backend. Spec: neues Akzeptanzkriterium, Edge Case „Zeitumstellung Herbst“, Anhang A.2.
+Die Zeitachse bleibt physikalisch (75 Minuten Leerraum zwischen 02:45 und 03:00). Eine Ortszeit-Achse wurde
+erwogen und vom User verworfen.

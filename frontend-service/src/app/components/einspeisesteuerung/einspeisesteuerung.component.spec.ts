@@ -552,6 +552,41 @@ describe('EinspeisesteuerungComponent', () => {
 
       expect(privat().prognoseReihe()).toEqual([[ms('2026-09-30T10:00:00'), null]]);
     });
+
+    /**
+     * <b>Die doppelte Stunde der Winterzeit bekommt keine `null`-Punkte.</b>
+     *
+     * <p>Die Zeitstempel sind zonenlose Ortszeit: „02:00" bis „02:45" gibt es am 25.10.2026 nur
+     * einmal, die Uhr läuft aber zweimal durch. Ein Raster in absoluten 15 Minuten setzte in die
+     * zweite Stunde vier `null`-Punkte ohne Entscheid und Preis — der Tooltip rastete darauf ein
+     * und blieb leer (Hene, 25.10.2026). Die Zone wird fest gesetzt, sonst prüfte der Test auf
+     * einem Rechner in UTC nichts.
+     */
+    describe('an der Umstellung auf Winterzeit', () => {
+      beforeEach(() => vi.stubEnv('TZ', 'Europe/Zurich'));
+
+      afterEach(() => vi.unstubAllEnvs());
+
+      it('should not add null points in the repeated hour', () => {
+        const zeiten = ['01:45', '02:00', '02:15', '02:30', '02:45', '03:00', '03:15'];
+        component.prognose = zeiten.map(z => prognosepunkt(`2026-10-25T${z}:00`, 0, 0));
+
+        const reihe = privat().prognoseReihe();
+
+        expect(reihe.map(punkt => punkt[0])).toEqual(zeiten.map(z => ms(`2026-10-25T${z}:00`)));
+        expect(reihe.every(punkt => punkt[1] === 0)).toBe(true);
+      });
+
+      it('should show a tooltip for every point of the forecast series', () => {
+        const zeiten = ['02:00', '02:15', '02:30', '02:45', '03:00'];
+        component.entscheide = zeiten.map(z => entscheid(`2026-10-25T${z}:00`));
+        component.prognose = zeiten.map(z => prognosepunkt(`2026-10-25T${z}:00`, 0, 0));
+
+        for (const [zeitpunkt] of privat().prognoseReihe()) {
+          expect(privat().tooltip(zeitpunkt as number)).not.toBe('');
+        }
+      });
+    });
   });
 
   // ==================== Die verrechnete Produktion ====================
