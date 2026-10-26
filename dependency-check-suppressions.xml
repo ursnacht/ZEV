@@ -16,7 +16,7 @@
       Laut NVD betrifft der CVE die JasperReports Library *Community Edition*
       (net.sf.jasperreports:jasperreports) nur bis einschliesslich 7.0.3.
       Der Fix (Deserialization-Class-Filter, automatisch aktiv, keine Konfiguration noetig)
-      wurde in 7.0.4 eingefuehrt. Wir nutzen 7.0.8 -> bereits gepatcht.
+      wurde in 7.0.4 eingefuehrt. Wir nutzen 7.1.0 -> bereits gepatcht.
       OWASP Dependency-Check flaggt hier faelschlich, weil das CE-Artefakt per
       CPE-Range dem breiteren Professional-Bereich (bis 9.0.2) zugeordnet wird.
       Quelle: https://nvd.nist.gov/vuln/detail/CVE-2025-10492

@@ -21,6 +21,8 @@
        Entfernen, sobald qrbill-generator selbst pdfbox >= 3.0.8 mitbringt (26.10.2026). -->
   <properties>
     <pdfbox.version>3.0.8</pdfbox.version>
+    <!-- Laufzeit und jasperreports-maven-plugin (Vorkompilieren der .jasper) mit derselben Version -->
+    <jasperreports.version>7.1.0</jasperreports.version>
   </properties>
 
   <dependencyManagement>
@@ -113,12 +115,12 @@
     <dependency>
       <groupId>net.sf.jasperreports</groupId>
       <artifactId>jasperreports</artifactId>
-      <version>7.0.8</version>
+      <version>${jasperreports.version}</version>
     </dependency>
     <dependency>
       <groupId>net.sf.jasperreports</groupId>
       <artifactId>jasperreports-pdf</artifactId>
-      <version>7.0.8</version>
+      <version>${jasperreports.version}</version>
     </dependency>
     <!-- Swiss QR Bill Generator for payment slips -->
     <dependency>
@@ -296,6 +298,11 @@
         <artifactId>jasperreports-maven-plugin</artifactId>
         <version>4.0.1</version>
         <dependencies>
+          <dependency>
+            <groupId>net.sf.jasperreports</groupId>
+            <artifactId>jasperreports</artifactId>
+            <version>${jasperreports.version}</version>
+          </dependency>
           <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
