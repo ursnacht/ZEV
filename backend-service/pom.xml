@@ -13,6 +13,36 @@
 
   <name>backend-service</name>
 
+  <!-- Sicherheits-Override einer transitiven Abhaengigkeit: PDFBox kommt nur ueber
+       qrbill-generator (3.4.0 = neueste Version, bringt pdfbox 3.0.6). 3.0.6 hat CVE-2026-33929
+       (Path Traversal, Medium), behoben in 3.0.8. Wir erzeugen den QR-Code als PNG und nutzen den
+       PDF-Pfad von qrbill nicht - der Override raeumt das OWASP-Finding trotzdem ab.
+       pdfbox-io und fontbox mitziehen, sie muessen zur pdfbox-Version passen.
+       Entfernen, sobald qrbill-generator selbst pdfbox >= 3.0.8 mitbringt (26.10.2026). -->
+  <properties>
+    <pdfbox.version>3.0.8</pdfbox.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.apache.pdfbox</groupId>
+        <artifactId>pdfbox</artifactId>
+        <version>${pdfbox.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pdfbox</groupId>
+        <artifactId>pdfbox-io</artifactId>
+        <version>${pdfbox.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pdfbox</groupId>
+        <artifactId>fontbox</artifactId>
+        <version>${pdfbox.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
   <dependencies>
     <dependency>
       <groupId>org.springframework.boot</groupId>
