@@ -16,7 +16,7 @@
 * Spring Boot 4 mit Java 25
 
 ### Frontend
-* Angular 21 mit TypeScript
+* Angular 22 mit TypeScript
 * Verwende immer das Schweizer Datumsformat dd.MM.yyyy
 * Verwende wo möglich und sinnvoll ein Feather Icon: Navigation, Seitentitel
 

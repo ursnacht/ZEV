@@ -161,7 +161,7 @@ Klassifikation analog zum Maven-Teil:
   `keycloak-*`) sind ausgeliefert → kritischer als reines Build-/Test-Tooling in `devDependencies`.
 
 > **Angular-Upgrade-Gate:** `keycloak-angular` / `keycloak-js` koppeln an die Angular-Major-Version
-> (aktuell Angular 21, `keycloak-angular ^21.0.0` / `keycloak-js ^25.0.0`). Angular-Major-Upgrades
+> (aktuell Angular 22, `keycloak-angular ^22.0.0` / `keycloak-js ^26.2.4`). Angular-Major-Upgrades
 > daher **nicht** ohne Kompatibilitäts-Check der Keycloak-Adapter durchführen.
 >
 > **Angular 22 / keycloak-js 26: möglich seit HTTPS auf dem NAS (24.10.2026), aber ein eigener
