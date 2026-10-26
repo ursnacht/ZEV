@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
@@ -30,6 +30,7 @@ import { toIsoDate, vorquartal } from '../../utils/date-utils';
     KebabMenuComponent, ColumnResizeDirective, IconComponent
   ],
   templateUrl: './debitorkontrolle-list.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./debitorkontrolle-list.component.css']
 })
 export class DebitorkontrolleListComponent extends WithMessage implements OnInit {

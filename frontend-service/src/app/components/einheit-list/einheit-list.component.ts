@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
 import Keycloak from 'keycloak-js';
 import { WithMessage } from '../../utils/with-message';
 import { CommonModule } from '@angular/common';
@@ -18,6 +18,7 @@ import { IconComponent } from '../icon/icon.component';
   standalone: true,
   imports: [CommonModule, EinheitFormComponent, TranslatePipe, EinheitTypPipe, KebabMenuComponent, ColumnResizeDirective, IconComponent],
   templateUrl: './einheit-list.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./einheit-list.component.css']
 })
 export class EinheitListComponent extends WithMessage implements OnInit {

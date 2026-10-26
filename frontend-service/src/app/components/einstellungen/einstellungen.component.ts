@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import Keycloak from 'keycloak-js';
@@ -19,6 +19,7 @@ import { FeatureFlagDirective } from '../../directives/feature-flag.directive';
   imports: [CommonModule, FormsModule, TranslatePipe, IconComponent, DatenbankAnsichtComponent,
     FeatureFlagDirective],
   templateUrl: './einstellungen.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./einstellungen.component.css']
 })
 export class EinstellungenComponent extends WithMessage implements OnInit {

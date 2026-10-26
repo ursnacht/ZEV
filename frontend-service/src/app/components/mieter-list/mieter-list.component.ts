@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { WithMessage } from '../../utils/with-message';
 import { MieterService } from '../../services/mieter.service';
@@ -18,6 +18,7 @@ import { IconComponent } from '../icon/icon.component';
   standalone: true,
   imports: [CommonModule, MieterFormComponent, TranslatePipe, SwissDatePipe, KebabMenuComponent, ColumnResizeDirective, IconComponent],
   templateUrl: './mieter-list.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./mieter-list.component.css']
 })
 export class MieterListComponent extends WithMessage implements OnInit {

@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Mieter } from '../../models/mieter.model';
@@ -12,6 +12,7 @@ import { toIsoDate } from '../../utils/date-utils';
   standalone: true,
   imports: [CommonModule, FormsModule, TranslatePipe, IconComponent],
   templateUrl: './mieter-form.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./mieter-form.component.css']
 })
 export class MieterFormComponent implements OnInit {

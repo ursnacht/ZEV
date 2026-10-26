@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CdkDrag, CdkDragDrop, CdkDropList, moveItemInArray } from '@angular/cdk/drag-drop';
@@ -45,6 +45,7 @@ import { IconComponent } from '../icon/icon.component';
   standalone: true,
   imports: [CommonModule, FormsModule, CdkDropList, CdkDrag, TranslatePipe, IconComponent],
   templateUrl: './nebenkosten-abrechnung-form.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./nebenkosten-abrechnung-form.component.css']
 })
 export class NebenkostenAbrechnungFormComponent implements OnInit {

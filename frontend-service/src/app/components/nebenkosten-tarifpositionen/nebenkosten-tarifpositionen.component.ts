@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
@@ -13,6 +13,7 @@ import { IconComponent } from '../icon/icon.component';
   selector: 'app-nebenkosten-tarifpositionen',
   standalone: true,
   imports: [CommonModule, TranslatePipe, IconComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './nebenkosten-tarifpositionen.component.html'
 })
 export class NebenkostenTarifpositionenComponent {

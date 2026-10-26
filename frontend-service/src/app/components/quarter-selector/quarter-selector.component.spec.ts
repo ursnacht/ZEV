@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { QuarterSelectorComponent } from './quarter-selector.component';
 import { TranslationService } from '../../services/translation.service';
@@ -201,6 +201,7 @@ describe('QuarterSelectorComponent', () => {
 @Component({
   standalone: true,
   imports: [QuarterSelectorComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: '<app-quarter-selector><button id="projiziert">Anzeigen</button></app-quarter-selector>'
 })
 class HostMitAktionComponent {}

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { KebabMenuComponent, KebabMenuItem } from './kebab-menu.component';
 import { TranslationService } from '../../services/translation.service';
@@ -25,6 +25,7 @@ describe('KebabMenuComponent', () => {
   ];
 
   @Component({
+    changeDetection: ChangeDetectionStrategy.Eager,
     standalone: true,
     imports: [KebabMenuComponent],
     template: `
@@ -282,6 +283,7 @@ describe('KebabMenuComponent', () => {
   // ==================== Mehrere Menüs nebeneinander ====================
 
   @Component({
+    changeDetection: ChangeDetectionStrategy.Eager,
     standalone: true,
     imports: [KebabMenuComponent],
     template: `

@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { WithMessage } from '../../utils/with-message';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -19,6 +19,7 @@ import { vorquartal, monatsende } from '../../utils/date-utils';
   imports: [CommonModule, FormsModule, TranslatePipe, SwissDatePipe, SwissNumberPipe,
     QuarterSelectorComponent, IconComponent],
   templateUrl: './solar-calculation.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./solar-calculation.component.css']
 })
 export class SolarCalculationComponent extends WithMessage implements OnInit, OnDestroy {

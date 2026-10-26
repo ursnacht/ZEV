@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PreiszeitreiheService } from '../../services/preiszeitreihe.service';
@@ -24,6 +24,7 @@ import { ladeECharts } from '../../utils/echarts-loader';
   standalone: true,
   imports: [CommonModule, FormsModule, TranslatePipe, IconComponent],
   templateUrl: './preiszeitreihe-chart.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./preiszeitreihe-chart.component.css']
 })
 export class PreiszeitreiheChartComponent extends WithMessage

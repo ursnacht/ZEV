@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -28,6 +28,7 @@ export interface UploadEntry {
   standalone: true,
   imports: [CommonModule, FormsModule, TranslatePipe, IconComponent],
   templateUrl: './messwerte-upload.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./messwerte-upload.component.css']
 })
 export class MesswerteUploadComponent extends WithMessage implements OnInit {

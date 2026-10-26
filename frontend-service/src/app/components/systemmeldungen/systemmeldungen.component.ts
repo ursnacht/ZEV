@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import Keycloak from 'keycloak-js';
@@ -22,6 +22,7 @@ import { IconComponent } from '../icon/icon.component';
   imports: [CommonModule, FormsModule, TranslatePipe, KebabMenuComponent, ColumnResizeDirective,
     IconComponent],
   templateUrl: './systemmeldungen.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./systemmeldungen.component.css']
 })
 export class SystemmeldungenComponent extends WithMessage implements OnInit {

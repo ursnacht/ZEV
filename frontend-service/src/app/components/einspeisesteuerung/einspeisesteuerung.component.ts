@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -64,6 +64,7 @@ const MENGE_ERSATZ = 1;
   standalone: true,
   imports: [CommonModule, FormsModule, TranslatePipe, IconComponent],
   templateUrl: './einspeisesteuerung.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./einspeisesteuerung.component.css']
 })
 export class EinspeisesteuerungComponent extends WithMessage

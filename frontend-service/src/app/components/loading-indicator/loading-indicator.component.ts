@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, ChangeDetectionStrategy } from '@angular/core';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 
 /**
@@ -14,6 +14,7 @@ import { TranslatePipe } from '../../pipes/translate.pipe';
   selector: 'app-loading-indicator',
   standalone: true,
   imports: [TranslatePipe],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <div class="zev-loading" [class.zev-loading--inline]="inline" role="status" aria-live="polite">
       <span class="zev-spinner" aria-hidden="true"></span>

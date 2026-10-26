@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
 import { VersionService } from '../../services/version.service';
@@ -8,6 +8,7 @@ import { VersionService } from '../../services/version.service';
   standalone: true,
   imports: [TranslatePipe, IconComponent],
   templateUrl: './startseite.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./startseite.component.css']
 })
 export class StartseiteComponent implements OnInit {

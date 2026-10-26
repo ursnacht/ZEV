@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList, moveItemInArray, CdkDragPreview } from '@angular/cdk/drag-drop';
 import { TarifService } from '../../services/tarif.service';
@@ -25,6 +25,7 @@ export type TarifGruppe = 'zukuenftig' | 'aktuell' | 'alt';
     ColumnResizeDirective, IconComponent, PreiszeitreiheChartComponent, FeatureFlagDirective,
     CdkDropList, CdkDrag, CdkDragHandle, CdkDragPreview],
   templateUrl: './tarif-list.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./tarif-list.component.css']
 })
 export class TarifListComponent implements OnInit {

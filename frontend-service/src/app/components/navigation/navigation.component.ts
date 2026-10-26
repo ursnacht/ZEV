@@ -1,10 +1,9 @@
-import { Component, OnInit, inject, OnDestroy, HostListener, HostBinding } from '@angular/core';
+import { Component, OnInit, inject, OnDestroy, HostListener, HostBinding, ChangeDetectionStrategy } from '@angular/core';
 import { Router, RouterModule, NavigationEnd } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 
 import Keycloak from 'keycloak-js';
-import { KeycloakProfile } from 'keycloak-js';
 import { AuthService } from '../../services/auth.service';
 import { ThemeService } from '../../services/theme.service';
 import { TranslationService } from '../../services/translation.service';
@@ -42,10 +41,19 @@ function eintrag(route: string, key: string, icon: string): MenueEintrag {
   standalone: true,
   imports: [RouterModule, TranslatePipe, IconComponent, FeatureFlagDirective, PermissionDirective],
   templateUrl: './navigation.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./navigation.component.css']
 })
 export class NavigationComponent implements OnInit, OnDestroy {
-  userProfile: KeycloakProfile | null = null;
+  /**
+   * Angezeigter Benutzername - aus dem Token, nicht ueber `loadUserProfile()`.
+   *
+   * <p>`loadUserProfile()` fragt die Account-API (`/realms/zev/account`) ab, und die antwortet
+   * mit 401. keycloak-js 26 wirft dann; der Fehler brach `ngOnInit` nach dem `await` ab, und
+   * Organisation, Sprache, Admin-Untermenue und Router-Abonnement wurden nie gesetzt (Angular-22-
+   * Upgrade, 26.10.2026). Die Namens-Claims stehen ohnehin im Token.
+   */
+  userName = '';
   currentLang = 'de';
   organizationName: string | null = null;
   private readonly keycloak = inject(Keycloak);
@@ -102,9 +110,9 @@ export class NavigationComponent implements OnInit, OnDestroy {
     public translationService: TranslationService
   ) { }
 
-  async ngOnInit() {
+  ngOnInit(): void {
     if (this.keycloak.authenticated) {
-      this.userProfile = await this.keycloak.loadUserProfile();
+      this.userName = this.extractUserName();
       this.extractOrganization();
     }
     this.currentLang = this.translationService.currentLang();
@@ -187,14 +195,13 @@ export class NavigationComponent implements OnInit, OnDestroy {
     }
   }
 
-  get userName(): string {
-    if (!this.userProfile) {
-      return '';
-    }
-    const firstName = this.userProfile.firstName || '';
-    const lastName = this.userProfile.lastName || '';
+  /** Vor- und Nachname aus dem Token, sonst der Benutzername. */
+  private extractUserName(): string {
+    const token = this.keycloak.tokenParsed;
+    const firstName = (token?.['given_name'] as string | undefined) || '';
+    const lastName = (token?.['family_name'] as string | undefined) || '';
     const fullName = `${firstName} ${lastName}`.trim();
-    return fullName || this.userProfile.username || '';
+    return fullName || (token?.['preferred_username'] as string | undefined) || '';
   }
 
 

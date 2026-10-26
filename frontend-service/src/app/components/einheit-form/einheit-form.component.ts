@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Einheit, EinheitTyp, MAX_MESSPUNKT_LAENGE } from '../../models/einheit.model';
 
@@ -9,6 +9,7 @@ import { IconComponent } from '../icon/icon.component';
   selector: 'app-einheit-form',
   standalone: true,
   imports: [FormsModule, TranslatePipe, IconComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './einheit-form.component.html'
 })
 export class EinheitFormComponent implements OnInit {

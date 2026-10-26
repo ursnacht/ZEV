@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, ChangeDetectionStrategy } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import Keycloak from 'keycloak-js';
@@ -10,7 +10,8 @@ import { ThemeService } from '../../services/theme.service';
 import { TranslationService } from '../../services/translation.service';
 
 /** Ziel jeder Navigation im Test - die echten Seiten braucht es nicht. */
-@Component({ standalone: true, template: '' })
+@Component({ standalone: true, changeDetection: ChangeDetectionStrategy.Eager,
+ template: '' })
 class LeereSeite {}
 
 /**
@@ -39,12 +40,12 @@ describe('NavigationComponent', () => {
    * Baut die Komponente je Test statt in `beforeEach`: Rollen und aufgerufene URL wirken schon in
    * `ngOnInit` und unterscheiden sich von Test zu Test.
    */
-  const baue = async (rollen: string[], url = '/'): Promise<void> => {
+  const baue = async (rollen: string[], url = '/', keycloak: Keycloak = keycloakMit(rollen)): Promise<void> => {
     await TestBed.configureTestingModule({
       imports: [NavigationComponent],
       providers: [
         provideRouter([{ path: '**', component: LeereSeite }]),
-        { provide: Keycloak, useValue: keycloakMit(rollen) },
+        { provide: Keycloak, useValue: keycloak },
         { provide: AuthService, useValue: { notifyLogout: () => of(void 0) } },
         { provide: ThemeService, useValue: { isDarkMode: signal(false), toggleTheme: () => {} } },
         { provide: FeatureFlagService, useValue: { isEnabled: () => false } },
@@ -183,6 +184,43 @@ describe('NavigationComponent', () => {
       expect(component.adminEintraege.map(e => e.permissions)).toEqual(
         [ALLE_ADMIN_PERMISSIONS[0], ...ALLE_ADMIN_PERMISSIONS].map(p => [p]));
       expect(component.adminPermissions).toEqual(ALLE_ADMIN_PERMISSIONS);
+    });
+  });
+
+  /**
+   * Angular-22-Upgrade (keycloak-js 26): `loadUserProfile()` fragte die Account-API ab, die mit 401
+   * antwortet - keycloak-js 26 wirft dann, und `ngOnInit` brach nach dem `await` ab. Der Name kommt
+   * jetzt aus dem Token; die Mock-Instanz hat kein `loadUserProfile`, ein Aufruf liesse den Test
+   * scheitern.
+   */
+  describe('angemeldeter Benutzer', () => {
+    const angemeldet = (claims: Record<string, unknown>): Keycloak => ({
+      authenticated: true,
+      realmAccess: { roles: [] },
+      resourceAccess: {},
+      tokenParsed: {
+        organization: { 'hene': { id: 'x', displayName: ['Hene AG'] } },
+        ...claims
+      }
+    } as unknown as Keycloak);
+
+    it('should show first and last name from the token', async () => {
+      await baue([], '/', angemeldet({ given_name: 'Urs', family_name: 'Muster', preferred_username: 'urs' }));
+
+      expect(component.userName).toBe('Urs Muster');
+    });
+
+    it('should fall back to the username when the token has no name', async () => {
+      await baue([], '/', angemeldet({ preferred_username: 'testuser' }));
+
+      expect(component.userName).toBe('testuser');
+    });
+
+    it('should complete ngOnInit and read the organization', async () => {
+      await baue([], '/', angemeldet({ preferred_username: 'testuser' }));
+
+      expect(component.organizationName).toBe('Hene AG');
+      expect(component.currentLang).toBe('de');
     });
   });
 });

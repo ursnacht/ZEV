@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NebenkostenService } from '../../services/nebenkosten.service';
 import { NkAbrechnung, NkRechnungLauf } from '../../models/nebenkosten.model';
@@ -35,6 +35,7 @@ const BEZEICHNUNG_MAX_LAENGE = 150;
     IconComponent,
     SwissNumberPipe
   ],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './nebenkosten-abrechnung.component.html'
 })
 export class NebenkostenAbrechnungComponent implements OnInit {

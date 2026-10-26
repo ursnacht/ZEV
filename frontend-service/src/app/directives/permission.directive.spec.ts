@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import Keycloak from 'keycloak-js';
 import { PermissionDirective } from './permission.directive';
@@ -37,6 +37,7 @@ describe('PermissionDirective', () => {
   // ==================== Eine einzelne Permission ====================
 
   @Component({
+    changeDetection: ChangeDetectionStrategy.Eager,
     standalone: true,
     imports: [PermissionDirective],
     template: `<li class="eintrag" *appPermission="'nebenkosten:manage'">Nebenkosten</li>`
@@ -67,6 +68,7 @@ describe('PermissionDirective', () => {
   // ==================== Mehrere Permissions ====================
 
   @Component({
+    changeDetection: ChangeDetectionStrategy.Eager,
     standalone: true,
     imports: [PermissionDirective],
     template: `<li class="eintrag"

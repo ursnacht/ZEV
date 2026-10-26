@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Debitor } from '../../models/debitor.model';
@@ -14,6 +14,7 @@ import { toIsoDate } from '../../utils/date-utils';
   standalone: true,
   imports: [CommonModule, FormsModule, TranslatePipe, IconComponent],
   templateUrl: './debitorkontrolle-form.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./debitorkontrolle-form.component.css']
 })
 export class DebitorkontrolleFormComponent implements OnInit {

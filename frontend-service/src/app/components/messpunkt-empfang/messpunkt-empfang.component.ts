@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
 import Keycloak from 'keycloak-js';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
@@ -94,6 +94,7 @@ function gruppe(zeile: MesspunktEmpfang): number {
   standalone: true,
   imports: [CommonModule, TranslatePipe, KebabMenuComponent, ColumnResizeDirective, IconComponent],
   templateUrl: './messpunkt-empfang.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./messpunkt-empfang.component.css']
 })
 export class MesspunktEmpfangComponent extends WithMessage implements OnInit {

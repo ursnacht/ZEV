@@ -1,4 +1,4 @@
-import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { EinheitService } from '../../services/einheit.service';
 import { Einheit, EinheitTyp } from '../../models/einheit.model';
@@ -10,6 +10,7 @@ import { EinheitTypPipe } from '../../pipes/einheit-typ.pipe';
   standalone: true,
   imports: [CommonModule, TranslatePipe, EinheitTypPipe],
   templateUrl: './einheit-selector.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./einheit-selector.component.css']
 })
 export class EinheitSelectorComponent implements OnInit {

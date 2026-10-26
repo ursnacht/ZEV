@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -37,6 +37,7 @@ export type TarifpositionSortColumn =
   imports: [CommonModule, FormsModule, TarifpositionFormComponent, TranslatePipe, SwissNumberPipe,
     EinheitTypPipe, KebabMenuComponent, ColumnResizeDirective, IconComponent],
   templateUrl: './tarifposition-list.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./tarifposition-list.component.css']
 })
 export class TarifpositionListComponent implements OnInit {

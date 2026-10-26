@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LoadingIndicatorComponent } from '../loading-indicator/loading-indicator.component';
@@ -23,6 +23,7 @@ import { vorquartal, monatsende } from '../../utils/date-utils';
   imports: [CommonModule, FormsModule, TranslatePipe, QuarterSelectorComponent, IconComponent,
     EinheitSelectorComponent, FeatureFlagDirective, RouterLink, LoadingIndicatorComponent],
   templateUrl: './rechnungen.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./rechnungen.component.css']
 })
 export class RechnungenComponent extends WithMessage implements OnInit {

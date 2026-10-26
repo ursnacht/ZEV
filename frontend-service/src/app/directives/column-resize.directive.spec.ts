@@ -1,10 +1,11 @@
-import { Component, ViewChild, ElementRef } from '@angular/core';
+import { Component, ViewChild, ElementRef, ChangeDetectionStrategy } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ColumnResizeDirective } from './column-resize.directive';
 
 @Component({
   standalone: true,
   imports: [ColumnResizeDirective],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <table #testTable class="zev-table" appColumnResize>
       <thead>
@@ -189,6 +190,7 @@ describe('ColumnResizeDirective', () => {
 
 describe('ColumnResizeDirective with single column', () => {
   @Component({
+    changeDetection: ChangeDetectionStrategy.Eager,
     standalone: true,
     imports: [ColumnResizeDirective],
     template: `
@@ -233,6 +235,7 @@ describe('ColumnResizeDirective with single column', () => {
 
 describe('ColumnResizeDirective with empty table', () => {
   @Component({
+    changeDetection: ChangeDetectionStrategy.Eager,
     standalone: true,
     imports: [ColumnResizeDirective],
     template: `
