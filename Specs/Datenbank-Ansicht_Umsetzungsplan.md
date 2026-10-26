@@ -90,3 +90,11 @@ Grundlage: [`Specs/Datenbank-Ansicht.md`](./Datenbank-Ansicht.md); Permission-Mo
 - **Whitelist-Ermittlung:** pro Anfrage aus dem Katalog (leichtgewichtig); optionales Caching später.
 - **Filter-Historie / `<datalist>`:** Browser filtern die angezeigten Vorschläge nach dem aktuellen Feldinhalt. Da das Feld beim Tabellenwechsel mit dem Standard-Filter (`org_id = …`) vorbefüllt wird, ist die **vollständige** Liste erst nach dem Leeren des Feldes (Löschen-Button ×) sichtbar – bewusst in Kauf genommen, um ohne zusätzliches Bedienelement/CSS auszukommen.
 - **Kein Löschen einzelner Historie-Einträge** über die Oberfläche (Verdrängung nach 20 Einträgen bzw. Browser-Daten löschen) – siehe Spec §7.
+
+## Nachtrag 26.10.2026: Filter-Parser statt Denylist (Security-Check Befund 1)
+
+- `WhereClauseValidator` (Denylist) samt Test entfernt; neu `DatenbankFilterParser` (Allowlist, rekursiver Abstieg), der Bedingung und `ORDER BY` aus den erkannten Bausteinen neu aufbaut. Spalten gegen die Katalog-Spaltenliste der Tabelle, im SQL in Anführungszeichen; Text-Literale neu maskiert.
+- `DatenbankService.abfrage` parst den Filter nach dem Laden der Spaltenliste; die Regex-Zerlegung in Bedingung und `ORDER BY` entfällt.
+- `V189__Add_Datenbank_Filter_Translations.sql`: Key `DATENBANK_WHERE_SPALTE_UNBEKANNT`.
+- Tests: `DatenbankFilterParserTest` (neu), `DatenbankServiceTest` mit echtem Parser (`@Spy`) und den Umgehungen aus dem Security-Check.
+- Damit überholt (Spec, Anhang A.1): die Einträge zum `WhereClauseValidator` in den Phasen oben und der Punkt „Restrisiko WHERE-Guard“.

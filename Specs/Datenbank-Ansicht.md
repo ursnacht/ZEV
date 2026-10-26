@@ -12,7 +12,7 @@
 ### FR-1: Ablauf / Flow
 1. `zev_admin` öffnet `/einstellungen`; ein zusätzlicher Bereich **„Datenbank-Ansicht"** ist sichtbar (nur mit Permission `datenbank:read`; siehe NFR-2).
 2. Das System lädt die Liste der **auswählbaren Tabellen** (alle Basistabellen des Schemas `zev`, dynamisch aus dem Katalog) in ein Auswahlfeld (Dropdown).
-3. Der Admin wählt eine Tabelle und gibt **optional** eine WHERE-Klausel in ein Textfeld ein (ohne das Schlüsselwort `WHERE`, z.B. `org_id = 42 AND zeit > '2026-01-01'`).
+3. Der Admin wählt eine Tabelle und gibt **optional** eine WHERE-Klausel in ein Textfeld ein (ohne das Schlüsselwort `WHERE`, z.B. `org_id = 42 AND zeit > '2026-01-01'`). Zulässig ist ein Filter-Ausdruck nach der Grammatik in NFR-2: Spalten der gewählten Tabelle, Vergleiche, `LIKE`/`ILIKE`, `IS [NOT] NULL`, `IN`, `BETWEEN`, `AND`/`OR`/`NOT`, Klammern, Zahl- und Text-Literale – **keine** Funktionen und Casts.
 4. Der Admin klickt **„Anzeigen"** — alternativ genügt die **Enter-Taste**, während der Fokus im Filter-Eingabefeld liegt (löst dieselbe Aktion aus, sofern eine Tabelle gewählt ist und keine Abfrage läuft).
 5. Das System validiert Tabelle + WHERE (NFR-2), führt eine **read-only**-Abfrage aus und liefert die Zeilen **paginiert** zurück.
 6. Das System zeigt die Ergebnisse **generisch** als Tabelle an: Spaltenüberschriften aus den DB-Metadaten, darunter die Zeilen; plus Zeilenanzahl und Pagination.
@@ -32,7 +32,7 @@
 * Die Sortierklausel steht **sichtbar im Filter-Feld** und ist damit — wie der Bedingungsteil — änder- und löschbar.
 * **Vorrang bei Spalten-Klick:** Wählt der Admin per Klick auf eine Spaltenüberschrift eine Sortierung (FR-1 Punkt 7), **gewinnt diese Auswahl**. Die Sortierklausel wird dabei aus dem Filter-Feld entfernt, damit nicht zwei `ORDER BY` im erzeugten SQL landen.
 * Serverseitig wird der Filter in **Bedingungsteil und `ORDER BY`-Klausel zerlegt**: Die Bedingung kommt hinter `WHERE`, die Sortierung dahinter. Besteht der Filter **nur** aus der Sortierung, entfällt das `WHERE` ganz (`WHERE ORDER BY id DESC` wäre ein Syntaxfehler).
-* Die `ORDER BY`-Klausel aus dem Filter ist freier Text und — anders als eine per Klick gewählte `sortSpalte` — **nicht** gegen die Katalog-Whitelist geprüft. Sie unterliegt derselben Prüfung wie der übrige Filter (`WhereClauseValidator`: keine `;`, keine Kommentare, keine DML-/DDL-Schlüsselwörter).
+* Die `ORDER BY`-Klausel aus dem Filter durchläuft denselben Parser wie der Bedingungsteil (NFR-2): erlaubt sind nur Spalten der gewählten Tabelle, je optional mit `ASC`/`DESC`, durch Komma getrennt.
 
 ### FR-1b: Filter-Historie im Browser (Nachtrag)
 * Nach jeder **erfolgreich ausgeführten** Abfrage wird die verwendete (nicht-leere) WHERE-Klausel in eine **lokale Filter-Historie** aufgenommen. Abgewiesene/fehlerhafte Filter (`400`) werden **nicht** gespeichert – die Historie enthält damit nur gültige Filter.
@@ -84,8 +84,11 @@ Neuer Controller unter `/api/datenbank`, klassenweit `@PreAuthorize("hasAuthorit
 * [ ] Auswahl einer Tabelle ohne WHERE zeigt deren Zeilen (paginiert, mit harter Obergrenze) generisch an — Spaltenüberschriften aus den DB-Metadaten.
 * [ ] Eine gültige WHERE-Klausel (z.B. `org_id = 42`) filtert das Ergebnis korrekt.
 * [ ] Die Ansicht zeigt Zeilen **aller Mandanten** (orgFilter nicht angewendet); `org_id` ist als Spalte sichtbar.
-* [ ] Eine WHERE-Eingabe mit `;`, SQL-Kommentar (`--`, `/* */`), Mehrfach-Statement oder DML/DDL-Schlüsselwort (`INSERT/UPDATE/DELETE/DROP/ALTER/TRUNCATE/CREATE/GRANT/...`) wird **abgewiesen** (Fehlermeldung, keine Ausführung).
-* [ ] Eine WHERE-Eingabe mit Sub-`SELECT` wird **abgewiesen**.
+* [x] Eine WHERE-Eingabe mit `;`, SQL-Kommentar (`--`, `/* */`) oder Mehrfach-Statement wird **abgewiesen** (Fehlermeldung, keine Ausführung). (Test: DatenbankFilterParserTest#parse_SyntaxAusserhalbDerGrammatik_WirdAbgewiesen, DatenbankServiceTest#abfrage_UnzulaessigerFilter_AbfrageWirdNichtAbgesetzt)
+* [x] Eine WHERE-Eingabe mit Sub-`SELECT` wird **abgewiesen**. (Test: DatenbankFilterParserTest#parse_SyntaxAusserhalbDerGrammatik_WirdAbgewiesen, DatenbankFilterParserTest#parse_FremdeBezeichner_WerdenAbgewiesen)
+* [x] Eine WHERE-Eingabe mit Funktionsaufruf (z.B. `query_to_xml(…)`, `pg_read_file(…)`, `lower(name)`), Cast (`::`) oder `||` wird **abgewiesen**; es wird kein SQL abgesetzt. (Test: DatenbankFilterParserTest#parse_Funktionsaufruf_WirdAbgewiesen, DatenbankServiceTest#abfrage_UnzulaessigerFilter_AbfrageWirdNichtAbgesetzt)
+* [x] Eine Spalte, die die gewählte Tabelle nicht hat (auch schema-qualifiziert wie `keycloak.credential`), wird **abgewiesen**; bei unbekannter Spalte erscheint `DATENBANK_WHERE_SPALTE_UNBEKANNT`. (Test: DatenbankFilterParserTest#parse_SpalteNurInAndererTabelle_WirdAbgewiesen, DatenbankFilterParserTest#parse_FremdeBezeichner_WerdenAbgewiesen; Nachweis: V189__Add_Datenbank_Filter_Translations.sql:3)
+* [x] Die Filter der Grammatik (Vergleiche, `LIKE`/`ILIKE`, `IS [NOT] NULL`, `IN`, `BETWEEN`, `AND`/`OR`/`NOT`, Klammern) bleiben zulässig; Text-Literale dürfen beliebigen Inhalt haben (auch `;` oder `select`). (Test: DatenbankFilterParserTest#parse_GaengigeFilter_WerdenNeuAufgebaut, DatenbankFilterParserTest#parse_SchluesselwortImText_IstZulaessig)
 * [ ] Ein nicht in der Whitelist enthaltener/ungültiger Tabellenname wird **abgewiesen** (kein SQL ausgeführt).
 * [ ] Jeder Schreibversuch (z.B. `UPDATE`-artige Eingabe) hat **keinerlei** Datenänderung zur Folge (read-only-Transaktion).
 * [ ] Zugriff auf die Endpunkte ohne `datenbank:read` → `403`.
@@ -128,13 +131,19 @@ Neuer Controller unter `/api/datenbank`, klassenweit `@PreAuthorize("hasAuthorit
 
 ### NFR-2: Sicherheit
 * **Nur `zev_admin`:** Neue feingranulare Permission **`datenbank:read`**, ausschliesslich der Composite-Rolle `zev_admin` zugeordnet (konsistent mit `Specs/Composite-Roles.md`/`Berechtigungen.md`). Backend: `@PreAuthorize("hasAuthority('datenbank:read')")`; Frontend: Route `/einstellungen` bleibt `einstellungen:write`, der DB-Bereich wird zusätzlich per `datenbank:read` ein-/ausgeblendet (`AuthService`/Permission-Prüfung).
-* **Read-only erzwungen:** Abfrage in read-only-Transaktion (`@Transactional(readOnly = true)` + `Connection.setReadOnly(true)`/`SET TRANSACTION READ ONLY`). **Keine** dedizierte DB-Rolle (Entscheidung) — die read-only-Transaktion genügt.
+* **Read-only erzwungen:** Abfrage in read-only-Transaktion (`@Transactional(readOnly = true)` + `Connection.setReadOnly(true)`/`SET TRANSACTION READ ONLY`). **Keine** dedizierte DB-Rolle (Entscheidung) — read-only-Transaktion und Filter-Parser genügen (Anhang A.1).
 * **Audit-Log:** Ausführungen werden ins **Application-Log** geschrieben (Benutzer, Tabelle, WHERE, Zeitpunkt) — **keine** Audit-Tabelle (Entscheidung).
 * **Tabellen-Whitelist:** Tabellenname muss exakt einer dynamisch aus dem Katalog gelesenen `zev`-Tabelle entsprechen; `keycloak`-, `pg_catalog`-, `information_schema`-Objekte sind ausgeschlossen.
-* **WHERE-Guards:** Ablehnung bei `;`, Kommentaren (`--`, `/*`, `*/`), mehreren Statements, DML/DDL-Schlüsselwörtern und Sub-`SELECT`. Genau **ein** `SELECT` auf **eine** Whitelist-Tabelle.
+* **Filter-Parser (Allowlist):** Der Filter wird zerlegt (`DatenbankFilterParser`) und das SQL **ausschliesslich aus den erkannten Bausteinen neu aufgebaut** – der Eingabetext gelangt nie unverändert ins SQL. Grammatik:
+  * Bedingung: Prädikate verknüpft mit `AND`/`OR`/`NOT` und Klammern.
+  * Prädikat: `operand vergleich operand` (`=`, `<>`, `!=`, `<`, `>`, `<=`, `>=`), `operand [NOT] LIKE|ILIKE operand`, `operand IS [NOT] NULL`, `operand [NOT] IN (literal, …)`, `operand [NOT] BETWEEN operand AND operand`.
+  * Operand: eine **Spalte der gewählten Tabelle** (Katalog, ohne Gross-/Kleinschreibung, im SQL in Anführungszeichen) oder ein Literal: Zahl aus `0`–`9` (optional negativ, optional mit Dezimalteil), Text in `'…'` (`''` für ein Apostroph; im SQL als `E'…'` mit verdoppeltem `\` und `'` neu maskiert, unabhängig von `standard_conforming_strings`; NUL unzulässig), `TRUE`/`FALSE`. Wörter bestehen nur aus ASCII-Buchstaben, Ziffern und `_`.
+  * Sortierung: `ORDER BY spalte [ASC|DESC] {, spalte [ASC|DESC]}` am Ende.
+  * Alles andere wird mit `400` abgewiesen: Funktionsaufrufe, Casts (`::`), Operatoren wie `||`, Sub-`SELECT`, schema-qualifizierte Namen, `;`, Kommentare, Parameter. Ein Wort, das keine Spalte der Tabelle ist (auch ein Funktionsname wie in `lower(name)`) → `DATENBANK_WHERE_SPALTE_UNBEKANNT`; Zeichen ausserhalb der Grammatik (`::`, `||`, `.`, `;` …) und übrige Syntaxfehler → `DATENBANK_WHERE_UNGUELTIG`; länger als 500 Zeichen → `DATENBANK_WHERE_ZU_LANG`.
+  > Eine Denylist verbotener Wörter liess Funktionsaufrufe wie `query_to_xml(…)` und `pg_read_file(…)` durch und damit Lesezugriffe über die Tabellen-Whitelist hinaus (Hintergrund: Anhang A.1).
 * **Fehler-Hygiene:** Fehlermeldungen ohne DB-interne Details/Stacktraces (kein Informationsleck).
 * **Bewusste Mandanten-Ausnahme:** Die mandantenübergreifende Rohansicht ist eine dokumentierte Ausnahme der Isolation, ausschliesslich für `zev_admin`.
-* **Filter-Historie (FR-1b):** Gespeichert werden **ausschliesslich die WHERE-Klauseln**, **keine** Abfrage-Ergebnisse/Daten. Die Ablage erfolgt unverschlüsselt im `localStorage` des Admin-Browsers (gerätelokal, kein Serverbezug); die Werte fliessen bei der Ausführung durch dieselben WHERE-Guards wie eine manuelle Eingabe (aus dem Storage übernommene Filter erhalten **keinen** Vertrauensvorschuss).
+* **Filter-Historie (FR-1b):** Gespeichert werden **ausschliesslich die WHERE-Klauseln**, **keine** Abfrage-Ergebnisse/Daten. Die Ablage erfolgt unverschlüsselt im `localStorage` des Admin-Browsers (gerätelokal, kein Serverbezug); die Werte fliessen bei der Ausführung durch denselben Filter-Parser wie eine manuelle Eingabe (aus dem Storage übernommene Filter erhalten **keinen** Vertrauensvorschuss).
 
 ### NFR-3: Kompatibilität
 * Rein additiv: neue Endpunkte + UI-Bereich; keine Änderung an bestehenden Einstellungen-Funktionen, keine DB-Schema-Änderung (nur Lesezugriff).
@@ -147,7 +156,9 @@ Neuer Controller unter `/api/datenbank`, klassenweit `@PreAuthorize("hasAuthorit
 | Keine Tabelle gewählt | „Anzeigen" deaktiviert bzw. Hinweis; keine Abfrage |
 | Leere WHERE-Klausel | Gesamte Tabelle (mit LIMIT) anzeigen |
 | Ungültige WHERE-Syntax | `400`, verständliche Meldung, keine DB-Interna |
-| Verbotene Tokens (`;`, `--`, DML/DDL, Sub-SELECT) | `400` „unzulässige Eingabe", keine Ausführung |
+| Eingabe ausserhalb der Grammatik (`;`, `--`, Sub-SELECT, Cast, `\|\|`, …) | `400` „unzulässige Eingabe", keine Ausführung |
+| Unbekannte Spalte oder Funktionsaufruf | `400` `DATENBANK_WHERE_SPALTE_UNBEKANNT`, keine Ausführung |
+| Gespeicherter Filter aus der Historie mit Funktion/Cast (vor dem Parser zulässig) | Normale Abweisung (`400`); der Eintrag bleibt in der Historie |
 | Unbekannter/ungültiger Tabellenname | `400`/`404`, kein SQL |
 | Leeres Ergebnis | Hinweis „keine Daten" |
 | Sehr grosses Ergebnis | Pagination + harte Obergrenze; Hinweis, dass gekürzt |
@@ -165,7 +176,7 @@ Neuer Controller unter `/api/datenbank`, klassenweit `@PreAuthorize("hasAuthorit
 ## 6. Abhängigkeiten & betroffene Funktionalität
 * **Voraussetzungen:** Bestehende `/einstellungen`-Seite und Permission-Modell (`Composite-Roles.md`, `Berechtigungen.md`); PostgreSQL-Katalog (`information_schema`/`pg_catalog`).
 * **Betroffener Code:**
-  - Backend (neu): `DatenbankController`, `DatenbankService` (`JdbcTemplate`), DTOs (`DatenbankAbfrageRequest`, `DatenbankAbfrageResponse`), WHERE-Validator.
+  - Backend (neu): `DatenbankController`, `DatenbankService` (`JdbcTemplate`), DTOs (`DatenbankAbfrageRequest`, `DatenbankAbfrageResponse`), Filter-Parser (`DatenbankFilterParser`).
   - Frontend (neu/erweitert): Abschnitt in `EinstellungenComponent` (oder Sub-Component `DatenbankAnsichtComponent`), `DatenbankService`, ggf. generische Ergebnis-Tabelle, `DatenbankFilterHistorieService` (localStorage, FR-1b).
   - Security: `SecurityConfig`/JWT-Mapping unverändert (Permission kommt aus Keycloak-Rolle); Keycloak-Realm um `datenbank:read` (→ `zev_admin`) ergänzen.
   - i18n: neue Übersetzungs-Keys (Flyway-Migration `V[XX]__Add_DatenbankAnsicht_Translations.sql`).
@@ -194,3 +205,26 @@ Alle geklärt (in FR/NFR/Out-of-Scope eingearbeitet):
 * [x] **Geltungsbereich der Filter-Historie:** → **pro Tabelle** getrennt (FR-1b), damit die Vorschläge zu den Spalten der gewählten Tabelle passen.
 * [x] **Darstellung der Auswahlliste:** → natives **`<datalist>`** am bestehenden Filter-Feld (FR-4) – kein zusätzliches Bedienelement, kein neues CSS.
 * [x] **Zeitpunkt der Aufnahme in die Historie:** → erst nach **erfolgreicher** Abfrage (ungültige Filter werden nicht gemerkt).
+
+## Anhang A – Entscheidungen und Verlauf
+
+### A.1 Filter-Parser statt WHERE-Denylist (NFR-2, 26.10.2026)
+Bis 26.10.2026 prüfte ein `WhereClauseValidator` den Filter per Denylist (`;`, Kommentare, die
+Schlüsselwörter `insert|update|delete|drop|alter|truncate|create|grant|revoke|merge|copy|call|do|select`,
+max. 500 Zeichen) und hängte den Text danach **unverändert** hinter `WHERE`. Die `ORDER BY`-Klausel
+aus dem Filter war ebenfalls freier Text. Bewusst streng war: auch Text-Literale mit einem
+verbotenen Wort (`LIKE '%select%'`) wurden abgewiesen.
+
+Der Security-Check vom 26.10.2026 (`/8_security-check`, Befund 1) zeigte, dass Funktionsaufrufe ohne
+verbotenes Wort durchkamen, z.B. `query_to_xml('sel'||'ect … from keycloak.credential',true,false,'')`
+oder `pg_read_file(…)`. Die read-only-Transaktion verhindert Schreiben, nicht Lesen. Das Backend
+verbindet sich mit demselben Superuser wie Keycloak; damit waren das Schema `keycloak`
+(Passwort-Hashes, Client-Secrets) und Dateien des DB-Servers lesbar – für Inhaber von
+`datenbank:read` (nur `zev_admin`).
+
+Abgewogen wurden drei Wege: eigene DB-Rolle mit zweiter DataSource (unverändertes Feature, aber
+Migration mit Passwort-Platzhalter und neue Variablen in `.env`/Compose auf jeder Installation),
+Allowlist-Parser (nur Code) oder beides. Gewählt: **Allowlist-Parser**. Folge: Ausdrücke mit
+Funktionen oder Casts (`zeit::date = '…'`, `lower(name) = …`, `date_trunc(…)`) sind nicht mehr
+möglich; Zeitvergleiche gehen weiterhin über Text-Literale (`zeit > '2026-01-01'`). Die
+Entscheidung „keine dedizierte DB-Rolle" (§8) bleibt.

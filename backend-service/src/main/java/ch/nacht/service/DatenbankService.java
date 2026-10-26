@@ -12,8 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Generische, read-only Datenbank-Ansicht (nur zev_admin, Permission datenbank:read).
@@ -23,7 +21,7 @@ import java.util.regex.Pattern;
  * Der Hibernate-{@code orgFilter} wird NICHT angewendet (mandantenübergreifende Rohansicht).
  *
  * <p>Sicherheit: Tabellenname nur aus dynamischer Whitelist des Schemas {@code zev};
- * WHERE über {@link WhereClauseValidator} geprüft; Ausführung in read-only-Transaktion mit
+ * Filter über {@link DatenbankFilterParser} zerlegt und neu aufgebaut; Ausführung in read-only-Transaktion mit
  * {@code statement_timeout}; harte Zeilenobergrenze (Pagination); bytea-Spalten ausgeschlossen.
  */
 @Service
@@ -39,22 +37,14 @@ public class DatenbankService {
     private static final String ORG_ID_SPALTE = "org_id";
     private static final String ID_SPALTE = "id";
 
-    /**
-     * Trennt eine {@code ORDER BY}-Klausel vom Bedingungsteil des Filters. Der Standard-Filter
-     * bringt eine mit (siehe {@link #getStandardFilter(String)}), und der Anwender darf eine
-     * eintippen — beides muss <b>hinter</b> das {@code WHERE}, sonst entsteht Unsinn wie
-     * {@code WHERE ORDER BY id DESC}.
-     */
-    private static final Pattern ORDER_BY = Pattern.compile("\\bORDER\\s+BY\\b", Pattern.CASE_INSENSITIVE);
-
     private final JdbcTemplate jdbcTemplate;
-    private final WhereClauseValidator whereClauseValidator;
+    private final DatenbankFilterParser filterParser;
     private final OrganizationContextService organizationContextService;
 
-    public DatenbankService(JdbcTemplate jdbcTemplate, WhereClauseValidator whereClauseValidator,
+    public DatenbankService(JdbcTemplate jdbcTemplate, DatenbankFilterParser filterParser,
                             OrganizationContextService organizationContextService) {
         this.jdbcTemplate = jdbcTemplate;
-        this.whereClauseValidator = whereClauseValidator;
+        this.filterParser = filterParser;
         this.organizationContextService = organizationContextService;
     }
 
@@ -121,20 +111,23 @@ public class DatenbankService {
             throw new IllegalArgumentException("DATENBANK_TABELLE_UNGUELTIG");
         }
 
-        // 2) WHERE validieren (Guards)
         String where = request.getWhere();
-        whereClauseValidator.validate(where);
 
-        // 3) Pagination klemmen
+        // 2) Pagination klemmen
         int size = request.getSize() == null ? DEFAULT_SIZE : Math.min(Math.max(request.getSize(), 1), MAX_SIZE);
         int page = request.getPage() == null ? 0 : Math.max(request.getPage(), 0);
         int offset = page * size;
 
-        // 4) Spalten aus dem Katalog (bytea ausgeschlossen)
+        // 3) Spalten aus dem Katalog (bytea ausgeschlossen)
         List<String> spalten = getSpalten(tabelle);
         if (spalten.isEmpty()) {
             throw new IllegalArgumentException("DATENBANK_TABELLE_UNGUELTIG");
         }
+
+        // 4) Filter zerlegen und aus den erkannten Bausteinen neu aufbauen (Allowlist): nur
+        //    Spalten dieser Tabelle, Literale und die Operatoren der Grammatik. Der Filter ist ein
+        //    einziges Eingabefeld; seine Sortierung kommt hinter das WHERE.
+        DatenbankFilterParser.GeparsterFilter filter = filterParser.parse(where, spalten);
 
         // 5) Read-only absichern + Langläufer verhindern
         jdbcTemplate.execute("SET LOCAL statement_timeout = " + STATEMENT_TIMEOUT_MS);
@@ -151,24 +144,13 @@ public class DatenbankService {
             orderBySql = " ORDER BY \"" + sortSpalte + "\" " + (desc ? "DESC" : "ASC");
         }
 
-        // 7) Filter in Bedingung und (optionale) ORDER BY-Klausel zerlegen. Der Filter ist ein
-        //    einziges Eingabefeld; die Sortierung daraus muss hinter das WHERE, sonst entsteht
-        //    " WHERE ORDER BY id DESC". Eine per Klick gewaehlte Sortierspalte hat Vorrang.
-        String bedingung = where;
-        String filterOrderBySql = "";
-        if (where != null && !where.isBlank()) {
-            Matcher orderBy = ORDER_BY.matcher(where);
-            if (orderBy.find()) {
-                bedingung = where.substring(0, orderBy.start()).trim();
-                filterOrderBySql = " " + where.substring(orderBy.start()).trim();
-            }
-        }
-
+        // 7) SQL zusammensetzen. Eine per Klick gewaehlte Sortierspalte hat Vorrang vor der
+        //    Sortierung aus dem Filter (sonst stuenden zwei ORDER BY im SQL).
         String cols = String.join(", ", spalten.stream().map(c -> "\"" + c + "\"").toList());
-        String whereSql = (bedingung == null || bedingung.isBlank()) ? "" : " WHERE " + bedingung;
-        // Tabellenname/Spalten/Sortierspalte stammen aus dem Katalog -> injektionssicher.
-        // Die ORDER BY-Klausel aus dem Filter ist dagegen freier Text und nur ueber den
-        // WhereClauseValidator abgesichert - wie der Bedingungsteil, in dem sie bisher stand.
+        String whereSql = filter.bedingung().isEmpty() ? "" : " WHERE " + filter.bedingung();
+        String filterOrderBySql = filter.sortierung().isEmpty() ? "" : " " + filter.sortierung();
+        // Tabellenname/Spalten/Sortierspalte stammen aus dem Katalog, Bedingung und Sortierung
+        // aus dem DatenbankFilterParser - kein Eingabetext gelangt unveraendert ins SQL.
         String sql = "SELECT " + cols + " FROM " + SCHEMA + ".\"" + tabelle + "\"" + whereSql
                 + (orderBySql.isEmpty() ? filterOrderBySql : orderBySql) + " LIMIT ? OFFSET ?";
 

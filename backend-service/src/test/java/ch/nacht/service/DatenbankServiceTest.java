@@ -12,6 +12,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -45,13 +46,13 @@ import static org.mockito.Mockito.when;
  * <p>Der Service weicht bewusst vom Repository-Pattern ab und baut sein SQL per
  * String-Konkatenation zusammen. Genau das macht ihn zur heikelsten Stelle des Backends:
  * Tabellen-, Spalten- und Sortiername landen unmaskiert in der Abfrage. Sicher ist das nur,
- * solange alle drei aus dem Katalog stammen und die WHERE-Klausel den Validator passiert.
+ * solange alle drei aus dem Katalog stammen und der Filter durch den Parser neu aufgebaut wird.
  *
  * <p>Die Tests pinnen deshalb nicht bloss Rückgabewerte, sondern das erzeugte SQL selbst:
  * Whitelist-Abgleich, Anführungszeichen um Bezeichner, gebundene Parameter für LIMIT/OFFSET,
  * die Klemmung der Seitengrösse und dass Datenbankfehler nicht nach aussen durchschlagen.
- * Der WHERE-Ausdruck selbst ist in {@link WhereClauseValidatorTest} abgedeckt; hier wird nur
- * geprüft, dass der Validator überhaupt gefragt wird.
+ * Die Grammatik des Filters ist in {@link DatenbankFilterParserTest} abgedeckt; hier läuft der
+ * echte Parser mit, damit das erzeugte SQL als Ganzes geprüft wird.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -60,8 +61,8 @@ public class DatenbankServiceTest {
     @Mock
     private JdbcTemplate jdbcTemplate;
 
-    @Mock
-    private WhereClauseValidator whereClauseValidator;
+    @Spy
+    private DatenbankFilterParser filterParser = new DatenbankFilterParser();
 
     @Mock
     private OrganizationContextService organizationContextService;
@@ -211,32 +212,35 @@ public class DatenbankServiceTest {
     // ==================== abfrage: WHERE ====================
 
     @Test
-    void abfrage_UebergibtWhereAnDenValidator() {
+    void abfrage_Filter_WirdAusDenErkanntenBausteinenNeuAufgebaut() {
         DatenbankAbfrageRequestDTO request = request("einheit");
         request.setWhere("org_id = 1");
 
         datenbankService.abfrage(request);
 
-        verify(whereClauseValidator).validate("org_id = 1");
-        assertTrue(erzeugtesSql().contains(" WHERE org_id = 1"));
+        verify(filterParser).parse("org_id = 1", SPALTEN);
+        assertTrue(erzeugtesSql().contains(" WHERE \"org_id\" = 1 LIMIT"), erzeugtesSql());
     }
 
-    @Test
-    void abfrage_ValidatorLehntAb_AbfrageWirdNichtAbgesetzt() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "id = 1; DROP TABLE zev.tarif",
+            // Die Umgehungen der frueheren Denylist (Security-Check 26.10.2026): Funktionsaufrufe
+            // ohne verbotenes Schluesselwort lasen ueber die Tabellen-Whitelist hinaus
+            "query_to_xml('sel'||'ect 1',true,false,'')::text like 'a%'",
+            "length(pg_read_file('/etc/passwd')) > 0",
+            "id IN (SELECT id FROM keycloak.credential)",
+            "id IN (SELECT id FROM mieter)",
+            "name::text = 'x'",
+            "name = 'a' || 'b'"
+    })
+    void abfrage_UnzulaessigerFilter_AbfrageWirdNichtAbgesetzt(String where) {
         DatenbankAbfrageRequestDTO request = request("einheit");
-        request.setWhere("id = 1; DROP TABLE zev.tarif");
-        doThrowUngueltig();
+        request.setWhere(where);
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                () -> datenbankService.abfrage(request));
+        assertThrows(IllegalArgumentException.class, () -> datenbankService.abfrage(request));
 
-        assertEquals("DATENBANK_WHERE_UNGUELTIG", exception.getMessage());
         verify(jdbcTemplate, never()).query(anyString(), any(RowMapper.class), anyInt(), anyInt());
-    }
-
-    private void doThrowUngueltig() {
-        org.mockito.Mockito.doThrow(new IllegalArgumentException("DATENBANK_WHERE_UNGUELTIG"))
-                .when(whereClauseValidator).validate(anyString());
     }
 
     @ParameterizedTest
@@ -270,7 +274,7 @@ public class DatenbankServiceTest {
         datenbankService.abfrage(request);
 
         assertEquals("SELECT \"id\", \"name\", \"org_id\" FROM zev.\"einheit\""
-                + " WHERE org_id = 42 ORDER BY id DESC LIMIT ? OFFSET ?", erzeugtesSql());
+                + " WHERE \"org_id\" = 42 ORDER BY \"id\" DESC LIMIT ? OFFSET ?", erzeugtesSql());
     }
 
     @Test
@@ -285,7 +289,7 @@ public class DatenbankServiceTest {
         String sql = erzeugtesSql();
         assertFalse(sql.contains("WHERE"), sql);
         assertEquals("SELECT \"id\", \"name\", \"org_id\" FROM zev.\"einheit\""
-                + " ORDER BY id DESC LIMIT ? OFFSET ?", sql);
+                + " ORDER BY \"id\" DESC LIMIT ? OFFSET ?", sql);
     }
 
     @ParameterizedTest
@@ -300,7 +304,7 @@ public class DatenbankServiceTest {
         datenbankService.abfrage(request);
 
         assertFalse(erzeugtesSql().contains("WHERE"), erzeugtesSql());
-        assertTrue(erzeugtesSql().contains("\"einheit\" " + where.trim() + " LIMIT"), erzeugtesSql());
+        assertTrue(erzeugtesSql().contains("\"einheit\" ORDER BY \"id\" DESC LIMIT"), erzeugtesSql());
     }
 
     @Test
@@ -316,7 +320,7 @@ public class DatenbankServiceTest {
 
         String sql = erzeugtesSql();
         assertEquals("SELECT \"id\", \"name\", \"org_id\" FROM zev.\"einheit\""
-                + " WHERE org_id = 42 ORDER BY \"name\" ASC LIMIT ? OFFSET ?", sql);
+                + " WHERE \"org_id\" = 42 ORDER BY \"name\" ASC LIMIT ? OFFSET ?", sql);
         // Nur ein einziges ORDER BY
         assertEquals(sql.indexOf("ORDER BY"), sql.lastIndexOf("ORDER BY"));
     }
