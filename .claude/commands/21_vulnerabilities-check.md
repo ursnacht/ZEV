@@ -53,7 +53,7 @@ npm-Module (package.json):
   design-system/      → CSS/TS-Build-Wrapper (nur devDependencies)
 
 Maven-Module (pom.xml, Reactor des Root-Parents):
-  pom.xml             → Parent (spring-boot-starter-parent 4.0.6)
+  pom.xml             → Parent (spring-boot-starter-parent, Version siehe pom.xml)
   admin-service/      → Spring Boot Admin
   backend-service/    → Spring Boot Backend (meiste selbst gepinnte Java-Deps)
   frontend-service/   → Angular-App in Spring Boot gewrappt (webmvc, actuator,
