@@ -16,7 +16,7 @@
       Laut NVD betrifft der CVE die JasperReports Library *Community Edition*
       (net.sf.jasperreports:jasperreports) nur bis einschliesslich 7.0.3.
       Der Fix (Deserialization-Class-Filter, automatisch aktiv, keine Konfiguration noetig)
-      wurde in 7.0.4 eingefuehrt. Wir nutzen 7.0.7 -> bereits gepatcht.
+      wurde in 7.0.4 eingefuehrt. Wir nutzen 7.0.8 -> bereits gepatcht.
       OWASP Dependency-Check flaggt hier faelschlich, weil das CE-Artefakt per
       CPE-Range dem breiteren Professional-Bereich (bis 9.0.2) zugeordnet wird.
       Quelle: https://nvd.nist.gov/vuln/detail/CVE-2025-10492
@@ -25,6 +25,53 @@
     ]]></notes>
     <packageUrl regex="true">^pkg:maven/net\.sf\.jasperreports/jasperreports(-pdf)?@.*$</packageUrl>
     <cve>CVE-2025-10492</cve>
+  </suppress>
+
+  <suppress>
+    <notes><![CDATA[
+      CVE-2026-53914 (JetBrains Kotlin, "unsafe deserialization in the build cache metadata").
+      Betrifft den Kotlin-Compiler bzw. das Build-Tooling (Build-Cache-Metadaten), nicht die
+      Kotlin-Standardbibliothek zur Laufzeit. OWASP ordnet die stdlib-JARs ueber den breiten CPE
+      cpe:2.3:a:jetbrains:kotlin zu. Wir kompilieren kein Kotlin; die stdlib kommt nur transitiv:
+      kotlin-stdlib 2.3.21 ueber spring-ai-anthropic -> anthropic-java-core,
+      kotlin-stdlib-common 1.9.10 ueber okhttp 4.12.0 -> okio 3.6.0.
+      Entfernen, sobald die Abhaengigkeiten Kotlin >= 2.4.20 mitbringen.
+      Quelle: https://nvd.nist.gov/vuln/detail/CVE-2026-53914 (geprueft 26.10.2026)
+    ]]></notes>
+    <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/kotlin-stdlib(-common)?@.*$</packageUrl>
+    <cve>CVE-2026-53914</cve>
+  </suppress>
+
+  <suppress>
+    <notes><![CDATA[
+      CVE-2020-29582 (JetBrains Kotlin, unsichere Temp-Dateien).
+      Laut NVD-Beschreibung nur "before 1.4.21"; kotlin-stdlib-common ist 1.9.10. OWASP meldet es
+      nur, weil der CPE-Bereich in der NVD (versionEndExcluding 2.1.0) breiter ist als die
+      Beschreibung. Quelle: https://nvd.nist.gov/vuln/detail/CVE-2020-29582 (geprueft 26.10.2026)
+    ]]></notes>
+    <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/kotlin-stdlib-common@1\.9\..*$</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+
+  <suppress>
+    <notes><![CDATA[
+      CVE-2025-10543 betrifft die Go-Bibliothek paho.mqtt.golang (CPE ...:paho_mqtt:...:go),
+      nicht den Java-Client org.eclipse.paho.client.mqttv3.
+      Quelle: https://nvd.nist.gov/vuln/detail/CVE-2025-10543 (geprueft 26.10.2026)
+    ]]></notes>
+    <packageUrl regex="true">^pkg:maven/org\.eclipse\.paho/org\.eclipse\.paho\.client\.mqttv3@.*$</packageUrl>
+    <cve>CVE-2025-10543</cve>
+  </suppress>
+
+  <suppress>
+    <notes><![CDATA[
+      CVE-2026-54285 betrifft opentelemetry-js (@opentelemetry/core, W3CBaggagePropagator, CPE
+      ...:opentelemetry:...:node.js), nicht das Java-Artefakt io.opentelemetry:opentelemetry-api
+      (kommt transitiv ueber anthropic-java-core).
+      Quelle: https://nvd.nist.gov/vuln/detail/CVE-2026-54285 (geprueft 26.10.2026)
+    ]]></notes>
+    <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-api@.*$</packageUrl>
+    <cve>CVE-2026-54285</cve>
   </suppress>
 
 </suppressions>
