@@ -5,6 +5,7 @@ import ch.nacht.util.Ortszeit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.SpringBootVersion;
 import org.springframework.boot.info.BuildProperties;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -64,5 +65,14 @@ public class VersionService {
             return null;
         }
         return props.getTime().atZone(Ortszeit.ZONE).format(BUILD_FORMAT);
+    }
+
+    /**
+     * Spring-Boot-Version des laufenden Backends (z.B. "4.1.2", Specs/Startseite.md FR-4.3). Spring
+     * Boot kennt sie selbst - ohne Konfiguration und ohne Build-Schritt. {@code null}, falls sie
+     * nicht ermittelbar ist; die Anzeige entfaellt dann.
+     */
+    public String getSpringBootVersion() {
+        return SpringBootVersion.getVersion();
     }
 }

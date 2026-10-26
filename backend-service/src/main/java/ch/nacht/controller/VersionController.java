@@ -29,6 +29,7 @@ public class VersionController {
         Map<String, String> version = new HashMap<>();
         version.put("schemaVersion", versionService.getSchemaVersion());
         version.put("buildTime", versionService.getBuildTime());
+        version.put("springBootVersion", versionService.getSpringBootVersion());
         return version;
     }
 }

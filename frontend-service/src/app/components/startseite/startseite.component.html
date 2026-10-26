@@ -7,17 +7,18 @@
     </h1>
     <p class="startseite__subtitle">{{ 'STARTSEITE_BESCHREIBUNG' | translate }}</p>
   </div>
-  @if (schemaVersion || buildTime) {
-    <p class="startseite__version">
-      @if (schemaVersion) {
-        <span>{{ 'DB_SCHEMA_VERSION' | translate }}: V{{ schemaVersion }}</span>
-      }
-      @if (schemaVersion && buildTime) {
-        <span> · </span>
-      }
-      @if (buildTime) {
-        <span>{{ 'BUILD_DATUM' | translate }}: {{ buildTime }}</span>
-      }
-    </p>
-  }
+  <!-- Teile mit " · " getrennt; fehlende Backend-Teile entfallen, Angular steht immer (FR-4.5/4.6).
+       "Spring Boot" und "Angular" sind Eigennamen und werden bewusst nicht uebersetzt (FR-4.5). -->
+  <p class="startseite__version">
+    @if (schemaVersion) {
+      <span>{{ 'DB_SCHEMA_VERSION' | translate }}: V{{ schemaVersion }} · </span>
+    }
+    @if (buildTime) {
+      <span>{{ 'BUILD_DATUM' | translate }}: {{ buildTime }} · </span>
+    }
+    @if (springBootVersion) {
+      <span>Spring Boot {{ springBootVersion }} · </span>
+    }
+    <span>Angular {{ angularVersion }}</span>
+  </p>
 </div>

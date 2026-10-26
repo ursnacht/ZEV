@@ -6,6 +6,7 @@ import { getRuntimeConfig } from '../runtime-config';
 export interface VersionInfo {
   schemaVersion: string | null;
   buildTime: string | null;
+  springBootVersion: string | null;
 }
 
 @Injectable({

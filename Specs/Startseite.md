@@ -23,16 +23,31 @@
 2. **Build-Datum:** Zusätzlich wird der Build-Zeitpunkt des Backends angezeigt (z.B. „Build: 17.07.2026 10:15").
    * Quelle: `build-info.properties`, erzeugt vom `spring-boot-maven-plugin` (Goal `build-info`); im Backend als `BuildProperties`-Bean verfügbar, Ausgabe im Schweizer Format `dd.MM.yyyy HH:mm` (lokale Zeitzone).
    * Wird das Jar nicht über das Plugin gebaut (z.B. IDE-Start), fehlt die Bean → das Build-Datum entfällt, ohne Fehler.
-3. Anzeige-Format: dezente Zeile am unteren Seitenrand, `Datenbank-Version: V<nn> · Build: <Datum>`; Labels über Translation-Keys `DB_SCHEMA_VERSION` (V82) und `BUILD_DATUM` (V83).
-4. Beide Angaben sind rein informativ: Ist eine davon nicht ermittelbar (`null`), entfällt nur der jeweilige Teil; schlägt der API-Aufruf fehl, wird nichts angezeigt (keine Fehlermeldung).
+3. **Spring-Boot-Version:** Die Spring-Boot-Version des Backends (z.B. „Spring Boot 4.1.2“).
+   * Quelle: `SpringBootVersion.getVersion()` – Spring Boot kennt seine Version selbst, ohne Konfiguration und ohne Build-Schritt. Geliefert als `springBootVersion` in `GET /api/version`.
+4. **Angular-Version:** Die Angular-Version des ausgelieferten Frontends (z.B. „Angular 22.2.3“).
+   * Quelle: `VERSION.full` aus `@angular/core`, direkt im Browser – kein Backend-Aufruf. So steht dort genau die Version, die tatsächlich ausgeliefert wurde.
+5. Anzeige-Format: dezente Zeile am unteren Seitenrand, Teile mit ` · ` getrennt:
+   `Datenbank-Version: V<nn> · Build: <Datum> · Spring Boot <x.y.z> · Angular <x.y.z>`.
+   Labels über Translation-Keys `DB_SCHEMA_VERSION` (V82) und `BUILD_DATUM` (V83); „Spring Boot“ und „Angular“ sind Eigennamen und werden nicht übersetzt.
+   > Wozu: Nach einem Deploy lässt sich ohne Entwicklertools prüfen, ob der neue Stand läuft – belegt beim Angular-22- und Spring-Boot-4.1.2-Upgrade auf Hene (26.10.2026).
+6. Alle Angaben sind rein informativ: Ist eine davon nicht ermittelbar (`null`), entfällt nur der jeweilige Teil; schlägt der API-Aufruf fehl, entfallen die drei Backend-Teile, die Angular-Version bleibt stehen (keine Fehlermeldung). (Hintergrund: Anhang A.1)
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 * [ ] Dem Benutzer wird nach dem Login die neue Startseite angezeigt.
 * [ ] Die Navigation ist bereits aufgeklappt.
 * [ ] Unten auf der Startseite wird die höchste Flyway-Schema-Version angezeigt (Format `V<nn>`).
 * [ ] Neben der Version wird das Build-Datum des Backends angezeigt (`dd.MM.yyyy HH:mm`), sofern das Jar über das Spring-Boot-Plugin gebaut wurde.
-* [ ] `GET /api/version` ist für jeden authentifizierten Benutzer (jede Rolle) aufrufbar und liefert `{ schemaVersion, buildTime }`.
-* [ ] Schlägt der Versions-Aufruf fehl oder fehlen die Werte, zeigt die Startseite keine Fehlermeldung – die Zeile entfällt (ganz oder teilweise).
+* [x] Die Zeile zeigt zusätzlich die Spring-Boot-Version des Backends (`Spring Boot <x.y.z>`, aus `SpringBootVersion.getVersion()`).
+      (Test: VersionServiceTest#getSpringBootVersion_ReturnsLaufendeVersion; startseite.component.spec.ts › StartseiteComponent › should show the Spring Boot version delivered by the backend)
+* [x] Die Zeile zeigt zusätzlich die Angular-Version des ausgelieferten Frontends (`Angular <x.y.z>`, aus `VERSION.full`).
+      (Test: startseite.component.spec.ts › StartseiteComponent › should show the Angular version of the delivered frontend)
+* [x] Die vorhandenen Teile stehen in der Reihenfolge Datenbank-Version, Build, Spring Boot, Angular, getrennt mit ` · `.
+      (Test: startseite.component.spec.ts › StartseiteComponent › should show all four parts in order, separated by a middle dot)
+* [x] `GET /api/version` ist für jeden authentifizierten Benutzer (jede Rolle) aufrufbar und liefert `{ schemaVersion, buildTime, springBootVersion }`.
+      (Test: ControllerAuthorizationTest#getVersion_authenticatedWithoutPermission_ok; ControllerAuthorizationTest#getVersion_withoutAuthentication_unauthorized; VersionControllerTest#getVersion_AlleWerte_ReturnsSchemaBuildUndSpringBoot)
+* [x] Schlägt der Versions-Aufruf fehl oder fehlen Werte, zeigt die Startseite keine Fehlermeldung – nur die fehlenden Teile entfallen; die Angular-Version steht immer da.
+      (Test: startseite.component.spec.ts › StartseiteComponent › should omit missing parts without a stray separator; startseite.component.spec.ts › StartseiteComponent › should keep only the Angular version when the version call fails, without an error message; VersionControllerTest#getVersion_FehlendeWerte_AlsNull; VersionServiceTest#getSchemaVersion_DatenbankWirft_ReturnsNull; VersionServiceTest#getBuildTime_OhneBuildInfo_ReturnsNull)
 * [ ] Die Labels stammen aus dem `TranslationService` (DE/EN).
 
 
@@ -43,7 +58,7 @@
 
 ### NFR-2: Sicherheit
 * Die Startseite ist mit jeder Rolle sichtbar
-* `GET /api/version` erfordert Authentifizierung, aber keine Permission (rollenunabhängig wie die Startseite selbst); es werden keine sensitiven Daten geliefert (nur Schema-Version und Build-Zeitpunkt)
+* `GET /api/version` erfordert Authentifizierung, aber keine Permission (rollenunabhängig wie die Startseite selbst); es werden keine sensitiven Daten geliefert (nur Schema-Version, Build-Zeitpunkt und Spring-Boot-Version)
 
 ### NFR-3: Kompatibilität
 * -
@@ -54,10 +69,21 @@
 |----------|-----------|
 | `flyway_schema_history` leer oder nicht lesbar | `schemaVersion = null` → Versions-Teil entfällt (Log-Warnung im Backend) |
 | Jar ohne `build-info` gebaut (z.B. IDE-Start) | `buildTime = null` → Build-Teil entfällt |
-| `GET /api/version` schlägt fehl | keine Anzeige, keine Fehlermeldung (rein informativ) |
+| `GET /api/version` schlägt fehl | Backend-Teile entfallen, nur die Angular-Version steht; keine Fehlermeldung (rein informativ) |
 
 ## 6. Abgrenzung / Out of Scope
 * -
 
 ## 7. Offene Fragen
 * -
+
+## Anhang A – Entscheidungen und Verlauf
+
+### A.1 Spring-Boot- und Angular-Version (FR-4, 26.10.2026)
+FR-4.3 lautete: „Anzeige-Format: dezente Zeile am unteren Seitenrand, `Datenbank-Version: V<nn> ·
+Build: <Datum>`“, FR-4.4: „Beide Angaben sind rein informativ: Ist eine davon nicht ermittelbar
+(`null`), entfällt nur der jeweilige Teil; schlägt der API-Aufruf fehl, wird nichts angezeigt“. Das
+Kriterium nannte als Antwort `{ schemaVersion, buildTime }` und „die Zeile entfällt (ganz oder
+teilweise)“. Auf Wunsch des Users zeigt die Zeile zusätzlich die Spring-Boot- und die
+Angular-Version. Weil die Angular-Version im Browser feststeht, entfällt die Zeile nicht mehr ganz.
+

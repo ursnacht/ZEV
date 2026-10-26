@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, VERSION } from '@angular/core';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
 import { VersionService } from '../../services/version.service';
@@ -14,6 +14,13 @@ import { VersionService } from '../../services/version.service';
 export class StartseiteComponent implements OnInit {
   schemaVersion: string | null = null;
   buildTime: string | null = null;
+  springBootVersion: string | null = null;
+
+  /**
+   * Angular-Version des ausgelieferten Frontends - direkt aus `@angular/core`, ohne Backend-Aufruf
+   * (Specs/Startseite.md, FR-4.4). Sie steht darum auch dann, wenn `/api/version` scheitert.
+   */
+  readonly angularVersion = VERSION.full;
 
   constructor(private versionService: VersionService) {}
 
@@ -22,11 +29,14 @@ export class StartseiteComponent implements OnInit {
       next: (version) => {
         this.schemaVersion = version.schemaVersion;
         this.buildTime = version.buildTime;
+        this.springBootVersion = version.springBootVersion;
       },
       error: () => {
-        // Version/Build sind rein informativ – bei Fehlern keine Anzeige, keine Fehlermeldung
+        // Rein informativ: Die Backend-Teile entfallen, die Angular-Version bleibt stehen - keine
+        // Fehlermeldung (Specs/Startseite.md, FR-4.6)
         this.schemaVersion = null;
         this.buildTime = null;
+        this.springBootVersion = null;
       }
     });
   }

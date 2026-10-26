@@ -25,6 +25,7 @@ import ch.nacht.service.SteuerungService;
 import ch.nacht.service.TarifService;
 import ch.nacht.service.TranslationService;
 import ch.nacht.service.TarifpositionService;
+import ch.nacht.service.VersionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -73,7 +74,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         EinheitController.class, MieterController.class, NkAbrechnungController.class,
         NkRechnungController.class, SystemmeldungController.class, PreiszeitreiheController.class,
         SteuerungController.class, TranslationController.class, StatistikController.class,
-        MesspunktEmpfangController.class})
+        MesspunktEmpfangController.class, VersionController.class})
 @Import(SecurityConfig.class)
 @TestPropertySource(properties = "app.cors.allowed-origins=http://localhost:4200")
 class ControllerAuthorizationTest {
@@ -104,6 +105,9 @@ class ControllerAuthorizationTest {
 
     @MockitoBean
     private MesspunktEmpfangService messpunktEmpfangService;
+
+    @MockitoBean
+    private VersionService versionService;
 
     @MockitoBean
     private MieterService mieterService;
@@ -408,6 +412,21 @@ class ControllerAuthorizationTest {
                 .andExpect(status().isForbidden());
 
         verify(einheitService, never()).getAllEinheiten();
+    }
+
+    // ==================== Version (Specs/Startseite.md, FR-4, NFR-2) ====================
+    // Die Startseite ist rollenunabhaengig: jeder angemeldete Benutzer, auch ohne Permission.
+
+    @Test
+    void getVersion_authenticatedWithoutPermission_ok() throws Exception {
+        mockMvc.perform(get("/api/version").with(jwt()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getVersion_withoutAuthentication_unauthorized() throws Exception {
+        mockMvc.perform(get("/api/version"))
+                .andExpect(status().isUnauthorized());
     }
 
     // ==================== Messpunkt-Empfang (Specs/Messpunkt-Empfang.md, FR-2.9) ====================

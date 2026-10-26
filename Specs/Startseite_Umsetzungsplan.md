@@ -209,3 +209,14 @@ offen, der Klick schloss es also — der Helfer fängt das über seinen `goto`-R
 **Nachgewiesen** (17.09.2026): Die vollständige E2E-Suite lief nach dem Rebuild durch — 492 Tests
 grün, 90 übersprungen, keiner gescheitert. Der `goto`-Rückfall in `navigateViaMenu` wird damit
 nicht mehr gebraucht, um die Menünavigation zu retten; er bleibt als Absicherung stehen.
+
+## Nachtrag — Spring-Boot- und Angular-Version (26.10.2026)
+
+Die Versionszeile zeigt zusätzlich `Spring Boot <x.y.z>` (Backend, `SpringBootVersion.getVersion()`
+über `GET /api/version` → `springBootVersion`) und `Angular <x.y.z>` (`VERSION.full` aus
+`@angular/core`, im Browser). Template auf ` · `-getrennte Teile umgestellt; die Angular-Version steht
+auch, wenn `/api/version` scheitert. Keine Migration (Eigennamen, keine Übersetzung). Tests:
+`VersionServiceTest` (5), `VersionControllerTest` (2), `ControllerAuthorizationTest` (+2),
+`startseite.component.spec.ts` (5), `version.service.spec.ts` (2) – zur Versionszeile gab es
+bisher keine Tests.
+
