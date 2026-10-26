@@ -40,7 +40,7 @@ describe('StartseiteComponent', () => {
     await erzeuge();
 
     expect(zeile()).toBe(
-      `DB_SCHEMA_VERSION: V188 · BUILD_DATUM: 26.10.2026 10:09 · Spring Boot 4.1.2 · Angular ${VERSION.full}`);
+      `Spring Boot 4.1.2 · Angular ${VERSION.full} · DB_SCHEMA_VERSION: V188 · BUILD_DATUM: 26.10.2026 10:09`);
   });
 
   it('should show the Spring Boot version delivered by the backend', async () => {
@@ -62,7 +62,14 @@ describe('StartseiteComponent', () => {
     versionServiceSpy.getVersion.mockReturnValue(of({ schemaVersion: '188', buildTime: null, springBootVersion: null }));
     await erzeuge();
 
-    expect(zeile()).toBe(`DB_SCHEMA_VERSION: V188 · Angular ${VERSION.full}`);
+    expect(zeile()).toBe(`Angular ${VERSION.full} · DB_SCHEMA_VERSION: V188`);
+  });
+
+  it('should not leave a separator at either end when only the build time is missing', async () => {
+    versionServiceSpy.getVersion.mockReturnValue(of({ schemaVersion: '188', buildTime: null, springBootVersion: '4.1.2' }));
+    await erzeuge();
+
+    expect(zeile()).toBe(`Spring Boot 4.1.2 · Angular ${VERSION.full} · DB_SCHEMA_VERSION: V188`);
   });
 
   it('should keep only the Angular version when the version call fails, without an error message', async () => {

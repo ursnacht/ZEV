@@ -28,7 +28,8 @@
 4. **Angular-Version:** Die Angular-Version des ausgelieferten Frontends (z.B. „Angular 22.2.3“).
    * Quelle: `VERSION.full` aus `@angular/core`, direkt im Browser – kein Backend-Aufruf. So steht dort genau die Version, die tatsächlich ausgeliefert wurde.
 5. Anzeige-Format: dezente Zeile am unteren Seitenrand, Teile mit ` · ` getrennt:
-   `Datenbank-Version: V<nn> · Build: <Datum> · Spring Boot <x.y.z> · Angular <x.y.z>`.
+   `Spring Boot <x.y.z> · Angular <x.y.z> · Datenbank-Version: V<nn> · Build: <Datum>`.
+   Fehlt ein Teil, entfällt er samt seinem Trenner; am Anfang oder Ende der Zeile steht nie ein ` · `. (Hintergrund: Anhang A.2)
    Labels über Translation-Keys `DB_SCHEMA_VERSION` (V82) und `BUILD_DATUM` (V83); „Spring Boot“ und „Angular“ sind Eigennamen und werden nicht übersetzt.
    > Wozu: Nach einem Deploy lässt sich ohne Entwicklertools prüfen, ob der neue Stand läuft – belegt beim Angular-22- und Spring-Boot-4.1.2-Upgrade auf Hene (26.10.2026).
 6. Alle Angaben sind rein informativ: Ist eine davon nicht ermittelbar (`null`), entfällt nur der jeweilige Teil; schlägt der API-Aufruf fehl, entfallen die drei Backend-Teile, die Angular-Version bleibt stehen (keine Fehlermeldung). (Hintergrund: Anhang A.1)
@@ -42,12 +43,12 @@
       (Test: VersionServiceTest#getSpringBootVersion_ReturnsLaufendeVersion; startseite.component.spec.ts › StartseiteComponent › should show the Spring Boot version delivered by the backend)
 * [x] Die Zeile zeigt zusätzlich die Angular-Version des ausgelieferten Frontends (`Angular <x.y.z>`, aus `VERSION.full`).
       (Test: startseite.component.spec.ts › StartseiteComponent › should show the Angular version of the delivered frontend)
-* [x] Die vorhandenen Teile stehen in der Reihenfolge Datenbank-Version, Build, Spring Boot, Angular, getrennt mit ` · `.
+* [x] Die vorhandenen Teile stehen in der Reihenfolge Spring Boot, Angular, Datenbank-Version, Build, getrennt mit ` · `.
       (Test: startseite.component.spec.ts › StartseiteComponent › should show all four parts in order, separated by a middle dot)
 * [x] `GET /api/version` ist für jeden authentifizierten Benutzer (jede Rolle) aufrufbar und liefert `{ schemaVersion, buildTime, springBootVersion }`.
       (Test: ControllerAuthorizationTest#getVersion_authenticatedWithoutPermission_ok; ControllerAuthorizationTest#getVersion_withoutAuthentication_unauthorized; VersionControllerTest#getVersion_AlleWerte_ReturnsSchemaBuildUndSpringBoot)
 * [x] Schlägt der Versions-Aufruf fehl oder fehlen Werte, zeigt die Startseite keine Fehlermeldung – nur die fehlenden Teile entfallen; die Angular-Version steht immer da.
-      (Test: startseite.component.spec.ts › StartseiteComponent › should omit missing parts without a stray separator; startseite.component.spec.ts › StartseiteComponent › should keep only the Angular version when the version call fails, without an error message; VersionControllerTest#getVersion_FehlendeWerte_AlsNull; VersionServiceTest#getSchemaVersion_DatenbankWirft_ReturnsNull; VersionServiceTest#getBuildTime_OhneBuildInfo_ReturnsNull)
+      (Test: startseite.component.spec.ts › StartseiteComponent › should omit missing parts without a stray separator; startseite.component.spec.ts › StartseiteComponent › should not leave a separator at either end when only the build time is missing; startseite.component.spec.ts › StartseiteComponent › should keep only the Angular version when the version call fails, without an error message; VersionControllerTest#getVersion_FehlendeWerte_AlsNull; VersionServiceTest#getSchemaVersion_DatenbankWirft_ReturnsNull; VersionServiceTest#getBuildTime_OhneBuildInfo_ReturnsNull)
 * [ ] Die Labels stammen aus dem `TranslationService` (DE/EN).
 
 
@@ -87,3 +88,10 @@ Kriterium nannte als Antwort `{ schemaVersion, buildTime }` und „die Zeile ent
 teilweise)“. Auf Wunsch des Users zeigt die Zeile zusätzlich die Spring-Boot- und die
 Angular-Version. Weil die Angular-Version im Browser feststeht, entfällt die Zeile nicht mehr ganz.
 
+### A.2 Reihenfolge der Versionszeile (FR-4.5, 26.10.2026)
+Bis 26.10.2026 lautete die Reihenfolge `Datenbank-Version · Build · Spring Boot · Angular`; das
+Kriterium dazu verlangte genau diese Folge. Der User hat die Zeile umgestellt, damit die
+Software-Versionen vorne stehen. Die Trenner hingen zunächst hinter Angular und der
+Datenbank-Version; fehlte das Build-Datum oder scheiterte der API-Aufruf, blieb ein ` · ` am
+Zeilenende stehen (`Angular 22.2.3 ·`). Seither hängt der Trenner am Teil, der Angular zugewandt
+ist.

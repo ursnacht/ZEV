@@ -220,3 +220,9 @@ auch, wenn `/api/version` scheitert. Keine Migration (Eigennamen, keine Überset
 `startseite.component.spec.ts` (5), `version.service.spec.ts` (2) – zur Versionszeile gab es
 bisher keine Tests.
 
+## Nachtrag — Reihenfolge der Versionszeile (26.10.2026)
+
+Reihenfolge auf `Spring Boot · Angular · Datenbank-Version · Build` umgestellt (Anpassung des Users).
+Die Trenner hängen jetzt am Angular zugewandten Teil, sonst blieb bei fehlendem Build-Datum oder
+gescheitertem `/api/version` ein ` · ` am Zeilenende. Tests angepasst, einer neu
+(`should not leave a separator at either end when only the build time is missing`).
