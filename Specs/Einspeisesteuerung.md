@@ -1306,5 +1306,9 @@ statt aus der Erzeugung, zählt die Ladung fälschlich zur Produktion. Der Fall 
 Preisen auf.“ Mit der vorzeichenbehafteten Produktion ist die Grenze aufgehoben, solange die
 Netzladung über den Erzeugungszähler läuft.
 
-Bereits geschriebene Entscheide tragen die alte Produktion; „Nachrechnen“ für den betroffenen Tag
-schreibt sie neu.
+Die Abfrage betraf auch den Standby-Bezug des Wechselrichters: Auf Hene standen **724** gespeicherte
+Entscheide mit leicht positivem Producer-`total` (im Mittel ~0.023 kWh je Nachtintervall, zusammen
+17.7 kWh inkl. der 1.32 kWh vom 04.11.) als Erzeugung in der Aufzeichnung. „Nachrechnen“ speichert
+nichts (FR-6) und hilft dafür nicht. Am 05.11.2026 wurden die 724 Zeilen einmalig per SQL aus den
+Messwerten neu gesetzt (`produktion = −Σ total(PRODUCER)` für alle Intervalle mit `Σ total > 0`);
+danach war der Peak auch in der Aufzeichnung weg.

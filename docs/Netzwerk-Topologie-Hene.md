@@ -416,6 +416,8 @@ Unabhängig vom Broker-Setup oben.
 
 ### Geräte-Inventar (Stand: Oktober 2026)
 
+IP-Adressen scannen: 'ip neigh'
+
 | Gerät                                 | Adresse                                                            | Bemerkung                                                                                                                                                          |
 |---------------------------------------|--------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Raspberry Pi `rpi4sa`                 | `192.168.10.189` (eth0), `192.168.10.190` (wlan0), VPN `10.8.0.14` | **DHCP-Reservierung** im Router. **Beide** Interfaces liegen im selben Subnetz – bei Scans/Bindings beachten                                                       |
