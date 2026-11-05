@@ -139,7 +139,7 @@ Je Monat werden folgende KPIs berechnet und angezeigt. **Grundlage sind ausschli
 ### FR-13: Batterie-Kennzahlen mit Pro-Intervall-Aggregation (Stufe 2)
 Zusätzlich zum Netto-Speicherfluss (FR-12.7) werden – getrennt – **geladene** und **entladene** Energie ausgewiesen. Diese lassen sich **nicht** aus den Monats-Summen ableiten, sondern erfordern eine **neue Aggregation je 15-Minuten-Intervall** (die vorhandenen Zeitraum-Summen-Queries genügen dafür nicht, s. Abschnitt 6):
 
-Pro Intervall `i`: `Netto_i = P_i − C_i + B_i − R_i`, dann über den Zeitraum:
+Pro Intervall `i`: `Netto_i = P_i − C_i + B_i − R_i`, dann über den Zeitraum. `P_i` ist die Netto-Erzeugung `−Σ total(PRODUCER)` **mit Vorzeichen**: Bezieht der Wechselrichter netto (Batterie aus dem Netz nachladen), ist sie negativ, und erst so geht die Bilanz auf (`Specs/Einspeisesteuerung.md`, Anhang A.3).
 1. **Batterie geladen** = `Σ max(0, Netto_i)`
 2. **Batterie entladen** = `Σ max(0, −Netto_i)`
 3. **Round-Trip-Wirkungsgrad** = `entladen / geladen` (nur wenn `geladen > 0`), als Prozent.

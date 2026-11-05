@@ -1145,3 +1145,10 @@ fest auf `Europe/Zurich`). Gegenprobe: Beide schlagen mit dem alten Code fehl. K
 Backend. Spec: neues Akzeptanzkriterium, Edge Case „Zeitumstellung Herbst“, Anhang A.2.
 Die Zeitachse bleibt physikalisch (75 Minuten Leerraum zwischen 02:45 und 03:00). Eine Ortszeit-Achse wurde
 erwogen und vom User verworfen.
+
+## Nachtrag 05.11.2026: Produktion mit Vorzeichen (Peak 04.11.2026)
+
+- `MesswerteRepository.sumBilanzKomponentenPerZeitBetween`: Produktion `−SUM(total)` statt `SUM(ABS(total))`, wie FR-2 es verlangt. Negativ, wenn der Wechselrichter netto bezieht (Netzladung der Batterie).
+- Javadoc in `SteuerungService`, `SteuerRegelService` und Kommentar `produktionVerrechnet` nachgeführt; keine Logikänderung dort (Überschuss `max(0, …)`, Kurve `max(0, …)`, Prognose schneidet nach dem Speicherzuschlag ab).
+- Tests: `MesswerteRepositoryIT#sumBilanzKomponentenPerZeit_ProducerBeziehtNetto_ProduktionNegativ`, `SteuerRegelServiceTest#entscheide_NegativeProduktion_UeberschussNull`, Frontend `produktionVerrechnet` mit Netzladung.
+- Spec: FR-2 (Vorzeichen), FR-5b (Grenze aufgehoben), drei Akzeptanzkriterien, Anhang A.3.

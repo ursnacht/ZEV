@@ -43,7 +43,8 @@ public class SteuerRegelService {
      * @param preis         Einspeisepreis in CHF/kWh; {@code null}, wenn keiner vorliegt
      * @param preisTiefRest tiefster erwarteter Preis im <b>Rest</b> des Ortstages; {@code null},
      *                      wenn für den Rest des Tages keine Preise vorliegen
-     * @param produktion    Summe der {@code PRODUCER} in kWh, <b>als Betrag</b> — siehe
+     * @param produktion    Netto-Erzeugung der {@code PRODUCER} in kWh ({@code −Σ total}); negativ,
+     *                      wenn der Wechselrichter netto bezieht — siehe
      *                      {@link #entscheide(Eingabe, BigDecimal, BigDecimal)}
      * @param verbrauch     Summe der {@code CONSUMER} in kWh
      */
@@ -79,12 +80,13 @@ public class SteuerRegelService {
      * wenn die Batterie voll war. Für den Entscheid ist die Menge auch nicht nötig: Eine Sperre
      * ohne Überschuss läuft ins Leere, schadet aber nicht.
      *
-     * <p><b>Zum Vorzeichen:</b> {@code eingabe.produktion()} ist ein <b>Betrag</b>. In
-     * {@code messwerte.total} steht die Produktion negativ ({@code ΔBezug − ΔEinspeisung}); wer sie
-     * ohne Vorzeichenwechsel addiert, erhält einen Überschuss von <b>immer 0</b> und eine
-     * Steuerung, die stumm ins Leere läuft. {@code MesswerteRepository
-     * .sumBilanzKomponentenPerZeitBetween} liefert die Produktion bereits mit {@code ABS()} — das
-     * ist die Quelle der Wahl.
+     * <p><b>Zum Vorzeichen:</b> {@code eingabe.produktion()} ist die Netto-Erzeugung
+     * {@code −Σ total(PRODUCER)}. In {@code messwerte.total} steht die Produktion negativ
+     * ({@code ΔBezug − ΔEinspeisung}); wer sie ohne Vorzeichenwechsel addiert, erhält einen
+     * Überschuss von <b>immer 0</b> und eine Steuerung, die stumm ins Leere läuft.
+     * {@code MesswerteRepository.sumBilanzKomponentenPerZeitBetween} liefert sie bereits mit
+     * Vorzeichenwechsel — das ist die Quelle der Wahl. Bezieht der Wechselrichter netto (Batterie
+     * aus dem Netz nachladen), wird sie negativ; der Überschuss bleibt dann 0.
      *
      * <p><b>Ohne Preis wird nicht gesperrt.</b> Fehlt {@code preis}, greifen {@code PREIS_NEGATIV}
      * und {@code EINSPEISEN_LOHNT} nicht; fehlt {@code preisTiefRest}, greift {@code WARTEN_AUF_TAL}

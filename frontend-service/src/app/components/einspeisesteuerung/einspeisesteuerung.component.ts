@@ -657,8 +657,10 @@ export class EinspeisesteuerungComponent extends WithMessage
    * <p><b>Nur für die Darstellung.</b> Überschuss, Regel und die gespeicherten Zustände bleiben auf
    * den gemessenen Werten.
    *
-   * <p><b>Grenze:</b> Lädt die Batterie aus dem **Netz** statt aus der Erzeugung, zählt die Ladung
-   * hier fälschlich zur Produktion. Der Fall tritt bei negativen Preisen auf.
+   * <p><b>Laden aus dem Netz:</b> Lädt der Wechselrichter die Batterie aus dem Netz nach, bezieht
+   * er netto Strom, und `produktion` ist **negativ** (`−Σ total`). Die Ladung hebt das wieder auf,
+   * das Ergebnis bleibt bei 0. Bis 05.11.2026 lieferte das Backend die Produktion als Betrag; der
+   * Bezug zählte dann als Erzeugung, und die Ladung kam noch dazu (Peak am 04.11.2026 um 18:45).
    */
   produktionVerrechnet(e: Steuerentscheid): number {
     return Math.max(0, e.produktion + (e.speicherLadung ?? 0) - (e.speicherEntladung ?? 0));

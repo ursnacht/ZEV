@@ -684,8 +684,9 @@ public class SteuerungService {
     /**
      * Die vier Bilanzkomponenten eines Intervalls.
      *
-     * <p>{@code produktion} und {@code ruecklieferung} sind <b>Betraege</b> — in
-     * {@code messwerte.total} stehen beide negativ.
+     * <p>{@code ruecklieferung} ist ein <b>Betrag</b>, {@code produktion} die Netto-Erzeugung
+     * {@code −Σ total(PRODUCER)} — in {@code messwerte.total} stehen beide negativ. Die Produktion
+     * wird <b>negativ</b>, wenn der Wechselrichter netto bezieht (Batterie aus dem Netz nachladen).
      *
      * <p>Bezug und Ruecklieferung gehen in <b>keine</b> Regel ein; sie machen die Energiebilanz
      * pruefbar: {@code Produktion + Bezug − Verbrauch − Ruecklieferung} ist der Netto-Batteriefluss
@@ -703,8 +704,8 @@ public class SteuerungService {
      * dort unter {@code zeit = 11:45}.
      *
      * <p>Über {@code sumBilanzKomponentenPerZeitBetween}, weil diese Abfrage die Produktion bereits
-     * mit {@code ABS()} liefert: In {@code messwerte.total} steht sie <b>negativ</b>, und wer selbst
-     * summiert, erhält einen Überschuss von immer 0.
+     * mit Vorzeichenwechsel liefert: In {@code messwerte.total} steht sie <b>negativ</b>, und wer
+     * selbst summiert, erhält einen Überschuss von immer 0.
      *
      * <p>Fehlen Messwerte, ergeben sich Nullen — der Entscheid wird trotzdem geschrieben, damit die
      * Lücke sichtbar ist statt unsichtbar.

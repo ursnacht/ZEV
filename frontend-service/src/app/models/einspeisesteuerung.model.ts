@@ -53,7 +53,7 @@ export interface Steuerentscheid {
   preis: number | null;
   /** Tiefster erwarteter Preis im Rest des Tages; `null`, wenn keiner mehr folgt. */
   preisTiefRest: number | null;
-  /** Produktion in kWh, als Betrag. */
+  /** Netto-Erzeugung in kWh; negativ, wenn der Wechselrichter netto bezieht (Netzladung der Batterie). */
   produktion: number;
   verbrauch: number;
   /**

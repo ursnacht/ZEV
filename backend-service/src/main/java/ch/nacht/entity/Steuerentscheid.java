@@ -83,10 +83,12 @@ public class Steuerentscheid {
     private BigDecimal preisTiefRest;
 
     /**
-     * Summe der {@code PRODUCER} im Intervall in kWh, <b>als Betrag</b>.
+     * Netto-Erzeugung der {@code PRODUCER} im Intervall in kWh, {@code −Σ total}.
      *
      * <p>In {@code messwerte.total} steht die Produktion <b>negativ</b> ({@code ΔBezug −
-     * ΔEinspeisung}); hier ist sie vorzeichenlos, damit der Überschuss lesbar bleibt.
+     * ΔEinspeisung}); hier ist sie positiv, solange die Anlage erzeugt. <b>Negativ</b> wird sie,
+     * wenn der Wechselrichter netto bezieht, etwa beim Nachladen der Batterie aus dem Netz
+     * (Specs/Einspeisesteuerung.md, FR-2, Anhang A.3).
      */
     @NotNull
     @Column(name = "produktion", precision = 12, scale = 3, nullable = false)

@@ -413,7 +413,7 @@ class MesswerteRepositoryIT extends AbstractIntegrationTest {
         // When
         List<Object[]> rows = messwerteRepository.sumBilanzKomponentenPerZeitBetween(from, to);
 
-        // Then: eine Zeile je Intervall, aufsteigend nach zeit; alle Komponenten als Betrag
+        // Then: eine Zeile je Intervall, aufsteigend nach zeit; Produktion als -total, Rest als Betrag
         assertThat(rows).hasSize(2);
 
         Object[] row1 = rows.get(0);
@@ -427,6 +427,29 @@ class MesswerteRepositoryIT extends AbstractIntegrationTest {
         assertThat(((Number) row2[2]).doubleValue()).isCloseTo(20.0, within(0.001)); // C
         assertThat(((Number) row2[3]).doubleValue()).isCloseTo(0.0, within(0.001));  // B
         assertThat(((Number) row2[4]).doubleValue()).isCloseTo(0.0, within(0.001));  // R
+    }
+
+    /**
+     * Specs/Einspeisesteuerung.md, FR-2: Bezieht der Wechselrichter netto (Batterie aus dem Netz
+     * nachladen, Hene 04.11.2026 18:45), ist die Produktion NEGATIV. Mit ABS() stand dort
+     * +1.32 kWh Erzeugung, und das Diagramm zeigte einen Peak.
+     */
+    @Test
+    void sumBilanzKomponentenPerZeit_ProducerBeziehtNetto_ProduktionNegativ() {
+        // Given: Wechselrichter bezieht 1.32, die zweite Anlage erzeugt noch 0.02
+        Einheit producer2 = einheitRepository.save(createEinheit("Zweite Anlage", EinheitTyp.PRODUCER));
+        LocalDateTime t1 = LocalDateTime.of(2024, 1, 15, 18, 45);
+        messwerteRepository.save(createMesswerte(t1, producer, 1.32, 0.0, null));
+        messwerteRepository.save(createMesswerte(t1, producer2, -0.02, 0.0, null));
+
+        // When
+        List<Object[]> rows = messwerteRepository.sumBilanzKomponentenPerZeitBetween(
+                LocalDateTime.of(2024, 1, 15, 0, 0), LocalDateTime.of(2024, 1, 16, 0, 0));
+
+        // Then
+        assertThat(rows).hasSize(1);
+        // Saldo mit Vorzeichen, nicht Summe der Beträge (1.34) und nicht der Betrag des Saldos (1.30)
+        assertThat(((Number) rows.get(0)[1]).doubleValue()).isCloseTo(-1.30, within(0.001));
     }
 
     @Test

@@ -613,6 +613,18 @@ describe('EinspeisesteuerungComponent', () => {
 
       expect(component.produktionVerrechnet(e)).toBe(0);
     });
+
+    /**
+     * Laden aus dem Netz: Der Wechselrichter bezieht netto, die Produktion kommt negativ an, und die
+     * Ladung hebt sie auf. Werte von Hene, 04.11.2026 18:45 - mit der Produktion als Betrag (+1.321)
+     * zeigte die Kurve dort 2.52 kWh.
+     */
+    it('should stay at zero when the inverter charges the battery from the grid', () => {
+      const e = entscheid('2026-11-04T18:45:00',
+        { produktion: -1.321, speicherLadung: 1.2, speicherEntladung: 0 });
+
+      expect(component.produktionVerrechnet(e)).toBe(0);
+    });
   });
 
   // ==================== Die Schattenrechnung (FR-1a) ====================

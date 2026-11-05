@@ -107,13 +107,20 @@ public interface MesswerteRepository extends JpaRepository<Messwerte, Long> {
     long countDistinctZeitByEinheitTypAndZeitBetween(@Param("typ") EinheitTyp typ, @Param("dateFrom") LocalDateTime dateFrom, @Param("dateTo") LocalDateTime dateTo);
 
     /**
-     * Aggregiert je 15-Min-Intervall (zeit) die Beträge der vier Bilanz-Komponenten für die
+     * Aggregiert je 15-Min-Intervall (zeit) die vier Bilanz-Komponenten für die
      * Batterie-Kennzahlen (Spec Statistik-Kennzahlen.md, Stufe 2). Rückgabe je Zeile:
-     * {@code [zeit, produktion, verbrauch, bezug, ruecklieferung]} (alle als Betrag/positiv).
-     * JPQL → der Hibernate-orgFilter greift (Mandanten-Isolation).
+     * {@code [zeit, produktion, verbrauch, bezug, ruecklieferung]}.
+     *
+     * <p><b>Produktion mit Vorzeichen</b> als {@code −Σ total(PRODUCER)} (Specs/Einspeisesteuerung.md,
+     * FR-2): positiv, solange die Anlage erzeugt; <b>negativ</b>, wenn der Wechselrichter netto
+     * bezieht - etwa wenn er die Batterie aus dem Netz nachlädt (Hene, 04.11.2026 18:45: +1.32 kWh).
+     * Mit {@code ABS()} wurde daraus Erzeugung, und das Diagramm zeigte einen Peak. Die übrigen drei
+     * Spalten sind Beträge.
+     *
+     * <p>JPQL → der Hibernate-orgFilter greift (Mandanten-Isolation).
      */
     @Query("SELECT m.zeit, "
-            + "COALESCE(SUM(CASE WHEN m.einheit.typ = ch.nacht.entity.EinheitTyp.PRODUCER THEN ABS(m.total) ELSE 0 END), 0), "
+            + "COALESCE(SUM(CASE WHEN m.einheit.typ = ch.nacht.entity.EinheitTyp.PRODUCER THEN -m.total ELSE 0 END), 0), "
             + "COALESCE(SUM(CASE WHEN m.einheit.typ = ch.nacht.entity.EinheitTyp.CONSUMER THEN m.total ELSE 0 END), 0), "
             + "COALESCE(SUM(CASE WHEN m.einheit.typ = ch.nacht.entity.EinheitTyp.BEZUG THEN m.total ELSE 0 END), 0), "
             + "COALESCE(SUM(CASE WHEN m.einheit.typ = ch.nacht.entity.EinheitTyp.RUECKLIEFERUNG THEN ABS(m.total) ELSE 0 END), 0) "

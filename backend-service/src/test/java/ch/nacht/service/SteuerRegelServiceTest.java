@@ -143,6 +143,21 @@ public class SteuerRegelServiceTest {
         assertEquals(0, new BigDecimal("6").compareTo(entscheid.ueberschuss()));
     }
 
+    /**
+     * Specs/Einspeisesteuerung.md, FR-2: Bezieht der Wechselrichter netto (Batterie aus dem Netz
+     * nachladen), kommt die Produktion negativ an. Der Ueberschuss bleibt 0 - nicht negativ.
+     */
+    @Test
+    void entscheide_NegativeProduktion_UeberschussNull() {
+        SteuerRegelService.Entscheid entscheid = steuerRegelService.entscheide(
+                new SteuerRegelService.Eingabe(new BigDecimal("0.100"), new BigDecimal("0.200"),
+                        new BigDecimal("-1.321"), new BigDecimal("0.821"), SOC_HOCH, false),
+                SCHWELLWERT, SPEICHERWERT, SOC_MINIMUM, SOC_HYSTERESE, KEIN_ABSTAND);
+
+        assertEquals(Steuerregel.KEIN_UEBERSCHUSS, entscheid.regel());
+        assertEquals(0, BigDecimal.ZERO.compareTo(entscheid.ueberschuss()));
+    }
+
     // ==================== EINSPEISEN_LOHNT ====================
 
     @Test

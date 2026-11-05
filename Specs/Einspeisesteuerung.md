@@ -277,6 +277,12 @@ Verbrauch   =   Σ total(CONSUMER)
 > würde. `total` ist `ΔBezug − ΔEinspeisung`; eine einspeisende Anlage hat deshalb ein negatives
 > `total` (§1). Ein Test mit **negativen** Producer-Werten gehört zu dieser Anforderung.
 
+**Die Produktion trägt ein Vorzeichen** und wird **negativ**, wenn der Wechselrichter netto Strom
+bezieht — etwa wenn er die Batterie bei tiefem Ladezustand aus dem Netz nachlädt. Sie ist die
+Netto-Erzeugung, kein Betrag: Der Überschuss bleibt dann 0, die Bilanz
+`Produktion + Bezug − Verbrauch − Rücklieferung` geht auf, und die verrechnete Produktion (FR-5b)
+bleibt bei 0, weil die Ladung den Bezug wieder aufhebt. (Hintergrund: Anhang A.3)
+
 `SPEICHER`, `BEZUG`, `RUECKLIEFERUNG` und `LADESTATION` zählen **nicht** mit: Sie messen nicht die
 Erzeugung, sondern deren Folgen. Insbesondere `RUECKLIEFERUNG` wäre eine Doppelzählung — sie ist
 das, was nach der Steuerung übrig bleibt, nicht ihre Eingangsgrösse.
@@ -707,8 +713,10 @@ wechselstromseitig vollständig erfasst und die Batterieladung dort nicht ersche
 gleichstromseitig. Träfe das nicht zu, wäre die Ladung doppelt gezählt: einmal im Verbrauch, einmal
 in der verrechneten Produktion. Prüfbar an der Tabelle, weil dort alle Grössen einzeln stehen.
 
-**Bekannte Grenze:** Lädt die Batterie aus dem **Netz** statt aus der Erzeugung, zählt die Ladung
-fälschlich zur Produktion. Der Fall tritt bei negativen Preisen auf.
+**Laden aus dem Netz:** Lädt der Wechselrichter die Batterie aus dem **Netz**, bezieht er über den
+Erzeugungszähler netto Strom; die Produktion ist dann negativ (FR-2) und hebt die Ladung auf. Die
+verrechnete Produktion bleibt bei 0. Voraussetzung ist, dass die Netzladung über den
+Erzeugungszähler läuft — beim Hybrid-Wechselrichter von Hene am 04.11.2026 belegt (Anhang A.3).
 
 **In der Tabelle** erscheinen **Ladung** und **Entladung** als eigene Spalten — neben der
 Bilanzdifferenz, nicht an ihrer Stelle: Die Differenz ist errechnet und enthält alles nicht
@@ -817,7 +825,7 @@ eigenen Zähler hat** — einen Einheiten-Typ `SPEICHER` gibt es bis heute nicht
 > **Warum das nötig wurde:** Produktion und Verbrauch standen bis dahin ohne Gegenprobe da. Der
 > Verdacht, sie seien falsch summiert, liess sich weder bestätigen noch entkräften — die Ansicht
 > zeigte die Hälfte der Bilanz. Die Summierung selbst ist nachweislich dieselbe wie in der
-> Statistik (`SUM(total)` je Einheiten-Typ, `abs()` für Producer).
+> Statistik (`SUM(total)` je Einheiten-Typ, Vorzeichenwechsel für Producer, FR-2).
 
 ### FR-7: Einstellungen je Mandant
 
@@ -957,6 +965,9 @@ Der Text ist an kein Feature gebunden.
 * [ ] Der Überschuss zählt ausschliesslich `PRODUCER` und `CONSUMER`.
 * [ ] **Der Überschuss wird aus negativen Producer-Werten korrekt gebildet:** Bei `total = −10` (Producer) und `total = 4` (Consumer) ergibt sich ein Überschuss von **6**, nicht 0 und nicht −14.
 * [ ] Ein Testfall mit realistischen Vorzeichen (Producer negativ, Consumer positiv) ist vorhanden.
+* [x] **Bezieht der Wechselrichter netto, ist die Produktion negativ:** Mit Producer-`total` = `+1.32` und `−0.02` im selben Intervall liefert die Bilanzabfrage eine Produktion von **−1.30** (nicht 1.34, nicht 1.30). (Test: MesswerteRepositoryIT#sumBilanzKomponentenPerZeit_ProducerBeziehtNetto_ProduktionNegativ)
+* [x] Bei negativer Produktion ist der Überschuss **0** und die Regel `KEIN_UEBERSCHUSS`, sofern keine Preisregel greift. (Test: SteuerRegelServiceTest#entscheide_NegativeProduktion_UeberschussNull)
+* [x] Lädt der Wechselrichter die Batterie aus dem Netz (Produktion −1.321, Ladung 1.2), zeigt die Produktionskurve **0**, keinen Peak. (Test: einspeisesteuerung.component.spec.ts › produktionVerrechnet › should stay at zero when the inverter charges the battery from the grid)
 
 **Persistierung**
 * [ ] Ein zweiter Lauf über dasselbe Intervall erzeugt **keinen** zweiten Datensatz, sondern überschreibt (Upsert auf `org_id, zeit_von`).
@@ -1275,3 +1286,25 @@ FR-5.2 lautete: „**Eine Steuerzeile** (`zev-date-range-row`, wie bei der Preis
 Am 25.10.2026 blieb auf Hene der Tooltip zwischen 02:00 und 03:00 Winterzeit leer. Es sah aus, als fehle dort die Meteoprognose. In der Datenbank war sie aber vollständig (96 Punkte). Ursache: Die Prognosekurve füllte Lücken mit einem Raster in 15-Minuten-Schritten **absoluter** Zeit. Die zonenlosen Zeitstempel kennen „02:00“ bis „02:45“ nur einmal, darum lagen in der zweiten, wiederholten Stunde vier `null`-Punkte ohne Entscheid und ohne Preis. Der Tooltip (`trigger: 'axis'`) rastete auf sie ein und fand nichts. Seither läuft das Raster in Ortszeit. Wer in diese Stunde zeigt, landet auf dem nächsten echten Intervall (02:45 oder 03:00).
 
 Die Zeitachse bleibt **physikalisch**: Der Tag hat 25 Stunden, und zwischen 02:45 Sommerzeit und 03:00 Winterzeit stehen 75 Minuten Leerraum ohne Daten. Erwogen wurde eine Achse in Ortszeit, die immer 96 Viertelstunden ohne Lücke zeigt. Der User hat sich dagegen entschieden: Der Leerraum zeigt ehrlich, dass für diese Stunde keine eigenen Werte vorliegen, und die Umstellung betrifft einen Tag im Jahr.
+
+### A.3 Produktion mit Vorzeichen statt als Betrag (FR-2, FR-5b, 05.11.2026)
+Am 04.11.2026 zeigte Hene um 18:45 einen Peak von 2.5 kWh in „Produktion (mit Speicher)", lange nach
+Sonnenuntergang. Die Rohdaten: Die Batterie entlud bis 18:48 und fiel auf 13 % SoC; von 18:49 bis
+18:53 lud der Wechselrichter sie aus dem Netz nach (Ladezähler +1.4 kWh, Erzeugungszähler `bezug`
+18.46 → 20.00 kWh, Netzbezug im Intervall 2.14 kWh statt sonst ~0.06). Die Messwerte waren also
+richtig; das Producer-`total` stand mit **+1.32** positiv.
+
+`sumBilanzKomponentenPerZeitBetween` rechnete die Produktion als `ABS(total)` statt — wie FR-2 es
+verlangt — als `−Σ total`. Aus 1.32 kWh Bezug wurden 1.32 kWh Erzeugung, FR-5b addierte die Ladung
+von 1.2 kWh, und die Kurve zeigte 2.52 statt 0. Dieselbe Abfrage speist die berechneten
+Batterie-Kennzahlen der Statistik und die Produktionsprognose; dort fehlte der Bezug ebenso in der
+Bilanz. Seit 05.11.2026 liefert sie die Produktion mit Vorzeichen; bei Null abgeschnitten wird erst
+in der Darstellung (FR-5b) und in der Prognose.
+
+FR-5b nannte das Laden aus dem Netz bisher als **bekannte Grenze**: „Lädt die Batterie aus dem Netz
+statt aus der Erzeugung, zählt die Ladung fälschlich zur Produktion. Der Fall tritt bei negativen
+Preisen auf.“ Mit der vorzeichenbehafteten Produktion ist die Grenze aufgehoben, solange die
+Netzladung über den Erzeugungszähler läuft.
+
+Bereits geschriebene Entscheide tragen die alte Produktion; „Nachrechnen“ für den betroffenen Tag
+schreibt sie neu.
