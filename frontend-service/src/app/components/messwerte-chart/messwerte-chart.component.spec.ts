@@ -5,6 +5,8 @@ import { MesswerteService, MesswertData } from '../../services/messwerte.service
 import { EinheitService } from '../../services/einheit.service';
 import { TranslationService } from '../../services/translation.service';
 import { Einheit, EinheitTyp } from '../../models/einheit.model';
+import { By } from '@angular/platform-browser';
+import { IconComponent } from '../icon/icon.component';
 import { of, throwError } from 'rxjs';
 
 /**
@@ -202,6 +204,155 @@ describe('MesswerteChartComponent', () => {
       expect(component.message).toContain('Netzwerkfehler');
       expect(component.message).not.toContain('[object Object]');
       expect(component.loading).toBe(false);
+    });
+  });
+
+  /** Bedienung wie in der Statistik (Specs/EChart.md, FR-1a). */
+  describe('Bedienung wie Statistik', () => {
+    function knopf(id: string): HTMLButtonElement {
+      return fixture.debugElement.query(By.css('#' + id)).nativeElement as HTMLButtonElement;
+    }
+
+    it('should place the submit button next to the quarter buttons', () => {
+      const anzeigen = fixture.debugElement.query(By.css('app-quarter-selector #grafikAnzeigen'));
+      expect(anzeigen).not.toBeNull();
+      expect((anzeigen.nativeElement as HTMLButtonElement).type).toBe('submit');
+      expect(fixture.debugElement.queryAll(By.css('button[type="submit"]')).length).toBe(1);
+      expect(fixture.debugElement.query(By.css('.zev-date-range-row #grafikAnzeigen'))).toBeNull();
+    });
+
+    it('should keep the submit button disabled until a unit is selected', () => {
+      fixture.detectChanges();
+      expect(knopf('grafikAnzeigen').disabled).toBe(true);
+
+      component.selectedEinheiten = [mockConsumer];
+      fixture.detectChanges();
+      expect(knopf('grafikAnzeigen').disabled).toBe(false);
+
+      component.loading = true;
+      fixture.detectChanges();
+      expect(knopf('grafikAnzeigen').disabled).toBe(true);
+    });
+
+    it('should offer paging and today in the date row, without pdf export', () => {
+      const zeile = fixture.debugElement.query(By.css('.zev-date-range-row'));
+      const ids = zeile.queryAll(By.css('button')).map(b => (b.nativeElement as HTMLButtonElement).id);
+      expect(ids).toEqual(['zeitraumZurueck', 'zeitraumVor', 'zeitraumHeute']);
+      expect(fixture.nativeElement.textContent).not.toContain('PDF_EXPORTIEREN');
+    });
+
+    it('should render chevron icons with translated title and aria-label', () => {
+      const pruefe = (id: string, icon: string, key: string) => {
+        const el = knopf(id);
+        expect(el.getAttribute('title')).toBe(key);
+        expect(el.getAttribute('aria-label')).toBe(key);
+        const symbol = fixture.debugElement.query(By.css('#' + id)).query(By.directive(IconComponent));
+        expect(symbol.componentInstance.name).toBe(icon);
+      };
+      pruefe('zeitraumZurueck', 'chevron-left', 'ZEITRAUM_ZURUECK');
+      pruefe('zeitraumVor', 'chevron-right', 'ZEITRAUM_VOR');
+      expect(knopf('zeitraumHeute').textContent).toContain('HEUTE');
+    });
+
+    it('should disable paging and today without a unit or while loading', () => {
+      fixture.detectChanges();
+      expect(knopf('zeitraumVor').disabled).toBe(true);
+      expect(knopf('zeitraumHeute').disabled).toBe(true);
+
+      component.selectedEinheiten = [mockConsumer];
+      fixture.detectChanges();
+      expect(knopf('zeitraumVor').disabled).toBe(false);
+      expect(knopf('zeitraumHeute').disabled).toBe(false);
+
+      component.loading = true;
+      fixture.detectChanges();
+      expect(knopf('zeitraumZurueck').disabled).toBe(true);
+      expect(knopf('zeitraumHeute').disabled).toBe(true);
+    });
+
+    describe('onBlaettern', () => {
+      it('should move a quarter forward and load immediately', () => {
+        component.selectedEinheiten = [mockConsumer];
+        component.dateFrom = '2026-07-01';
+        component.dateTo = '2026-09-30';
+
+        component.onBlaettern(1);
+
+        expect(component.dateFrom).toBe('2026-10-01');
+        expect(component.dateTo).toBe('2026-12-31');
+        expect(messwerteServiceSpy.getMesswerteByEinheit).toHaveBeenCalledWith(1, '2026-10-01', '2026-12-31');
+      });
+
+      it('should move a day backwards', () => {
+        component.selectedEinheiten = [mockConsumer];
+        component.dateFrom = '2026-10-13';
+        component.dateTo = '2026-10-13';
+
+        component.onBlaettern(-1);
+
+        expect(component.dateFrom).toBe('2026-10-12');
+        expect(component.dateTo).toBe('2026-10-12');
+      });
+
+      it('should not move without a unit, while loading or with an invalid range', () => {
+        component.dateFrom = '2026-10-01';
+        component.dateTo = '2026-10-07';
+        component.onBlaettern(1);
+        expect(component.dateFrom).toBe('2026-10-01');
+
+        component.selectedEinheiten = [mockConsumer];
+        component.loading = true;
+        component.onBlaettern(1);
+        expect(component.dateFrom).toBe('2026-10-01');
+
+        component.loading = false;
+        component.dateFrom = '2026-10-14';
+        component.onBlaettern(1);
+        expect(component.dateFrom).toBe('2026-10-14');
+        expect(messwerteServiceSpy.getMesswerteByEinheit).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('onHeute', () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('should set both dates to today and load immediately', () => {
+        vi.setSystemTime(new Date(2026, 9, 7, 14, 30));
+        component.selectedEinheiten = [mockConsumer];
+
+        component.onHeute();
+
+        expect(component.dateFrom).toBe('2026-10-07');
+        expect(component.dateTo).toBe('2026-10-07');
+        expect(messwerteServiceSpy.getMesswerteByEinheit).toHaveBeenCalledWith(1, '2026-10-07', '2026-10-07');
+      });
+
+      /** 00:30 Ortszeit ist im Sommer 22:30 UTC des Vortags - toISOString() lieferte den 06.10. */
+      it('should use the local date shortly after midnight', () => {
+        vi.setSystemTime(new Date(2026, 9, 7, 0, 30));
+        component.selectedEinheiten = [mockConsumer];
+
+        component.onHeute();
+
+        expect(component.dateFrom).toBe('2026-10-07');
+      });
+
+      it('should reload when today is already shown', () => {
+        vi.setSystemTime(new Date(2026, 9, 7, 9, 0));
+        component.selectedEinheiten = [mockConsumer];
+        component.onHeute();
+        messwerteServiceSpy.getMesswerteByEinheit.mockClear();
+
+        component.onHeute();
+
+        expect(messwerteServiceSpy.getMesswerteByEinheit).toHaveBeenCalledTimes(1);
+      });
     });
   });
 

@@ -12,7 +12,7 @@ import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.c
 import { IconComponent } from '../icon/icon.component';
 import { EinheitSelectorComponent } from '../einheit-selector/einheit-selector.component';
 import { formatSwissNumber } from '../../utils/number-utils';
-import { formatSwissDateTime, vorquartal, monatsende } from '../../utils/date-utils';
+import { blaettereZeitraum, formatSwissDateTime, monatsende, toIsoDate, vorquartal } from '../../utils/date-utils';
 import { chartFarben } from '../../utils/chart-farben';
 import { ladeECharts } from '../../utils/echarts-loader';
 
@@ -102,6 +102,44 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
   onQuarterSelected(event: {von: string, bis: string}): void {
     this.dateFrom = event.von;
     this.dateTo = event.bis;
+  }
+
+  /**
+   * Setzt den Zeitraum auf heute–heute und zeigt die Grafik sofort an — wie in der Statistik
+   * (Specs/EChart.md, FR-1a). Auch ein zweiter Klick lädt: Für den laufenden Tag kommen laufend
+   * Messwerte dazu.
+   *
+   * <p>Über {@link toIsoDate} statt {@code toISOString()}: Letzteres liefert das UTC-Datum, und
+   * kurz nach Mitternacht stünde dann der Vortag im Feld.
+   */
+  onHeute(): void {
+    const heute = toIsoDate(new Date());
+    this.dateFrom = heute;
+    this.dateTo = heute;
+    this.onSubmit();
+  }
+
+  /**
+   * Blättert den Zeitraum um seine eigene Länge und lädt sofort — dieselbe Regel wie in der
+   * Statistik (`blaettereZeitraum`, Specs/Statistik.md, FR-4).
+   */
+  onBlaettern(richtung: 1 | -1): void {
+    if (!this.kannBlaettern) {
+      return;
+    }
+    const neu = blaettereZeitraum(this.dateFrom, this.dateTo, richtung);
+    this.dateFrom = neu.von;
+    this.dateTo = neu.bis;
+    this.onSubmit();
+  }
+
+  /**
+   * Blättern nur mit gültigem Zeitraum, mindestens einer Einheit und nicht während des Ladens.
+   * Ohne Einheit liefe das sofortige Laden nur in die Fehlermeldung.
+   */
+  get kannBlaettern(): boolean {
+    return !this.loading && this.selectedEinheiten.length > 0
+      && !!this.dateFrom && !!this.dateTo && this.dateFrom <= this.dateTo;
   }
 
   onSubmit(): void {

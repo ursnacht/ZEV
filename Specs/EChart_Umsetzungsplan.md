@@ -406,3 +406,22 @@ Maske bedienbar. Der Fall belegt, dass die Absicherung den Umbau unverändert ü
 | `messwerte-grafik.spec.ts` (14 + 1) | 30/30, beide Browser |
 | `composite-roles.spec.ts` (11 + 1) | 12/12 |
 | Frontend-Unit-Suite | 1571 in 59 Dateien |
+
+---
+
+## Nachtrag 06.11.2026: Bedienung wie in der Statistik (FR-1a)
+
+Schaltflächen und Datumsfelder der Messwerte-Grafik sind an die Statistik angeglichen, ohne PDF-Export.
+
+| Datei | Änderung |
+|---|---|
+| `messwerte-chart.component.html` | „Anzeigen" (`#grafikAnzeigen`) in den Aktions-Slot des Quartal-Selektors; in der Datumszeile ◀ / ▶ (`#zeitraumZurueck`/`#zeitraumVor`) und „Heute" (`#zeitraumHeute`) |
+| `messwerte-chart.component.ts` | `onHeute()`, `onBlaettern()`, `kannBlaettern` — Regel aus `blaettereZeitraum` (`utils/date-utils.ts`), keine Kopie |
+| `messwerte-chart.component.spec.ts` | `describe('Bedienung wie Statistik')`, 10 Tests |
+| `tests/messwerte-grafik.spec.ts` | E2E „should page the period and jump to today, loading immediately" |
+
+* **Abweichungen von der Statistik:** Blättern und „Heute" sind ohne gewählte Einheit gesperrt. Die
+  Erfolgsmeldung mit der Zahl der Datenpunkte bleibt.
+* **Keine Migration:** `ZEITRAUM_ZURUECK`, `ZEITRAUM_VOR` (V181) und `HEUTE` (V65) existieren.
+* **Kein neues CSS:** Aktions-Slot (`.zev-quarter-selector__actions`), `zev-date-range-row` und
+  `zev-button-group` kommen aus dem Design System.

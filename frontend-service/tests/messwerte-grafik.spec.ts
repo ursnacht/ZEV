@@ -33,7 +33,7 @@ async function oeffneGrafik(page: Page): Promise<void> {
 }
 
 function anzeigenButton(page: Page) {
-    return page.locator('button[type="submit"]');
+    return page.locator('#grafikAnzeigen');
 }
 
 /** Erste echte Einheit (nicht „Alle auswählen"). */
@@ -276,6 +276,34 @@ test.describe('Messwerte-Grafik - Diagramm', () => {
         // Die Maske bleibt bedienbar: Panel und Canvas entstehen, nur ohne Datenreihe.
         await expect(page.locator(CANVAS)).toBeVisible({ timeout: 20000 });
         await expect(anzeigenButton(page)).toBeEnabled();
+    });
+
+    /**
+     * Bedienung wie in der Statistik (`Specs/EChart.md`, FR-1a): „Anzeigen" neben den Quartalen,
+     * ◀ / ▶ blättern um die Länge des Zeitraums, „Heute" setzt heute–heute — beide laden sofort.
+     */
+    test('should page the period and jump to today, loading immediately', async ({ page }) => {
+        await oeffneGrafik(page);
+        await expect(page.locator('app-quarter-selector button[type="submit"]')).toBeVisible();
+        await expect(page.locator('.zev-date-range-row button[type="submit"]')).toHaveCount(0);
+
+        await ersteEinheit(page).check();
+        await setzeZeitraum(page, '2026-01-01', '2026-01-31');
+
+        const antwort = page.waitForResponse(r => r.url().includes('/api/messwerte'));
+        await page.locator('#zeitraumVor').click();
+        await antwort;
+        await expect(page.locator('#dateFrom')).toHaveValue('2026-02-01');
+        await expect(page.locator('#dateTo')).toHaveValue('2026-02-28');
+        await expect(page.locator('.zev-panel--chart')).toHaveCount(1);
+
+        const heute = new Date();
+        const iso = `${heute.getFullYear()}-${String(heute.getMonth() + 1).padStart(2, '0')}-${String(heute.getDate()).padStart(2, '0')}`;
+        const antwortHeute = page.waitForResponse(r => r.url().includes('/api/messwerte'));
+        await page.locator('#zeitraumHeute').click();
+        await antwortHeute;
+        await expect(page.locator('#dateFrom')).toHaveValue(iso);
+        await expect(page.locator('#dateTo')).toHaveValue(iso);
     });
 
     /**

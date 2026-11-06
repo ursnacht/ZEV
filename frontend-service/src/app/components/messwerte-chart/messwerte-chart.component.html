@@ -14,6 +14,12 @@
           [selectedVon]="dateFrom"
           [selectedBis]="dateTo"
           (quarterSelected)="onQuarterSelected($event)">
+          <!-- Bedienung wie in der Statistik (Specs/EChart.md, FR-1a): "Anzeigen" neben den Quartalen -->
+          <button type="submit" id="grafikAnzeigen" class="zev-button zev-button--primary"
+            [disabled]="loading || !dateFrom || !dateTo || selectedEinheiten.length === 0">
+            <app-icon name="search"></app-icon>
+            {{ loading ? ('LADE_DATEN' | translate) : ('ANZEIGEN' | translate) }}
+          </button>
         </app-quarter-selector>
 
         <div class="zev-date-range-row">
@@ -29,10 +35,21 @@
             </div>
 
             <div class="zev-button-group">
-              <button type="submit" class="zev-button zev-button--primary"
-                [disabled]="loading || !dateFrom || !dateTo || selectedEinheiten.length === 0">
-                <app-icon name="search"></app-icon>
-                {{ loading ? ('LADE_DATEN' | translate) : ('ANZEIGEN' | translate) }}
+              <!-- Blättern um die Länge des Zeitraums: Tag, ganze Monate oder Anzahl Tage -->
+              <button type="button" id="zeitraumZurueck" class="zev-button zev-button--secondary" (click)="onBlaettern(-1)"
+                [disabled]="!kannBlaettern" [attr.aria-label]="'ZEITRAUM_ZURUECK' | translate"
+                [title]="'ZEITRAUM_ZURUECK' | translate">
+                <app-icon name="chevron-left" size="xl"></app-icon>
+              </button>
+              <button type="button" id="zeitraumVor" class="zev-button zev-button--secondary" (click)="onBlaettern(1)"
+                [disabled]="!kannBlaettern" [attr.aria-label]="'ZEITRAUM_VOR' | translate"
+                [title]="'ZEITRAUM_VOR' | translate">
+                <app-icon name="chevron-right" size="xl"></app-icon>
+              </button>
+              <button type="button" id="zeitraumHeute" class="zev-button zev-button--secondary" (click)="onHeute()"
+                [disabled]="loading || selectedEinheiten.length === 0">
+                <app-icon name="calendar"></app-icon>
+                {{ 'HEUTE' | translate }}
               </button>
             </div>
           </div>

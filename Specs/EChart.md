@@ -20,15 +20,24 @@
 
 ## 2. Funktionale Anforderungen (FR) - Was soll das System tun?
 
-### FR-1: Ablauf / Flow — unverändert
-
-Die Bedienung bleibt **exakt** wie heute; der Wechsel ist für den Benutzer nur an der Darstellung und am neuen Zoom erkennbar.
+### FR-1: Ablauf / Flow
 
 1. Benutzer öffnet **Messwerte-Grafik** (`/chart`, Permission `messwerte:read`).
-2. Er wählt Einheiten (Mehrfachauswahl samt „Alle auswählen") und einen Zeitraum (Quartals-Schaltflächen oder Datum von/bis; `Datum von` zieht `Datum bis` auf das Monatsende nach).
-3. Klick auf **Anzeigen** lädt die Messwerte je Einheit und zeichnet **ein Diagramm je Einheit** in einem eigenen Panel mit Titel `Name [Typ]`.
+2. Er wählt Einheiten (Mehrfachauswahl samt „Alle auswählen") und einen Zeitraum (Quartals-Schaltflächen, Datum von/bis, Blättern oder „Heute", FR-1a; `Datum von` zieht `Datum bis` auf das Monatsende nach).
+3. Klick auf **Anzeigen** lädt die Messwerte je Einheit und zeichnet **ein Diagramm je Einheit** in einem eigenen Panel mit Titel `Name [Typ]`. Blättern und „Heute" laden selbst.
 4. Eine Erfolgsmeldung nennt die Zahl der geladenen Datenpunkte und der Einheiten.
-5. **Neu:** Innerhalb des geladenen Zeitraums kann der Benutzer zoomen und den Ausschnitt verschieben — ohne neuen Server-Aufruf.
+5. Innerhalb des geladenen Zeitraums kann der Benutzer zoomen und den Ausschnitt verschieben — ohne neuen Server-Aufruf.
+
+### FR-1a: Bedienung wie in der Statistik
+
+Schaltflächen und Datumsfelder sind angeordnet und verhalten sich wie auf der Statistik-Seite (`Specs/Statistik.md`, FR-2 bis FR-4) — **ohne** „PDF exportieren", die Grafik hat keinen Export. Wer beide Seiten nutzt, findet dieselben Knöpfe an derselben Stelle (Hintergrund: Anhang A.1).
+
+1. **„Anzeigen"** steht rechts neben den Quartalsknöpfen (Aktions-Slot des Quartal-Selektors). Gesperrt während des Ladens, ohne beide Daten oder ohne gewählte Einheit; während des Ladens mit dem Text `LADE_DATEN`.
+2. In der Zeile der Datumsfelder stehen **◀ / ▶** (Icons `chevron-left`/`chevron-right`, Tooltip und `aria-label` aus `ZEITRAUM_ZURUECK`/`ZEITRAUM_VOR`) und danach **„Heute"** (Icon `calendar`, Text `HEUTE`).
+3. **Blättern** verschiebt den Zeitraum um seine eigene Länge — dieselbe Regel wie in der Statistik (`blaettereZeitraum`, `Specs/Statistik.md`, FR-4.1) — und **lädt sofort**.
+4. **„Heute"** setzt `Datum von` und `Datum bis` auf das heutige lokale Datum und **lädt sofort**; auch ein zweiter Klick lädt (aktualisieren).
+5. **Abweichung von der Statistik:** Blättern und „Heute" sind **ohne gewählte Einheit gesperrt** — das sofortige Laden liefe sonst nur in die Fehlermeldung. Die Statistik kennt keine Einheitenauswahl.
+6. Die **Erfolgsmeldung** mit der Zahl der Datenpunkte bleibt (FR-1.4) — anders als in der Statistik, wo das Ergebnis selbst die Rückmeldung ist. Hier ist die Zahl eine eigene Information: Ein leerer Zeitraum ergibt ein leeres Diagramm, die Meldung sagt „0".
 
 ### FR-2: Darstellung
 
@@ -44,7 +53,7 @@ Die Bedienung bleibt **exakt** wie heute; der Wechsel ist für den Benutzer nur 
 
 * **Alle** Zahlen im Schweizer Format über `formatSwissNumber()` aus `src/app/utils/number-utils.ts` — Achsenbeschriftung, Tooltip und die Summen in der Legende. **Kein** `toLocaleString()`, **kein** `toFixed()`, keine ECharts-eigene Locale-Formatierung.
 * **Zeitpunkte** im Format `dd.MM.yyyy HH:mm`, manuell gebildet (kein `toLocaleString`).
-* **Alle** Texte über den `TranslationService`, auch die Legendennamen: `TOTAL`, `ZEV`, `ZEIT`, `KWH`. Ebenso Lade- und Fehlerzustand des Diagramms: `DIAGRAMM_LAEDT` und `DIAGRAMM_NICHT_LADBAR`. **Alle diese Keys sind vorhanden** (in der Übersetzungstabelle geprüft) — es braucht **keine neue Migration**.
+* **Alle** Texte über den `TranslationService`, auch die Legendennamen: `TOTAL`, `ZEV`, `ZEIT`, `KWH`. Ebenso Lade- und Fehlerzustand des Diagramms: `DIAGRAMM_LAEDT` und `DIAGRAMM_NICHT_LADBAR`, die Bedienung (FR-1a): `ANZEIGEN`, `LADE_DATEN`, `ZEITRAUM_ZURUECK`, `ZEITRAUM_VOR`, `HEUTE`. **Alle diese Keys sind vorhanden** (in der Übersetzungstabelle geprüft) — es braucht **keine neue Migration**.
 * **Aufgelöst wird beim Zeichnen.** Ein Sprachwechsel während ein Diagramm offen steht erneuert die Beschriftung **nicht**: `TranslationService.setLanguage()` setzt ein Signal, das Template-Texte erneuert — ein gezeichnetes Canvas nicht. Die Legende trägt bis zum nächsten Zeichnen die alte Sprache. Das ist heute genauso und bleibt eine **bekannte Einschränkung** (§5); sie gilt für beide Diagramme gleich, und wenn sie behoben wird, dann für beide gemeinsam.
 
 ### FR-4: Farben und Dark Mode
@@ -80,9 +89,17 @@ Während die Bibliothek nachgeladen wird, zeigt das Panel `DIAGRAMM_LAEDT`; sche
 
 **Verhalten bleibt**
 * [ ] Die **14 bestehenden E2E-Tests** in `tests/messwerte-grafik.spec.ts` laufen **unverändert** grün — insbesondere der Pixel-Vergleich „Zeitraum mit Messwerten bemalt mehr als einer ohne".
-* [x] Die Bedienung ist unverändert: Einheiten-Mehrfachauswahl, „Alle auswählen", Quartals-Schaltflächen, `Datum von` zieht `Datum bis` auf das Monatsende, gesperrte Schaltfläche ohne Auswahl, Fehlermeldung bei vertauschtem Zeitraum.
+* [x] Die Datenauswahl bleibt: Einheiten-Mehrfachauswahl, „Alle auswählen", Quartals-Schaltflächen, `Datum von` zieht `Datum bis` auf das Monatsende, gesperrte Schaltfläche ohne Auswahl, Fehlermeldung bei vertauschtem Zeitraum. (Test: einheit-selector.component.spec.ts › EinheitSelectorComponent › onSelectAllToggle (default - alle) › should select all einheiten including producers; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › onQuarterSelected › should set dateFrom and dateTo from event; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › onDateFromChange › should set dateTo to last day of dateFrom month; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › onSubmit › should show error when dateFrom is after dateTo; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › should keep the submit button disabled until a unit is selected; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Auswahl und Validierung › should keep the submit button disabled without a unit selection; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Auswahl und Validierung › should select every unit via the select-all checkbox)
 * [x] Ein Panel je gewählter Einheit mit Titel `Name [Typ]`; die Erfolgsmeldung nennt Datenpunkte und Einheiten.
 * [x] Beide Datenreihen erscheinen, die ZEV-Reihe negativ aufgetragen.
+
+**Bedienung wie Statistik (FR-1a)**
+* [x] „Anzeigen" steht im Quartal-Selektor rechts neben den Quartalsknöpfen; in der Zeile der Datumsfelder steht kein „Anzeigen". (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › should place the submit button next to the quarter buttons; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should page the period and jump to today, loading immediately)
+* [x] In der Zeile der Datumsfelder stehen ◀ / ▶ und „Heute" in dieser Reihenfolge, **kein** „PDF exportieren". (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › should offer paging and today in the date row, without pdf export)
+* [x] ◀ / ▶ tragen die Icons `chevron-left`/`chevron-right` und die übersetzte Beschriftung (`ZEITRAUM_ZURUECK`/`ZEITRAUM_VOR`) als Tooltip und `aria-label`; „Heute" zeigt `HEUTE`. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › should render chevron icons with translated title and aria-label)
+* [x] Blättern verschiebt den Zeitraum um seine Länge (Quartal → nächstes Quartal, Tag → Vortag) und lädt sofort die Messwerte. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › onBlaettern › should move a quarter forward and load immediately; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › onBlaettern › should move a day backwards; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should page the period and jump to today, loading immediately)
+* [x] „Heute" setzt beide Daten auf das **lokale** Tagesdatum und lädt sofort; ein zweiter Klick lädt erneut. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › onHeute › should set both dates to today and load immediately; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › onHeute › should use the local date shortly after midnight; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › onHeute › should reload when today is already shown; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should page the period and jump to today, loading immediately)
+* [x] Blättern und „Heute" sind ohne gewählte Einheit und während des Ladens gesperrt; Blättern zusätzlich bei ungültigem Zeitraum (von > bis). (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › should disable paging and today without a unit or while loading; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › onBlaettern › should not move without a unit, while loading or with an invalid range)
 
 **Neu und geändert**
 * [x] Mausrad/Touch zoomt innerhalb des geladenen Zeitraums, der Slider verschiebt den Ausschnitt — **ohne** neuen HTTP-Aufruf.
@@ -140,7 +157,8 @@ Während die Bibliothek nachgeladen wird, zeigt das Panel `DIAGRAMM_LAEDT`; sche
 | Sehr grosser Zeitraum (mehrere Quartale) | Wird geladen und gezeichnet; die Lesbarkeit übernimmt `dataZoom` |
 | Nachladen der Bibliothek scheitert (Netz, Chunk fehlt) | Fehlermeldung, kein Diagramm, Seite bleibt bedienbar |
 | Fehler beim Laden der Messwerte | Lesbare Fehlermeldung, kein halb gezeichnetes Diagramm |
-| Vertauschter Zeitraum | Wie heute: Fehlermeldung, kein Server-Aufruf, kein Diagramm |
+| Vertauschter Zeitraum | Wie heute: Fehlermeldung, kein Server-Aufruf, kein Diagramm; ◀ / ▶ gesperrt |
+| Blättern oder „Heute" ohne gewählte Einheit | Schaltflächen gesperrt, kein Server-Aufruf (FR-1a.5) |
 | Panel wird in der Grösse verändert (`resize: vertical`) | Diagramm folgt über den `ResizeObserver` |
 | Sprachwechsel bei offenem Diagramm | Beschriftung und Legende bleiben bis zum nächsten Zeichnen in der alten Sprache. **Bekannte Einschränkung**, heute genauso, gilt für beide Diagramme (FR-3) |
 | Wechsel des Dark Mode bei offenem Diagramm | Die Farben werden beim Zeichnen aus den Tokens gelesen; ein Wechsel wirkt erst beim nächsten Zeichnen. **Bekannte Einschränkung**, gilt heute für die Preiszeitreihe genauso (§8) |
@@ -173,7 +191,7 @@ Während die Bibliothek nachgeladen wird, zeigt das Panel `DIAGRAMM_LAEDT`; sche
 
 ## 7. Abgrenzung / Out of Scope
 
-* **Keine neuen Funktionen** in der Messwerte-Grafik: kein Export, keine Kennzahlen, keine zusätzlichen Reihen, keine Änderung der Datenauswahl.
+* **Keine weiteren Funktionen** in der Messwerte-Grafik über Zoom und die Bedienung aus FR-1a hinaus: kein Export (auch nicht der PDF-Export der Statistik), keine Kennzahlen, keine zusätzlichen Reihen, keine Änderung der Datenauswahl.
 * **Keine Änderung an Backend, API oder Datenbank.**
 * **Kein Umbau der Statistik-Seite** und keiner anderen Maske; `zev-panel--chart` bleibt wie es ist.
 * **Keine fachliche Änderung an der Preiszeitreihe** — dort wird ausschliesslich auf die gemeinsamen Bausteine umgestellt.
@@ -191,3 +209,11 @@ Während die Bibliothek nachgeladen wird, zeigt das Panel `DIAGRAMM_LAEDT`; sche
 * **Dark-Mode-Wechsel bei offenem Diagramm** wirkt erst beim nächsten Zeichnen. Soll das Diagramm auf den Wechsel reagieren (Beobachter auf `data-theme`)? --> **Annahme bestätigt:** nein, wie bei der Preiszeitreihe; bleibt als bekannte Einschränkung dokumentiert. Falls später doch, dann für beide Diagramme gemeinsam.
 * **Legende bei vielen Reihen:** Zwei Reihen je Diagramm sind gesetzt; die Legende zeigt die Summen. Bleibt die Summe im Legendentext oder wandert sie in den Panel-Titel? --> **Annahme bestätigt:** bleibt im Legendentext wie heute.
 * **Erwartete Bundle-Ersparnis** ist noch nicht gemessen (chart.js liegt als 6.2 MB im `node_modules`, davon landet nur ein Teil im Bundle). --> Wird im Umsetzungsplan mit Zahlen vor und nach dem Umbau belegt.
+
+## Anhang A – Entscheidungen und Verlauf
+
+### A.1 Bedienung wie in der Statistik (FR-1, FR-1a, 06.11.2026)
+
+Vorher galt FR-1 „Ablauf / Flow — unverändert": *„Die Bedienung bleibt **exakt** wie heute; der Wechsel ist für den Benutzer nur an der Darstellung und am neuen Zoom erkennbar."* Das betraf den Bibliothekswechsel von chart.js auf ECharts und ist mit ihm erfüllt. „Anzeigen" stand damals in der Zeile der Datumsfelder, Blättern und „Heute" gab es nicht. Das Kriterium dazu lautete „Die Bedienung ist unverändert: …".
+
+Am 06.11.2026 wurde die Bedienung auf Wunsch des Benutzers an die Statistik angeglichen, damit beide Seiten mit Zeitraumwahl gleich bedient werden. Den PDF-Export der Statistik übernimmt die Grafik bewusst nicht.
