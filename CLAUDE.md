@@ -154,4 +154,4 @@ Additional documentation in `/docs/` (aktuelle Liste: `ls docs/`) - u.a. Keycloa
 
 Direct database access options:
 - **MCP Server**: Use the `zev-db` MCP server for SQL queries
-- **Docker**: `docker exec postgres psql -U postgres -d zev -c "SELECT ..."`
+- **Docker**: `docker exec zev-postgres psql -U postgres -d zev -c "SELECT ..."`

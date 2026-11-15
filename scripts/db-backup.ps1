@@ -13,14 +13,14 @@
     Verzeichnis fuer die Backup-Datei. Vorgabe: aktuelles Verzeichnis.
 
 .PARAMETER Container
-    Name des Postgres-Containers. Vorgabe: postgres
+    Name des Postgres-Containers. Vorgabe: zev-postgres
 
 .EXAMPLE
     .\scripts\db-backup.ps1 -Ziel D:\Backups\zev
 #>
 param(
     [string]$Ziel = ".",
-    [string]$Container = "postgres"
+    [string]$Container = "zev-postgres"
 )
 
 $ErrorActionPreference = 'Stop'

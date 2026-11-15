@@ -273,7 +273,7 @@ lokal gespiegelt wird.
 docker compose up -d
 
 # 3. Root-Zertifikat der internen CA exportieren
-docker cp caddy:/data/caddy/pki/authorities/local/root.crt caddy-root.crt
+docker cp zev-caddy:/data/caddy/pki/authorities/local/root.crt caddy-root.crt
 
 # 4. Import in den Windows-Zertifikatspeicher (Administrator-Konsole)
 certutil -addstore -f ROOT caddy-root.crt

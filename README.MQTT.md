@@ -16,12 +16,13 @@ Referenzen: [`Specs/MQTT-Integration.md`](./Specs/MQTT-Integration.md) (Backend-
 
 | Service          | Port        | Zweck                                             |
 |------------------|-------------|---------------------------------------------------|
-| postgres         | 5432        | Datenbank (`zev`)                                 |
+| postgres         | 25432 → 5432 | Datenbank (`zev`)                                |
 | mosquitto        | 1883        | MQTT-Broker (Auth aktiv, Config ins Image gebacken) |
-| keycloak         | 9000        | OAuth2/JWT (`--import-realm`)                      |
-| backend-service  | 8090        | Spring Boot, **Profil `mqtt`** (Subscriber + Job) |
-| admin-service    | 8081        | Spring Boot Admin                                 |
-| frontend-service | 4200 → 8080 | Angular (via Spring Boot)                         |
+| keycloak         | –           | OAuth2/JWT (`--import-realm`), über Caddy unter `/auth` |
+| backend-service  | –           | Spring Boot, **Profil `mqtt`** (Subscriber + Job), über Caddy unter `/api` |
+| admin-service    | –           | Spring Boot Admin, über Caddy auf 8444            |
+| frontend-service | –           | Angular (via Spring Boot), über Caddy             |
+| caddy            | 8000, 8443, 8444 | Reverse-Proxy, einziger Einstiegspunkt       |
 
 **Nicht enthalten:** Prometheus, Grafana.
 
@@ -50,8 +51,9 @@ docker compose --env-file .env.mqtt -f docker-compose-mqtt.yml up --build
 > für die `${...}`-Interpolation (nicht `.env.mqtt`); ohne `-f` das Standard-`docker-compose.yml`.
 > Die Flags stehen **vor** dem Unterbefehl (`up`, `logs`, …).
 
-Zugriffspunkte nach dem Start: Frontend http://localhost:4200 · Backend http://localhost:8090 ·
-Keycloak http://localhost:9000 · Admin http://localhost:8081 · MQTT `tcp://localhost:1883`.
+Zugriffspunkte nach dem Start: Anwendung https://localhost:8443 (API unter `/api`, Keycloak unter
+`/auth`) · Admin https://localhost:8444 · Datenbank `localhost:25432` · MQTT `tcp://localhost:1883`.
+Die Container heissen `zev-<service>` (z. B. `zev-backend-service`).
 
 ## End-to-End-Test mit dem Publisher-Simulator
 
@@ -155,9 +157,9 @@ python -m gateway.main --config config.sim.yaml
   ```bash
   mosquitto_sub -h localhost -t 'zev/#' -v -u zev-backend -P zev-mqtt-dev
   ```
-- Health/Metriken:
-  `curl http://localhost:8090/actuator/health/mqtt` ·
-  `curl -s http://localhost:8090/actuator/prometheus | grep zev_mqtt`
+- Health/Metriken: Spring Boot Admin (https://localhost:8444) → Instanz `backend-service` →
+  *Health* (`mqtt`) bzw. *Metrics* (`zev_mqtt…`). Port 8090 ist nicht mehr veröffentlicht, die
+  Actuator-Endpoints sind vom Host aus nicht direkt erreichbar.
 
 ## Nützliche Befehle
 

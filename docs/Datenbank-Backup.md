@@ -55,10 +55,10 @@ Ablauf:
 
 1. Das Backup wird in eine **neue** Datenbank `zev_neu` gespielt. Schlägt das fehl, ist nichts
    verändert.
-2. Nachfrage — erst nach Eingabe von `RESTORE` geht es weiter. Dann werden `backend-service` und
-   `keycloak` gestoppt.
+2. Nachfrage — erst nach Eingabe von `RESTORE` geht es weiter. Dann werden `zev-backend-service` und
+   `zev-keycloak` gestoppt.
 3. Die Datenbanken werden umbenannt: `zev` → `zev_alt`, `zev_neu` → `zev`.
-4. `keycloak` und `backend-service` werden wieder gestartet — auch nach einem Fehler.
+4. `zev-keycloak` und `zev-backend-service` werden wieder gestartet — auch nach einem Fehler.
 
 Der bisherige Stand bleibt als **`zev_alt`** erhalten. Ein früheres `zev_alt` wird dabei gelöscht.
 
@@ -73,13 +73,13 @@ Der bisherige Stand bleibt als **`zev_alt`** erhalten. Ein früheres `zev_alt` w
 Ist nach dem Restore etwas nicht in Ordnung, den vorherigen Stand zurückholen:
 
 ```powershell
-docker stop backend-service keycloak
+docker stop zev-backend-service zev-keycloak
 @'
 SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'zev' AND pid <> pg_backend_pid();
 ALTER DATABASE zev RENAME TO zev_verworfen;
 ALTER DATABASE zev_alt RENAME TO zev;
-'@ | docker exec -i postgres sh -c 'psql -v ON_ERROR_STOP=1 -U $POSTGRES_USER -d postgres'
-docker start keycloak backend-service
+'@ | docker exec -i zev-postgres sh -c 'psql -v ON_ERROR_STOP=1 -U $POSTGRES_USER -d postgres'
+docker start zev-keycloak zev-backend-service
 ```
 
 Danach liegt der verworfene Stand als `zev_verworfen` vor und kann mit `dropdb` entfernt werden.
@@ -89,7 +89,7 @@ Danach liegt der verworfene Stand als `zev_verworfen` vor und kann mit `dropdb` 
 Läuft alles, kann `zev_alt` weg — es belegt so viel Platz wie die Datenbank selbst:
 
 ```powershell
-docker exec postgres sh -c 'dropdb -U $POSTGRES_USER zev_alt'
+docker exec zev-postgres sh -c 'dropdb -U $POSTGRES_USER zev_alt'
 ```
 
 > **Zusätzliche Datenbank-Benutzer** (z. B. `zev_readonly`, `docs/Datenbank-Benutzer.md`) sind
@@ -117,6 +117,10 @@ DOCKER="sudo docker" ./scripts/db-restore.sh --nur-pruefen /volume1/backup/zev/z
 ```
 
 `DOCKER="sudo docker"` nur, wenn `docker` dort `sudo` braucht.
+
+> **Containernamen:** Auf dem NAS heissen die Container ohne Präfix (`postgres`, `backend-service`,
+> `keycloak`) — das ist die Vorgabe der `.sh`-Skripte. Lokal tragen sie das Präfix `zev-`
+> (Vorgabe der `.ps1`-Skripte). Abweichende Namen: `-Container` usw. bzw. `CONTAINER=…`.
 
 > **Das Backup vom NAS herunterkopieren**, z. B. mit `scp`. Ein Backup auf derselben Platte schützt
 > nicht gegen deren Ausfall.

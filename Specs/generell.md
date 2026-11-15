@@ -137,4 +137,4 @@ Bei der Code-Generierung die Vorlagen-Tabelle in `CLAUDE.md` (Abschnitt "Code-Vo
 * Zugriff auf die Datenbank
   * via MCP-Server 'zev-db'
   * via docker container
-    * Beispiel um alle Übersetzungskeys zu lesen: "docker exec postgres psql -U postgres -d zev -c "SELECT key FROM zev.translation ORDER BY key;"
+    * Beispiel um alle Übersetzungskeys zu lesen: "docker exec zev-postgres psql -U postgres -d zev -c "SELECT key FROM zev.translation ORDER BY key;"

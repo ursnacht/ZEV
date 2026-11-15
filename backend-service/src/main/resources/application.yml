@@ -61,11 +61,6 @@ spring:
             # Actuator-Endpoints dieses Service abruft (Details: Environment, Logger, ...).
             user.name: ${ACTUATOR_USER:actuator}
             user.password: ${ACTUATOR_PASSWORD:actuator}
-  datasource:
-    url: jdbc:postgresql://localhost:5432/zev
-    username: postgres
-    password: postgres
-  
   jpa:
     hibernate:
       ddl-auto: validate

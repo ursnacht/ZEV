@@ -496,7 +496,7 @@ Das Ziel in `-L` wird **vom NAS** aufgelöst; die Container-IP im Docker-Bridge-
 | `no pg_hba.conf entry for host "127.0.0.1", user postgres, database zev` | Tunnel zeigt auf `localhost:5432` des NAS — das ist **DSM's eigener PostgreSQL**, nicht die ZEV-DB. Erkennungsmerkmal: Der ZEV-Container sieht Clients immer als `172.x.0.1` (Bridge-Gateway), **nie** als `127.0.0.1`. → Auf die Container-IP tunneln (oben). |
 | Tunnel ging gestern, heute nicht mehr | Die Container-IP ändert sich beim Neuaufsetzen des Stacks → neu ermitteln. Dauerhaft stabiler: ZEV-Postgres in der NAS-Compose auf einen freien Host-Port legen (`"15432:5432"` statt `"5432:5432"`, da 5432 von DSM belegt ist) und wieder auf `localhost` tunneln. |
 
-Lokal bewusst Port **15432**: Auf `5432` läuft die lokale Dev-Datenbank — sonst verbindet
+Lokal bewusst Port **15432**: Auf `25432` läuft die lokale Dev-Datenbank — sonst verbindet
 sich das DB-Tool unbemerkt auf die falsche Instanz.
 
 ```bash

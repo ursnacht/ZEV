@@ -59,7 +59,7 @@ docker compose up -d --build
 
 # 3. Root-Zertifikat der internen CA holen und importieren.
 #    Erst jetzt möglich: Caddy erzeugt die CA beim ersten Start.
-docker cp caddy:/data/caddy/pki/authorities/local/root.crt caddy-root.crt
+docker cp zev-caddy:/data/caddy/pki/authorities/local/root.crt caddy-root.crt
 certutil -addstore -f ROOT caddy-root.crt        # Windows, als Administrator
 
 # 4. Anwendung öffnen
@@ -83,9 +83,10 @@ einer **bestehenden** Installation müssen die Adressen von Hand ergänzt werden
 |--------|-----|-----------|
 | **Anwendung** | https://localhost:8443 | der reguläre Weg (über Caddy) |
 | Anwendung (HTTP) | http://localhost:8000 | leitet auf HTTPS weiter |
-| Keycloak | http://localhost:9000/auth | direkt, ohne Proxy (admin/admin) |
-| Backend API | http://localhost:8090 | direkt; regulär über `https://localhost:8443/api` |
-| Admin Service | http://localhost:8081 | Spring Boot Admin (sba/sba) |
+| Keycloak | https://localhost:8443/auth | Admin-Konsole über Caddy (admin/admin) |
+| Backend API | https://localhost:8443/api | über Caddy; Port 8090 ist nicht veröffentlicht |
+| Admin Service | https://localhost:8444 | Spring Boot Admin über Caddy (sba/sba), nur im HTTPS-Betrieb |
+| Datenbank | localhost:25432 | PostgreSQL, Datenbank `zev` |
 | Prometheus | http://localhost:9090 | |
 | Grafana | http://localhost:3000 | admin/admin |
 

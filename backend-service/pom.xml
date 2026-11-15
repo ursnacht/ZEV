@@ -260,7 +260,7 @@
         <groupId>org.flywaydb</groupId>
         <artifactId>flyway-maven-plugin</artifactId>
         <configuration>
-          <url>jdbc:postgresql://localhost:5432/zev</url>
+          <url>jdbc:postgresql://localhost:25432/zev</url>
           <user>postgres</user>
           <password>postgres</password>
           <schemas>

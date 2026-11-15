@@ -7,9 +7,9 @@
 
     ABLAUF (ohne -NurPruefen):
       1. Backup in eine NEUE Datenbank zev_neu spielen. Schlaegt das fehl, ist nichts veraendert.
-      2. Nachfrage. Dann backend-service und keycloak stoppen.
+      2. Nachfrage. Dann zev-backend-service und zev-keycloak stoppen.
       3. Umbenennen: zev -> zev_alt, zev_neu -> zev.
-      4. keycloak und backend-service starten.
+      4. zev-keycloak und zev-backend-service starten.
     Der bisherige Stand bleibt als zev_alt erhalten (Rueckweg: siehe Anleitung).
 
     WARUM NICHT pg_restore --clean IN DIE LAUFENDE DATENBANK: --clean loescht nur, was im Backup
@@ -29,6 +29,15 @@
 .PARAMETER NurPruefen
     Nicht zurueckspielen, sondern nur pruefen, ob das Backup lesbar und vollstaendig ist.
 
+.PARAMETER Container
+    Name des Postgres-Containers. Vorgabe: zev-postgres
+
+.PARAMETER BackendContainer
+    Name des Backend-Containers, der fuer den Tausch gestoppt wird. Vorgabe: zev-backend-service
+
+.PARAMETER KeycloakContainer
+    Name des Keycloak-Containers, der fuer den Tausch gestoppt wird. Vorgabe: zev-keycloak
+
 .EXAMPLE
     .\scripts\db-restore.ps1 -Datei .\zev-2026-10-08_0930.dump -NurPruefen
     .\scripts\db-restore.ps1 -Datei .\zev-2026-10-08_0930.dump
@@ -36,7 +45,9 @@
 param(
     [Parameter(Mandatory = $true)][string]$Datei,
     [switch]$NurPruefen,
-    [string]$Container = "postgres"
+    [string]$Container = "zev-postgres",
+    [string]$BackendContainer = "zev-backend-service",
+    [string]$KeycloakContainer = "zev-keycloak"
 )
 
 $ErrorActionPreference = 'Stop'
@@ -100,8 +111,8 @@ UNION ALL SELECT 'flyway: letzte Version', (SELECT version FROM zev.flyway_schem
         return
     }
 
-    Write-Host "Stoppe backend-service und keycloak ..."
-    docker stop backend-service keycloak | Out-Null; Pruefe "docker stop"
+    Write-Host "Stoppe $BackendContainer und $KeycloakContainer ..."
+    docker stop $BackendContainer $KeycloakContainer | Out-Null; Pruefe "docker stop"
 
     try {
         # ---------- 3. Umbenennen ----------
@@ -118,8 +129,8 @@ ALTER DATABASE $ziel RENAME TO zev;
         Write-Host "Restore abgeschlossen. Der bisherige Stand liegt als zev_alt vor."
     } finally {
         # ---------- 4. Starten - auch nach einem Fehler ----------
-        Write-Host "Starte keycloak und backend-service ..."
-        docker start keycloak backend-service | Out-Null
+        Write-Host "Starte $KeycloakContainer und $BackendContainer ..."
+        docker start $KeycloakContainer $BackendContainer | Out-Null
     }
 } finally {
     ImContainer 'rm -f /tmp/zev-restore.dump' | Out-Null

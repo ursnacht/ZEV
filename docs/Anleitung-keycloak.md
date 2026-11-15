@@ -2,7 +2,7 @@
 
 1. Organizations-Feature aktivieren (in docker-compose mit --features=organization)
 2. Organization erstellen:
-   - Keycloak Admin Console öffnen: http://localhost:9000
+   - Keycloak Admin Console öffnen: https://localhost:8443/auth
    - Realm "zev" auswählen
    - Menü: "Organizations" → "Create organization"
    - Name eingeben (z.B. "ZEV Musterstrasse")
@@ -125,7 +125,7 @@ Das ist ideal für dein Spring-Boot-Backend, um im Hintergrund die Admin-API auf
    **Beispiel mit `curl`:**
 
     ```Bash
-    curl.exe -X POST "http://localhost:9000/realms/zev/protocol/openid-connect/token" \
+    curl.exe -X POST "https://localhost:8443/auth/realms/zev/protocol/openid-connect/token" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     -d "grant_type=client_credentials" \
     -d "client_id=zev-backend" \
@@ -139,7 +139,7 @@ Das ist ideal für dein Spring-Boot-Backend, um im Hintergrund die Admin-API auf
 
 ```Java
 Keycloak keycloak = KeycloakBuilder.builder()
-    .serverUrl("http://localhost:9000")
+    .serverUrl("https://localhost:8443/auth")
     .realm("zev")
     .grantType(OAuth2Constants.CLIENT_CREDENTIALS) // Wichtig: Client Credentials!
     .clientId("zev-backend")

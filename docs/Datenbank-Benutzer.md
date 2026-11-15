@@ -4,7 +4,8 @@ Ein Benutzer, der die Anwendungsdaten **lesen**, aber nichts verändern kann —
 DB-Tools oder einen MCP-Server.
 
 Gilt lokal wie auf dem NAS (Hene). Auf dem NAS dieselben Befehle im SSH-Fenster, gegebenenfalls
-mit `sudo docker`.
+mit `sudo docker` — und mit dem Containernamen `postgres` statt `zev-postgres` (das Präfix `zev-`
+tragen nur die lokalen Container).
 
 ## Anlegen
 
@@ -12,7 +13,7 @@ Als Administrator im Postgres-Container — **demselben Benutzer, mit dem Flyway
 anlegt** (`$POSTGRES_USER`). Warum das zählt, steht unter „Künftige Tabellen".
 
 ```powershell
-docker exec -it postgres sh -c 'psql -U $POSTGRES_USER -d zev'
+docker exec -it zev-postgres sh -c 'psql -U $POSTGRES_USER -d zev'
 ```
 
 In `psql`:
@@ -63,7 +64,7 @@ weiter — sie unterstützt nur MySQL/MariaDB, nicht PostgreSQL.
    | Feld | lokal |
    |---|---|
    | Hostname / IP | `127.0.0.1` |
-   | Port | `5432` |
+   | Port | `25432` |
    | Benutzer / Passwort | `POSTGRES_USER` / `POSTGRES_PASSWORD` aus der `.env` |
    | Datenbanken | `zev` |
 
@@ -108,8 +109,8 @@ SSH-Benutzer, lokaler Port z. B. `15432`.
 ## Prüfen
 
 ```powershell
-docker exec -it postgres psql -U zev_readonly -d zev -c "SELECT count(*) FROM zev.messwerte"
-docker exec -it postgres psql -U zev_readonly -d zev -c "DELETE FROM zev.messwerte WHERE false"
+docker exec -it zev-postgres psql -U zev_readonly -d zev -c "SELECT count(*) FROM zev.messwerte"
+docker exec -it zev-postgres psql -U zev_readonly -d zev -c "DELETE FROM zev.messwerte WHERE false"
 ```
 
 * Die erste muss eine Zahl liefern.
@@ -117,11 +118,11 @@ docker exec -it postgres psql -U zev_readonly -d zev -c "DELETE FROM zev.messwer
   `WHERE false` sorgt dafür, dass sie selbst bei falsch gesetzten Rechten nichts löschen würde.
 
 Innerhalb des Containers fragt `psql` je nach Konfiguration nicht nach dem Passwort; über das
-Netzwerk (Port 5432) schon.
+Netzwerk (lokal Port 25432) schon.
 
 ## Zugriff mit einem DB-Tool
 
-**Lokal:** `localhost:5432`, Datenbank `zev`, Benutzer `zev_readonly`.
+**Lokal:** `localhost:25432`, Datenbank `zev`, Benutzer `zev_readonly`.
 
 **NAS:** Über einen SSH-Tunnel — aber **nicht** auf `localhost:5432` des NAS: Dort läuft die
 PostgreSQL-Instanz von DSM selbst, nicht die ZEV-Datenbank. Die Fehlermeldung
@@ -133,7 +134,7 @@ ssh <user>@<nas-host> "sudo docker inspect -f '{{range .NetworkSettings.Networks
 ssh -N -L 15432:<container-ip>:5432 <user>@<nas-host>
 ```
 
-Das DB-Tool dann auf `localhost:15432`. Lokal bewusst ein anderer Port als 5432, damit die
+Das DB-Tool dann auf `localhost:15432`. Lokal bewusst ein anderer Port als 25432, damit die
 lokale Datenbank nicht verwechselt wird. Die Container-IP kann sich beim Neuaufsetzen des Stacks
 ändern.
 
