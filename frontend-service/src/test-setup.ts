@@ -15,6 +15,21 @@ if (typeof URL.revokeObjectURL !== 'function') {
   URL.revokeObjectURL = () => {};
 }
 
+// Node >= 25 defines its own global `localStorage`. Without `--localstorage-file` its getter
+// returns undefined - and because the property already exists, Vitest does not replace it with
+// the jsdom implementation. Point the global back at jsdom's Storage (Vitest exposes the JSDOM
+// instance as `globalThis.jsdom`).
+if (typeof (globalThis as any).localStorage === 'undefined') {
+  const jsdomStorage = (globalThis as any).jsdom?.window?.localStorage;
+  if (jsdomStorage) {
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: jsdomStorage,
+      configurable: true,
+      writable: true,
+    });
+  }
+}
+
 // jsdom implements neither DataTransfer nor DragEvent (used by the CSV drag & drop upload).
 if (typeof (globalThis as any).DataTransfer === 'undefined') {
   class DataTransferShim {
