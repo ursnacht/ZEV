@@ -570,7 +570,144 @@ public class ProduktionsprognoseServiceTest {
                 eq(LocalDateTime.of(2026, 9, 25, 0, 0)));
     }
 
+    // ==================== Der Faktor je Tageszeit (FR-3) ====================
+
+    /**
+     * <b>Eine Tageszeit mit genug Punkten rechnet mit ihrem eigenen Faktor.</b>
+     *
+     * <p>Fuenf Tage (20.–24.09.) liefern um 12:00 je 0.500 kWh bei 100 W/m² — Faktor 0.005. Der
+     * Faktor ueber den ganzen Tag enthaelt zusaetzlich das helle Intervall vom 28.08. mit 2.000 kWh:
+     * 4.500 / 600 = 0.0075. Stuende 0.0075 am Punkt, waere die Tageszeit nicht ausgewertet worden —
+     * und der beschattete Nachmittag bekaeme wieder das Mittel ueber den ganzen Tag.
+     */
+    @Test
+    void getPrognose_TageszeitMitGenugPunkten_RechnetMitEigenemFaktor() {
+        lernhistorieMitTageszeit("0.500", tageAb(LocalDate.of(2026, 9, 20), 5, 12));
+
+        PrognosepunktDTO punkt = einzigerPunkt();
+
+        assertEquals(new BigDecimal("0.00500000"), punkt.getFaktor());
+        // 400 W/m² x 0.005 - am Punkt steht der Faktor, mit dem gerechnet wurde
+        assertEquals(new BigDecimal("2.000"), punkt.getErwarteteErzeugung());
+    }
+
+    /**
+     * Mit <b>vier</b> Punkten bekommt die Tageszeit keinen eigenen Faktor — es gilt der ueber den
+     * ganzen Tag: (2.000 + 4 × 0.500) / 500 = 0.008.
+     *
+     * <p>Ein Faktor aus so wenigen Punkten folgte dem Wetter dieser Tage, nicht der Anlage.
+     */
+    @Test
+    void getPrognose_TageszeitMitZuWenigPunkten_FaelltAufTagesfaktorZurueck() {
+        lernhistorieMitTageszeit("0.500", tageAb(LocalDate.of(2026, 9, 21), 4, 12));
+
+        assertEquals(new BigDecimal("0.00800000"), einzigerPunkt().getFaktor());
+    }
+
+    /**
+     * Das Lernfenster der Tageszeit ist <b>14 Tage</b>, nicht {@code historieTage}.
+     *
+     * <p>Die fuenf Punkte liegen am 06.–10.09., das Fenster beginnt am 11.09. Sie zaehlen fuer den
+     * Faktor ueber den ganzen Tag (0.0075), aber nicht fuer die Tageszeit — sonst lernte sie noch
+     * aus Wochen, in denen der Schatten anders fiel.
+     */
+    @Test
+    void getPrognose_TageszeitPunkteAelterAlsVierzehnTage_ZaehlenNichtFuerDieTageszeit() {
+        lernhistorieMitTageszeit("0.500", tageAb(LocalDate.of(2026, 9, 6), 5, 12));
+
+        assertEquals(new BigDecimal("0.00750000"), einzigerPunkt().getFaktor());
+    }
+
+    /**
+     * Die Tageszeit ist die <b>Normalzeit</b>: Ueber die Zeitumstellung (25.10.2026) hinweg gehoert
+     * 13:00 Sommerzeit zu 12:00 Winterzeit — derselbe Sonnenstand.
+     *
+     * <p>Gefragt ist der 30.10. um 12:00, gelernt wurde am 19.–23.10. um 13:00. Nach Ortszeit
+     * geschluesselt faende 12:00 keinen Punkt und fiele auf 0.0075 zurueck; das Profil laege bis zu
+     * zwei Wochen lang um eine Stunde daneben.
+     */
+    @Test
+    void getPrognose_TageszeitUeberZeitumstellung_SchluesselIstNormalzeit() {
+        LocalDate nachUmstellung = LocalDate.of(2026, 10, 30);
+        lernhistorieMitTageszeit("0.500", tageAb(LocalDate.of(2026, 10, 19), 5, 13));
+        when(prognoseRepository.findByZeitBetween(any(), any()))
+                .thenReturn(List.of(prognosepunkt(nachUmstellung.atTime(12, 0), "400.00")));
+
+        List<PrognosepunktDTO> punkte = produktionsprognoseService.getPrognose(nachUmstellung);
+
+        assertEquals(new BigDecimal("0.00500000"), punkte.get(0).getFaktor());
+    }
+
+    /**
+     * Lieferte eine Tageszeit bei Einstrahlung <b>nichts</b>, ist ihr Faktor 0 — nicht der
+     * Rueckfall.
+     *
+     * <p>Das ist der voll beschattete Abend. Der Faktor ueber den ganzen Tag (2.000 / 600) sagte
+     * dort Erzeugung voraus, die nie kommt, und die Merit-Order wartete auf sie.
+     */
+    @Test
+    void getPrognose_TageszeitOhneErzeugung_FaktorIstNull() {
+        lernhistorieMitTageszeit("0.000", tageAb(LocalDate.of(2026, 9, 20), 5, 12));
+
+        PrognosepunktDTO punkt = einzigerPunkt();
+
+        assertEquals(new BigDecimal("0.00000000"), punkt.getFaktor());
+        assertEquals(new BigDecimal("0.000"), punkt.getErwarteteErzeugung());
+    }
+
+    /**
+     * Ohne Faktor ueber den ganzen Tag gibt es auch <b>keinen je Tageszeit</b>.
+     *
+     * <p>145 helle Intervalle liegen unter der Schwelle von 150 — der Rueckfall aus FR-4. Die
+     * Tageszeit haette ihre fuenf Punkte; duerfte sie trotzdem rechnen, entstuende ein Tag mit
+     * erwarteter Erzeugung in einzelnen Viertelstunden und Luecken dazwischen.
+     */
+    @Test
+    void getPrognose_OhneTagesfaktor_KeinFaktorJeTageszeit() {
+        List<Object[]> gti = gtiPunkte(MIN_PUNKTE - 10);
+        List<Object[]> messwerte = new ArrayList<>();
+        for (LocalDateTime zeit : tageAb(LocalDate.of(2026, 9, 20), 5, 12)) {
+            gti.add(new Object[]{zeit, new BigDecimal("100.00")});
+            messwerte.add(messwert(zeit, "0.500"));
+        }
+        when(prognoseRepository.findGtiJeIntervall(any(), any())).thenReturn(gti);
+        when(messwerteRepository.sumBilanzKomponentenPerZeitBetween(any(), any()))
+                .thenReturn(messwerte);
+
+        PrognosepunktDTO punkt = einzigerPunkt();
+
+        assertNull(punkt.getFaktor());
+        assertNull(punkt.getErwarteteErzeugung());
+    }
+
     // ==================== Hilfsmittel ====================
+
+    /**
+     * Die uebliche Lernhistorie ({@value #MIN_PUNKTE} helle Intervalle ab dem 28.08., eines davon
+     * mit 2.000 kWh) <b>plus</b> je ein helles Intervall zu 100 W/m² an den genannten Zeitpunkten,
+     * jedes mit der genannten Erzeugung.
+     */
+    private void lernhistorieMitTageszeit(String erzeugung, List<LocalDateTime> zeiten) {
+        List<Object[]> gti = gtiPunkte(MIN_PUNKTE);
+        List<Object[]> messwerte = new ArrayList<>();
+        messwerte.add(messwert(beginn(0), "2.000"));
+        for (LocalDateTime zeit : zeiten) {
+            gti.add(new Object[]{zeit, new BigDecimal("100.00")});
+            messwerte.add(messwert(zeit, erzeugung));
+        }
+        when(prognoseRepository.findGtiJeIntervall(any(), any())).thenReturn(gti);
+        when(messwerteRepository.sumBilanzKomponentenPerZeitBetween(any(), any()))
+                .thenReturn(messwerte);
+    }
+
+    /** {@code anzahl} aufeinanderfolgende Tage ab {@code erster}, jeweils zur vollen Stunde. */
+    private List<LocalDateTime> tageAb(LocalDate erster, int anzahl, int stunde) {
+        List<LocalDateTime> zeiten = new ArrayList<>();
+        for (int i = 0; i < anzahl; i++) {
+            zeiten.add(erster.plusDays(i).atTime(stunde, 0));
+        }
+        return zeiten;
+    }
 
     /** Ruft {@code getPrognose} und liefert den einen erwarteten Punkt des Tages. */
     private PrognosepunktDTO einzigerPunkt() {

@@ -1,5 +1,6 @@
 package ch.nacht.util;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -32,5 +33,22 @@ public final class Ortszeit {
      */
     public static LocalDateTime jetzt() {
         return LocalDateTime.now(ZONE);
+    }
+
+    /**
+     * Dieselbe Ortszeit in <b>Normalzeit</b> (MEZ) — im Winter unveraendert, im Sommer eine Stunde
+     * frueher.
+     *
+     * <p>Fuer alles, was am Sonnenstand haengt: Der Schatten eines Nachbarhauses faellt nach der
+     * Sonne, nicht nach der Uhr. Ein nach Ortszeit geschluesseltes Tagesprofil laege nach jeder
+     * Zeitumstellung um eine Stunde daneben, bis das Lernfenster durchgelaufen ist
+     * (Specs/Ladeplanung.md, FR-3).
+     *
+     * <p>In der doppelten Stunde der Herbstumstellung (02:00–03:00) gilt die erste, die
+     * Sommerzeit-Lesart. Sie liegt in der Nacht und spielt fuer die Einstrahlung keine Rolle.
+     */
+    public static LocalDateTime normalzeit(LocalDateTime ortszeit) {
+        Instant zeitpunkt = ortszeit.atZone(ZONE).toInstant();
+        return LocalDateTime.ofInstant(zeitpunkt, ZONE.getRules().getStandardOffset(zeitpunkt));
     }
 }

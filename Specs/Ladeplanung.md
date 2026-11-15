@@ -209,9 +209,28 @@ zum Rückfall führt.
 **Der Umrechnungsfaktor wird gelernt, nicht konfiguriert:**
 
 ```
-faktor = Σ erzeugung_ist(i) / Σ gti(i)        über die letzten n Tage, nur Intervalle mit gti > 0
-prognose(i) = gti(i) * faktor
+faktor(t)   = Σ erzeugung_ist(i) / Σ gti(i)   über die letzten 14 Tage, nur Intervalle der Tageszeit t
+faktor_tag  = Σ erzeugung_ist(i) / Σ gti(i)   über die letzten n Tage, alle Intervalle mit gti > 0
+prognose(i) = gti(i) * faktor(t(i))           ohne genug Punkte für t: gti(i) * faktor_tag
 ```
+
+* **Je Tageszeit, nicht einer für den ganzen Tag.** Ein einziger Faktor ist ein Mittel über
+  beschattete und unbeschattete Stunden: am Vormittag zu tief, am Nachmittag zu hoch. Im November
+  2026 lag die erwartete Erzeugung am Nachmittag 57 % über der gemessenen. (Messung: Anhang A.19)
+* **Die Tageszeit ist die Normalzeit (MEZ)**, nicht die Ortszeit: Der Schatten folgt der Sonne, nicht
+  der Uhr. Nach Ortszeit geschlüsselt läge das Profil nach jeder Zeitumstellung um eine Stunde
+  daneben, bis das Lernfenster durchgelaufen ist.
+* **Das Lernfenster je Tageszeit ist fest 14 Tage** (oder `historieTage`, wenn kleiner) und damit
+  kürzer als das des Tagesfaktors: Der Schatten wandert mit dem Sonnenstand, und ein Fenster von 28
+  Tagen lernt noch aus Wochen, in denen er anders fiel.
+* **Eine Tageszeit braucht mindestens 5 Intervalle** im Fenster. Darunter gilt `faktor_tag` — ein
+  Faktor aus zwei, drei Punkten folgte dem Wetter dieser Tage, nicht der Anlage.
+* **Lieferte eine Tageszeit bei Einstrahlung nichts, ist ihr Faktor 0** und nicht der Rückfall: Das
+  ist der voll beschattete Abend, und `faktor_tag` sagte dort Erzeugung voraus, die nie kommt.
+* **Ohne `faktor_tag` gibt es auch keinen je Tageszeit** — die Schwelle aus FR-4 gilt für den ganzen
+  Tag.
+* Am Prognosepunkt und im Steuerentscheid (`prognose_faktor`) steht der Faktor, **mit dem das
+  Intervall gerechnet wurde**; `gti × prognose_faktor` ergibt weiterhin die erwartete Erzeugung.
 
 * `erzeugung_ist` ist die **verrechnete** Erzeugung:
   `produktion + speicher_ladung − speicher_entladung`, nie negativ.
@@ -263,7 +282,9 @@ Antwort auf „reicht die Restsonne, um die freie Kapazität zu füllen". Robust
   am schlechtesten (16 %) — an trüben Tagen reicht die Sonne ohnehin kaum für eine Ladung.
 * **Der Faktor ist nicht der Engpass, das Wettermodell ist es:** Er schwankte über dieselben Tage
   um 2.3 %, die Tagesabweichungen um ±16 %. Gewichtung nach Aktualität, kürzeres Lernfenster oder
-  eine andere Regression drehten an einer Grösse, die bereits auf 2 % genau ist.
+  eine andere Regression drehten an einer Grösse, die bereits auf 2 % genau ist. **Das galt für die
+  Tagesmenge Anfang Oktober, ohne Schatten.** Für den Tagesverlauf bei tief stehender Sonne gilt es
+  nicht — daher der Faktor je Tageszeit (Anhang A.19).
 * **Für den Überschuss ist das Lastprofil eine zweite, gleich grosse Fehlerquelle:** ein Median aus
   nur vier Stichproben. Am 07.10.2026 lag der Verbrauch 43 % über dem Profil, in der Testwoche fast
   täglich darüber. Das Verhältnis tatsächlicher zu erwartetem Überschuss streute von 0.70 bis 1.65.
@@ -536,6 +557,19 @@ Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten**:
 * [x] Mit weniger als **150 Intervallen mit `gti > 0`** im Lernfenster gibt es **keinen** Faktor
       → Rückfall. (Test: ProduktionsprognoseServiceTest#getPrognose_WenigerAlsMinPunkte_LaesstErwarteteErzeugungLeer;
       ProduktionsprognoseServiceTest#getPrognose_GenauMinPunkte_LerntFaktor; ProduktionsprognoseServiceTest#getPrognose_OhneFaktor_KeinErwarteterUeberschuss)
+* [ ] Eine Tageszeit mit mindestens **5 Intervallen** in den letzten 14 Tagen rechnet mit ihrem
+      eigenen Faktor, sonst mit dem über den ganzen Tag; ältere Punkte zählen für die Tageszeit nicht.
+      (Test: ProduktionsprognoseServiceTest#getPrognose_TageszeitMitGenugPunkten_RechnetMitEigenemFaktor;
+      ProduktionsprognoseServiceTest#getPrognose_TageszeitMitZuWenigPunkten_FaelltAufTagesfaktorZurueck;
+      ProduktionsprognoseServiceTest#getPrognose_TageszeitPunkteAelterAlsVierzehnTage_ZaehlenNichtFuerDieTageszeit)
+* [ ] Die Tageszeit ist die **Normalzeit**: Über eine Zeitumstellung hinweg gehört 13:00 Sommerzeit
+      zu 12:00 Winterzeit.
+      (Test: ProduktionsprognoseServiceTest#getPrognose_TageszeitUeberZeitumstellung_SchluesselIstNormalzeit;
+      OrtszeitTest#normalzeit_UeberDieZeitumstellung_GleicherSonnenstandGleicheZeit)
+* [ ] Eine Tageszeit ohne Erzeugung bei Einstrahlung hat den Faktor **0**, nicht den Rückfall; ohne
+      Faktor über den ganzen Tag gibt es auch keinen je Tageszeit.
+      (Test: ProduktionsprognoseServiceTest#getPrognose_TageszeitOhneErzeugung_FaktorIstNull;
+      ProduktionsprognoseServiceTest#getPrognose_OhneTagesfaktor_KeinFaktorJeTageszeit)
 * [x] Bei `historieTage < 7` gibt es **kein** Lastprofil → Rückfall.
       (Test: ProduktionsprognoseServiceTest#getPrognose_WenigerAlsSiebenTageHistorie_KeinLastprofil)
 * [x] Der erwartete Überschuss ist nie negativ.
@@ -1228,3 +1262,44 @@ Beim Akzeptanzkriterien-Check vom 15.10.2026 als „umformulieren" vorgeschlagen
 * FR-7 sagte, die Einstrahlung stehe „neben dem Umrechnungsfaktor". Angezeigt wird der Faktor aber
   weder in der Tabelle noch im Tooltip. Der Satz ist an die Anzeige angepasst; nachrechenbar bleibt
   die erwartete Erzeugung über den gespeicherten `prognose_faktor`.
+
+### A.19 Faktor je Tageszeit statt eines Tagesfaktors (FR-3; 15.11.2026)
+
+**Anlass.** Am 14.11.2026 folgte die Produktion der erwarteten Erzeugung bis etwa 12:45 und fiel
+dann innert eines Intervalls auf rund 0.3 kWh, während die Prognose bis 16:00 hoch blieb.
+
+**Befund (Hene, 17.10.–14.11.2026).**
+
+* An klaren Tagen seit dem 27.10. liegt das Verhältnis Erzeugung zu Einstrahlung am Nachmittag
+  (ab 13:00) bei rund einem Drittel des Vormittags; am 14.11. bei 0.00078 gegen 0.00453.
+* Am 22.10., dem sonnigsten Tag im Fenster, gab es keinen Einbruch (0.00352 gegen 0.00363). Der
+  Schatten setzt also erst Ende Oktober ein und nimmt seither zu.
+* An trüben Tagen gibt es keinen Einbruch — Schatten nimmt nur die Direktstrahlung weg.
+
+**Rückrechnung 28.10.–14.11.2026** (18 Tage; jeder Tag nur aus den Tagen davor gelernt; Rückfall auf
+den Tagesfaktor, wo eine Tageszeit keinen Punkt hatte):
+
+| Variante | Nachmittag erwartet (Ist 131.4 kWh) | Abweichung | Absoluter Fehler ganzer Tag (kWh) |
+|---|---|---|---|
+| Tagesfaktor, 28 Tage (bisher) | 206.7 | +57 % | 210.8 |
+| Je Tageszeit, Ortszeit, 28 Tage | 191.8 | +46 % | 208.5 |
+| Je Tageszeit, Normalzeit, 28 Tage | 160.3 | +22 % | 189.9 |
+| **Je Tageszeit, Normalzeit, 14 Tage** | 144.2 | +10 % | 171.7 |
+| Je Tageszeit, Normalzeit, 10 Tage | 143.5 | +9 % | 175.7 |
+| Wie 14 Tage, zusätzlich getrennt nach hell/trüb | 149.6 | +14 % | 169.2 |
+
+**Was daraus folgt — und was nicht.**
+
+* Die naheliegende Form (Ortszeit, 28 Tage) bringt fast nichts. Erst Normalzeit und das kürzere
+  Fenster wirken.
+* **Die 14 Tage sind an denselben 18 Tagen gewählt, an denen sie gemessen wurden** — ein
+  Anhaltspunkt, kein gesicherter Wert. Im Frühling, wenn der Schatten wieder weicht, ist neu zu
+  messen.
+* Der Gewinn von Ortszeit zu Normalzeit fällt zeitlich mit dem Einsetzen des Schattens zusammen
+  (Umstellung 25.10., Schatten ab etwa 27.10.). Wie viel davon die Zeitumstellung ist, trennen diese
+  Daten nicht. Richtig ist der Schlüssel in Normalzeit unabhängig davon.
+* Die Trennung nach hellen und trüben Intervallen lohnt den Aufwand nicht (171.7 → 169.2).
+* **Die Mindestzahl von 5 Intervallen je Tageszeit ist nicht gemessen**, sondern gesetzt; die
+  Rückrechnung liess jede Tageszeit mit mindestens einem Punkt zu.
+* Der Restfehler (172 kWh bei 363 kWh Ist) ist überwiegend der der Einstrahlungsprognose; am
+  Vormittag verbessert keine Variante etwas.

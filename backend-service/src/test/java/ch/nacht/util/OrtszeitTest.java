@@ -45,4 +45,30 @@ public class OrtszeitTest {
 
         assertTrue(!jetzt.isBefore(vorher) && !jetzt.isAfter(nachher));
     }
+
+    /** Im Winter gilt die Normalzeit ohnehin - der Stempel bleibt, wie er ist. */
+    @Test
+    void normalzeit_ImWinter_BleibtUnveraendert() {
+        LocalDateTime winter = LocalDateTime.of(2026, 11, 14, 12, 0);
+
+        assertEquals(winter, Ortszeit.normalzeit(winter));
+    }
+
+    /** Im Sommer geht die Uhr eine Stunde vor: 13:00 Sommerzeit ist 12:00 Normalzeit. */
+    @Test
+    void normalzeit_ImSommer_IstEineStundeFrueher() {
+        assertEquals(LocalDateTime.of(2026, 7, 1, 12, 0),
+                Ortszeit.normalzeit(LocalDateTime.of(2026, 7, 1, 13, 0)));
+    }
+
+    /**
+     * Der letzte Sommerzeit-Tag und der erste Winterzeit-Tag (Umstellung 25.10.2026) ergeben zur
+     * selben Sonnenzeit dieselbe Normalzeit - genau dafuer gibt es die Umrechnung.
+     */
+    @Test
+    void normalzeit_UeberDieZeitumstellung_GleicherSonnenstandGleicheZeit() {
+        assertEquals(
+                Ortszeit.normalzeit(LocalDateTime.of(2026, 10, 24, 13, 0)).toLocalTime(),
+                Ortszeit.normalzeit(LocalDateTime.of(2026, 10, 25, 12, 0)).toLocalTime());
+    }
 }

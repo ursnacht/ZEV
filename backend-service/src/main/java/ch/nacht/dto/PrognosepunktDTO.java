@@ -26,7 +26,11 @@ public class PrognosepunktDTO {
      */
     private BigDecimal erwarteteErzeugung;
 
-    /** Der gelernte Faktor von W/m² auf kWh; {@code null}, wenn zu wenig Historie vorliegt. */
+    /**
+     * Der gelernte Faktor von W/m² auf kWh, mit dem <b>dieses</b> Intervall gerechnet wurde — der
+     * Faktor seiner Tageszeit oder, ohne genug Punkte dafür, der über den ganzen Tag;
+     * {@code null}, wenn zu wenig Historie vorliegt.
+     */
     private BigDecimal faktor;
 
     /** Erwarteter Verbrauch in kWh (Median der gleichen Wochentage); {@code null} ohne Stichprobe. */

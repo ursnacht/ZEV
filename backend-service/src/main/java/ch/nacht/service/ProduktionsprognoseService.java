@@ -9,6 +9,7 @@ import ch.nacht.exception.FeatureDisabledException;
 import ch.nacht.repository.EinheitRepository;
 import ch.nacht.repository.EinstrahlungsprognoseRepository;
 import ch.nacht.repository.MesswerteRepository;
+import ch.nacht.util.Ortszeit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,12 +34,20 @@ import java.util.Map;
  * <p><b>Der Umrechnungsfaktor wird gelernt, nicht konfiguriert:</b>
  *
  * <pre>
- *   faktor = Σ erzeugung_ist / Σ gti      über die letzten n Tage, nur Intervalle mit gti &gt; 0
- *   prognose(i) = gti(i) * faktor
+ *   faktor(t)   = Σ erzeugung_ist / Σ gti   über die letzten 14 Tage, nur Intervalle der Tageszeit t
+ *   faktor_tag  = Σ erzeugung_ist / Σ gti   über die letzten n Tage, alle Intervalle mit gti &gt; 0
+ *   prognose(i) = gti(i) * faktor(t(i))     — ohne genug Punkte für t: gti(i) * faktor_tag
  * </pre>
  *
  * <p>Das Verhältnis der Summen ist eine Regression durch den Ursprung, gewichtet nach Einstrahlung
  * — helle Intervalle zählen mehr, und genau auf die kommt es an.
+ *
+ * <p><b>Warum je Tageszeit.</b> Ein einziger Faktor für den ganzen Tag ist ein Mittel über
+ * beschattete und unbeschattete Stunden: am Vormittag zu tief, am Nachmittag zu hoch. Im November
+ * 2026 lag die erwartete Erzeugung am Nachmittag 57 % über der gemessenen; mit dem Faktor je
+ * Tageszeit waren es 10 % (Specs/Ladeplanung.md, Anhang A.19). Die Tageszeit ist die
+ * <b>Normalzeit</b> ({@link Ortszeit#normalzeit}), weil der Schatten der Sonne folgt und nicht der
+ * Uhr.
  *
  * <p><b>Gelernt wird die VERRECHNETE Erzeugung</b>, nicht der blosse Zählerwert:
  * {@code produktion + speicher_ladung − speicher_entladung}. Der Erzeugungszähler sieht nur, was
@@ -73,6 +82,27 @@ public class ProduktionsprognoseService {
      * dauerhaft zu früh laden.
      */
     private static final int MIN_PUNKTE = 150;
+
+    /**
+     * Lernfenster des Faktors je Tageszeit in Tagen — bewusst kürzer als {@code historieTage}.
+     *
+     * <p>Der Schatten wandert mit dem Sonnenstand. Über 28 Tage gelernt, enthielt der Faktor im
+     * November 2026 noch die schattenfreien Wochen des Oktobers und lag am Nachmittag 22 % zu
+     * hoch; mit 14 Tagen waren es 10 %, mit 10 Tagen wurde der Fehler je Intervall wieder grösser
+     * (Specs/Ladeplanung.md, Anhang A.19). Ist {@code historieTage} kleiner, gilt dieser Wert.
+     */
+    private static final int LERNFENSTER_TAGESZEIT_TAGE = 14;
+
+    /**
+     * Mindestzahl Intervalle derselben Tageszeit, damit sie einen eigenen Faktor bekommt.
+     *
+     * <p>Im Fenster von 14 Tagen liegen höchstens 14. Darunter gilt der Faktor über den ganzen
+     * Tag — ein Faktor aus zwei, drei Punkten folgte dem Wetter dieser Tage, nicht der Anlage.
+     */
+    private static final int MIN_PUNKTE_JE_TAGESZEIT = 5;
+
+    /** Nachkommastellen des Faktors, wie {@code prognose_faktor NUMERIC(12,8)}. */
+    private static final int FAKTOR_SCALE = 8;
 
     /** Nachkommastellen einer Energiemenge, wie {@code NUMERIC(12,3)}. */
     private static final int MENGE_SCALE = 3;
@@ -168,11 +198,14 @@ public class ProduktionsprognoseService {
         LocalDateTime bis = datum.atStartOfDay();
         List<Object[]> historie = messwerteRepository.sumBilanzKomponentenPerZeitBetween(von, bis);
 
-        BigDecimal faktor = umrechnungsfaktor(orgId, datum, von, bis, historie);
+        Faktoren faktoren = umrechnungsfaktoren(orgId, datum, von, bis, historie);
         Map<LocalTime, BigDecimal> lastprofil = lastprofil(orgId, datum, historieTage, historie);
 
         List<PrognosepunktDTO> punkte = new ArrayList<>();
         for (Einstrahlungsprognose wert : werte) {
+            // Der Faktor DIESES Intervalls - am Punkt steht, womit gerechnet wurde, damit
+            // gti x faktor weiterhin die erwartete Erzeugung ergibt.
+            BigDecimal faktor = faktoren.fuer(wert.getZeit());
             PrognosepunktDTO punkt = new PrognosepunktDTO();
             punkt.setZeit(wert.getZeit());
             punkt.setGti(wert.getGti());
@@ -258,15 +291,19 @@ public class ProduktionsprognoseService {
     }
 
     /**
-     * Der gelernte Faktor von W/m² auf kWh je Intervall; {@code null}, wenn zu wenig Historie
-     * vorliegt.
+     * Die gelernten Faktoren von W/m² auf kWh je Intervall: einer über den ganzen Tag und, wo
+     * genug Punkte vorliegen, einer je Tageszeit.
      *
      * <p>Gerechnet wird über die {@code n} Tage <b>vor</b> dem gefragten Tag. Den Tag selbst
      * auszulassen ist kein Zufall: In der Rückrechnung dürfte er nicht einfliessen, weil sein
      * Verlauf zum Entscheidungszeitpunkt noch nicht bekannt war. Für die Anzeige heute macht es
      * kaum einen Unterschied, für die spätere Kalibrierung den ganzen.
+     *
+     * <p><b>Ohne Faktor über den ganzen Tag gibt es gar keinen</b> — auch keinen je Tageszeit. Die
+     * Schwelle von {@value #MIN_PUNKTE} hellen Intervallen ist die Rückfall-Bedingung aus FR-4,
+     * und einzelne Tageszeiten sollen sie nicht unterlaufen.
      */
-    private BigDecimal umrechnungsfaktor(Long orgId, LocalDate datum, LocalDateTime von,
+    private Faktoren umrechnungsfaktoren(Long orgId, LocalDate datum, LocalDateTime von,
                                          LocalDateTime bis, List<Object[]> historie) {
         // Einstrahlung je Intervall (nur helle), als Nachschlagewerk nach Intervall-BEGINN.
         Map<LocalDateTime, BigDecimal> gtiJeZeit = new HashMap<>();
@@ -276,8 +313,16 @@ public class ProduktionsprognoseService {
         if (gtiJeZeit.size() < MIN_PUNKTE) {
             log.debug("Umrechnungsfaktor: nur {} helle Intervalle fuer org={} - kein Faktor",
                     gtiJeZeit.size(), orgId);
-            return null;
+            return Faktoren.KEINE;
         }
+
+        // Das kuerzere Fenster der Tageszeit-Faktoren liegt INNERHALB der gelesenen Historie -
+        // es braucht keine eigene Abfrage. Ist historieTage kleiner, gilt deren Beginn.
+        LocalDateTime vonTageszeit = datum.minusDays(LERNFENSTER_TAGESZEIT_TAGE).atStartOfDay();
+        if (vonTageszeit.isBefore(von)) {
+            vonTageszeit = von;
+        }
+        Map<LocalTime, Summe> jeTageszeit = new HashMap<>();
 
         // Der Speicherfluss je Intervall - er fehlt im Erzeugungszaehler und muss dazu.
         Map<LocalDateTime, BigDecimal> speicherJeZeit = speicherflussJeIntervall(von, bis);
@@ -306,12 +351,61 @@ public class ProduktionsprognoseService {
             }
             summeErzeugung = summeErzeugung.add(erzeugung);
             summeGti = summeGti.add(gti);
+
+            if (!zeit.isBefore(vonTageszeit)) {
+                jeTageszeit.computeIfAbsent(Ortszeit.normalzeit(zeit).toLocalTime(),
+                        t -> new Summe()).zaehle(erzeugung, gti);
+            }
         }
 
         if (summeGti.signum() <= 0 || summeErzeugung.signum() <= 0) {
-            return null;
+            return Faktoren.KEINE;
         }
-        return summeErzeugung.divide(summeGti, 8, RoundingMode.HALF_UP);
+
+        Map<LocalTime, BigDecimal> faktorJeTageszeit = new HashMap<>();
+        jeTageszeit.forEach((tageszeit, summe) -> {
+            if (summe.punkte >= MIN_PUNKTE_JE_TAGESZEIT) {
+                // Eine Erzeugungssumme von 0 ergibt hier bewusst den Faktor 0 und NICHT den
+                // Rueckfall: Eine Tageszeit, die bei Einstrahlung an fuenf Tagen nichts lieferte,
+                // liegt im Schatten - der Tagesfaktor sagte dort Erzeugung voraus, die nie kommt.
+                faktorJeTageszeit.put(tageszeit,
+                        summe.erzeugung.divide(summe.gti, FAKTOR_SCALE, RoundingMode.HALF_UP));
+            }
+        });
+        return new Faktoren(summeErzeugung.divide(summeGti, FAKTOR_SCALE, RoundingMode.HALF_UP),
+                faktorJeTageszeit);
+    }
+
+    /** Laufende Summen einer Tageszeit. {@code gti} ist nie 0: Gezählt werden nur helle Intervalle. */
+    private static final class Summe {
+        private BigDecimal erzeugung = BigDecimal.ZERO;
+        private BigDecimal gti = BigDecimal.ZERO;
+        private int punkte;
+
+        private void zaehle(BigDecimal erzeugungIntervall, BigDecimal gtiIntervall) {
+            erzeugung = erzeugung.add(erzeugungIntervall);
+            gti = gti.add(gtiIntervall);
+            punkte++;
+        }
+    }
+
+    /**
+     * Der Faktor über den ganzen Tag und die Faktoren je Tageszeit (Schlüssel: Normalzeit).
+     *
+     * @param tag          {@code null}, wenn zu wenig Historie vorliegt — dann gibt es keinen Faktor
+     * @param jeTageszeit  nur Tageszeiten mit genug Punkten; für alle übrigen gilt {@code tag}
+     */
+    private record Faktoren(BigDecimal tag, Map<LocalTime, BigDecimal> jeTageszeit) {
+
+        private static final Faktoren KEINE = new Faktoren(null, Map.of());
+
+        /** Der Faktor für das Intervall, das um {@code zeit} (Ortszeit) beginnt. */
+        private BigDecimal fuer(LocalDateTime zeit) {
+            if (tag == null) {
+                return null;
+            }
+            return jeTageszeit.getOrDefault(Ortszeit.normalzeit(zeit).toLocalTime(), tag);
+        }
     }
 
     /**
