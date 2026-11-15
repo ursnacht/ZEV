@@ -11,9 +11,9 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: postgres
+    container_name: zev-postgres
     ports:
-      - "5432:5432"
+      - "25432:5432"
     env_file:
       - .env.mqtt
     environment:
@@ -34,7 +34,7 @@ services:
 
   mosquitto:
     build: ./pi-gateway/deploy/mosquitto  # passwd wird beim Start aus MOSQUITTO_USERS erzeugt (Auth aktiv)
-    container_name: mosquitto
+    container_name: zev-mosquitto
     ports:
       - "1883:1883"
     env_file:
@@ -62,7 +62,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:latest
-    container_name: keycloak
+    container_name: zev-keycloak
     env_file:
       - .env.mqtt
     environment:
@@ -97,8 +97,6 @@ services:
       - start-dev
       - --import-realm
       - --features=organization
-    ports:
-      - "9000:9000"
     depends_on:
       - postgres
     volumes:
@@ -120,9 +118,7 @@ services:
 
   backend-service:
     build: ./backend-service
-    container_name: backend-service
-    ports:
-      - "8090:8090"
+    container_name: zev-backend-service
     env_file:
       - .env.mqtt
     environment:
@@ -134,7 +130,7 @@ services:
       # iss-Claim muss dem Host entsprechen, über den der BROWSER Keycloak erreicht.
       # Für NAS: BACKEND_JWT_ISSUER_URI in .env.mqtt auf http://nasnafam.synology.me:9000/realms/zev setzen
       # (gleicher Variablenname wie der Platzhalter in application.yml).
-      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=${BACKEND_JWT_ISSUER_URI:-http://localhost:9000/auth/realms/zev}
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=${BACKEND_JWT_ISSUER_URI:-http://localhost:8000/auth/realms/zev}
       # JWK-Set wird serverseitig geladen -> interner Docker-Name bleibt korrekt.
       # Containerinterner Aufruf (geht NICHT ueber caddy) - nur der Pfad /auth kommt dazu.
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:9000/auth/realms/zev/protocol/openid-connect/certs
@@ -175,9 +171,7 @@ services:
 
   admin-service:
     build: ./admin-service
-    container_name: admin-service
-    ports:
-      - "8081:8081"
+    container_name: zev-admin-service
     environment:
       # Basic Auth fuer /actuator/**; muss in allen Services identisch sein,
       # damit der SBA-Server die Client-Endpoints abrufen kann
@@ -192,9 +186,7 @@ services:
 
   frontend-service:
     build: ./frontend-service
-    container_name: frontend-service
-    ports:
-      - "4200:8080"
+    container_name: zev-frontend-service
     environment:
       # Laufzeit-Config des Angular-Frontends (überschreibt /assets/config.json via
       # FrontendConfigController). Defaults localhost; für NAS in .env.mqtt setzen.
@@ -223,7 +215,7 @@ services:
 
   caddy:
     image: caddy:2
-    container_name: caddy
+    container_name: zev-caddy
     ports:
       - "8000:80"
       # HTTPS (Zertifikatsweg A, siehe Specs/HTTPS.md). 8443 statt 443, weil 443 auf dem NAS

@@ -1,9 +1,9 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: postgres
+    container_name: zev-postgres
     ports:
-      - "5432:5432"
+      - "25432:5432"
     env_file:
       - .env
     environment:
@@ -24,7 +24,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:latest
-    container_name: keycloak
+    container_name: zev-keycloak
     env_file:
       - .env
     environment:
@@ -59,8 +59,6 @@ services:
       - start-dev
       - --import-realm
       - --features=organization
-    ports:
-      - "9000:9000"
     depends_on:
       - postgres
     volumes:
@@ -82,9 +80,7 @@ services:
 
   backend-service:
     build: ./backend-service
-    container_name: backend-service
-    ports:
-      - "8090:8090"
+    container_name: zev-backend-service
     env_file:
       - .env
     environment:
@@ -130,9 +126,7 @@ services:
 
   admin-service:
     build: ./admin-service
-    container_name: admin-service
-    ports:
-      - "8081:8081"
+    container_name: zev-admin-service
     environment:
       # Basic Auth fuer /actuator/**; muss in allen Services identisch sein,
       # damit der SBA-Server die Client-Endpoints abrufen kann
@@ -147,9 +141,7 @@ services:
 
   frontend-service:
     build: ./frontend-service
-    container_name: frontend-service
-    ports:
-      - "4200:8080"
+    container_name: zev-frontend-service
     environment:
       # Laufzeit-Config des Angular-Frontends (überschreibt /assets/config.json via
       # FrontendConfigController). Defaults localhost; für NAS in .env.mqtt setzen.
@@ -178,7 +170,7 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
-    container_name: prometheus
+    container_name: zev-prometheus
     ports:
       - "9090:9090"
     volumes:
@@ -195,7 +187,7 @@ services:
 
   grafana:
     image: grafana/grafana:latest
-    container_name: grafana
+    container_name: zev-grafana
     ports:
       - "3000:3000"
     env_file:
@@ -219,7 +211,7 @@ services:
   # denselben Keycloak unter :8000/auth (ein Issuer fuer beide Betriebsarten).
   caddy:
     image: caddy:2
-    container_name: caddy
+    container_name: zev-caddy
     ports:
       - "8000:80"
       # HTTPS (Zertifikatsweg A, siehe Specs/HTTPS.md). 8443 statt 443, weil 443 auf dem NAS
