@@ -16,6 +16,8 @@
   * `ssid` zeigt die WiFi-Konfiguration: \
      `10:52:26.348 MQT: gPlug/2/TEST/stat/RESULT = {"SSId1":"DiLegno 2GHz","SSId2":"Glue_public"}`
   * Mit dem Befehl `Ap 1` oder `Ap 2` die entsprechende ssid wählen
+  * Folgend Befehl ausführen: `WiFiConfig 5` \
+    => "wait until selected AP is available again without rebooting" 
 
 ## Tasmota Befehle
 > https://tasmota.github.io/docs/Commands/
