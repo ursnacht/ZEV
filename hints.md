@@ -6,7 +6,7 @@
 > ``docker compose --env-file .\.env.mqtt -f .\docker-compose-mqtt.yml up --build``
 
 ### Log
-> ``docker logs -f backend-service``
+> ``docker logs -f zev-backend-service``
 
 ## IP-Adresse herausfinden
 ### Windows
