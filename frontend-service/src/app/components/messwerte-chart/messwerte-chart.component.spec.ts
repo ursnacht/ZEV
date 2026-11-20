@@ -4,7 +4,7 @@ import { MesswerteChartComponent } from './messwerte-chart.component';
 import { MesswerteService, MesswertData } from '../../services/messwerte.service';
 import { EinheitService } from '../../services/einheit.service';
 import { TranslationService } from '../../services/translation.service';
-import { Einheit, EinheitTyp } from '../../models/einheit.model';
+import { Einheit, EinheitTyp, MesspunktGruppe } from '../../models/einheit.model';
 import { By } from '@angular/platform-browser';
 import { IconComponent } from '../icon/icon.component';
 import { of, throwError } from 'rxjs';
@@ -37,11 +37,18 @@ describe('MesswerteChartComponent', () => {
     { zeit: '2026-01-15T10:15:00', total: 2.25, zev: 1.25 }
   ];
 
+  const mockBezug: Einheit = { id: 3, name: 'Bezug von BKW', typ: EinheitTyp.BEZUG, messpunkt: 'Bilanz' };
+  const mockRuecklieferung: Einheit = {
+    id: 4, name: 'Rücklieferung an BKW', typ: EinheitTyp.RUECKLIEFERUNG, messpunkt: 'Bilanz'
+  };
+  const bilanz: MesspunktGruppe = { messpunkt: 'Bilanz', einheiten: [mockBezug, mockRuecklieferung] };
+
   /** Zugriff auf die privaten Bausteine — Testcode darf das, Produktivcode nicht. */
   function privat(): {
     optionen: (data: MesswertData[]) => Record<string, unknown>;
+    optionenMesspunkt: (reihen: { einheit: Einheit; daten: MesswertData[] }[]) => Record<string, unknown>;
     legende: (key: string, summe: number, kwh: string) => string;
-    reihe: (name: string, daten: number[][], farbe: string) => Record<string, unknown>;
+    reihe: (name: string, daten: number[][], farbe?: string) => Record<string, unknown>;
   } {
     return component as unknown as ReturnType<typeof privat>;
   }
@@ -70,7 +77,7 @@ describe('MesswerteChartComponent', () => {
     component = fixture.componentInstance;
     // Stub VOR detectChanges: `onSubmit` zeichnet sonst wirklich und fasst ECharts an.
     zeichnenSpy = vi.spyOn(
-      component as unknown as { createChartsSequentially: (r: MesswertData[][]) => Promise<void> },
+      component as unknown as { createChartsSequentially: (d: Map<number, MesswertData[]>) => Promise<void> },
       'createChartsSequentially').mockResolvedValue(undefined);
     fixture.detectChanges();
   });
@@ -177,7 +184,8 @@ describe('MesswerteChartComponent', () => {
       component.onSubmit();
 
       expect(component.charts.length).toBe(2);
-      expect(component.charts[0].einheitName).toBe('Wohnung A');
+      expect(component.charts[0].einheiten).toEqual([mockConsumer]);
+      expect(component.charts[0].messpunkt).toBeUndefined();
       expect(component.charts[0].instanz).toBeNull();
       expect(zeichnenSpy).toHaveBeenCalled();
     });
@@ -420,16 +428,145 @@ describe('MesswerteChartComponent', () => {
     });
   });
 
+  // Specs/EChart.md, FR-8: zusaetzliches Diagramm je Messpunkt mit mehreren Einheiten
+  describe('Messpunkt-Diagramm', () => {
+    const bezugWerte: MesswertData[] = [
+      { zeit: '2026-01-15T10:00:00', total: 1.5, zev: 0 },
+      { zeit: '2026-01-15T10:15:00', total: 0, zev: 0 }
+    ];
+    const ruecklieferungWerte: MesswertData[] = [
+      { zeit: '2026-01-15T10:00:00', total: 0, zev: 0 },
+      { zeit: '2026-01-15T10:15:00', total: -2.25, zev: 0 }
+    ];
+
+    it('should enable the submit button with only a messpunkt selected', () => {
+      component.onGruppenChange([bilanz]);
+      fixture.detectChanges();
+
+      expect(component.hatAuswahl).toBe(true);
+      expect(fixture.nativeElement.querySelector('#grafikAnzeigen').disabled).toBe(false);
+      expect(component.kannBlaettern).toBe(true);
+      // Auch Blaettern und "Heute" zaehlen den Messpunkt als Auswahl (FR-1a.5).
+      expect(fixture.nativeElement.querySelector('#zeitraumVor').disabled).toBe(false);
+      expect(fixture.nativeElement.querySelector('#zeitraumHeute').disabled).toBe(false);
+    });
+
+    it('should load both einheiten of a selected messpunkt and add one chart for it', () => {
+      component.selectedGruppen = [bilanz];
+      component.dateFrom = '2026-01-01';
+      component.dateTo = '2026-03-31';
+
+      component.onSubmit();
+
+      expect(messwerteServiceSpy.getMesswerteByEinheit).toHaveBeenCalledTimes(2);
+      expect(messwerteServiceSpy.getMesswerteByEinheit).toHaveBeenCalledWith(3, '2026-01-01', '2026-03-31');
+      expect(messwerteServiceSpy.getMesswerteByEinheit).toHaveBeenCalledWith(4, '2026-01-01', '2026-03-31');
+      expect(component.charts.length).toBe(1);
+      expect(component.charts[0].messpunkt).toBe('Bilanz');
+      expect(component.charts[0].einheiten).toEqual([mockBezug, mockRuecklieferung]);
+    });
+
+    it('should load an einheit only once when it is selected alone and as part of its messpunkt', () => {
+      messwerteServiceSpy.getMesswerteByEinheit.mockReturnValue(of(messwerte));
+      component.selectedEinheiten = [mockConsumer, mockBezug];
+      component.selectedGruppen = [bilanz];
+
+      component.onSubmit();
+
+      // Wohnung, Bezug, Ruecklieferung - der Bezug nicht zweimal.
+      expect(messwerteServiceSpy.getMesswerteByEinheit).toHaveBeenCalledTimes(3);
+      // Erst die Einheiten, danach der Messpunkt.
+      expect(component.charts.map(c => c.schluessel)).toEqual(['1', '3', 'messpunkt-0']);
+      // Gemeldet werden die geladenen Einheiten (3) und ihre Datenpunkte (3 x 2), nicht die Diagramme.
+      expect(component.message).toBe('6 DATENPUNKTE_FUER 3 EINHEITEN_GELADEN');
+    });
+
+    it('should title the messpunkt panel with both einheiten and the messpunkt', () => {
+      component.selectedEinheiten = [mockConsumer];
+      component.selectedGruppen = [bilanz];
+
+      component.onSubmit();
+      fixture.detectChanges();
+
+      const titel: HTMLElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('.zev-panel--chart .zev-panel__title'));
+      expect(titel.map(t => t.textContent?.trim())).toEqual([
+        'Wohnung A [KONSUMENT]',
+        'Bezug von BKW [TYP_BEZUG] / Rücklieferung an BKW [TYP_RUECKLIEFERUNG] / [Bilanz]'
+      ]);
+      expect(fixture.nativeElement.querySelector('#chart-messpunkt-0')).not.toBeNull();
+    });
+
+    it('should draw one series per einheit with its stored sign and without a ZEV series', () => {
+      const optionen = privat().optionenMesspunkt([
+        { einheit: mockBezug, daten: bezugWerte },
+        { einheit: mockRuecklieferung, daten: ruecklieferungWerte }
+      ]);
+      const series = optionen['series'] as { name: string; data: number[][]; lineStyle: { color?: string } }[];
+
+      expect(series.length).toBe(2);
+      // Name der Einheit samt Summe im Schweizer Format - kein TOTAL/ZEV.
+      expect(series[0].name).toBe('Bezug von BKW (Σ 1.500 KWH)');
+      expect(series[1].name).toBe('Rücklieferung an BKW (Σ -2.250 KWH)');
+      // Nicht gespiegelt: Die Ruecklieferung ist negativ gespeichert und bleibt es.
+      expect(series[0].data.map(p => p[1])).toEqual([1.5, 0]);
+      expect(series[1].data.map(p => p[1])).toEqual([0, -2.25]);
+      // Zwei verschiedene Reihenfarben, beide gesetzt.
+      expect(series[0].lineStyle.color).toBeTruthy();
+      expect(series[1].lineStyle.color).toBeTruthy();
+      expect(series[0].lineStyle.color).not.toBe(series[1].lineStyle.color);
+    });
+
+    it('should share axes, zoom and step line with the single-unit chart', () => {
+      const einzeln = privat().optionen(messwerte);
+      const messpunkt = privat().optionenMesspunkt([{ einheit: mockBezug, daten: bezugWerte }]);
+
+      expect(JSON.stringify(messpunkt['dataZoom'])).toBe(JSON.stringify(einzeln['dataZoom']));
+      expect((messpunkt['xAxis'] as { type: string; name: string }).type).toBe('time');
+      expect((messpunkt['yAxis'] as { name: string }).name).toBe('KWH');
+      // Einzeilig blaetternd: Mit den Namen der Einheiten braeche die Legende sonst um.
+      expect((messpunkt['legend'] as { type: string }).type).toBe('scroll');
+      const reihe = (messpunkt['series'] as Record<string, unknown>[])[0];
+      expect(reihe['step']).toBe('end');
+      expect(reihe['sampling']).toBe('lttb');
+    });
+
+    it('should leave the colour of a third series to the library', () => {
+      const dritte: Einheit = { id: 9, name: 'Dritte', typ: EinheitTyp.CONSUMER, messpunkt: 'Bilanz' };
+      const optionen = privat().optionenMesspunkt([
+        { einheit: mockBezug, daten: [] },
+        { einheit: mockRuecklieferung, daten: [] },
+        { einheit: dritte, daten: [] }
+      ]);
+      const series = optionen['series'] as { lineStyle: { color?: string }; itemStyle?: unknown }[];
+
+      // Keine dritte Token-Farbe vorhanden - lieber die Palette von ECharts als zweimal dieselbe.
+      expect(series[2].lineStyle.color).toBeUndefined();
+      expect(series[2].itemStyle).toBeUndefined();
+    });
+
+    it('should draw an empty series when an einheit has no measurements', () => {
+      const optionen = privat().optionenMesspunkt([
+        { einheit: mockBezug, daten: bezugWerte },
+        { einheit: mockRuecklieferung, daten: [] }
+      ]);
+      const series = optionen['series'] as { name: string; data: number[][] }[];
+
+      expect(series[1].data).toEqual([]);
+      expect(series[1].name).toBe('Rücklieferung an BKW (Σ 0.000 KWH)');
+    });
+  });
+
   describe('ngOnDestroy', () => {
     it('should dispose every instance and disconnect every observer', () => {
       const dispose = vi.fn();
       const disconnect = vi.fn();
       component.charts = [{
-        einheitId: 1, einheitName: 'Wohnung A', einheitTyp: 'CONSUMER',
+        schluessel: '1', einheiten: [mockConsumer],
         instanz: { dispose } as unknown as import('echarts/core').ECharts
       }];
-      (component as unknown as { observers: Map<number, { disconnect: () => void }> })
-        .observers.set(1, { disconnect });
+      (component as unknown as { observers: Map<string, { disconnect: () => void }> })
+        .observers.set('1', { disconnect });
 
       component.ngOnDestroy();
 

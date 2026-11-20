@@ -36,7 +36,10 @@ function anzeigenButton(page: Page) {
     return page.locator('#grafikAnzeigen');
 }
 
-/** Erste echte Einheit (nicht „Alle auswählen"). */
+/**
+ * Erste echte Einheit (nicht „Alle auswählen"). Der Selektor trifft auch die Messpunkt-Einträge
+ * (`#messpunkt-gruppe-<n>`, Specs/EChart.md FR-8) — sie stehen aber immer **nach** den Einheiten.
+ */
 function ersteEinheit(page: Page) {
     return page.locator('.zev-checkbox-item:not(.zev-checkbox-item--select-all) input[type="checkbox"]')
         .first();
@@ -276,6 +279,68 @@ test.describe('Messwerte-Grafik - Diagramm', () => {
         // Die Maske bleibt bedienbar: Panel und Canvas entstehen, nur ohne Datenreihe.
         await expect(page.locator(CANVAS)).toBeVisible({ timeout: 20000 });
         await expect(anzeigenButton(page)).toBeEnabled();
+    });
+
+    /**
+     * Messpunkt mit mehreren Einheiten (`Specs/EChart.md`, FR-8): Die Auswahl bietet dafür einen
+     * Zusatzeintrag **nach** den Einheiten, und er allein zeichnet **ein** Diagramm mit dem Titel
+     * `Einheit [Typ] / Einheit [Typ] / [Messpunkt]`.
+     *
+     * **Mit vorgegebenen Daten:** Einheiten und Messwerte werden nur im Browser umgeschrieben
+     * (`page.route`). Der Test hinge sonst an den Stammdaten des Mandanten — ohne zwei Einheiten am
+     * selben Messpunkt gäbe es den Eintrag nicht, und der Test liefe nie. Geprüft wird damit das
+     * Frontend, nicht die Stammdaten; angelegt oder verändert wird nichts.
+     */
+    test('should offer and draw a combined chart for units sharing a metering point', async ({ page }) => {
+        const einheiten = [
+            { id: 9001, name: 'Wohnung A', typ: 'CONSUMER', messpunkt: 'CH-1' },
+            { id: 9002, name: 'Bezug E2E', typ: 'BEZUG', messpunkt: 'Bilanz' },
+            { id: 9003, name: 'Ruecklieferung E2E', typ: 'RUECKLIEFERUNG', messpunkt: 'Bilanz' }
+        ];
+        const geladen: number[] = [];
+        await page.route(/\/api\/einheit$/, route => route.request().method() === 'GET'
+            ? route.fulfill({ json: einheiten }) : route.continue());
+        await page.route(/\/api\/messwerte\/by-einheit/, route => {
+            const id = Number(new URL(route.request().url()).searchParams.get('einheitId'));
+            geladen.push(id);
+            // Bezug positiv, Rücklieferung negativ - so, wie die Werte gespeichert sind.
+            const vorzeichen = id === 9003 ? -1 : 1;
+            return route.fulfill({ json: [
+                { zeit: '2026-01-15T10:00:00', total: vorzeichen * 1.5, zev: 0 },
+                { zeit: '2026-01-15T10:15:00', total: vorzeichen * 2.25, zev: 0 }
+            ] });
+        });
+
+        await oeffneGrafik(page);
+
+        // Der Eintrag steht nach den drei Einheiten und nennt beide samt Messpunkt. Der Typ ist
+        // übersetzt, deshalb hier nur die Form - den genauen Text liefert der Titel-Vergleich unten.
+        const eintraege = page.locator('.zev-checkbox-item:not(.zev-checkbox-item--select-all) input[type="checkbox"]');
+        await expect(eintraege).toHaveCount(4);
+        await expect(eintraege.last()).toHaveId('messpunkt-gruppe-0');
+        const bezeichnung = ((await page.locator('label[for="messpunkt-gruppe-0"]').textContent()) ?? '').trim();
+        expect(bezeichnung).toMatch(/^Bezug E2E \[.+\] \/ Ruecklieferung E2E \[.+\] \/ \[Bilanz\]$/);
+
+        // Nur der Messpunkt ist gewählt: beide Einheiten geladen, aber EIN Panel.
+        await page.locator('#messpunkt-gruppe-0').check();
+        await expect(anzeigenButton(page)).toBeEnabled();
+        expect(await zeigeAn(page)).toBe(4);
+        expect([...geladen].sort()).toEqual([9002, 9003]);
+        await expect(page.locator('.zev-panel--chart')).toHaveCount(1);
+        await expect(page.locator('.zev-panel--chart .zev-panel__title')).toHaveText(bezeichnung);
+        await expect(page.locator('#chart-messpunkt-0 canvas')).toBeVisible({ timeout: 20000 });
+        expect(await warteAufGezeichnetesDiagramm(page)).toBeGreaterThan(0);
+
+        // „Alle auswählen" schliesst den Messpunkt ein: drei Einheiten-Diagramme, der Messpunkt
+        // zuletzt - und jede Einheit wird nur einmal geladen, obwohl zwei doppelt gewählt sind.
+        geladen.length = 0;
+        await page.locator('#einheit-select-all').check();
+        const antworten = page.waitForResponse(r => r.url().includes('/api/messwerte'));
+        await anzeigenButton(page).click();
+        await antworten;
+        await expect(page.locator('.zev-panel--chart')).toHaveCount(4);
+        await expect(page.locator('.zev-panel--chart .zev-panel__title').last()).toHaveText(bezeichnung);
+        expect([...geladen].sort()).toEqual([9001, 9002, 9003]);
     });
 
     /**

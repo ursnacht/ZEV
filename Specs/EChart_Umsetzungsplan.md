@@ -425,3 +425,36 @@ Schaltflächen und Datumsfelder der Messwerte-Grafik sind an die Statistik angeg
 * **Keine Migration:** `ZEITRAUM_ZURUECK`, `ZEITRAUM_VOR` (V181) und `HEUTE` (V65) existieren.
 * **Kein neues CSS:** Aktions-Slot (`.zev-quarter-selector__actions`), `zev-date-range-row` und
   `zev-button-group` kommen aus dem Design System.
+
+---
+
+## Nachtrag 20.11.2026: Gemeinsames Diagramm je Messpunkt (FR-8)
+
+Tragen mehrere Einheiten denselben Messpunkt (z.B. Bezug / Rücklieferung), bietet die Auswahl der
+Messwerte-Grafik einen Zusatzeintrag an; er zeichnet ein Diagramm mit einer Reihe je Einheit.
+
+| Datei | Änderung |
+|---|---|
+| `models/einheit.model.ts` | `MesspunktGruppe` |
+| `utils/messpunkt-gruppen.ts` (+ Spec) | neu: `messpunktGruppen()` — Gruppen ab zwei Einheiten je Messpunkt |
+| `pipes/messpunkt-gruppe.pipe.ts` (+ Spec) | neu: `Einheit [Typ] / Einheit [Typ] / [Messpunkt]`; übersetzt den Typ über die `EinheitTypPipe` |
+| `components/einheit-selector/` | `@Input() mitMesspunktGruppen`, `@Output() gruppenChange`, Einträge `#messpunkt-gruppe-<n>` nach den Einheiten; „Alle auswählen" schliesst sie ein |
+| `messwerte-chart.component.ts` | `ChartData` trägt `schluessel`, `einheiten`, `messpunkt`; jede Einheit wird einmal geladen; `optionenMesspunkt()`; gemeinsamer Teil der Optionen in `diagrammOptionen()` |
+| `messwerte-chart.component.html` | Titel über die Pipe, Behälter `#chart-<schluessel>` (für Einheiten weiterhin `#chart-<id>`) |
+| `tests/messwerte-grafik.spec.ts` | E2E „should offer and draw a combined chart for units sharing a metering point" — mit **vorgegebenen Daten** (`page.route`), damit er nicht an den Stammdaten des Mandanten hängt |
+
+* **Rechnungen unverändert:** Die Einträge erscheinen nur mit `mitMesspunktGruppen`.
+* **Keine Migration, kein neuer Übersetzungs-Key:** Die Bezeichnung besteht aus Namen, übersetztem Typ und Messpunkt.
+* **Kein neues CSS:** Die Einträge nutzen `zev-checkbox-item`.
+* **Kein Backend:** Geladen wird weiterhin über `GET /api/messwerte/by-einheit`, je Einheit einmal.
+
+**Zwei Befunde aus der Prüfung, beide behoben:**
+
+* **Sortierung der Einheiten-Auswahl war browserabhängig.** Der Vergleich in `einheit-selector`
+  lieferte für zwei Nicht-Konsumenten verschiedenen Typs in beiden Richtungen 1. Firefox zeigte die
+  Rücklieferung vor dem Bezug, Chromium umgekehrt — aufgefallen erst am E2E-Test, weil die
+  Bezeichnung des Messpunkts die Reihenfolge sichtbar macht. Jetzt: Konsumenten zuerst, innerhalb
+  beider Gruppen nach Name. Das gilt auch für die Rechnungen.
+* **Legende bei schmaler Breite.** Mit den Namen der Einheiten brach sie bei 390 px auf zwei Zeilen
+  um und lag über Achsentitel und Zeichenfläche. Sie ist jetzt einzeilig und blättert
+  (`legend.type: 'scroll'`), in beiden Diagrammarten.

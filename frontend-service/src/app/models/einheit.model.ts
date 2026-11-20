@@ -17,6 +17,15 @@ export enum EinheitTyp {
 /** Länge von `zev.einheit.messpunkt` – Formularfeld, Backend-`@Size` und Messpunkt-Empfang. */
 export const MAX_MESSPUNKT_LAENGE = 50;
 
+/**
+ * Einheiten, die denselben Messpunkt tragen — z.B. Bezug und Rücklieferung desselben Zählers
+ * (Specs/EChart.md, FR-8). Immer mindestens zwei.
+ */
+export interface MesspunktGruppe {
+  messpunkt: string;
+  einheiten: Einheit[];
+}
+
 export interface Einheit {
   id?: number;
   name: string;

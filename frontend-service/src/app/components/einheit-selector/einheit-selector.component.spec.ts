@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { EinheitSelectorComponent } from './einheit-selector.component';
 import { EinheitService } from '../../services/einheit.service';
 import { TranslationService } from '../../services/translation.service';
-import { Einheit, EinheitTyp } from '../../models/einheit.model';
+import { Einheit, EinheitTyp, MesspunktGruppe } from '../../models/einheit.model';
 import { of, throwError } from 'rxjs';
 
 describe('EinheitSelectorComponent', () => {
@@ -88,6 +88,21 @@ describe('EinheitSelectorComponent', () => {
       expect(component.einheiten.length).toBe(4);
       expect(component.einheiten.slice(0, 2).map(e => e.id)).toEqual([1, 2]);
       expect(component.einheiten.slice(2).map(e => e.id).sort()).toEqual([3, 4]);
+    });
+
+    it('should sort non-consumers of different types by name, whatever the input order', () => {
+      // Der fruehere Vergleich war fuer zwei Nicht-Konsumenten verschiedenen Typs widerspruechlich;
+      // die Reihenfolge hing dann vom Browser ab. Beide Eingabereihenfolgen muessen dasselbe ergeben.
+      const bezug: Einheit = { id: 5, name: 'Bezug', typ: EinheitTyp.BEZUG };
+      const ruecklieferung: Einheit = { id: 6, name: 'Rücklieferung', typ: EinheitTyp.RUECKLIEFERUNG };
+
+      einheitServiceSpy.getAllEinheiten.mockReturnValue(of([ruecklieferung, producer, bezug, consumer1]));
+      component.ngOnInit();
+      expect(component.einheiten.map(e => e.id)).toEqual([1, 5, 6, 3]);
+
+      einheitServiceSpy.getAllEinheiten.mockReturnValue(of([producer, bezug, consumer1, ruecklieferung]));
+      component.ngOnInit();
+      expect(component.einheiten.map(e => e.id)).toEqual([1, 5, 6, 3]);
     });
 
     it('should leave the list empty when loading fails', () => {
@@ -180,6 +195,101 @@ describe('EinheitSelectorComponent', () => {
       expect(component.selectedEinheitIds.has(4)).toBe(true);
       expect(component.selectedEinheitIds.has(3)).toBe(false);
       expect(component.allSelected()).toBe(true);
+    });
+  });
+
+  // Specs/EChart.md, FR-8: Zusatzeintrag je Messpunkt mit mehreren Einheiten
+  describe('Messpunkt-Gruppen', () => {
+    const bezug: Einheit = { id: 5, name: 'Bezug von BKW', typ: EinheitTyp.BEZUG, messpunkt: 'Bilanz' };
+    const ruecklieferung: Einheit = {
+      id: 6, name: 'Rücklieferung an BKW', typ: EinheitTyp.RUECKLIEFERUNG, messpunkt: 'Bilanz'
+    };
+
+    beforeEach(() => {
+      component.einheiten = [consumer1, bezug, ruecklieferung];
+    });
+
+    it('should offer no group unless enabled', () => {
+      expect(component.gruppen).toEqual([]);
+
+      // ngOnInit laedt (leer) und ueberschriebe die Liste - danach erneut setzen, sonst fehlte der
+      // Eintrag bloss, weil gar keine Einheiten da sind.
+      fixture.detectChanges();
+      component.einheiten = [consumer1, bezug, ruecklieferung];
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelectorAll('.zev-checkbox-item:not(.zev-checkbox-item--select-all)').length)
+        .toBe(3);
+      expect(fixture.nativeElement.querySelector('#messpunkt-gruppe-0')).toBeNull();
+    });
+
+    it('should offer one entry per shared messpunkt, labelled with units and messpunkt', () => {
+      component.mitMesspunktGruppen = true;
+      // ngOnInit laedt (leer) und ueberschriebe die Liste - danach erneut setzen.
+      fixture.detectChanges();
+      component.einheiten = [consumer1, bezug, ruecklieferung];
+      fixture.detectChanges();
+
+      expect(component.gruppen).toEqual([{ messpunkt: 'Bilanz', einheiten: [bezug, ruecklieferung] }]);
+      const label: HTMLElement = fixture.nativeElement.querySelector('label[for="messpunkt-gruppe-0"]');
+      expect(label.textContent?.trim())
+        .toBe('Bezug von BKW [TYP_BEZUG] / Rücklieferung an BKW [TYP_RUECKLIEFERUNG] / [Bilanz]');
+      // Nach den Einheiten, nicht dazwischen: der letzte Eintrag der Liste.
+      const eintraege = fixture.nativeElement.querySelectorAll('.zev-checkbox-item input');
+      expect(eintraege[eintraege.length - 1].id).toBe('messpunkt-gruppe-0');
+    });
+
+    it('should emit the selected groups and leave the units untouched', () => {
+      component.mitMesspunktGruppen = true;
+      const gruppen: MesspunktGruppe[][] = [];
+      const einheiten: Einheit[][] = [];
+      component.gruppenChange.subscribe(g => gruppen.push(g));
+      component.selectionChange.subscribe(e => einheiten.push(e));
+
+      component.onGruppeToggle('Bilanz');
+
+      expect(gruppen).toEqual([[{ messpunkt: 'Bilanz', einheiten: [bezug, ruecklieferung] }]]);
+      // Die Gruppe waehlt ihre Einheiten NICHT mit - sonst entstuenden drei Diagramme statt einem.
+      expect(einheiten).toEqual([[]]);
+      expect(component.selectedEinheitIds.size).toBe(0);
+    });
+
+    it('should deselect a group on second toggle', () => {
+      component.mitMesspunktGruppen = true;
+      component.onGruppeToggle('Bilanz');
+      component.onGruppeToggle('Bilanz');
+
+      expect(component.selectedMesspunkte.size).toBe(0);
+    });
+
+    it('should include the groups in select-all', () => {
+      component.mitMesspunktGruppen = true;
+
+      component.onSelectAllToggle();
+      expect(component.selectedMesspunkte.has('Bilanz')).toBe(true);
+      expect(component.allSelected()).toBe(true);
+      expect(component.someSelected()).toBe(false);
+
+      component.onSelectAllToggle();
+      expect(component.selectedMesspunkte.size).toBe(0);
+      expect(component.selectedEinheitIds.size).toBe(0);
+    });
+
+    it('should report someSelected while only the group is chosen', () => {
+      component.mitMesspunktGruppen = true;
+      component.onGruppeToggle('Bilanz');
+
+      expect(component.someSelected()).toBe(true);
+      expect(component.allSelected()).toBe(false);
+    });
+
+    it('should not emit groups unless enabled', () => {
+      const gruppen: MesspunktGruppe[][] = [];
+      component.gruppenChange.subscribe(g => gruppen.push(g));
+
+      component.onSelectAllToggle();
+
+      expect(gruppen).toEqual([]);
+      expect(component.selectedMesspunkte.size).toBe(0);
     });
   });
 });

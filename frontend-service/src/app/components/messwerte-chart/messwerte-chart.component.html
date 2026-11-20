@@ -8,7 +8,8 @@
   }
 
   <form (ngSubmit)="onSubmit()">
-    <app-einheit-selector (selectionChange)="onSelectionChange($event)"></app-einheit-selector>
+    <app-einheit-selector [mitMesspunktGruppen]="true" (selectionChange)="onSelectionChange($event)"
+      (gruppenChange)="onGruppenChange($event)"></app-einheit-selector>
 
         <app-quarter-selector
           [selectedVon]="dateFrom"
@@ -16,7 +17,7 @@
           (quarterSelected)="onQuarterSelected($event)">
           <!-- Bedienung wie in der Statistik (Specs/EChart.md, FR-1a): "Anzeigen" neben den Quartalen -->
           <button type="submit" id="grafikAnzeigen" class="zev-button zev-button--primary"
-            [disabled]="loading || !dateFrom || !dateTo || selectedEinheiten.length === 0">
+            [disabled]="loading || !dateFrom || !dateTo || !hatAuswahl">
             <app-icon name="search"></app-icon>
             {{ loading ? ('LADE_DATEN' | translate) : ('ANZEIGEN' | translate) }}
           </button>
@@ -47,7 +48,7 @@
                 <app-icon name="chevron-right" size="xl"></app-icon>
               </button>
               <button type="button" id="zeitraumHeute" class="zev-button zev-button--secondary" (click)="onHeute()"
-                [disabled]="loading || selectedEinheiten.length === 0">
+                [disabled]="loading || !hatAuswahl">
                 <app-icon name="calendar"></app-icon>
                 {{ 'HEUTE' | translate }}
               </button>
@@ -55,13 +56,13 @@
           </div>
         </form>
 
-        @for (chartData of charts; track chartData.einheitId) {
+        @for (chartData of charts; track chartData.schluessel) {
           <div class="zev-panel zev-panel--chart">
-            <h3 class="zev-panel__title">{{ chartData.einheitName }} [{{ chartData.einheitTyp | einheitTyp }}]</h3>
+            <h3 class="zev-panel__title">{{ chartData.einheiten | messpunktGruppe:chartData.messpunkt }}</h3>
             <div class="zev-panel__content">
               <!-- Behaelter statt <canvas>: ECharts legt sein Canvas selbst darin an. Die ID bleibt,
                    damit die Komponente den Behaelter weiterhin ueber getElementById findet. -->
-              <div [id]="'chart-' + chartData.einheitId" class="messwerte-chart__diagramm"></div>
+              <div [id]="'chart-' + chartData.schluessel" class="messwerte-chart__diagramm"></div>
 
               @if (bibliothekLaedt) {
                 <p class="messwerte-chart__hinweis">{{ 'DIAGRAMM_LAEDT' | translate }}</p>

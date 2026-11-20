@@ -23,8 +23,8 @@
 ### FR-1: Ablauf / Flow
 
 1. Benutzer öffnet **Messwerte-Grafik** (`/chart`, Permission `messwerte:read`).
-2. Er wählt Einheiten (Mehrfachauswahl samt „Alle auswählen") und einen Zeitraum (Quartals-Schaltflächen, Datum von/bis, Blättern oder „Heute", FR-1a; `Datum von` zieht `Datum bis` auf das Monatsende nach).
-3. Klick auf **Anzeigen** lädt die Messwerte je Einheit und zeichnet **ein Diagramm je Einheit** in einem eigenen Panel mit Titel `Name [Typ]`. Blättern und „Heute" laden selbst.
+2. Er wählt Einheiten und — wo vorhanden — Messpunkte mit mehreren Einheiten (FR-8; Mehrfachauswahl samt „Alle auswählen") und einen Zeitraum (Quartals-Schaltflächen, Datum von/bis, Blättern oder „Heute", FR-1a; `Datum von` zieht `Datum bis` auf das Monatsende nach).
+3. Klick auf **Anzeigen** lädt die Messwerte je Einheit und zeichnet **ein Diagramm je Einheit** in einem eigenen Panel mit Titel `Name [Typ]`, danach **eines je gewähltem Messpunkt** (FR-8). Blättern und „Heute" laden selbst.
 4. Eine Erfolgsmeldung nennt die Zahl der geladenen Datenpunkte und der Einheiten.
 5. Innerhalb des geladenen Zeitraums kann der Benutzer zoomen und den Ausschnitt verschieben — ohne neuen Server-Aufruf.
 
@@ -36,7 +36,7 @@ Schaltflächen und Datumsfelder sind angeordnet und verhalten sich wie auf der S
 2. In der Zeile der Datumsfelder stehen **◀ / ▶** (Icons `chevron-left`/`chevron-right`, Tooltip und `aria-label` aus `ZEITRAUM_ZURUECK`/`ZEITRAUM_VOR`) und danach **„Heute"** (Icon `calendar`, Text `HEUTE`).
 3. **Blättern** verschiebt den Zeitraum um seine eigene Länge — dieselbe Regel wie in der Statistik (`blaettereZeitraum`, `Specs/Statistik.md`, FR-4.1) — und **lädt sofort**.
 4. **„Heute"** setzt `Datum von` und `Datum bis` auf das heutige lokale Datum und **lädt sofort**; auch ein zweiter Klick lädt (aktualisieren).
-5. **Abweichung von der Statistik:** Blättern und „Heute" sind **ohne gewählte Einheit gesperrt** — das sofortige Laden liefe sonst nur in die Fehlermeldung. Die Statistik kennt keine Einheitenauswahl.
+5. **Abweichung von der Statistik:** Blättern und „Heute" sind **ohne Auswahl gesperrt** (weder Einheit noch Messpunkt gewählt) — das sofortige Laden liefe sonst nur in die Fehlermeldung. Die Statistik kennt keine Einheitenauswahl.
 6. Die **Erfolgsmeldung** mit der Zahl der Datenpunkte bleibt (FR-1.4) — anders als in der Statistik, wo das Ergebnis selbst die Rückmeldung ist. Hier ist die Zahl eine eigene Information: Ein leerer Zeitraum ergibt ein leeres Diagramm, die Meldung sagt „0".
 
 ### FR-2: Darstellung
@@ -85,6 +85,21 @@ Das Diagramm füllt sein Panel und folgt Grössenänderungen über einen `Resize
 
 Während die Bibliothek nachgeladen wird, zeigt das Panel `DIAGRAMM_LAEDT`; scheitert das Nachladen, erscheint `DIAGRAMM_NICHT_LADBAR` als Fehlermeldung und die Seite bleibt bedienbar. Beide Keys sind vorhanden.
 
+### FR-8: Gemeinsames Diagramm je Messpunkt
+
+Tragen **mehrere Einheiten denselben Messpunkt** — typisch Bezug und Rücklieferung desselben Zählers —, bietet die Auswahl dafür einen **zusätzlichen Eintrag** an, und er zeichnet beide in **einem** Diagramm.
+
+1. **Wann es den Eintrag gibt:** je Messpunkt, den mindestens zwei Einheiten des Mandanten tragen. Verglichen wird der Messpunkt ohne Leerraum am Rand, sonst genau (Gross-/Kleinschreibung zählt). Einheiten ohne Messpunkt bilden keine Gruppe.
+2. **Bezeichnung** in der Auswahl und als Panel-Titel: `<Einheit 1> [<Typ 1>] / <Einheit 2> [<Typ 2>] / [<Messpunkt>]`, z.B. `Bezug von BKW [Bezug] / Rücklieferung an BKW [Rücklieferung] / [Bilanz]`. Die Einheiten stehen in der Reihenfolge der Auswahlliste (Konsumenten zuerst, sonst nach Name — in jedem Browser gleich), der Typ ist übersetzt wie bei der einzelnen Einheit.
+3. **Wo er steht:** in derselben Liste **nach** den Einheiten, sortiert nach Messpunkt. „Alle auswählen" schliesst die Einträge ein.
+4. **Unabhängig von den Einheiten:** Der Eintrag wählt seine Einheiten nicht mit. Wer nur den Messpunkt wählt, bekommt **ein** Diagramm; wer zusätzlich die Einheiten wählt, bekommt deren Diagramme davor.
+5. **Inhalt des Diagramms:** **eine Reihe je Einheit** mit ihrem `total`, im **gespeicherten Vorzeichen** — nichts wird gespiegelt. Der Bezug ist positiv gespeichert, die Rücklieferung negativ; die eine Linie liegt damit über, die andere unter der Nulllinie. Die Legende nennt je Reihe den **Namen der Einheit** und die Summe in kWh. Die **ZEV-Reihe entfällt** in diesem Diagramm.
+
+   > Zwei Einheiten mit je `Total` und `ZEV` ergäben vier Linien; für Bezug und Rücklieferung ist `zev` ohnehin 0.
+6. **Alles Übrige wie im Diagramm einer Einheit** (FR-2 bis FR-4, FR-7): Stufenlinie, Zoom, Ausdünnung, Achsen, Schweizer Zahlenformat, Farben aus Design-Tokens (erste Reihe Primär-, zweite Sekundärfarbe).
+7. **Geladen wird jede Einheit einmal**, auch wenn sie einzeln **und** über ihren Messpunkt gewählt ist. Die Erfolgsmeldung zählt die geladenen **Einheiten** und ihre Datenpunkte, nicht die Diagramme.
+8. Die Auswahl der **Rechnungen** (dieselbe Komponente) zeigt die Einträge **nicht**.
+
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
 **Verhalten bleibt**
@@ -99,7 +114,15 @@ Während die Bibliothek nachgeladen wird, zeigt das Panel `DIAGRAMM_LAEDT`; sche
 * [x] ◀ / ▶ tragen die Icons `chevron-left`/`chevron-right` und die übersetzte Beschriftung (`ZEITRAUM_ZURUECK`/`ZEITRAUM_VOR`) als Tooltip und `aria-label`; „Heute" zeigt `HEUTE`. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › should render chevron icons with translated title and aria-label)
 * [x] Blättern verschiebt den Zeitraum um seine Länge (Quartal → nächstes Quartal, Tag → Vortag) und lädt sofort die Messwerte. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › onBlaettern › should move a quarter forward and load immediately; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › onBlaettern › should move a day backwards; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should page the period and jump to today, loading immediately)
 * [x] „Heute" setzt beide Daten auf das **lokale** Tagesdatum und lädt sofort; ein zweiter Klick lädt erneut. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › onHeute › should set both dates to today and load immediately; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › onHeute › should use the local date shortly after midnight; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › onHeute › should reload when today is already shown; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should page the period and jump to today, loading immediately)
-* [x] Blättern und „Heute" sind ohne gewählte Einheit und während des Ladens gesperrt; Blättern zusätzlich bei ungültigem Zeitraum (von > bis). (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › should disable paging and today without a unit or while loading; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › onBlaettern › should not move without a unit, while loading or with an invalid range)
+* [x] Blättern und „Heute" sind ohne Auswahl (weder Einheit noch Messpunkt) und während des Ladens gesperrt; Blättern zusätzlich bei ungültigem Zeitraum (von > bis). (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › should disable paging and today without a unit or while loading; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › onBlaettern › should not move without a unit, while loading or with an invalid range; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Messpunkt-Diagramm › should enable the submit button with only a messpunkt selected)
+
+**Messpunkt mit mehreren Einheiten (FR-8)**
+* [x] Je Messpunkt, den mindestens zwei Einheiten tragen, entsteht eine Gruppe; Einheiten ohne Messpunkt und einmalig vergebene Messpunkte bilden keine. Verglichen wird ohne Leerraum am Rand, aber mit Gross-/Kleinschreibung. (Test: messpunkt-gruppen.spec.ts › Messpunkt-Gruppen Utils › messpunktGruppen › should group two einheiten sharing a messpunkt; Test: messpunkt-gruppen.spec.ts › Messpunkt-Gruppen Utils › messpunktGruppen › should not build a group for a messpunkt used only once; Test: messpunkt-gruppen.spec.ts › Messpunkt-Gruppen Utils › messpunktGruppen › should ignore einheiten without a messpunkt; Test: messpunkt-gruppen.spec.ts › Messpunkt-Gruppen Utils › messpunktGruppen › should compare the messpunkt without surrounding whitespace but case-sensitively)
+* [x] Die Auswahl der Messwerte-Grafik zeigt je Gruppe einen Eintrag **nach** den Einheiten, beschriftet `Einheit [Typ] / Einheit [Typ] / [Messpunkt]`; ohne die Einstellung (Rechnungen) erscheint er nicht. (Test: einheit-selector.component.spec.ts › EinheitSelectorComponent › Messpunkt-Gruppen › should offer one entry per shared messpunkt, labelled with units and messpunkt; Test: einheit-selector.component.spec.ts › EinheitSelectorComponent › Messpunkt-Gruppen › should offer no group unless enabled; Test: messpunkt-gruppe.pipe.spec.ts › MesspunktGruppePipe › transform › should join the einheiten and append the messpunkt; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should offer and draw a combined chart for units sharing a metering point)
+* [x] Der Eintrag wählt seine Einheiten nicht mit; „Alle auswählen" schliesst ihn ein und hebt ihn wieder auf. (Test: einheit-selector.component.spec.ts › EinheitSelectorComponent › Messpunkt-Gruppen › should emit the selected groups and leave the units untouched; Test: einheit-selector.component.spec.ts › EinheitSelectorComponent › Messpunkt-Gruppen › should include the groups in select-all)
+* [x] Mit nur einem gewählten Messpunkt ist „Anzeigen" freigegeben, beide Einheiten werden geladen, und es entsteht **ein** Panel mit dem Titel `Einheit [Typ] / Einheit [Typ] / [Messpunkt]`. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Messpunkt-Diagramm › should enable the submit button with only a messpunkt selected; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Messpunkt-Diagramm › should load both einheiten of a selected messpunkt and add one chart for it; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Messpunkt-Diagramm › should title the messpunkt panel with both einheiten and the messpunkt; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should offer and draw a combined chart for units sharing a metering point)
+* [x] Das Messpunkt-Diagramm zeigt eine Reihe je Einheit mit deren `total` im gespeicherten Vorzeichen, benannt nach der Einheit samt Summe im Schweizer Format, in zwei verschiedenen Token-Farben und **ohne** ZEV-Reihe; Achsen, Zoom und Stufenlinie sind dieselben wie im Diagramm einer Einheit. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Messpunkt-Diagramm › should draw one series per einheit with its stored sign and without a ZEV series; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Messpunkt-Diagramm › should share axes, zoom and step line with the single-unit chart)
+* [x] Eine Einheit, die einzeln und über ihren Messpunkt gewählt ist, wird **einmal** geladen; die Diagramme der Einheiten stehen vor denen der Messpunkte, und die Erfolgsmeldung zählt die geladenen Einheiten. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Messpunkt-Diagramm › should load an einheit only once when it is selected alone and as part of its messpunkt)
 
 **Neu und geändert**
 * [x] Mausrad/Touch zoomt innerhalb des geladenen Zeitraums, der Slider verschiebt den Ausschnitt — **ohne** neuen HTTP-Aufruf.
@@ -158,7 +181,11 @@ Während die Bibliothek nachgeladen wird, zeigt das Panel `DIAGRAMM_LAEDT`; sche
 | Nachladen der Bibliothek scheitert (Netz, Chunk fehlt) | Fehlermeldung, kein Diagramm, Seite bleibt bedienbar |
 | Fehler beim Laden der Messwerte | Lesbare Fehlermeldung, kein halb gezeichnetes Diagramm |
 | Vertauschter Zeitraum | Wie heute: Fehlermeldung, kein Server-Aufruf, kein Diagramm; ◀ / ▶ gesperrt |
-| Blättern oder „Heute" ohne gewählte Einheit | Schaltflächen gesperrt, kein Server-Aufruf (FR-1a.5) |
+| Blättern oder „Heute" ohne Auswahl | Schaltflächen gesperrt, kein Server-Aufruf (FR-1a.5) |
+| Kein Messpunkt mit mehreren Einheiten | Die Auswahl zeigt nur die Einheiten, wie bisher |
+| Messpunkt gewählt, eine seiner Einheiten ohne Messwerte | Das Diagramm zeigt die andere Reihe; die leere steht mit Summe 0 in der Legende |
+| Mehr als zwei Einheiten am selben Messpunkt | Ein Eintrag und ein Diagramm mit einer Reihe je Einheit. Die ersten beiden tragen die Token-Farben, weitere die Palette von ECharts (es gibt nur zwei Reihenfarben) |
+| Gleicher Messpunkt, unterschiedlich geschrieben (`BKW` / `bkw`) | Keine Gruppe — es sind zwei Messpunkte, wie in der Einheitenverwaltung |
 | Panel wird in der Grösse verändert (`resize: vertical`) | Diagramm folgt über den `ResizeObserver` |
 | Sprachwechsel bei offenem Diagramm | Beschriftung und Legende bleiben bis zum nächsten Zeichnen in der alten Sprache. **Bekannte Einschränkung**, heute genauso, gilt für beide Diagramme (FR-3) |
 | Wechsel des Dark Mode bei offenem Diagramm | Die Farben werden beim Zeichnen aus den Tokens gelesen; ein Wechsel wirkt erst beim nächsten Zeichnen. **Bekannte Einschränkung**, gilt heute für die Preiszeitreihe genauso (§8) |
@@ -180,6 +207,9 @@ Während die Bibliothek nachgeladen wird, zeigt das Panel `DIAGRAMM_LAEDT`; sche
 | `components/messwerte-chart/messwerte-chart.component.spec.ts` | Zeichnen stubben (jsdom hat kein Canvas), Optionen als reine Funktion prüfen — Vorbild `preiszeitreihe-chart.component.spec.ts` |
 | `components/preiszeitreihe-chart/preiszeitreihe-chart.component.ts` | nutzt die gemeinsamen Bausteine statt eigener Kopien |
 | `utils/echarts-loader.ts`, `utils/chart-farben.ts` | neu |
+| `utils/messpunkt-gruppen.ts`, `pipes/messpunkt-gruppe.pipe.ts` | neu: Gruppen je Messpunkt bilden und bezeichnen (FR-8) |
+| `components/einheit-selector/` | Zusatzeinträge je Messpunkt, abschaltbar (`mitMesspunktGruppen`); Rechnungen unverändert |
+| `models/einheit.model.ts` | neu: `MesspunktGruppe` |
 | `frontend-service/package.json` (+ Lockfile) | `chart.js` entfernen |
 
 **Datenmigration**
@@ -191,7 +221,9 @@ Während die Bibliothek nachgeladen wird, zeigt das Panel `DIAGRAMM_LAEDT`; sche
 
 ## 7. Abgrenzung / Out of Scope
 
-* **Keine weiteren Funktionen** in der Messwerte-Grafik über Zoom und die Bedienung aus FR-1a hinaus: kein Export (auch nicht der PDF-Export der Statistik), keine Kennzahlen, keine zusätzlichen Reihen, keine Änderung der Datenauswahl.
+* **Keine weiteren Funktionen** in der Messwerte-Grafik über Zoom, die Bedienung aus FR-1a und das Messpunkt-Diagramm aus FR-8 hinaus: kein Export (auch nicht der PDF-Export der Statistik), keine Kennzahlen, keine Änderung des Zeitraums oder der geladenen Daten.
+* **Kein Saldo je Messpunkt.** Das Messpunkt-Diagramm zeigt die Einheiten nebeneinander; eine verrechnete Reihe (Bezug minus Rücklieferung) gibt es nicht.
+* **Keine frei zusammengestellten Diagramme.** Gemeinsam gezeichnet wird nur, was denselben Messpunkt trägt.
 * **Keine Änderung an Backend, API oder Datenbank.**
 * **Kein Umbau der Statistik-Seite** und keiner anderen Maske; `zev-panel--chart` bleibt wie es ist.
 * **Keine fachliche Änderung an der Preiszeitreihe** — dort wird ausschliesslich auf die gemeinsamen Bausteine umgestellt.
@@ -217,3 +249,9 @@ Während die Bibliothek nachgeladen wird, zeigt das Panel `DIAGRAMM_LAEDT`; sche
 Vorher galt FR-1 „Ablauf / Flow — unverändert": *„Die Bedienung bleibt **exakt** wie heute; der Wechsel ist für den Benutzer nur an der Darstellung und am neuen Zoom erkennbar."* Das betraf den Bibliothekswechsel von chart.js auf ECharts und ist mit ihm erfüllt. „Anzeigen" stand damals in der Zeile der Datumsfelder, Blättern und „Heute" gab es nicht. Das Kriterium dazu lautete „Die Bedienung ist unverändert: …".
 
 Am 06.11.2026 wurde die Bedienung auf Wunsch des Benutzers an die Statistik angeglichen, damit beide Seiten mit Zeitraumwahl gleich bedient werden. Den PDF-Export der Statistik übernimmt die Grafik bewusst nicht.
+
+### A.2 Gemeinsames Diagramm je Messpunkt (FR-8, 20.11.2026)
+
+Vorher zeichnete die Seite ausschliesslich ein Diagramm je Einheit, und §7 schloss „zusätzliche Reihen" und jede „Änderung der Datenauswahl" aus. Bezug und Rücklieferung desselben Zählers liessen sich nur in zwei Panels untereinander vergleichen.
+
+Am 20.11.2026 kam auf Wunsch des Benutzers der Zusatzeintrag je Messpunkt dazu. Zwei Festlegungen stammen aus der Umsetzung, nicht aus dem Wunsch: Das Diagramm zeigt je Einheit nur `total` (ohne ZEV-Reihe), und „Alle auswählen" schliesst die Messpunkt-Einträge ein — Letzteres, damit „alle" weiterhin alle Kästchen der Liste meint.

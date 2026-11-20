@@ -13,7 +13,17 @@
         <input type="checkbox" [id]="'einheit-' + einheit.id" [value]="einheit.id"
           [checked]="selectedEinheitIds.has(einheit.id!)" (change)="onEinheitToggle(einheit.id!)">
         <label [for]="'einheit-' + einheit.id">
-          {{ einheit.name }} [{{ einheit.typ | einheitTyp }}]
+          {{ [einheit] | messpunktGruppe }}
+        </label>
+      </div>
+    }
+    <!-- Zusatzeintrag je Messpunkt mit mehreren Einheiten (Specs/EChart.md, FR-8) -->
+    @for (gruppe of gruppen; track gruppe.messpunkt; let i = $index) {
+      <div class="zev-checkbox-item">
+        <input type="checkbox" [id]="'messpunkt-gruppe-' + i"
+          [checked]="selectedMesspunkte.has(gruppe.messpunkt)" (change)="onGruppeToggle(gruppe.messpunkt)">
+        <label [for]="'messpunkt-gruppe-' + i">
+          {{ gruppe.einheiten | messpunktGruppe:gruppe.messpunkt }}
         </label>
       </div>
     }

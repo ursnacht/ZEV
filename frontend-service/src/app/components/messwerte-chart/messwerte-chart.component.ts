@@ -3,8 +3,8 @@ import { WithMessage } from '../../utils/with-message';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MesswerteService, MesswertData } from '../../services/messwerte.service';
-import { Einheit } from '../../models/einheit.model';
-import { EinheitTypPipe } from '../../pipes/einheit-typ.pipe';
+import { Einheit, MesspunktGruppe } from '../../models/einheit.model';
+import { MesspunktGruppePipe } from '../../pipes/messpunkt-gruppe.pipe';
 import { forkJoin } from 'rxjs';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
@@ -13,13 +13,16 @@ import { IconComponent } from '../icon/icon.component';
 import { EinheitSelectorComponent } from '../einheit-selector/einheit-selector.component';
 import { formatSwissNumber } from '../../utils/number-utils';
 import { blaettereZeitraum, formatSwissDateTime, monatsende, toIsoDate, vorquartal } from '../../utils/date-utils';
-import { chartFarben } from '../../utils/chart-farben';
+import { ChartFarben, chartFarben } from '../../utils/chart-farben';
 import { ladeECharts } from '../../utils/echarts-loader';
 
 interface ChartData {
-  einheitId: number;
-  einheitName: string;
-  einheitTyp: string;
+  /** Eindeutig je Diagramm: die Einheit-ID oder `messpunkt-<n>`. Teil der DOM-ID des Behälters. */
+  schluessel: string;
+  /** Eine Einheit — oder alle Einheiten eines Messpunkts (Specs/EChart.md, FR-8). */
+  einheiten: Einheit[];
+  /** Nur beim Diagramm eines Messpunkts gesetzt. */
+  messpunkt?: string;
   /** ECharts-Instanz; `null`, solange nicht gezeichnet. */
   instanz: import('echarts/core').ECharts | null;
 }
@@ -27,7 +30,7 @@ interface ChartData {
 @Component({
   selector: 'app-messwerte-chart',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe, EinheitTypPipe, QuarterSelectorComponent, IconComponent, EinheitSelectorComponent],
+  imports: [CommonModule, FormsModule, TranslatePipe, MesspunktGruppePipe, QuarterSelectorComponent, IconComponent, EinheitSelectorComponent],
   templateUrl: './messwerte-chart.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./messwerte-chart.component.css']
@@ -36,6 +39,8 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
   dateFrom: string = '';
   dateTo: string = '';
   selectedEinheiten: Einheit[] = [];
+  /** Gewählte Messpunkte mit mehreren Einheiten — je einer ein zusätzliches Diagramm (FR-8). */
+  selectedGruppen: MesspunktGruppe[] = [];
   loading = false;
 
   charts: ChartData[] = [];
@@ -51,7 +56,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
    */
   private echarts?: typeof import('echarts/core');
   /** Je Diagramm ein Beobachter - ersetzt die frühere manuelle Canvas-Berechnung. */
-  private observers = new Map<number, ResizeObserver>();
+  private observers = new Map<string, ResizeObserver>();
 
   constructor(
     private messwerteService: MesswerteService,
@@ -81,6 +86,27 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
 
   onSelectionChange(einheiten: Einheit[]): void {
     this.selectedEinheiten = einheiten;
+  }
+
+  onGruppenChange(gruppen: MesspunktGruppe[]): void {
+    this.selectedGruppen = gruppen;
+  }
+
+  /** Mindestens eine Einheit oder ein Messpunkt gewählt — sonst gibt es nichts zu zeichnen. */
+  get hatAuswahl(): boolean {
+    return this.selectedEinheiten.length > 0 || this.selectedGruppen.length > 0;
+  }
+
+  /**
+   * Die Einheiten, deren Messwerte geladen werden: die gewählten und die der gewählten Messpunkte,
+   * **jede einmal**. Wer Bezug, Rücklieferung und ihren Messpunkt wählt, löst zwei Abfragen aus,
+   * nicht vier.
+   */
+  private zuLadendeEinheiten(): Einheit[] {
+    const jeId = new Map<number, Einheit>();
+    [...this.selectedEinheiten, ...this.selectedGruppen.flatMap(g => g.einheiten)]
+      .forEach(e => jeId.set(e.id!, e));
+    return [...jeId.values()];
   }
 
   /**
@@ -134,16 +160,16 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
   }
 
   /**
-   * Blättern nur mit gültigem Zeitraum, mindestens einer Einheit und nicht während des Ladens.
-   * Ohne Einheit liefe das sofortige Laden nur in die Fehlermeldung.
+   * Blättern nur mit gültigem Zeitraum, einer Auswahl und nicht während des Ladens.
+   * Ohne Auswahl liefe das sofortige Laden nur in die Fehlermeldung.
    */
   get kannBlaettern(): boolean {
-    return !this.loading && this.selectedEinheiten.length > 0
+    return !this.loading && this.hatAuswahl
       && !!this.dateFrom && !!this.dateTo && this.dateFrom <= this.dateTo;
   }
 
   onSubmit(): void {
-    if (!this.dateFrom || !this.dateTo || this.selectedEinheiten.length === 0) {
+    if (!this.dateFrom || !this.dateTo || !this.hatAuswahl) {
       this.showMessage(this.translationService.translate('BITTE_ALLE_FELDER_AUSFUELLEN'), 'error');
       return;
     }
@@ -157,23 +183,38 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
     this.gebeDiagrammeFrei();
     this.charts = [];
 
-    const requests = this.selectedEinheiten.map(e =>
+    // Auswahl festhalten: Sie kann sich aendern, waehrend die Antwort unterwegs ist.
+    const einheiten = this.zuLadendeEinheiten();
+    const einzelne = [...this.selectedEinheiten];
+    const gruppen = [...this.selectedGruppen];
+    const requests = einheiten.map(e =>
       this.messwerteService.getMesswerteByEinheit(e.id!, this.dateFrom, this.dateTo)
     );
 
     forkJoin(requests).subscribe({
       next: (results: MesswertData[][]) => {
         let totalDataPoints = 0;
+        const datenJeEinheit = new Map<number, MesswertData[]>();
 
         results.forEach((data, index) => {
-          const einheit = this.selectedEinheiten[index];
           totalDataPoints += data.length;
-          this.charts.push({ einheitId: einheit.id!, einheitName: einheit.name || '', einheitTyp: einheit.typ || '', instanz: null });
+          datenJeEinheit.set(einheiten[index].id!, data);
         });
 
+        // Erst je Einheit ein Diagramm, danach je Messpunkt eines - dieselbe Reihenfolge wie in
+        // der Auswahl.
+        this.charts = [
+          ...einzelne.map(e => ({ schluessel: `${e.id}`, einheiten: [e], instanz: null })),
+          ...gruppen.map((g, index) => ({
+            schluessel: `messpunkt-${index}`, einheiten: g.einheiten, messpunkt: g.messpunkt, instanz: null
+          }))
+        ];
+
         this.cdr.detectChanges();
-        void this.createChartsSequentially(results);
-        this.showMessage(`${totalDataPoints} ${this.translationService.translate('DATENPUNKTE_FUER')} ${this.charts.length} ${this.translationService.translate('EINHEITEN_GELADEN')}`, 'success');
+        void this.createChartsSequentially(datenJeEinheit);
+        // Gezaehlt werden die geladenen Einheiten, nicht die Diagramme: Ein Messpunkt-Diagramm
+        // laedt keine eigenen Daten.
+        this.showMessage(`${totalDataPoints} ${this.translationService.translate('DATENPUNKTE_FUER')} ${einheiten.length} ${this.translationService.translate('EINHEITEN_GELADEN')}`, 'success');
         this.loading = false;
       },
       error: (error) => {
@@ -197,7 +238,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
    * <p>Der Fehlschlag des Nachladens wird **einmal** gemeldet, nicht je Einheit: Bei „Alle
    * auswählen" stünden sonst zehn identische Meldungen.
    */
-  private async createChartsSequentially(results: MesswertData[][]): Promise<void> {
+  private async createChartsSequentially(datenJeEinheit: Map<number, MesswertData[]>): Promise<void> {
     if (!await this.ladeBibliothek()) {
       return;
     }
@@ -205,7 +246,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
     let index = 0;
     const createNext = () => {
       if (index >= this.charts.length) return;
-      this.createChart(this.charts[index], results[index]);
+      this.createChart(this.charts[index], datenJeEinheit);
       index++;
       if (index < this.charts.length) setTimeout(createNext, 50);
     };
@@ -236,13 +277,13 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
   }
 
   /**
-   * Zeichnet ein Diagramm in den Behälter der Einheit.
+   * Zeichnet ein Diagramm in seinen Behälter — für eine Einheit oder für einen Messpunkt.
    *
    * <p>Die Optionen sind mit Absicht denen der Preiszeitreihe nachgebaut — zwei Diagramme, die
    * gleich aussehen und gleich gebaut sind, sind zusammen billiger zu pflegen als zwei eigene Welten.
    */
-  private createChart(chartData: ChartData, data: MesswertData[]): void {
-    const behaelter = document.getElementById(`chart-${chartData.einheitId}`);
+  private createChart(chartData: ChartData, datenJeEinheit: Map<number, MesswertData[]>): void {
+    const behaelter = document.getElementById(`chart-${chartData.schluessel}`);
     if (!behaelter || !this.echarts) {
       return;
     }
@@ -254,9 +295,13 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
     // "WICHTIG! Funktioniert mit true nicht."): ECharts misst selbst, sobald wir es anstossen.
     const observer = new ResizeObserver(() => instanz.resize());
     observer.observe(behaelter);
-    this.observers.set(chartData.einheitId, observer);
+    this.observers.set(chartData.schluessel, observer);
 
-    instanz.setOption(this.optionen(data), true);
+    const daten = (einheit: Einheit) => datenJeEinheit.get(einheit.id!) ?? [];
+    const optionen = chartData.messpunkt
+      ? this.optionenMesspunkt(chartData.einheiten.map(einheit => ({ einheit, daten: daten(einheit) })))
+      : this.optionen(daten(chartData.einheiten[0]));
+    instanz.setOption(optionen, true);
   }
 
   /**
@@ -271,16 +316,61 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
    */
   private optionen(data: MesswertData[]): Record<string, unknown> {
     const farben = chartFarben();
-    const totalReihe = data.map(d => [new Date(d.zeit).getTime(), d.total ?? 0]);
+    const kwh = this.translationService.translate('KWH');
     const zevReihe = data.map(d => [new Date(d.zeit).getTime(), -(d.zev ?? 0)]);
-    const totalSumme = data.reduce((summe, d) => summe + (d.total ?? 0), 0);
     const zevSumme = data.reduce((summe, d) => summe + (d.zev ?? 0), 0);
+
+    return this.diagrammOptionen([
+      this.reihe(this.legende('TOTAL', this.totalSumme(data), kwh), this.totalReihe(data), farben.primaer),
+      this.reihe(this.legende('ZEV', zevSumme, kwh), zevReihe, farben.sekundaer)
+    ], farben, kwh);
+  }
+
+  /**
+   * Diagramm-Optionen für einen Messpunkt mit mehreren Einheiten (Specs/EChart.md, FR-8):
+   * **eine Reihe je Einheit**, jeweils ihr `total` mit dem Vorzeichen, wie es gespeichert ist.
+   *
+   * <p>Bei Bezug und Rücklieferung ergibt das von selbst das gewünschte Bild: Der Bezug ist positiv,
+   * die Rücklieferung negativ gespeichert — die eine Linie liegt über, die andere unter der
+   * Nulllinie. Gespiegelt wird hier deshalb **nichts**, anders als bei der ZEV-Reihe.
+   *
+   * <p>Die ZEV-Reihe entfällt: Sie gehört zur einzelnen Einheit, und zwei davon machten aus dem
+   * Vergleich vier Linien.
+   *
+   * <p>Die ersten beiden Reihen tragen die beiden Reihenfarben aus den Design-Tokens. Mehr als zwei
+   * Einheiten an einem Messpunkt sind nicht vorgesehen; kämen sie vor, nimmt ECharts für die
+   * weiteren seine eigene Palette — unterscheidbar, statt zweimal dieselbe Farbe.
+   */
+  private optionenMesspunkt(reihen: { einheit: Einheit; daten: MesswertData[] }[]): Record<string, unknown> {
+    const farben = chartFarben();
+    const reihenfarben = [farben.primaer, farben.sekundaer];
     const kwh = this.translationService.translate('KWH');
 
+    return this.diagrammOptionen(reihen.map(({ einheit, daten }, index) => this.reihe(
+      this.legendeText(einheit.name, this.totalSumme(daten), kwh),
+      this.totalReihe(daten),
+      reihenfarben[index])), farben, kwh);
+  }
+
+  /** `total` als Zeitreihe `[Zeitpunkt, Wert]`, im gespeicherten Vorzeichen. */
+  private totalReihe(data: MesswertData[]): number[][] {
+    return data.map(d => [new Date(d.zeit).getTime(), d.total ?? 0]);
+  }
+
+  private totalSumme(data: MesswertData[]): number {
+    return data.reduce((summe, d) => summe + (d.total ?? 0), 0);
+  }
+
+  /** Was beide Diagrammarten teilen: Achsen, Tooltip, Legende, Zoom — nur die Reihen unterscheiden sich. */
+  private diagrammOptionen(series: Record<string, unknown>[], farben: ChartFarben,
+                           kwh: string): Record<string, unknown> {
     return {
       animation: false,
       grid: { left: 70, right: 20, top: 40, bottom: 70 },
-      legend: { top: 0, textStyle: { color: farben.text } },
+      // `scroll`: Die Legende bleibt einzeilig und blaettert, wenn sie nicht passt. Beim
+      // Messpunkt-Diagramm stehen die Namen der Einheiten darin; auf schmalen Anzeigen brach sie
+      // sonst auf zwei Zeilen um und lag ueber dem Achsentitel und der Zeichenflaeche.
+      legend: { type: 'scroll', top: 0, textStyle: { color: farben.text } },
       tooltip: {
         trigger: 'axis',
         formatter: (params: { seriesName: string; value: [number, number] }[]) => {
@@ -314,10 +404,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
         splitLine: { lineStyle: { color: farben.gitter } }
       },
       dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 10 }],
-      series: [
-        this.reihe(this.legende('TOTAL', totalSumme, kwh), totalReihe, farben.primaer),
-        this.reihe(this.legende('ZEV', zevSumme, kwh), zevReihe, farben.sekundaer)
-      ]
+      series
     };
   }
 
@@ -329,7 +416,12 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
    * `toFixed(3)`.
    */
   private legende(key: string, summe: number, kwh: string): string {
-    return `${this.translationService.translate(key)} (Σ ${formatSwissNumber(summe, 3)} ${kwh})`;
+    return this.legendeText(this.translationService.translate(key), summe, kwh);
+  }
+
+  /** Wie {@link legende}, aber mit fertigem Namen — beim Messpunkt-Diagramm ist das der Name der Einheit. */
+  private legendeText(name: string, summe: number, kwh: string): string {
+    return `${name} (Σ ${formatSwissNumber(summe, 3)} ${kwh})`;
   }
 
   /**
@@ -339,7 +431,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
    * „Alle auswählen" liegen mehrere Diagramme gleichzeitig auf der Seite. Bei kleinen Mengen ist die
    * Ausdünnung unschädlich, bei grossen ist sie der Unterschied zwischen flüssig und zäh.
    */
-  private reihe(name: string, daten: number[][], farbe: string): Record<string, unknown> {
+  private reihe(name: string, daten: number[][], farbe?: string): Record<string, unknown> {
     return {
       name,
       type: 'line',
@@ -347,8 +439,9 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
       showSymbol: false,
       connectNulls: false,
       sampling: 'lttb',
-      lineStyle: { color: farbe, width: 2 },
-      itemStyle: { color: farbe },
+      // Ohne Farbe (dritte und weitere Reihe eines Messpunkts) waehlt ECharts aus seiner Palette.
+      lineStyle: farbe ? { color: farbe, width: 2 } : { width: 2 },
+      ...(farbe ? { itemStyle: { color: farbe } } : {}),
       data: daten
     };
   }
