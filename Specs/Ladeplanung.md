@@ -561,7 +561,8 @@ Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten**:
       eigenen Faktor, sonst mit dem über den ganzen Tag; ältere Punkte zählen für die Tageszeit nicht.
       (Test: ProduktionsprognoseServiceTest#getPrognose_TageszeitMitGenugPunkten_RechnetMitEigenemFaktor;
       ProduktionsprognoseServiceTest#getPrognose_TageszeitMitZuWenigPunkten_FaelltAufTagesfaktorZurueck;
-      ProduktionsprognoseServiceTest#getPrognose_TageszeitPunkteAelterAlsVierzehnTage_ZaehlenNichtFuerDieTageszeit)
+      ProduktionsprognoseServiceTest#getPrognose_TageszeitPunkteAelterAlsVierzehnTage_ZaehlenNichtFuerDieTageszeit;
+      ProduktionsprognoseServiceTest#getPrognose_TageszeitFenster_BeginntGenauVierzehnTageVorher)
 * [x] Die Tageszeit ist die **Normalzeit**: Über eine Zeitumstellung hinweg gehört 13:00 Sommerzeit
       zu 12:00 Winterzeit.
       (Test: ProduktionsprognoseServiceTest#getPrognose_TageszeitUeberZeitumstellung_SchluesselIstNormalzeit;
@@ -788,9 +789,10 @@ Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten**:
     Tagen wie dem 07.10. nicht. Zu ermitteln je Tag: erwarteter gegen tatsächlichen Überschuss ab
     der ersten Sperre. **Entschieden wird mit der Auswertung im Frühling 2027.**
     (Hintergrund: Anhang A.8, A.9)
-* **Wie viele Tage für Lastprofil und Faktor?** Vorgabe 28. Für den Faktor sind vermutlich weniger
-  besser (er soll aktuellen Zuständen folgen), für das Lastprofil mehr. Getrennte Werte wären
-  denkbar — vorerst einer, bis die Daten etwas anderes nahelegen.
+* **Wie viele Tage für Lastprofil und Tagesfaktor?** Vorgabe 28 (`historieTage`), ein Wert für
+  beide. Für das Lastprofil wären eher mehr Tage besser. Der **Faktor je Tageszeit** hat davon
+  getrennt ein festes Fenster von 14 Tagen (FR-3); ob 14 richtig ist, zeigt erst eine Messung
+  ausserhalb der Novembertage, an denen der Wert gewählt wurde (Anhang A.19).
 * **Soll der Plan gespeichert werden oder nur der Rang?** Die Spec sieht nur Rang und benötigte
   Anzahl vor — der ganze Plan wäre 96 Werte je Intervall. Reicht das zum Nachvollziehen?
 * **Ab wann ist das Verfahren besser?** Offen ist, welche Kennzahl entscheidet: verschobene

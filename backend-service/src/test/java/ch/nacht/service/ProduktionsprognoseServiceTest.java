@@ -619,6 +619,26 @@ public class ProduktionsprognoseServiceTest {
     }
 
     /**
+     * <b>Die Grenze des Fensters liegt genau bei 14 Tagen.</b> Gefragt ist der 25.09., das Fenster
+     * beginnt am 11.09. um 00:00 (einschliesslich).
+     *
+     * <p>Fuenf Punkte am 11.–15.09. liegen alle darin: eigener Faktor 0.005. Um einen Tag frueher
+     * (10.–14.09.) faellt der erste heraus, vier bleiben — zu wenig, es gilt der Tagesfaktor
+     * 0.0075. Die uebrigen Tests liessen jedes Fenster zwischen 5 und 18 Tagen durchgehen; erst
+     * dieses Paar legt die 14 fest.
+     */
+    @Test
+    void getPrognose_TageszeitFenster_BeginntGenauVierzehnTageVorher() {
+        lernhistorieMitTageszeit("0.500", tageAb(LocalDate.of(2026, 9, 11), 5, 12));
+        assertEquals(new BigDecimal("0.00500000"), einzigerPunkt().getFaktor(),
+                "11.09. ist der erste Tag des Fensters und zaehlt mit");
+
+        lernhistorieMitTageszeit("0.500", tageAb(LocalDate.of(2026, 9, 10), 5, 12));
+        assertEquals(new BigDecimal("0.00750000"), einzigerPunkt().getFaktor(),
+                "10.09. liegt einen Tag vor dem Fenster - es bleiben vier Punkte");
+    }
+
+    /**
      * Die Tageszeit ist die <b>Normalzeit</b>: Ueber die Zeitumstellung (25.10.2026) hinweg gehoert
      * 13:00 Sommerzeit zu 12:00 Winterzeit — derselbe Sonnenstand.
      *

@@ -89,7 +89,8 @@ public class ProduktionsprognoseService {
      * <p>Der Schatten wandert mit dem Sonnenstand. Über 28 Tage gelernt, enthielt der Faktor im
      * November 2026 noch die schattenfreien Wochen des Oktobers und lag am Nachmittag 22 % zu
      * hoch; mit 14 Tagen waren es 10 %, mit 10 Tagen wurde der Fehler je Intervall wieder grösser
-     * (Specs/Ladeplanung.md, Anhang A.19). Ist {@code historieTage} kleiner, gilt dieser Wert.
+     * (Specs/Ladeplanung.md, Anhang A.19). Ist {@code historieTage} kleiner, reicht das Fenster nur
+     * so weit zurück wie die gelesene Historie.
      */
     private static final int LERNFENSTER_TAGESZEIT_TAGE = 14;
 
@@ -317,11 +318,9 @@ public class ProduktionsprognoseService {
         }
 
         // Das kuerzere Fenster der Tageszeit-Faktoren liegt INNERHALB der gelesenen Historie -
-        // es braucht keine eigene Abfrage. Ist historieTage kleiner, gilt deren Beginn.
+        // es braucht keine eigene Abfrage. Ist historieTage kleiner als das Fenster, begrenzt die
+        // Historie es von selbst: Vor ihrem Beginn wurde nichts gelesen.
         LocalDateTime vonTageszeit = datum.minusDays(LERNFENSTER_TAGESZEIT_TAGE).atStartOfDay();
-        if (vonTageszeit.isBefore(von)) {
-            vonTageszeit = von;
-        }
         Map<LocalTime, Summe> jeTageszeit = new HashMap<>();
 
         // Der Speicherfluss je Intervall - er fehlt im Erzeugungszaehler und muss dazu.
