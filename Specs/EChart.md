@@ -43,8 +43,11 @@ Schaltflächen und Datumsfelder sind angeordnet und verhalten sich wie auf der S
 
 * **Zwei Datenreihen je Diagramm, wie heute:** `Total` und `ZEV`, wobei die ZEV-Reihe **negativ** aufgetragen wird (Spiegelung nach unten). Die Legende nennt je Reihe die Summe in kWh.
 * **Stufenlinie** (`step: 'end'`) statt der heutigen geglätteten Linie (`tension: 0.1`): Ein Messwert gilt für die **ganze** Viertelstunde. Die geglättete Linie behauptet einen stetigen Verlauf zwischen den Intervallen, den es nicht gibt. Das ändert das gewohnte Bild — bewusst.
+* **Auch das letzte Intervall ist zu sehen:** Jede Reihe endet mit einem Abschlusspunkt am Ende ihres letzten Intervalls (Beginn + 15 Minuten) mit dessen Wert. Er ist kein Messwert: Der Tooltip überspringt ihn, und in die Summe der Legende geht er nicht ein.
+  > Eine Stufenlinie zeichnet jeden Wert bis zum nächsten Punkt. Ohne Abschlusspunkt fehlte die letzte Viertelstunde, und eine Reihe mit einem einzigen Messwert blieb leer (Hintergrund: Anhang A.4).
 * **Keine Flächenfüllung** (heute `fill: false`) — bleibt so.
-* **x-Achse:** Zeit; **y-Achse:** Energie. Beide Achsentitel aus dem `TranslationService` — `ZEIT` und `KWH` (beide Keys vorhanden).
+* **x-Achse:** Zeit, **ohne Achsentitel**; **y-Achse:** Energie mit dem Titel `KWH` aus dem `TranslationService`.
+  > Der Titel „Zeit“ stand mitten im Zoom-Schieber unter der Achse; dass sie die Zeit zeigt, sagen die Uhrzeiten an ihr (Hintergrund: Anhang A.3).
 * **Zoom:** `dataZoom` mit `inside` (Mausrad/Touch) **und** `slider` — dieselbe Konfiguration wie bei der Preiszeitreihe.
 * **Ausdünnung:** `sampling: 'lttb'` ab einer grossen Punktzahl (NFR-1). Bei ~8'600 Punkten je Reihe und mehreren Diagrammen auf einer Seite ist das kein Luxus.
 * **Modularer, dynamischer Import** wie bei der Preiszeitreihe. Der gemeinsame Loader registriert die **Vereinigung** aller von beiden Diagrammen benötigten Module — `LineChart`, `BarChart`, `GridComponent`, `TooltipComponent`, `DataZoomComponent`, `LegendComponent`, `CanvasRenderer` — und nicht je Aufrufer eine eigene Auswahl (FR-5). Ein nicht registriertes Modul **zeichnet stumm nichts**: ECharts meldet keinen Fehler. Genau daran ist der Balken-Serientyp der Preiszeitreihe zuerst gescheitert, und eine je Aufrufer verschiedene Liste würde die Falle vervielfachen. Der Preis ist ein etwas grösserer gemeinsamer Chunk — er wird ohnehin nur beim Öffnen eines Diagramms geladen.
@@ -53,7 +56,7 @@ Schaltflächen und Datumsfelder sind angeordnet und verhalten sich wie auf der S
 
 * **Alle** Zahlen im Schweizer Format über `formatSwissNumber()` aus `src/app/utils/number-utils.ts` — Achsenbeschriftung, Tooltip und die Summen in der Legende. **Kein** `toLocaleString()`, **kein** `toFixed()`, keine ECharts-eigene Locale-Formatierung.
 * **Zeitpunkte** im Format `dd.MM.yyyy HH:mm`, manuell gebildet (kein `toLocaleString`).
-* **Alle** Texte über den `TranslationService`, auch die Legendennamen: `TOTAL`, `ZEV`, `ZEIT`, `KWH`. Ebenso Lade- und Fehlerzustand des Diagramms: `DIAGRAMM_LAEDT` und `DIAGRAMM_NICHT_LADBAR`, die Bedienung (FR-1a): `ANZEIGEN`, `LADE_DATEN`, `ZEITRAUM_ZURUECK`, `ZEITRAUM_VOR`, `HEUTE`. **Alle diese Keys sind vorhanden** (in der Übersetzungstabelle geprüft) — es braucht **keine neue Migration**.
+* **Alle** Texte über den `TranslationService`, auch die Legendennamen und der Achsentitel: `TOTAL`, `ZEV`, `KWH`. Ebenso Lade- und Fehlerzustand des Diagramms: `DIAGRAMM_LAEDT` und `DIAGRAMM_NICHT_LADBAR`, die Bedienung (FR-1a): `ANZEIGEN`, `LADE_DATEN`, `ZEITRAUM_ZURUECK`, `ZEITRAUM_VOR`, `HEUTE`. **Alle diese Keys sind vorhanden** (in der Übersetzungstabelle geprüft) — es braucht **keine neue Migration**.
 * **Aufgelöst wird beim Zeichnen.** Ein Sprachwechsel während ein Diagramm offen steht erneuert die Beschriftung **nicht**: `TranslationService.setLanguage()` setzt ein Signal, das Template-Texte erneuert — ein gezeichnetes Canvas nicht. Die Legende trägt bis zum nächsten Zeichnen die alte Sprache. Das ist heute genauso und bleibt eine **bekannte Einschränkung** (§5); sie gilt für beide Diagramme gleich, und wenn sie behoben wird, dann für beide gemeinsam.
 
 ### FR-4: Farben und Dark Mode
@@ -127,10 +130,11 @@ Tragen **mehrere Einheiten denselben Messpunkt** — typisch Bezug und Rücklief
 **Neu und geändert**
 * [x] Mausrad/Touch zoomt innerhalb des geladenen Zeitraums, der Slider verschiebt den Ausschnitt — **ohne** neuen HTTP-Aufruf.
 * [x] Die Linie ist eine **Stufenlinie**, ohne Flächenfüllung.
+* [ ] Jede Reihe mit Messwerten endet mit einem Abschlusspunkt 15 Minuten nach ihrem letzten Messwert und mit dessen Wert, sodass auch ein einzelner Messwert als Stufe gezeichnet wird; eine leere Reihe bleibt leer. Der Tooltip zeigt den Abschlusspunkt nicht, und die Summe der Legende zählt ihn nicht. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Abschlusspunkt › should draw a single measurement as one quarter-hour step; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Abschlusspunkt › should extend every series by the end of its last interval; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Abschlusspunkt › should not add a point to an empty series; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Abschlusspunkt › should leave the closing point out of the tooltip)
 * [x] Zahlen in Achsenbeschriftung, Tooltip und Legende stehen im Schweizer Format (Punkt als Dezimal-, Hochkomma als Tausendertrennzeichen). In `messwerte-chart.component.ts` kommt weder `toLocaleString` noch `toFixed` vor; die Formatierung läuft ausschliesslich über `formatSwissNumber`. (Projektweit sind beide zulässig — `number-utils.ts` verwendet `toFixed` selbst, und genau dort gehört es hin.)
 * [x] Die Legendennamen kommen aus dem `TranslationService` (`TOTAL`, `ZEV`) und stehen beim Zeichnen in der aktiven Sprache. **Nicht** gefordert ist, dass ein Sprachwechsel ein bereits gezeichnetes Diagramm erneuert (FR-3, bekannte Einschränkung).
 * [x] Achsen-, Gitter- und Reihenfarben stammen aus Design-Tokens. **Keine Diagrammfarbe** ist ein Literal; die Rückfallwerte im gemeinsamen Farb-Baustein sind erlaubt und erwünscht (ohne sie wäre das Diagramm unsichtbar, falls ein Token fehlt).
-* [x] Die Achsentitel kommen aus `ZEIT` und `KWH`, nicht aus festem Text.
+* [x] Der Titel der y-Achse kommt aus `KWH`, nicht aus festem Text; die Zeitachse trägt keinen Titel. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › optionen › should name the y axis from the translation service and leave the time axis untitled)
 * [x] Das Diagramm folgt einer Grössenänderung des Panels (kein `responsive: false`, keine manuelle Canvas-Berechnung).
 * [x] Beim Verlassen der Seite wird die ECharts-Instanz freigegeben und der `ResizeObserver` abgemeldet.
 
@@ -255,3 +259,11 @@ Am 06.11.2026 wurde die Bedienung auf Wunsch des Benutzers an die Statistik ange
 Vorher zeichnete die Seite ausschliesslich ein Diagramm je Einheit, und §7 schloss „zusätzliche Reihen" und jede „Änderung der Datenauswahl" aus. Bezug und Rücklieferung desselben Zählers liessen sich nur in zwei Panels untereinander vergleichen.
 
 Am 20.11.2026 kam auf Wunsch des Benutzers der Zusatzeintrag je Messpunkt dazu. Zwei Festlegungen stammen aus der Umsetzung, nicht aus dem Wunsch: Das Diagramm zeigt je Einheit nur `total` (ohne ZEV-Reihe), und „Alle auswählen" schliesst die Messpunkt-Einträge ein — Letzteres, damit „alle" weiterhin alle Kästchen der Liste meint.
+
+### A.3 Kein Titel an der Zeitachse (FR-2, 22.11.2026)
+
+Vorher trug die x-Achse den Titel „Zeit“ (`ZEIT`), mittig unter der Achse. Dort liegt auch der Zoom-Schieber; der Titel stand mitten in ihm und war kaum lesbar. Das Kriterium lautete „Die Achsentitel kommen aus `ZEIT` und `KWH`“. Der Titel ist am 22.11.2026 auf Wunsch des Benutzers entfallen. Der Übersetzungs-Key `ZEIT` bleibt bestehen.
+
+### A.4 Abschlusspunkt der Stufenlinie (FR-2, 22.11.2026)
+
+Vorher endete jede Reihe mit ihrem letzten Messwert. Weil die Stufenlinie einen Wert erst bis zum nächsten Punkt zeichnet, fehlte die letzte Viertelstunde im Bild. Aufgefallen ist es am 21.11.2026 an der frisch angelegten Einheit „Verbrauch gesamt (Solar-Log)“: Sie hatte genau einen Messwert (23:15, 0.140 kWh), die Legende nannte die Summe, das Diagramm blieb leer.

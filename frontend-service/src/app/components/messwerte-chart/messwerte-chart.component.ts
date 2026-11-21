@@ -16,6 +16,9 @@ import { blaettereZeitraum, formatSwissDateTime, monatsende, toIsoDate, vorquart
 import { ChartFarben, chartFarben } from '../../utils/chart-farben';
 import { ladeECharts } from '../../utils/echarts-loader';
 
+/** Länge eines Messintervalls: `messwerte.zeit` trägt den Beginn einer Viertelstunde. */
+const INTERVALL_MS = 15 * 60 * 1000;
+
 interface ChartData {
   /** Eindeutig je Diagramm: die Einheit-ID oder `messpunkt-<n>`. Teil der DOM-ID des Behälters. */
   schluessel: string;
@@ -373,7 +376,9 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
       legend: { type: 'scroll', top: 0, textStyle: { color: farben.text } },
       tooltip: {
         trigger: 'axis',
-        formatter: (params: { seriesName: string; value: [number, number] }[]) => {
+        formatter: (alle: { seriesName: string; value: number[] }[]) => {
+          // Der Abschlusspunkt (siehe mitAbschluss) ist kein Messwert und hat keinen Tooltip.
+          const params = alle.filter(p => !p.value[2]);
           if (params.length === 0) {
             return '';
           }
@@ -383,12 +388,10 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
           return [kopf, ...zeilen].join('<br>');
         }
       },
+      // Kein Achsentitel: "Zeit" stand mitten im Zoom-Schieber darunter, und dass die Achse die
+      // Zeit zeigt, sagen die Uhrzeiten an ihr ohnehin (Specs/EChart.md, FR-2).
       xAxis: {
         type: 'time',
-        name: this.translationService.translate('ZEIT'),
-        nameLocation: 'middle',
-        nameGap: 30,
-        nameTextStyle: { color: farben.text },
         axisLine: { lineStyle: { color: farben.achse } },
         axisLabel: { color: farben.text }
       },
@@ -442,8 +445,27 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
       // Ohne Farbe (dritte und weitere Reihe eines Messpunkts) waehlt ECharts aus seiner Palette.
       lineStyle: farbe ? { color: farbe, width: 2 } : { width: 2 },
       ...(farbe ? { itemStyle: { color: farbe } } : {}),
-      data: daten
+      data: this.mitAbschluss(daten)
     };
+  }
+
+  /**
+   * Hängt an eine Reihe den **Abschlusspunkt** an: das Ende des letzten Intervalls, mit dessen Wert.
+   *
+   * Eine Stufenlinie (`step: 'end'`) zeichnet jeden Wert als waagrechtes Stück bis zum **nächsten**
+   * Punkt. Der letzte Punkt hat keinen nächsten: Seine Viertelstunde fehlte im Bild, und eine
+   * Reihe mit einem einzigen Messwert zeichnete gar nichts — obwohl die Legende eine Summe
+   * nannte. Belegt am 21.11.2026 an einer frisch angelegten Einheit mit genau einem Intervall.
+   *
+   * Der Punkt trägt als drittes Element eine `1`, damit der Tooltip ihn überspringt: Er ist kein
+   * Messwert. In die Summe der Legende geht er nicht ein, sie wird aus den Messwerten gebildet.
+   */
+  private mitAbschluss(daten: number[][]): number[][] {
+    if (daten.length === 0) {
+      return daten;
+    }
+    const letzter = daten[daten.length - 1];
+    return [...daten, [letzter[0] + INTERVALL_MS, letzter[1], 1]];
   }
 
 }

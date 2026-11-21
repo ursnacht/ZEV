@@ -388,11 +388,12 @@ describe('MesswerteChartComponent', () => {
       expect(dataZoom.map(z => z.type)).toEqual(['inside', 'slider']);
     });
 
-    it('should name the axes from the translation service', () => {
+    it('should name the y axis from the translation service and leave the time axis untitled', () => {
       const optionen = privat().optionen(messwerte);
 
-      expect((optionen['xAxis'] as { name: string })['name']).toBe('ZEIT');
       expect((optionen['yAxis'] as { name: string })['name']).toBe('KWH');
+      // Kein Titel an der Zeitachse: Er stand mitten im Zoom-Schieber.
+      expect((optionen['xAxis'] as { name?: string })['name']).toBeUndefined();
     });
 
     it('should work with an empty data set', () => {
@@ -509,8 +510,9 @@ describe('MesswerteChartComponent', () => {
       expect(series[0].name).toBe('Bezug von BKW (Σ 1.500 KWH)');
       expect(series[1].name).toBe('Rücklieferung an BKW (Σ -2.250 KWH)');
       // Nicht gespiegelt: Die Ruecklieferung ist negativ gespeichert und bleibt es.
-      expect(series[0].data.map(p => p[1])).toEqual([1.5, 0]);
-      expect(series[1].data.map(p => p[1])).toEqual([0, -2.25]);
+      // Je Reihe die beiden Messwerte, dazu der Abschlusspunkt mit dem letzten Wert.
+      expect(series[0].data.map(p => p[1])).toEqual([1.5, 0, 0]);
+      expect(series[1].data.map(p => p[1])).toEqual([0, -2.25, -2.25]);
       // Zwei verschiedene Reihenfarben, beide gesetzt.
       expect(series[0].lineStyle.color).toBeTruthy();
       expect(series[1].lineStyle.color).toBeTruthy();
@@ -554,6 +556,55 @@ describe('MesswerteChartComponent', () => {
 
       expect(series[1].data).toEqual([]);
       expect(series[1].name).toBe('Rücklieferung an BKW (Σ 0.000 KWH)');
+    });
+  });
+
+  // Specs/EChart.md, FR-2: Auch das letzte Intervall ist zu sehen
+  describe('Abschlusspunkt', () => {
+    const tooltip = (optionen: Record<string, unknown>) =>
+      (optionen['tooltip'] as { formatter: (p: { seriesName: string; value: number[] }[]) => string })
+        .formatter;
+
+    it('should draw a single measurement as one quarter-hour step', () => {
+      // Ohne Abschlusspunkt hat die Stufenlinie nur EINEN Punkt und zeichnet nichts - die Legende
+      // nennt aber eine Summe. So sah eine Einheit mit genau einem Intervall aus.
+      const einer: MesswertData[] = [{ zeit: '2026-11-21T23:15:00', total: 0.14, zev: 0 }];
+      const start = new Date('2026-11-21T23:15:00').getTime();
+
+      const serien = privat().optionen(einer)['series'] as { name: string; data: number[][] }[];
+
+      expect(serien[0].data).toEqual([[start, 0.14], [start + 15 * 60 * 1000, 0.14, 1]]);
+      // Die Summe kommt aus dem Messwert, der Abschlusspunkt zaehlt nicht doppelt.
+      expect(serien[0].name).toBe('TOTAL (Σ 0.140 KWH)');
+    });
+
+    it('should extend every series by the end of its last interval', () => {
+      const serien = privat().optionen(messwerte)['series'] as { data: number[][] }[];
+      const ende = new Date('2026-01-15T10:15:00').getTime() + 15 * 60 * 1000;
+
+      expect(serien[0].data.length).toBe(3);
+      expect(serien[0].data[2]).toEqual([ende, 2.25, 1]);
+      // Die ZEV-Reihe ist gespiegelt - der Abschlusspunkt traegt den gespiegelten Wert.
+      expect(serien[1].data[2]).toEqual([ende, -1.25, 1]);
+    });
+
+    it('should not add a point to an empty series', () => {
+      const serien = privat().optionen([])['series'] as { data: number[][] }[];
+
+      expect(serien[0].data).toEqual([]);
+    });
+
+    it('should leave the closing point out of the tooltip', () => {
+      const optionen = privat().optionen(messwerte);
+      const serien = optionen['series'] as { name: string; data: number[][] }[];
+
+      // Ueber einem Messwert: Zeit und Wert wie bisher.
+      const echt = tooltip(optionen)([{ seriesName: 'Total', value: serien[0].data[1] }]);
+      expect(echt).toContain('15.01.2026 10:15');
+      expect(echt).toContain('Total: 2.250 KWH');
+
+      // Ueber dem Abschlusspunkt: nichts - er ist kein Messwert.
+      expect(tooltip(optionen)([{ seriesName: 'Total', value: serien[0].data[2] }])).toBe('');
     });
   });
 
