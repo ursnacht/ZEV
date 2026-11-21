@@ -383,10 +383,16 @@ journalctl -u pi-gateway.service -f
 ### Mosquitto-Bridge für die gPlugK (Nachbarhaus)
 
 Die gPlugK publizieren selbst an einen Mosquitto auf dem Pi, der `gPlug/#` per Bridge an den
-NAS weiterleitet; das Pi-Gateway ist daran nicht beteiligt. Vorlagen: `deploy/mosquitto-bridge/`
+NAS weiterleitet; bei Hene ist das Pi-Gateway daran nicht beteiligt. Vorlagen: `deploy/mosquitto-bridge/`
 (`zev.conf`, `acl.example`, `bridge.conf.example`, ohne Passwörter). Einrichtung Schritt für
 Schritt: [`docs/Netzwerk-Topologie-Hene.md`](../docs/Netzwerk-Topologie-Hene.md), Abschnitt
 „Setup-Notiz: MQTT-Broker auf dem Raspberry Pi“.
+
+**Lokales Setup:** Das Gateway kann stattdessen ebenfalls an den Mosquitto auf dem Pi
+publizieren (`broker.url: tcp://localhost:1883`); die Bridge leitet dann `gPlug/#` **und** `zev/#`
+weiter. Dafür in den Vorlagen die mit „Lokales Setup“ markierten Zeilen einkommentieren und einen
+Benutzer für das Gateway anlegen. Schritt für Schritt: dieselbe Setup-Notiz, Abschnitt
+„Lokales Setup“.
 
 ## Stand / Abgrenzung
 

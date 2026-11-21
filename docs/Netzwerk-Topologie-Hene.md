@@ -292,7 +292,8 @@ Pi: Reader → lokaler Broker ──(Bridge/VPN)──> NAS-Broker → ZEV
 
 Der Mosquitto auf dem Pi nimmt die Meldungen der gPlugs im LAN entgegen und leitet **nur**
 `gPlug/#` per Bridge an den NAS-Broker weiter. Das Pi-Gateway publiziert weiterhin **direkt**
-an den NAS (Variante B) und benutzt diesen Broker nicht.
+an den NAS (Variante B) und benutzt diesen Broker nicht. Die Abweichung davon — auch das Gateway
+über den Broker auf dem Pi — steht unten im Abschnitt „Lokales Setup“.
 
 ```
 gPlug ──(User gplug)──► Mosquitto Pi ──(Bridge, User zevbridge)──► Mosquitto NAS ──(User zev-backend)──► Backend
@@ -389,6 +390,60 @@ abonniert (`Specs/MQTT-Integration.md`, FR-10), bleiben solche Meldungen folgenl
 gPlugs konfigurieren (Abschnitt „gPlugK“ unten) und mit `mosquitto_sub` auf dem Pi prüfen, ob
 ihre Meldungen ankommen.
 
+### Lokales Setup: auch das Pi-Gateway über den Broker auf dem Pi
+
+Im lokalen Setup publiziert das Pi-Gateway nicht direkt an den NAS, sondern wie die gPlugs an
+den Mosquitto auf dem Pi. Die Bridge leitet dann **beide** Topics weiter. Das entspricht
+Variante C für alle Meldungen: Bei einem Ausfall von VPN oder NAS puffert der Pi-Broker auch die
+Zählerstände des Gateways.
+
+```
+gPlug ──────(User gplug)──────┐
+                              ├─► Mosquitto Pi ──(Bridge, User zevbridge)──► Mosquitto NAS ──► Backend
+Pi-Gateway ─(User pigateway)──┘
+```
+
+Abweichend von den Schritten oben:
+
+1. **Bridge** (`/etc/mosquitto/conf.d/bridge.conf`): zweite Topic-Zeile, in der Vorlage auskommentiert.
+
+   ```conf
+   topic gPlug/# out 1
+   topic zev/# out 1
+   ```
+
+2. **Benutzer für das Gateway** am Pi-Broker anlegen und in `/etc/mosquitto/acl` berechtigen
+   (`42` durch die org_id ersetzen):
+
+   ```bash
+   sudo mosquitto_passwd /etc/mosquitto/passwd pigateway
+   ```
+
+   ```conf
+   user pigateway
+   topic write zev/42/+/messwert
+   ```
+
+   Fehlt der ACL-Eintrag, nimmt der Broker die Meldungen an und verwirft sie stillschweigend —
+   im Gateway sieht das aus wie ein erfolgreicher Publish.
+
+3. **Puffer** (`/etc/mosquitto/conf.d/zev.conf`): `max_queued_messages` ist für rund 300
+   gPlug-Meldungen pro Stunde bemessen. Das Gateway bringt je Zähler 60 pro Stunde dazu; bei 19
+   Zählern reichen 20000 nur noch für rund 14 Stunden. Für wieder etwa drei Tage `100000` setzen.
+
+4. **Gateway** (`/opt/pi-gateway/config.yaml`): `broker.url: tcp://localhost:1883`;
+   `MQTT_USERNAME`/`MQTT_PASSWORD` in `/etc/pi-gateway.env` auf `pigateway` und dessen Passwort.
+
+5. **Neu starten:** `sudo systemctl restart mosquitto && sudo systemctl restart pi-gateway`.
+
+Auf dem NAS muss `zevbridge` auf `zev/#` publizieren dürfen. Ohne Zugriffsregeln (NAS-Abschnitt 3,
+„noch nicht aktiv“) gilt das bereits; mit ACL ist `topic write zev/#` für `zevbridge` zu ergänzen.
+Der User `pi-org1` auf dem NAS entfällt in diesem Setup.
+
+Prüfen wie in Schritt 6, mit `-t 'zev/#'` statt `'gPlug/#'`. Kommen die Meldungen auf dem Pi an
+(dort mit einem Benutzer mitlesen, der `zev/#` lesen darf), aber nicht auf dem NAS, liegt es an
+der Bridge.
+
 ### Fehlerbilder
 
 | Im Log des Pi (`journalctl -u mosquitto`) | Ursache |
@@ -398,6 +453,7 @@ ihre Meldungen ankommen.
 | `Connection Refused: not authorised` bei der Bridge | `zevbridge` fehlt in `MOSQUITTO_USERS` oder Passwort falsch (Schritt 1) |
 | Bridge verbindet sich nicht, kein Refused | NAS-Adresse falsch oder VPN weg – `mosquitto_sub -h <nas-adresse> -u zevbridge …` vom Pi aus testen |
 | gPlug-Meldung kommt auf dem Pi nicht an | `MqttHost`/`MqttUser` im gPlug falsch, Firewall, oder org_id in `acl` und FullTopic verschieden |
+| Lokales Setup: Gateway meldet erfolgreiche Publishes, auf dem NAS kommt nichts an | `topic zev/# out 1` fehlt in `bridge.conf`, oder der ACL-Eintrag für `pigateway` fehlt bzw. trägt die falsche org_id |
 
 ### Sicherheit / Pi-spezifisch
 

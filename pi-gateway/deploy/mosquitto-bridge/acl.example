@@ -7,3 +7,9 @@
 user gplug
 topic write gPlug/42/+/tele/#
 topic read gPlug/42/+/cmnd/#
+
+# "Lokales Setup" (docs/Netzwerk-Topologie-Hene.md): Publiziert auch das Pi-Gateway an diesen
+# Broker, braucht es einen eigenen Benutzer mit Schreibrecht auf seine Messwerte. Ohne den
+# Eintrag nimmt der Broker die Meldungen an und verwirft sie stillschweigend.
+# user pigateway
+# topic write zev/42/+/messwert

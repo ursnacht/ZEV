@@ -22,6 +22,8 @@ read_attempts: 2
 
 broker:
   url: tcp://nas.local:1883      # bzw. tls://nas.local:8883
+  # "Lokales Setup": tcp://localhost:1883 - der Mosquitto auf dem Pi leitet per Bridge an den NAS
+  # weiter (README, Abschnitt "Mosquitto-Bridge"). Dann gelten Benutzer und Passwort des Pi-Brokers.
   username: ${MQTT_USERNAME}     # aus der Umgebung (EnvironmentFile)
   password: ${MQTT_PASSWORD}
   qos: 1                         # 0 oder 1 genügt (absolute Stände sind verlusttolerant)

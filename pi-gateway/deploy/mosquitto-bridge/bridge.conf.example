@@ -10,6 +10,10 @@ remote_username zevbridge
 remote_password <passwort>
 # Nur die gPlug-Meldungen, nur vom Pi zum NAS
 topic gPlug/# out 1
+# "Lokales Setup" (docs/Netzwerk-Topologie-Hene.md): Publiziert auch das Pi-Gateway an diesen
+# Broker statt direkt an den NAS, die folgende Zeile einkommentieren - sonst bleiben seine
+# Meldungen auf dem Pi liegen.
+# topic zev/# out 1
 bridge_protocol_version mqttv311
 # Zusammen mit persistence: puffert bei VPN-/NAS-Ausfall
 cleansession false

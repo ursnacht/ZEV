@@ -9,7 +9,7 @@
 * **Ausgangslage:**
   - Bei Hene liest der Pi **15 Wago-Zähler** (über das Kommunikationsmodul WAGO 879-9000), den **BKW-Bilanzzähler** (über WhatWatt Go) und die **Batterie** (am Hybrid-Wechselrichter) aus – alle per **Modbus TCP** –, dazu Ertrag und Verbrauch eines **Solar-Log** per **HTTP** (FR-9). Vor MQTT stellte er die Daten per **SFTP** bereit; dieser Weg ist abgelöst (`docs/Netzwerk-Topologie-Hene.md`).
   - In `Specs/MQTT-Integration.md` ist diese Pi-Software bewusst **Out of Scope** – dieses Dokument beschreibt sie.
-  - Topologie: Die Software publiziert direkt an den Broker auf dem NAS (Variante B). Ein lokaler Broker + Bridge (Variante C) ist für sie **nicht erforderlich**, da absolute Zählerstände verlusttolerant sind (siehe unten).
+  - Topologie: Die Software publiziert an den unter `broker.url` konfigurierten Broker — bei Hene direkt an den Broker auf dem NAS (Variante B). Im **lokalen Setup** ist das der Mosquitto auf dem Pi, der `zev/#` zusammen mit `gPlug/#` per Bridge an den NAS weiterleitet (`docs/Netzwerk-Topologie-Hene.md`, Abschnitt „Lokales Setup“); für die Software ändert sich dabei nur die Konfiguration. Ein lokaler Broker + Bridge (Variante C) ist für sie **nicht erforderlich**, da absolute Zählerstände verlusttolerant sind (siehe unten).
   - Die **gPlugK im Nachbarhaus** liest diese Software **nicht**: Sie publizieren selbst (`Specs/MQTT-Integration.md`, FR-10). Der Mosquitto, der ihre Meldungen auf dem Pi per Bridge an den NAS weiterleitet, ist Betrieb, nicht Teil dieser Software.
 
 > **Designentscheidung – absolute Zählerstände statt Deltas:** Der Pi überträgt die **absoluten (kumulativen) Zählerstände**, **nicht** berechnete Deltas. Die Delta-/Intervall-Bildung erfolgt im **Backend** (`Specs/MQTT-Integration.md`, FR-6). Vorteil: **verlusttolerant** — geht eine Nachricht verloren, bleibt die Gesamtsumme korrekt (die Differenz zweier empfangener Stände deckt die Lücke), es sinkt nur kurz die Auflösung. Dadurch ist der Pi **weitgehend zustandslos** (keine „letzter Stand"-Persistenz nötig) und QoS/Pufferung entspannen sich deutlich.
@@ -87,7 +87,7 @@
 ### FR-4: Übertragung & Pufferung
 1. Bei nicht erreichbarem Broker/VPN ist ein **Nachrichtenverlust unkritisch** — der nächste erfolgreich übertragene Stand schliesst die Lücke (Backend bildet die Differenz).
 2. **Keine Pufferung** – eine Pufferung brächte nur die *zeitliche Auflösung* während Ausfällen zurück, nicht die Energie. Wäre sie je nötig: ein lokaler Mosquitto + Bridge (Variante C) oder eine einfache in-process/Disk-Queue. **Kein** zwingender Store-and-Forward.
-3. Ohne Pufferung reicht ein direkter Publish an den NAS-Broker (Variante B).
+3. Ohne Pufferung reicht ein direkter Publish an den NAS-Broker (Variante B). Publiziert das Gateway an einen Mosquitto auf dem Pi mit Bridge (lokales Setup), puffert dieser — eine Eigenschaft des Brokers, nicht der Software.
 
 ### FR-5: Konfiguration
 1. **Flexible Zähler-Liste:** Die Zähler werden als **Liste beliebiger Länge** konfiguriert — typisch **10–20 oder mehr**, keine feste Anzahl im Code. Jeder Eintrag beschreibt einen Zähler vollständig: `messpunkt`, Protokoll, Host/IP und Port, dazu je Protokoll bei Modbus Unit-ID und Register-Mapping, beim Solar-Log die Schlüssel (FR-9).
