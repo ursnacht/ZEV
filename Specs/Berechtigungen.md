@@ -60,13 +60,19 @@ Die Rollen-Spalten sind aus der obigen Fachrolle→Permission-Zuordnung abgeleit
 | Startseite ⁰                                         | – (authentifiziert)      | ✅  | ✅        | ✅        |
 | Einheiten – Liste ansehen                            | `einheit:read`           | ✅  | ✅        | ✅        |
 | Einheiten – anlegen / bearbeiten / löschen (KI-Matching) | `einheit:write`      | ❌  | ✅        | ✅        |
+| Messpunkt-Empfang ansehen                            | `einheit:read`           | ✅  | ✅        | ✅        |
+| Messpunkt-Empfang – Einträge löschen                 | `einheit:write`          | ❌  | ✅        | ✅        |
 | Messwerte-Grafik ansehen                             | `messwerte:read`         | ✅  | ✅        | ✅        |
 | Messwerte-Upload (CSV + KI-Matching) ¹               | `messwerte:write`        | ❌  | ✅        | ✅        |
 | Solarverteilung berechnen ²                          | `messwerte:write`        | ❌  | ✅        | ✅        |
 | Statistik ansehen & PDF-Export                       | `statistik:read`         | ✅  | ✅        | ✅        |
 | Rechnungen generieren & herunterladen                | `rechnungen:manage`      | ✅  | ✅        | ✅        |
+| Tarifpositionen verwalten ⁷                          | `rechnungen:manage`      | ✅  | ✅        | ✅        |
+| Nebenkostenabrechnung erfassen & abschliessen ⁸      | `nebenkosten:manage`     | ✅  | ✅        | ✅        |
+| Nebenkosten-Rechnungen generieren & herunterladen ⁸  | `nebenkosten:manage` **und** `rechnungen:manage` | ✅  | ✅        | ✅        |
 | Debitorenkontrolle ⁴                                 | `debitoren:manage`       | ✅  | ✅        | ✅        |
-| Tarife verwalten                                     | `tarife:manage`          | ❌  | ✅        | ✅        |
+| Tarife verwalten, dynamische Preiszeitreihe ⁹        | `tarife:manage`          | ❌  | ✅        | ✅        |
+| Einspeisesteuerung ansehen & nachrechnen ⁶           | `tarife:manage`          | ❌  | ✅        | ✅        |
 | Mieterverwaltung                                     | `mieter:manage`          | ❌  | ✅        | ✅        |
 | Übersetzungs-Editor (verwalten)                      | `translations:manage`    | ❌  | ✅        | ❌        |
 | **Einstellungen (Rechnungsangaben) bearbeiten**      | `einstellungen:write`    | ❌  | ✅        | ✅        |
@@ -83,13 +89,21 @@ Die Rollen-Spalten sind aus der obigen Fachrolle→Permission-Zuordnung abgeleit
 
 ¹ Zusätzlich per Feature-Flag `MESSWERTE_UPLOAD` gesteuert (`FeatureFlagGuard`). Ist das Flag inaktiv, ist die Route für alle gesperrt.
 
-² Die Seite `/solar-calculation` ist per Route auch für Leser erreichbar, die eigentliche Berechnung (`POST /api/messwerte/calculate-distribution` und `.../calculation-progress`) erfordert jedoch `messwerte:write`.
+² Die Seite `/solar-calculation` und die Berechnung selbst (`POST /api/messwerte/calculate-distribution`, `GET .../calculation-progress`) erfordern beide `messwerte:write` – die Route ist für Leser gesperrt.
 
 ³ Das **Lesen** der effektiven Feature-Flags (`GET /api/feature-flags`, Permission `featureflags:read`) ist für alle Fachrollen erlaubt (interne UI-Steuerung). Das **Verwalten** erfordert `featureflags:manage`. In der `EinstellungenComponent` wird die Feature-Flag-Sektion nur bei `featureflags:manage` angezeigt.
 
 ⁴ Die Debitorkontrolle lädt für das Anlegen/Bearbeiten (Mieter-Dropdown) zusätzlich die Mieter-Liste (`GET /api/mieter`, Permission `mieter:read`). Daher hat jede Fachrolle mit `debitoren:manage` auch `mieter:read` (die Debitoren-Tabelle selbst nutzt `mieterName`/`einheitName` aus dem JOIN und benötigt sie nicht).
 
 ⁵ Generische, **read-only** Tabellenansicht innerhalb der Seite `/einstellungen` (nur `zev_admin`). Die Seite selbst erfordert `einstellungen:write` (auch `org_admin`), der Datenbank-Bereich wird jedoch nur bei `datenbank:read` angezeigt und ist backend-seitig separat geschützt. Mandantenübergreifende Rohansicht (orgFilter nicht angewendet).
+
+⁶ Zusätzlich per Feature-Flag `EINSPEISESTEUERUNG` gesteuert (`FeatureFlagGuard` an der Route `/einspeisesteuerung`; das Backend prüft das Flag ebenfalls und antwortet sonst mit `FEATURE_FLAG_DEAKTIVIERT`). Dieselbe Permission wie die Preiszeitreihe, mit der sich die Einspeisesteuerung die Datengrundlage teilt; darunter fällt auch die Produktionsprognose der Ladeplanung (`GET /api/einspeisesteuerung/prognose`, `Specs/Ladeplanung.md`).
+
+⁷ Das **Lesen** der Tarifpositionen (`GET /api/tarifpositionen`, `GET /{id}`) erfordert nur `mieter:read`; Anlegen, Ändern und Löschen sowie die Seite `/tarifpositionen` erfordern `rechnungen:manage`.
+
+⁸ Zusätzlich per Feature-Flag `NEBENKOSTENABRECHNUNG` gesteuert (`FeatureFlagGuard` an den Routen `/nebenkosten/…`; das Backend prüft das Flag ebenfalls). Das Erzeugen und Herunterladen der Nebenkosten-Rechnungen verlangt **beide** Permissions zugleich (`nebenkosten:manage` und `rechnungen:manage`).
+
+⁹ Die Preiszeitreihe hat keine eigene Route; sie ist ein Bereich der Seite `/tarife` und erscheint nur mit dem Feature-Flag `PREISZEITREIHE` (`*appFeature`).
 
 ## Öffentlich (ohne Authentifizierung)
 
@@ -122,10 +136,15 @@ Die Spalten `zev_user` / `zev_admin` / `org_admin` sind gleich dargestellt wie i
 | TranslationController    | `GET /list`, `POST`, `PUT`, `DELETE`                                        | `hasAuthority('translations:manage')`    | ❌  | ✅        | ❌        |
 | TarifController          | alle                                                                        | `hasAuthority('tarife:manage')`          | ❌  | ✅        | ✅        |
 | PreiszeitreiheController | alle (`GET`, `POST /download`)                                              | `hasAuthority('tarife:manage')`          | ❌  | ✅        | ✅        |
+| SteuerungController      | alle (`GET /entscheide`, `GET /entscheide/simuliert`, `GET /prognose`, `POST /simulation`) | `hasAuthority('tarife:manage')`          | ❌  | ✅        | ✅        |
 | MieterController         | `GET /api/mieter` (Liste), `GET /{id}`                                       | `hasAuthority('mieter:read')`            | ✅  | ✅        | ✅        |
 | MieterController         | `POST`, `PUT`, `DELETE`                                                      | `hasAuthority('mieter:manage')`          | ❌  | ✅        | ✅        |
 | DebitorController        | alle                                                                        | `hasAuthority('debitoren:manage')`       | ✅  | ✅        | ✅        |
 | RechnungController       | alle                                                                        | `hasAuthority('rechnungen:manage')`      | ✅  | ✅        | ✅        |
+| TarifpositionController  | `GET /api/tarifpositionen`, `GET /{id}`                                      | `hasAuthority('mieter:read')`            | ✅  | ✅        | ✅        |
+| TarifpositionController  | `POST`, `PUT /{id}`, `DELETE /{id}`                                          | `hasAuthority('rechnungen:manage')`      | ✅  | ✅        | ✅        |
+| NkAbrechnungController   | alle (`GET`, `GET /vorlage`, `GET /{id}`, `POST`, `POST /{id}/kopie`, `PUT /{id}`, `PATCH /{id}/abgerechnet`, `DELETE /{id}`) | `hasAuthority('nebenkosten:manage')` | ✅  | ✅        | ✅        |
+| NkRechnungController     | alle (`POST`, `GET /{mieterId}/pdf` unter `/api/nebenkosten/abrechnungen/{abrechnungId}/rechnungen`) | `hasAuthority('nebenkosten:manage') and hasAuthority('rechnungen:manage')` | ✅  | ✅        | ✅        |
 | EinstellungenController  | alle                                                                        | `hasAuthority('einstellungen:write')`    | ❌  | ✅        | ✅        |
 | DatenbankController      | `GET /api/datenbank/tabellen`, `POST /api/datenbank/abfrage`                | `hasAuthority('datenbank:read')`         | ❌  | ✅        | ❌        |
 | FeatureFlagController    | `GET /api/feature-flags`                                                    | `hasAuthority('featureflags:read')`      | ✅  | ✅        | ✅        |
@@ -134,5 +153,6 @@ Die Spalten `zev_user` / `zev_admin` / `org_admin` sind gleich dargestellt wie i
 | SystemmeldungController  | `GET /api/systemmeldungen`, `GET /kategorien`                               | `hasAuthority('systemmeldungen:read')`   | ✅  | ✅        | ✅        |
 | SystemmeldungController  | `PUT /{id}/erledigt`, `DELETE /{id}`                                        | `hasAuthority('systemmeldungen:manage')` | ❌  | ✅        | ✅        |
 | AuthController           | `POST /api/auth/logout`                                                     | `isAuthenticated()`                      | ✅  | ✅        | ✅        |
+| VersionController        | `GET /api/version`                                                          | `isAuthenticated()`                      | ✅  | ✅        | ✅        |
 
 `PingController` (`GET /ping`), `/api/public/**` sowie `/actuator/health|info|prometheus` sind öffentlich; die übrigen Actuator-Endpoints erfordern Basic Auth (siehe Abschnitt oben).
