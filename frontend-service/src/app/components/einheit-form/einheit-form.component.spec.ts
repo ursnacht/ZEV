@@ -369,6 +369,24 @@ describe('EinheitFormComponent', () => {
       expect(checkbox()!.checked).toBe(true);
     });
 
+    it('should show an unchecked nebenkosten checkbox again after the feature was off', async () => {
+      // "Unveraendert" gilt auch fuer den abgewaehlten Zustand: Das Aus- und Einblenden darf
+      // ein false nicht auf den Standardwert zuruecksetzen.
+      component.formData = { name: 'Allgemein', typ: EinheitTyp.CONSUMER, nebenkostenRelevant: false };
+      nebenkostenAktiv.set(false);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(checkbox()).toBeNull();
+
+      nebenkostenAktiv.set(true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(checkbox()!.checked).toBe(false);
+      expect(component.formData.nebenkostenRelevant).toBe(false);
+    });
+
     it('should still send nebenkostenRelevant while the feature is off', () => {
       // Ausgeblendet heisst nicht zurueckgesetzt: Sonst verloere eine Einheit beim Speichern ihr
       // Kennzeichen, nur weil das Feature gerade aus ist.
