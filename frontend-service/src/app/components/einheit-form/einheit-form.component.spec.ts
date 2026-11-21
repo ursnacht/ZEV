@@ -1,8 +1,10 @@
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { EinheitFormComponent } from './einheit-form.component';
 import { Einheit, EinheitTyp } from '../../models/einheit.model';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
+import { FeatureFlagService } from '../../services/feature-flag.service';
 
 describe('EinheitFormComponent', () => {
   let component: EinheitFormComponent;
@@ -12,13 +14,25 @@ describe('EinheitFormComponent', () => {
     translate: (key: string) => key
   };
 
+  /**
+   * Feature NEBENKOSTENABRECHNUNG, in den Tests standardmässig an. Als Signal, weil die
+   * `*appFeature`-Direktive auf eine Änderung reagieren soll wie im Betrieb.
+   */
+  const nebenkostenAktiv = signal(true);
+  const mockFeatureFlagService = {
+    isEnabled: (key: string) => key === 'NEBENKOSTENABRECHNUNG' && nebenkostenAktiv()
+  };
+
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [EinheitFormComponent],
       providers: [
-        { provide: TranslationService, useValue: mockTranslationService }
+        { provide: TranslationService, useValue: mockTranslationService },
+        { provide: FeatureFlagService, useValue: mockFeatureFlagService }
       ]
     }).compileComponents();
+
+    nebenkostenAktiv.set(true);
 
     fixture = TestBed.createComponent(EinheitFormComponent);
     component = fixture.componentInstance;
@@ -333,6 +347,41 @@ describe('EinheitFormComponent', () => {
       expect(component.formData.nebenkostenRelevant).toBe(true);
       expect(checkbox()).not.toBeNull();
       expect(checkbox()!.checked).toBe(true);
+    });
+
+    it('should hide the nebenkosten checkbox for a CONSUMER while the feature is off', async () => {
+      // Ohne das Feature gibt es keine Abrechnung, in der die Einheit als Wohnung zaehlen koennte.
+      nebenkostenAktiv.set(false);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(component.formData.typ).toBe(EinheitTyp.CONSUMER);
+      expect(checkbox()).toBeNull();
+      expect(element().textContent).not.toContain('EINHEIT_NEBENKOSTEN_RELEVANT');
+
+      // Wird das Feature eingeschaltet, erscheint sie - mit dem unveraenderten Wert.
+      nebenkostenAktiv.set(true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(checkbox()).not.toBeNull();
+      expect(checkbox()!.checked).toBe(true);
+    });
+
+    it('should still send nebenkostenRelevant while the feature is off', () => {
+      // Ausgeblendet heisst nicht zurueckgesetzt: Sonst verloere eine Einheit beim Speichern ihr
+      // Kennzeichen, nur weil das Feature gerade aus ist.
+      nebenkostenAktiv.set(false);
+      const gespeichert = vi.fn();
+      component.save.subscribe(gespeichert);
+      component.formData = { name: 'Allgemein', typ: EinheitTyp.CONSUMER, nebenkostenRelevant: false };
+      fixture.detectChanges();
+
+      component.onSubmit();
+
+      expect(gespeichert).toHaveBeenCalledWith(
+        expect.objectContaining({ typ: EinheitTyp.CONSUMER, nebenkostenRelevant: false }));
     });
 
     it('should hide the nebenkosten checkbox for every type other than CONSUMER', () => {

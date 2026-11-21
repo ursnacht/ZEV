@@ -4,11 +4,12 @@ import { Einheit, EinheitTyp, MAX_MESSPUNKT_LAENGE } from '../../models/einheit.
 
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { IconComponent } from '../icon/icon.component';
+import { FeatureFlagDirective } from '../../directives/feature-flag.directive';
 
 @Component({
   selector: 'app-einheit-form',
   standalone: true,
-  imports: [FormsModule, TranslatePipe, IconComponent],
+  imports: [FormsModule, TranslatePipe, IconComponent, FeatureFlagDirective],
   changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './einheit-form.component.html'
 })
