@@ -106,10 +106,10 @@ Tragen **mehrere Einheiten denselben Messpunkt** — typisch Bezug und Rücklief
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
 **Verhalten bleibt**
-* [ ] Die **14 bestehenden E2E-Tests** in `tests/messwerte-grafik.spec.ts` laufen **unverändert** grün — insbesondere der Pixel-Vergleich „Zeitraum mit Messwerten bemalt mehr als einer ohne".
+* [x] Die **14 bestehenden E2E-Tests** in `tests/messwerte-grafik.spec.ts` laufen **unverändert** grün — insbesondere der Pixel-Vergleich „Zeitraum mit Messwerten bemalt mehr als einer ohne".
 * [x] Die Datenauswahl bleibt: Einheiten-Mehrfachauswahl, „Alle auswählen", Quartals-Schaltflächen, `Datum von` zieht `Datum bis` auf das Monatsende, gesperrte Schaltfläche ohne Auswahl, Fehlermeldung bei vertauschtem Zeitraum. (Test: einheit-selector.component.spec.ts › EinheitSelectorComponent › onSelectAllToggle (default - alle) › should select all einheiten including producers; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › onQuarterSelected › should set dateFrom and dateTo from event; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › onDateFromChange › should set dateTo to last day of dateFrom month; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › onSubmit › should show error when dateFrom is after dateTo; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › should keep the submit button disabled until a unit is selected; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Auswahl und Validierung › should keep the submit button disabled without a unit selection; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Auswahl und Validierung › should select every unit via the select-all checkbox)
-* [x] Ein Panel je gewählter Einheit mit Titel `Name [Typ]`; die Erfolgsmeldung nennt Datenpunkte und Einheiten.
-* [x] Beide Datenreihen erscheinen, die ZEV-Reihe negativ aufgetragen.
+* [x] Ein Panel je gewählter Einheit mit Titel `Name [Typ]`; die Erfolgsmeldung nennt Datenpunkte und Einheiten. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › onSubmit › should create one chart entry per selected einheit; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Messpunkt-Diagramm › should title the messpunkt panel with both einheiten and the messpunkt; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Messpunkt-Diagramm › should load an einheit only once when it is selected alone and as part of its messpunkt; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should draw one chart per selected unit; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should report the number of loaded data points)
+* [x] Beide Datenreihen erscheinen, die ZEV-Reihe negativ aufgetragen. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › optionen › should build two series, the ZEV one mirrored below zero; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should paint more when the period contains measurements)
 
 **Bedienung wie Statistik (FR-1a)**
 * [x] „Anzeigen" steht im Quartal-Selektor rechts neben den Quartalsknöpfen; in der Zeile der Datumsfelder steht kein „Anzeigen". (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Bedienung wie Statistik › should place the submit button next to the quarter buttons; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should page the period and jump to today, loading immediately)
@@ -128,33 +128,33 @@ Tragen **mehrere Einheiten denselben Messpunkt** — typisch Bezug und Rücklief
 * [x] Eine Einheit, die einzeln und über ihren Messpunkt gewählt ist, wird **einmal** geladen; die Diagramme der Einheiten stehen vor denen der Messpunkte, und die Erfolgsmeldung zählt die geladenen Einheiten. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Messpunkt-Diagramm › should load an einheit only once when it is selected alone and as part of its messpunkt)
 
 **Neu und geändert**
-* [x] Mausrad/Touch zoomt innerhalb des geladenen Zeitraums, der Slider verschiebt den Ausschnitt — **ohne** neuen HTTP-Aufruf.
-* [x] Die Linie ist eine **Stufenlinie**, ohne Flächenfüllung.
-* [ ] Jede Reihe mit Messwerten endet mit einem Abschlusspunkt 15 Minuten nach ihrem letzten Messwert und mit dessen Wert, sodass auch ein einzelner Messwert als Stufe gezeichnet wird; eine leere Reihe bleibt leer. Der Tooltip zeigt den Abschlusspunkt nicht, und die Summe der Legende zählt ihn nicht. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Abschlusspunkt › should draw a single measurement as one quarter-hour step; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Abschlusspunkt › should extend every series by the end of its last interval; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Abschlusspunkt › should not add a point to an empty series; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Abschlusspunkt › should leave the closing point out of the tooltip)
-* [x] Zahlen in Achsenbeschriftung, Tooltip und Legende stehen im Schweizer Format (Punkt als Dezimal-, Hochkomma als Tausendertrennzeichen). In `messwerte-chart.component.ts` kommt weder `toLocaleString` noch `toFixed` vor; die Formatierung läuft ausschliesslich über `formatSwissNumber`. (Projektweit sind beide zulässig — `number-utils.ts` verwendet `toFixed` selbst, und genau dort gehört es hin.)
-* [x] Die Legendennamen kommen aus dem `TranslationService` (`TOTAL`, `ZEV`) und stehen beim Zeichnen in der aktiven Sprache. **Nicht** gefordert ist, dass ein Sprachwechsel ein bereits gezeichnetes Diagramm erneuert (FR-3, bekannte Einschränkung).
-* [x] Achsen-, Gitter- und Reihenfarben stammen aus Design-Tokens. **Keine Diagrammfarbe** ist ein Literal; die Rückfallwerte im gemeinsamen Farb-Baustein sind erlaubt und erwünscht (ohne sie wäre das Diagramm unsichtbar, falls ein Token fehlt).
+* [x] Mausrad/Touch zoomt innerhalb des geladenen Zeitraums, der Slider verschiebt den Ausschnitt — **ohne** neuen HTTP-Aufruf. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › optionen › should offer zoom inside and as a slider; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should zoom with the mouse wheel without asking the server)
+* [x] Die Linie ist eine **Stufenlinie**, ohne Flächenfüllung. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › reihe › should build a step line with sampling and without symbols)
+* [x] Jede Reihe mit Messwerten endet mit einem Abschlusspunkt 15 Minuten nach ihrem letzten Messwert und mit dessen Wert, sodass auch ein einzelner Messwert als Stufe gezeichnet wird; eine leere Reihe bleibt leer. Der Tooltip zeigt den Abschlusspunkt nicht, und die Summe der Legende zählt ihn nicht. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Abschlusspunkt › should draw a single measurement as one quarter-hour step; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Abschlusspunkt › should extend every series by the end of its last interval; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Abschlusspunkt › should not add a point to an empty series; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Abschlusspunkt › should leave the closing point out of the tooltip)
+* [x] Zahlen in Achsenbeschriftung, Tooltip und Legende stehen im Schweizer Format (Punkt als Dezimal-, Hochkomma als Tausendertrennzeichen). In `messwerte-chart.component.ts` kommt weder `toLocaleString` noch `toFixed` vor; die Formatierung läuft ausschliesslich über `formatSwissNumber`. (Projektweit sind beide zulässig — `number-utils.ts` verwendet `toFixed` selbst, und genau dort gehört es hin.) (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › legende › should combine the translated name with the swiss formatted sum; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Abschlusspunkt › should leave the closing point out of the tooltip; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Achsenbeschriftung › should format the y axis labels in Swiss format; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Achsenbeschriftung › should format tooltip values from 1000 with the thousands separator)
+* [x] Die Legendennamen kommen aus dem `TranslationService` (`TOTAL`, `ZEV`) und stehen beim Zeichnen in der aktiven Sprache. **Nicht** gefordert ist, dass ein Sprachwechsel ein bereits gezeichnetes Diagramm erneuert (FR-3, bekannte Einschränkung). (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › legende › should combine the translated name with the swiss formatted sum; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Abschlusspunkt › should draw a single measurement as one quarter-hour step)
+* [x] Achsen-, Gitter- und Reihenfarben stammen aus Design-Tokens. **Keine Diagrammfarbe** ist ein Literal; die Rückfallwerte im gemeinsamen Farb-Baustein sind erlaubt und erwünscht (ohne sie wäre das Diagramm unsichtbar, falls ein Token fehlt). (Test: chart-farben.spec.ts › chartFarben › should prefer the token over the fallback; Test: chart-farben.spec.ts › chartFarben › should fall back when a token is missing; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Messpunkt-Diagramm › should draw one series per einheit with its stored sign and without a ZEV series)
 * [x] Der Titel der y-Achse kommt aus `KWH`, nicht aus festem Text; die Zeitachse trägt keinen Titel. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › optionen › should name the y axis from the translation service and leave the time axis untitled)
-* [x] Das Diagramm folgt einer Grössenänderung des Panels (kein `responsive: false`, keine manuelle Canvas-Berechnung).
-* [x] Beim Verlassen der Seite wird die ECharts-Instanz freigegeben und der `ResizeObserver` abgemeldet.
+* [x] Das Diagramm folgt einer Grössenänderung des Panels (kein `responsive: false`, keine manuelle Canvas-Berechnung). (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › createChart › should observe the container and resize the chart when it changes)
+* [x] Beim Verlassen der Seite wird die ECharts-Instanz freigegeben und der `ResizeObserver` abgemeldet. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › ngOnDestroy › should dispose every instance and disconnect every observer)
 
 **Sicherheit unverändert**
-* [x] `/chart` bleibt mit der Permission `messwerte:read` erreichbar und ohne sie gesperrt (`composite-roles.spec.ts` deckt das mit einem Fall ab).
+* [x] `/chart` bleibt mit der Permission `messwerte:read` erreichbar und ohne sie gesperrt (`composite-roles.spec.ts` deckt das mit einem Fall ab). (E2E: composite-roles.spec.ts › zev_user kann die Messwerte-Grafik ansehen (messwerte:read))
 
 **Bundle und Abhängigkeit**
 * [x] `chart.js` steht nicht mehr in `package.json`, und `grep -r "chart.js" frontend-service/src` findet nichts.
-* [x] Nach dem Produktionsbau ist `main-*.js` **kleiner** als vorher; die Zahl wird gemessen und im Umsetzungsplan festgehalten.
-* [x] ECharts liegt weiterhin **nicht** im Initial-Bundle, sondern in eigenen Chunks (dynamischer Import).
-* [x] Auf der Seite **Lizenzen** erscheint chart.js nicht mehr.
+* [x] Nach dem Produktionsbau ist `main-*.js` **kleiner** als vorher; die Zahl wird gemessen und im Umsetzungsplan festgehalten. (Nachweis: EChart_Umsetzungsplan.md, „Bundle (Phasen 1 und 7)“)
+* [x] ECharts liegt weiterhin **nicht** im Initial-Bundle, sondern in eigenen Chunks (dynamischer Import). (Nachweis: utils/echarts-loader.ts:37; EChart_Umsetzungsplan.md, „Bundle (Phasen 1 und 7)“)
+* [x] Auf der Seite **Lizenzen** erscheint chart.js nicht mehr. (Nachweis: src/assets/frontend-licenses.json)
 
 **Gemeinsame Bausteine**
-* [x] Nachladen der Bibliothek, Farben und Zeitformatierung stehen **einmal** im Projekt und werden von beiden Diagrammen genutzt.
-* [x] Die Tests der Preiszeitreihe (37 Unit, 13 E2E) laufen nach der Umstellung unverändert grün.
+* [x] Nachladen der Bibliothek, Farben und Zeitformatierung stehen **einmal** im Projekt und werden von beiden Diagrammen genutzt. (Test: echarts-loader.spec.ts › ladeECharts › should register the modules of both charts; Test: chart-farben.spec.ts › chartFarben › should deliver a colour for every purpose; Test: date-utils.spec.ts › Date Utils › formatSwissDateTime › should format a Date object)
+* [x] Die Tests der Preiszeitreihe (37 Unit, 13 E2E) laufen nach der Umstellung unverändert grün. (Test: preiszeitreihe-chart.component.spec.ts; E2E: preiszeitreihe.spec.ts)
 
 **Fehlerfälle**
-* [x] Scheitert das Nachladen der Bibliothek, erscheint eine Fehlermeldung, und die Seite bleibt bedienbar (Auswahl, Zeitraum, Navigation).
-* [x] Ein Zeitraum ohne Messwerte führt zu einer Meldung mit `0` Datenpunkten; das Panel entsteht, das Diagramm bleibt leer, die Seite bleibt bedienbar.
-* [x] Ein Fehler beim Laden der Messwerte zeigt eine lesbare Meldung (kein `[object Object]`).
+* [x] Scheitert das Nachladen der Bibliothek, erscheint eine Fehlermeldung, und die Seite bleibt bedienbar (Auswahl, Zeitraum, Navigation). (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Nachladen scheitert › should report DIAGRAMM_NICHT_LADBAR once and keep the page usable; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Nachladen scheitert › should not try to load again after a failure)
+* [x] Ein Zeitraum ohne Messwerte führt zu einer Meldung mit `0` Datenpunkten; das Panel entsteht, das Diagramm bleibt leer, die Seite bleibt bedienbar. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › optionen › should work with an empty data set; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should stay usable for a period without measurements)
+* [x] Ein Fehler beim Laden der Messwerte zeigt eine lesbare Meldung (kein `[object Object]`). (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › onSubmit › should show a readable error when loading fails)
 
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
@@ -169,7 +169,7 @@ Tragen **mehrere Einheiten denselben Messpunkt** — typisch Bezug und Rücklief
 * Der dynamische Import lädt ausschliesslich lokal gebündelte Chunks — **kein** CDN, keine externe Quelle.
 
 ### NFR-3: Kompatibilität
-* **Keine Datenbank-Änderung, keine Migration, keine neuen Übersetzungs-Keys** (`TOTAL`, `ZEV`, `ZEIT` existieren).
+* **Keine Datenbank-Änderung, keine Migration, keine neuen Übersetzungs-Keys** (`TOTAL`, `ZEV`, `KWH` existieren).
 * Keine Änderung an Backend, API oder DTOs.
 * Reiner Frontend-Umbau: Ein Rückweg ist ein einzelner Commit. Es gibt keinen migrierten Datenbestand, der einen Rückweg blockieren könnte.
 * Die Statistik-Seite und alle übrigen Masken bleiben unberührt.
@@ -260,10 +260,10 @@ Vorher zeichnete die Seite ausschliesslich ein Diagramm je Einheit, und §7 schl
 
 Am 20.11.2026 kam auf Wunsch des Benutzers der Zusatzeintrag je Messpunkt dazu. Zwei Festlegungen stammen aus der Umsetzung, nicht aus dem Wunsch: Das Diagramm zeigt je Einheit nur `total` (ohne ZEV-Reihe), und „Alle auswählen" schliesst die Messpunkt-Einträge ein — Letzteres, damit „alle" weiterhin alle Kästchen der Liste meint.
 
-### A.3 Kein Titel an der Zeitachse (FR-2, 22.11.2026)
+### A.3 Kein Titel an der Zeitachse (FR-2, 21.11.2026)
 
-Vorher trug die x-Achse den Titel „Zeit“ (`ZEIT`), mittig unter der Achse. Dort liegt auch der Zoom-Schieber; der Titel stand mitten in ihm und war kaum lesbar. Das Kriterium lautete „Die Achsentitel kommen aus `ZEIT` und `KWH`“. Der Titel ist am 22.11.2026 auf Wunsch des Benutzers entfallen. Der Übersetzungs-Key `ZEIT` bleibt bestehen.
+Vorher trug die x-Achse den Titel „Zeit“ (`ZEIT`), mittig unter der Achse. Dort liegt auch der Zoom-Schieber; der Titel stand mitten in ihm und war kaum lesbar. Das Kriterium lautete „Die Achsentitel kommen aus `ZEIT` und `KWH`“. Der Titel ist am 21.11.2026 auf Wunsch des Benutzers entfallen. Der Übersetzungs-Key `ZEIT` bleibt bestehen.
 
-### A.4 Abschlusspunkt der Stufenlinie (FR-2, 22.11.2026)
+### A.4 Abschlusspunkt der Stufenlinie (FR-2, 21.11.2026)
 
 Vorher endete jede Reihe mit ihrem letzten Messwert. Weil die Stufenlinie einen Wert erst bis zum nächsten Punkt zeichnet, fehlte die letzte Viertelstunde im Bild. Aufgefallen ist es am 21.11.2026 an der frisch angelegten Einheit „Verbrauch gesamt (Solar-Log)“: Sie hatte genau einen Messwert (23:15, 0.140 kWh), die Legende nannte die Summe, das Diagramm blieb leer.

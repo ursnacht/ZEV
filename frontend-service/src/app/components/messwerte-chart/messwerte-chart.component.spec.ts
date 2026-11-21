@@ -608,6 +608,143 @@ describe('MesswerteChartComponent', () => {
     });
   });
 
+  describe('Achsenbeschriftung', () => {
+    it('should format the y axis labels in Swiss format', () => {
+      const yAchse = privat().optionen(messwerte)['yAxis'] as
+        { axisLabel: { formatter: (wert: number) => string } };
+
+      // Hochkomma als Tausender-, Punkt als Dezimaltrennzeichen - auch an der Achse.
+      expect(yAchse.axisLabel.formatter(1234.5)).toBe("1'234.500");
+      expect(yAchse.axisLabel.formatter(-0.25)).toBe('-0.250');
+    });
+
+    it('should format tooltip values from 1000 with the thousands separator', () => {
+      const optionen = privat().optionen(messwerte);
+      const formatter = (optionen['tooltip'] as
+        { formatter: (p: { seriesName: string; value: number[] }[]) => string }).formatter;
+
+      expect(formatter([{ seriesName: 'Total', value: [0, 12345.6789] }]))
+        .toContain("Total: 12'345.679 KWH");
+    });
+  });
+
+  // Specs/EChart.md, FR-7: Nachladen der Bibliothek scheitert
+  describe('Nachladen scheitert', () => {
+    /** Wartet die Kette aus `onSubmit` ab: laden (scheitert), melden. */
+    const warte = async (): Promise<void> => {
+      await fixture.whenStable();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      fixture.detectChanges();
+    };
+    let lader: ReturnType<typeof vi.fn<() => Promise<null>>>;
+
+    beforeEach(() => {
+      // Hier laeuft das echte Zeichnen - bis zum Lader, der nichts liefert.
+      zeichnenSpy.mockRestore();
+      lader = vi.fn<() => Promise<null>>().mockResolvedValue(null);
+      (component as unknown as { lade: () => Promise<null> }).lade = lader;
+    });
+
+    it('should report DIAGRAMM_NICHT_LADBAR once and keep the page usable', async () => {
+      messwerteServiceSpy.getMesswerteByEinheit.mockReturnValue(of(messwerte));
+      component.selectedEinheiten = [mockConsumer, mockProducer];
+      fixture.detectChanges();
+
+      component.onSubmit();
+      await warte();
+
+      // Eine Meldung fuer zwei Einheiten, nicht eine je Einheit.
+      expect(lader).toHaveBeenCalledTimes(1);
+      expect(component.message).toBe('DIAGRAMM_NICHT_LADBAR');
+      expect(component.messageType).toBe('error');
+      expect(component.bibliothekFehlt).toBe(true);
+      expect(component.bibliothekLaedt).toBe(false);
+      // Die Panels stehen mit dem Hinweis, gezeichnet ist nichts.
+      const hinweise: HTMLElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('.messwerte-chart__hinweis'));
+      expect(hinweise.map(h => h.textContent?.trim())).toEqual(
+        ['DIAGRAMM_NICHT_LADBAR', 'DIAGRAMM_NICHT_LADBAR']);
+      expect(component.charts.every(c => c.instanz === null)).toBe(true);
+      // Die Seite bleibt bedienbar: nicht im Ladezustand, Anzeigen und Blaettern frei.
+      expect(component.loading).toBe(false);
+      expect(fixture.nativeElement.querySelector('#grafikAnzeigen').disabled).toBe(false);
+      expect(component.kannBlaettern).toBe(true);
+    });
+
+    it('should not try to load again after a failure', async () => {
+      component.selectedEinheiten = [mockConsumer];
+
+      component.onSubmit();
+      await warte();
+      component.onSubmit();
+      await warte();
+
+      // Der Fehlschlag ist gemerkt: Der zweite Klick laedt die Messwerte, aber nicht die Bibliothek.
+      expect(messwerteServiceSpy.getMesswerteByEinheit).toHaveBeenCalledTimes(2);
+      expect(lader).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // Specs/EChart.md, FR-7: Groessenanpassung
+  describe('createChart', () => {
+    let behaelter: HTMLElement;
+    let beobachtet: Element[];
+    let beobachterCallback: () => void;
+
+    beforeEach(() => {
+      behaelter = document.createElement('div');
+      behaelter.id = 'chart-1';
+      document.body.appendChild(behaelter);
+      beobachtet = [];
+      // jsdom kennt keinen ResizeObserver - und der Test will seinen Callback selbst ausloesen.
+      vi.stubGlobal('ResizeObserver', class {
+        constructor(callback: () => void) { beobachterCallback = callback; }
+        observe(element: Element): void { beobachtet.push(element); }
+        disconnect(): void { /* nichts */ }
+      });
+    });
+
+    afterEach(() => {
+      behaelter.remove();
+      vi.unstubAllGlobals();
+    });
+
+    it('should observe the container and resize the chart when it changes', () => {
+      const instanz = { setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn() };
+      const init = vi.fn().mockReturnValue(instanz);
+      (component as unknown as { echarts: unknown }).echarts = { init };
+      const chartData = { schluessel: '1', einheiten: [mockConsumer], instanz: null };
+
+      (component as unknown as {
+        createChart: (c: typeof chartData, d: Map<number, MesswertData[]>) => void;
+      }).createChart(chartData, new Map([[1, messwerte]]));
+
+      // Gezeichnet in den Behaelter der Einheit, beobachtet wird genau dieser.
+      expect(init).toHaveBeenCalledWith(behaelter);
+      expect(instanz.setOption).toHaveBeenCalledTimes(1);
+      expect(beobachtet).toEqual([behaelter]);
+      expect(chartData.instanz).toBe(instanz);
+
+      // Aendert der Behaelter seine Groesse, misst das Diagramm neu - ohne das bliebe es bei der
+      // Groesse vom ersten Zeichnen.
+      expect(instanz.resize).not.toHaveBeenCalled();
+      beobachterCallback();
+      expect(instanz.resize).toHaveBeenCalledTimes(1);
+    });
+
+    it('should do nothing without a container', () => {
+      const init = vi.fn();
+      (component as unknown as { echarts: unknown }).echarts = { init };
+
+      (component as unknown as {
+        createChart: (c: unknown, d: Map<number, MesswertData[]>) => void;
+      }).createChart({ schluessel: 'gibt-es-nicht', einheiten: [mockConsumer], instanz: null }, new Map());
+
+      expect(init).not.toHaveBeenCalled();
+      expect(beobachtet).toEqual([]);
+    });
+  });
+
   describe('ngOnDestroy', () => {
     it('should dispose every instance and disconnect every observer', () => {
       const dispose = vi.fn();

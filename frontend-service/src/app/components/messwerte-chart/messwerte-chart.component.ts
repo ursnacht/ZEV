@@ -58,6 +58,12 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
    * Bibliothek mit (Specs/EChart.md, NFR-1).
    */
   private echarts?: typeof import('echarts/core');
+  /**
+   * Der Lader als Feld, damit ein Test das Scheitern des Nachladens vorgeben kann. Das Modul
+   * selbst lässt sich im Test nicht ersetzen, und ein echter Fehlschlag bräuchte einen fehlenden
+   * Chunk.
+   */
+  private lade: typeof ladeECharts = ladeECharts;
   /** Je Diagramm ein Beobachter - ersetzt die frühere manuelle Canvas-Berechnung. */
   private observers = new Map<string, ResizeObserver>();
 
@@ -230,12 +236,12 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
   /**
    * Lädt die Bibliothek **einmal** und zeichnet die Diagramme danach nacheinander.
    *
-   * <p>Die Staffelung (100 ms, dann 50 ms je weiteres) stammt aus der chart.js-Zeit und **bleibt**,
+   * <p>Die Staffelung (100 ms, dann 50 ms je weiteres) stammt aus der Zeit vor ECharts und **bleibt**,
    * begruendet durch eine Messung mit „Alle auswaehlen" (16 Einheiten, 113'568 Datenpunkte):
    * Mit ECharts sind alle Diagramme nach 1'817 ms bemalt, davon sind 850 ms diese Staffelung — die
    * Zeichenzeit selbst liegt bei rund 60 ms je Diagramm. Alle 16 unmittelbar hintereinander zu
    * zeichnen hiesse, den Haupt-Thread rund eine Sekunde am Stueck zu blockieren. Gestaffelt
-   * beantwortet die Maske einen Klick in 64 ms (chart.js: 739 ms bei 9'078 ms Gesamtzeit).
+   * beantwortet die Maske einen Klick in 64 ms (vorher: 739 ms bei 9'078 ms Gesamtzeit).
    * Die Kette kostet also weniger als das, was sie staffelt.
    *
    * <p>Der Fehlschlag des Nachladens wird **einmal** gemeldet, nicht je Einheit: Bei „Alle
@@ -266,7 +272,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
     }
     this.bibliothekLaedt = true;
     this.cdr.detectChanges();
-    const geladen = await ladeECharts();
+    const geladen = await this.lade();
     this.bibliothekLaedt = false;
     if (!geladen) {
       this.bibliothekFehlt = true;
@@ -416,7 +422,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
    *
    * Der Name kommt aus dem `TranslationService` (die Keys `TOTAL` und `ZEV` sind vorhanden), die
    * Summe im Schweizer Format über `formatSwissNumber` — früher stand hier fester Text und
-   * `toFixed(3)`.
+   * eine feste Rundung ohne Tausendertrennzeichen.
    */
   private legende(key: string, summe: number, kwh: string): string {
     return this.legendeText(this.translationService.translate(key), summe, kwh);
