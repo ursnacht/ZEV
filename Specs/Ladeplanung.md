@@ -557,16 +557,16 @@ Schlüssel (Flyway, `ON CONFLICT (key) DO NOTHING`), deutsch **mit Umlauten**:
 * [x] Mit weniger als **150 Intervallen mit `gti > 0`** im Lernfenster gibt es **keinen** Faktor
       → Rückfall. (Test: ProduktionsprognoseServiceTest#getPrognose_WenigerAlsMinPunkte_LaesstErwarteteErzeugungLeer;
       ProduktionsprognoseServiceTest#getPrognose_GenauMinPunkte_LerntFaktor; ProduktionsprognoseServiceTest#getPrognose_OhneFaktor_KeinErwarteterUeberschuss)
-* [ ] Eine Tageszeit mit mindestens **5 Intervallen** in den letzten 14 Tagen rechnet mit ihrem
+* [x] Eine Tageszeit mit mindestens **5 Intervallen** in den letzten 14 Tagen rechnet mit ihrem
       eigenen Faktor, sonst mit dem über den ganzen Tag; ältere Punkte zählen für die Tageszeit nicht.
       (Test: ProduktionsprognoseServiceTest#getPrognose_TageszeitMitGenugPunkten_RechnetMitEigenemFaktor;
       ProduktionsprognoseServiceTest#getPrognose_TageszeitMitZuWenigPunkten_FaelltAufTagesfaktorZurueck;
       ProduktionsprognoseServiceTest#getPrognose_TageszeitPunkteAelterAlsVierzehnTage_ZaehlenNichtFuerDieTageszeit)
-* [ ] Die Tageszeit ist die **Normalzeit**: Über eine Zeitumstellung hinweg gehört 13:00 Sommerzeit
+* [x] Die Tageszeit ist die **Normalzeit**: Über eine Zeitumstellung hinweg gehört 13:00 Sommerzeit
       zu 12:00 Winterzeit.
       (Test: ProduktionsprognoseServiceTest#getPrognose_TageszeitUeberZeitumstellung_SchluesselIstNormalzeit;
       OrtszeitTest#normalzeit_UeberDieZeitumstellung_GleicherSonnenstandGleicheZeit)
-* [ ] Eine Tageszeit ohne Erzeugung bei Einstrahlung hat den Faktor **0**, nicht den Rückfall; ohne
+* [x] Eine Tageszeit ohne Erzeugung bei Einstrahlung hat den Faktor **0**, nicht den Rückfall; ohne
       Faktor über den ganzen Tag gibt es auch keinen je Tageszeit.
       (Test: ProduktionsprognoseServiceTest#getPrognose_TageszeitOhneErzeugung_FaktorIstNull;
       ProduktionsprognoseServiceTest#getPrognose_OhneTagesfaktor_KeinFaktorJeTageszeit)
