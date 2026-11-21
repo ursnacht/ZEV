@@ -108,6 +108,31 @@ zaehler:
     register:
       bezug:       { addr: "600C", typ: float32, wortfolge: big, skalierung: 1.0 }
 
+  # SOLAR-LOG ueber dessen JSON-Schnittstelle (protokoll: solarlog-http, kein Modbus).
+  # Gelesen werden Schluessel der Antwort auf POST /getjp; die Zaehler stehen dort in Wh und
+  # werden als kWh publiziert. Schluesseltabelle: README, Abschnitt "Solar-Log".
+  #
+  # Die PRODUKTION gehoert unter 'einspeisung': Das Backend rechnet total = ΔBezug − ΔEinspeisung,
+  # und ein Produzent traegt negatives total. Der VERBRAUCH gehoert unter 'bezug'.
+  # Je Messpunkt ein Eintrag - der fehlende Schluessel wird als 0 publiziert.
+  #
+  # port: Default 80. Hinter einer NAT-Regel der dort freigegebene Port.
+  # max_alter (Default 15m): Werte, deren Zeitstempel weiter von der Zeit des Pi abweicht, werden
+  # verworfen - ein Solar-Log ohne Verbindung zum Wechselrichter antwortet sonst mit stehendem
+  # Zaehler. Braucht dieselbe Zeitzone und richtig gehende Uhren; 'max_alter: 0' schaltet es aus.
+  # - messpunkt: "PV-SolarLog"
+  #   protokoll: solarlog-http
+  #   host: 192.168.20.90
+  #   port: 8081
+  #   schluessel:
+  #     einspeisung: 109         # Ertrag gesamt (Wh)
+  # - messpunkt: "Verbrauch-SolarLog"
+  #   protokoll: solarlog-http
+  #   host: 192.168.20.90
+  #   port: 8081
+  #   schluessel:
+  #     bezug: 115               # Verbrauch gesamt (Wh)
+
 # BKW-Bilanzzaehler (WhatWatt Go): weiterer modbus-tcp-Eintrag mit eigener host, Register in
 # docs/Netzwerk-Topologie-Hene.md (Abschnitt "WhatWatt Go"). Die gPlugK im Nachbarhaus brauchen
 # keinen Eintrag: Sie publizieren selbst (Specs/MQTT-Integration.md, FR-10).

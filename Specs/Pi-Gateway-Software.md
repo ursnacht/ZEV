@@ -7,7 +7,7 @@
   - Automatisierte, zeitnahe Datenerfassung statt manuellem CSV-Upload bzw. dem früheren File/SFTP-Weg.
   - Klar getrennte Verantwortung: der MQTT-Broker verteilt nur Nachrichten, das **Auslesen der Zähler ist Aufgabe dieses separaten Prozesses** (siehe Rollentrennung in `docs/Netzwerk-Topologie-Hene.md`).
 * **Ausgangslage:**
-  - Bei Hene liest der Pi **15 Wago-Zähler** (über das Kommunikationsmodul WAGO 879-9000), den **BKW-Bilanzzähler** (über WhatWatt Go) und die **Batterie** (am Hybrid-Wechselrichter) aus – alle per **Modbus TCP**. Vor MQTT stellte er die Daten per **SFTP** bereit; dieser Weg ist abgelöst (`docs/Netzwerk-Topologie-Hene.md`).
+  - Bei Hene liest der Pi **15 Wago-Zähler** (über das Kommunikationsmodul WAGO 879-9000), den **BKW-Bilanzzähler** (über WhatWatt Go) und die **Batterie** (am Hybrid-Wechselrichter) aus – alle per **Modbus TCP** –, dazu Ertrag und Verbrauch eines **Solar-Log** per **HTTP** (FR-9). Vor MQTT stellte er die Daten per **SFTP** bereit; dieser Weg ist abgelöst (`docs/Netzwerk-Topologie-Hene.md`).
   - In `Specs/MQTT-Integration.md` ist diese Pi-Software bewusst **Out of Scope** – dieses Dokument beschreibt sie.
   - Topologie: Die Software publiziert direkt an den Broker auf dem NAS (Variante B). Ein lokaler Broker + Bridge (Variante C) ist für sie **nicht erforderlich**, da absolute Zählerstände verlusttolerant sind (siehe unten).
   - Die **gPlugK im Nachbarhaus** liest diese Software **nicht**: Sie publizieren selbst (`Specs/MQTT-Integration.md`, FR-10). Der Mosquitto, der ihre Meldungen auf dem Pi per Bridge an den NAS weiterleitet, ist Betrieb, nicht Teil dieser Software.
@@ -90,7 +90,7 @@
 3. Ohne Pufferung reicht ein direkter Publish an den NAS-Broker (Variante B).
 
 ### FR-5: Konfiguration
-1. **Flexible Zähler-Liste:** Die Zähler werden als **Liste beliebiger Länge** konfiguriert — typisch **10–20 oder mehr**, keine feste Anzahl im Code. Jeder Eintrag beschreibt einen Zähler vollständig (Protokoll, Host/IP, Port, Unit-ID, Register-Mapping, `messpunkt`).
+1. **Flexible Zähler-Liste:** Die Zähler werden als **Liste beliebiger Länge** konfiguriert — typisch **10–20 oder mehr**, keine feste Anzahl im Code. Jeder Eintrag beschreibt einen Zähler vollständig: `messpunkt`, Protokoll, Host/IP und Port, dazu je Protokoll bei Modbus Unit-ID und Register-Mapping, beim Solar-Log die Schlüssel (FR-9).
 2. **Neuer Zähler = nur ein Konfigurations-Eintrag** (kein Code-Change, kein Rebuild).
 3. Weitere Parameter über Konfigurationsdatei/Env: `org_id`, Broker-URL/Credentials, Lese-/Publish-Intervall.
 4. **Keine Secrets im Code/Repo** (Broker-Passwort etc. via Env/gesicherte Datei).
@@ -164,9 +164,22 @@
    > Damit lässt sich der gPlug-Ingest des Backends prüfen, bevor ein echter gPlug angeschlossen ist, und später jederzeit ohne Gerät wieder. Echte gPlugs publizieren selbst (Abschnitt 7); `sim-gplug` ist nur im Simulator sinnvoll.
 4. Simulator-Zähler (`sim`, `sim-gplug`) brauchen weder `host` noch `register`.
 
+### FR-9: Solar-Log über HTTP auslesen
+1. **`protokoll: solarlog-http`** liest die kumulativen Zähler eines Solar-Log über dessen offene JSON-Schnittstelle statt über Modbus: je Lesen **eine** Anfrage `POST http://{host}:{port}/getjp` mit dem Rumpf `{"801":{"170":null}}`. Die Werte stehen in der Antwort unter `801` → `170`, geschlüsselt nach Nummern (Tabelle: `pi-gateway/README.md`, Abschnitt „Solar-Log“).
+2. **`schluessel`** ordnet die Nummern den beiden Feldern des Vertrags zu: `schluessel.bezug` und/oder `schluessel.einspeisung`. **Mindestens einer ist Pflicht**; der fehlende wird als `0` publiziert, mit einer `INFO`-Zeile beim Start (wie FR-1.7). Andere Namen im Block sind ein `ConfigError`.
+   * **Die Produktion gehört unter `einspeisung`** (Schlüssel 109, Ertrag gesamt), **der Verbrauch unter `bezug`** (Schlüssel 115, Verbrauch gesamt) — je ein Eintrag mit eigenem `messpunkt`.
+     > Das Backend rechnet `total = ΔBezug − ΔEinspeisung`, und ein Produzent trägt negatives `total` (`MQTT-Integration.md`, FR-6). Unter `bezug` publiziert, zählte die Anlage als Verbraucher.
+3. **Einheit:** Das Solar-Log führt seine Zähler in **Wh**; publiziert wird in kWh (Wert ÷ 1000).
+4. **`port`** ist optional, Default **80** (nicht der Modbus-Default 502). `unit_id`, `register` und `zustand` gibt es für dieses Protokoll nicht; stehen sie am Eintrag, bricht der Start mit `ConfigError` ab (ein kopierter Modbus-Block bliebe sonst unbemerkt wirkungslos).
+5. **Lese-Timeout und Wiederholung** wie bei Modbus: `read_timeout` (global oder je Zähler) begrenzt die Anfrage, `read_attempts` wiederholt einen gescheiterten Read (FR-1.5, FR-1.6).
+6. **Als gescheiterter Read gelten:** Solar-Log nicht erreichbar oder Zeitüberschreitung; abgebrochene oder keine HTTP-Antwort; Antwort ohne den Block `801`/`170`; statt der Werte ein Text (z. B. `ACCESS DENIED`, wenn die Schnittstelle eine Anmeldung verlangt); ein konfigurierter Schlüssel fehlt, ist keine Zahl oder negativ. Ein fehlender Schlüssel wird **nicht** als 0 publiziert.
+7. **Alter der Werte (`max_alter`, Default 15 Minuten):** Schlüssel 100 der Antwort trägt den Zeitstempel der Werte in der Ortszeit des Solar-Log. Weicht er um mehr als `max_alter` von der Ortszeit des Pi ab — in die Vergangenheit **oder** in die Zukunft —, wird der Read verworfen; ebenso, wenn er nicht lesbar ist. `max_alter: 0` schaltet die Prüfung aus. Angabe als Zahl (Sekunden) oder Kurzform (`"5m"`).
+   > Ein Solar-Log ohne Verbindung zu seinen Wechselrichtern antwortet weiter, mit stehendem Zähler — publiziert sähe das aus wie „keine Produktion“. Verworfen fehlen dem Backend die Messungen, und dessen Ausfall-Erkennung meldet es. Voraussetzung: dieselbe Zeitzone und richtig gehende Uhren auf beiden Geräten.
+8. **Zeitstempel im Payload** ist die Zeit des Pi (FR-3.2), nicht die des Solar-Log — dessen Stempel hat keine Zone.
+
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
-* [x] Der Dienst liest **alle konfigurierten Zähler** – beliebig viele, ein zusätzlicher Zähler ist allein ein Konfigurations-Eintrag (bei Hene 15 Wago, BKW über WhatWatt und Batterie, alle Modbus TCP) – und beginnt den nächsten Zyklus `publish_interval` nach dem Beginn des vorigen. (Test: test_config.py › ZaehlerListeTest › test_loadConfig_ZwanzigZaehler_AlleGeladenUndReaderErzeugt; test_main.py › RunLoopTest › test_runLoop_MittlererZaehlerScheitertImmer_UebrigePubliziert, test_runLoop_KurzerZyklus_WartetIntervallMinusZyklusdauer)
+* [x] Der Dienst liest **alle konfigurierten Zähler** – beliebig viele, ein zusätzlicher Zähler ist allein ein Konfigurations-Eintrag (bei Hene 15 Wago, BKW über WhatWatt und Batterie über Modbus TCP, dazu das Solar-Log über HTTP) – und beginnt den nächsten Zyklus `publish_interval` nach dem Beginn des vorigen. (Test: test_config.py › ZaehlerListeTest › test_loadConfig_ZwanzigZaehler_AlleGeladenUndReaderErzeugt; test_main.py › RunLoopTest › test_runLoop_MittlererZaehlerScheitertImmer_UebrigePubliziert, test_runLoop_KurzerZyklus_WartetIntervallMinusZyklusdauer)
 * [x] Nach dem Lesen wartet die Schleife `publish_interval` minus Zyklusdauer; dauert der Zyklus so lang wie das Intervall oder länger, beginnt der nächste sofort (FR-1.4). (Test: test_main.py › RunLoopTest › test_runLoop_KurzerZyklus_WartetIntervallMinusZyklusdauer, test_runLoop_ZyklusLaengerAlsIntervall_LiestSofortWieder, test_runLoop_ZyklusGenauIntervall_WartetNicht)
 * [x] Ohne `read_timeout` in der Config gilt der Default **5 s**; ein gesetzter Wert (Zahl oder `"8s"`/`"1m"`) wird für **alle** Zähler übernommen. (Test: test_config.py › ReadTimeoutConfigTest › test_loadConfig_OhneReadTimeout_Default5sFuerAlle, test_loadConfig_ReadTimeoutGesetzt_GiltFuerAlle)
 * [x] `zaehler[].read_timeout` überschreibt den globalen Wert **nur für diesen Zähler**; die übrigen behalten `read_timeout`. (Test: test_config.py › ReadTimeoutConfigTest › test_loadConfig_ZaehlerReadTimeout_NurFuerDiesenZaehler)
@@ -200,6 +213,18 @@
 * [x] Die gPlug-Meldung trägt `Time` als lokale Zeit ohne Offset und ohne Sekundenbruchteile, `z.Ei`/`z.Eo` in kWh mit 3 Nachkommastellen, `z.SMid` nur mit konfigurierter Seriennummer, dazu `Pi`/`Po` und Tarifregister, deren Summe `Ei` bzw. `Eo` ergibt. (Test: test_sim_gplug.py › GplugPayloadTest › test_payload_TimeLokalOhneOffsetOhneMikrosekunden, test_payload_ZaehlerstaendeInKwhMitDreiStellen, test_payload_TarifregisterSummierenSich, test_payload_OhneSeriennummer_KeinSMid)
 * [x] `Pi`/`Po` sind die mittlere Leistung seit dem letzten Lesen, die erste Meldung trägt 0; ein `sim-gplug`-Zähler meldet keinen Ladezustand. (Test: test_sim_gplug.py › SimGplugReaderTest › test_read_ErsteMeldung_LeistungNull, test_read_FolgeMeldung_LeistungAusZuwachs, test_read_SimGplug_MeldungGplugOhneZustand)
 
+* [x] `protokoll: solarlog-http` wird ohne `register` akzeptiert und erzeugt einen Solar-Log-Reader; `port` ist ohne Angabe 80, bei Modbus weiterhin 502. (Test: test_solarlog_reader.py › SolarLogConfigTest › test_loadConfig_SolarLog_OhneRegisterGueltig, test_loadConfig_OhnePort_Default80, test_loadConfig_ModbusOhnePort_Weiterhin502, test_buildReaders_SolarLog_ErzeugtSolarLogReader)
+* [x] Ohne `host`, ohne `schluessel`, mit leerem Block, mit unbekanntem Namen im Block oder mit einem Schlüssel, der keine ganze Zahl ≥ 0 ist, bricht der Start mit `ConfigError` ab; ein Schlüssel als Zahlentext wird übernommen. (Test: test_solarlog_reader.py › SolarLogConfigTest › test_loadConfig_OhneHost_ConfigError, test_loadConfig_OhneSchluessel_ConfigError, test_loadConfig_UnbekannterSchluesselname_ConfigError, test_loadConfig_SchluesselKeineZahl_ConfigError, test_loadConfig_SchluesselAlsText_Uebernommen)
+* [x] Für das Feld, dessen Schlüssel an einem `solarlog-http`-Eintrag fehlt, erscheint beim Start eine `INFO`-Zeile; mit beiden Schlüsseln keine. (Test: test_solarlog_reader.py › SolarLogReaderTest › test_init_NurEinSchluessel_InfoZeileFuerDasFehlendeFeld)
+* [x] Stehen `register`, `zustand` oder `unit_id` an einem `solarlog-http`-Eintrag, bricht der Start mit `ConfigError` ab. (Test: test_solarlog_reader.py › SolarLogConfigTest › test_loadConfig_ModbusAngabenAmSolarLog_ConfigError)
+* [x] Eine abgebrochene oder nicht als HTTP lesbare Antwort des Solar-Log ist ein gescheiterter Read und wird gemäss `read_attempts` wiederholt. (Test: test_solarlog_reader.py › SolarLogReaderTest › test_read_AbgebrocheneOderKeineHttpAntwort_ReadError, test_readWithRetry_AbgebrocheneAntwortDannErfolg_Wiederholt)
+* [x] Je Read geht genau eine Anfrage `POST …/getjp` mit dem Rumpf `{"801":{"170":null}}` und dem Lese-Timeout des Zählers hinaus. (Test: test_solarlog_reader.py › SolarLogReaderTest › test_read_FragtPerPostAnGetjpMitLeseTimeout)
+* [x] Der Wert unter `schluessel.einspeisung` erscheint als `zaehlerstandEinspeisung` in kWh (Wh ÷ 1000) mit `zaehlerstandBezug` 0; unter `schluessel.bezug` entsprechend umgekehrt; mit beiden Schlüsseln beide Stände. Der Zeitstempel ist der des Pi, mit Zone. (Test: test_solarlog_reader.py › SolarLogReaderTest › test_read_Ertrag_AlsEinspeisungInKwh, test_read_Verbrauch_AlsBezugInKwh, test_read_BeideSchluessel_BeideStaende, test_read_ZeitstempelDesPi_NichtDesSolarLog)
+* [x] Ein nicht erreichbares Solar-Log, eine Zeitüberschreitung, eine Antwort ohne `801`/`170`, ein Text statt der Werte (`ACCESS DENIED`) sowie ein fehlender, nicht numerischer oder negativer Wert unter einem konfigurierten Schlüssel ergeben einen gescheiterten Read — nichts wird publiziert, auch keine 0. (Test: test_solarlog_reader.py › SolarLogReaderTest › test_read_NichtErreichbar_ReadErrorMitUrlUndTimeout, test_read_Zeitueberschreitung_ReadError, test_read_KeinJson_ReadError, test_read_BlockFehlt_ReadError, test_read_ZugriffVerweigert_ReadErrorNenntDenText, test_read_SchluesselFehlt_ReadErrorNenntSchluessel, test_read_WertKeineZahl_ReadError, test_read_NegativerStand_ReadError)
+* [x] Ein gescheiterter Solar-Log-Read wird gemäss `read_attempts` wiederholt; gelingt der zweite Versuch, wird der Stand geliefert. (Test: test_solarlog_reader.py › SolarLogReaderTest › test_readWithRetry_ErstFehlerDannAntwort_LiefertStand)
+* [x] Weicht der Zeitstempel der Werte (Schlüssel 100) um mehr als `max_alter` von der Zeit des Pi ab — zurück oder voraus — oder ist er nicht lesbar, wird der Read verworfen; genau an der Grenze wird publiziert; mit `max_alter: 0` entfällt die Prüfung ganz. (Test: test_solarlog_reader.py › SolarLogReaderTest › test_read_WerteZuAlt_ReadError, test_read_WerteGenauAnDerGrenze_Publiziert, test_read_ZeitstempelInDerZukunft_ReadError, test_read_ZeitstempelNichtLesbar_ReadErrorMitHinweis, test_read_MaxAlterNull_KeinePruefung)
+* [x] `max_alter` gilt ohne Angabe 15 Minuten, nimmt Sekunden oder Kurzform, lässt `0` zu und führt bei ungültiger Angabe zu `ConfigError`. (Test: test_solarlog_reader.py › SolarLogConfigTest › test_loadConfig_SolarLog_OhneRegisterGueltig, test_loadConfig_MaxAlter_KurzformUndNull, test_loadConfig_MaxAlterUngueltig_ConfigError, test_loadConfig_MaxAlterNegativ_MeldungNenntNullAlsErlaubt)
+
 ## 4. Nicht-funktionale Anforderungen (NFR)
 
 ### NFR-1: Performance / Ressourcen
@@ -214,7 +239,7 @@
 ### NFR-3: Zuverlässigkeit
 * **Verlusttoleranz durch absolute Zählerstände** — eine verlorene Nachricht führt nicht zu Datenverlust; daher genügt QoS 0/1 und **keine** zwingende Pufferung.
 * Duplikate sind backend-seitig idempotent (Unique `einheit_id`+`zeit`).
-* Selbstheilung: Reconnect für Broker und Modbus.
+* Selbstheilung: Reconnect für den Broker; jede Messung baut ihre Verbindung zum Zähler neu auf (Modbus wie Solar-Log).
 
 ### NFR-4: Kompatibilität
 * Payload/Topic-Vertrag mit `MQTT-Integration.md` bleibt stabil; Änderungen nur koordiniert.
@@ -223,7 +248,7 @@
 ## 5. Edge Cases & Fehlerbehandlung
 | Szenario | Verhalten |
 |----------|-----------|
-| Zähler (Modbus) nicht erreichbar | Loggen, diesen Zyklus überspringen, Retry (nächster Stand schliesst die Lücke) |
+| Zähler nicht erreichbar (Modbus oder Solar-Log) | Loggen, diesen Zyklus überspringen, Retry (nächster Stand schliesst die Lücke) |
 | Teilweiser/fehlgeschlagener Read | Messwert dieser Quelle verwerfen, nicht publizieren |
 | Abgeschnittene Antwort (`ModbusIOException` der Bibliothek) | Wie ein fehlgeschlagener Read: Retry gemäss `read_attempts`, danach überspringen (FR-1.6) |
 | Zählerüberlauf / Rücksprung / Zählerwechsel | Rohstand wird publiziert; Erkennung/Behandlung im **Backend** (Differenz < 0) |
@@ -232,13 +257,18 @@
 | Uhr driftet / kein NTP | Nicht erkannt: NTP und Zeitzone sind Betriebsvoraussetzung (FR-6.3), Prüfung per `timedatectl status` (Anhang A). Zeitstempel bleiben lokale Zeit mit Offset |
 | Doppelter Publish (nach Reconnect) | Backend behandelt idempotent (Unique-Constraint) |
 | Prozessabsturz/Neustart | `systemd` startet neu; kein „letzter Stand" nötig (zustandslos) |
+| Solar-Log antwortet ohne Werte oder bricht die Antwort ab | Wie ein fehlgeschlagener Modbus-Read: Retry gemäss `read_attempts`, danach überspringen (FR-9.6) |
+| Solar-Log antwortet mit stehendem Zähler (Wechselrichter nicht erreichbar) | Der Zeitstempel der Werte veraltet → Read verworfen, sobald er `max_alter` überschreitet; das Backend meldet den Ausfall (FR-9.7) |
+| Uhr oder Zeitzone von Pi und Solar-Log passen nicht zusammen | Jeder Read wird verworfen, die Meldung nennt die Abweichung. Abhilfe: Uhren richten oder `max_alter: 0` (FR-9.7) |
+| Solar-Log verlangt nach einem Firmware-Update eine Anmeldung | Statt der Werte kommt ein Text → gescheiterter Read, die Meldung nennt ihn (FR-9.6). Anmeldung beherrscht der Reader nicht (Abschnitt 7) |
+| Mehrere Wechselrichter am Solar-Log | Die Zähler 109/115 sind die Summe über alle Geräte; Einzelwerte liest der Reader nicht |
 | `register.einspeisung` fehlt (Konsument) | Register wird **nicht gelesen**, `zaehlerstandEinspeisung: 0` publiziert; `INFO` beim Start (FR-1.7) |
 | `register.einspeisung` **nachträglich entfernt**, obwohl der Zähler bisher echte Werte lieferte | Der Stand fällt einmalig auf 0 → das Backend sieht ein **negatives Delta** und nullt es per Reset-Guard (`MQTT-Integration.md`). Kein Datenschaden, aber die Einspeisung dieses Intervalls fehlt – nur bei Zählern entfernen, die tatsächlich nicht einspeisen |
 
 ## 6. Abhängigkeiten & betroffene Funktionalität
 * **Vertrag/Backend:** `Specs/MQTT-Integration.md` (Topic, Payload, QoS, Delta-Bildung/Aggregation) — **maßgeblich**.
 * **Topologie/Broker:** `docs/Netzwerk-Topologie-Hene.md` (Broker-Setup NAS/Pi, Varianten A/B/C, VPN, SD-Wear, Monitoring).
-* **Hardware/Protokolle:** Wago über Kommunikationsmodul WAGO 879-9000, BKW-Zähler über WhatWatt Go, Hybrid-Wechselrichter (alle Modbus TCP), Mosquitto-Broker, VPN (WireGuard).
+* **Hardware/Protokolle:** Wago über Kommunikationsmodul WAGO 879-9000, BKW-Zähler über WhatWatt Go, Hybrid-Wechselrichter (alle Modbus TCP), Solar-Log (HTTP/JSON, FR-9), Mosquitto-Broker, VPN (WireGuard).
 * **Voraussetzungen:** Einheiten inkl. `messpunkt` sind im ZEV-System angelegt; `org_id` bekannt; VPN eingerichtet.
 * **Kein** ZEV-App-Code betroffen (separates Pi-Artefakt); keine DB-/i18n-/Frontend-Änderung.
 
@@ -249,6 +279,7 @@
 * **VPN-Einrichtung**, Netzwerk-Segmentierung der Zähler.
 * **Bidirektionale Steuerung** (Befehle an Zähler), automatische Geräteregistrierung.
 * **Keine UI**; Konfiguration per Datei/Env.
+* **Solar-Log:** keine Anmeldung an einer passwortgeschützten Schnittstelle, keine Einzelwerte je Wechselrichter, keine Momentanleistung — nur die beiden Summenzähler (FR-9).
 * **gPlugK im Nachbarhaus:** publizieren selbst (`Specs/MQTT-Integration.md`, FR-10); die Mosquitto-Bridge auf dem Pi, die ihre Meldungen weiterleitet, ist Betrieb (`docs/Netzwerk-Topologie-Hene.md`).
 
 ## 8. Offene Fragen
@@ -462,3 +493,8 @@ FR-1.6 lautete: „**Zeitbudget:** `read_timeout × read_attempts` (+ Pausen) je
 
 ### B.12 Takt ab Zyklusbeginn (FR-1.4, FR-1.6, 23.10.2026)
 Bisher wartete die Schleife nach jedem Zyklus das volle `publish_interval` (`stop_event.wait(publish_interval)`); der Abstand zweier Messungen war Zyklusdauer + Intervall. FR-1.6 hielt das am 23.10.2026 fest („Nach jedem Zyklus wartet die Schleife `publish_interval` (FR-1.4); der Abstand zweier Messungen desselben Zählers ist also **Zyklusdauer + `publish_interval`** … Abstand also rund 4 statt 1 Minute“), das erste Akzeptanzkriterium lautete „… – und wartet danach das konfigurierte Intervall“, geprüft mit `test_runLoop_NachZyklus_WartetPublishInterval`. Auf Wunsch des Users zieht die Schleife die Zyklusdauer jetzt von der Wartezeit ab; ist sie negativ, wird sofort wieder gelesen. Der Takt läuft damit ab Zyklusbeginn. Die Checkbox des ersten Kriteriums ist zurückgesetzt, weil sich sein Wortlaut geändert hat.
+
+### B.13 Solar-Log als zweites Protokoll (FR-9, 21.11.2026)
+Bis dahin las das Gateway ausschliesslich Modbus TCP: Abschnitt 1, FR-5.1 und NFR-3 nannten nur dieses Protokoll, der Edge Case hiess „Zähler (Modbus) nicht erreichbar“. Der SolarEdge-Wechselrichter der Anlage war über Modbus nicht erreichbar (Modbus TCP am Gerät nicht eingeschaltet, dafür wäre die Inbetriebnahme-App nötig gewesen), das Solar-Log daneben lieferte Ertrag und Verbrauch dagegen ohne Anmeldung über HTTP.
+
+Am 21.11.2026 gegen das Gerät hinter `192.168.20.90:8081` geprüft: Der Reader lieferte `zaehlerstandEinspeisung` 71366.333 kWh (Ertrag) und `zaehlerstandBezug` 44093.708 kWh (Verbrauch). **Nicht geprüft** ist, wie oft das Solar-Log die Zähler und den Zeitstempel (Schlüssel 100) nachführt; der Default von 15 Minuten für `max_alter` ist deshalb gesetzt, nicht gemessen. Die Bedeutung der Schlüssel stammt aus der Solar-Log-Dokumentation.

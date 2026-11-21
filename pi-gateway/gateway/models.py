@@ -30,7 +30,7 @@ class MeterConfig:
     """Vollständige Beschreibung eines Zählers (ein Eintrag der Zähler-Liste)."""
 
     messpunkt: str
-    protokoll: str                # "modbus-tcp", "sim" oder "sim-gplug" (Simulator)
+    protokoll: str                # "modbus-tcp", "solarlog-http", "sim" oder "sim-gplug"
     register_bezug: RegisterSpec
     # None = in der Config nicht angegeben (typisch bei Konsumenten): das Register wird
     # NICHT gelesen, publiziert wird 0 (Payload-Vertrag bleibt vollständig).
@@ -56,6 +56,13 @@ class MeterConfig:
     # Zaehlerstaende, aus denen das Backend Deltas bildet. Ein Ladezustand ist ein Momentanwert -
     # er wird nie aggregiert (Specs/Geraetezustand.md).
     register_zustand: dict[str, RegisterSpec] = field(default_factory=dict)
+    # Nur protokoll "solarlog-http" (FR-9): Schluessel der JSON-Antwort, unter denen die
+    # kumulativen Zaehler in Wh stehen. None = Rolle nicht konfiguriert, publiziert wird 0.
+    schluessel_bezug: int | None = None
+    schluessel_einspeisung: int | None = None
+    # Nur "solarlog-http": Werte, deren Zeitstempel weiter von der Zeit des Pi abweicht, werden
+    # verworfen. 0 = keine Pruefung. Wird von der Konfiguration aufgeloest (Default s. config.py).
+    max_alter_seconds: float = 900.0
 
 
 @dataclass(frozen=True)

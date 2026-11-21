@@ -11,10 +11,12 @@ from ..models import MeterConfig
 from .base import Reader
 from .modbus_reader import ModbusReader
 from .sim_reader import SimReader
+from .solarlog_reader import SolarLogReader
 
 # Protokoll-Name (aus der Config) → Reader-Konstruktor.
 _READERS: dict[str, Callable[[MeterConfig], Reader]] = {
     "modbus-tcp": ModbusReader,
+    "solarlog-http": SolarLogReader,  # Solar-Log über dessen JSON-Schnittstelle (FR-9)
     "sim": SimReader,      # Publisher-Simulator (synthetische Zählerstände)
     "sim-gplug": SimReader,  # dito, publiziert als gPlugK-Meldung (FR-8.3)
 }

@@ -29,7 +29,9 @@ _INTERVAL_UNITS = {"s": 1, "m": 60, "h": 3600}
 
 # "sim" = Publisher-Simulator, "sim-gplug" = Simulator mit gPlug-Meldungen (Specs/Pi-Gateway-Software.md, FR-8)
 _SIM_PROTOCOLS = {"sim", "sim-gplug"}
-_SUPPORTED_PROTOCOLS = {"modbus-tcp"} | _SIM_PROTOCOLS
+# Solar-Log über HTTP (FR-9): liest Schlüssel einer JSON-Antwort statt Modbus-Register.
+_SOLARLOG_PROTOCOL = "solarlog-http"
+_SUPPORTED_PROTOCOLS = {"modbus-tcp", _SOLARLOG_PROTOCOL} | _SIM_PROTOCOLS
 # float32: Wago-Zaehler (IEEE 754). uint32: Wechselrichter, die kumulative Energie als
 # vorzeichenlose Ganzzahl fuehren - der Solinteg MHT liefert kWh mal 10, also skalierung: 0.1.
 # uint16: Momentanwerte in EINEM Register - der Ladezustand desselben Geraets (Register 33000),
@@ -37,7 +39,7 @@ _SUPPORTED_PROTOCOLS = {"modbus-tcp"} | _SIM_PROTOCOLS
 _SUPPORTED_REGISTER_TYPES = {"float32", "uint32", "uint16"}
 _SUPPORTED_WORD_ORDERS = {"big", "little"}
 
-# Platzhalter-Register für den Simulator (liest keine echten Register).
+# Platzhalter-Register für Protokolle ohne Register: Simulator und Solar-Log.
 _DUMMY_REGISTER = RegisterSpec(addr=0)
 
 # Spaltenlänge von zaehler_rohdaten.seriennummer im Backend.
@@ -47,6 +49,14 @@ _MAX_SERIENNUMMER_LAENGE = 64
 # Ein RTU→TCP-Hub gibt die Anfrage seriell an den Zähler weiter und antwortet erst danach –
 # bei langsamen Bussen/vielen Slaves dauert das deutlich länger als bei direktem TCP.
 _DEFAULT_READ_TIMEOUT = 5.0
+
+# Solar-Log: so weit darf der Zeitstempel der Werte von der Zeit des Pi abweichen (Sekunden).
+# Grosszügig gewählt: Wie oft das Solar-Log den Stempel nachführt, ist nicht gemessen. Es geht
+# um ein stehendes Gerät oder eine falsch gehende Uhr, nicht um Sekunden.
+_DEFAULT_MAX_ALTER = 900.0
+# Ein Solar-Log bedient seine Weboberfläche und /getjp auf Port 80.
+_DEFAULT_SOLARLOG_PORT = 80
+_DEFAULT_MODBUS_PORT = 502
 
 # Lese-Versuche je Zähler und Zyklus (inkl. Erstversuch). Default 2 = ein Wiederholversuch:
 # Auf der RTU-Strecke treten sporadische Fehler auf (z. B. `exception_code=11` vom
@@ -125,10 +135,11 @@ def _parse_broker(data: dict) -> BrokerConfig:
     )
 
 
-def _parse_timeout(value, ctx: str, default: float) -> float:
+def _parse_timeout(value, ctx: str, default: float, erlaube_null: bool = False) -> float:
     """Timeout in Sekunden: Zahl (``5``, ``2.5``) oder Kurzform (``"5s"``, ``"1m"``).
 
-    ``None`` → ``default``. Muss > 0 sein.
+    ``None`` → ``default``. Muss > 0 sein; mit ``erlaube_null`` ist auch 0 gültig (so bei
+    ``max_alter``, wo 0 „keine Prüfung“ heisst).
     """
     if value is None:
         return default
@@ -147,8 +158,11 @@ def _parse_timeout(value, ctx: str, default: float) -> float:
         raise ConfigError(f"{ctx} muss eine Zahl oder Kurzform wie '5s' sein.")
 
     # nan und inf sind float, aber keine Zeitangabe: nan <= 0 ist False und kaeme sonst durch.
-    if not math.isfinite(seconds) or seconds <= 0:
-        raise ConfigError(f"{ctx} muss > 0 sein (war: {value}).")
+    # ``erlaube_null``: Bei ``max_alter`` heisst 0 "keine Pruefung" und ist gueltig.
+    zu_klein = seconds < 0 if erlaube_null else seconds <= 0
+    if not math.isfinite(seconds) or zu_klein:
+        grenze = ">= 0" if erlaube_null else "> 0"
+        raise ConfigError(f"{ctx} muss {grenze} sein (war: {value}).")
     return seconds
 
 
@@ -193,12 +207,34 @@ def _parse_meters(data, read_timeout: float, read_attempts: int = _DEFAULT_READ_
                 f"nicht unterstützt (verfügbar: {sorted(_SUPPORTED_PROTOCOLS)})."
             )
 
+        schluessel_bezug = schluessel_einspeisung = None
+        max_alter = _DEFAULT_MAX_ALTER
+        standard_port = (_DEFAULT_SOLARLOG_PORT if protokoll == _SOLARLOG_PROTOCOL
+                         else _DEFAULT_MODBUS_PORT)
+
         if protokoll in _SIM_PROTOCOLS:
             # Der Simulator liest weder Host noch echte Register – Felder optional.
             host = entry.get("host")
             register_bezug = _DUMMY_REGISTER
             register_einspeisung = _DUMMY_REGISTER
             register_zustand = {}
+        elif protokoll == _SOLARLOG_PROTOCOL:
+            # Das Solar-Log kennt keine Register: Gelesen werden Schlüssel seiner JSON-Antwort.
+            # Angaben eines Modbus-Zählers sind hier ein Startfehler statt stillschweigend
+            # wirkungslos - ein kopierter 'register'-Block fiele sonst nie auf.
+            fremd = sorted({"register", "zustand", "unit_id"} & set(entry))
+            if fremd:
+                raise ConfigError(
+                    f"zaehler[{index}] '{messpunkt}': {fremd} gibt es bei protokoll "
+                    f"'{_SOLARLOG_PROTOCOL}' nicht (dort: 'schluessel')."
+                )
+            host = _require(entry, "host", str, ctx=f"zaehler[{index}] '{messpunkt}'")
+            register_bezug = _DUMMY_REGISTER
+            register_einspeisung = None
+            register_zustand = {}
+            schluessel_bezug, schluessel_einspeisung = _parse_schluessel(
+                entry.get("schluessel"), messpunkt)
+            max_alter = _parse_max_alter(entry.get("max_alter"), messpunkt)
         else:
             host = _require(entry, "host", str, ctx=f"zaehler[{index}] '{messpunkt}'")
             register = _require(entry, "register", dict, ctx=f"zaehler[{index}] '{messpunkt}'")
@@ -212,7 +248,8 @@ def _parse_meters(data, read_timeout: float, read_attempts: int = _DEFAULT_READ_
                 messpunkt=messpunkt,
                 protokoll=protokoll,
                 host=host,
-                port=_parse_ganzzahl(entry.get("port"), f"zaehler '{messpunkt}' port", 502, 1, 65535),
+                port=_parse_ganzzahl(
+                    entry.get("port"), f"zaehler '{messpunkt}' port", standard_port, 1, 65535),
                 unit_id=_parse_ganzzahl(entry.get("unit_id"), f"zaehler '{messpunkt}' unit_id", 1, 0, 255),
                 register_bezug=register_bezug,
                 register_einspeisung=register_einspeisung,
@@ -223,10 +260,47 @@ def _parse_meters(data, read_timeout: float, read_attempts: int = _DEFAULT_READ_
                 read_timeout_seconds=_parse_timeout(
                     entry.get("read_timeout"), f"zaehler '{messpunkt}' read_timeout", read_timeout),
                 read_attempts=read_attempts,
+                schluessel_bezug=schluessel_bezug,
+                schluessel_einspeisung=schluessel_einspeisung,
+                max_alter_seconds=max_alter,
             )
         )
 
     return meters
+
+
+def _parse_schluessel(data, messpunkt: str) -> tuple[int | None, int | None]:
+    """Schlüssel eines Solar-Log-Zählers: ``{bezug: 115}`` und/oder ``{einspeisung: 109}``.
+
+    Mindestens einer ist Pflicht - ein Eintrag ohne Schlüssel publizierte dauerhaft 0 und sähe
+    aus wie ein Zähler, an dem nichts läuft. Ein fehlender wird als 0 publiziert, wie das fehlende
+    ``register.einspeisung`` beim Modbus-Zähler (FR-1.7).
+    """
+    ctx = f"zaehler '{messpunkt}' schluessel"
+    if not isinstance(data, dict):
+        raise ConfigError(f"{ctx} fehlt oder ist kein Mapping.")
+    unbekannt = sorted(set(data) - {"bezug", "einspeisung"})
+    if unbekannt:
+        # Ein Tippfehler ("einspeisng") darf nicht stillschweigend zu 0 werden.
+        raise ConfigError(f"{ctx}: unbekannte Angabe {unbekannt} (erlaubt: bezug, einspeisung).")
+
+    bezug = _parse_schluesselnummer(data.get("bezug"), f"{ctx}.bezug")
+    einspeisung = _parse_schluesselnummer(data.get("einspeisung"), f"{ctx}.einspeisung")
+    if bezug is None and einspeisung is None:
+        raise ConfigError(f"{ctx}: mindestens 'bezug' oder 'einspeisung' ist nötig.")
+    return bezug, einspeisung
+
+
+def _parse_schluesselnummer(value, ctx: str) -> int | None:
+    if value is None:
+        return None
+    return _parse_ganzzahl(value, ctx, 0, 0, 9999)
+
+
+def _parse_max_alter(value, messpunkt: str) -> float:
+    """Erlaubte Abweichung des Solar-Log-Zeitstempels; ``0`` schaltet die Prüfung aus."""
+    return _parse_timeout(value, f"zaehler '{messpunkt}' max_alter", _DEFAULT_MAX_ALTER,
+                          erlaube_null=True)
 
 
 def _parse_zustand_register(data, messpunkt: str) -> dict:

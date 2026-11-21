@@ -1,7 +1,7 @@
 # ZEV Pi-Gateway
 
 Reader-/Publisher-Software für den Raspberry Pi am Zählerstandort: liest die
-Stromzähler (aktuell **Wago via Modbus TCP**) aus und **publiziert deren absolute
+Stromzähler (über **Modbus TCP**, ein Solar-Log über **HTTP**) aus und **publiziert deren absolute
 Zählerstände** (Wirkenergie in kWh) per MQTT an den Broker. Die Delta-/Intervall-
 Bildung übernimmt das **Backend** – der Pi ist damit weitgehend zustandslos und
 verlusttolerant.
@@ -20,7 +20,8 @@ verlusttolerant.
 config.yaml ─► config.py ─► main.py (Read-Loop)
                                │
               factory.py ──────┤ pro Zähler: Reader.read()  ──► MeterReading (absolute Stände)
-              modbus_reader ───┘                                      │
+              modbus_reader ───┤                                      │
+              solarlog_reader ─┘                                      │
                                                               publisher.py ──► MQTT
                                                        zev/{orgId}/{messpunkt}/messwert
 ```
@@ -29,6 +30,8 @@ config.yaml ─► config.py ─► main.py (Read-Loop)
 - `gateway/readers/factory.py` – erzeugt je `protokoll` den passenden Reader (erweiterbar)
 - `gateway/readers/modbus_reader.py` – Modbus TCP; Registertypen **`float32`** (Wago-Zähler)
   und **`uint32`** (Wechselrichter mit kumulativer Ganzzahl-Energie, z. B. Solinteg MHT)
+- `gateway/readers/solarlog_reader.py` – Solar-Log über dessen JSON-Schnittstelle (HTTP);
+  Ertrag und Verbrauch, siehe Abschnitt „Solar-Log“
 - `gateway/publisher.py` – MQTT-Publish der absoluten Stände (Topic/Payload gemäss Vertrag)
 - `gateway/main.py` – Orchestrierung, Read-Loop, Signal-Handling, Heartbeat
 
@@ -132,6 +135,76 @@ mbpoll -a 1 -t 4:float -r <register> -c 2 -1 <zaehler-ip> -p 502
 ```
 
 Konkrete Register/Skalierung stammen aus dem Wago-Datenblatt.
+
+## Solar-Log über die JSON-Schnittstelle
+
+Ein Solar-Log liefert Ertrag und Verbrauch über HTTP, ohne Modbus. Das Gateway liest es mit
+`protokoll: solarlog-http` (Specs/Pi-Gateway-Software.md, FR-9); Beispiel-Einträge stehen in
+`config.example.yaml`:
+
+```yaml
+zaehler:
+  - messpunkt: "PV-SolarLog"          # Einheit vom Typ Produzent
+    protokoll: solarlog-http
+    host: 192.168.20.90
+    port: 8081                        # Default 80; hier der Port der NAT-Regel
+    schluessel:
+      einspeisung: 109                # Ertrag gesamt -> Produktion
+  - messpunkt: "Verbrauch-SolarLog"   # Einheit vom Typ Konsument
+    protokoll: solarlog-http
+    host: 192.168.20.90
+    port: 8081
+    schluessel:
+      bezug: 115                      # Verbrauch gesamt
+```
+
+Die **Produktion gehört unter `einspeisung`**, der Verbrauch unter `bezug`: Das Backend rechnet
+`total = ΔBezug − ΔEinspeisung`, und ein Produzent trägt negatives `total`.
+
+`max_alter` (Default `15m`, je Eintrag): Weicht der Zeitstempel der Werte (Schlüssel 100) weiter von
+der Zeit des Pi ab, wird die Messung verworfen. Ein Solar-Log ohne Verbindung zum Wechselrichter
+antwortet sonst mit stehendem Zähler. Das setzt dieselbe Zeitzone und richtig gehende Uhren voraus;
+`max_alter: 0` schaltet die Prüfung aus.
+
+Von Hand prüfen:
+
+```bash
+# Aktuelle Werte, ohne Anmeldung (offene JSON-Schnittstelle des Solar-Log)
+curl -X POST -d '{"801":{"170":null}}' http://<solarlog-host>:<port>/getjp
+```
+
+Die Antwort steht unter `801` → `170`. Abgefragt am 21.11.2026 um 20:14 an der Anlage hinter
+`192.168.20.90:8081` (NAT-Regel am Router):
+
+| Schlüssel | Bedeutung | Einheit | Wert am 21.11.2026 20:14 |
+|---|---|---|---|
+| 100 | Zeitstempel der Werte (Ortszeit des Solar-Log, ohne Zone) | `dd.MM.yy HH:mm:ss` | 21.11.26 20:14:30 |
+| 101 | AC-Leistung aktuell | W | 0 (Nacht) |
+| 102 | DC-Leistung aktuell | W | 0 |
+| 103 | AC-Spannung | V | 0 |
+| 104 | DC-Spannung | V | 0 |
+| 105 | Ertrag heute | Wh | 18'320 |
+| 106 | Ertrag gestern | Wh | 7'728 |
+| 107 | Ertrag Monat | Wh | 240'848 |
+| 108 | Ertrag Jahr | Wh | 11'062'328 |
+| 109 | **Ertrag gesamt** (kumulativer Zähler) | Wh | 71'366'333 |
+| 110 | Verbrauch aktuell | W | 2'382 |
+| 111 | Verbrauch heute | Wh | 13'294 |
+| 112 | Verbrauch gestern | Wh | 18'724 |
+| 113 | Verbrauch Monat | Wh | 438'558 |
+| 114 | Verbrauch Jahr | Wh | 6'268'664 |
+| 115 | **Verbrauch gesamt** (kumulativer Zähler) | Wh | 44'092'261 |
+| 116 | Installierte Leistung | Wp | 9'230 |
+
+* **Die Bedeutung der Schlüssel stammt aus der Solar-Log-Dokumentation und ist nicht am Gerät
+  nachgewiesen.** Die Werte passen dazu (Nacht: Leistung 0, Zähler in plausibler Grössenordnung);
+  vor einer Nutzung gegen die Anzeige des Solar-Log abgleichen.
+* Für das Gateway taugen nur die **kumulativen** Zähler 109 und 115: Der Payload-Vertrag verlangt
+  absolute Stände in kWh (der Reader teilt durch 1000). Tages-, Monats- und Jahreswerte springen
+  zurück.
+* Die Werte sind die **Summe aller Wechselrichter** am Solar-Log, nicht die eines einzelnen Geräts.
+* Wie oft das Solar-Log die Zähler nachführt, ist nicht gemessen.
+* Die Schnittstelle antwortet **ohne Passwort**. Die NAT-Regel darf nicht von aussen erreichbar sein.
 
 ## Publisher-Simulator (lokaler End-to-End-Test)
 
@@ -317,7 +390,7 @@ Schritt: [`docs/Netzwerk-Topologie-Hene.md`](../docs/Netzwerk-Topologie-Hene.md)
 
 ## Stand / Abgrenzung
 
-- **Umgesetzt:** Projekt-Setup, Konfiguration, Modbus-Reader (Wago), MQTT-Publisher,
+- **Umgesetzt:** Projekt-Setup, Konfiguration, Modbus-Reader (Wago), Solar-Log-Reader, MQTT-Publisher,
   Read-Loop mit Fehlerisolation je Zähler, Reconnect/Backoff, Heartbeat-Logging, systemd.
 - **Später:** optionale Pufferung (aktuell nicht nötig – absolute Stände sind verlusttolerant).
 - **Kein gPlug-Reader:** Der BKW-Zähler wird über WhatWatt Go per Modbus TCP gelesen; die gPlugK
