@@ -5,6 +5,7 @@ import { Einheit, EinheitTyp } from '../../models/einheit.model';
 import { Mieter } from '../../models/mieter.model';
 import { TranslationService } from '../../services/translation.service';
 import { FeatureFlagService } from '../../services/feature-flag.service';
+import { toIsoDate } from '../../utils/date-utils';
 
 describe('DebitorkontrolleFormComponent', () => {
   let component: DebitorkontrolleFormComponent;
@@ -70,7 +71,9 @@ describe('DebitorkontrolleFormComponent', () => {
     });
 
     it('should set datumVon and datumBis to today by default', () => {
-      const today = new Date().toISOString().split('T')[0];
+      // Lokales Datum, nicht toISOString(): Das liefert das UTC-Datum, und zwischen Mitternacht
+      // und 01:00 bzw. 02:00 Ortszeit ist dort noch der Vortag - der Test schlug dann fehl.
+      const today = toIsoDate(new Date());
       expect(component.formData.datumVon).toBe(today);
       expect(component.formData.datumBis).toBe(today);
     });
