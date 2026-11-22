@@ -29,6 +29,13 @@ const INTERVALL_MS = 15 * 60 * 1000;
 /** Kennung der Preisreihe im Diagramm - der Tooltip erkennt sie daran und formatiert als Preis. */
 const EINSPEISETARIF_ID = 'einspeisetarif';
 
+/** Deckkraft der Total-Fläche im Diagramm einer Einheit (Specs/Grafiken.md, FR-2): blass, sie liegt unten. */
+const FLAECHE_TOTAL = 0.25;
+/** Deckkraft der ZEV-Fläche darüber: dicht genug, um das Total zu überdecken. */
+const FLAECHE_ZEV = 0.6;
+/** Deckkraft des gedeckten Verbrauchs im Vergleich (FR-9.3): Mehrere Flächen liegen übereinander und müssen durchscheinen. */
+const FLAECHE_GEDECKT = 0.35;
+
 interface ChartData {
   /** Eindeutig je Diagramm: die Einheit-ID oder `messpunkt-<n>`. Teil der DOM-ID des Behälters. */
   schluessel: string;
@@ -144,9 +151,8 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
   }
 
   /**
-   * Ein Vergleich braucht mindestens zwei Einheiten - mit einer wäre er das Diagramm dieser
-   * Einheit ohne ihre ZEV-Reihe. Gezählt wird, was geladen würde: Ein Messpunkt mit zwei Einheiten
-   * genügt.
+   * Ein Vergleich braucht mindestens zwei Einheiten - mit einer gäbe es nichts zu vergleichen.
+   * Gezählt wird, was geladen würde: Ein Messpunkt mit zwei Einheiten genügt.
    */
   get kannVergleichen(): boolean {
     return this.zuLadendeEinheiten().length >= 2;
@@ -275,7 +281,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
     const gruppen = [...this.selectedGruppen];
     // Ein Vergleich mit weniger als zwei Einheiten ist keiner: Wurde die Auswahl seit dem Klick
     // auf "Vergleich" verkleinert und dann geblaettert, geht es zurueck zu den einzelnen
-    // Diagrammen - sonst stuende dort "Vergleich: 1 Einheiten" mit einer einzigen Linie.
+    // Diagrammen - sonst stuende dort "Vergleich: 1 Einheiten" mit einer einzigen Einheit.
     if (this.modus === 'vergleich' && einheiten.length < 2) {
       this.modus = 'einzeln';
     }
@@ -423,7 +429,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
 
     const daten = (einheit: Einheit) => datenJeEinheit.get(einheit.id!) ?? [];
     // Messpunkt und Vergleich zeichnen eine Reihe je Einheit; nur der Vergleich spiegelt die
-    // Produzenten (FR-9.3).
+    // Produzenten und ergaenzt den gedeckten Verbrauch als Flaeche (FR-9.3).
     const optionen = chartData.messpunkt || chartData.vergleich
       ? this.optionenMesspunkt(
         chartData.einheiten.map(einheit => ({ einheit, daten: daten(einheit) })), this.preise,
@@ -439,18 +445,20 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
    * frühere geglättete Linie (`tension: 0.1`) behauptete einen stetigen Verlauf zwischen den
    * Intervallen, den es nicht gibt.
    *
-   * <p><b>Die ZEV-Reihe wird negativ aufgetragen</b> — wie bisher. Das spiegelt sie unter die
-   * Nulllinie und macht Bezug und Eigenverbrauch auf einen Blick unterscheidbar.
+   * <p><b>Zwei Flächen übereinander</b> (FR-2): das Total und darüber, in der zweiten Farbe, der
+   * ZEV-Anteil — der Teil, den die eigene Produktion deckt. Beide stehen im gespeicherten
+   * Vorzeichen, der ZEV-Anteil liegt also **innerhalb** des Totals; was vom Total sichtbar bleibt,
+   * kommt aus dem Netz. Die ZEV-Fläche ist dichter, damit sie das Total darunter überdeckt.
    */
   private optionen(data: MesswertData[], preise: PreiszeitreihePunkt[] = []): Record<string, unknown> {
     const farben = chartFarben();
     const kwh = this.translationService.translate('KWH');
-    const zevReihe = data.map(d => [new Date(d.zeit).getTime(), -(d.zev ?? 0)]);
-    const zevSumme = data.reduce((summe, d) => summe + (d.zev ?? 0), 0);
 
     return this.diagrammOptionen([
-      this.reihe(this.legende('TOTAL', this.totalSumme(data), kwh), this.totalReihe(data), farben.primaer),
-      this.reihe(this.legende('ZEV', zevSumme, kwh), zevReihe, farben.sekundaer)
+      this.reihe(this.legende('TOTAL', this.summe(data, 'total'), kwh), this.zeitreihe(data, 'total'),
+        farben.primaer, FLAECHE_TOTAL),
+      this.reihe(this.legende('ZEV', this.summe(data, 'zev'), kwh), this.zeitreihe(data, 'zev'),
+        farben.sekundaer, FLAECHE_ZEV)
     ], farben, kwh, preise);
   }
 
@@ -459,15 +467,17 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
    * FR-8) oder den Vergleich aller gewählten Einheiten (FR-9): **eine Reihe je Einheit**, jeweils
    * ihr `total` — im gespeicherten Vorzeichen, ausser bei Produzenten im Vergleich.
    *
-   * <p>Im Vergleich (`produzentenPositiv`) werden die Reihen der **Produzenten** gespiegelt, damit
-   * die Produktion über der Nulllinie neben dem Verbrauch steht (FR-9.3).
+   * <p>Im Vergleich (`vergleich`) werden die Reihen der **Produzenten** gespiegelt, damit die
+   * Produktion über der Nulllinie neben dem Verbrauch steht (FR-9.3). Dazu bekommt jeder
+   * **Konsument** mit ZEV-Anteil eine Fläche in seiner Farbe: den Teil seines Verbrauchs, den die
+   * eigene Produktion deckt. Die Flächen stehen **nach** allen Linien, damit die Reihenfolge der
+   * Einheiten und ihre Farben bleiben.
    *
    * <p>Bei Bezug und Rücklieferung ergibt das gespeicherte Vorzeichen von selbst das gewünschte
    * Bild: Der Bezug ist positiv, die Rücklieferung negativ gespeichert — die eine Linie liegt über,
    * die andere unter der Nulllinie. Im Messpunkt-Diagramm wird deshalb **nichts** gespiegelt.
    *
-   * <p>Die ZEV-Reihe entfällt: Sie gehört zur einzelnen Einheit, und zwei davon machten aus dem
-   * Vergleich vier Linien.
+   * <p>Im Messpunkt-Diagramm gibt es keine ZEV-Reihe: Für Bezug und Rücklieferung ist `zev` 0.
    *
    * <p>Die Reihen tragen der Reihe nach die Reihenpalette aus `chartFarben().reihen`. Für eine
    * siebte und weitere nimmt ECharts seine eigene Palette — unterscheidbar, statt eine Farbe
@@ -475,41 +485,66 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
    */
   private optionenMesspunkt(reihen: { einheit: Einheit; daten: MesswertData[] }[],
                             preise: PreiszeitreihePunkt[] = [],
-                            produzentenPositiv = false): Record<string, unknown> {
+                            vergleich = false): Record<string, unknown> {
     const farben = chartFarben();
     const reihenfarben = farben.reihen;
     const kwh = this.translationService.translate('KWH');
 
-    return this.diagrammOptionen(reihen.map(({ einheit, daten }, index) => {
+    const linien = reihen.map(({ einheit, daten }, index) => {
       // Im Vergleich (FR-9) steht die Produktion ueber der Nulllinie, neben Verbrauch und Bezug:
       // Gespeichert ist sie negativ, und unter der Nulllinie liesse sie sich mit den uebrigen
       // Kurven nicht vergleichen. Reihe UND Summe drehen, sonst widerspraeche die Legende dem Bild.
-      const spiegeln = produzentenPositiv && einheit.typ === EinheitTyp.PRODUCER;
-      const zeitreihe = this.totalReihe(daten);
-      const summe = this.totalSumme(daten);
+      const spiegeln = vergleich && einheit.typ === EinheitTyp.PRODUCER;
+      const zeitreihe = this.zeitreihe(daten, 'total');
+      const summe = this.summe(daten, 'total');
       return this.reihe(
         this.legendeText(einheit.name, spiegeln ? this.gespiegelt(summe) : summe, kwh),
         spiegeln ? zeitreihe.map(([zeit, wert]) => [zeit, this.gespiegelt(wert)]) : zeitreihe,
         reihenfarben[index]);
-    }), farben, kwh, preise);
+    });
+    return this.diagrammOptionen(
+      vergleich ? [...linien, ...this.gedeckteFlaechen(reihen, reihenfarben, kwh)] : linien,
+      farben, kwh, preise);
+  }
+
+  /**
+   * Der gedeckte Verbrauch im Vergleich (Specs/Grafiken.md, FR-9.3): je Konsument eine Fläche mit
+   * seinem ZEV-Anteil, in der Farbe seiner Linie. Die Linie zeigt den ganzen Verbrauch — gefüllt
+   * ist, was die eigene Produktion deckt.
+   *
+   * Nur Konsumenten: Der ZEV-Anteil des Produzenten ist dieselbe Energie noch einmal. Und nur mit
+   * einem Anteil im Zeitraum — eine leere Fläche je Einheit füllte bloss die Legende.
+   */
+  private gedeckteFlaechen(reihen: { einheit: Einheit; daten: MesswertData[] }[], reihenfarben: string[],
+                           kwh: string): Record<string, unknown>[] {
+    const zev = this.translationService.translate('ZEV');
+    return reihen
+      .map(({ einheit, daten }, index) => ({ einheit, daten, farbe: reihenfarben[index] }))
+      .filter(({ einheit, daten }) => einheit.typ === EinheitTyp.CONSUMER && daten.some(d => (d.zev ?? 0) !== 0))
+      // Rand duenner als die Linie der Einheit: Die Flaeche traegt die Aussage, nicht ihr Rand.
+      .map(({ einheit, daten, farbe }) => this.reihe(
+        this.legendeText(`${einheit.name} – ${zev}`, this.summe(daten, 'zev'), kwh),
+        this.zeitreihe(daten, 'zev'), farbe, FLAECHE_GEDECKT, 1));
   }
 
   /**
    * Dreht das Vorzeichen; eine 0 bleibt 0 statt `-0`. Angezeigt sähen beide gleich aus, `-0`
-   * unterscheidet sich aber in `Object.is`/`toEqual` von `0`. Die ZEV-Reihe in `optionen()` dreht
-   * weiterhin ohne diesen Schutz.
+   * unterscheidet sich aber in `Object.is`/`toEqual` von `0`.
    */
   private gespiegelt(wert: number): number {
     return wert === 0 ? 0 : -wert;
   }
 
-  /** `total` als Zeitreihe `[Zeitpunkt, Wert]`, im gespeicherten Vorzeichen. */
-  private totalReihe(data: MesswertData[]): number[][] {
-    return data.map(d => [new Date(d.zeit).getTime(), d.total ?? 0]);
+  /**
+   * `total` oder `zev` als Zeitreihe `[Zeitpunkt, Wert]`, im gespeicherten Vorzeichen. `zev` ist
+   * der Teil des Totals, den die eigene Produktion deckt.
+   */
+  private zeitreihe(data: MesswertData[], feld: 'total' | 'zev'): number[][] {
+    return data.map(d => [new Date(d.zeit).getTime(), d[feld] ?? 0]);
   }
 
-  private totalSumme(data: MesswertData[]): number {
-    return data.reduce((summe, d) => summe + (d.total ?? 0), 0);
+  private summe(data: MesswertData[], feld: 'total' | 'zev'): number {
+    return data.reduce((summe, d) => summe + (d[feld] ?? 0), 0);
   }
 
   /** Was beide Diagrammarten teilen: Achsen, Tooltip, Legende, Zoom — nur die Reihen unterscheiden sich. */
@@ -634,8 +669,12 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
    * `sampling: 'lttb'` ist dauerhaft aktiv: Ein Quartal sind bis zu 8'640 Punkte je Reihe, und bei
    * „Alle auswählen" liegen mehrere Diagramme gleichzeitig auf der Seite. Bei kleinen Mengen ist die
    * Ausdünnung unschädlich, bei grossen ist sie der Unterschied zwischen flüssig und zäh.
+   *
+   * Mit `flaeche` (Deckkraft) ist der Raum zwischen Linie und Nulllinie gefüllt; ohne Angabe bleibt
+   * die Reihe eine reine Linie.
    */
-  private reihe(name: string, daten: number[][], farbe?: string): Record<string, unknown> {
+  private reihe(name: string, daten: number[][], farbe?: string, flaeche?: number,
+                linienbreite = 2): Record<string, unknown> {
     return {
       name,
       type: 'line',
@@ -644,8 +683,9 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
       connectNulls: false,
       sampling: 'lttb',
       // Ohne Farbe (siebte und weitere Reihe eines Diagramms) waehlt ECharts aus seiner Palette.
-      lineStyle: farbe ? { color: farbe, width: 2 } : { width: 2 },
+      lineStyle: farbe ? { color: farbe, width: linienbreite } : { width: linienbreite },
       ...(farbe ? { itemStyle: { color: farbe } } : {}),
+      ...(flaeche === undefined ? {} : { areaStyle: { opacity: flaeche } }),
       data: this.mitAbschluss(daten)
     };
   }

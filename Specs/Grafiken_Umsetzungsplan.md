@@ -544,3 +544,23 @@ der Nulllinie neben Verbrauch und Bezug steht.
 
 * **Nur Darstellung:** kein Backend, keine Migration, keine neuen Texte.
 * **Rücklieferung und Speicher** behalten ihr Vorzeichen; das Messpunkt-Diagramm ist unverändert.
+
+---
+
+## Nachtrag 22.11.2026: Gedeckter Verbrauch als Fläche (FR-2, FR-9.3)
+
+Auf Wunsch des Benutzers (Vorbild: Tagesansicht des Solar-Log) bekommt der Verbrauch eine andere
+Farbe, wo ihn die eigene Produktion deckt. Vorher zeigte das Diagramm einer Einheit `Total` und `ZEV`
+als Linien ohne Füllung, die ZEV-Reihe unter die Nulllinie gespiegelt; der Vergleich kannte keine
+ZEV-Reihe. Die Kriterien dazu lauteten „Beide Datenreihen erscheinen, die ZEV-Reihe negativ
+aufgetragen" und „Die Linie ist eine Stufenlinie, ohne Flächenfüllung".
+
+| Datei | Änderung |
+|---|---|
+| `messwerte-chart.component.ts` | `optionen()`: Total und ZEV als Flächen im gespeicherten Vorzeichen; `gedeckteFlaechen()`: im Vergleich je Konsument mit ZEV-Anteil eine Fläche in seiner Farbe, nach den Linien; `reihe(…, flaeche)` mit optionaler Deckkraft; Parameter `produzentenPositiv` heisst neu `vergleich` |
+| `messwerte-chart.component.spec.ts` | Tests in `optionen`, `reihe` und `Vergleich` angepasst bzw. ergänzt |
+
+* **Quelle** ist der gespeicherte `zev`-Wert je Viertelstunde — es wird nichts neu gerechnet.
+* **Farben** bleiben: Total in der Primär-, ZEV in der Sekundärfarbe (FR-4).
+* **Kein Backend, keine Migration, keine neuen Texte** (`ZEV` ist vorhanden).
+* Die Spec führt auf Wunsch des Benutzers keinen Anhang mehr; die ersetzte Fassung steht deshalb hier.

@@ -64,9 +64,9 @@ describe('MesswerteChartComponent', () => {
     optionen: (data: MesswertData[], preise?: PreiszeitreihePunkt[]) => Record<string, unknown>;
     optionenMesspunkt: (reihen: { einheit: Einheit; daten: MesswertData[] }[],
                         preise?: PreiszeitreihePunkt[],
-                        produzentenPositiv?: boolean) => Record<string, unknown>;
+                        vergleich?: boolean) => Record<string, unknown>;
     legende: (key: string, summe: number, kwh: string) => string;
-    reihe: (name: string, daten: number[][], farbe?: string) => Record<string, unknown>;
+    reihe: (name: string, daten: number[][], farbe?: string, flaeche?: number) => Record<string, unknown>;
   } {
     return component as unknown as ReturnType<typeof privat>;
   }
@@ -394,14 +394,31 @@ describe('MesswerteChartComponent', () => {
   });
 
   describe('optionen', () => {
-    it('should build two series, the ZEV one mirrored below zero', () => {
+    it('should build two filled series, the ZEV share inside the total', () => {
       const optionen = privat().optionen(messwerte);
-      const serien = optionen['series'] as { name: string; data: number[][] }[];
+      const serien = optionen['series'] as
+        { name: string; data: number[][]; areaStyle?: { opacity: number }; itemStyle: { color: string } }[];
 
       expect(serien).toHaveLength(2);
-      // Total unveraendert, ZEV negativ - so unterscheidet die Grafik Bezug und Eigenverbrauch.
+      // Beide im gespeicherten Vorzeichen: Der ZEV-Anteil liegt INNERHALB des Totals, nicht
+      // gespiegelt darunter - er ist der Teil des Verbrauchs, den die eigene Produktion deckt.
       expect(serien[0].data[0][1]).toBe(1.5);
-      expect(serien[1].data[0][1]).toBe(-0.5);
+      expect(serien[1].data[0][1]).toBe(0.5);
+      // Zwei Flaechen in zwei Farben; die ZEV-Flaeche ist dichter und ueberdeckt das Total.
+      expect(serien[0].areaStyle).toBeDefined();
+      expect(serien[1].areaStyle).toBeDefined();
+      expect(serien[1].areaStyle!.opacity).toBeGreaterThan(serien[0].areaStyle!.opacity);
+      expect(serien[1].itemStyle.color).not.toBe(serien[0].itemStyle.color);
+    });
+
+    it('should keep the stored sign of a producer, total and ZEV share both below zero', () => {
+      const produktion: MesswertData[] = [{ zeit: '2026-01-15T10:00:00', total: -2, zev: -1.5 }];
+
+      const serien = privat().optionen(produktion)['series'] as { name: string; data: number[][] }[];
+
+      expect(serien[0].data[0][1]).toBe(-2);
+      expect(serien[1].data[0][1]).toBe(-1.5);
+      expect(serien[1].name).toBe('ZEV (Σ -1.500 KWH)');
     });
 
     it('should turn the timestamps into numbers for the time axis', () => {
@@ -453,8 +470,16 @@ describe('MesswerteChartComponent', () => {
       expect(reihe['sampling']).toBe('lttb');
       expect(reihe['showSymbol']).toBe(false);
       expect(reihe['connectNulls']).toBe(false);
-      // Keine Flaechenfuellung: Eine gefuellte Flaeche liest sich als Summe ueber die Zeit.
+      // Ohne Angabe eine reine Linie - gefuellt wird nur auf Verlangen.
       expect(reihe['areaStyle']).toBeUndefined();
+    });
+
+    it('should fill the area down to zero only when an opacity is given', () => {
+      const reihe = privat().reihe('Total', [[1, 2]], '#4CAF50', 0.25);
+
+      expect(reihe['areaStyle']).toEqual({ opacity: 0.25 });
+      // Weiterhin eine Stufenlinie.
+      expect(reihe['step']).toBe('end');
     });
   });
 
@@ -701,6 +726,44 @@ describe('MesswerteChartComponent', () => {
       // Die Ruecklieferung ist kein Produzent und bleibt unter der Nulllinie.
       expect(serien[2].data.map(p => p[1])).toEqual([-2.25, -2.25]);
       expect(serien[2].name).toBe('Rücklieferung an BKW (Σ -2.250 KWH)');
+    });
+
+    it('should add the covered share of each consumer as an area in its colour, after all lines', () => {
+      const ohneAnteil: MesswertData[] = [{ zeit: '2026-01-15T10:00:00', total: 0.75, zev: 0 }];
+      const produktion: MesswertData[] = [{ zeit: '2026-01-15T10:00:00', total: -2, zev: -1.5 }];
+      const zweiter: Einheit = { ...mockConsumer, id: 99, name: 'Wohnung B' };
+
+      const serien = privat().optionenMesspunkt([
+        { einheit: mockConsumer, daten: messwerte },
+        { einheit: mockProducer, daten: produktion },
+        { einheit: zweiter, daten: ohneAnteil }
+      ], [], true)['series'] as
+        { name: string; data: number[][]; areaStyle?: { opacity: number };
+          itemStyle: { color: string }; lineStyle: { width: number } }[];
+
+      // Drei Linien in der Reihenfolge der Einheiten, danach EINE Flaeche: Der Produzent bekommt
+      // keine (dieselbe Energie noch einmal), der Konsument ohne ZEV-Anteil auch nicht.
+      expect(serien.map(reihe => reihe.name)).toEqual([
+        'Wohnung A (Σ 3.750 KWH)', 'Solar Anlage (Σ 2.000 KWH)', 'Wohnung B (Σ 0.750 KWH)',
+        'Wohnung A – ZEV (Σ 1.750 KWH)']);
+      expect(serien.slice(0, 3).every(reihe => reihe.areaStyle === undefined)).toBe(true);
+      const flaeche = serien[3];
+      expect(flaeche.areaStyle).toBeDefined();
+      // Der gedeckte Anteil im gespeicherten Vorzeichen, mit Abschlusspunkt.
+      expect(flaeche.data.map(p => p[1])).toEqual([0.5, 1.25, 1.25]);
+      // In der Farbe der Linie des Konsumenten, mit duennerem Rand.
+      expect(flaeche.itemStyle.color).toBe(serien[0].itemStyle.color);
+      expect(flaeche.lineStyle.width).toBeLessThan(serien[0].lineStyle.width);
+    });
+
+    it('should not add covered areas to a messpunkt chart', () => {
+      const serien = privat().optionenMesspunkt([
+        { einheit: mockConsumer, daten: messwerte },
+        { einheit: mockProducer, daten: messwerte }
+      ])['series'] as { name: string; areaStyle?: unknown }[];
+
+      expect(serien).toHaveLength(2);
+      expect(serien.every(reihe => reihe.areaStyle === undefined)).toBe(true);
     });
 
     it('should not mirror producers unless asked to', () => {
@@ -1071,8 +1134,8 @@ describe('MesswerteChartComponent', () => {
 
       expect(serien[0].data.length).toBe(3);
       expect(serien[0].data[2]).toEqual([ende, 2.25, 1]);
-      // Die ZEV-Reihe ist gespiegelt - der Abschlusspunkt traegt den gespiegelten Wert.
-      expect(serien[1].data[2]).toEqual([ende, -1.25, 1]);
+      // Auch die ZEV-Reihe traegt ihren letzten Wert bis ans Ende des Intervalls.
+      expect(serien[1].data[2]).toEqual([ende, 1.25, 1]);
     });
 
     it('should not add a point to an empty series', () => {
@@ -1238,10 +1301,11 @@ describe('MesswerteChartComponent', () => {
       }).createChart(chartData, new Map([[1, messwerte], [2, produktion]]));
 
       const optionen = instanz.setOption.mock.calls[0][0] as { series: { name: string; data: number[][] }[] };
-      // Je Einheit ihr Total unter ihrem Namen - keine ZEV-Reihe. Die Produktion steht POSITIV:
+      // Je Einheit ihr Total unter ihrem Namen. Die Produktion steht POSITIV:
       // Reihe und Summe sind gespiegelt, damit sie neben dem Verbrauch vergleichbar ist.
+      // Nach den Linien folgt der gedeckte Verbrauch des Konsumenten als Flaeche.
       expect(optionen.series.map(reihe => reihe.name)).toEqual(
-        ['Wohnung A (Σ 3.750 KWH)', 'Solar Anlage (Σ 1.750 KWH)']);
+        ['Wohnung A (Σ 3.750 KWH)', 'Solar Anlage (Σ 1.750 KWH)', 'Wohnung A – ZEV (Σ 1.750 KWH)']);
       expect(optionen.series[0].data.map(punkt => punkt[1])).toEqual([1.5, 2.25, 2.25]);
       expect(optionen.series[1].data.map(punkt => punkt[1])).toEqual([0.5, 1.25, 1.25]);
     });
