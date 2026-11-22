@@ -1,5 +1,7 @@
 import { createSpyObj, SpyObj } from '../../../testing/spy';
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import Keycloak from 'keycloak-js';
 import { MesswerteChartComponent } from './messwerte-chart.component';
 import { MesswerteService, MesswertData } from '../../services/messwerte.service';
 import { EinheitService } from '../../services/einheit.service';
@@ -8,6 +10,9 @@ import { Einheit, EinheitTyp, MesspunktGruppe } from '../../models/einheit.model
 import { By } from '@angular/platform-browser';
 import { IconComponent } from '../icon/icon.component';
 import { of, throwError } from 'rxjs';
+import { PreiszeitreiheService } from '../../services/preiszeitreihe.service';
+import { PreiszeitreihePunkt } from '../../models/preiszeitreihe.model';
+import { FeatureFlagService } from '../../services/feature-flag.service';
 
 /**
  * Unit-Tests der Messwerte-Grafik (`Specs/EChart.md`).
@@ -43,10 +48,23 @@ describe('MesswerteChartComponent', () => {
   };
   const bilanz: MesspunktGruppe = { messpunkt: 'Bilanz', einheiten: [mockBezug, mockRuecklieferung] };
 
+  let preiszeitreiheServiceSpy: SpyObj<PreiszeitreiheService>;
+  /** Permissions des Testbenutzers; `tarife:manage` gibt die Checkbox „Einspeisetarif" frei. */
+  let rollen: string[];
+  /** Feature-Flag PREISZEITREIHE, als Signal wie im Betrieb. */
+  const preiszeitreiheAktiv = signal(true);
+
+  const preise: PreiszeitreihePunkt[] = [
+    { zeit: '2026-01-15T10:00:00', preis: 0.08125 },
+    { zeit: '2026-01-15T10:15:00', preis: 0.1234567 }
+  ];
+
   /** Zugriff auf die privaten Bausteine — Testcode darf das, Produktivcode nicht. */
   function privat(): {
-    optionen: (data: MesswertData[]) => Record<string, unknown>;
-    optionenMesspunkt: (reihen: { einheit: Einheit; daten: MesswertData[] }[]) => Record<string, unknown>;
+    optionen: (data: MesswertData[], preise?: PreiszeitreihePunkt[]) => Record<string, unknown>;
+    optionenMesspunkt: (reihen: { einheit: Einheit; daten: MesswertData[] }[],
+                        preise?: PreiszeitreihePunkt[],
+                        produzentenPositiv?: boolean) => Record<string, unknown>;
     legende: (key: string, summe: number, kwh: string) => string;
     reihe: (name: string, daten: number[][], farbe?: string) => Record<string, unknown>;
   } {
@@ -64,12 +82,23 @@ describe('MesswerteChartComponent', () => {
     translationServiceSpy.translate.mockImplementation((key: string) => key);
     translationServiceSpy.getCurrentLanguage.mockReturnValue('de');
 
+    preiszeitreiheServiceSpy = createSpyObj<PreiszeitreiheService>('PreiszeitreiheService', ['getPunkte']);
+    preiszeitreiheServiceSpy.getPunkte.mockReturnValue(of(preise));
+    rollen = ['tarife:manage'];
+    preiszeitreiheAktiv.set(true);
+
     await TestBed.configureTestingModule({
       imports: [MesswerteChartComponent],
       providers: [
         { provide: MesswerteService, useValue: messwerteServiceSpy },
         { provide: EinheitService, useValue: einheitServiceSpy },
-        { provide: TranslationService, useValue: translationServiceSpy }
+        { provide: TranslationService, useValue: translationServiceSpy },
+        { provide: PreiszeitreiheService, useValue: preiszeitreiheServiceSpy },
+        { provide: Keycloak, useValue: { hasRealmRole: (rolle: string) => rollen.includes(rolle) } },
+        {
+          provide: FeatureFlagService,
+          useValue: { isEnabled: (flag: string) => flag === 'PREISZEITREIHE' && preiszeitreiheAktiv() }
+        }
       ]
     }).compileComponents();
 
@@ -650,6 +679,40 @@ describe('MesswerteChartComponent', () => {
       expect(component.message).toBe('6 DATENPUNKTE_FUER 3 EINHEITEN_GELADEN');
     });
 
+    it('should mirror only producers, including the sum, and leave a zero untouched', () => {
+      const produktion: MesswertData[] = [
+        { zeit: '2026-01-15T10:00:00', total: 0, zev: 0 },
+        { zeit: '2026-01-15T10:15:00', total: -1.288, zev: -1 }
+      ];
+      const ruecklieferung: MesswertData[] = [{ zeit: '2026-01-15T10:15:00', total: -2.25, zev: 0 }];
+
+      const serien = privat().optionenMesspunkt([
+        { einheit: mockConsumer, daten: messwerte },
+        { einheit: mockProducer, daten: produktion },
+        { einheit: mockRuecklieferung, daten: ruecklieferung }
+      ], [], true)['series'] as { name: string; data: number[][] }[];
+
+      // Verbraucher unveraendert.
+      expect(serien[0].data.map(p => p[1])).toEqual([1.5, 2.25, 2.25]);
+      // Produzent gespiegelt: positiv, in Reihe und Summe. Die 0 bleibt eine 0 (kein -0).
+      expect(serien[1].data.map(p => p[1])).toEqual([0, 1.288, 1.288]);
+      expect(Object.is(serien[1].data[0][1], -0)).toBe(false);
+      expect(serien[1].name).toBe('Solar Anlage (Σ 1.288 KWH)');
+      // Die Ruecklieferung ist kein Produzent und bleibt unter der Nulllinie.
+      expect(serien[2].data.map(p => p[1])).toEqual([-2.25, -2.25]);
+      expect(serien[2].name).toBe('Rücklieferung an BKW (Σ -2.250 KWH)');
+    });
+
+    it('should not mirror producers unless asked to', () => {
+      const produktion: MesswertData[] = [{ zeit: '2026-01-15T10:15:00', total: -1.288, zev: -1 }];
+
+      const serien = privat().optionenMesspunkt([{ einheit: mockProducer, daten: produktion }])['series'] as
+        { name: string; data: number[][] }[];
+
+      expect(serien[0].data.map(p => p[1])).toEqual([-1.288, -1.288]);
+      expect(serien[0].name).toBe('Solar Anlage (Σ -1.288 KWH)');
+    });
+
     it('should return to the single charts on Anzeigen', () => {
       component.selectedEinheiten = [mockConsumer, mockProducer];
       component.onVergleich();
@@ -711,6 +774,275 @@ describe('MesswerteChartComponent', () => {
       expect(messwerteServiceSpy.getMesswerteByEinheit).not.toHaveBeenCalled();
       expect(component.modus).toBe('einzeln');
       expect(component.charts).toEqual([]);
+    });
+  });
+
+  // Specs/EChart.md, FR-10: Einspeisetarif einblenden
+  describe('Einspeisetarif', () => {
+    const checkbox = (): HTMLInputElement | null =>
+      fixture.nativeElement.querySelector('#grafikEinspeisetarif');
+    type Reihe = { id?: string; name: string; yAxisIndex?: number; step?: string; data: number[][];
+      lineStyle: { color?: string; type?: string } };
+
+    it('should offer the checkbox right of the comparison button, unchecked', () => {
+      const slot: HTMLElement = fixture.nativeElement.querySelector('app-quarter-selector');
+      const ids = Array.from(slot.querySelectorAll('button, input[type="checkbox"]')).map(e => e.id);
+
+      expect(ids.indexOf('grafikEinspeisetarif')).toBe(ids.indexOf('grafikVergleich') + 1);
+      expect(checkbox()!.checked).toBe(false);
+      expect(slot.querySelector('label[for="grafikEinspeisetarif"]')?.textContent)
+        .toContain('GRAFIK_EINSPEISETARIF');
+    });
+
+    it('should hide the checkbox without the permission tarife:manage', () => {
+      // Die Preiszeitreihe verlangt tarife:manage - ohne sie liefe jeder Klick in ein 403.
+      rollen = [];
+      const ohneRecht = TestBed.createComponent(MesswerteChartComponent);
+      ohneRecht.detectChanges();
+
+      expect(ohneRecht.componentInstance.darfEinspeisetarif).toBe(false);
+      expect(ohneRecht.nativeElement.querySelector('#grafikEinspeisetarif')).toBeNull();
+      // Die uebrigen Schaltflaechen bleiben.
+      expect(ohneRecht.nativeElement.querySelector('#grafikVergleich')).not.toBeNull();
+    });
+
+    it('should hide the checkbox while the feature PREISZEITREIHE is off', async () => {
+      preiszeitreiheAktiv.set(false);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(checkbox()).toBeNull();
+    });
+
+    it('should disable the checkbox while loading', () => {
+      // Ein Umschalten mitten im Laden startete einen zweiten Lauf neben dem ersten.
+      component.loading = true;
+      fixture.detectChanges();
+      expect(checkbox()!.disabled).toBe(true);
+
+      component.loading = false;
+      fixture.detectChanges();
+      expect(checkbox()!.disabled).toBe(false);
+    });
+
+    it('should not ask for prices while the checkbox is off', () => {
+      component.selectedEinheiten = [mockConsumer];
+
+      component.onSubmit();
+
+      expect(preiszeitreiheServiceSpy.getPunkte).not.toHaveBeenCalled();
+      expect(component.messageType).toBe('success');
+    });
+
+    it('should only remember the choice while no chart is shown', () => {
+      component.selectedEinheiten = [mockConsumer];
+
+      checkbox()!.click();
+
+      expect(component.mitEinspeisetarif).toBe(true);
+      expect(messwerteServiceSpy.getMesswerteByEinheit).not.toHaveBeenCalled();
+      expect(preiszeitreiheServiceSpy.getPunkte).not.toHaveBeenCalled();
+    });
+
+    it('should load the prices of the period once, together with the measurements', () => {
+      messwerteServiceSpy.getMesswerteByEinheit.mockReturnValue(of(messwerte));
+      component.selectedEinheiten = [mockConsumer, mockProducer];
+      component.dateFrom = '2026-01-15';
+      component.dateTo = '2026-01-16';
+      component.mitEinspeisetarif = true;
+
+      component.onSubmit();
+
+      // Ein Abruf fuer alle Diagramme, nicht einer je Einheit.
+      expect(preiszeitreiheServiceSpy.getPunkte).toHaveBeenCalledTimes(1);
+      expect(preiszeitreiheServiceSpy.getPunkte).toHaveBeenCalledWith('2026-01-15', '2026-01-16');
+      expect(component.charts.length).toBe(2);
+      expect(component.message).toBe('4 DATENPUNKTE_FUER 2 EINHEITEN_GELADEN');
+      expect((component as unknown as { preise: PreiszeitreihePunkt[] }).preise).toEqual(preise);
+    });
+
+    it('should reload with and without prices when toggled while charts are shown', () => {
+      component.selectedEinheiten = [mockConsumer];
+      component.onSubmit();
+      fixture.detectChanges();
+      expect(messwerteServiceSpy.getMesswerteByEinheit).toHaveBeenCalledTimes(1);
+
+      checkbox()!.click();
+      expect(messwerteServiceSpy.getMesswerteByEinheit).toHaveBeenCalledTimes(2);
+      expect(preiszeitreiheServiceSpy.getPunkte).toHaveBeenCalledTimes(1);
+
+      // Waehrend des Ladens ist die Checkbox gesperrt - erst die Ansicht nachziehen.
+      fixture.detectChanges();
+      checkbox()!.click();
+      expect(messwerteServiceSpy.getMesswerteByEinheit).toHaveBeenCalledTimes(3);
+      // Abgewaehlt: kein weiterer Preisabruf, und die Preise des letzten Laufs sind weg.
+      expect(preiszeitreiheServiceSpy.getPunkte).toHaveBeenCalledTimes(1);
+      expect((component as unknown as { preise: PreiszeitreihePunkt[] }).preise).toEqual([]);
+    });
+
+    it('should ask for the prices once in the comparison too', () => {
+      component.selectedEinheiten = [mockConsumer, mockProducer];
+      component.mitEinspeisetarif = true;
+
+      component.onVergleich();
+
+      expect(component.charts.map(c => c.schluessel)).toEqual(['vergleich']);
+      expect(preiszeitreiheServiceSpy.getPunkte).toHaveBeenCalledTimes(1);
+    });
+
+    it('should still show the measurements and report the cause when the prices fail', () => {
+      // Das Backend antwortet im Klartext, z.B. bei einer Spanne ueber 366 Tage.
+      preiszeitreiheServiceSpy.getPunkte.mockReturnValue(
+        throwError(() => ({ status: 400, error: 'Zeitraum zu lang' })));
+      messwerteServiceSpy.getMesswerteByEinheit.mockReturnValue(of(messwerte));
+      component.selectedEinheiten = [mockConsumer];
+      component.mitEinspeisetarif = true;
+
+      component.onSubmit();
+
+      expect(component.charts.length).toBe(1);
+      expect(component.loading).toBe(false);
+      expect(component.message).toBe('Zeitraum zu lang');
+      expect(component.messageType).toBe('error');
+    });
+
+    it('should show the key of the backend when the failure carries one', () => {
+      // So antwortet der GlobalExceptionHandler, z.B. bei abgeschaltetem Feature (403).
+      preiszeitreiheServiceSpy.getPunkte.mockReturnValue(
+        throwError(() => ({ status: 403, error: { error: 'FEATURE_FLAG_DEAKTIVIERT' } })));
+      component.selectedEinheiten = [mockConsumer];
+      component.mitEinspeisetarif = true;
+
+      component.onSubmit();
+
+      // Der Key geht durch translate() - im Test liefert der Mock ihn unveraendert zurueck.
+      expect(translationServiceSpy.translate).toHaveBeenCalledWith('FEATURE_FLAG_DEAKTIVIERT');
+      expect(component.message).toBe('FEATURE_FLAG_DEAKTIVIERT');
+      expect(component.messageType).toBe('error');
+      expect(component.charts.length).toBe(1);
+    });
+
+    it('should not ask for prices once the feature is switched off, even with the box ticked', () => {
+      // Abgeschaltet waehrend das Haekchen sitzt: Die Checkbox verschwindet, das Haekchen liesse
+      // sich nicht mehr entfernen - ohne die Wache liefe jedes Laden in ein 403.
+      component.selectedEinheiten = [mockConsumer];
+      component.mitEinspeisetarif = true;
+      preiszeitreiheAktiv.set(false);
+
+      component.onSubmit();
+
+      expect(preiszeitreiheServiceSpy.getPunkte).not.toHaveBeenCalled();
+      expect(component.messageType).toBe('success');
+    });
+
+    it('should fall back to PREISE_ABRUF_FEHLGESCHLAGEN when the failure carries no text', () => {
+      preiszeitreiheServiceSpy.getPunkte.mockReturnValue(
+        throwError(() => ({ status: 502, error: { message: 'x' } })));
+      component.selectedEinheiten = [mockConsumer];
+      component.mitEinspeisetarif = true;
+
+      component.onSubmit();
+
+      // Kein [object Object] - ein Objekt-Rumpf ist kein Text.
+      expect(component.message).toBe('PREISE_ABRUF_FEHLGESCHLAGEN');
+      expect(component.messageType).toBe('error');
+    });
+
+    it('should warn when the period has no prices', () => {
+      preiszeitreiheServiceSpy.getPunkte.mockReturnValue(of([]));
+      component.selectedEinheiten = [mockConsumer];
+      component.mitEinspeisetarif = true;
+
+      component.onSubmit();
+
+      expect(component.charts.length).toBe(1);
+      expect(component.message).toBe('KEINE_PREISE_VORHANDEN');
+      expect(component.messageType).toBe('warning');
+    });
+
+    it('should add the tariff as a dashed step line on its own right axis', () => {
+      const optionen = privat().optionen(messwerte, preise);
+      const achsen = optionen['yAxis'] as { name: string; position?: string }[];
+      const serien = optionen['series'] as Reihe[];
+      const tarif = serien[serien.length - 1];
+
+      expect(achsen.length).toBe(2);
+      expect(achsen[0].name).toBe('KWH');
+      expect(achsen[1].name).toBe('PREIS_CHF_KWH');
+      expect(achsen[1].position).toBe('right');
+      // Total und ZEV bleiben, der Tarif kommt als dritte Reihe dazu.
+      expect(serien.length).toBe(3);
+      expect(tarif.name).toBe('GRAFIK_EINSPEISETARIF_CHF_KWH');
+      expect(tarif.yAxisIndex).toBe(1);
+      expect(tarif.step).toBe('end');
+      expect(tarif.lineStyle.type).toBe('dashed');
+      // Die Preise unveraendert, dazu der Abschlusspunkt des letzten Intervalls.
+      expect(tarif.data.map(p => p[1])).toEqual([0.08125, 0.1234567, 0.1234567]);
+      // Die rechte Achse braucht Platz fuer ihre Beschriftung.
+      expect((optionen['grid'] as { right: number }).right).toBe(70);
+      // Die Messreihen bleiben auf der linken Achse.
+      expect(serien[0].yAxisIndex).toBeUndefined();
+    });
+
+    it('should draw the tariff in neutral grey and keep the grid to the energy axis', () => {
+      // In jsdom greifen die Rueckfallwerte der Tokens: --color-gray-600 -> #666666.
+      const optionen = privat().optionen(messwerte, preise);
+      const achsen = optionen['yAxis'] as { splitLine: { show?: boolean } }[];
+      const serien = optionen['series'] as Reihe[];
+
+      expect(serien[2].lineStyle.color).toBe('#666666');
+      // Zwei Gitter uebereinander waeren unlesbar: Die Hilfslinien gehoeren der Energie.
+      expect(achsen[0].splitLine.show).toBeUndefined();
+      expect(achsen[1].splitLine.show).toBe(false);
+    });
+
+    it('should still show the comparison when the prices fail', () => {
+      preiszeitreiheServiceSpy.getPunkte.mockReturnValue(throwError(() => ({ status: 502 })));
+      component.selectedEinheiten = [mockConsumer, mockProducer];
+      component.mitEinspeisetarif = true;
+
+      component.onVergleich();
+
+      expect(component.charts.map(c => c.schluessel)).toEqual(['vergleich']);
+      expect(component.message).toBe('PREISE_ABRUF_FEHLGESCHLAGEN');
+    });
+
+    it('should leave the chart unchanged without prices', () => {
+      const optionen = privat().optionen(messwerte, []);
+
+      expect(Array.isArray(optionen['yAxis'])).toBe(false);
+      expect((optionen['series'] as Reihe[]).length).toBe(2);
+      expect((optionen['grid'] as { right: number }).right).toBe(20);
+    });
+
+    it('should add the tariff to charts with one series per einheit too', () => {
+      const optionen = privat().optionenMesspunkt([
+        { einheit: mockBezug, daten: messwerte },
+        { einheit: mockRuecklieferung, daten: messwerte }
+      ], preise);
+      const serien = optionen['series'] as Reihe[];
+
+      expect(serien.length).toBe(3);
+      expect(serien[2].id).toBe('einspeisetarif');
+      // Grau und gestrichelt - keine Farbe der Reihenpalette.
+      expect(serien.slice(0, 2).map(r => r.lineStyle.color)).not.toContain(serien[2].lineStyle.color);
+    });
+
+    it('should format the tariff in the tooltip as a price with five decimals', () => {
+      const optionen = privat().optionen(messwerte, preise);
+      const formatter = (optionen['tooltip'] as {
+        formatter: (p: { seriesName: string; seriesId?: string; value: number[] }[]) => string;
+      }).formatter;
+
+      const text = formatter([
+        { seriesName: 'Total', value: [0, 1.5] },
+        { seriesName: 'Einspeisetarif (CHF/kWh)', seriesId: 'einspeisetarif', value: [0, 0.1234567] }
+      ]);
+
+      expect(text).toContain('Total: 1.500 KWH');
+      // Fuenf Stellen wie in der Preiszeitreihe, ohne angehaengtes kWh.
+      expect(text).toContain('Einspeisetarif (CHF/kWh): 0.12346');
+      expect(text).not.toContain('0.12346 KWH');
     });
   });
 
@@ -895,15 +1227,57 @@ describe('MesswerteChartComponent', () => {
         schluessel: 'vergleich', einheiten: [mockConsumer, mockProducer], vergleich: true, instanz: null
       };
 
+      // Die Produktion ist negativ gespeichert - so, wie sie aus dem Backend kommt.
+      const produktion: MesswertData[] = [
+        { zeit: '2026-01-15T10:00:00', total: -0.5, zev: -0.5 },
+        { zeit: '2026-01-15T10:15:00', total: -1.25, zev: -1 }
+      ];
+
       (component as unknown as {
         createChart: (c: typeof chartData, d: Map<number, MesswertData[]>) => void;
-      }).createChart(chartData, new Map([[1, messwerte], [2, messwerte]]));
+      }).createChart(chartData, new Map([[1, messwerte], [2, produktion]]));
 
       const optionen = instanz.setOption.mock.calls[0][0] as { series: { name: string; data: number[][] }[] };
-      // Je Einheit ihr Total unter ihrem Namen - keine ZEV-Reihe.
+      // Je Einheit ihr Total unter ihrem Namen - keine ZEV-Reihe. Die Produktion steht POSITIV:
+      // Reihe und Summe sind gespiegelt, damit sie neben dem Verbrauch vergleichbar ist.
       expect(optionen.series.map(reihe => reihe.name)).toEqual(
-        ['Wohnung A (Σ 3.750 KWH)', 'Solar Anlage (Σ 3.750 KWH)']);
+        ['Wohnung A (Σ 3.750 KWH)', 'Solar Anlage (Σ 1.750 KWH)']);
       expect(optionen.series[0].data.map(punkt => punkt[1])).toEqual([1.5, 2.25, 2.25]);
+      expect(optionen.series[1].data.map(punkt => punkt[1])).toEqual([0.5, 1.25, 1.25]);
+    });
+
+    it('should keep the stored sign of a producer in a messpunkt chart', () => {
+      // Nur der Vergleich spiegelt. Truegen ein Produzent und eine andere Einheit denselben
+      // Messpunkt, bliebe dort das gespeicherte Vorzeichen (FR-8.5).
+      behaelter.id = 'chart-messpunkt-0';
+      const instanz = { setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn() };
+      (component as unknown as { echarts: unknown }).echarts = { init: vi.fn().mockReturnValue(instanz) };
+      const chartData = {
+        schluessel: 'messpunkt-0', einheiten: [mockProducer, mockConsumer], messpunkt: 'MP', instanz: null
+      };
+      const produktion: MesswertData[] = [{ zeit: '2026-01-15T10:00:00', total: -0.5, zev: -0.5 }];
+
+      (component as unknown as {
+        createChart: (c: typeof chartData, d: Map<number, MesswertData[]>) => void;
+      }).createChart(chartData, new Map([[2, produktion], [1, messwerte]]));
+
+      const optionen = instanz.setOption.mock.calls[0][0] as { series: { name: string; data: number[][] }[] };
+      expect(optionen.series[0].name).toBe('Solar Anlage (Σ -0.500 KWH)');
+      expect(optionen.series[0].data.map(punkt => punkt[1])).toEqual([-0.5, -0.5]);
+    });
+
+    it('should draw the loaded tariff into the chart', () => {
+      const instanz = { setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn() };
+      (component as unknown as { echarts: unknown }).echarts = { init: vi.fn().mockReturnValue(instanz) };
+      (component as unknown as { preise: PreiszeitreihePunkt[] }).preise = preise;
+      const chartData = { schluessel: '1', einheiten: [mockConsumer], instanz: null };
+
+      (component as unknown as {
+        createChart: (c: typeof chartData, d: Map<number, MesswertData[]>) => void;
+      }).createChart(chartData, new Map([[1, messwerte]]));
+
+      const optionen = instanz.setOption.mock.calls[0][0] as { series: { id?: string }[] };
+      expect(optionen.series.map(reihe => reihe.id)).toEqual([undefined, undefined, 'einspeisetarif']);
     });
 
     it('should do nothing without a container', () => {

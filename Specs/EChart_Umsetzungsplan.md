@@ -496,3 +496,51 @@ die einzelnen Diagramme verschwinden.
   Anzeige), steht sie über die ganze Breite und lag auf „kWh". Der obere Rand der Zeichenfläche
   ist von 40 auf 55 gesetzt, für beide Diagrammarten.
 * **Uhrzeiten liefen bei 390 px ineinander:** `axisLabel.hideOverlap` an der Zeitachse.
+
+---
+
+## Nachtrag 22.11.2026: Einspeisetarif einblenden (FR-10)
+
+Checkbox „Einspeisetarif" rechts von „Vergleich": blendet den dynamischen Einspeisepreis des
+gewählten Zeitraums als zusätzliche Linie mit eigener Achse in jedes Diagramm ein.
+
+| Datei | Änderung |
+|---|---|
+| `V192__Add_Grafik_Einspeisetarif_Translations.sql` | neu: `GRAFIK_EINSPEISETARIF`, `GRAFIK_EINSPEISETARIF_CHF_KWH` |
+| `messwerte-chart.component.ts` | `darfEinspeisetarif` (Permission `tarife:manage`), `mitEinspeisetarif`, `onEinspeisetarifToggle()`; Preisabruf im selben `forkJoin` wie die Messwerte, mit `catchError`; `preisAchse()`, `preisReihe()`; Tooltip formatiert den Preis mit fünf Stellen |
+| `messwerte-chart.component.html` | Checkbox `#grafikEinspeisetarif` im Aktions-Slot, `@if (darfEinspeisetarif)` und `*appFeature="'PREISZEITREIHE'"` |
+| `messwerte-chart.component.spec.ts` | `describe('Einspeisetarif')`, ein Test in `createChart`; Provider für `Keycloak`, `PreiszeitreiheService`, `FeatureFlagService` |
+| `tests/messwerte-grafik.spec.ts` | E2E „should show the feed-in tariff for the selected period" (Flag und Preise im Browser vorgegeben) |
+| `Specs/Berechtigungen.md` | Fussnote zur Messwerte-Grafik |
+| `utils/chart-preis.ts` (+ Spec) | neu: `formatPreis`, `preisPunkte`; Preiszeitreihe-Chart und Einspeisesteuerung nutzen sie statt eigener Kopien (verhaltensneutral, ihre Tests unverändert grün) |
+
+* **Kein neuer Endpunkt, kein neues CSS:** `PreiszeitreiheService.getPunkte()` und `zev-checkbox-item` bestehen.
+* **Braucht einen Neustart des Backends** für `V192`.
+* **Aus dem Vorlagen-Check:** Fehlertext nach der Projektregel (`error.error?.error`, übersetzt), das Flag
+  `PREISZEITREIHE` gehört zusätzlich zur Wache vor dem Preisabruf, gemeinsame y-Achsen-Basis
+  (`wertAchse`).
+
+**Zwei Befunde aus Sichtprüfung und E2E-Lauf, beide behoben:**
+
+* **Fünf bestehende E2E-Tests schlugen fehl**, weil ihr Selektor für die Einträge der
+  Einheiten-Auswahl (`.zev-checkbox-item:not(…--select-all)`) auch die neue Checkbox traf: „Alle
+  auswählen" galt als unvollständig, die Zahl der Einträge stimmte nicht. Der Selektor ist jetzt
+  auf `app-einheit-selector` eingegrenzt und steht einmal als Konstante (`AUSWAHL_EINTRAG`,
+  `AUSWAHL_KAESTCHEN`) statt sechsfach ausgeschrieben.
+* **Seitlicher Überlauf bei 390 px:** Mit drei Elementen im Aktions-Slot war die Zeile breiter als
+  die Seite. `.zev-quarter-selector__actions` bricht jetzt um (`flex-wrap`, Design System).
+
+---
+
+## Nachtrag 22.11.2026: Produzenten im Vergleich positiv (FR-9.3)
+
+Im Vergleichsdiagramm werden Reihe und Summe der Produzenten gespiegelt, damit die Produktion über
+der Nulllinie neben Verbrauch und Bezug steht.
+
+| Datei | Änderung |
+|---|---|
+| `messwerte-chart.component.ts` | `optionenMesspunkt(…, produzentenPositiv)`: spiegelt Einheiten vom Typ `PRODUCER`, `createChart` übergibt `true` nur für den Vergleich; `gespiegelt()` lässt eine 0 unverändert |
+| `messwerte-chart.component.spec.ts` | zwei Tests in `Vergleich`, einer in `createChart` (Messpunkt bleibt ungespiegelt); der Vergleichs-Test in `createChart` arbeitet mit negativ gespeicherter Produktion |
+
+* **Nur Darstellung:** kein Backend, keine Migration, keine neuen Texte.
+* **Rücklieferung und Speicher** behalten ihr Vorzeichen; das Messpunkt-Diagramm ist unverändert.

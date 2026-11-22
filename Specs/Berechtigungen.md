@@ -62,7 +62,7 @@ Die Rollen-Spalten sind aus der obigen Fachrolle→Permission-Zuordnung abgeleit
 | Einheiten – anlegen / bearbeiten / löschen (KI-Matching) | `einheit:write`      | ❌  | ✅        | ✅        |
 | Messpunkt-Empfang ansehen                            | `einheit:read`           | ✅  | ✅        | ✅        |
 | Messpunkt-Empfang – Einträge löschen                 | `einheit:write`          | ❌  | ✅        | ✅        |
-| Messwerte-Grafik ansehen                             | `messwerte:read`         | ✅  | ✅        | ✅        |
+| Messwerte-Grafik ansehen ¹⁰                          | `messwerte:read`         | ✅  | ✅        | ✅        |
 | Messwerte-Upload (CSV + KI-Matching) ¹               | `messwerte:write`        | ❌  | ✅        | ✅        |
 | Solarverteilung berechnen ²                          | `messwerte:write`        | ❌  | ✅        | ✅        |
 | Statistik ansehen & PDF-Export                       | `statistik:read`         | ✅  | ✅        | ✅        |
@@ -104,6 +104,8 @@ Die Rollen-Spalten sind aus der obigen Fachrolle→Permission-Zuordnung abgeleit
 ⁸ Zusätzlich per Feature-Flag `NEBENKOSTENABRECHNUNG` gesteuert (`FeatureFlagGuard` an den Routen `/nebenkosten/…`; das Backend prüft das Flag ebenfalls). Das Erzeugen und Herunterladen der Nebenkosten-Rechnungen verlangt **beide** Permissions zugleich (`nebenkosten:manage` und `rechnungen:manage`).
 
 ⁹ Die Preiszeitreihe hat keine eigene Route; sie ist ein Bereich der Seite `/tarife` und erscheint nur mit dem Feature-Flag `PREISZEITREIHE` (`*appFeature`).
+
+¹⁰ Die Checkbox „Einspeisetarif" der Messwerte-Grafik (`Specs/EChart.md`, FR-10) liest die Preiszeitreihe (`GET /api/preiszeitreihe`) und erscheint deshalb nur mit `tarife:manage` und aktivem Feature-Flag `PREISZEITREIHE`. `zev_user` sieht die Grafik ohne sie.
 
 ## Öffentlich (ohne Authentifizierung)
 

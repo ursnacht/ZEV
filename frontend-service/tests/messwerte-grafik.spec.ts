@@ -21,6 +21,17 @@ import { navigateViaMenu } from './helpers';
 
 const CANVAS = '.zev-panel--chart canvas';
 
+/**
+ * Ein Eintrag der Einheiten-Auswahl (Einheit oder Messpunkt), ohne „Alle auswählen".
+ *
+ * Auf `app-einheit-selector` eingegrenzt: Die Seite hat mit „Einspeisetarif" (`Specs/EChart.md`,
+ * FR-10) eine weitere Checkbox mit derselben Design-System-Klasse. Ohne die Eingrenzung zählte sie
+ * als Einheit mit - „Alle auswählen" galt dann als unvollständig, und die Zahl der Einträge stimmte
+ * nicht mehr.
+ */
+const AUSWAHL_EINTRAG = 'app-einheit-selector .zev-checkbox-item:not(.zev-checkbox-item--select-all)';
+const AUSWAHL_KAESTCHEN = `${AUSWAHL_EINTRAG} input[type="checkbox"]`;
+
 async function oeffneGrafik(page: Page): Promise<void> {
     await navigateViaMenu(page, '/chart');
     await page.locator('.zev-container h1').waitFor({ state: 'visible', timeout: 15000 });
@@ -28,7 +39,7 @@ async function oeffneGrafik(page: Page): Promise<void> {
     // auswählen" steht **statisch** im Template und ist auch sichtbar, solange die Einheiten noch
     // nicht geladen sind. Ein `count()` direkt danach liest 0 — dieser Test war deshalb flaky, und
     // dieselbe Falle hat schon eine Messung verdorben.
-    await page.locator('.zev-checkbox-item:not(.zev-checkbox-item--select-all) input[type="checkbox"]')
+    await page.locator(AUSWAHL_KAESTCHEN)
         .first().waitFor({ state: 'attached', timeout: 20000 });
 }
 
@@ -41,7 +52,7 @@ function anzeigenButton(page: Page) {
  * (`#messpunkt-gruppe-<n>`, Specs/EChart.md FR-8) — sie stehen aber immer **nach** den Einheiten.
  */
 function ersteEinheit(page: Page) {
-    return page.locator('.zev-checkbox-item:not(.zev-checkbox-item--select-all) input[type="checkbox"]')
+    return page.locator(AUSWAHL_KAESTCHEN)
         .first();
 }
 
@@ -139,7 +150,7 @@ test.describe('Messwerte-Grafik - Navigation und Vorbelegung', () => {
         await oeffneGrafik(page);
 
         await expect(page.locator('#einheit-select-all')).toBeVisible();
-        await expect(page.locator('.zev-checkbox-item:not(.zev-checkbox-item--select-all)').first())
+        await expect(page.locator(AUSWAHL_EINTRAG).first())
             .toBeVisible();
     });
 
@@ -188,7 +199,7 @@ test.describe('Messwerte-Grafik - Auswahl und Validierung', () => {
         await oeffneGrafik(page);
 
         const einzelne = page.locator(
-            '.zev-checkbox-item:not(.zev-checkbox-item--select-all) input[type="checkbox"]');
+            AUSWAHL_KAESTCHEN);
         const anzahl = await einzelne.count();
         expect(anzahl).toBeGreaterThan(0);
 
@@ -243,7 +254,7 @@ test.describe('Messwerte-Grafik - Diagramm', () => {
         await oeffneGrafik(page);
 
         const einzelne = page.locator(
-            '.zev-checkbox-item:not(.zev-checkbox-item--select-all) input[type="checkbox"]');
+            AUSWAHL_KAESTCHEN);
         const verfuegbar = await einzelne.count();
         const gewaehlt = Math.min(verfuegbar, 2);
         test.skip(gewaehlt < 2, 'Weniger als zwei Einheiten vorhanden');
@@ -315,7 +326,7 @@ test.describe('Messwerte-Grafik - Diagramm', () => {
 
         // Der Eintrag steht nach den drei Einheiten und nennt beide samt Messpunkt. Der Typ ist
         // übersetzt, deshalb hier nur die Form - den genauen Text liefert der Titel-Vergleich unten.
-        const eintraege = page.locator('.zev-checkbox-item:not(.zev-checkbox-item--select-all) input[type="checkbox"]');
+        const eintraege = page.locator(AUSWAHL_KAESTCHEN);
         await expect(eintraege).toHaveCount(4);
         await expect(eintraege.last()).toHaveId('messpunkt-gruppe-0');
         const bezeichnung = ((await page.locator('label[for="messpunkt-gruppe-0"]').textContent()) ?? '').trim();
@@ -384,6 +395,53 @@ test.describe('Messwerte-Grafik - Diagramm', () => {
         await zeigeAn(page);
         await expect(page.locator('.zev-panel--chart')).toHaveCount(2, { timeout: 20000 });
         await expect(page.locator('#chart-vergleich')).toHaveCount(0);
+    });
+
+    /**
+     * Einspeisetarif (`Specs/EChart.md`, FR-10): Die Checkbox rechts von „Vergleich" blendet den
+     * Preis ein und lädt ihn für genau den gewählten Zeitraum.
+     *
+     * **Mit vorgegebenen Daten:** Feature-Flag und Preise werden nur im Browser umgeschrieben
+     * (`page.route`) - ob der Mandant das Flag `PREISZEITREIHE` gesetzt und Preise geladen hat,
+     * soll den Test nicht entscheiden. Der Testuser ist `zev_admin` und hat `tarife:manage`.
+     */
+    test('should show the feed-in tariff for the selected period', async ({ page }) => {
+        const preisAbrufe: string[] = [];
+        await page.route(/\/api\/feature-flags$/, async route => {
+            const antwort = await route.fetch();
+            await route.fulfill({ response: antwort, json: { ...(await antwort.json()), PREISZEITREIHE: true } });
+        });
+        await page.route(/\/api\/preiszeitreihe\?/, route => {
+            preisAbrufe.push(new URL(route.request().url()).search);
+            return route.fulfill({ json: [
+                { zeit: '2026-01-15T00:00:00', preis: 0.08 },
+                { zeit: '2026-01-15T12:00:00', preis: 0.12 }
+            ] });
+        });
+
+        await oeffneGrafik(page);
+        const tarif = page.locator('#grafikEinspeisetarif');
+        await expect(tarif).toBeVisible();
+        await expect(tarif).not.toBeChecked();
+        await expect(page.locator('label[for="grafikEinspeisetarif"]')).not.toContainText('GRAFIK_');
+
+        await ersteEinheit(page).check();
+        await setzeZeitraum(page, '2026-01-15', '2026-01-15');
+
+        // Ohne Haekchen kein Preisabruf.
+        await zeigeAn(page);
+        await expect(page.locator(CANVAS)).toBeVisible({ timeout: 20000 });
+        expect(preisAbrufe).toEqual([]);
+        const ohneTarif = await warteAufGezeichnetesDiagramm(page);
+
+        // Mit Haekchen laedt die Seite neu - die Preise fuer genau diesen Zeitraum, einmal.
+        await expect(page.locator('.zev-message')).toHaveCount(0, { timeout: 10000 });
+        await tarif.check();
+        await expect(page.locator('.zev-message')).toBeVisible({ timeout: 30000 });
+        expect(preisAbrufe).toEqual(['?von=2026-01-15&bis=2026-01-15']);
+
+        // Die zusaetzliche Linie, ihre Achse und ihr Legendeneintrag bemalen mehr als zuvor.
+        await expect.poll(() => gezeichnetePixel(page), { timeout: 20000 }).toBeGreaterThan(ohneTarif);
     });
 
     /**

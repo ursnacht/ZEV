@@ -27,6 +27,15 @@
             <app-icon name="bar-chart-2"></app-icon>
             {{ 'GRAFIK_VERGLEICH' | translate }}
           </button>
+          <!-- Einspeisetarif einblenden (Specs/EChart.md, FR-10): nur mit der Permission der
+               Preiszeitreihe und mit deren Feature-Flag - sonst liefe der Abruf in ein 403 -->
+          @if (darfEinspeisetarif) {
+            <div class="zev-checkbox-item" *appFeature="'PREISZEITREIHE'">
+              <input type="checkbox" id="grafikEinspeisetarif" name="grafikEinspeisetarif"
+                [checked]="mitEinspeisetarif" [disabled]="loading" (change)="onEinspeisetarifToggle()">
+              <label for="grafikEinspeisetarif">{{ 'GRAFIK_EINSPEISETARIF' | translate }}</label>
+            </div>
+          }
         </app-quarter-selector>
 
         <div class="zev-date-range-row">

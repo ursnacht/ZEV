@@ -24,7 +24,7 @@
 
 1. Benutzer öffnet **Messwerte-Grafik** (`/chart`, Permission `messwerte:read`).
 2. Er wählt Einheiten und — wo vorhanden — Messpunkte mit mehreren Einheiten (FR-8; Mehrfachauswahl samt „Alle auswählen") und einen Zeitraum (Quartals-Schaltflächen, Datum von/bis, Blättern oder „Heute", FR-1a; `Datum von` zieht `Datum bis` auf das Monatsende nach).
-3. Klick auf **Anzeigen** lädt die Messwerte je Einheit und zeichnet **ein Diagramm je Einheit** in einem eigenen Panel mit Titel `Name [Typ]`, danach **eines je gewähltem Messpunkt** (FR-8). Klick auf **Vergleich** zeichnet stattdessen **ein** Diagramm mit allen gewählten Einheiten (FR-9). Blättern und „Heute" laden selbst, in der Ansicht, die gerade steht.
+3. Klick auf **Anzeigen** lädt die Messwerte je Einheit und zeichnet **ein Diagramm je Einheit** in einem eigenen Panel mit Titel `Name [Typ]`, danach **eines je gewähltem Messpunkt** (FR-8). Klick auf **Vergleich** zeichnet stattdessen **ein** Diagramm mit allen gewählten Einheiten (FR-9). Die Checkbox **Einspeisetarif** blendet in jedes Diagramm den dynamischen Einspeisepreis ein (FR-10). Blättern und „Heute" laden selbst, in der Ansicht, die gerade steht.
 4. Eine Erfolgsmeldung nennt die Zahl der geladenen Datenpunkte und der Einheiten.
 5. Innerhalb des geladenen Zeitraums kann der Benutzer zoomen und den Ausschnitt verschieben — ohne neuen Server-Aufruf.
 
@@ -56,7 +56,7 @@ Schaltflächen und Datumsfelder sind angeordnet und verhalten sich wie auf der S
 
 * **Alle** Zahlen im Schweizer Format über `formatSwissNumber()` aus `src/app/utils/number-utils.ts` — Achsenbeschriftung, Tooltip und die Summen in der Legende. **Kein** `toLocaleString()`, **kein** `toFixed()`, keine ECharts-eigene Locale-Formatierung.
 * **Zeitpunkte** im Format `dd.MM.yyyy HH:mm`, manuell gebildet (kein `toLocaleString`).
-* **Alle** Texte über den `TranslationService`, auch die Legendennamen und der Achsentitel: `TOTAL`, `ZEV`, `KWH`. Ebenso Lade- und Fehlerzustand des Diagramms: `DIAGRAMM_LAEDT` und `DIAGRAMM_NICHT_LADBAR`, die Bedienung (FR-1a): `ANZEIGEN`, `LADE_DATEN`, `ZEITRAUM_ZURUECK`, `ZEITRAUM_VOR`, `HEUTE`, und der Vergleich (FR-9): `GRAFIK_VERGLEICH`, `EINHEITEN`. `GRAFIK_VERGLEICH` kommt aus der Migration `V191`, alle übrigen Keys aus früheren.
+* **Alle** Texte über den `TranslationService`, auch die Legendennamen und der Achsentitel: `TOTAL`, `ZEV`, `KWH`. Ebenso Lade- und Fehlerzustand des Diagramms: `DIAGRAMM_LAEDT` und `DIAGRAMM_NICHT_LADBAR`, die Bedienung (FR-1a): `ANZEIGEN`, `LADE_DATEN`, `ZEITRAUM_ZURUECK`, `ZEITRAUM_VOR`, `HEUTE`, und der Vergleich (FR-9): `GRAFIK_VERGLEICH`, `EINHEITEN`. `GRAFIK_VERGLEICH` kommt aus der Migration `V191`. Der Einspeisetarif (FR-10) nutzt `GRAFIK_EINSPEISETARIF` und `GRAFIK_EINSPEISETARIF_CHF_KWH` (beide `V192`) sowie `PREIS_CHF_KWH`, `KEINE_PREISE_VORHANDEN` und `PREISE_ABRUF_FEHLGESCHLAGEN`. Alle übrigen Keys kommen aus früheren Migrationen.
 * **Aufgelöst wird beim Zeichnen.** Ein Sprachwechsel während ein Diagramm offen steht erneuert die Beschriftung **nicht**: `TranslationService.setLanguage()` setzt ein Signal, das Template-Texte erneuert — ein gezeichnetes Canvas nicht. Die Legende trägt bis zum nächsten Zeichnen die alte Sprache. Das ist heute genauso und bleibt eine **bekannte Einschränkung** (§5); sie gilt für beide Diagramme gleich, und wenn sie behoben wird, dann für beide gemeinsam.
 
 ### FR-4: Farben und Dark Mode
@@ -73,6 +73,7 @@ Nachladen der Bibliothek, Farbzugriff und Zeitformatierung stehen **einmal** und
 |---|---|
 | `utils/echarts-loader.ts` | dynamischer Import samt `core.use([...])`, gemerkt für weitere Aufrufe; liefert `null`, wenn das Nachladen scheitert |
 | `utils/chart-farben.ts` | Farben aus den Design-Tokens mit Rückfallwerten |
+| `utils/chart-preis.ts` | Preis in CHF/kWh mit fünf Nachkommastellen (`formatPreis`) und Umrechnung der Preiszeitreihe in Datenpunkte (`preisPunkte`) — für Preiszeitreihe, Einspeisesteuerung und Messwerte-Grafik (FR-10) |
 | `utils/date-utils.ts` (bestehend) | **Neu dort:** `formatSwissDateTime()` für `dd.MM.yyyy HH:mm`. Die Preiszeitreihe hat diese Formatierung heute privat in der Komponente (`formatiereZeit`); sie wandert hierher, damit sie nicht zweimal existiert — die Datei ist ohnehin die Heimat der Datumsformatierung |
 
 Die Preiszeitreihe-Komponente wird auf diese Bausteine umgestellt. Ihre Tests müssen unverändert grün bleiben — sie sind der Nachweis, dass die Extraktion verhaltensneutral war.
@@ -112,11 +113,30 @@ Neben „Anzeigen" steht die Schaltfläche **„Vergleich"** (`GRAFIK_VERGLEICH`
 2. **Wann sie frei ist:** wie „Anzeigen" (beide Daten gesetzt, nicht beim Laden) und zusätzlich nur mit **mindestens zwei** Einheiten. Gezählt wird, was geladen würde: die gewählten Einheiten und die der gewählten Messpunkte, jede einmal.
 
    > Mit einer Einheit wäre der Vergleich ihr eigenes Diagramm ohne ZEV-Reihe.
-3. **Was erscheint:** genau ein Panel mit dem Titel `Vergleich: <n> Einheiten`. Darin **eine Reihe je Einheit** mit ihrem `total` im gespeicherten Vorzeichen, benannt nach der Einheit samt Summe — derselbe Aufbau wie das Messpunkt-Diagramm (FR-8.5, FR-8.6), also ohne ZEV-Reihe. Produzenten, Rücklieferung und entladende Speicher liegen damit unter der Nulllinie.
+3. **Was erscheint:** genau ein Panel mit dem Titel `Vergleich: <n> Einheiten`. Darin **eine Reihe je Einheit** mit ihrem `total`, benannt nach der Einheit samt Summe — derselbe Aufbau wie das Messpunkt-Diagramm (FR-8.5, FR-8.6), also ohne ZEV-Reihe.
+   * **Produzenten stehen positiv:** Ihre Reihe und ihre Summe werden gespiegelt (gespeichert ist die Produktion negativ), damit die Produktion über der Nulllinie neben Verbrauch und Bezug steht und sich mit ihnen vergleichen lässt.
+   * Alle übrigen Typen behalten das gespeicherte Vorzeichen: Rücklieferung und entladende Speicher liegen unter der Nulllinie.
+   * Im Messpunkt-Diagramm (FR-8) wird nichts gespiegelt.
 4. **Reihenfolge der Reihen:** wie in der Auswahlliste; die Einheiten eines gewählten Messpunkts folgen, sofern sie nicht schon selbst gewählt sind.
 5. **„Anzeigen" bringt die einzelnen Diagramme zurück.** Es gibt immer nur eine der beiden Ansichten.
 6. **Blättern und „Heute"** laden in der Ansicht, die gerade steht: Wer im Vergleich blättert, bleibt im Vergleich. Sind inzwischen weniger als zwei Einheiten gewählt, fällt die Ansicht auf die einzelnen Diagramme zurück.
 7. **Geladen** wird wie bei „Anzeigen": jede Einheit einmal, die Erfolgsmeldung zählt Einheiten und Datenpunkte (FR-8.7).
+
+### FR-10: Einspeisetarif einblenden
+
+Rechts von „Vergleich" steht die Checkbox **„Einspeisetarif"** (`GRAFIK_EINSPEISETARIF`). Ist sie gesetzt, zeigt jedes Diagramm zusätzlich den dynamischen Einspeisepreis des gewählten Zeitraums.
+
+1. **Quelle:** die Preiszeitreihe (`GET /api/preiszeitreihe?von=…&bis=…`, `Specs/Preiszeitreihe.md`) — Viertelstundenwerte in CHF/kWh.
+2. **Wer die Checkbox sieht:** nur Benutzer mit der Permission `tarife:manage` und nur bei aktivem Feature-Flag `PREISZEITREIHE`. Beides verlangt auch der Endpunkt; ohne eines davon gibt es die Checkbox nicht.
+
+   > Sichtbar, aber wirkungslos wäre schlimmer als nicht da: Jeder Klick liefe in ein 403. Wird das Flag abgeschaltet, während das Häkchen sitzt, ruft die Grafik keine Preise mehr ab.
+3. **Wann geladen wird:** zusammen mit den Messwerten, **ein** Abruf je Laden für den Zeitraum `Datum von` bis `Datum bis` — nicht einer je Einheit. Ohne Häkchen wird nichts abgerufen.
+4. **Umschalten bei stehenden Diagrammen** lädt sofort neu und zeichnet mit bzw. ohne Preis. Stehen noch keine Diagramme, merkt sich die Maske nur die Wahl; sie gilt für „Anzeigen", „Vergleich", Blättern und „Heute". Während des Ladens ist die Checkbox gesperrt.
+5. **Darstellung:** in **jedem** Diagramm (Einheit, Messpunkt, Vergleich) eine zusätzliche Reihe `Einspeisetarif (CHF/kWh)` als **gestrichelte Stufenlinie** in neutralem Grau, auf einer **eigenen rechten y-Achse** mit dem Titel `Preis (CHF/kWh)`. Die Energie-Achse links und ihre Hilfslinien bleiben; die rechte Achse hat keine eigenen Hilfslinien. Auch die Preisreihe endet mit einem Abschlusspunkt (FR-2).
+
+   > Energie und Preis haben keine gemeinsame Skala. Grau und gestrichelt, weil im Vergleich alle Reihenfarben vergeben sind und der Preis keine Energie ist.
+6. **Tooltip:** Der Preis steht mit **fünf** Nachkommastellen wie in der Preiszeitreihe und ohne angehängtes `kWh`.
+7. **Der Preis ist Beiwerk:** Scheitert sein Abruf, erscheinen die Diagramme trotzdem — ohne Preisreihe und mit einer Fehlermeldung: dem übersetzten Key des Backends (`{ error }`) oder dessen Klartext (z. B. bei einer Spanne über 366 Tage), sonst `PREISE_ABRUF_FEHLGESCHLAGEN`. Liefert der Abruf **keine** Preise, erscheint die Warnung `KEINE_PREISE_VORHANDEN`. In beiden Fällen ersetzt die Meldung die Erfolgsmeldung mit der Zahl der Datenpunkte.
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
@@ -145,10 +165,18 @@ Neben „Anzeigen" steht die Schaltfläche **„Vergleich"** (`GRAFIK_VERGLEICH`
 **Vergleich (FR-9)**
 * [x] „Vergleich" steht im Quartal-Selektor neben „Anzeigen" und ist gesperrt, solange weniger als zwei Einheiten zu laden wären; ein gewählter Messpunkt mit zwei Einheiten genügt. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should offer the button next to the submit button, disabled below two einheiten; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should disable the comparison while loading or without a complete period; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should enable the comparison for a single messpunkt with two einheiten; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should do nothing without two einheiten; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should draw all selected units into one comparison chart)
 * [x] Ein Klick auf „Vergleich" ersetzt die einzelnen Diagramme durch **ein** Panel `#chart-vergleich` mit dem Titel `Vergleich: <n> Einheiten`, das alle gewählten Einheiten in der Reihenfolge der Auswahl trägt. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should replace the single charts by one chart with all selected einheiten; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should draw all selected units into one comparison chart)
-* [x] Das Vergleichsdiagramm zeigt je Einheit eine Reihe mit ihrem `total` unter ihrem Namen samt Summe, ohne ZEV-Reihe. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › createChart › should draw one series per einheit into the comparison chart)
+* [x] Das Vergleichsdiagramm zeigt je Einheit eine Reihe mit ihrem `total` unter ihrem Namen samt Summe, ohne ZEV-Reihe. Die Reihen der **Produzenten** stehen dabei positiv — Werte und Summe gespiegelt —, alle übrigen Typen im gespeicherten Vorzeichen; im Messpunkt-Diagramm wird nichts gespiegelt. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › createChart › should draw one series per einheit into the comparison chart; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should mirror only producers, including the sum, and leave a zero untouched; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should not mirror producers unless asked to; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › createChart › should keep the stored sign of a producer in a messpunkt chart)
 * [x] Eine Einheit, die einzeln und über ihren Messpunkt gewählt ist, wird für den Vergleich einmal geladen und einmal gezeichnet; die Meldung zählt die geladenen Einheiten. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should load each einheit once, also when it is selected through its messpunkt too)
 * [x] „Anzeigen" bringt die einzelnen Diagramme zurück; Blättern und „Heute" bleiben in der Ansicht, die gerade steht – im Vergleich nur, solange mindestens zwei Einheiten gewählt sind, sonst erscheinen die einzelnen Diagramme. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should return to the single charts on Anzeigen; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should keep the comparison when paging and jumping to today; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should stay with the single charts when paging after returning from the comparison; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should fall back to the single chart when the selection shrank below two einheiten; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should draw all selected units into one comparison chart)
 * [x] Diagramme mit einer Reihe je Einheit vergeben sechs verschiedene Token-Farben; eine siebte Reihe trägt keine eigene Farbe (Palette der Bibliothek). (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Messpunkt-Diagramm › should give six series their own token colour and leave a seventh to the library; Test: chart-farben.spec.ts › chartFarben › should offer a palette of six distinct colours for charts with one series per unit)
+
+**Einspeisetarif (FR-10)**
+* [x] Die Checkbox „Einspeisetarif" steht rechts von „Vergleich", ist anfangs nicht gesetzt und erscheint nur mit der Permission `tarife:manage` und aktivem Feature-Flag `PREISZEITREIHE`. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should offer the checkbox right of the comparison button, unchecked; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should hide the checkbox without the permission tarife:manage; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should hide the checkbox while the feature PREISZEITREIHE is off; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should disable the checkbox while loading; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should show the feed-in tariff for the selected period)
+* [x] Ohne Häkchen wird kein Preis abgerufen; mit Häkchen genau einmal je Laden für den gewählten Zeitraum, auch im Vergleich. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should not ask for prices while the checkbox is off; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should load the prices of the period once, together with the measurements; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should ask for the prices once in the comparison too; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should not ask for prices once the feature is switched off, even with the box ticked; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should show the feed-in tariff for the selected period)
+* [x] Umschalten bei stehenden Diagrammen lädt sofort neu, mit bzw. ohne Preis; ohne Diagramme wird nur die Wahl gemerkt. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should reload with and without prices when toggled while charts are shown; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should only remember the choice while no chart is shown; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should show the feed-in tariff for the selected period)
+* [x] Der Preis erscheint in Diagrammen einer Einheit wie in solchen mit einer Reihe je Einheit als zusätzliche, gestrichelte Stufenlinie `Einspeisetarif (CHF/kWh)` auf einer eigenen rechten Achse `Preis (CHF/kWh)`, mit Abschlusspunkt; ohne Preise bleibt das Diagramm unverändert (eine Achse). (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should add the tariff as a dashed step line on its own right axis; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should leave the chart unchanged without prices; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should add the tariff to charts with one series per einheit too; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should draw the tariff in neutral grey and keep the grid to the energy axis; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › createChart › should draw the loaded tariff into the chart)
+* [x] Im Tooltip steht der Preis mit fünf Nachkommastellen und ohne `kWh`. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should format the tariff in the tooltip as a price with five decimals)
+* [x] Scheitert der Preisabruf, erscheinen die Diagramme trotzdem, mit dem Key oder Klartext des Backends als Fehlermeldung bzw. `PREISE_ABRUF_FEHLGESCHLAGEN`; liefert er keine Preise, erscheint die Warnung `KEINE_PREISE_VORHANDEN`. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should still show the measurements and report the cause when the prices fail; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should show the key of the backend when the failure carries one; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should fall back to PREISE_ABRUF_FEHLGESCHLAGEN when the failure carries no text; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should warn when the period has no prices; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Einspeisetarif › should still show the comparison when the prices fail)
 
 **Neu und geändert**
 * [x] Mausrad/Touch zoomt innerhalb des geladenen Zeitraums, der Slider verschiebt den Ausschnitt — **ohne** neuen HTTP-Aufruf. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › optionen › should offer zoom inside and as a slider; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should zoom with the mouse wheel without asking the server)
@@ -188,11 +216,11 @@ Neben „Anzeigen" steht die Schaltfläche **„Vergleich"** (`GRAFIK_VERGLEICH`
 
 ### NFR-2: Sicherheit
 * **Unverändert:** Route `/chart` verlangt die Permission `messwerte:read` (`AuthGuard`, `app.routes.ts`) — Fachrollen `zev_user`, `org_admin`, `zev_admin`. Die Daten kommen weiterhin über `GET /api/messwerte/by-einheit` mit `hasAuthority('messwerte:read')`.
-* Keine neuen Endpunkte, keine neuen Berechtigungen, kein Feature-Flag.
+* Keine neuen Endpunkte und keine neuen Berechtigungen. Der Einspeisetarif (FR-10) nutzt den bestehenden Endpunkt `GET /api/preiszeitreihe` mit dessen Absicherung: Permission `tarife:manage` und Feature-Flag `PREISZEITREIHE`. Die Checkbox erscheint nur, wenn beides erfüllt ist; massgeblich bleibt die Prüfung im Backend. `zev_user` sieht die Grafik damit ohne Einspeisetarif.
 * Der dynamische Import lädt ausschliesslich lokal gebündelte Chunks — **kein** CDN, keine externe Quelle.
 
 ### NFR-3: Kompatibilität
-* **Keine Änderung am Schema.** Einzige Migration ist `V191` mit dem Übersetzungs-Key `GRAFIK_VERGLEICH` (FR-9); alle übrigen Keys existieren.
+* **Keine Änderung am Schema.** Zwei Migrationen mit Übersetzungs-Keys: `V191` (`GRAFIK_VERGLEICH`, FR-9) und `V192` (`GRAFIK_EINSPEISETARIF`, `GRAFIK_EINSPEISETARIF_CHF_KWH`, FR-10); alle übrigen Keys existieren.
 * Keine Änderung an Backend, API oder DTOs.
 * Reiner Frontend-Umbau: Ein Rückweg ist ein einzelner Commit. Es gibt keinen migrierten Datenbestand, der einen Rückweg blockieren könnte.
 * Die Statistik-Seite und alle übrigen Masken bleiben unberührt.
@@ -215,7 +243,12 @@ Neben „Anzeigen" steht die Schaltfläche **„Vergleich"** (`GRAFIK_VERGLEICH`
 | Vergleich mit mehr als sechs Einheiten | Die ersten sechs Reihen tragen die Token-Farben, weitere die Palette von ECharts; die Legende blättert, wenn sie nicht in eine Zeile passt |
 | „Vergleich" mit nur einer Einheit | Schaltfläche gesperrt (FR-9.2) |
 | Auswahl nach einem Vergleich auf eine Einheit verkleinert, dann geblättert | Es erscheint das einzelne Diagramm dieser Einheit; die Ansicht steht danach wieder auf „einzeln" (FR-9.6) |
+| Produzent im Vergleich, der netto bezieht (z. B. Wechselrichter lädt die Batterie aus dem Netz, `total` positiv) | Gespiegelt wie jeder Wert des Produzenten: Die Reihe liegt in diesen Intervallen unter der Nulllinie |
 | Zwei Einheiten mit demselben Namen im Vergleich | Beide Reihen tragen denselben Legendentext; unterscheidbar sind sie nur an der Farbe |
+| Einspeisetarif verlangt, Zeitraum ohne Preise | Diagramme ohne Preisreihe, Warnung `KEINE_PREISE_VORHANDEN` (FR-10.7) |
+| Einspeisetarif verlangt, Zeitraum länger als 366 Tage | Die Preiszeitreihe lehnt ab; Diagramme ohne Preisreihe, Fehlermeldung mit dem Text des Backends |
+| Einspeisetarif verlangt, Preise decken nur einen Teil des Zeitraums | Die Preislinie steht nur dort, wo es Preise gibt |
+| Benutzer ohne `tarife:manage` oder Flag `PREISZEITREIHE` aus | Keine Checkbox, kein Preisabruf; die Grafik funktioniert wie zuvor |
 | Gleicher Messpunkt, unterschiedlich geschrieben (`BKW` / `bkw`) | Keine Gruppe — es sind zwei Messpunkte, wie in der Einheitenverwaltung |
 | Panel wird in der Grösse verändert (`resize: vertical`) | Diagramm folgt über den `ResizeObserver` |
 | Sprachwechsel bei offenem Diagramm | Beschriftung und Legende bleiben bis zum nächsten Zeichnen in der alten Sprache. **Bekannte Einschränkung**, heute genauso, gilt für beide Diagramme (FR-3) |
@@ -229,6 +262,7 @@ Neben „Anzeigen" steht die Schaltfläche **„Vergleich"** (`GRAFIK_VERGLEICH`
 * **`tests/messwerte-grafik.spec.ts`** (14 Tests) als Netz — ohne diese Tests wäre der Umbau nicht verantwortbar. Sie sind der Grund, warum diese Spec überhaupt geschrieben werden kann.
   * **Randbedingung:** Die Tests zählen `.zev-panel--chart canvas`. Die Zusicherung „unverändert grün" gilt, solange ECharts **genau ein** `<canvas>` je Instanz erzeugt. Legt es mehrere Render-Layer an, ist der **Test** anzupassen — und die Anpassung ist zu begründen, nicht die Zusicherung zu beugen.
 * Design-Tokens (`design-system/src/tokens/tokens.css`), `formatSwissNumber`, `TranslationService`.
+* Für den Einspeisetarif (FR-10): `PreiszeitreiheService` (`GET /api/preiszeitreihe`, `Specs/Preiszeitreihe.md`), Feature-Flag `PREISZEITREIHE` (`FeatureFlagService`, `*appFeature`), Permission `tarife:manage` aus dem Keycloak-Token (`Specs/Berechtigungen.md`, Fussnote ¹⁰).
 
 **Betroffener Code**
 | Datei | Änderung |
@@ -241,6 +275,9 @@ Neben „Anzeigen" steht die Schaltfläche **„Vergleich"** (`GRAFIK_VERGLEICH`
 | `utils/messpunkt-gruppen.ts`, `pipes/messpunkt-gruppe.pipe.ts` | neu: Gruppen je Messpunkt bilden und bezeichnen (FR-8) |
 | `components/einheit-selector/` | Zusatzeinträge je Messpunkt, abschaltbar (`mitMesspunktGruppen`); Rechnungen unverändert |
 | `models/einheit.model.ts` | neu: `MesspunktGruppe` |
+| `utils/chart-preis.ts` | neu: gemeinsame Preis-Bausteine (FR-5, FR-10) |
+| `components/preiszeitreihe-chart/`, `components/einspeisesteuerung/` | nutzen `formatPreis` und `preisPunkte` statt eigener Kopien — verhaltensneutral |
+| `V191`, `V192` (Migrationen) | Übersetzungs-Keys für Vergleich und Einspeisetarif |
 | `frontend-service/package.json` (+ Lockfile) | `chart.js` entfernen |
 
 **Datenmigration**
@@ -248,7 +285,7 @@ Neben „Anzeigen" steht die Schaltfläche **„Vergleich"** (`GRAFIK_VERGLEICH`
 
 **Tests**
 * Frontend-Unit: `messwerte-chart.component.spec.ts` umstellen (18 Tests), neue Tests für die gemeinsamen Bausteine.
-* E2E: `messwerte-grafik.spec.ts` bleibt **unverändert** — das ist Absicht und gleichzeitig das stärkste Akzeptanzkriterium. Ergänzt wird nur ein Test für das Zoomen.
+* E2E: Die 14 ursprünglichen Tests in `messwerte-grafik.spec.ts` bleiben in ihren Rümpfen **unverändert** — das ist Absicht und gleichzeitig das stärkste Akzeptanzkriterium. Ergänzt wird je ein Test für Zoom, Bedienung (FR-1a), Messpunkt-Diagramm (FR-8), Vergleich (FR-9) und Einspeisetarif (FR-10).
 
 ## 7. Abgrenzung / Out of Scope
 
@@ -256,6 +293,8 @@ Neben „Anzeigen" steht die Schaltfläche **„Vergleich"** (`GRAFIK_VERGLEICH`
 * **Kein Saldo je Messpunkt.** Das Messpunkt-Diagramm zeigt die Einheiten nebeneinander; eine verrechnete Reihe (Bezug minus Rücklieferung) gibt es nicht.
 * **Keine Summe im Vergleich.** Das Vergleichsdiagramm (FR-9) zeigt die Einheiten nebeneinander; eine aufsummierte Reihe über alle gibt es nicht.
 * **Kein Mischbetrieb.** Vergleich und einzelne Diagramme stehen nie gleichzeitig auf der Seite.
+* **Nur der dynamische Einspeisepreis** (FR-10). Die festen Tarife der Tarifverwaltung (ZEV, VNB) zeigt die Grafik nicht, ebenso keinen Ertrag in Franken (Energie × Preis).
+* **Kein Abruf bei der Preisquelle.** Die Grafik liest die gespeicherte Preiszeitreihe; aktualisiert wird sie in der Tarifverwaltung bzw. durch den Job.
 * **Keine Änderung an Backend, API oder Datenbank.**
 * **Kein Umbau der Statistik-Seite** und keiner anderen Maske; `zev-panel--chart` bleibt wie es ist.
 * **Keine fachliche Änderung an der Preiszeitreihe** — dort wird ausschliesslich auf die gemeinsamen Bausteine umgestellt.
@@ -303,3 +342,15 @@ Vorher liessen sich mehrere Einheiten nur dann in einem Diagramm sehen, wenn sie
 Aus der Umsetzung stammen: die Mindestzahl von zwei Einheiten, dass Blättern und „Heute" in der stehenden Ansicht bleiben, und die sechs Reihenfarben. Bis dahin gab es für Diagramme mit einer Reihe je Einheit nur zwei Token-Farben; eine dritte Einheit am selben Messpunkt bekam die Palette von ECharts.
 
 `NFR-3` lautete „keine Migration, keine neuen Übersetzungs-Keys" — das galt für den Bibliothekswechsel und gilt mit `V191` nicht mehr wörtlich.
+
+### A.6 Einspeisetarif in der Messwerte-Grafik (FR-10, 22.11.2026)
+
+Vorher zeigte die Grafik ausschliesslich Energie; den Einspeisepreis gab es nur in der Tarifverwaltung (Preiszeitreihe) und in der Einspeisesteuerung. `NFR-2` lautete „Keine neuen Endpunkte, keine neuen Berechtigungen, kein Feature-Flag" — die Seite hing an keinem Flag. `NFR-3` nannte `V191` als einzige Migration. Am 22.11.2026 kam auf Wunsch des Benutzers die Checkbox dazu.
+
+Aus der Umsetzung stammen: „Einspeisetarif" meint den dynamischen Einspeisepreis der Preiszeitreihe (einen anderen Einspeisetarif kennt die Anwendung nicht); die Bindung der Checkbox an `tarife:manage` und das Flag `PREISZEITREIHE`, weil der Endpunkt beides verlangt; die Darstellung als graue, gestrichelte Linie auf eigener Achse; und dass ein gescheiterter Preisabruf die Messwerte nicht mitreisst.
+
+### A.7 Produzenten im Vergleich positiv (FR-9.3, 22.11.2026)
+
+Vorher zeigte der Vergleich jede Einheit im gespeicherten Vorzeichen: „Produzenten, Rücklieferung und entladende Speicher liegen damit unter der Nulllinie." Das Kriterium lautete „… je Einheit eine Reihe mit ihrem `total` unter ihrem Namen samt Summe, ohne ZEV-Reihe". Im ersten Gebrauch (Verbrauch gesamt, Bezug und PV-Anlage in einem Diagramm) lag die Produktion als einzige Kurve unter der Nulllinie und liess sich mit den beiden anderen nicht vergleichen. Auf Wunsch des Benutzers stehen die Produzenten seither positiv.
+
+Aus der Umsetzung stammt die Abgrenzung: gespiegelt werden nur Einheiten vom Typ Produzent, nicht Rücklieferung und Speicher, und nur im Vergleich, nicht im Messpunkt-Diagramm.

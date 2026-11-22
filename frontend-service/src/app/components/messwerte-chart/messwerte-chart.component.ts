@@ -1,11 +1,16 @@
-import { Component, OnDestroy, OnInit, ChangeDetectorRef, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnDestroy, OnInit, ChangeDetectorRef, ChangeDetectionStrategy, inject } from '@angular/core';
+import Keycloak from 'keycloak-js';
 import { WithMessage } from '../../utils/with-message';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MesswerteService, MesswertData } from '../../services/messwerte.service';
-import { Einheit, MesspunktGruppe } from '../../models/einheit.model';
+import { Einheit, EinheitTyp, MesspunktGruppe } from '../../models/einheit.model';
 import { MesspunktGruppePipe } from '../../pipes/messpunkt-gruppe.pipe';
-import { forkJoin } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { PreiszeitreiheService } from '../../services/preiszeitreihe.service';
+import { PreiszeitreihePunkt } from '../../models/preiszeitreihe.model';
+import { FeatureFlagDirective } from '../../directives/feature-flag.directive';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { TranslationService } from '../../services/translation.service';
 import { QuarterSelectorComponent } from '../quarter-selector/quarter-selector.component';
@@ -15,9 +20,14 @@ import { formatSwissNumber } from '../../utils/number-utils';
 import { blaettereZeitraum, formatSwissDateTime, monatsende, toIsoDate, vorquartal } from '../../utils/date-utils';
 import { ChartFarben, chartFarben } from '../../utils/chart-farben';
 import { ladeECharts } from '../../utils/echarts-loader';
+import { formatPreis, preisPunkte } from '../../utils/chart-preis';
+import { FeatureFlagService } from '../../services/feature-flag.service';
 
 /** Länge eines Messintervalls: `messwerte.zeit` trägt den Beginn einer Viertelstunde. */
 const INTERVALL_MS = 15 * 60 * 1000;
+
+/** Kennung der Preisreihe im Diagramm - der Tooltip erkennt sie daran und formatiert als Preis. */
+const EINSPEISETARIF_ID = 'einspeisetarif';
 
 interface ChartData {
   /** Eindeutig je Diagramm: die Einheit-ID oder `messpunkt-<n>`. Teil der DOM-ID des Behälters. */
@@ -35,7 +45,8 @@ interface ChartData {
 @Component({
   selector: 'app-messwerte-chart',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe, MesspunktGruppePipe, QuarterSelectorComponent, IconComponent, EinheitSelectorComponent],
+  imports: [CommonModule, FormsModule, TranslatePipe, MesspunktGruppePipe, QuarterSelectorComponent, IconComponent,
+    EinheitSelectorComponent, FeatureFlagDirective],
   templateUrl: './messwerte-chart.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./messwerte-chart.component.css']
@@ -54,6 +65,21 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
    * Einheiten übrig, dann fällt sie auf `einzeln` zurück.
    */
   modus: 'einzeln' | 'vergleich' = 'einzeln';
+
+  /**
+   * Darf der Benutzer den Einspeisetarif sehen? Die Preiszeitreihe verlangt `tarife:manage`
+   * (Specs/Berechtigungen.md) - ohne die Permission gibt es die Checkbox nicht, sonst liefe jeder
+   * Klick in ein 403. Das Feature-Flag `PREISZEITREIHE` prüft das Template (`*appFeature`) und
+   * zusätzlich die Wache vor dem Preisabruf.
+   *
+   * Über `hasRealmRole` wie in den übrigen Komponenten (z.B. Einheiten-Liste) und wie im Backend,
+   * das nur die Realm-Rollen auswertet.
+   */
+  readonly darfEinspeisetarif = inject(Keycloak).hasRealmRole('tarife:manage');
+  /** Checkbox „Einspeisetarif": blendet den dynamischen Einspeisepreis in jedes Diagramm ein (FR-10). */
+  mitEinspeisetarif = false;
+  /** Die Preise des zuletzt geladenen Zeitraums; leer, wenn nicht verlangt oder keine vorhanden. */
+  private preise: PreiszeitreihePunkt[] = [];
 
   charts: ChartData[] = [];
   /** Solange die Bibliothek nachgeladen wird, zeigt jedes Panel einen Hinweis. */
@@ -78,6 +104,8 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
 
   constructor(
     private messwerteService: MesswerteService,
+    private preiszeitreiheService: PreiszeitreiheService,
+    private featureFlagService: FeatureFlagService,
     private translationService: TranslationService,
     private cdr: ChangeDetectorRef
   ) { super(); }
@@ -213,6 +241,18 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
     this.ladeUndZeichne();
   }
 
+  /**
+   * Checkbox „Einspeisetarif" (Specs/EChart.md, FR-10). Stehen schon Diagramme, werden sie neu
+   * geladen und gezeichnet - mit bzw. ohne Preisreihe. Ohne Diagramme merkt sich die Maske nur
+   * die Wahl; sie gilt beim nächsten Laden.
+   */
+  onEinspeisetarifToggle(): void {
+    this.mitEinspeisetarif = !this.mitEinspeisetarif;
+    if (this.charts.length > 0) {
+      this.ladeUndZeichne();
+    }
+  }
+
   /** Lädt die Messwerte der Auswahl und zeichnet sie in der Ansicht von {@link modus}. */
   private ladeUndZeichne(): void {
     if (!this.dateFrom || !this.dateTo || !this.hatAuswahl) {
@@ -244,8 +284,30 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
       this.messwerteService.getMesswerteByEinheit(e.id!, this.dateFrom, this.dateTo)
     );
 
-    forkJoin(requests).subscribe({
-      next: (results: MesswertData[][]) => {
+    // Der Einspeisetarif ist Beiwerk: Scheitert sein Abruf, erscheinen die Messwerte trotzdem -
+    // ohne Preisreihe und mit der Meldung, warum sie fehlt.
+    // Auch das Flag gehoert zur Wache: Wird es abgeschaltet, waehrend das Haekchen sitzt,
+    // verschwindet die Checkbox - das Haekchen liesse sich nicht mehr entfernen und jedes Laden
+    // liefe in ein 403.
+    const mitPreis = this.mitEinspeisetarif && this.darfEinspeisetarif
+      && this.featureFlagService.isEnabled('PREISZEITREIHE');
+    let preisFehler: string | null = null;
+    const preise$ = mitPreis
+      ? this.preiszeitreiheService.getPunkte(this.dateFrom, this.dateTo).pipe(
+        catchError(error => {
+          // Das Backend antwortet mit einem Key ({ error }, z.B. FEATURE_FLAG_DEAKTIVIERT) oder
+          // im Klartext (z.B. bei einer Spanne ueber 366 Tage). Ein Key wird uebersetzt, Klartext
+          // kommt aus translate() unveraendert zurueck.
+          preisFehler = this.translationService.translate(error?.error?.error
+            || (typeof error?.error === 'string' && error.error)
+            || 'PREISE_ABRUF_FEHLGESCHLAGEN');
+          return of<PreiszeitreihePunkt[]>([]);
+        }))
+      : of<PreiszeitreihePunkt[]>([]);
+
+    forkJoin({ messwerte: forkJoin(requests), preise: preise$ }).subscribe({
+      next: ({ messwerte: results, preise }) => {
+        this.preise = preise ?? [];
         let totalDataPoints = 0;
         const datenJeEinheit = new Map<number, MesswertData[]>();
 
@@ -269,7 +331,14 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
         void this.createChartsSequentially(datenJeEinheit);
         // Gezaehlt werden die geladenen Einheiten, nicht die Diagramme: Ein Messpunkt-Diagramm
         // laedt keine eigenen Daten.
-        this.showMessage(`${totalDataPoints} ${this.translationService.translate('DATENPUNKTE_FUER')} ${einheiten.length} ${this.translationService.translate('EINHEITEN_GELADEN')}`, 'success');
+        if (preisFehler) {
+          this.showMessage(preisFehler, 'error');
+        } else if (mitPreis && this.preise.length === 0) {
+          // Verlangt, aber nichts da: sagen statt ein Diagramm ohne die erwartete Linie zu zeigen.
+          this.showMessage(this.translationService.translate('KEINE_PREISE_VORHANDEN'), 'warning');
+        } else {
+          this.showMessage(`${totalDataPoints} ${this.translationService.translate('DATENPUNKTE_FUER')} ${einheiten.length} ${this.translationService.translate('EINHEITEN_GELADEN')}`, 'success');
+        }
         this.loading = false;
       },
       error: (error) => {
@@ -353,10 +422,13 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
     this.observers.set(chartData.schluessel, observer);
 
     const daten = (einheit: Einheit) => datenJeEinheit.get(einheit.id!) ?? [];
-    // Messpunkt und Vergleich zeichnen dasselbe: eine Reihe je Einheit.
+    // Messpunkt und Vergleich zeichnen eine Reihe je Einheit; nur der Vergleich spiegelt die
+    // Produzenten (FR-9.3).
     const optionen = chartData.messpunkt || chartData.vergleich
-      ? this.optionenMesspunkt(chartData.einheiten.map(einheit => ({ einheit, daten: daten(einheit) })))
-      : this.optionen(daten(chartData.einheiten[0]));
+      ? this.optionenMesspunkt(
+        chartData.einheiten.map(einheit => ({ einheit, daten: daten(einheit) })), this.preise,
+        !!chartData.vergleich)
+      : this.optionen(daten(chartData.einheiten[0]), this.preise);
     instanz.setOption(optionen, true);
   }
 
@@ -370,7 +442,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
    * <p><b>Die ZEV-Reihe wird negativ aufgetragen</b> — wie bisher. Das spiegelt sie unter die
    * Nulllinie und macht Bezug und Eigenverbrauch auf einen Blick unterscheidbar.
    */
-  private optionen(data: MesswertData[]): Record<string, unknown> {
+  private optionen(data: MesswertData[], preise: PreiszeitreihePunkt[] = []): Record<string, unknown> {
     const farben = chartFarben();
     const kwh = this.translationService.translate('KWH');
     const zevReihe = data.map(d => [new Date(d.zeit).getTime(), -(d.zev ?? 0)]);
@@ -379,17 +451,20 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
     return this.diagrammOptionen([
       this.reihe(this.legende('TOTAL', this.totalSumme(data), kwh), this.totalReihe(data), farben.primaer),
       this.reihe(this.legende('ZEV', zevSumme, kwh), zevReihe, farben.sekundaer)
-    ], farben, kwh);
+    ], farben, kwh, preise);
   }
 
   /**
    * Diagramm-Optionen für mehrere Einheiten in einem Diagramm — einen Messpunkt (Specs/EChart.md,
    * FR-8) oder den Vergleich aller gewählten Einheiten (FR-9): **eine Reihe je Einheit**, jeweils
-   * ihr `total` mit dem Vorzeichen, wie es gespeichert ist.
+   * ihr `total` — im gespeicherten Vorzeichen, ausser bei Produzenten im Vergleich.
    *
-   * <p>Bei Bezug und Rücklieferung ergibt das von selbst das gewünschte Bild: Der Bezug ist positiv,
-   * die Rücklieferung negativ gespeichert — die eine Linie liegt über, die andere unter der
-   * Nulllinie. Gespiegelt wird hier deshalb **nichts**, anders als bei der ZEV-Reihe.
+   * <p>Im Vergleich (`produzentenPositiv`) werden die Reihen der **Produzenten** gespiegelt, damit
+   * die Produktion über der Nulllinie neben dem Verbrauch steht (FR-9.3).
+   *
+   * <p>Bei Bezug und Rücklieferung ergibt das gespeicherte Vorzeichen von selbst das gewünschte
+   * Bild: Der Bezug ist positiv, die Rücklieferung negativ gespeichert — die eine Linie liegt über,
+   * die andere unter der Nulllinie. Im Messpunkt-Diagramm wird deshalb **nichts** gespiegelt.
    *
    * <p>Die ZEV-Reihe entfällt: Sie gehört zur einzelnen Einheit, und zwei davon machten aus dem
    * Vergleich vier Linien.
@@ -398,15 +473,34 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
    * siebte und weitere nimmt ECharts seine eigene Palette — unterscheidbar, statt eine Farbe
    * zweimal zu vergeben.
    */
-  private optionenMesspunkt(reihen: { einheit: Einheit; daten: MesswertData[] }[]): Record<string, unknown> {
+  private optionenMesspunkt(reihen: { einheit: Einheit; daten: MesswertData[] }[],
+                            preise: PreiszeitreihePunkt[] = [],
+                            produzentenPositiv = false): Record<string, unknown> {
     const farben = chartFarben();
     const reihenfarben = farben.reihen;
     const kwh = this.translationService.translate('KWH');
 
-    return this.diagrammOptionen(reihen.map(({ einheit, daten }, index) => this.reihe(
-      this.legendeText(einheit.name, this.totalSumme(daten), kwh),
-      this.totalReihe(daten),
-      reihenfarben[index])), farben, kwh);
+    return this.diagrammOptionen(reihen.map(({ einheit, daten }, index) => {
+      // Im Vergleich (FR-9) steht die Produktion ueber der Nulllinie, neben Verbrauch und Bezug:
+      // Gespeichert ist sie negativ, und unter der Nulllinie liesse sie sich mit den uebrigen
+      // Kurven nicht vergleichen. Reihe UND Summe drehen, sonst widerspraeche die Legende dem Bild.
+      const spiegeln = produzentenPositiv && einheit.typ === EinheitTyp.PRODUCER;
+      const zeitreihe = this.totalReihe(daten);
+      const summe = this.totalSumme(daten);
+      return this.reihe(
+        this.legendeText(einheit.name, spiegeln ? this.gespiegelt(summe) : summe, kwh),
+        spiegeln ? zeitreihe.map(([zeit, wert]) => [zeit, this.gespiegelt(wert)]) : zeitreihe,
+        reihenfarben[index]);
+    }), farben, kwh, preise);
+  }
+
+  /**
+   * Dreht das Vorzeichen; eine 0 bleibt 0 statt `-0`. Angezeigt sähen beide gleich aus, `-0`
+   * unterscheidet sich aber in `Object.is`/`toEqual` von `0`. Die ZEV-Reihe in `optionen()` dreht
+   * weiterhin ohne diesen Schutz.
+   */
+  private gespiegelt(wert: number): number {
+    return wert === 0 ? 0 : -wert;
   }
 
   /** `total` als Zeitreihe `[Zeitpunkt, Wert]`, im gespeicherten Vorzeichen. */
@@ -419,28 +513,37 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
   }
 
   /** Was beide Diagrammarten teilen: Achsen, Tooltip, Legende, Zoom — nur die Reihen unterscheiden sich. */
-  private diagrammOptionen(series: Record<string, unknown>[], farben: ChartFarben,
-                           kwh: string): Record<string, unknown> {
+  private diagrammOptionen(series: Record<string, unknown>[], farben: ChartFarben, kwh: string,
+                           preise: PreiszeitreihePunkt[] = []): Record<string, unknown> {
+    const zeigtPreis = preise.length > 0;
+    const energieAchse = {
+      ...this.wertAchse(kwh, farben),
+      splitLine: { lineStyle: { color: farben.gitter } }
+    };
     return {
       animation: false,
       // top 55: Die Legende steht oben ueber die ganze Breite, sobald sie blaettert (Vergleich mit
       // vielen Einheiten, schmale Anzeige). Mit 40 lag sie auf dem Achsentitel "kWh".
-      grid: { left: 70, right: 20, top: 55, bottom: 70 },
+      // Mit Preisreihe braucht die zweite Achse rechts Platz fuer ihre Beschriftung.
+      grid: { left: 70, right: zeigtPreis ? 70 : 20, top: 55, bottom: 70 },
       // `scroll`: Die Legende bleibt einzeilig und blaettert, wenn sie nicht passt. Beim
       // Messpunkt-Diagramm stehen die Namen der Einheiten darin; auf schmalen Anzeigen brach sie
       // sonst auf zwei Zeilen um und lag ueber dem Achsentitel und der Zeichenflaeche.
       legend: { type: 'scroll', top: 0, textStyle: { color: farben.text } },
       tooltip: {
         trigger: 'axis',
-        formatter: (alle: { seriesName: string; value: number[] }[]) => {
+        formatter: (alle: { seriesName: string; seriesId?: string; value: number[] }[]) => {
           // Der Abschlusspunkt (siehe mitAbschluss) ist kein Messwert und hat keinen Tooltip.
           const params = alle.filter(p => !p.value[2]);
           if (params.length === 0) {
             return '';
           }
           const kopf = formatSwissDateTime(new Date(params[0].value[0]));
-          const zeilen = params.map(p =>
-            `${p.seriesName}: ${formatSwissNumber(p.value[1], 3)} ${kwh}`);
+          // Der Einspeisetarif ist ein Preis: fuenf Stellen wie in der Preiszeitreihe und ohne
+          // die Einheit kWh - sie steht bei ihm im Namen (CHF/kWh).
+          const zeilen = params.map(p => p.seriesId === EINSPEISETARIF_ID
+            ? `${p.seriesName}: ${formatPreis(p.value[1])}`
+            : `${p.seriesName}: ${formatSwissNumber(p.value[1], 3)} ${kwh}`);
           return [kopf, ...zeilen].join('<br>');
         }
       },
@@ -452,19 +555,60 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
         // hideOverlap: Bei schmaler Anzeige liefen die Uhrzeiten sonst ineinander.
         axisLabel: { color: farben.text, hideOverlap: true }
       },
-      yAxis: {
-        type: 'value',
-        name: kwh,
-        nameTextStyle: { color: farben.text },
-        axisLine: { lineStyle: { color: farben.achse } },
-        axisLabel: {
-          color: farben.text,
-          formatter: (wert: number) => formatSwissNumber(wert, 3)
-        },
-        splitLine: { lineStyle: { color: farben.gitter } }
-      },
+      // Ohne Preis EINE Achse wie bisher; mit Preis kommt rechts eine zweite fuer CHF/kWh dazu -
+      // Energie und Preis haben keine gemeinsame Skala.
+      yAxis: zeigtPreis ? [energieAchse, this.preisAchse(farben)] : energieAchse,
       dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 10 }],
-      series
+      series: zeigtPreis ? [...series, this.preisReihe(preise, farben)] : series
+    };
+  }
+
+  /** Was beide y-Achsen teilen: Titel, Farben und die Beschriftung im Schweizer Format. */
+  private wertAchse(name: string, farben: ChartFarben): Record<string, unknown> {
+    return {
+      type: 'value',
+      name,
+      nameTextStyle: { color: farben.text },
+      axisLine: { lineStyle: { color: farben.achse } },
+      axisLabel: {
+        color: farben.text,
+        formatter: (wert: number) => formatSwissNumber(wert, 3)
+      }
+    };
+  }
+
+  /** Rechte Achse für den Einspeisetarif in CHF/kWh, ohne eigene Hilfslinien. */
+  private preisAchse(farben: ChartFarben): Record<string, unknown> {
+    return {
+      ...this.wertAchse(this.translationService.translate('PREIS_CHF_KWH'), farben),
+      position: 'right',
+      // Die rechte Achsenlinie zeichnet ECharts nur auf Verlangen.
+      axisLine: { show: true, lineStyle: { color: farben.achse } },
+      // Zwei Gitter uebereinander waeren unlesbar - das Gitter gehoert der Energie.
+      splitLine: { show: false }
+    };
+  }
+
+  /**
+   * Die Reihe des Einspeisetarifs (Specs/EChart.md, FR-10): Stufenlinie wie die Messwerte - ein
+   * Preis gilt für die ganze Viertelstunde -, auf der rechten Achse.
+   *
+   * Gestrichelt und in neutralem Grau: Die Farben der Reihenpalette sind in einem Vergleich alle
+   * vergeben, und der Preis ist keine Energie. Strich und Ton setzen ihn von jeder Messreihe ab.
+   */
+  private preisReihe(preise: PreiszeitreihePunkt[], farben: ChartFarben): Record<string, unknown> {
+    return {
+      id: EINSPEISETARIF_ID,
+      name: this.translationService.translate('GRAFIK_EINSPEISETARIF_CHF_KWH'),
+      type: 'line',
+      step: 'end',
+      showSymbol: false,
+      connectNulls: false,
+      sampling: 'lttb',
+      yAxisIndex: 1,
+      lineStyle: { color: farben.bandZwei, width: 1.5, type: 'dashed' },
+      itemStyle: { color: farben.bandZwei },
+      data: this.mitAbschluss(preisPunkte(preise))
     };
   }
 

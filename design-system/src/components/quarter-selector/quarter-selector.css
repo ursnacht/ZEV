@@ -21,6 +21,12 @@
  */
 .zev-quarter-selector__actions {
   display: inline-flex;
+  /*
+   * Umbrechen statt ueberlaufen: Mit mehreren Elementen im Slot (Messwerte-Grafik: "Anzeigen",
+   * "Vergleich" und die Checkbox "Einspeisetarif") war die Zeile bei 390px breiter als die Seite
+   * und schob sie seitlich auf.
+   */
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--spacing-sm);
   margin-left: var(--spacing-md);
