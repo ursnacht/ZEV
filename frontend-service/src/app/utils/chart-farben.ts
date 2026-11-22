@@ -1,5 +1,5 @@
 /**
- * Diagrammfarben aus den Design-Tokens (`Specs/EChart.md`, FR-4).
+ * Diagrammfarben aus den Design-Tokens (`Specs/Grafiken.md`, FR-4).
  *
  * **Warum aus Tokens und nicht fest:** Die Neutraltöne kippen im Dark Mode — `--color-gray-700` ist
  * dort hell. Feste Werte ergäben je nach Modus ein unlesbares Diagramm.
@@ -63,7 +63,7 @@ export interface ChartFarben {
   soc: string;
   /**
    * **Reihenpalette** für Diagramme mit *einer Reihe je Einheit* (Messpunkt, Vergleich —
-   * `Specs/EChart.md`, FR-8 und FR-9): sechs Töne aus sechs Farbfamilien, in dieser Reihenfolge.
+   * `Specs/Grafiken.md`, FR-8 und FR-9): sechs Töne aus sechs Farbfamilien, in dieser Reihenfolge.
    *
    * Sie besteht aus denselben Tokens wie die Felder oben, **ohne deren Zweckbindung**: In diesen
    * Diagrammen gibt es weder Zustandsbänder noch eine Solar- oder Ladezustandsreihe, mit denen

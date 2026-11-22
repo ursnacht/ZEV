@@ -17,7 +17,7 @@
         </label>
       </div>
     }
-    <!-- Zusatzeintrag je Messpunkt mit mehreren Einheiten (Specs/EChart.md, FR-8) -->
+    <!-- Zusatzeintrag je Messpunkt mit mehreren Einheiten (Specs/Grafiken.md, FR-8) -->
     @for (gruppe of gruppen; track gruppe.messpunkt; let i = $index) {
       <div class="zev-checkbox-item">
         <input type="checkbox" [id]="'messpunkt-gruppe-' + i"

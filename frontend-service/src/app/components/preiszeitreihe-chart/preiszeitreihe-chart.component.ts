@@ -202,7 +202,7 @@ export class PreiszeitreiheChartComponent extends WithMessage
    * Lädt `echarts` beim ersten Zeichnen nach. `false`, wenn das misslingt.
    *
    * Die Registrierung der Module steht im gemeinsamen Loader — dort für alle Diagramme gemeinsam,
-   * weil ein nicht registrierter Serientyp stumm nichts zeichnet (Specs/EChart.md, FR-5).
+   * weil ein nicht registrierter Serientyp stumm nichts zeichnet (Specs/Grafiken.md, FR-5).
    */
   private async ladeBibliothek(): Promise<boolean> {
     if (this.echarts) {

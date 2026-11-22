@@ -24,7 +24,7 @@ const CANVAS = '.zev-panel--chart canvas';
 /**
  * Ein Eintrag der Einheiten-Auswahl (Einheit oder Messpunkt), ohne „Alle auswählen".
  *
- * Auf `app-einheit-selector` eingegrenzt: Die Seite hat mit „Einspeisetarif" (`Specs/EChart.md`,
+ * Auf `app-einheit-selector` eingegrenzt: Die Seite hat mit „Einspeisetarif" (`Specs/Grafiken.md`,
  * FR-10) eine weitere Checkbox mit derselben Design-System-Klasse. Ohne die Eingrenzung zählte sie
  * als Einheit mit - „Alle auswählen" galt dann als unvollständig, und die Zahl der Einträge stimmte
  * nicht mehr.
@@ -49,7 +49,7 @@ function anzeigenButton(page: Page) {
 
 /**
  * Erste echte Einheit (nicht „Alle auswählen"). Der Selektor trifft auch die Messpunkt-Einträge
- * (`#messpunkt-gruppe-<n>`, Specs/EChart.md FR-8) — sie stehen aber immer **nach** den Einheiten.
+ * (`#messpunkt-gruppe-<n>`, Specs/Grafiken.md FR-8) — sie stehen aber immer **nach** den Einheiten.
  */
 function ersteEinheit(page: Page) {
     return page.locator(AUSWAHL_KAESTCHEN)
@@ -293,7 +293,7 @@ test.describe('Messwerte-Grafik - Diagramm', () => {
     });
 
     /**
-     * Messpunkt mit mehreren Einheiten (`Specs/EChart.md`, FR-8): Die Auswahl bietet dafür einen
+     * Messpunkt mit mehreren Einheiten (`Specs/Grafiken.md`, FR-8): Die Auswahl bietet dafür einen
      * Zusatzeintrag **nach** den Einheiten, und er allein zeichnet **ein** Diagramm mit dem Titel
      * `Einheit [Typ] / Einheit [Typ] / [Messpunkt]`.
      *
@@ -355,7 +355,7 @@ test.describe('Messwerte-Grafik - Diagramm', () => {
     });
 
     /**
-     * Vergleich (`Specs/EChart.md`, FR-9): alle gewählten Einheiten in **einem** Diagramm, die
+     * Vergleich (`Specs/Grafiken.md`, FR-9): alle gewählten Einheiten in **einem** Diagramm, die
      * einzelnen verschwinden; „Anzeigen" bringt sie zurück. Liest nur, mit den vorhandenen Einheiten.
      */
     test('should draw all selected units into one comparison chart', async ({ page }) => {
@@ -398,7 +398,7 @@ test.describe('Messwerte-Grafik - Diagramm', () => {
     });
 
     /**
-     * Einspeisetarif (`Specs/EChart.md`, FR-10): Die Checkbox rechts von „Vergleich" blendet den
+     * Einspeisetarif (`Specs/Grafiken.md`, FR-10): Die Checkbox rechts von „Vergleich" blendet den
      * Preis ein und lädt ihn für genau den gewählten Zeitraum.
      *
      * **Mit vorgegebenen Daten:** Feature-Flag und Preise werden nur im Browser umgeschrieben
@@ -445,7 +445,7 @@ test.describe('Messwerte-Grafik - Diagramm', () => {
     });
 
     /**
-     * Bedienung wie in der Statistik (`Specs/EChart.md`, FR-1a): „Anzeigen" neben den Quartalen,
+     * Bedienung wie in der Statistik (`Specs/Grafiken.md`, FR-1a): „Anzeigen" neben den Quartalen,
      * ◀ / ▶ blättern um die Länge des Zeitraums, „Heute" setzt heute–heute — beide laden sofort.
      */
     test('should page the period and jump to today, loading immediately', async ({ page }) => {
@@ -475,7 +475,7 @@ test.describe('Messwerte-Grafik - Diagramm', () => {
     /**
      * Zoomen: Mausrad über dem Diagramm ändert das Bild — **ohne** neuen Server-Aufruf.
      *
-     * Der Zoom kam mit dem Wechsel auf ECharts (`Specs/EChart.md`) und ist die einzige neue
+     * Der Zoom kam mit dem Wechsel auf ECharts (`Specs/Grafiken.md`) und ist die einzige neue
      * Funktion dieses Umbaus. Geprüft wird über die bemalten Pixel: Ein anderer Ausschnitt ergibt
      * ein anderes Bild. Ein Zoom, der zufällig **genau** dieselbe Pixelzahl bemalt, ist bei
      * fünfstelligen Zahlen praktisch ausgeschlossen.

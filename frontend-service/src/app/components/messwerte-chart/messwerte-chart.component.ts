@@ -32,11 +32,11 @@ const EINSPEISETARIF_ID = 'einspeisetarif';
 interface ChartData {
   /** Eindeutig je Diagramm: die Einheit-ID oder `messpunkt-<n>`. Teil der DOM-ID des Behälters. */
   schluessel: string;
-  /** Eine Einheit — oder alle Einheiten eines Messpunkts (Specs/EChart.md, FR-8). */
+  /** Eine Einheit — oder alle Einheiten eines Messpunkts (Specs/Grafiken.md, FR-8). */
   einheiten: Einheit[];
   /** Nur beim Diagramm eines Messpunkts gesetzt. */
   messpunkt?: string;
-  /** Vergleichsdiagramm: alle gewählten Einheiten in einem (Specs/EChart.md, FR-9). */
+  /** Vergleichsdiagramm: alle gewählten Einheiten in einem (Specs/Grafiken.md, FR-9). */
   vergleich?: boolean;
   /** ECharts-Instanz; `null`, solange nicht gezeichnet. */
   instanz: import('echarts/core').ECharts | null;
@@ -90,7 +90,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
   /**
    * ECharts wird **dynamisch** nachgeladen (`utils/echarts-loader.ts`): `/chart` ist eine eager
    * Route, ein statischer Import landete im Initial-Bundle und jede Seite der Anwendung lüde die
-   * Bibliothek mit (Specs/EChart.md, NFR-1).
+   * Bibliothek mit (Specs/Grafiken.md, NFR-1).
    */
   private echarts?: typeof import('echarts/core');
   /**
@@ -187,7 +187,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
 
   /**
    * Setzt den Zeitraum auf heute–heute und zeigt die Grafik sofort an — wie in der Statistik
-   * (Specs/EChart.md, FR-1a). Auch ein zweiter Klick lädt: Für den laufenden Tag kommen laufend
+   * (Specs/Grafiken.md, FR-1a). Auch ein zweiter Klick lädt: Für den laufenden Tag kommen laufend
    * Messwerte dazu.
    *
    * <p>Über {@link toIsoDate} statt {@code toISOString()}: Letzteres liefert das UTC-Datum, und
@@ -231,7 +231,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
 
   /**
    * „Vergleich": alle gewählten Einheiten in **einem** Diagramm; die einzelnen Diagramme
-   * verschwinden (Specs/EChart.md, FR-9).
+   * verschwinden (Specs/Grafiken.md, FR-9).
    */
   onVergleich(): void {
     if (!this.kannVergleichen) {
@@ -242,7 +242,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
   }
 
   /**
-   * Checkbox „Einspeisetarif" (Specs/EChart.md, FR-10). Stehen schon Diagramme, werden sie neu
+   * Checkbox „Einspeisetarif" (Specs/Grafiken.md, FR-10). Stehen schon Diagramme, werden sie neu
    * geladen und gezeichnet - mit bzw. ohne Preisreihe. Ohne Diagramme merkt sich die Maske nur
    * die Wahl; sie gilt beim nächsten Laden.
    */
@@ -455,7 +455,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
   }
 
   /**
-   * Diagramm-Optionen für mehrere Einheiten in einem Diagramm — einen Messpunkt (Specs/EChart.md,
+   * Diagramm-Optionen für mehrere Einheiten in einem Diagramm — einen Messpunkt (Specs/Grafiken.md,
    * FR-8) oder den Vergleich aller gewählten Einheiten (FR-9): **eine Reihe je Einheit**, jeweils
    * ihr `total` — im gespeicherten Vorzeichen, ausser bei Produzenten im Vergleich.
    *
@@ -548,7 +548,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
         }
       },
       // Kein Achsentitel: "Zeit" stand mitten im Zoom-Schieber darunter, und dass die Achse die
-      // Zeit zeigt, sagen die Uhrzeiten an ihr ohnehin (Specs/EChart.md, FR-2).
+      // Zeit zeigt, sagen die Uhrzeiten an ihr ohnehin (Specs/Grafiken.md, FR-2).
       xAxis: {
         type: 'time',
         axisLine: { lineStyle: { color: farben.achse } },
@@ -590,7 +590,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
   }
 
   /**
-   * Die Reihe des Einspeisetarifs (Specs/EChart.md, FR-10): Stufenlinie wie die Messwerte - ein
+   * Die Reihe des Einspeisetarifs (Specs/Grafiken.md, FR-10): Stufenlinie wie die Messwerte - ein
    * Preis gilt für die ganze Viertelstunde -, auf der rechten Achse.
    *
    * Gestrichelt und in neutralem Grau: Die Farben der Reihenpalette sind in einem Vergleich alle

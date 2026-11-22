@@ -23,7 +23,7 @@ export class EinheitSelectorComponent implements OnInit {
   /**
    * Wenn true, steht nach den Einheiten je Messpunkt mit mehreren Einheiten ein Zusatzeintrag
    * (z.B. Bezug / Rücklieferung desselben Zählers) — für die Messwerte-Grafik
-   * (Specs/EChart.md, FR-8). "Alle auswählen" schliesst diese Einträge dann ein.
+   * (Specs/Grafiken.md, FR-8). "Alle auswählen" schliesst diese Einträge dann ein.
    */
   @Input() mitMesspunktGruppen = false;
   @Output() selectionChange = new EventEmitter<Einheit[]>();

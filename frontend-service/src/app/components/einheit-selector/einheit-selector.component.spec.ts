@@ -198,7 +198,7 @@ describe('EinheitSelectorComponent', () => {
     });
   });
 
-  // Specs/EChart.md, FR-8: Zusatzeintrag je Messpunkt mit mehreren Einheiten
+  // Specs/Grafiken.md, FR-8: Zusatzeintrag je Messpunkt mit mehreren Einheiten
   describe('Messpunkt-Gruppen', () => {
     const bezug: Einheit = { id: 5, name: 'Bezug von BKW', typ: EinheitTyp.BEZUG, messpunkt: 'Bilanz' };
     const ruecklieferung: Einheit = {

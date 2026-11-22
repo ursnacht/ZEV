@@ -105,7 +105,7 @@ Die Rollen-Spalten sind aus der obigen Fachrolle→Permission-Zuordnung abgeleit
 
 ⁹ Die Preiszeitreihe hat keine eigene Route; sie ist ein Bereich der Seite `/tarife` und erscheint nur mit dem Feature-Flag `PREISZEITREIHE` (`*appFeature`).
 
-¹⁰ Die Checkbox „Einspeisetarif" der Messwerte-Grafik (`Specs/EChart.md`, FR-10) liest die Preiszeitreihe (`GET /api/preiszeitreihe`) und erscheint deshalb nur mit `tarife:manage` und aktivem Feature-Flag `PREISZEITREIHE`. `zev_user` sieht die Grafik ohne sie.
+¹⁰ Die Checkbox „Einspeisetarif" der Messwerte-Grafik (`Specs/Grafiken.md`, FR-10) liest die Preiszeitreihe (`GET /api/preiszeitreihe`) und erscheint deshalb nur mit `tarife:manage` und aktivem Feature-Flag `PREISZEITREIHE`. `zev_user` sieht die Grafik ohne sie.
 
 ## Öffentlich (ohne Authentifizierung)
 

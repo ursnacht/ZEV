@@ -1,4 +1,4 @@
-# Umsetzungsplan: EChart
+# Umsetzungsplan: Grafiken
 
 ## Zusammenfassung
 
@@ -11,7 +11,7 @@ Der Umbau ist rein technisch: Die Bedienung bleibt gleich, neu ist allein das Zo
 verschwindet chart.js aus dem Initial-Bundle, und vier Regelverstösse in derselben Datei werden
 behoben (`toLocaleString`, `toFixed`, hart kodierte Farben, hart kodierte Legendennamen).
 
-Grundlage: `Specs/EChart.md`. **Kein Backend, keine Datenbank, keine Migration** – für den
+Grundlage: `Specs/Grafiken.md`. **Kein Backend, keine Datenbank, keine Migration** – für den
 Bibliothekswechsel. Spätere Nachträge stehen am Ende; der vom 22.11.2026 bringt eine
 Übersetzungs-Migration.
 
@@ -78,7 +78,7 @@ Backend, API, DTOs, Datenbank, Übersetzungstabelle, Routing, Navigation, Statis
 
 Bekannter Stand aus dem letzten Bau: `main` **983.46 kB**, Initial total **1.05 MB**, Warnschwelle
 `maximumWarning: 1mb` seit je überschritten. Erwartung nach dem Umbau: **70–200 kB** weniger
-(`Specs/EChart.md`, NFR-1). Fällt die Ersparnis deutlich kleiner aus, zieht etwas anderes chart.js
+(`Specs/Grafiken.md`, NFR-1). Fällt die Ersparnis deutlich kleiner aus, zieht etwas anderes chart.js
 herein — dann ist das zu klären und nicht wegzurunden.
 
 ---
@@ -116,7 +116,7 @@ export function chartFarben(): ChartFarben { … }
 
 * Liest die Design-Tokens über `getComputedStyle(document.documentElement)`.
 * **Rückfallwerte sind erwünscht** (`--color-gray-500` → `#cccccc` usw.): Fehlt ein Token, wäre das
-  Diagramm sonst unsichtbar. Sie sind die einzigen erlaubten Farb-Literale (`Specs/EChart.md`, AK).
+  Diagramm sonst unsichtbar. Sie sind die einzigen erlaubten Farb-Literale (`Specs/Grafiken.md`, AK).
 * `sekundaer` ist neu gegenüber der Preiszeitreihe — die Messwerte-Grafik braucht eine zweite
   Reihenfarbe (`--color-secondary`, entspricht dem heutigen `#2196F3`).
 
@@ -163,7 +163,7 @@ falls ein Test sie mockt, ist der Mock auf das Modul umzustellen.
   damit die Komponente den Behälter weiterhin findet.
 * **Randbedingung:** Die E2E-Tests zählen `.zev-panel--chart canvas`. Erzeugt ECharts genau ein
   Canvas je Instanz, bleiben sie unverändert grün — sonst ist der **Test** anzupassen und die
-  Anpassung zu begründen (`Specs/EChart.md`, §6).
+  Anpassung zu begründen (`Specs/Grafiken.md`, §6).
 * Lade- und Fehlerzustand über die vorhandenen Keys `DIAGRAMM_LAEDT` und `DIAGRAMM_NICHT_LADBAR`.
 
 ---
@@ -260,7 +260,7 @@ Keine. Es gibt keine Backend-Änderung; `GET /api/messwerte/by-einheit` bleibt u
 
 ## Offene Punkte / Annahmen
 
-Aus `Specs/EChart.md` §8 — **alle Annahmen sind bestätigt** (28.08.2026):
+Aus `Specs/Grafiken.md` §8 — **alle Annahmen sind bestätigt** (28.08.2026):
 
 1. **Sequenzieller Aufbau** bleibt zunächst; die Messung in Phase 9 entscheidet. Fällt er weg, ist
    der E2E-Helfer `warteAufGezeichnetesDiagramm` mitzuprüfen.

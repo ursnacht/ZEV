@@ -15,19 +15,19 @@
           [selectedVon]="dateFrom"
           [selectedBis]="dateTo"
           (quarterSelected)="onQuarterSelected($event)">
-          <!-- Bedienung wie in der Statistik (Specs/EChart.md, FR-1a): "Anzeigen" neben den Quartalen -->
+          <!-- Bedienung wie in der Statistik (Specs/Grafiken.md, FR-1a): "Anzeigen" neben den Quartalen -->
           <button type="submit" id="grafikAnzeigen" class="zev-button zev-button--primary"
             [disabled]="loading || !dateFrom || !dateTo || !hatAuswahl">
             <app-icon name="search"></app-icon>
             {{ loading ? ('LADE_DATEN' | translate) : ('ANZEIGEN' | translate) }}
           </button>
-          <!-- Alle gewaehlten Einheiten in EINEM Diagramm (Specs/EChart.md, FR-9) -->
+          <!-- Alle gewaehlten Einheiten in EINEM Diagramm (Specs/Grafiken.md, FR-9) -->
           <button type="button" id="grafikVergleich" class="zev-button zev-button--secondary" (click)="onVergleich()"
             [disabled]="loading || !dateFrom || !dateTo || !kannVergleichen">
             <app-icon name="bar-chart-2"></app-icon>
             {{ 'GRAFIK_VERGLEICH' | translate }}
           </button>
-          <!-- Einspeisetarif einblenden (Specs/EChart.md, FR-10): nur mit der Permission der
+          <!-- Einspeisetarif einblenden (Specs/Grafiken.md, FR-10): nur mit der Permission der
                Preiszeitreihe und mit deren Feature-Flag - sonst liefe der Abruf in ein 403 -->
           @if (darfEinspeisetarif) {
             <div class="zev-checkbox-item" *appFeature="'PREISZEITREIHE'">

@@ -15,7 +15,7 @@ import { PreiszeitreihePunkt } from '../../models/preiszeitreihe.model';
 import { FeatureFlagService } from '../../services/feature-flag.service';
 
 /**
- * Unit-Tests der Messwerte-Grafik (`Specs/EChart.md`).
+ * Unit-Tests der Messwerte-Grafik (`Specs/Grafiken.md`).
  *
  * <p><b>Das Zeichnen ist gestubbt.</b> ECharts wird dynamisch nachgeladen und braucht ein gemessenes
  * Element mit Canvas — in jsdom gibt es beides nicht. Ohne den Stub liefe nach dem Testende ein
@@ -244,7 +244,7 @@ describe('MesswerteChartComponent', () => {
     });
   });
 
-  /** Bedienung wie in der Statistik (Specs/EChart.md, FR-1a). */
+  /** Bedienung wie in der Statistik (Specs/Grafiken.md, FR-1a). */
   describe('Bedienung wie Statistik', () => {
     function knopf(id: string): HTMLButtonElement {
       return fixture.debugElement.query(By.css('#' + id)).nativeElement as HTMLButtonElement;
@@ -458,7 +458,7 @@ describe('MesswerteChartComponent', () => {
     });
   });
 
-  // Specs/EChart.md, FR-8: zusaetzliches Diagramm je Messpunkt mit mehreren Einheiten
+  // Specs/Grafiken.md, FR-8: zusaetzliches Diagramm je Messpunkt mit mehreren Einheiten
   describe('Messpunkt-Diagramm', () => {
     const bezugWerte: MesswertData[] = [
       { zeit: '2026-01-15T10:00:00', total: 1.5, zev: 0 },
@@ -593,7 +593,7 @@ describe('MesswerteChartComponent', () => {
     });
   });
 
-  // Specs/EChart.md, FR-9: alle gewaehlten Einheiten in einem Diagramm
+  // Specs/Grafiken.md, FR-9: alle gewaehlten Einheiten in einem Diagramm
   describe('Vergleich', () => {
     const vergleichButton = (): HTMLButtonElement =>
       fixture.nativeElement.querySelector('#grafikVergleich');
@@ -777,7 +777,7 @@ describe('MesswerteChartComponent', () => {
     });
   });
 
-  // Specs/EChart.md, FR-10: Einspeisetarif einblenden
+  // Specs/Grafiken.md, FR-10: Einspeisetarif einblenden
   describe('Einspeisetarif', () => {
     const checkbox = (): HTMLInputElement | null =>
       fixture.nativeElement.querySelector('#grafikEinspeisetarif');
@@ -1046,7 +1046,7 @@ describe('MesswerteChartComponent', () => {
     });
   });
 
-  // Specs/EChart.md, FR-2: Auch das letzte Intervall ist zu sehen
+  // Specs/Grafiken.md, FR-2: Auch das letzte Intervall ist zu sehen
   describe('Abschlusspunkt', () => {
     const tooltip = (optionen: Record<string, unknown>) =>
       (optionen['tooltip'] as { formatter: (p: { seriesName: string; value: number[] }[]) => string })
@@ -1115,7 +1115,7 @@ describe('MesswerteChartComponent', () => {
     });
   });
 
-  // Specs/EChart.md, FR-7: Nachladen der Bibliothek scheitert
+  // Specs/Grafiken.md, FR-7: Nachladen der Bibliothek scheitert
   describe('Nachladen scheitert', () => {
     /** Wartet die Kette aus `onSubmit` ab: laden (scheitert), melden. */
     const warte = async (): Promise<void> => {
@@ -1172,7 +1172,7 @@ describe('MesswerteChartComponent', () => {
     });
   });
 
-  // Specs/EChart.md, FR-7: Groessenanpassung
+  // Specs/Grafiken.md, FR-7: Groessenanpassung
   describe('createChart', () => {
     let behaelter: HTMLElement;
     let beobachtet: Element[];

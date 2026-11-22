@@ -19,7 +19,7 @@ export const MAX_MESSPUNKT_LAENGE = 50;
 
 /**
  * Einheiten, die denselben Messpunkt tragen — z.B. Bezug und Rücklieferung desselben Zählers
- * (Specs/EChart.md, FR-8). Immer mindestens zwei.
+ * (Specs/Grafiken.md, FR-8). Immer mindestens zwei.
  */
 export interface MesspunktGruppe {
   messpunkt: string;

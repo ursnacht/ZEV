@@ -5,7 +5,7 @@
 import { Einheit, MesspunktGruppe } from '../models/einheit.model';
 
 /**
- * Fasst Einheiten mit **demselben Messpunkt** zu Gruppen zusammen (Specs/EChart.md, FR-8).
+ * Fasst Einheiten mit **demselben Messpunkt** zu Gruppen zusammen (Specs/Grafiken.md, FR-8).
  *
  * Eine Gruppe entsteht erst ab zwei Einheiten; Einheiten ohne Messpunkt gehören zu keiner. Verglichen
  * wird der Messpunkt ohne Leerraum am Rand, sonst aber genau — `BKW` und `bkw` sind zwei Messpunkte,

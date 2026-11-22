@@ -5,7 +5,7 @@ import { EinheitTypPipe } from './einheit-typ.pipe';
 
 /**
  * Angular pipe für die Bezeichnung einer oder mehrerer Einheiten samt gemeinsamem Messpunkt
- * (Specs/EChart.md, FR-8).
+ * (Specs/Grafiken.md, FR-8).
  *
  * Der Typ wird über die {@link EinheitTypPipe} übersetzt — die Zuordnung Typ → Text steht damit
  * weiterhin an einer Stelle. Nicht `pure`, damit ein Sprachwechsel die Bezeichnung erneuert.

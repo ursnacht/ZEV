@@ -73,7 +73,7 @@ test.describe('Composite-Roles: permission-basierter Zugriff', () => {
 
     /**
      * Die Messwerte-Grafik haengt an `messwerte:read` — die Permission hat auch `zev_user`. Der Fall
-     * steht hier, weil der Wechsel der Diagramm-Bibliothek (Specs/EChart.md) die Seite umgebaut hat:
+     * steht hier, weil der Wechsel der Diagramm-Bibliothek (Specs/Grafiken.md) die Seite umgebaut hat:
      * Er belegt, dass die Absicherung dabei unveraendert geblieben ist.
      */
     test('zev_user kann die Messwerte-Grafik ansehen (messwerte:read)', async ({ page }) => {

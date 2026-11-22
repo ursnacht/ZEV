@@ -1,6 +1,6 @@
 /**
  * Nachladen von ECharts für die Diagramme der Anwendung
- * (`Specs/EChart.md`, FR-5).
+ * (`Specs/Grafiken.md`, FR-5).
  *
  * **Warum dynamisch:** `/chart` und `/tarife` sind eager Routen. Ein statischer Import landete im
  * Initial-Bundle, und jede Seite der Anwendung lüde die Bibliothek mit — auch wer nie ein Diagramm
