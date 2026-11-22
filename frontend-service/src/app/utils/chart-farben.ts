@@ -61,6 +61,17 @@ export interface ChartFarben {
    * Kurve schon einmal auftrat.
    */
   soc: string;
+  /**
+   * **Reihenpalette** für Diagramme mit *einer Reihe je Einheit* (Messpunkt, Vergleich —
+   * `Specs/EChart.md`, FR-8 und FR-9): sechs Töne aus sechs Farbfamilien, in dieser Reihenfolge.
+   *
+   * Sie besteht aus denselben Tokens wie die Felder oben, **ohne deren Zweckbindung**: In diesen
+   * Diagrammen gibt es weder Zustandsbänder noch eine Solar- oder Ladezustandsreihe, mit denen
+   * sich eine Kurve verwechseln liesse — alle Reihen sind gleichartig, sie müssen sich nur
+   * voneinander unterscheiden. Wo ein Diagramm Bänder oder benannte Grössen zeigt
+   * (Einspeisesteuerung), gelten weiterhin die einzelnen Felder.
+   */
+  reihen: string[];
 }
 
 /**
@@ -71,7 +82,7 @@ export interface ChartFarben {
 export function chartFarben(): ChartFarben {
   const stil = getComputedStyle(document.documentElement);
   const token = (name: string, fallback: string) => stil.getPropertyValue(name).trim() || fallback;
-  return {
+  const farben = {
     achse: token('--color-gray-500', '#cccccc'),
     text: token('--color-gray-700', '#555555'),
     gitter: token('--color-gray-300', '#e0e0e0'),
@@ -85,5 +96,10 @@ export function chartFarben(): ChartFarben {
     bandEins: token('--color-chart-orange', '#F97316'),
     bandZwei: token('--color-gray-600', '#666666'),
     soc: token('--color-chart-purple', '#7E57C2')
+  };
+  return {
+    ...farben,
+    reihen: [farben.primaer, farben.sekundaer, farben.akzent, farben.solar,
+      farben.bandEins, farben.soc]
   };
 }

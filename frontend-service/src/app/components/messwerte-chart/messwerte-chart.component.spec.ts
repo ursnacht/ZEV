@@ -533,18 +533,23 @@ describe('MesswerteChartComponent', () => {
       expect(reihe['sampling']).toBe('lttb');
     });
 
-    it('should leave the colour of a third series to the library', () => {
-      const dritte: Einheit = { id: 9, name: 'Dritte', typ: EinheitTyp.CONSUMER, messpunkt: 'Bilanz' };
-      const optionen = privat().optionenMesspunkt([
-        { einheit: mockBezug, daten: [] },
-        { einheit: mockRuecklieferung, daten: [] },
-        { einheit: dritte, daten: [] }
-      ]);
-      const series = optionen['series'] as { lineStyle: { color?: string }; itemStyle?: unknown }[];
+    it('should give six series their own token colour and leave a seventh to the library', () => {
+      const reihen = [1, 2, 3, 4, 5, 6, 7].map(n => ({
+        einheit: { id: 100 + n, name: `Einheit ${n}`, typ: EinheitTyp.CONSUMER } as Einheit,
+        daten: [] as MesswertData[]
+      }));
 
-      // Keine dritte Token-Farbe vorhanden - lieber die Palette von ECharts als zweimal dieselbe.
-      expect(series[2].lineStyle.color).toBeUndefined();
-      expect(series[2].itemStyle).toBeUndefined();
+      const series = privat().optionenMesspunkt(reihen)['series'] as
+        { lineStyle: { color?: string }; itemStyle?: unknown }[];
+
+      // Sechs verschiedene Farben: Zwei Kurven im selben Ton waeren in der Legende nicht zu
+      // unterscheiden.
+      const farben = series.slice(0, 6).map(reihe => reihe.lineStyle.color);
+      expect(farben.every(farbe => !!farbe)).toBe(true);
+      expect(new Set(farben).size).toBe(6);
+      // Danach ist die Token-Palette erschoepft - lieber die von ECharts als eine Farbe doppelt.
+      expect(series[6].lineStyle.color).toBeUndefined();
+      expect(series[6].itemStyle).toBeUndefined();
     });
 
     it('should draw an empty series when an einheit has no measurements', () => {
@@ -556,6 +561,156 @@ describe('MesswerteChartComponent', () => {
 
       expect(series[1].data).toEqual([]);
       expect(series[1].name).toBe('Rücklieferung an BKW (Σ 0.000 KWH)');
+    });
+  });
+
+  // Specs/EChart.md, FR-9: alle gewaehlten Einheiten in einem Diagramm
+  describe('Vergleich', () => {
+    const vergleichButton = (): HTMLButtonElement =>
+      fixture.nativeElement.querySelector('#grafikVergleich');
+    const panelTitel = (): string[] => Array.from(
+      fixture.nativeElement.querySelectorAll('.zev-panel--chart .zev-panel__title') as NodeListOf<HTMLElement>)
+      .map(titel => (titel.textContent ?? '').replace(/\s+/g, ' ').trim());
+
+    it('should offer the button next to the submit button, disabled below two einheiten', () => {
+      const slot: HTMLElement = fixture.nativeElement.querySelector('app-quarter-selector');
+      expect(slot.querySelector('#grafikAnzeigen')).not.toBeNull();
+      expect(slot.querySelector('#grafikVergleich')).not.toBeNull();
+      expect(vergleichButton().textContent).toContain('GRAFIK_VERGLEICH');
+      expect(vergleichButton().disabled).toBe(true);
+      // Rechts von "Anzeigen", als sekundaere Schaltflaeche - und kein zweiter Submit-Button:
+      // Enter im Formular soll weiterhin "Anzeigen" ausloesen.
+      const knoepfe = Array.from(slot.querySelectorAll('button')).map(knopf => knopf.id);
+      expect(knoepfe.indexOf('grafikVergleich')).toBe(knoepfe.indexOf('grafikAnzeigen') + 1);
+      expect(vergleichButton().classList.contains('zev-button--secondary')).toBe(true);
+      expect(vergleichButton().type).toBe('button');
+
+      // Eine Einheit ist kein Vergleich.
+      component.onSelectionChange([mockConsumer]);
+      fixture.detectChanges();
+      expect(component.kannVergleichen).toBe(false);
+      expect(vergleichButton().disabled).toBe(true);
+
+      component.onSelectionChange([mockConsumer, mockProducer]);
+      fixture.detectChanges();
+      expect(vergleichButton().disabled).toBe(false);
+    });
+
+    it('should disable the comparison while loading or without a complete period', () => {
+      component.onSelectionChange([mockConsumer, mockProducer]);
+      fixture.detectChanges();
+      expect(vergleichButton().disabled).toBe(false);
+
+      component.loading = true;
+      fixture.detectChanges();
+      expect(vergleichButton().disabled).toBe(true);
+
+      component.loading = false;
+      component.dateTo = '';
+      fixture.detectChanges();
+      expect(vergleichButton().disabled).toBe(true);
+    });
+
+    it('should enable the comparison for a single messpunkt with two einheiten', () => {
+      component.onGruppenChange([bilanz]);
+      fixture.detectChanges();
+
+      expect(component.kannVergleichen).toBe(true);
+      expect(vergleichButton().disabled).toBe(false);
+    });
+
+    it('should replace the single charts by one chart with all selected einheiten', () => {
+      component.selectedEinheiten = [mockConsumer, mockProducer];
+      component.onSubmit();
+      fixture.detectChanges();
+      expect(component.charts.length).toBe(2);
+
+      vergleichButton().click();
+      fixture.detectChanges();
+
+      // Die zwei einzelnen Diagramme sind weg, es steht genau eines.
+      expect(component.charts.length).toBe(1);
+      expect(component.charts[0].vergleich).toBe(true);
+      expect(component.charts[0].einheiten).toEqual([mockConsumer, mockProducer]);
+      expect(fixture.nativeElement.querySelectorAll('.zev-panel--chart').length).toBe(1);
+      expect(fixture.nativeElement.querySelector('#chart-vergleich')).not.toBeNull();
+      expect(panelTitel()).toEqual(['GRAFIK_VERGLEICH: 2 EINHEITEN']);
+    });
+
+    it('should load each einheit once, also when it is selected through its messpunkt too', () => {
+      messwerteServiceSpy.getMesswerteByEinheit.mockReturnValue(of(messwerte));
+      component.selectedEinheiten = [mockConsumer, mockBezug];
+      component.selectedGruppen = [bilanz];
+
+      component.onVergleich();
+
+      // Wohnung, Bezug, Ruecklieferung - der Bezug nicht zweimal, weder geladen noch gezeichnet.
+      expect(messwerteServiceSpy.getMesswerteByEinheit).toHaveBeenCalledTimes(3);
+      expect(component.charts[0].einheiten).toEqual([mockConsumer, mockBezug, mockRuecklieferung]);
+      expect(component.message).toBe('6 DATENPUNKTE_FUER 3 EINHEITEN_GELADEN');
+    });
+
+    it('should return to the single charts on Anzeigen', () => {
+      component.selectedEinheiten = [mockConsumer, mockProducer];
+      component.onVergleich();
+      expect(component.modus).toBe('vergleich');
+
+      component.onSubmit();
+
+      expect(component.modus).toBe('einzeln');
+      expect(component.charts.map(c => c.schluessel)).toEqual(['1', '2']);
+    });
+
+    it('should keep the comparison when paging and jumping to today', () => {
+      component.selectedEinheiten = [mockConsumer, mockProducer];
+      component.dateFrom = '2026-10-13';
+      component.dateTo = '2026-10-13';
+      component.onVergleich();
+
+      component.onBlaettern(1);
+      expect(component.dateFrom).toBe('2026-10-14');
+      expect(component.charts.map(c => c.schluessel)).toEqual(['vergleich']);
+
+      component.onHeute();
+      expect(component.charts.map(c => c.schluessel)).toEqual(['vergleich']);
+    });
+
+    it('should stay with the single charts when paging after returning from the comparison', () => {
+      component.selectedEinheiten = [mockConsumer, mockProducer];
+      component.dateFrom = '2026-10-13';
+      component.dateTo = '2026-10-13';
+      component.onVergleich();
+      component.onSubmit();
+
+      component.onBlaettern(1);
+
+      expect(component.charts.map(c => c.schluessel)).toEqual(['1', '2']);
+    });
+
+    it('should fall back to the single chart when the selection shrank below two einheiten', () => {
+      // Nach dem Vergleich die Auswahl auf eine Einheit verkleinert, dann geblaettert: Ein
+      // "Vergleich: 1 Einheiten" mit einer Linie waere keiner.
+      component.selectedEinheiten = [mockConsumer, mockProducer];
+      component.dateFrom = '2026-10-13';
+      component.dateTo = '2026-10-13';
+      component.onVergleich();
+
+      component.onSelectionChange([mockConsumer]);
+      component.onBlaettern(1);
+
+      expect(component.modus).toBe('einzeln');
+      expect(component.charts.map(c => c.schluessel)).toEqual(['1']);
+      expect(component.charts[0].vergleich).toBeUndefined();
+    });
+
+    it('should do nothing without two einheiten', () => {
+      component.selectedEinheiten = [mockConsumer];
+
+      component.onVergleich();
+
+      expect(messwerteServiceSpy.getMesswerteByEinheit).not.toHaveBeenCalled();
+      expect(component.modus).toBe('einzeln');
+      expect(component.charts).toEqual([]);
     });
   });
 
@@ -730,6 +885,25 @@ describe('MesswerteChartComponent', () => {
       expect(instanz.resize).not.toHaveBeenCalled();
       beobachterCallback();
       expect(instanz.resize).toHaveBeenCalledTimes(1);
+    });
+
+    it('should draw one series per einheit into the comparison chart', () => {
+      behaelter.id = 'chart-vergleich';
+      const instanz = { setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn() };
+      (component as unknown as { echarts: unknown }).echarts = { init: vi.fn().mockReturnValue(instanz) };
+      const chartData = {
+        schluessel: 'vergleich', einheiten: [mockConsumer, mockProducer], vergleich: true, instanz: null
+      };
+
+      (component as unknown as {
+        createChart: (c: typeof chartData, d: Map<number, MesswertData[]>) => void;
+      }).createChart(chartData, new Map([[1, messwerte], [2, messwerte]]));
+
+      const optionen = instanz.setOption.mock.calls[0][0] as { series: { name: string; data: number[][] }[] };
+      // Je Einheit ihr Total unter ihrem Namen - keine ZEV-Reihe.
+      expect(optionen.series.map(reihe => reihe.name)).toEqual(
+        ['Wohnung A (Σ 3.750 KWH)', 'Solar Anlage (Σ 3.750 KWH)']);
+      expect(optionen.series[0].data.map(punkt => punkt[1])).toEqual([1.5, 2.25, 2.25]);
     });
 
     it('should do nothing without a container', () => {

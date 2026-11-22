@@ -26,6 +26,8 @@ interface ChartData {
   einheiten: Einheit[];
   /** Nur beim Diagramm eines Messpunkts gesetzt. */
   messpunkt?: string;
+  /** Vergleichsdiagramm: alle gewählten Einheiten in einem (Specs/EChart.md, FR-9). */
+  vergleich?: boolean;
   /** ECharts-Instanz; `null`, solange nicht gezeichnet. */
   instanz: import('echarts/core').ECharts | null;
 }
@@ -45,6 +47,13 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
   /** Gewählte Messpunkte mit mehreren Einheiten — je einer ein zusätzliches Diagramm (FR-8). */
   selectedGruppen: MesspunktGruppe[] = [];
   loading = false;
+  /**
+   * Was zuletzt verlangt wurde: `einzeln` = ein Diagramm je Einheit und Messpunkt („Anzeigen"),
+   * `vergleich` = alle gewählten Einheiten in einem („Vergleich", FR-9). Blättern und „Heute"
+   * laden in der Ansicht neu, die gerade steht — ausser im Vergleich sind weniger als zwei
+   * Einheiten übrig, dann fällt sie auf `einzeln` zurück.
+   */
+  modus: 'einzeln' | 'vergleich' = 'einzeln';
 
   charts: ChartData[] = [];
   /** Solange die Bibliothek nachgeladen wird, zeigt jedes Panel einen Hinweis. */
@@ -107,6 +116,15 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
   }
 
   /**
+   * Ein Vergleich braucht mindestens zwei Einheiten - mit einer wäre er das Diagramm dieser
+   * Einheit ohne ihre ZEV-Reihe. Gezählt wird, was geladen würde: Ein Messpunkt mit zwei Einheiten
+   * genügt.
+   */
+  get kannVergleichen(): boolean {
+    return this.zuLadendeEinheiten().length >= 2;
+  }
+
+  /**
    * Die Einheiten, deren Messwerte geladen werden: die gewählten und die der gewählten Messpunkte,
    * **jede einmal**. Wer Bezug, Rücklieferung und ihren Messpunkt wählt, löst zwei Abfragen aus,
    * nicht vier.
@@ -151,7 +169,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
     const heute = toIsoDate(new Date());
     this.dateFrom = heute;
     this.dateTo = heute;
-    this.onSubmit();
+    this.ladeUndZeichne();
   }
 
   /**
@@ -165,7 +183,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
     const neu = blaettereZeitraum(this.dateFrom, this.dateTo, richtung);
     this.dateFrom = neu.von;
     this.dateTo = neu.bis;
-    this.onSubmit();
+    this.ladeUndZeichne();
   }
 
   /**
@@ -177,7 +195,26 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
       && !!this.dateFrom && !!this.dateTo && this.dateFrom <= this.dateTo;
   }
 
+  /** „Anzeigen": ein Diagramm je gewählter Einheit und je gewähltem Messpunkt. */
   onSubmit(): void {
+    this.modus = 'einzeln';
+    this.ladeUndZeichne();
+  }
+
+  /**
+   * „Vergleich": alle gewählten Einheiten in **einem** Diagramm; die einzelnen Diagramme
+   * verschwinden (Specs/EChart.md, FR-9).
+   */
+  onVergleich(): void {
+    if (!this.kannVergleichen) {
+      return;
+    }
+    this.modus = 'vergleich';
+    this.ladeUndZeichne();
+  }
+
+  /** Lädt die Messwerte der Auswahl und zeichnet sie in der Ansicht von {@link modus}. */
+  private ladeUndZeichne(): void {
     if (!this.dateFrom || !this.dateTo || !this.hatAuswahl) {
       this.showMessage(this.translationService.translate('BITTE_ALLE_FELDER_AUSFUELLEN'), 'error');
       return;
@@ -196,6 +233,13 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
     const einheiten = this.zuLadendeEinheiten();
     const einzelne = [...this.selectedEinheiten];
     const gruppen = [...this.selectedGruppen];
+    // Ein Vergleich mit weniger als zwei Einheiten ist keiner: Wurde die Auswahl seit dem Klick
+    // auf "Vergleich" verkleinert und dann geblaettert, geht es zurueck zu den einzelnen
+    // Diagrammen - sonst stuende dort "Vergleich: 1 Einheiten" mit einer einzigen Linie.
+    if (this.modus === 'vergleich' && einheiten.length < 2) {
+      this.modus = 'einzeln';
+    }
+    const modus = this.modus;
     const requests = einheiten.map(e =>
       this.messwerteService.getMesswerteByEinheit(e.id!, this.dateFrom, this.dateTo)
     );
@@ -210,14 +254,16 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
           datenJeEinheit.set(einheiten[index].id!, data);
         });
 
-        // Erst je Einheit ein Diagramm, danach je Messpunkt eines - dieselbe Reihenfolge wie in
-        // der Auswahl.
-        this.charts = [
-          ...einzelne.map(e => ({ schluessel: `${e.id}`, einheiten: [e], instanz: null })),
-          ...gruppen.map((g, index) => ({
-            schluessel: `messpunkt-${index}`, einheiten: g.einheiten, messpunkt: g.messpunkt, instanz: null
-          }))
-        ];
+        // Vergleich: EIN Diagramm mit allen geladenen Einheiten. Sonst erst je Einheit ein
+        // Diagramm, danach je Messpunkt eines - dieselbe Reihenfolge wie in der Auswahl.
+        this.charts = modus === 'vergleich'
+          ? [{ schluessel: 'vergleich', einheiten, vergleich: true, instanz: null }]
+          : [
+            ...einzelne.map(e => ({ schluessel: `${e.id}`, einheiten: [e], instanz: null })),
+            ...gruppen.map((g, index) => ({
+              schluessel: `messpunkt-${index}`, einheiten: g.einheiten, messpunkt: g.messpunkt, instanz: null
+            }))
+          ];
 
         this.cdr.detectChanges();
         void this.createChartsSequentially(datenJeEinheit);
@@ -307,7 +353,8 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
     this.observers.set(chartData.schluessel, observer);
 
     const daten = (einheit: Einheit) => datenJeEinheit.get(einheit.id!) ?? [];
-    const optionen = chartData.messpunkt
+    // Messpunkt und Vergleich zeichnen dasselbe: eine Reihe je Einheit.
+    const optionen = chartData.messpunkt || chartData.vergleich
       ? this.optionenMesspunkt(chartData.einheiten.map(einheit => ({ einheit, daten: daten(einheit) })))
       : this.optionen(daten(chartData.einheiten[0]));
     instanz.setOption(optionen, true);
@@ -336,8 +383,9 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
   }
 
   /**
-   * Diagramm-Optionen für einen Messpunkt mit mehreren Einheiten (Specs/EChart.md, FR-8):
-   * **eine Reihe je Einheit**, jeweils ihr `total` mit dem Vorzeichen, wie es gespeichert ist.
+   * Diagramm-Optionen für mehrere Einheiten in einem Diagramm — einen Messpunkt (Specs/EChart.md,
+   * FR-8) oder den Vergleich aller gewählten Einheiten (FR-9): **eine Reihe je Einheit**, jeweils
+   * ihr `total` mit dem Vorzeichen, wie es gespeichert ist.
    *
    * <p>Bei Bezug und Rücklieferung ergibt das von selbst das gewünschte Bild: Der Bezug ist positiv,
    * die Rücklieferung negativ gespeichert — die eine Linie liegt über, die andere unter der
@@ -346,13 +394,13 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
    * <p>Die ZEV-Reihe entfällt: Sie gehört zur einzelnen Einheit, und zwei davon machten aus dem
    * Vergleich vier Linien.
    *
-   * <p>Die ersten beiden Reihen tragen die beiden Reihenfarben aus den Design-Tokens. Mehr als zwei
-   * Einheiten an einem Messpunkt sind nicht vorgesehen; kämen sie vor, nimmt ECharts für die
-   * weiteren seine eigene Palette — unterscheidbar, statt zweimal dieselbe Farbe.
+   * <p>Die Reihen tragen der Reihe nach die Reihenpalette aus `chartFarben().reihen`. Für eine
+   * siebte und weitere nimmt ECharts seine eigene Palette — unterscheidbar, statt eine Farbe
+   * zweimal zu vergeben.
    */
   private optionenMesspunkt(reihen: { einheit: Einheit; daten: MesswertData[] }[]): Record<string, unknown> {
     const farben = chartFarben();
-    const reihenfarben = [farben.primaer, farben.sekundaer];
+    const reihenfarben = farben.reihen;
     const kwh = this.translationService.translate('KWH');
 
     return this.diagrammOptionen(reihen.map(({ einheit, daten }, index) => this.reihe(
@@ -375,7 +423,9 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
                            kwh: string): Record<string, unknown> {
     return {
       animation: false,
-      grid: { left: 70, right: 20, top: 40, bottom: 70 },
+      // top 55: Die Legende steht oben ueber die ganze Breite, sobald sie blaettert (Vergleich mit
+      // vielen Einheiten, schmale Anzeige). Mit 40 lag sie auf dem Achsentitel "kWh".
+      grid: { left: 70, right: 20, top: 55, bottom: 70 },
       // `scroll`: Die Legende bleibt einzeilig und blaettert, wenn sie nicht passt. Beim
       // Messpunkt-Diagramm stehen die Namen der Einheiten darin; auf schmalen Anzeigen brach sie
       // sonst auf zwei Zeilen um und lag ueber dem Achsentitel und der Zeichenflaeche.
@@ -399,7 +449,8 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
       xAxis: {
         type: 'time',
         axisLine: { lineStyle: { color: farben.achse } },
-        axisLabel: { color: farben.text }
+        // hideOverlap: Bei schmaler Anzeige liefen die Uhrzeiten sonst ineinander.
+        axisLabel: { color: farben.text, hideOverlap: true }
       },
       yAxis: {
         type: 'value',
@@ -448,7 +499,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
       showSymbol: false,
       connectNulls: false,
       sampling: 'lttb',
-      // Ohne Farbe (dritte und weitere Reihe eines Messpunkts) waehlt ECharts aus seiner Palette.
+      // Ohne Farbe (siebte und weitere Reihe eines Diagramms) waehlt ECharts aus seiner Palette.
       lineStyle: farbe ? { color: farbe, width: 2 } : { width: 2 },
       ...(farbe ? { itemStyle: { color: farbe } } : {}),
       data: this.mitAbschluss(daten)

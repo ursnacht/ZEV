@@ -11,7 +11,9 @@ Der Umbau ist rein technisch: Die Bedienung bleibt gleich, neu ist allein das Zo
 verschwindet chart.js aus dem Initial-Bundle, und vier Regelverstösse in derselben Datei werden
 behoben (`toLocaleString`, `toFixed`, hart kodierte Farben, hart kodierte Legendennamen).
 
-Grundlage: `Specs/EChart.md`. **Kein Backend, keine Datenbank, keine Migration.**
+Grundlage: `Specs/EChart.md`. **Kein Backend, keine Datenbank, keine Migration** – für den
+Bibliothekswechsel. Spätere Nachträge stehen am Ende; der vom 22.11.2026 bringt eine
+Übersetzungs-Migration.
 
 ---
 
@@ -458,3 +460,39 @@ Messwerte-Grafik einen Zusatzeintrag an; er zeichnet ein Diagramm mit einer Reih
 * **Legende bei schmaler Breite.** Mit den Namen der Einheiten brach sie bei 390 px auf zwei Zeilen
   um und lag über Achsentitel und Zeichenfläche. Sie ist jetzt einzeilig und blättert
   (`legend.type: 'scroll'`), in beiden Diagrammarten.
+
+---
+
+## Nachtrag 22.11.2026: Vergleich – alle gewählten Einheiten in einem Diagramm (FR-9)
+
+Neue Schaltfläche „Vergleich" neben „Anzeigen": ein Diagramm mit einer Reihe je gewählter Einheit,
+die einzelnen Diagramme verschwinden.
+
+| Datei | Änderung |
+|---|---|
+| `V191__Add_Grafik_Vergleich_Translation.sql` | neu: Key `GRAFIK_VERGLEICH` („Vergleich" / „Comparison") |
+| `messwerte-chart.component.ts` | `modus` (`einzeln`/`vergleich`), `onVergleich()`, `kannVergleichen`; `onSubmit()` und der Vergleich teilen sich `ladeUndZeichne()`; Blättern und „Heute" laden in der stehenden Ansicht, mit Rückfall auf `einzeln` bei weniger als zwei Einheiten; Reihenpalette für Diagramme mit einer Reihe je Einheit |
+| `messwerte-chart.component.html` | Schaltfläche `#grafikVergleich` im Aktions-Slot; Panel-Titel des Vergleichs |
+| `utils/chart-farben.ts` (+ Spec) | `reihen`: Palette aus sechs Tokens für Diagramme mit einer Reihe je Einheit |
+| `messwerte-chart.component.spec.ts` | `describe('Vergleich')` (u.a. Sperre beim Laden, Rückkehr zu den einzelnen Diagrammen, Rückfall bei verkleinerter Auswahl), ein Test in `createChart`, Farbtest auf sechs Reihen erweitert |
+| `tests/messwerte-grafik.spec.ts` | E2E „should draw all selected units into one comparison chart" |
+
+* **Kein neues CSS:** Schaltfläche und Slot kommen aus dem Design System.
+* **Kein Backend ausser der Übersetzung:** Geladen wird wie bisher je Einheit.
+* **Gezeichnet wird mit `optionenMesspunkt()`** – der Vergleich ist dasselbe Diagramm wie das eines
+  Messpunkts, nur mit frei gewählten Einheiten.
+* **Braucht einen Neustart des Backends**, damit Flyway `V191` ausführt; vorher zeigt die
+  Schaltfläche den rohen Key.
+
+**Drei Befunde aus Sichtprüfung und E2E-Lauf, alle behoben:**
+
+* **Der Ausblend-Timer einer älteren Erfolgsmeldung löschte eine neuere Meldung** (`utils/with-message.ts`,
+  Basis von 14 Komponenten). Wer innert fünf Sekunden zweimal etwas auslöste, sah die zweite
+  Meldung nur kurz; eine Fehlermeldung, die auf einen Erfolg folgte, verschwand von selbst.
+  Aufgefallen am neuen E2E-Test: „Anzeigen" → „Vergleich" → „Anzeigen" liess die dritte Meldung so
+  früh verschwinden, dass der Test sie in Firefox einmal verpasste. Jetzt bricht jede neue Meldung
+  und jedes Wegklicken den laufenden Timer ab (`with-message.spec.ts`, neu).
+* **Legende über dem Achsentitel:** Blättert die Legende (Vergleich mit vielen Einheiten, schmale
+  Anzeige), steht sie über die ganze Breite und lag auf „kWh". Der obere Rand der Zeichenfläche
+  ist von 40 auf 55 gesetzt, für beide Diagrammarten.
+* **Uhrzeiten liefen bei 390 px ineinander:** `axisLabel.hideOverlap` an der Zeitachse.

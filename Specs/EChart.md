@@ -24,7 +24,7 @@
 
 1. Benutzer öffnet **Messwerte-Grafik** (`/chart`, Permission `messwerte:read`).
 2. Er wählt Einheiten und — wo vorhanden — Messpunkte mit mehreren Einheiten (FR-8; Mehrfachauswahl samt „Alle auswählen") und einen Zeitraum (Quartals-Schaltflächen, Datum von/bis, Blättern oder „Heute", FR-1a; `Datum von` zieht `Datum bis` auf das Monatsende nach).
-3. Klick auf **Anzeigen** lädt die Messwerte je Einheit und zeichnet **ein Diagramm je Einheit** in einem eigenen Panel mit Titel `Name [Typ]`, danach **eines je gewähltem Messpunkt** (FR-8). Blättern und „Heute" laden selbst.
+3. Klick auf **Anzeigen** lädt die Messwerte je Einheit und zeichnet **ein Diagramm je Einheit** in einem eigenen Panel mit Titel `Name [Typ]`, danach **eines je gewähltem Messpunkt** (FR-8). Klick auf **Vergleich** zeichnet stattdessen **ein** Diagramm mit allen gewählten Einheiten (FR-9). Blättern und „Heute" laden selbst, in der Ansicht, die gerade steht.
 4. Eine Erfolgsmeldung nennt die Zahl der geladenen Datenpunkte und der Einheiten.
 5. Innerhalb des geladenen Zeitraums kann der Benutzer zoomen und den Ausschnitt verschieben — ohne neuen Server-Aufruf.
 
@@ -34,7 +34,7 @@ Schaltflächen und Datumsfelder sind angeordnet und verhalten sich wie auf der S
 
 1. **„Anzeigen"** steht rechts neben den Quartalsknöpfen (Aktions-Slot des Quartal-Selektors). Gesperrt während des Ladens, ohne beide Daten oder ohne gewählte Einheit; während des Ladens mit dem Text `LADE_DATEN`.
 2. In der Zeile der Datumsfelder stehen **◀ / ▶** (Icons `chevron-left`/`chevron-right`, Tooltip und `aria-label` aus `ZEITRAUM_ZURUECK`/`ZEITRAUM_VOR`) und danach **„Heute"** (Icon `calendar`, Text `HEUTE`).
-3. **Blättern** verschiebt den Zeitraum um seine eigene Länge — dieselbe Regel wie in der Statistik (`blaettereZeitraum`, `Specs/Statistik.md`, FR-4.1) — und **lädt sofort**.
+3. **Blättern** verschiebt den Zeitraum um seine eigene Länge — dieselbe Regel wie in der Statistik (`blaettereZeitraum`, `Specs/Statistik.md`, FR-4.1) — und **lädt sofort**, in der Ansicht, die gerade steht (einzelne Diagramme oder Vergleich, FR-9).
 4. **„Heute"** setzt `Datum von` und `Datum bis` auf das heutige lokale Datum und **lädt sofort**; auch ein zweiter Klick lädt (aktualisieren).
 5. **Abweichung von der Statistik:** Blättern und „Heute" sind **ohne Auswahl gesperrt** (weder Einheit noch Messpunkt gewählt) — das sofortige Laden liefe sonst nur in die Fehlermeldung. Die Statistik kennt keine Einheitenauswahl.
 6. Die **Erfolgsmeldung** mit der Zahl der Datenpunkte bleibt (FR-1.4) — anders als in der Statistik, wo das Ergebnis selbst die Rückmeldung ist. Hier ist die Zahl eine eigene Information: Ein leerer Zeitraum ergibt ein leeres Diagramm, die Meldung sagt „0".
@@ -56,13 +56,14 @@ Schaltflächen und Datumsfelder sind angeordnet und verhalten sich wie auf der S
 
 * **Alle** Zahlen im Schweizer Format über `formatSwissNumber()` aus `src/app/utils/number-utils.ts` — Achsenbeschriftung, Tooltip und die Summen in der Legende. **Kein** `toLocaleString()`, **kein** `toFixed()`, keine ECharts-eigene Locale-Formatierung.
 * **Zeitpunkte** im Format `dd.MM.yyyy HH:mm`, manuell gebildet (kein `toLocaleString`).
-* **Alle** Texte über den `TranslationService`, auch die Legendennamen und der Achsentitel: `TOTAL`, `ZEV`, `KWH`. Ebenso Lade- und Fehlerzustand des Diagramms: `DIAGRAMM_LAEDT` und `DIAGRAMM_NICHT_LADBAR`, die Bedienung (FR-1a): `ANZEIGEN`, `LADE_DATEN`, `ZEITRAUM_ZURUECK`, `ZEITRAUM_VOR`, `HEUTE`. **Alle diese Keys sind vorhanden** (in der Übersetzungstabelle geprüft) — es braucht **keine neue Migration**.
+* **Alle** Texte über den `TranslationService`, auch die Legendennamen und der Achsentitel: `TOTAL`, `ZEV`, `KWH`. Ebenso Lade- und Fehlerzustand des Diagramms: `DIAGRAMM_LAEDT` und `DIAGRAMM_NICHT_LADBAR`, die Bedienung (FR-1a): `ANZEIGEN`, `LADE_DATEN`, `ZEITRAUM_ZURUECK`, `ZEITRAUM_VOR`, `HEUTE`, und der Vergleich (FR-9): `GRAFIK_VERGLEICH`, `EINHEITEN`. `GRAFIK_VERGLEICH` kommt aus der Migration `V191`, alle übrigen Keys aus früheren.
 * **Aufgelöst wird beim Zeichnen.** Ein Sprachwechsel während ein Diagramm offen steht erneuert die Beschriftung **nicht**: `TranslationService.setLanguage()` setzt ein Signal, das Template-Texte erneuert — ein gezeichnetes Canvas nicht. Die Legende trägt bis zum nächsten Zeichnen die alte Sprache. Das ist heute genauso und bleibt eine **bekannte Einschränkung** (§5); sie gilt für beide Diagramme gleich, und wenn sie behoben wird, dann für beide gemeinsam.
 
 ### FR-4: Farben und Dark Mode
 
 * Achsen-, Gitter- und Reihenfarben aus den Design-Tokens (`--color-*`), nicht hart kodiert. Die Neutraltöne kippen im Dark Mode (`--color-gray-600` ist dort hell) — genau deshalb kommen sie aus den Tokens.
 * Die beiden Reihen bleiben visuell unterscheidbar: `Total` in der Primärfarbe, `ZEV` in der Sekundärfarbe (`--color-secondary`).
+* Diagramme mit **einer Reihe je Einheit** (FR-8, FR-9) vergeben der Reihe nach die Reihenpalette aus `utils/chart-farben.ts` (`reihen`): Primär, Sekundär, Rot (`--color-danger`), Gelb, Orange und Violett (`--color-chart-*`). Es sind dieselben Tokens, die die Einspeisesteuerung zweckgebunden verwendet; hier gibt es weder Bänder noch benannte Grössen, die Reihen müssen sich nur voneinander unterscheiden. Eine siebte und weitere Reihe bekommt die Palette von ECharts — unterscheidbar, statt eine Farbe zweimal zu vergeben.
 
 ### FR-5: Gemeinsame Bausteine
 
@@ -99,9 +100,23 @@ Tragen **mehrere Einheiten denselben Messpunkt** — typisch Bezug und Rücklief
 5. **Inhalt des Diagramms:** **eine Reihe je Einheit** mit ihrem `total`, im **gespeicherten Vorzeichen** — nichts wird gespiegelt. Der Bezug ist positiv gespeichert, die Rücklieferung negativ; die eine Linie liegt damit über, die andere unter der Nulllinie. Die Legende nennt je Reihe den **Namen der Einheit** und die Summe in kWh. Die **ZEV-Reihe entfällt** in diesem Diagramm.
 
    > Zwei Einheiten mit je `Total` und `ZEV` ergäben vier Linien; für Bezug und Rücklieferung ist `zev` ohnehin 0.
-6. **Alles Übrige wie im Diagramm einer Einheit** (FR-2 bis FR-4, FR-7): Stufenlinie, Zoom, Ausdünnung, Achsen, Schweizer Zahlenformat, Farben aus Design-Tokens (erste Reihe Primär-, zweite Sekundärfarbe).
+6. **Alles Übrige wie im Diagramm einer Einheit** (FR-2 bis FR-4, FR-7): Stufenlinie, Zoom, Ausdünnung, Achsen, Schweizer Zahlenformat, Farben aus Design-Tokens (der Reihe nach die Reihenfarben, FR-4).
 7. **Geladen wird jede Einheit einmal**, auch wenn sie einzeln **und** über ihren Messpunkt gewählt ist. Die Erfolgsmeldung zählt die geladenen **Einheiten** und ihre Datenpunkte, nicht die Diagramme.
 8. Die Auswahl der **Rechnungen** (dieselbe Komponente) zeigt die Einträge **nicht**.
+
+### FR-9: Vergleich – alle gewählten Einheiten in einem Diagramm
+
+Neben „Anzeigen" steht die Schaltfläche **„Vergleich"** (`GRAFIK_VERGLEICH`). Sie zeichnet **ein** Diagramm mit allen gewählten Einheiten; die einzelnen Diagramme verschwinden.
+
+1. **Wo sie steht:** im Aktions-Slot des Quartal-Selektors, rechts von „Anzeigen", als sekundäre Schaltfläche mit Icon `bar-chart-2`.
+2. **Wann sie frei ist:** wie „Anzeigen" (beide Daten gesetzt, nicht beim Laden) und zusätzlich nur mit **mindestens zwei** Einheiten. Gezählt wird, was geladen würde: die gewählten Einheiten und die der gewählten Messpunkte, jede einmal.
+
+   > Mit einer Einheit wäre der Vergleich ihr eigenes Diagramm ohne ZEV-Reihe.
+3. **Was erscheint:** genau ein Panel mit dem Titel `Vergleich: <n> Einheiten`. Darin **eine Reihe je Einheit** mit ihrem `total` im gespeicherten Vorzeichen, benannt nach der Einheit samt Summe — derselbe Aufbau wie das Messpunkt-Diagramm (FR-8.5, FR-8.6), also ohne ZEV-Reihe. Produzenten, Rücklieferung und entladende Speicher liegen damit unter der Nulllinie.
+4. **Reihenfolge der Reihen:** wie in der Auswahlliste; die Einheiten eines gewählten Messpunkts folgen, sofern sie nicht schon selbst gewählt sind.
+5. **„Anzeigen" bringt die einzelnen Diagramme zurück.** Es gibt immer nur eine der beiden Ansichten.
+6. **Blättern und „Heute"** laden in der Ansicht, die gerade steht: Wer im Vergleich blättert, bleibt im Vergleich. Sind inzwischen weniger als zwei Einheiten gewählt, fällt die Ansicht auf die einzelnen Diagramme zurück.
+7. **Geladen** wird wie bei „Anzeigen": jede Einheit einmal, die Erfolgsmeldung zählt Einheiten und Datenpunkte (FR-8.7).
 
 ## 3. Akzeptanzkriterien - Wann ist die Anforderung erfüllt? (testbar)
 
@@ -126,6 +141,14 @@ Tragen **mehrere Einheiten denselben Messpunkt** — typisch Bezug und Rücklief
 * [x] Mit nur einem gewählten Messpunkt ist „Anzeigen" freigegeben, beide Einheiten werden geladen, und es entsteht **ein** Panel mit dem Titel `Einheit [Typ] / Einheit [Typ] / [Messpunkt]`. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Messpunkt-Diagramm › should enable the submit button with only a messpunkt selected; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Messpunkt-Diagramm › should load both einheiten of a selected messpunkt and add one chart for it; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Messpunkt-Diagramm › should title the messpunkt panel with both einheiten and the messpunkt; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should offer and draw a combined chart for units sharing a metering point)
 * [x] Das Messpunkt-Diagramm zeigt eine Reihe je Einheit mit deren `total` im gespeicherten Vorzeichen, benannt nach der Einheit samt Summe im Schweizer Format, in zwei verschiedenen Token-Farben und **ohne** ZEV-Reihe; Achsen, Zoom und Stufenlinie sind dieselben wie im Diagramm einer Einheit. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Messpunkt-Diagramm › should draw one series per einheit with its stored sign and without a ZEV series; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Messpunkt-Diagramm › should share axes, zoom and step line with the single-unit chart)
 * [x] Eine Einheit, die einzeln und über ihren Messpunkt gewählt ist, wird **einmal** geladen; die Diagramme der Einheiten stehen vor denen der Messpunkte, und die Erfolgsmeldung zählt die geladenen Einheiten. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Messpunkt-Diagramm › should load an einheit only once when it is selected alone and as part of its messpunkt)
+
+**Vergleich (FR-9)**
+* [x] „Vergleich" steht im Quartal-Selektor neben „Anzeigen" und ist gesperrt, solange weniger als zwei Einheiten zu laden wären; ein gewählter Messpunkt mit zwei Einheiten genügt. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should offer the button next to the submit button, disabled below two einheiten; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should disable the comparison while loading or without a complete period; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should enable the comparison for a single messpunkt with two einheiten; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should do nothing without two einheiten; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should draw all selected units into one comparison chart)
+* [x] Ein Klick auf „Vergleich" ersetzt die einzelnen Diagramme durch **ein** Panel `#chart-vergleich` mit dem Titel `Vergleich: <n> Einheiten`, das alle gewählten Einheiten in der Reihenfolge der Auswahl trägt. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should replace the single charts by one chart with all selected einheiten; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should draw all selected units into one comparison chart)
+* [x] Das Vergleichsdiagramm zeigt je Einheit eine Reihe mit ihrem `total` unter ihrem Namen samt Summe, ohne ZEV-Reihe. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › createChart › should draw one series per einheit into the comparison chart)
+* [x] Eine Einheit, die einzeln und über ihren Messpunkt gewählt ist, wird für den Vergleich einmal geladen und einmal gezeichnet; die Meldung zählt die geladenen Einheiten. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should load each einheit once, also when it is selected through its messpunkt too)
+* [x] „Anzeigen" bringt die einzelnen Diagramme zurück; Blättern und „Heute" bleiben in der Ansicht, die gerade steht – im Vergleich nur, solange mindestens zwei Einheiten gewählt sind, sonst erscheinen die einzelnen Diagramme. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should return to the single charts on Anzeigen; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should keep the comparison when paging and jumping to today; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should stay with the single charts when paging after returning from the comparison; Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Vergleich › should fall back to the single chart when the selection shrank below two einheiten; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should draw all selected units into one comparison chart)
+* [x] Diagramme mit einer Reihe je Einheit vergeben sechs verschiedene Token-Farben; eine siebte Reihe trägt keine eigene Farbe (Palette der Bibliothek). (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › Messpunkt-Diagramm › should give six series their own token colour and leave a seventh to the library; Test: chart-farben.spec.ts › chartFarben › should offer a palette of six distinct colours for charts with one series per unit)
 
 **Neu und geändert**
 * [x] Mausrad/Touch zoomt innerhalb des geladenen Zeitraums, der Slider verschiebt den Ausschnitt — **ohne** neuen HTTP-Aufruf. (Test: messwerte-chart.component.spec.ts › MesswerteChartComponent › optionen › should offer zoom inside and as a slider; E2E: messwerte-grafik.spec.ts › Messwerte-Grafik - Diagramm › should zoom with the mouse wheel without asking the server)
@@ -169,7 +192,7 @@ Tragen **mehrere Einheiten denselben Messpunkt** — typisch Bezug und Rücklief
 * Der dynamische Import lädt ausschliesslich lokal gebündelte Chunks — **kein** CDN, keine externe Quelle.
 
 ### NFR-3: Kompatibilität
-* **Keine Datenbank-Änderung, keine Migration, keine neuen Übersetzungs-Keys** (`TOTAL`, `ZEV`, `KWH` existieren).
+* **Keine Änderung am Schema.** Einzige Migration ist `V191` mit dem Übersetzungs-Key `GRAFIK_VERGLEICH` (FR-9); alle übrigen Keys existieren.
 * Keine Änderung an Backend, API oder DTOs.
 * Reiner Frontend-Umbau: Ein Rückweg ist ein einzelner Commit. Es gibt keinen migrierten Datenbestand, der einen Rückweg blockieren könnte.
 * Die Statistik-Seite und alle übrigen Masken bleiben unberührt.
@@ -188,7 +211,11 @@ Tragen **mehrere Einheiten denselben Messpunkt** — typisch Bezug und Rücklief
 | Blättern oder „Heute" ohne Auswahl | Schaltflächen gesperrt, kein Server-Aufruf (FR-1a.5) |
 | Kein Messpunkt mit mehreren Einheiten | Die Auswahl zeigt nur die Einheiten, wie bisher |
 | Messpunkt gewählt, eine seiner Einheiten ohne Messwerte | Das Diagramm zeigt die andere Reihe; die leere steht mit Summe 0 in der Legende |
-| Mehr als zwei Einheiten am selben Messpunkt | Ein Eintrag und ein Diagramm mit einer Reihe je Einheit. Die ersten beiden tragen die Token-Farben, weitere die Palette von ECharts (es gibt nur zwei Reihenfarben) |
+| Mehr als zwei Einheiten am selben Messpunkt | Ein Eintrag und ein Diagramm mit einer Reihe je Einheit, in den Reihenfarben aus FR-4 |
+| Vergleich mit mehr als sechs Einheiten | Die ersten sechs Reihen tragen die Token-Farben, weitere die Palette von ECharts; die Legende blättert, wenn sie nicht in eine Zeile passt |
+| „Vergleich" mit nur einer Einheit | Schaltfläche gesperrt (FR-9.2) |
+| Auswahl nach einem Vergleich auf eine Einheit verkleinert, dann geblättert | Es erscheint das einzelne Diagramm dieser Einheit; die Ansicht steht danach wieder auf „einzeln" (FR-9.6) |
+| Zwei Einheiten mit demselben Namen im Vergleich | Beide Reihen tragen denselben Legendentext; unterscheidbar sind sie nur an der Farbe |
 | Gleicher Messpunkt, unterschiedlich geschrieben (`BKW` / `bkw`) | Keine Gruppe — es sind zwei Messpunkte, wie in der Einheitenverwaltung |
 | Panel wird in der Grösse verändert (`resize: vertical`) | Diagramm folgt über den `ResizeObserver` |
 | Sprachwechsel bei offenem Diagramm | Beschriftung und Legende bleiben bis zum nächsten Zeichnen in der alten Sprache. **Bekannte Einschränkung**, heute genauso, gilt für beide Diagramme (FR-3) |
@@ -225,9 +252,10 @@ Tragen **mehrere Einheiten denselben Messpunkt** — typisch Bezug und Rücklief
 
 ## 7. Abgrenzung / Out of Scope
 
-* **Keine weiteren Funktionen** in der Messwerte-Grafik über Zoom, die Bedienung aus FR-1a und das Messpunkt-Diagramm aus FR-8 hinaus: kein Export (auch nicht der PDF-Export der Statistik), keine Kennzahlen, keine Änderung des Zeitraums oder der geladenen Daten.
+* **Keine weiteren Funktionen** in der Messwerte-Grafik über Zoom, die Bedienung aus FR-1a, das Messpunkt-Diagramm aus FR-8 und den Vergleich aus FR-9 hinaus: kein Export (auch nicht der PDF-Export der Statistik), keine Kennzahlen, keine Änderung des Zeitraums oder der geladenen Daten.
 * **Kein Saldo je Messpunkt.** Das Messpunkt-Diagramm zeigt die Einheiten nebeneinander; eine verrechnete Reihe (Bezug minus Rücklieferung) gibt es nicht.
-* **Keine frei zusammengestellten Diagramme.** Gemeinsam gezeichnet wird nur, was denselben Messpunkt trägt.
+* **Keine Summe im Vergleich.** Das Vergleichsdiagramm (FR-9) zeigt die Einheiten nebeneinander; eine aufsummierte Reihe über alle gibt es nicht.
+* **Kein Mischbetrieb.** Vergleich und einzelne Diagramme stehen nie gleichzeitig auf der Seite.
 * **Keine Änderung an Backend, API oder Datenbank.**
 * **Kein Umbau der Statistik-Seite** und keiner anderen Maske; `zev-panel--chart` bleibt wie es ist.
 * **Keine fachliche Änderung an der Preiszeitreihe** — dort wird ausschliesslich auf die gemeinsamen Bausteine umgestellt.
@@ -267,3 +295,11 @@ Vorher trug die x-Achse den Titel „Zeit“ (`ZEIT`), mittig unter der Achse. D
 ### A.4 Abschlusspunkt der Stufenlinie (FR-2, 21.11.2026)
 
 Vorher endete jede Reihe mit ihrem letzten Messwert. Weil die Stufenlinie einen Wert erst bis zum nächsten Punkt zeichnet, fehlte die letzte Viertelstunde im Bild. Aufgefallen ist es am 21.11.2026 an der frisch angelegten Einheit „Verbrauch gesamt (Solar-Log)“: Sie hatte genau einen Messwert (23:15, 0.140 kWh), die Legende nannte die Summe, das Diagramm blieb leer.
+
+### A.5 Vergleich aller gewählten Einheiten (FR-9, 22.11.2026)
+
+Vorher liessen sich mehrere Einheiten nur dann in einem Diagramm sehen, wenn sie denselben Messpunkt trugen (FR-8); §7 schloss „frei zusammengestellte Diagramme" ausdrücklich aus. Am 22.11.2026 kam auf Wunsch des Benutzers die Schaltfläche dazu, die alle gewählten Einheiten in einem Diagramm zeigt. Der Wunsch nannte sie „Vereinigung"; gewählt wurde „Vergleich", weil das Diagramm die Einheiten nebeneinander stellt und nichts zusammenzählt.
+
+Aus der Umsetzung stammen: die Mindestzahl von zwei Einheiten, dass Blättern und „Heute" in der stehenden Ansicht bleiben, und die sechs Reihenfarben. Bis dahin gab es für Diagramme mit einer Reihe je Einheit nur zwei Token-Farben; eine dritte Einheit am selben Messpunkt bekam die Palette von ECharts.
+
+`NFR-3` lautete „keine Migration, keine neuen Übersetzungs-Keys" — das galt für den Bibliothekswechsel und gilt mit `V191` nicht mehr wörtlich.

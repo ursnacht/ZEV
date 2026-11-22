@@ -28,6 +28,17 @@ describe('chartFarben', () => {
     expect(farben.flaeche).toBeTruthy();
   });
 
+  it('should offer a palette of six distinct colours for charts with one series per unit', () => {
+    const farben = chartFarben();
+
+    // Sechs verschiedene Toene: Zwei gleiche Kurven waeren in der Legende nicht zu unterscheiden.
+    expect(farben.reihen.length).toBe(6);
+    expect(new Set(farben.reihen).size).toBe(6);
+    // Die ersten beiden sind die bisherigen Reihenfarben - Diagramme mit zwei Reihen sehen aus
+    // wie zuvor.
+    expect(farben.reihen.slice(0, 2)).toEqual([farben.primaer, farben.sekundaer]);
+  });
+
   it('should fall back when a token is missing', () => {
     // In jsdom sind die Design-Tokens nicht geladen - genau der Fall, den die Rueckfallwerte
     // abdecken. Ohne sie waere das Diagramm hier unsichtbar.

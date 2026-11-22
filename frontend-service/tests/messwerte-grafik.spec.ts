@@ -344,6 +344,49 @@ test.describe('Messwerte-Grafik - Diagramm', () => {
     });
 
     /**
+     * Vergleich (`Specs/EChart.md`, FR-9): alle gewählten Einheiten in **einem** Diagramm, die
+     * einzelnen verschwinden; „Anzeigen" bringt sie zurück. Liest nur, mit den vorhandenen Einheiten.
+     */
+    test('should draw all selected units into one comparison chart', async ({ page }) => {
+        await oeffneGrafik(page);
+
+        // Nur die Einheiten selbst (`#einheit-<id>`), nicht die Messpunkt-Einträge: Ein Messpunkt
+        // mit zwei Einheiten gäbe schon mit EINEM Häkchen den Vergleich frei und ein Panel statt zwei.
+        const einzelne = page.locator('.zev-checkbox-item input[id^="einheit-"]:not(#einheit-select-all)');
+        test.skip(await einzelne.count() < 2, 'Weniger als zwei Einheiten vorhanden');
+
+        // Mit einer Einheit ist der Vergleich gesperrt, mit zweien frei.
+        await einzelne.nth(0).check();
+        await expect(page.locator('#grafikVergleich')).toBeDisabled();
+        await einzelne.nth(1).check();
+        await expect(page.locator('#grafikVergleich')).toBeEnabled();
+
+        await zeigeAn(page);
+        await expect(page.locator('.zev-panel--chart')).toHaveCount(2);
+
+        await page.locator('#grafikVergleich').click();
+
+        // Die zwei einzelnen Diagramme sind weg, es steht genau das Vergleichsdiagramm. Gewartet
+        // wird auf das Diagramm selbst, nicht auf eine der beiden Antworten.
+        await expect(page.locator('#chart-vergleich canvas')).toBeVisible({ timeout: 20000 });
+        await expect(page.locator('.zev-panel--chart')).toHaveCount(1);
+        expect(await warteAufGezeichnetesDiagramm(page)).toBeGreaterThan(0);
+        // Titel übersetzt, kein roher Key.
+        const titel = page.locator('.zev-panel--chart .zev-panel__title');
+        await expect(titel).not.toContainText('GRAFIK_VERGLEICH');
+        await expect(titel).not.toContainText('EINHEITEN');
+        // Leerraum am Rand zulassen: Der Titel steht im Template in einem @if-Block.
+        await expect(titel).toHaveText(/^\s*\S.*: 2 \S+\s*$/);
+
+        // „Anzeigen" bringt die einzelnen Diagramme zurück. Zuerst die Meldung des Vergleichs
+        // abwarten: `zeigeAn` wartet auf eine sichtbare Meldung und sähe sonst die alte.
+        await expect(page.locator('.zev-message')).toHaveCount(0, { timeout: 10000 });
+        await zeigeAn(page);
+        await expect(page.locator('.zev-panel--chart')).toHaveCount(2, { timeout: 20000 });
+        await expect(page.locator('#chart-vergleich')).toHaveCount(0);
+    });
+
+    /**
      * Bedienung wie in der Statistik (`Specs/EChart.md`, FR-1a): „Anzeigen" neben den Quartalen,
      * ◀ / ▶ blättern um die Länge des Zeitraums, „Heute" setzt heute–heute — beide laden sofort.
      */

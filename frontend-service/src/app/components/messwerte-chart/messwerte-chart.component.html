@@ -21,6 +21,12 @@
             <app-icon name="search"></app-icon>
             {{ loading ? ('LADE_DATEN' | translate) : ('ANZEIGEN' | translate) }}
           </button>
+          <!-- Alle gewaehlten Einheiten in EINEM Diagramm (Specs/EChart.md, FR-9) -->
+          <button type="button" id="grafikVergleich" class="zev-button zev-button--secondary" (click)="onVergleich()"
+            [disabled]="loading || !dateFrom || !dateTo || !kannVergleichen">
+            <app-icon name="bar-chart-2"></app-icon>
+            {{ 'GRAFIK_VERGLEICH' | translate }}
+          </button>
         </app-quarter-selector>
 
         <div class="zev-date-range-row">
@@ -58,7 +64,13 @@
 
         @for (chartData of charts; track chartData.schluessel) {
           <div class="zev-panel zev-panel--chart">
-            <h3 class="zev-panel__title">{{ chartData.einheiten | messpunktGruppe:chartData.messpunkt }}</h3>
+            <h3 class="zev-panel__title">
+              @if (chartData.vergleich) {
+                {{ 'GRAFIK_VERGLEICH' | translate }}: {{ chartData.einheiten.length }} {{ 'EINHEITEN' | translate }}
+              } @else {
+                {{ chartData.einheiten | messpunktGruppe:chartData.messpunkt }}
+              }
+            </h3>
             <div class="zev-panel__content">
               <!-- Behaelter statt <canvas>: ECharts legt sein Canvas selbst darin an. Die ID bleibt,
                    damit die Komponente den Behaelter weiterhin ueber getElementById findet. -->
