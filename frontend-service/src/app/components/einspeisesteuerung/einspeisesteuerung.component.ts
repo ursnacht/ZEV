@@ -21,6 +21,7 @@ import { chartFarben } from '../../utils/chart-farben';
 import { ladeECharts } from '../../utils/echarts-loader';
 import { formatSwissDateTime, toIsoDate } from '../../utils/date-utils';
 import { formatSwissNumber } from '../../utils/number-utils';
+import { formatPreis, preisPunkte } from '../../utils/chart-preis';
 
 type EChartsCore = Awaited<ReturnType<typeof ladeECharts>>;
 
@@ -295,7 +296,7 @@ export class EinspeisesteuerungComponent extends WithMessage
    */
   private preisReihe(): (number | null)[][] {
     if (this.preise.length > 0) {
-      return this.preise.map(p => [new Date(p.zeit).getTime(), p.preis]);
+      return preisPunkte(this.preise);
     }
     return this.entscheide.map(e => [new Date(e.zeit).getTime(), e.preis]);
   }
@@ -504,7 +505,7 @@ export class EinspeisesteuerungComponent extends WithMessage
 
   /** Betrag im Schweizer Format; leer bei `null` — eine 0.00 sähe aus wie ein gemessener Wert. */
   preis(wert: number | null): string {
-    return wert == null ? '' : formatSwissNumber(wert, 5);
+    return wert == null ? '' : formatPreis(wert);
   }
 
   /** Ladezustand in Prozent, eine Nachkommastelle; leer bei `null` (kein Speicher erfasst). */

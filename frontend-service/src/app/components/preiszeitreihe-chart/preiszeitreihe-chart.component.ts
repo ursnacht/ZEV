@@ -11,6 +11,7 @@ import { formatSwissNumber } from '../../utils/number-utils';
 import { formatSwissDateTime, toIsoDate, blaettereZeitraum, monatsende, plusTage } from '../../utils/date-utils';
 import { chartFarben } from '../../utils/chart-farben';
 import { ladeECharts } from '../../utils/echarts-loader';
+import { formatPreis, preisPunkte } from '../../utils/chart-preis';
 
 /**
  * Diagramm der dynamischen Einspeisepreise (Specs/Preiszeitreihe.md, FR-3).
@@ -228,7 +229,7 @@ export class PreiszeitreiheChartComponent extends WithMessage
    */
   private optionen(): Record<string, unknown> {
     const farben = this.farben();
-    const daten = this.punkte.map(p => [new Date(p.zeit).getTime(), p.preis]);
+    const daten = preisPunkte(this.punkte);
     return {
       animation: false,
       grid: { left: 60, right: 20, top: 20, bottom: 70 },
@@ -238,7 +239,7 @@ export class PreiszeitreiheChartComponent extends WithMessage
           const [zeit, preis] = params[0].value;
           return `${this.formatiereZeit(new Date(zeit))}<br>`
             + `${this.translationService.translate('PREIS_CHF_KWH')}: `
-            + `${formatSwissNumber(preis, 5)}`;
+            + `${formatPreis(preis)}`;
         }
       },
       xAxis: {
