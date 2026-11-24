@@ -1,7 +1,7 @@
 # Mosquitto-Broker mit gebackener Config, aber OHNE eingebackene passwd:
 # Die Zugangsdaten werden beim Container-Start aus der Umgebung (MOSQUITTO_USERS)
 # generiert -> keine Secrets im Image oder im Repo.
-# Funktioniert fuer Dev (docker-compose-mqtt.yml) wie NAS (eigene MOSQUITTO_USERS in .env).
+# Funktioniert fuer Dev (docker-compose.yml) wie NAS (eigene MOSQUITTO_USERS in .env).
 FROM eclipse-mosquitto:2
 COPY mosquitto.conf /mosquitto/config/mosquitto.conf
 COPY docker-entrypoint.sh /zev-entrypoint.sh

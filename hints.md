@@ -1,9 +1,9 @@
 # Hints
 
-### Anwendung lokal mit MQTT starten
-> ``docker compose --env-file .\.env.mqtt -f .\docker-compose-mqtt.yml up``
+### Anwendung lokal starten (Standard-Stack mit MQTT)
+> ``docker compose up``
 
-> ``docker compose --env-file .\.env.mqtt -f .\docker-compose-mqtt.yml up --build``
+> ``docker compose up --build``
 
 ### Log
 > ``docker logs -f zev-backend-service``

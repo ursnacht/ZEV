@@ -116,7 +116,7 @@ still. Abhilfe: in Grafana einen Alert auf `zev_mqtt_last_message_timestamp` (FR
 
 Der Broker auf dem NAS nimmt die Meldungen des Pi-Gateways und – über die Bridge des Pi – die
 der gPlugs entgegen. Er läuft als Service `mosquitto` im ZEV-Stack
-(`docker-compose-mqtt-hene.yml`, lokal `docker-compose-mqtt.yml`) und wird aus
+(`docker-compose-hene.yml`, lokal `docker-compose.yml`) und wird aus
 `pi-gateway/deploy/mosquitto/` gebaut:
 
 | Datei | Inhalt |
@@ -149,7 +149,7 @@ Die `passwd` entsteht beim Start des Containers. Ein neuer oder geänderter User
 erst nach dem Neuerzeugen des Containers:
 
 ```bash
-docker compose -f docker-compose-mqtt-hene.yml up -d mosquitto
+docker compose -f docker-compose-hene.yml up -d mosquitto
 ```
 
 Backend und Pi-Gateway verbinden sich danach selbst neu.
@@ -161,7 +161,7 @@ Die `mosquitto.conf` ist ins Image gebacken. Nach einer Änderung im Repo die Da
 Hene-Compose baut aus `./mosquitto` neben der Compose-Datei) und neu bauen:
 
 ```bash
-docker compose -f docker-compose-mqtt-hene.yml up -d --build mosquitto
+docker compose -f docker-compose-hene.yml up -d --build mosquitto
 ```
 
 Dass die neue Konfiguration greift, zeigt der Container selbst:
@@ -541,7 +541,7 @@ ssh -N -o ServerAliveInterval=30 -L 15432:<container-ip>:5432 <user>@nasnafam.sy
 
 Das Ziel in `-L` wird **vom NAS** aufgelöst; die Container-IP im Docker-Bridge-Netz
 (`zev-network`) ist von dort erreichbar. DB-Tool danach auf `localhost:15432`, Datenbank
-`zev`, Credentials aus `.env.mqtt` **auf dem NAS**. Schemas: `zev` (Anwendung), `keycloak`
+`zev`, Credentials aus `.env` **auf dem NAS**. Schemas: `zev` (Anwendung), `keycloak`
 (Identity).
 
 **Fallen, die uns Zeit gekostet haben:**

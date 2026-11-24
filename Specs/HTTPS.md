@@ -395,7 +395,7 @@ Hostnamen** nur HTTPS gilt — HSTS kennt keine Ports. Port 8081 spricht aber ke
 | Baustein | Änderung |
 |---|---|
 | `caddy/Caddyfile.https` | Site `https://{$ZEV_PUBLIC_HOST}:8444` mit `tls internal`, `reverse_proxy admin-service:8081` |
-| Compose-Dateien (`caddy`) | Port `8444:8444` (`docker-compose.yml`, `docker-compose-mqtt.yml`, lokale `docker-compose-mqtt-hene.yml`) |
+| Compose-Dateien (`caddy`) | Port `8444:8444` (`docker-compose.yml`, `docker-compose-ohne-mqtt.yml`, lokale `docker-compose-hene.yml`) |
 | `admin-service/…/application.yml` | `server.forward-headers-strategy: framework` — die SBA-Oberfläche baut ihre Adressen sonst mit `http` und Port 8081 (Mixed Content) |
 
 * **Eigener Port statt Pfad** (`/admin`): SBA läuft im Root-Kontext; ein Pfad-Prefix verlangte
@@ -411,7 +411,7 @@ Hostnamen** nur HTTPS gilt — HSTS kennt keine Ports. Port 8081 spricht aber ke
 **Einführen auf dem NAS** (vom Betreiber):
 1. `caddy/Caddyfile.https` und die Hene-Compose-Datei (Port `8444:8444`) aufs NAS bringen.
 2. Neues Image `zev-admin-service:amd64` bauen und laden (`docs/NAS-Images.md`).
-3. `docker compose -f docker-compose-mqtt-hene.yml up -d admin-service caddy`
+3. `docker compose -f docker-compose-hene.yml up -d admin-service caddy`
 4. Prüfen: `https://nafam.zev:8444` öffnet SBA mit Anmeldedialog, ohne Zertifikatswarnung und
    ohne Mixed-Content-Meldung in der Browser-Konsole; die Instanzen erscheinen wie bisher.
 

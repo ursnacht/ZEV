@@ -24,10 +24,10 @@ wiederholt, sondern referenziert.
 
 | Aspekt | Ist-Zustand | Fundstelle |
 |---|---|---|
-| Zugriff | Drei Origins: `:4200` Frontend, `:8090` Backend, `:9000` Keycloak | `docker-compose-mqtt.yml` |
-| Frontend-Config | `FRONTEND_API_BASE_URL` / `FRONTEND_KEYCLOAK_URL` = `http://10.8.0.1:…` | `.env.mqtt` (NAS) |
-| Keycloak | `start-dev` **ohne** `KC_HOSTNAME` → `iss` wird aus dem Request abgeleitet | `docker-compose-mqtt.yml:67-72` |
-| Backend | Validiert gegen ein **festes** `BACKEND_JWT_ISSUER_URI` | `docker-compose-mqtt.yml` |
+| Zugriff | Drei Origins: `:4200` Frontend, `:8090` Backend, `:9000` Keycloak | `docker-compose.yml` |
+| Frontend-Config | `FRONTEND_API_BASE_URL` / `FRONTEND_KEYCLOAK_URL` = `http://10.8.0.1:…` | `.env` (NAS) |
+| Keycloak | `start-dev` **ohne** `KC_HOSTNAME` → `iss` wird aus dem Request abgeleitet | `docker-compose.yml:67-72` |
+| Backend | Validiert gegen ein **festes** `BACKEND_JWT_ISSUER_URI` | `docker-compose.yml` |
 | Realm | `redirectUris`/`webOrigins` aus `${ZEV_FRONTEND_URL}`; Client erzwingt PKCE `S256` | `keycloak/realms/zev-realm.json:14-24` |
 | Proxy | Nicht vorhanden; `docker-compose.nas.yml` aus der Doku existiert im Repo **nicht** | — |
 | Ports 80/443 auf dem NAS | **Belegt von DSMs eigenem nginx** (verifiziert: HTTP 200, `Server: nginx`) → Caddy kann sie nicht binden | — |
@@ -83,9 +83,9 @@ letzten Schritt funktionsfähig bleibt und kein Aussperren möglich ist.
 |--------|-------|--------------|
 | [x] | 1. Namensauflösung **zuerst** | Hostname festlegen und in **beiden** Netzen auflösbar machen (Optionen s. u.). Prüfen mit `ping nafam.zev` bzw. `nslookup` aus VPN und LAN. **Vor** jeder Konfigurationsänderung – ohne funktionierende Auflösung führt jeder weitere Schritt ins Leere. |
 | [x] | 2. Caddy **additiv** einführen | Service `caddy` (`image: caddy:2`, s. `docs/NAS-Proxy.md` Variante 1) ergänzen, aber die bestehenden Port-Mappings `4200/8090/9000` **noch nicht entfernen**. Danach ist die Anwendung über den alten *und* den neuen Weg erreichbar. Test: `curl http://nafam.zev:8000/` liefert die index.html, `curl http://nafam.zev:8000/api/…` das Backend. |
-| [x] | 3. Keycloak auf `/auth` umstellen | `KC_HTTP_RELATIVE_PATH=/auth`, `KC_HOSTNAME=http://nafam.zev:8000` (**ohne** `/auth` – den relativen Pfad haengt Keycloak selbst an; mit `/auth` in beiden Variablen droht `…/auth/auth/…`), `KC_PROXY_HEADERS=xforwarded` setzen (die Zeilen sind in `docker-compose-mqtt.yml:71-72` bereits als Kommentar vorbereitet). **Achtung:** Ab hier ist die Admin-Konsole nur noch über `http://nafam.zev:8000/auth` erreichbar. |
+| [x] | 3. Keycloak auf `/auth` umstellen | `KC_HTTP_RELATIVE_PATH=/auth`, `KC_HOSTNAME=http://nafam.zev:8000` (**ohne** `/auth` – den relativen Pfad haengt Keycloak selbst an; mit `/auth` in beiden Variablen droht `…/auth/auth/…`), `KC_PROXY_HEADERS=xforwarded` setzen (die Zeilen sind in `docker-compose.yml:71-72` bereits als Kommentar vorbereitet). **Achtung:** Ab hier ist die Admin-Konsole nur noch über `http://nafam.zev:8000/auth` erreichbar. |
 | [x] | 4. Realm: Redirect-URIs **ergänzen** | In der Admin-Konsole beim Client `zev-frontend` `http://nafam.zev:8000/*` zu `redirectUris` und `http://nafam.zev:8000` zu `webOrigins` **hinzufügen** – die alten Einträge vorerst **stehen lassen**. So bleibt der Zugriff über die IP funktionsfähig, bis alles verifiziert ist. |
-| [x] | 5. Backend-Issuer umstellen | **Zwei** Werte: (a) `BACKEND_JWT_ISSUER_URI=http://nafam.zev:8000/auth/realms/zev` und (b) die fest verdrahtete JWK-Set-URL in `docker-compose-mqtt.yml:122` auf `http://keycloak:9000/auth/realms/zev/protocol/openid-connect/certs` (interner Container-Aufruf, geht **nicht** ueber Caddy – nur der Pfad `/auth` kommt dazu). Ohne (b) findet das Backend keine Signaturschluessel und jede Anfrage scheitert. Backend neu starten. **Ab hier werden Tokens mit altem `iss` abgelehnt** – bestehende Sessions brechen, alle Benutzer müssen sich neu anmelden. |
+| [x] | 5. Backend-Issuer umstellen | **Zwei** Werte: (a) `BACKEND_JWT_ISSUER_URI=http://nafam.zev:8000/auth/realms/zev` und (b) die fest verdrahtete JWK-Set-URL in `docker-compose.yml:122` auf `http://keycloak:9000/auth/realms/zev/protocol/openid-connect/certs` (interner Container-Aufruf, geht **nicht** ueber Caddy – nur der Pfad `/auth` kommt dazu). Ohne (b) findet das Backend keine Signaturschluessel und jede Anfrage scheitert. Backend neu starten. **Ab hier werden Tokens mit altem `iss` abgelehnt** – bestehende Sessions brechen, alle Benutzer müssen sich neu anmelden. |
 | [x] | 6. Frontend-Config umstellen | `FRONTEND_API_BASE_URL=` (leer), `FRONTEND_KEYCLOAK_URL=http://nafam.zev:8000/auth`, `ZEV_FRONTEND_URL=http://nafam.zev:8000`. Frontend-Container neu starten. |
 | [~] | 7. Verifikation aus beiden Netzen | **Teilweise erledigt:** Aus dem VPN heraus verifiziert (Config, Realm/Issuer, JWK-Bezug, Redirect bis zur Login-Maske). **Offen:** echte Anmeldung im Browser und ein Test von einem LAN-Client (`192.168.7.0/24`) **ohne** VPN – genau der Fall, um dessentwillen die Migration gemacht wurde. |
 | [ ] | 8. Aufräumen | Direkte Port-Mappings `4200:8080`, `8090:8090`, `9000:9000` entfernen (nur noch Caddy von aussen erreichbar). Alte IP-Einträge aus `redirectUris`/`webOrigins` entfernen. |
@@ -175,7 +175,7 @@ Konsolen-Events mitlesen) – damit wird sichtbar, ob der Redirect sauber durchl
   fälschlich „von uns gebaut" signalisieren. Entschieden am 2026-08-14.
 - **`FRONTEND_API_BASE_URL` leer setzen:** Die Compose nutzt `${VAR:-default}`; diese Syntax greift auch bei **leerem** Wert. Fuer einen echt leeren Wert muss der Doppelpunkt weg (`${VAR-default}`), sonst landet stillschweigend `http://localhost:8090` in der Config.
 - **`docker-compose.nas.yml` existiert im Repo nicht** – die NAS-Installation nutzt
-  `docker-compose-mqtt.yml`. Der Caddy-Service ist dort (bzw. in der NAS-Kopie) zu ergänzen; ob
+  `docker-compose.yml`. Der Caddy-Service ist dort (bzw. in der NAS-Kopie) zu ergänzen; ob
   die Compose-Datei ins Repo gehört, ist offen.
 - **Realm-Änderungen wendet der Benutzer selbst an** (Konvention: keine Realm-Reimporte durch
   Claude).

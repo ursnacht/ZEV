@@ -1,3 +1,13 @@
+# ZEV-Stack MIT MQTT-Broker, OHNE Prometheus/Grafana.
+# Das ist der Standard-Stack; die Variante ohne MQTT steht in docker-compose-ohne-mqtt.yml.
+# Env-Datei: .env  (Vorlage: .env.example -> kopieren nach .env)
+#
+# Start:
+#   cp .env.example .env
+#   docker compose up --build
+#
+# Das Backend läuft mit Spring-Profil 'mqtt' und abonniert den Broker (mosquitto).
+# Publisher-Simulator separat starten (Host): siehe pi-gateway/README.md.
 services:
   postgres:
     image: postgres:16-alpine
@@ -21,6 +31,34 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+
+  mosquitto:
+    build: ./pi-gateway/deploy/mosquitto  # passwd wird beim Start aus MOSQUITTO_USERS erzeugt (Auth aktiv)
+    container_name: zev-mosquitto
+    ports:
+      - "1883:1883"
+    env_file:
+      - .env
+    environment:
+      # Broker-User (user:passwort, whitespace-getrennt); daraus generiert der
+      # Entrypoint die gehashte passwd. Muss MQTT_BROKER_USERNAME (Backend) und –
+      # fuer den Pi – den Publisher-User sowie den Bridge-User der gPlugs (zevbridge)
+      # enthalten (docs/Netzwerk-Topologie-Hene.md).
+      - MOSQUITTO_USERS=${MOSQUITTO_USERS}
+    volumes:
+      # Persistenz (persistence true in mosquitto.conf): Die gepufferten Nachrichten der
+      # dauerhaften Backend-Sitzung (mqtt.clean-session=false) ueberstehen so auch einen
+      # Neustart des Brokers, nicht nur einen des Backends.
+      - mosquitto-data:/mosquitto/data
+    networks:
+      - zev-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "mosquitto_pub -h localhost -t healthcheck -m ping -q 1 -u $${MQTT_BROKER_USERNAME} -P $${MQTT_BROKER_PASSWORD} || exit 1" ]
+      interval: 60s
+      timeout: 5s
+      retries: 5
+      start_period: 10s   # frühe Probes beim Hochfahren, damit backend nicht ~60s auf 'healthy' wartet
 
   keycloak:
     image: quay.io/keycloak/keycloak:latest
@@ -85,11 +123,12 @@ services:
       - .env
     environment:
       - TZ=Europe/Zurich
+      - SPRING_PROFILES_ACTIVE=mqtt
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/zev
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       # iss-Claim muss dem Host entsprechen, über den der BROWSER Keycloak erreicht.
-      # Für NAS: BACKEND_JWT_ISSUER_URI in .env.mqtt auf http://nasnafam.synology.me:9000/realms/zev setzen
+      # Für NAS: BACKEND_JWT_ISSUER_URI in .env auf http://nasnafam.synology.me:9000/realms/zev setzen
       # (gleicher Variablenname wie der Platzhalter in application.yml).
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=${BACKEND_JWT_ISSUER_URI:-http://localhost:8000/auth/realms/zev}
       # JWK-Set wird serverseitig geladen -> interner Docker-Name bleibt korrekt.
@@ -115,8 +154,14 @@ services:
       # Basic Auth fuer die Registrierung am SBA-Server (SBA-UI-Credentials)
       - SBA_USER=${SBA_USER:-sba}
       - SBA_PASSWORD=${SBA_PASSWORD:-sba}
+      # MQTT-Broker (im selben Netz erreichbar unter 'mosquitto')
+      - MQTT_BROKER_URL=tcp://mosquitto:1883
+      - MQTT_BROKER_USERNAME=${MQTT_BROKER_USERNAME}
+      - MQTT_BROKER_PASSWORD=${MQTT_BROKER_PASSWORD}
     depends_on:
       postgres:
+        condition: service_healthy
+      mosquitto:
         condition: service_healthy
       admin-service:
         condition: service_started
@@ -144,11 +189,11 @@ services:
     container_name: zev-frontend-service
     environment:
       # Laufzeit-Config des Angular-Frontends (überschreibt /assets/config.json via
-      # FrontendConfigController). Defaults localhost; für NAS in .env.mqtt setzen.
+      # FrontendConfigController). Defaults localhost; für NAS in .env setzen.
       # Leer = relative /api-Aufrufe auf derselben Origin (ueber caddy). Achtung: ${VAR:-default}
       # wuerde auch bei LEEREM Wert den Default setzen - daher hier ohne Default.
       - FRONTEND_API_BASE_URL=${FRONTEND_API_BASE_URL}
-      - FRONTEND_KEYCLOAK_URL=${FRONTEND_KEYCLOAK_URL:-http://localhost:8000/auth}
+      - FRONTEND_KEYCLOAK_URL=${FRONTEND_KEYCLOAK_URL:?FRONTEND_KEYCLOAK_URL muss gesetzt sein}
       - FRONTEND_KEYCLOAK_REALM=${FRONTEND_KEYCLOAK_REALM:-zev}
       - FRONTEND_KEYCLOAK_CLIENT_ID=${FRONTEND_KEYCLOAK_CLIENT_ID:-zev-frontend}
       # Basic Auth fuer /actuator/** (SBA-Details); Default nur fuer lokale Entwicklung
@@ -168,47 +213,6 @@ services:
       - zev-network
     restart: unless-stopped
 
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: zev-prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus-data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.enable-lifecycle'
-      - '--web.enable-admin-api'
-    networks:
-      - zev-network
-    restart: unless-stopped
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: zev-grafana
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env
-    environment:
-      - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER}
-      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
-    depends_on:
-      - prometheus
-    networks:
-      - zev-network
-    restart: unless-stopped
-
-  # Reverse-Proxy: ein Einstiegspunkt fuer alles (http://localhost:8000, mit CADDY_CONFIG
-  # umgestellt auf https://localhost:8443).
-  # Spiegelt das NAS-Setup - siehe Specs/NAS-Einheitlicher-Hostname_Umsetzungsplan.md.
-  # Der Angular-Dev-Server (ng serve) laeuft weiterhin separat auf :4200 und nutzt
-  # denselben Keycloak unter :8000/auth (ein Issuer fuer beide Betriebsarten).
   caddy:
     image: caddy:2
     container_name: zev-caddy
@@ -245,10 +249,9 @@ services:
 
 volumes:
   postgres-data:
+  mosquitto-data:
   caddy-data:
   caddy-config:
-  prometheus-data:
-  grafana-data:
 networks:
   zev-network:
     driver: bridge

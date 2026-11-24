@@ -15,12 +15,11 @@ node_modules/
 
 # Environment files with secrets
 .env
-.env.mqtt
+.env.ohne.mqtt
 .env.local
 .env.*.local
-!.env.mqtt.example
-.env.mqtt.hene
-docker-compose-mqtt-hene.yml
+.env.hene
+docker-compose-hene.yml
 
 # Windows reserved-name artifact (e.g. from a stray `> NUL` redirect)
 /NUL

@@ -125,12 +125,15 @@ Das Backend läuft in zwei Modi, gesteuert über das Spring-Profil `mqtt`:
 
 | Modus | Start | MQTT-Subscriber & Aggregations-Job | Messwert-Erfassung |
 |-------|-------|------------------------------------|--------------------|
-| **Standard (ohne MQTT)** | `docker-compose up --build` | inaktiv (kein `mqtt`-Profil) | nur CSV-Upload |
-| **Mit MQTT** | `docker compose --env-file .env.mqtt -f docker-compose-mqtt.yml up --build` | aktiv (`SPRING_PROFILES_ACTIVE=mqtt`) | CSV-Upload **und** MQTT-Ingest |
+| **Standard (mit MQTT)** | `docker compose up --build` | aktiv (`SPRING_PROFILES_ACTIVE=mqtt`) | CSV-Upload **und** MQTT-Ingest |
+| **Ohne MQTT** | `docker compose --env-file .env.ohne.mqtt -f docker-compose-ohne-mqtt.yml up --build` | inaktiv (kein `mqtt`-Profil) | nur CSV-Upload |
 
 - Ohne aktives Profil `mqtt` werden **keine** MQTT-Beans gestartet (kein Broker-Client, kein
   Scheduled-Aggregations-Job); die Anwendung verhält sich wie bisher (CSV-Upload).
-- Der MQTT-Stack enthält zusätzlich einen **Mosquitto-Broker** und **kein** Prometheus/Grafana.
+- Der Standard-Stack (`docker-compose.yml`, `.env`) enthält einen **Mosquitto-Broker** und **kein** Prometheus/Grafana.
+- Der Stack ohne MQTT (`docker-compose-ohne-mqtt.yml`) hat seine eigene Env-Datei `.env.ohne.mqtt`
+  (Vorlage: `.env.ohne.mqtt.example`). Bei **jedem** Compose-Aufruf **beide** Flags angeben —
+  ohne sie nimmt Compose den Standard-Stack.
 - Vollständige Anleitung (inkl. Publisher-Simulator zum End-to-End-Test): **[`README.MQTT.md`](./README.MQTT.md)**.
 - Fachliche Details des MQTT-Ingests: [`Specs/MQTT-Integration.md`](./Specs/MQTT-Integration.md).
 

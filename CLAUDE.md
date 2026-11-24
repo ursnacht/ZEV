@@ -16,7 +16,7 @@ deshalb nicht aus dem Kontext schliessen, dass etwas erlaubt ist.
   Neustart oder Rebuild gebraucht: **Befehl nennen, der User führt ihn aus.**
 - **Bereits ausgeführte Flyway-Migrationen nie ändern** — die Checksum-Prüfung bricht sonst beim
   nächsten Start. Status über den `zev-db`-MCP-Server prüfen; im Zweifel eine neue Migration anlegen.
-- **Secrets bleiben lokal:** `.env` und `.env.*` (z.B. `.env.mqtt.hene`) gehören nicht ins Repository.
+- **Secrets bleiben lokal:** `.env` und `.env.*` (z.B. `.env.ohne.mqtt`, `.env.hene`) gehören nicht ins Repository.
 
 ## Project Overview
 
@@ -142,7 +142,7 @@ Additional documentation in `/docs/` (aktuelle Liste: `ls docs/`) - u.a. Keycloa
 
 ## Docker Compose
 
-**Environment:** Copy `.env.example` to `.env` and set `ANTHROPIC_API_KEY` for AI features.
+**Environment:** Copy `.env.example` to `.env` and set `ANTHROPIC_API_KEY` for AI features. `docker-compose.yml` + `.env` are the default stack **with MQTT**; the variant without MQTT is `docker-compose-ohne-mqtt.yml` + `.env.ohne.mqtt` (see `README.md`, „Betriebsmodi"). Hene (NAS): `docker-compose-hene.yml` + `.env.hene` (both local only).
 
 ## Test Users (Keycloak)
 

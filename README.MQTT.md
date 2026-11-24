@@ -1,4 +1,4 @@
-# ZEV-Stack mit MQTT (`docker-compose-mqtt.yml`)
+# ZEV-Stack mit MQTT (`docker-compose.yml`, der Standard-Stack)
 
 Startet den ZEV-Stack **inklusive MQTT-Broker** und dem Backend mit aktivem Spring-Profil
 `mqtt` (MQTT-Subscriber + Aggregations-Job) – **ohne** Prometheus/Grafana. Damit lässt sich
@@ -31,25 +31,24 @@ Referenzen: [`Specs/MQTT-Integration.md`](./Specs/MQTT-Integration.md) (Backend-
 - Für den Simulator: Python ≥ 3.9 (siehe `pi-gateway/README.md`)
 
 ## Zugangsdaten (nur Entwicklung)
-- **MQTT-Broker:** `zev-backend` / `zev-mqtt-dev` (in `.env.mqtt.example` und der gebackenen
+- **MQTT-Broker:** `zev-backend` / `zev-mqtt-dev` (in `.env.example` und der gebackenen
   `pi-gateway/deploy/mosquitto/passwd`). **Nicht** produktiv verwenden.
-- Keycloak-Admin `admin` / `admin`, PostgreSQL `postgres` / `postgres` (aus `.env.mqtt`).
+- Keycloak-Admin `admin` / `admin`, PostgreSQL `postgres` / `postgres` (aus `.env`).
 - Keycloak-Testuser wie im Haupt-Stack (`testuser`/`testpassword`, …).
 
 ## Schnellstart
 
 ```bash
 # 1) Env-Datei aus der Vorlage anlegen (einmalig)
-cp .env.mqtt.example .env.mqtt
+cp .env.example .env
 
 # 2) Stack bauen und starten
-docker compose --env-file .env.mqtt -f docker-compose-mqtt.yml up --build
+docker compose up --build
 ```
 
-> **Wichtig:** Bei **jedem** Compose-Aufruf **beide** Flags angeben – `--env-file .env.mqtt`
-> **und** `-f docker-compose-mqtt.yml`. Ohne `--env-file` zieht Compose die allgemeine `.env`
-> für die `${...}`-Interpolation (nicht `.env.mqtt`); ohne `-f` das Standard-`docker-compose.yml`.
-> Die Flags stehen **vor** dem Unterbefehl (`up`, `logs`, …).
+> `docker-compose.yml` und `.env` sind die Vorgaben von Compose – es braucht keine Flags. Die
+> Variante **ohne** MQTT (`docker-compose-ohne-mqtt.yml`, `.env.ohne.mqtt`) verlangt dagegen bei
+> jedem Aufruf `--env-file` **und** `-f`, siehe [`README.md`](./README.md), „Betriebsmodi".
 
 Zugriffspunkte nach dem Start: Anwendung https://localhost:8443 (API unter `/api`, Keycloak unter
 `/auth`) · Admin https://localhost:8444 · Datenbank `localhost:25432` · MQTT `tcp://localhost:1883`.
@@ -143,7 +142,7 @@ python -m gateway.main --config config.sim.yaml
 > **Wichtig:** Die Zeitzonen-Korrektur steckt zum grössten Teil im **Backend** (Payload-Format,
 > verbatim-Speicherung, `TZ=Europe/Zurich`). Nach Code-Änderungen daher auch das Backend neu bauen:
 > ```powershell
-> docker compose --env-file .env.mqtt -f docker-compose-mqtt.yml up --build -d backend-service
+> docker compose up --build -d backend-service
 > ```
 > Für einen sauberen Test vorher die alten (ggf. UTC-Raster-)Testdaten entfernen –
 > `... down -v` (inkl. DB-Volume) oder gezielt `TRUNCATE zev.zaehler_rohdaten;`
@@ -165,16 +164,16 @@ python -m gateway.main --config config.sim.yaml
 
 ```bash
 # im Hintergrund starten
-docker compose --env-file .env.mqtt -f docker-compose-mqtt.yml up --build -d
+docker compose up --build -d
 
 # Logs (nur Backend)
-docker compose --env-file .env.mqtt -f docker-compose-mqtt.yml logs -f backend-service
+docker compose logs -f backend-service
 
 # stoppen
-docker compose --env-file .env.mqtt -f docker-compose-mqtt.yml down
+docker compose down
 
 # stoppen inkl. Datenbank-Volume (frischer Start)
-docker compose --env-file .env.mqtt -f docker-compose-mqtt.yml down -v
+docker compose down -v
 ```
 
 ## Troubleshooting
@@ -186,9 +185,10 @@ docker compose --env-file .env.mqtt -f docker-compose-mqtt.yml down -v
   `zev-backend` / `zev-mqtt-dev`.
 - **Backend baut keine MQTT-Verbindung auf** → läuft es mit Profil `mqtt`? Im Compose ist
   `SPRING_PROFILES_ACTIVE=mqtt` gesetzt; ohne dieses Profil startet kein Subscriber/Job.
-- **Compose nimmt falsche Werte** → `--env-file .env.mqtt` vergessen (siehe „Wichtig" oben).
+- **Compose nimmt falsche Werte** → liegt im Verzeichnis die richtige `.env` (Vorlage `.env.example`)?
+  Die Datei des Stacks ohne MQTT heisst `.env.ohne.mqtt`.
 
 ## Externer Broker (statt lokalem Mosquitto)
-Für einen echten Broker (z. B. auf dem NAS) in `.env.mqtt` `MQTT_BROKER_URL` sowie eigene
+Für einen echten Broker (z. B. auf dem NAS) in `.env` `MQTT_BROKER_URL` sowie eigene
 `MQTT_BROKER_USERNAME`/`MQTT_BROKER_PASSWORD` setzen. Produktionsbetrieb des Brokers (getrennte
 User pro Publisher/Subscriber, ACL, TLS) siehe [`docs/Netzwerk-Topologie-Hene.md`](./docs/Netzwerk-Topologie-Hene.md).

@@ -227,14 +227,14 @@ sich der gPlug-Ingest des Backends (`Specs/MQTT-Integration.md`, FR-10) ohne Ger
 Werte müssen in `zaehler_rohdaten` genauso ankommen wie die einer Pi-Meldung.
 
 Der Broker erzwingt Auth (Username/Passwort). Dev-Credentials: `zev-backend` / `zev-mqtt-dev`
-(Default in `.env.mqtt.example` → `MOSQUITTO_USERS`).
+(Default in `.env.example` → `MOSQUITTO_USERS`).
 
 **1) Broker + Backend starten** – am einfachsten über den MQTT-Stack (enthält Broker `mosquitto`
 und Backend mit Profil `mqtt`), aus dem Repo-Root:
 
 ```bash
-cp .env.mqtt.example .env.mqtt
-docker compose --env-file .env.mqtt -f docker-compose-mqtt.yml up --build
+cp .env.example .env
+docker compose up --build
 ```
 
 <details><summary>Alternative: nur ein Wegwerf-Broker (Backend separat)</summary>
@@ -300,7 +300,7 @@ Image und Repo; derselbe Broker taugt für Dev **und** NAS.
 Format (whitespace-getrennte Paare; Passwörter ohne Whitespace, Doppelpunkt im Passwort erlaubt):
 
 ```dotenv
-# in .env.mqtt (bzw. der NAS-.env)
+# in .env (bzw. der NAS-.env)
 MOSQUITTO_USERS=zev-backend:zev-mqtt-dev pi-org1:change-me
 ```
 
@@ -314,7 +314,7 @@ MOSQUITTO_USERS=zev-backend:zev-mqtt-dev pi-org1:change-me
 (kein Image-Rebuild nötig, da die passwd zur Laufzeit erzeugt wird):
 
 ```bash
-docker compose --env-file .env.mqtt -f docker-compose-mqtt.yml up -d mosquitto
+docker compose up -d mosquitto
 ```
 
 > **Zeilenenden:** `docker-entrypoint.sh` und `mosquitto.conf` müssen **LF** behalten (via
