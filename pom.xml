@@ -32,7 +32,7 @@
          SBA 4.1.2 auf Spring Boot 4.0.7 bricht beim Start des admin-service mit
          NoClassDefFoundError org.springframework.boot.http.client.InetAddressFilter
          (Klasse existiert erst ab Spring Boot 4.1) - verifiziert 2026-08-13. -->
-    <spring-boot-admin.version>4.1.4</spring-boot-admin.version>
+    <spring-boot-admin.version>4.1.5</spring-boot-admin.version>
     <!-- Sicherheits-Overrides der Spring-Boot-verwalteten Versionen (CVE-Fixes) gehoeren hierher,
          z.B. <tomcat.version>. Jeweils entfernen, sobald ein Spring-Boot-Parent-Update die Version
          mitbringt ODER ueberschreitet - vorher pruefen (OWASP-Lauf), ob das BOM nicht nach UNTEN
