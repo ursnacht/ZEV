@@ -65,7 +65,7 @@ describe('MesswerteChartComponent', () => {
     optionenMesspunkt: (reihen: { einheit: Einheit; daten: MesswertData[] }[],
                         preise?: PreiszeitreihePunkt[],
                         vergleich?: boolean) => Record<string, unknown>;
-    legende: (key: string, summe: number, kwh: string) => string;
+    legende: (key: string, summe: number | null, kwh: string) => string;
     reihe: (name: string, daten: number[][], farbe?: string, flaeche?: number) => Record<string, unknown>;
   } {
     return component as unknown as ReturnType<typeof privat>;
@@ -448,6 +448,19 @@ describe('MesswerteChartComponent', () => {
       expect(serien).toHaveLength(2);
       expect(serien[0].data).toEqual([]);
     });
+
+    it('should show a dash instead of a sum when there are no measurements', () => {
+      const serien = privat().optionen([])['series'] as { name: string }[];
+
+      expect(serien.map(reihe => reihe.name)).toEqual(['TOTAL (Σ –)', 'ZEV (Σ –)']);
+    });
+
+    it('should keep a sum of zero as a number when measurements exist', () => {
+      const serien = privat().optionen([{ zeit: '2026-01-15T10:00:00', total: 0, zev: 0 }])['series'] as
+        { name: string }[];
+
+      expect(serien[0].name).toBe('TOTAL (Σ 0.000 KWH)');
+    });
   });
 
   describe('legende', () => {
@@ -458,6 +471,110 @@ describe('MesswerteChartComponent', () => {
 
     it('should keep the sign of a negative sum', () => {
       expect(privat().legende('ZEV', -12.25, 'kWh')).toBe('ZEV (Σ -12.250 kWh)');
+    });
+  });
+
+  describe('Lücken', () => {
+    const mitLuecke: MesswertData[] = [
+      { zeit: '2026-01-15T10:00:00', total: 1.5, zev: 0.5 },
+      { zeit: '2026-01-15T10:45:00', total: 2.25, zev: 1.25 }
+    ];
+    const zeit = (text: string) => new Date(text).getTime();
+
+    it('should fill every missing interval between two values with zero', () => {
+      const serien = privat().optionen(mitLuecke)['series'] as { name: string; data: number[][] }[];
+
+      // 10:15 und 10:30 fehlen: beide stehen mit 0 in der Reihe, als Luecke gekennzeichnet (2),
+      // damit der Tooltip einen Strich statt der 0 nennt. Danach der Abschlusspunkt (1).
+      expect(serien[0].data).toEqual([
+        [zeit('2026-01-15T10:00:00'), 1.5],
+        [zeit('2026-01-15T10:15:00'), 0, 2],
+        [zeit('2026-01-15T10:30:00'), 0, 2],
+        [zeit('2026-01-15T10:45:00'), 2.25],
+        [zeit('2026-01-15T11:00:00'), 2.25, 1]
+      ]);
+      expect(serien[1].data.map(p => p[1])).toEqual([0.5, 0, 0, 1.25, 1.25]);
+      // Die Summe bleibt die der Messwerte.
+      expect(serien[0].name).toBe('TOTAL (Σ 3.750 KWH)');
+    });
+
+    it('should show a dash instead of zero in the tooltip of a filled interval', () => {
+      const optionen = privat().optionen(mitLuecke);
+      const serien = optionen['series'] as { data: number[][] }[];
+      const formatter = (optionen['tooltip'] as
+        { formatter: (p: { seriesName: string; value: number[] }[]) => string }).formatter;
+
+      const text = formatter([{ seriesName: 'Total', value: serien[0].data[1] }]);
+
+      expect(text).toContain('15.01.2026 10:15');
+      expect(text).toContain('Total: –');
+      expect(text).not.toContain('0.000');
+    });
+
+    it('should keep a measured zero as a number in the tooltip', () => {
+      const gemessen: MesswertData[] = [{ zeit: '2026-01-15T10:00:00', total: 0, zev: 0 }];
+      const optionen = privat().optionen(gemessen);
+      const serien = optionen['series'] as { data: number[][] }[];
+      const formatter = (optionen['tooltip'] as
+        { formatter: (p: { seriesName: string; value: number[] }[]) => string }).formatter;
+
+      expect(formatter([{ seriesName: 'Total', value: serien[0].data[0] }])).toContain('Total: 0.000 KWH');
+    });
+
+    it('should not invent a gap in the night of the change to winter time', () => {
+      // Lueckenlos auf der Uhr - zwischen 02:45 (Sommerzeit) und 03:00 (Winterzeit) liegen in
+      // Europe/Zurich aber 75 Minuten. Gezaehlt wird deshalb in Ortszeit. (In einer Zeitzone ohne
+      // Umstellung ist der Test trivial gruen.)
+      const umstellung: MesswertData[] = ['01:45', '02:00', '02:15', '02:30', '02:45', '03:00', '03:15']
+        .map(uhrzeit => ({ zeit: `2026-10-25T${uhrzeit}:00`, total: 1, zev: 0 }));
+
+      const serien = privat().optionen(umstellung)['series'] as { data: number[][] }[];
+
+      expect(serien[0].data.map(p => p[1])).toEqual([1, 1, 1, 1, 1, 1, 1, 1]);
+    });
+
+    it('should fill a real gap across the change to winter time', () => {
+      const umstellung: MesswertData[] = ['01:45', '03:15']
+        .map(uhrzeit => ({ zeit: `2026-10-25T${uhrzeit}:00`, total: 1, zev: 0 }));
+
+      const serien = privat().optionen(umstellung)['series'] as { data: number[][] }[];
+
+      // 02:00 bis 03:00 auf der Uhr: fuenf Intervalle.
+      expect(serien[0].data.map(p => p[1])).toEqual([1, 0, 0, 0, 0, 0, 1, 1]);
+    });
+
+    it('should not add points to a series without gaps', () => {
+      const serien = privat().optionen(messwerte)['series'] as { data: number[][] }[];
+
+      expect(serien[0].data.map(p => p[1])).toEqual([1.5, 2.25, 2.25]);
+    });
+
+    it('should fill gaps per einheit in a comparison, also for a mirrored producer', () => {
+      const produktion: MesswertData[] = [
+        { zeit: '2026-01-15T10:00:00', total: -1, zev: -1 },
+        { zeit: '2026-01-15T10:30:00', total: -2, zev: -1 }
+      ];
+      const serien = privat().optionenMesspunkt([
+        { einheit: mockConsumer, daten: messwerte },
+        { einheit: mockProducer, daten: produktion }
+      ], [], true)['series'] as { data: number[][] }[];
+
+      // Der Konsument ist lueckenlos und bleibt es; beim Produzenten steht 10:15 mit 0 (nicht -0).
+      expect(serien[0].data.map(p => p[1])).toEqual([1.5, 2.25, 2.25]);
+      expect(serien[1].data.map(p => p[1])).toEqual([1, 0, 2, 2]);
+      // Das Kennzeichen der Luecke ueberlebt das Spiegeln - sonst stuende im Tooltip wieder die 0.
+      expect(serien[1].data[1][2]).toBe(2);
+    });
+
+    it('should fill gaps in the covered share of a comparison', () => {
+      const serien = privat().optionenMesspunkt([
+        { einheit: mockConsumer, daten: mitLuecke },
+        { einheit: mockProducer, daten: messwerte }
+      ], [], true)['series'] as { data: number[][] }[];
+
+      expect(serien[2].data.map(p => p[1])).toEqual([0.5, 0, 0, 1.25, 1.25]);
+      // Auch hier als Luecke gekennzeichnet (2), der Abschlusspunkt als solcher (1).
+      expect(serien[2].data.map(p => p[2])).toEqual([undefined, 2, 2, undefined, 1]);
     });
   });
 
@@ -614,7 +731,7 @@ describe('MesswerteChartComponent', () => {
       const series = optionen['series'] as { name: string; data: number[][] }[];
 
       expect(series[1].data).toEqual([]);
-      expect(series[1].name).toBe('Rücklieferung an BKW (Σ 0.000 KWH)');
+      expect(series[1].name).toBe('Rücklieferung an BKW (Σ –)');
     });
   });
 
@@ -756,6 +873,32 @@ describe('MesswerteChartComponent', () => {
       expect(flaeche.lineStyle.width).toBeLessThan(serien[0].lineStyle.width);
     });
 
+    it('should mark filled series with a filled legend symbol and list every series', () => {
+      const optionen = privat().optionenMesspunkt([
+        { einheit: mockConsumer, daten: messwerte },
+        { einheit: mockProducer, daten: messwerte }
+      ], [], true);
+      const serien = optionen['series'] as { name: string }[];
+      const legende = (optionen['legend'] as { data: (string | { name: string; icon: string })[] }).data;
+
+      // Linien als blosser Name (Liniensymbol von ECharts), die Flaeche mit gefuelltem Rechteck -
+      // und kein Eintrag fehlt: Mit `data` zeigt ECharts nur, was darin steht.
+      expect(legende).toEqual([
+        serien[0].name, serien[1].name, { name: 'Wohnung A – ZEV (Σ 1.750 KWH)', icon: 'roundRect' }]);
+      expect(legende).toHaveLength(serien.length);
+    });
+
+    it('should keep the einspeisetarif in the legend, as a line, and mark total and ZEV as filled', () => {
+      const legende = (privat().optionen(messwerte, preise)['legend'] as
+        { data: (string | { name: string; icon: string })[] }).data;
+
+      // Total und ZEV sind Flaechen, der Einspeisetarif eine Linie - und er fehlt nicht.
+      expect(legende).toHaveLength(3);
+      expect(legende.slice(0, 2).every(eintrag => typeof eintrag !== 'string' && eintrag.icon === 'roundRect'))
+        .toBe(true);
+      expect(legende[2]).toBe('GRAFIK_EINSPEISETARIF_CHF_KWH');
+    });
+
     it('should not add covered areas to a messpunkt chart', () => {
       const serien = privat().optionenMesspunkt([
         { einheit: mockConsumer, daten: messwerte },
@@ -764,6 +907,17 @@ describe('MesswerteChartComponent', () => {
 
       expect(serien).toHaveLength(2);
       expect(serien.every(reihe => reihe.areaStyle === undefined)).toBe(true);
+    });
+
+    it('should show a dash as the sum of a producer without measurements', () => {
+      const serien = privat().optionenMesspunkt([
+        { einheit: mockConsumer, daten: messwerte },
+        { einheit: mockProducer, daten: [] }
+      ], [], true)['series'] as { name: string; data: number[][] }[];
+
+      // Ohne Messwerte gibt es nichts zu spiegeln - auch keine Summe.
+      expect(serien[1].name).toBe('Solar Anlage (Σ –)');
+      expect(serien[1].data).toEqual([]);
     });
 
     it('should not mirror producers unless asked to', () => {

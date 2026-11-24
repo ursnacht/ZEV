@@ -25,6 +25,24 @@ import { FeatureFlagService } from '../../services/feature-flag.service';
 
 /** Länge eines Messintervalls: `messwerte.zeit` trägt den Beginn einer Viertelstunde. */
 const INTERVALL_MS = 15 * 60 * 1000;
+/**
+ * Kennzeichen im dritten Element eines Datenpunkts `[Zeit, Wert, Kennzeichen]` für den
+ * Abschlusspunkt einer Reihe (Specs/Grafiken.md, FR-2). Er ist kein Messwert: Der Tooltip
+ * überspringt ihn.
+ */
+const PUNKT_ABSCHLUSS = 1;
+/**
+ * Kennzeichen für eine mit 0 gefüllte Lücke. Auch sie ist kein Messwert: Der Tooltip nennt dort
+ * {@link KEIN_WERT} statt der 0.
+ */
+const PUNKT_LUECKE = 2;
+/**
+ * Steht anstelle einer Zahl, wo es keinen Messwert gibt — im Tooltip einer Lücke und als Summe
+ * einer leeren Reihe. Ein Halbgeviertstrich wie in der Einspeisesteuerung, kein Bindestrich: Der
+ * sähe neben einer negativen Summe aus wie ein Minus ohne Zahl. Ein Zeichen wie `Σ`, kein
+ * übersetzbarer Text.
+ */
+const KEIN_WERT = '–';
 
 /** Kennung der Preisreihe im Diagramm - der Tooltip erkennt sie daran und formatiert als Preis. */
 const EINSPEISETARIF_ID = 'einspeisetarif';
@@ -498,8 +516,10 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
       const zeitreihe = this.zeitreihe(daten, 'total');
       const summe = this.summe(daten, 'total');
       return this.reihe(
-        this.legendeText(einheit.name, spiegeln ? this.gespiegelt(summe) : summe, kwh),
-        spiegeln ? zeitreihe.map(([zeit, wert]) => [zeit, this.gespiegelt(wert)]) : zeitreihe,
+        this.legendeText(einheit.name, spiegeln && summe !== null ? this.gespiegelt(summe) : summe, kwh),
+        // Das Kennzeichen einer Luecke (drittes Element) bleibt beim Spiegeln erhalten.
+        spiegeln ? zeitreihe.map(([zeit, wert, ...kennzeichen]) => [zeit, this.gespiegelt(wert), ...kennzeichen])
+          : zeitreihe,
         reihenfarben[index]);
     });
     return this.diagrammOptionen(
@@ -536,15 +556,50 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
   }
 
   /**
-   * `total` oder `zev` als Zeitreihe `[Zeitpunkt, Wert]`, im gespeicherten Vorzeichen. `zev` ist
+   * `total` oder `zev` als Zeitreihe `[Zeitpunkt, Wert]` (gefüllte Lücken zusätzlich mit
+   * Kennzeichen), im gespeicherten Vorzeichen. `zev` ist
    * der Teil des Totals, den die eigene Produktion deckt.
+   *
+   * Fehlende Viertelstunden **zwischen** zwei Messwerten werden mit 0 gefüllt (Specs/Grafiken.md,
+   * FR-2): Die Stufenlinie zöge sonst den letzten Wert über die ganze Lücke — eine Energie, die
+   * nie gemessen wurde. Gefüllt wird jedes Intervall, nicht nur das erste, damit der Tooltip an
+   * jeder Stelle der Lücke etwas nennt. Die Punkte tragen {@link PUNKT_LUECKE}: Der Tooltip
+   * schreibt dort {@link KEIN_WERT} statt `0.000 kWh`, damit eine Lücke nicht wie eine gemessene
+   * Null aussieht. Vor dem ersten und nach dem letzten Messwert bleibt die
+   * Reihe leer: Dort ist nichts gemessen worden, auch keine 0 (z.B. der Rest des heutigen Tages).
+   *
+   * Erwartet die Messwerte aufsteigend nach Zeit, wie das Backend sie liefert.
+   *
+   * Weitergezählt wird in **Ortszeit** ({@link naechstesIntervall}), nicht in Millisekunden: Die
+   * Zeitstempel sind zonenlose Ortszeit, und in der Nacht der Umstellung auf Winterzeit liegen
+   * zwischen 02:45 und 03:00 fünfundsiebzig Minuten — eine lückenlose Reihe bekäme sonst eine
+   * Stunde lang erfundene Nullen.
    */
   private zeitreihe(data: MesswertData[], feld: 'total' | 'zev'): number[][] {
-    return data.map(d => [new Date(d.zeit).getTime(), d[feld] ?? 0]);
+    const punkte: number[][] = [];
+    for (const d of data) {
+      const zeit = new Date(d.zeit).getTime();
+      if (punkte.length > 0) {
+        for (let luecke = this.naechstesIntervall(punkte[punkte.length - 1][0]); luecke < zeit;
+             luecke = this.naechstesIntervall(luecke)) {
+          punkte.push([luecke, 0, PUNKT_LUECKE]);
+        }
+      }
+      punkte.push([zeit, d[feld] ?? 0]);
+    }
+    return punkte;
   }
 
-  private summe(data: MesswertData[], feld: 'total' | 'zev'): number {
-    return data.reduce((summe, d) => summe + (d[feld] ?? 0), 0);
+  /** Der Beginn der nächsten Viertelstunde auf der Uhr (Ortszeit) — siehe {@link zeitreihe}. */
+  private naechstesIntervall(zeit: number): number {
+    const naechste = new Date(zeit);
+    naechste.setMinutes(naechste.getMinutes() + INTERVALL_MS / 60_000);
+    return naechste.getTime();
+  }
+
+  /** Summe der Messwerte — `null`, wenn es keine gibt: Die Legende nennt dann {@link KEIN_WERT} statt 0. */
+  private summe(data: MesswertData[], feld: 'total' | 'zev'): number | null {
+    return data.length === 0 ? null : data.reduce((summe, d) => summe + (d[feld] ?? 0), 0);
   }
 
   /** Was beide Diagrammarten teilen: Achsen, Tooltip, Legende, Zoom — nur die Reihen unterscheiden sich. */
@@ -555,6 +610,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
       ...this.wertAchse(kwh, farben),
       splitLine: { lineStyle: { color: farben.gitter } }
     };
+    const alleReihen = zeigtPreis ? [...series, this.preisReihe(preise, farben)] : series;
     return {
       animation: false,
       // top 55: Die Legende steht oben ueber die ganze Breite, sobald sie blaettert (Vergleich mit
@@ -564,21 +620,35 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
       // `scroll`: Die Legende bleibt einzeilig und blaettert, wenn sie nicht passt. Beim
       // Messpunkt-Diagramm stehen die Namen der Einheiten darin; auf schmalen Anzeigen brach sie
       // sonst auf zwei Zeilen um und lag ueber dem Achsentitel und der Zeichenflaeche.
-      legend: { type: 'scroll', top: 0, textStyle: { color: farben.text } },
+      // Eine Flaeche traegt ein gefuelltes Rechteck statt des Liniensymbols (FR-2): Im Vergleich
+      // haben Linie und gedeckter Verbrauch einer Einheit dieselbe Farbe und waeren sonst in der
+      // Legende nicht zu unterscheiden. Mit `data` zeigt ECharts nur, was darin steht - also alle.
+      legend: {
+        type: 'scroll',
+        top: 0,
+        textStyle: { color: farben.text },
+        data: alleReihen.map(reihe => reihe['areaStyle'] ? { name: reihe['name'], icon: 'roundRect' } : reihe['name'])
+      },
       tooltip: {
         trigger: 'axis',
         formatter: (alle: { seriesName: string; seriesId?: string; value: number[] }[]) => {
           // Der Abschlusspunkt (siehe mitAbschluss) ist kein Messwert und hat keinen Tooltip.
-          const params = alle.filter(p => !p.value[2]);
+          const params = alle.filter(p => p.value[2] !== PUNKT_ABSCHLUSS);
           if (params.length === 0) {
             return '';
           }
           const kopf = formatSwissDateTime(new Date(params[0].value[0]));
           // Der Einspeisetarif ist ein Preis: fuenf Stellen wie in der Preiszeitreihe und ohne
           // die Einheit kWh - sie steht bei ihm im Namen (CHF/kWh).
-          const zeilen = params.map(p => p.seriesId === EINSPEISETARIF_ID
-            ? `${p.seriesName}: ${formatPreis(p.value[1])}`
-            : `${p.seriesName}: ${formatSwissNumber(p.value[1], 3)} ${kwh}`);
+          // Eine gefuellte Luecke ist kein Messwert: Strich statt "0.000 kWh" (FR-2).
+          const zeilen = params.map(p => {
+            if (p.seriesId === EINSPEISETARIF_ID) {
+              return `${p.seriesName}: ${formatPreis(p.value[1])}`;
+            }
+            return p.value[2] === PUNKT_LUECKE
+              ? `${p.seriesName}: ${KEIN_WERT}`
+              : `${p.seriesName}: ${formatSwissNumber(p.value[1], 3)} ${kwh}`;
+          });
           return [kopf, ...zeilen].join('<br>');
         }
       },
@@ -594,7 +664,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
       // Energie und Preis haben keine gemeinsame Skala.
       yAxis: zeigtPreis ? [energieAchse, this.preisAchse(farben)] : energieAchse,
       dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 10 }],
-      series: zeigtPreis ? [...series, this.preisReihe(preise, farben)] : series
+      series: alleReihen
     };
   }
 
@@ -654,13 +724,16 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
    * Summe im Schweizer Format über `formatSwissNumber` — früher stand hier fester Text und
    * eine feste Rundung ohne Tausendertrennzeichen.
    */
-  private legende(key: string, summe: number, kwh: string): string {
+  private legende(key: string, summe: number | null, kwh: string): string {
     return this.legendeText(this.translationService.translate(key), summe, kwh);
   }
 
-  /** Wie {@link legende}, aber mit fertigem Namen — beim Messpunkt-Diagramm ist das der Name der Einheit. */
-  private legendeText(name: string, summe: number, kwh: string): string {
-    return `${name} (Σ ${formatSwissNumber(summe, 3)} ${kwh})`;
+  /**
+   * Wie {@link legende}, aber mit fertigem Namen — beim Messpunkt-Diagramm ist das der Name der Einheit.
+   * Ohne Summe (`null`, Reihe ohne Messwerte) steht {@link KEIN_WERT} ohne Einheit.
+   */
+  private legendeText(name: string, summe: number | null, kwh: string): string {
+    return summe === null ? `${name} (Σ ${KEIN_WERT})` : `${name} (Σ ${formatSwissNumber(summe, 3)} ${kwh})`;
   }
 
   /**
@@ -698,7 +771,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
    * Reihe mit einem einzigen Messwert zeichnete gar nichts — obwohl die Legende eine Summe
    * nannte. Belegt am 21.11.2026 an einer frisch angelegten Einheit mit genau einem Intervall.
    *
-   * Der Punkt trägt als drittes Element eine `1`, damit der Tooltip ihn überspringt: Er ist kein
+   * Der Punkt trägt als drittes Element {@link PUNKT_ABSCHLUSS}, damit der Tooltip ihn überspringt: Er ist kein
    * Messwert. In die Summe der Legende geht er nicht ein, sie wird aus den Messwerten gebildet.
    */
   private mitAbschluss(daten: number[][]): number[][] {
@@ -706,7 +779,7 @@ export class MesswerteChartComponent extends WithMessage implements OnInit, OnDe
       return daten;
     }
     const letzter = daten[daten.length - 1];
-    return [...daten, [letzter[0] + INTERVALL_MS, letzter[1], 1]];
+    return [...daten, [letzter[0] + INTERVALL_MS, letzter[1], PUNKT_ABSCHLUSS]];
   }
 
 }

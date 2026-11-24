@@ -564,3 +564,52 @@ aufgetragen" und „Die Linie ist eine Stufenlinie, ohne Flächenfüllung".
 * **Farben** bleiben: Total in der Primär-, ZEV in der Sekundärfarbe (FR-4).
 * **Kein Backend, keine Migration, keine neuen Texte** (`ZEV` ist vorhanden).
 * Die Spec führt auf Wunsch des Benutzers keinen Anhang mehr; die ersetzte Fassung steht deshalb hier.
+
+---
+
+## Nachtrag 24.11.2026: Legendensymbol nach Art der Reihe (FR-2)
+
+Im Vergleich trugen die Linie einer Einheit und ihr gedeckter Verbrauch dasselbe Legendensymbol in
+derselben Farbe. Gefüllte Reihen bekommen in der Legende ein gefülltes Rechteck.
+
+| Datei | Änderung |
+|---|---|
+| `messwerte-chart.component.ts` | `diagrammOptionen()`: `legend.data` aus allen Reihen, Flächen mit `icon: 'roundRect'` |
+| `messwerte-chart.component.spec.ts` | zwei Tests in `Vergleich` |
+
+* Gilt für alle Diagramme der Komponente — auch `Total` und `ZEV` im Diagramm einer Einheit tragen das Rechteck.
+* **Nur Darstellung:** kein Backend, keine Migration, keine neuen Texte.
+
+---
+
+## Nachtrag 24.11.2026: Lücken stehen auf 0 (FR-2)
+
+Die Stufenlinie zog den letzten Wert über fehlende Viertelstunden hinweg (gesehen am Bezug vom Netz,
+der nur bei Energiefluss Werte liefert). Fehlende Intervalle zwischen zwei Messwerten werden beim
+Aufbau der Reihe mit 0 gefüllt.
+
+| Datei | Änderung |
+|---|---|
+| `messwerte-chart.component.ts` | `zeitreihe()`: füllt jedes fehlende Intervall zwischen zwei Messwerten mit `[Zeit, 0]` (seit dem folgenden Nachtrag mit Kennzeichen) |
+| `messwerte-chart.component.spec.ts` | neue Gruppe `Lücken` mit sechs Tests |
+
+* Gilt für alle Messreihen (Total, ZEV, je Einheit im Messpunkt-Diagramm und im Vergleich), nicht für den Einspeisetarif.
+* Die Ränder (vor dem ersten, nach dem letzten Messwert) bleiben leer; die Summen ändern sich nicht.
+* Weitergezählt wird in Ortszeit (`naechstesIntervall()`): Mit festen 15 Minuten in Millisekunden bekam jede lückenlose Reihe in der Nacht der Umstellung auf Winterzeit vier erfundene Nullen (Befund des Akzeptanzkriterien-Checks).
+* **Nur Darstellung:** kein Backend, keine Migration, keine neuen Texte.
+
+---
+
+## Nachtrag 24.11.2026: Strich statt 0, wo kein Messwert vorhanden ist (FR-2)
+
+Eine gefüllte Lücke und eine Reihe ohne Messwerte sahen aus wie eine gemessene Null. Der Tooltip
+nennt in einer Lücke `–`, die Legende einer Reihe ohne Messwerte `(Σ –)`.
+
+| Datei | Änderung |
+|---|---|
+| `messwerte-chart.component.ts` | Kennzeichen `PUNKT_ABSCHLUSS`/`PUNKT_LUECKE` im dritten Element eines Punkts, `KEIN_WERT`; Tooltip schreibt den Strich; `summe()` liefert `null` ohne Messwerte, `legendeText()` schreibt dann `(Σ -)`; das Spiegeln behält das Kennzeichen |
+| `messwerte-chart.component.spec.ts` | zwei weitere Tests in `Lücken` (Tooltip), zwei in `optionen`, einer in `Vergleich`; `Messpunkt-Diagramm` angepasst |
+
+* Die Linie liegt in der Lücke weiterhin auf 0; ein gemessener Wert 0 und eine Summe 0 aus Messwerten bleiben Zahlen.
+* Der Strich ist ein Zeichen, kein Text — kein Übersetzungs-Key, keine Migration.
+* Halbgeviertstrich `–` wie in der Einspeisesteuerung statt des zuerst verlangten Bindestrichs: `(Σ -)` wirkte neben negativen Summen wie ein Minus ohne Zahl (Hinweis des Vorlagen-Checks, vom Benutzer bestätigt).
