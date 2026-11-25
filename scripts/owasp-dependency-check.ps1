@@ -3,7 +3,7 @@
 #
 # Liest den NVD-API-Key AUSSCHLIESSLICH aus der Umgebungsvariable NVD_API_KEY.
 # Der Key wird NIE ins Repo geschrieben oder geloggt.
-# READ-ONLY gegenueber Sourcen: aendert keine pom.xml; schreibt nur Reports nach <modul>/target/
+# READ-ONLY gegenueber Sourcen: aendert keine pom.xml; schreibt nur Reports nach target/ (Gesamtlauf) bzw. <modul>/target/ (-Module)
 # (bereits via .gitignore ausgeschlossen).
 #
 # ---------------------------------------------------------------------------
@@ -93,7 +93,7 @@ try {
         Write-Host "Report: $Module/target/dependency-check-report.html (+ .json)" -ForegroundColor Green
     }
     else {
-        Write-Host "Reports: <modul>/target/dependency-check-report.html (+ .json) je Modul" -ForegroundColor Green
+        Write-Host "Report: target/dependency-check-report.html (+ .json) im Wurzelverzeichnis, alle Module in einem Bericht" -ForegroundColor Green
     }
     exit $code
 }

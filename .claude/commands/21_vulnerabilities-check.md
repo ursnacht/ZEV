@@ -139,7 +139,9 @@ mvn org.owasp:dependency-check-maven:aggregate -DnvdApiKey=$env:NVD_API_KEY -Dfo
 mvn org.owasp:dependency-check-maven:check -pl backend-service -DnvdApiKey=$env:NVD_API_KEY
 ```
 
-Ergebnis: `<modul>/target/dependency-check-report.html` (+ `.json`). Die JSON/HTML nach
+Ergebnis: beim Gesamtlauf (`aggregate`) **ein** Bericht für alle Module unter
+`target/dependency-check-report.html` (+ `.json`) im Wurzelverzeichnis; mit `-Module <modul>`
+unter `<modul>/target/`. Vor der Auswertung den Zeitstempel prüfen (stammt er von diesem Lauf?). Die JSON/HTML nach
 `vulnerabilities` mit `severity` (CRITICAL/HIGH/MEDIUM/LOW) und betroffenem Artefakt auswerten.
 
 **Wichtige Rahmenbedingungen:**
